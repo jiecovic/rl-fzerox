@@ -1071,7 +1071,7 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
         generated_course_seed=11,
         generated_course_hash="initial",
         generated_course_slot=0,
-        generated_course_generation=0,
+        generated_course_generation=1,
         log_per_course=False,
     )
     projected_config = config.model_copy(

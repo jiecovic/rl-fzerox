@@ -27,10 +27,13 @@ from rl_fzerox.core.manager.registry.runs.maintenance import (
 from rl_fzerox.core.manager.registry.runs.runtime import (
     append_run_event,
     clear_run_runtime,
-    clear_run_track_sampling_state,
-    get_run_track_sampling_state,
     update_run_fork_source,
     upsert_run_runtime,
+)
+from rl_fzerox.core.manager.registry.runs.track_sampling import (
+    clear_run_track_sampling_state,
+    get_run_track_sampling_state,
+    migrate_run_track_sampling_state_json,
     upsert_run_track_sampling_state,
 )
 from rl_fzerox.core.manager.registry.runs.workers import (
@@ -54,6 +57,7 @@ __all__ = [
     "list_runs",
     "list_visible_run_summaries",
     "list_visible_runs",
+    "migrate_run_track_sampling_state_json",
     "pending_run_command",
     "reconcile_orphaned_runs",
     "register_run_worker",

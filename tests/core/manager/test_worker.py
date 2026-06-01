@@ -98,7 +98,6 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
                     ema_completion_fraction=1.0,
                     generated_course_slot=0,
                     generated_course_generation=3,
-                    generated_replacement_count=2,
                     generated_entry_id="x_cup_rotated_gp_race_novice_blue_falcon_balanced",
                     generated_course_id="x_cup_rotated",
                     generated_course_name="X Cup rotated",

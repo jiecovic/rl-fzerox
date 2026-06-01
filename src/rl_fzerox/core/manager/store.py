@@ -227,6 +227,9 @@ class ManagerStore:
             updated_at=updated_at,
         )
 
+    def migrate_run_track_sampling_state_json(self, run_id: str | None = None) -> int:
+        return run_registry.migrate_run_track_sampling_state_json(self, run_id)
+
     def register_run_worker(
         self,
         *,

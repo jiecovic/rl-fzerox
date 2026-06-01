@@ -197,8 +197,7 @@ export function xCupGenerationSummary(entry: TrackPoolCourseView) {
     parts.push(`slot ${entry.generatedCourseSlot + 1}`);
   }
   if (entry.generatedCourseGeneration !== null) {
-    // Runtime generation is zero-based; display it as a human count.
-    parts.push(`generated ${entry.generatedCourseGeneration + 1}`);
+    parts.push(`generated ${entry.generatedCourseGeneration}`);
   }
   return parts.join(" · ");
 }
@@ -273,7 +272,6 @@ function courseViewFromRuntime({
     generationSuccessRate: runtimeEntry?.generation_success_rate ?? null,
     generationSuccessSampleCount: runtimeEntry?.generation_success_sample_count ?? null,
     generatedCourseGeneration: runtimeEntry?.generated_course_generation ?? null,
-    generatedReplacementCount: runtimeEntry?.generated_replacement_count ?? 0,
     generatedCourseSlot: runtimeEntry?.generated_course_slot ?? null,
     id,
     label,

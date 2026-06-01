@@ -7,13 +7,6 @@ from typing import TYPE_CHECKING
 from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.manager.registry.common import utc_now
 from rl_fzerox.core.manager.registry.rows import run_from_row, run_select_sql
-from rl_fzerox.core.training.session.callbacks.track_sampling.persistence import (
-    load_track_sampling_runtime_state_json,
-    track_sampling_runtime_state_json,
-)
-from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
-    TrackSamplingRuntimeState,
-)
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -23,53 +16,6 @@ def clear_run_runtime(store: ManagerStore, run_id: str) -> None:
     store._ensure_schema_initialized()
     with store._connect() as connection:
         connection.execute("DELETE FROM run_runtime WHERE run_id = ?", (run_id,))
-
-
-def clear_run_track_sampling_state(store: ManagerStore, run_id: str) -> None:
-    store._ensure_schema_initialized()
-    with store._connect() as connection:
-        connection.execute("DELETE FROM run_track_sampling_state WHERE run_id = ?", (run_id,))
-
-
-def get_run_track_sampling_state(
-    store: ManagerStore,
-    run_id: str,
-) -> TrackSamplingRuntimeState | None:
-    store._ensure_schema_initialized()
-    with store._connect() as connection:
-        row = connection.execute(
-            """
-            SELECT state_json
-            FROM run_track_sampling_state
-            WHERE run_id = ?
-            """,
-            (run_id,),
-        ).fetchone()
-    if row is None:
-        return None
-    return load_track_sampling_runtime_state_json(str(row["state_json"]))
-
-
-def upsert_run_track_sampling_state(
-    store: ManagerStore,
-    *,
-    run_id: str,
-    state: TrackSamplingRuntimeState,
-    updated_at: str | None = None,
-) -> None:
-    store._ensure_schema_initialized()
-    state_json = track_sampling_runtime_state_json(state)
-    with store._connect() as connection:
-        connection.execute(
-            """
-            INSERT INTO run_track_sampling_state(run_id, state_json, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(run_id) DO UPDATE SET
-                state_json = excluded.state_json,
-                updated_at = excluded.updated_at
-            """,
-            (run_id, state_json, updated_at or utc_now()),
-        )
 
 
 def upsert_run_runtime(
