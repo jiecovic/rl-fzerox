@@ -70,6 +70,7 @@ class ConfiguredActionLayoutCatalog:
 
 CONFIGURED_ACTION_LAYOUTS = ConfiguredActionLayoutCatalog()
 
+
 class ActionMaskConfig(BaseModel):
     """Optional branch-wise action-mask restrictions for MultiDiscrete actions."""
 
