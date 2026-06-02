@@ -24,6 +24,9 @@ export function progressRewardDensityFromValues(
   bucketDistance: number,
   bucketReward: number,
 ): number {
+  if (bucketDistance <= 0) {
+    return roundProgressValue(bucketReward);
+  }
   return roundProgressValue((bucketReward / bucketDistance) * 1_000);
 }
 
@@ -31,6 +34,9 @@ export function progressBucketRewardFromDensity(
   bucketDistance: number,
   rewardPerThousandUnits: number,
 ): number {
+  if (bucketDistance <= 0) {
+    return roundProgressValue(rewardPerThousandUnits);
+  }
   return roundProgressValue((rewardPerThousandUnits * bucketDistance) / 1_000);
 }
 
@@ -46,13 +52,22 @@ export function progressSummaryRows(config: ManagedRunConfig): readonly Progress
 
   return [
     {
-      label: "One bucket",
-      detail: `${formatNumber(bucketDistance)} spline units of new frontier progress`,
-      value: `${formatSignedNumber(bucketReward)} reward`,
+      label: bucketDistance <= 0 ? "Continuous progress" : "One bucket",
+      detail:
+        bucketDistance <= 0
+          ? "Pays proportional reward for each newly covered spline unit"
+          : `${formatNumber(bucketDistance)} spline units of new frontier progress`,
+      value:
+        bucketDistance <= 0
+          ? `${formatSignedNumber(bucketReward)} per 1k units`
+          : `${formatSignedNumber(bucketReward)} reward`,
     },
     {
       label: "Reward density",
-      detail: `${formatSignedNumber(bucketReward)} / ${formatNumber(bucketDistance)} units`,
+      detail:
+        bucketDistance <= 0
+          ? "Continuous reward density"
+          : `${formatSignedNumber(bucketReward)} / ${formatNumber(bucketDistance)} units`,
       value: `${formatSignedNumber(rewardPerThousandUnits)} per 1k units`,
     },
     {

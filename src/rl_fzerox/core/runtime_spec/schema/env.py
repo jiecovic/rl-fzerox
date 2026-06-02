@@ -67,7 +67,7 @@ class RewardCourseOverrideConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     time_penalty_per_frame: float | None = None
-    progress_bucket_distance: PositiveFloat | None = None
+    progress_bucket_distance: NonNegativeFloat | None = None
     progress_bucket_reward: NonNegativeFloat | None = None
     progress_reward_interval_frames: PositiveInt | None = None
     suspend_progress_while_outside_track_bounds: bool | None = None
@@ -145,7 +145,7 @@ class RewardConfig(BaseModel):
 
     name: Literal["reward_main"] = "reward_main"
     time_penalty_per_frame: float = -0.005
-    progress_bucket_distance: PositiveFloat = 1_000.0
+    progress_bucket_distance: NonNegativeFloat = 1_000.0
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
     suspend_progress_while_outside_track_bounds: bool = True

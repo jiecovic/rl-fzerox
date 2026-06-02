@@ -23,7 +23,7 @@ class ManagedRewardConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     time_penalty_per_frame: float = 0.0
-    progress_bucket_distance: PositiveFloat = 25.0
+    progress_bucket_distance: NonNegativeFloat = 25.0
     progress_bucket_reward: NonNegativeFloat = 0.05
     progress_reward_interval_frames: PositiveInt = 1
     suspend_progress_while_outside_track_bounds: bool = True

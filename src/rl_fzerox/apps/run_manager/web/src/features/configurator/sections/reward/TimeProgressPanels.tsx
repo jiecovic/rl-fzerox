@@ -54,7 +54,7 @@ export function TimeProgressPanels({
       >
         <div className="config-field-grid">
           <NumberField
-            help="Spline distance represented by one progress reward bucket. Changing this keeps the current reward density per 1k spline units and derives a new per-bucket reward automatically."
+            help="Spline distance represented by one progress reward bucket. Set to 0 for continuous proportional progress. Changing this keeps the current reward density per 1k spline units."
             label="Bucket distance"
             resetValue={defaultConfig.reward.progress_bucket_distance}
             step="5"

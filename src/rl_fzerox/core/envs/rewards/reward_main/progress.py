@@ -88,17 +88,18 @@ class FrontierProgressRewardTracker:
         progress_distance = summary.max_race_distance if race_distance is None else race_distance
         relative_progress = self._progress.relative_distance(progress_distance)
         bucket_distance = weights.progress_bucket_distance
-        if bucket_distance <= 0.0:
-            return zero_frontier_reward()
-        crossed_bucket_count = int((relative_progress - self._frontier_distance) // bucket_distance)
-        if crossed_bucket_count <= 0:
+        progress_delta = self._progress_delta(
+            relative_progress=relative_progress,
+            bucket_distance=bucket_distance,
+        )
+        if progress_delta <= 0.0:
             return zero_frontier_reward()
 
-        self._advance_frontier(crossed_bucket_count, weights=weights)
+        self._advance_frontier(progress_delta, bucket_distance=bucket_distance)
         if progress_suspended:
             return zero_frontier_reward()
 
-        progress_reward = crossed_bucket_count * weights.progress_bucket_reward
+        progress_reward = self._progress_reward(progress_delta, weights=weights)
         ground_effect_adjustment = progress_reward * (max(float(progress_multiplier), 0.0) - 1.0)
         surface_adjusted_progress = progress_reward + ground_effect_adjustment
         speed_multiplier = progress_speed_multiplier(
@@ -126,7 +127,7 @@ class FrontierProgressRewardTracker:
                 energy_gain_reward=energy_gain_reward,
             )
 
-        self._pending_delta += crossed_bucket_count * bucket_distance
+        self._pending_delta += progress_delta
         self._pending_reward += progress_reward
         self._pending_ground_effect_adjustment += ground_effect_adjustment
         self._pending_speed_adjustment += speed_adjustment
@@ -217,16 +218,26 @@ class FrontierProgressRewardTracker:
         self._pending_energy_gain_reward = 0.0
         self._pending_frames = 0
 
-    def _advance_frontier(
-        self,
-        crossed_bucket_count: int,
-        *,
-        weights: SharedRewardWeights,
-    ) -> None:
-        self._frontier_distance += crossed_bucket_count * weights.progress_bucket_distance
-        self._frontier_bucket_index = int(
-            self._frontier_distance // weights.progress_bucket_distance
-        )
+    def _progress_delta(self, *, relative_progress: float, bucket_distance: float) -> float:
+        relative_delta = relative_progress - self._frontier_distance
+        if relative_delta <= 0.0:
+            return 0.0
+        if bucket_distance <= 0.0:
+            return relative_delta
+        crossed_bucket_count = int(relative_delta // bucket_distance)
+        return crossed_bucket_count * bucket_distance
+
+    def _progress_reward(self, progress_delta: float, *, weights: SharedRewardWeights) -> float:
+        if weights.progress_bucket_distance <= 0.0:
+            return (progress_delta / 1_000.0) * weights.progress_bucket_reward
+        return (progress_delta / weights.progress_bucket_distance) * weights.progress_bucket_reward
+
+    def _advance_frontier(self, progress_delta: float, *, bucket_distance: float) -> None:
+        self._frontier_distance += progress_delta
+        if bucket_distance <= 0.0:
+            self._frontier_bucket_index += 1
+            return
+        self._frontier_bucket_index = int(self._frontier_distance // bucket_distance)
 
 
 def zero_frontier_reward() -> FrontierReward:

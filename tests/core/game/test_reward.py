@@ -196,6 +196,37 @@ def test_reward_main_rewards_each_frontier_bucket_once() -> None:
     assert info["frontier_progress_distance"] == 2_000.0
 
 
+def test_reward_main_can_pay_continuous_frontier_progress() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=0.0,
+            progress_bucket_reward=2.0,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first_step = tracker.step_summary(
+        _summary(max_race_distance=2_500.0),
+        _status(step_count=1),
+        _telemetry(race_distance=2_500.0),
+    )
+    repeated_step = tracker.step_summary(
+        _summary(max_race_distance=2_500.0),
+        _status(step_count=2),
+        _telemetry(race_distance=500.0),
+    )
+
+    assert first_step.reward == 5.0
+    assert first_step.breakdown == {"frontier_progress": 5.0}
+    assert repeated_step.reward == 0.0
+    info = tracker.info(_telemetry(race_distance=2_500.0))
+    assert info["frontier_progress_distance"] == 2_500.0
+    assert info["progress_bucket_distance"] == 0.0
+    assert info["progress_bucket_reward"] == 2.0
+
+
 def test_reward_main_can_delay_frontier_rewards_by_interval() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
