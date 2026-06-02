@@ -197,14 +197,20 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
             state=store.get_run_track_sampling_state(run.id),
         )
     if run.source_snapshot_dir is not None and run.source_artifact is not None:
-        source_run = None if run.source_run_id is None else store.get_run(run.source_run_id)
+        if run.source_run_id is None:
+            raise RuntimeError(
+                "managed fork source metadata is missing; recreate the fork draft"
+            )
+        source_run = store.get_run(run.source_run_id)
+        if source_run is None:
+            raise RuntimeError(f"source run not found for forked run: {run.source_run_id}")
         return build_managed_fork_train_app_config(
             run.config,
             run_id=run.id,
             run_dir=run.run_dir,
             source_run_dir=run.source_snapshot_dir,
             source_artifact=run.source_artifact,
-            source_config=None if source_run is None else source_run.config,
+            source_config=source_run.config,
             tensorboard_step_offset=run.lineage_step_offset,
         )
     if run.source_run_id is not None and run.source_artifact is not None:

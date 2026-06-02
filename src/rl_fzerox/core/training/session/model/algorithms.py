@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeAlias
 
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, TrainConfig
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ def training_requires_action_masks(config: TrainAppConfig) -> bool:
 def resolve_effective_training_algorithm(
     *,
     train_config: TrainConfig,
-) -> str:
+) -> TrainAlgorithmName:
     """Resolve the configured train.algorithm into the concrete algorithm used."""
 
     return train_config.algorithm

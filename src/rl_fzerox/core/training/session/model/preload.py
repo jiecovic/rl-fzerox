@@ -7,6 +7,7 @@ from typing import Protocol, TypeGuard, TypeVar
 from stable_baselines3.common.utils import FloatSchedule
 from torch import nn
 
+from rl_fzerox.core.domain.training_algorithms import TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema import TrainConfig
 from rl_fzerox.core.training.runs import (
     load_train_run_config,
@@ -48,11 +49,10 @@ def maybe_resume_training_model(
         train_config=train_config,
         resume_run_dir=resume_run_dir,
     )
-    if train_config.resume_source_algorithm is not None:
-        source_algorithm = train_config.resume_source_algorithm
-    else:
-        source_train_config = load_train_run_train_config(resume_run_dir)
-        source_algorithm = resolve_effective_training_algorithm(train_config=source_train_config)
+    source_algorithm = _source_algorithm(
+        train_config=train_config,
+        resume_run_dir=resume_run_dir,
+    )
     current_algorithm = resolve_effective_training_algorithm(train_config=train_config)
     if source_algorithm != current_algorithm:
         raise RuntimeError(
@@ -109,8 +109,30 @@ def _source_auxiliary_state_signature(
         if not train_config.resume_source_auxiliary_state_enabled:
             return None
         return tuple(int(value) for value in train_config.resume_source_auxiliary_state_head_arch)
+    _raise_if_managed_source_metadata_missing(train_config)
     source_run_config = load_train_run_config(resume_run_dir)
     return _auxiliary_state_signature_from_config(source_run_config.policy)
+
+
+def _source_algorithm(
+    *,
+    train_config: TrainConfig,
+    resume_run_dir: Path,
+) -> TrainAlgorithmName:
+    if train_config.resume_source_algorithm is not None:
+        return train_config.resume_source_algorithm
+    _raise_if_managed_source_metadata_missing(train_config)
+    source_train_config = load_train_run_train_config(resume_run_dir)
+    return resolve_effective_training_algorithm(train_config=source_train_config)
+
+
+def _raise_if_managed_source_metadata_missing(train_config: TrainConfig) -> None:
+    if not train_config.resume_source_metadata_required:
+        return
+    raise RuntimeError(
+        "Managed resume requires source checkpoint metadata from the manager DB. "
+        "Saved YAML manifests are not used as a config source for managed runs."
+    )
 
 
 def _is_full_model_loader(value: object) -> TypeGuard[_FullModelLoader]:

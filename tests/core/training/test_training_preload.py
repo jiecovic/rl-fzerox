@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Literal
 
 import pytest
+from pydantic import ValidationError
 from torch import nn
 
 from rl_fzerox.core.runtime_spec.schema import TrainConfig
@@ -152,3 +153,52 @@ def test_full_model_resume_rejects_aux_bank_signature_mismatch(
             train_env=object(),
             train_config=train_config,
         )
+
+
+def test_managed_resume_requires_source_metadata(tmp_path: Path) -> None:
+    with pytest.raises(ValidationError, match="resume_source_algorithm"):
+        TrainConfig(
+            algorithm="maskable_hybrid_action_ppo",
+            resume_run_dir=tmp_path,
+            resume_artifact="latest",
+            resume_source_metadata_required=True,
+        )
+
+
+def test_managed_resume_uses_injected_source_metadata_without_yaml_loaders(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = _DummyModel(auxiliary_state_head_arch=None)
+    model_path = tmp_path / "model.zip"
+    train_config = TrainConfig(
+        algorithm="maskable_hybrid_action_ppo",
+        resume_run_dir=tmp_path,
+        resume_artifact="latest",
+        resume_mode="weights_only",
+        resume_source_algorithm="maskable_hybrid_action_ppo",
+        resume_source_auxiliary_state_enabled=False,
+        resume_source_metadata_required=True,
+        device="cpu",
+    )
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
+        lambda run_dir: pytest.fail(f"unexpected config YAML load: {run_dir}"),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.load_train_run_train_config",
+        lambda run_dir: pytest.fail(f"unexpected train YAML load: {run_dir}"),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
+        lambda run_dir, artifact: model_path,
+    )
+
+    maybe_resume_training_model(
+        model=model,
+        train_env=object(),
+        train_config=train_config,
+    )
+
+    assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
