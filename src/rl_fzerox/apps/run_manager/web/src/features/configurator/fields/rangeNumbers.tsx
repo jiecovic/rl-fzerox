@@ -10,6 +10,7 @@ import {
   roundToStepPrecision,
 } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
+import { useEditableNumberInput } from "@/features/configurator/fields/numberInput";
 import { resetHandler } from "@/features/configurator/fields/reset";
 import {
   discreteSliderTicks,
@@ -49,36 +50,19 @@ export function RangeNumberField({
   resetValue?: number;
   ticks?: readonly SliderTick[];
 }) {
-  const [rawValue, setRawValue] = useState(formatDecimalInput(value, numberStep));
-
-  useEffect(() => {
-    setRawValue(formatDecimalInput(value, numberStep));
-  }, [numberStep, value]);
-
-  function commitValue() {
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-      setRawValue(formatDecimalInput(value, numberStep));
-      return;
-    }
-    const normalized = roundToStepPrecision(parsed, numberStep);
-    onChange(normalized);
-    setRawValue(formatDecimalInput(normalized, numberStep));
-  }
+  const manualInput = useEditableNumberInput({
+    format: (nextValue) => formatDecimalInput(nextValue, numberStep),
+    formattedValue: formatDecimalInput(value, numberStep),
+    normalize: (nextValue) => roundToStepPrecision(nextValue, numberStep),
+    onCommit: onChange,
+    onValidInput: onChange,
+    parse: (rawValue) => parseFiniteRangeNumber(rawValue, min, max),
+  });
 
   function updateFromSlider(nextValue: number) {
     const normalized = roundToStepPrecision(nextValue, rangeStep);
     onChange(normalized);
-    setRawValue(formatDecimalInput(normalized, numberStep));
-  }
-
-  function changeManualValue(nextRawValue: string) {
-    setRawValue(nextRawValue);
-    const parsed = Number(nextRawValue);
-    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-      return;
-    }
-    onChange(roundToStepPrecision(parsed, numberStep));
+    manualInput.setRawValue(formatDecimalInput(normalized, numberStep));
   }
 
   return (
@@ -102,9 +86,9 @@ export function RangeNumberField({
           min={min}
           step={numberStep}
           type="number"
-          value={rawValue}
-          onBlur={commitValue}
-          onChange={(event) => changeManualValue(event.target.value)}
+          value={manualInput.rawValue}
+          onBlur={manualInput.commitRawValue}
+          onChange={(event) => manualInput.changeRawValue(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.currentTarget.blur();
@@ -137,26 +121,16 @@ export function RangeIntegerField({
   resetValue?: number;
   ticks?: readonly SliderTick[];
 }) {
-  const [rawValue, setRawValue] = useState(formatInteger(value));
-
-  useEffect(() => {
-    setRawValue(formatInteger(value));
-  }, [value]);
-
-  function commitValue() {
-    const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-    if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
-      setRawValue(formatInteger(value));
-      return;
-    }
-    onChange(parsed);
-    setRawValue(formatInteger(parsed));
-  }
+  const manualInput = useEditableNumberInput({
+    format: formatInteger,
+    formattedValue: formatInteger(value),
+    normalize: Math.round,
+    onCommit: onChange,
+    parse: (rawValue) => parseSafeIntegerRange(rawValue, min, max),
+  });
 
   function updateFromSlider(nextValue: number) {
-    const rounded = Math.round(nextValue);
-    onChange(rounded);
-    setRawValue(formatInteger(rounded));
+    manualInput.setCommittedValue(nextValue);
   }
 
   return (
@@ -182,13 +156,23 @@ export function RangeIntegerField({
           className="h-[34px] indent-0 tabular-nums"
           inputMode="numeric"
           spellCheck={false}
-          value={rawValue}
-          onBlur={commitValue}
-          onChange={(event) => setRawValue(event.target.value)}
+          value={manualInput.rawValue}
+          onBlur={manualInput.commitRawValue}
+          onChange={(event) => manualInput.changeRawValue(event.target.value)}
         />
       </RangeRow>
     </FieldShell>
   );
+}
+
+function parseFiniteRangeNumber(rawValue: string, min: number, max: number) {
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null;
+}
+
+function parseSafeIntegerRange(rawValue: string, min: number, max: number) {
+  const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
+  return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max ? parsed : null;
 }
 
 export function DiscreteSliderNumberField({
