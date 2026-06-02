@@ -116,8 +116,7 @@ class TrainConfig(BaseModel):
                 )
             if self.resume_source_algorithm is None:
                 raise ValueError(
-                    "train.resume_source_metadata_required requires "
-                    "train.resume_source_algorithm"
+                    "train.resume_source_metadata_required requires train.resume_source_algorithm"
                 )
             if self.resume_source_auxiliary_state_enabled is None:
                 raise ValueError(
