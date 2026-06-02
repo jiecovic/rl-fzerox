@@ -39,7 +39,10 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
   const collapsedCupIdSet = useMemo(() => new Set(collapsedCupIds), [collapsedCupIds]);
 
   const normalizedTracks = (tracks: TracksConfig) => {
-    const nextTracks = { ...tracks };
+    const nextTracks = {
+      ...tracks,
+      x_cup_auto_regeneration: { ...tracks.x_cup_auto_regeneration },
+    };
     if (nextTracks.race_mode === "gp_race" && nextTracks.gp_difficulty == null) {
       nextTracks.gp_difficulty = defaultGpDifficulty;
     }
@@ -49,6 +52,9 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
       if (nextTracks.selected_course_ids.length === 0) {
         nextTracks.selected_course_ids = defaultCourseIds;
       }
+    }
+    if (!nextTracks.include_x_cup) {
+      nextTracks.x_cup_auto_regeneration.enabled = false;
     }
     return nextTracks;
   };

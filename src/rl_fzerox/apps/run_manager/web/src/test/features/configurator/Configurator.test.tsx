@@ -369,6 +369,35 @@ describe("Configurator", () => {
     expect(screen.getByRole("button", { name: "Mute City" })).toBeInTheDocument();
   });
 
+  it("clears X Cup auto regeneration when X Cup is disabled", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Tracks" }));
+    await user.click(screen.getByRole("radio", { name: "GP Race" }));
+    await user.click(screen.getByRole("button", { name: "Enable X Cup" }));
+    await user.click(screen.getByRole("button", { name: "Auto regenerate" }));
+    await user.click(screen.getByRole("button", { name: "Disable X Cup" }));
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalled());
+    const savedConfig = onSaveDraft.mock.calls[0]?.[1] as ManagedRunConfig;
+    expect(savedConfig.tracks.include_x_cup).toBe(false);
+    expect(savedConfig.tracks.x_cup_auto_regeneration.enabled).toBe(false);
+  });
+
   it("enables GP difficulty selection only in GP race mode", async () => {
     const user = userEvent.setup();
 
