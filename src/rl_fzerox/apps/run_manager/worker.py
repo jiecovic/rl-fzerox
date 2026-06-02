@@ -198,9 +198,7 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
         )
     if run.source_snapshot_dir is not None and run.source_artifact is not None:
         if run.source_run_id is None:
-            raise RuntimeError(
-                "managed fork source metadata is missing; recreate the fork draft"
-            )
+            raise RuntimeError("managed fork source metadata is missing; recreate the fork draft")
         source_run = store.get_run(run.source_run_id)
         if source_run is None:
             raise RuntimeError(f"source run not found for forked run: {run.source_run_id}")
