@@ -12,8 +12,14 @@ from rl_fzerox.core.manager.db.repositories.runs import (
     append_run_event as insert_run_event,
 )
 from rl_fzerox.core.manager.db.repositories.runs import (
+    get_managed_run,
     insert_run,
+    list_managed_runs,
+    list_recent_managed_run_events,
+    list_visible_managed_run_summaries,
+    rename_run,
     resolve_lineage_id,
+    set_run_status,
 )
 from rl_fzerox.core.manager.models import (
     ManagedRun,
@@ -24,14 +30,7 @@ from rl_fzerox.core.manager.models import (
 from rl_fzerox.core.manager.registry.common import (
     new_run_id,
     raise_name_conflict,
-    sql_placeholders,
     utc_now,
-)
-from rl_fzerox.core.manager.registry.rows import (
-    run_from_row,
-    run_select_sql,
-    run_summary_from_row,
-    run_summary_select_sql,
 )
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 
@@ -142,12 +141,8 @@ def get_run(store: ManagerStore, run_id: str) -> ManagedRun | None:
     from rl_fzerox.core.manager.registry.runs.maintenance import reconcile_orphaned_runs
 
     reconcile_orphaned_runs(store)
-    with store._connect() as connection:
-        row = connection.execute(
-            run_select_sql(where_clause="WHERE runs.id = ?"),
-            (run_id,),
-        ).fetchone()
-    return None if row is None else run_from_row(row)
+    with store._orm_session() as session:
+        return get_managed_run(session, run_id)
 
 
 def list_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
@@ -155,11 +150,8 @@ def list_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
     from rl_fzerox.core.manager.registry.runs.maintenance import reconcile_orphaned_runs
 
     reconcile_orphaned_runs(store)
-    with store._connect() as connection:
-        rows = connection.execute(
-            run_select_sql(order_clause="ORDER BY runs.created_at DESC, runs.id DESC")
-        ).fetchall()
-    return tuple(run_from_row(row) for row in rows)
+    with store._orm_session() as session:
+        return list_managed_runs(session)
 
 
 def list_visible_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
@@ -171,14 +163,8 @@ def list_visible_run_summaries(store: ManagerStore) -> tuple[ManagedRunSummary, 
     from rl_fzerox.core.manager.registry.runs.maintenance import reconcile_orphaned_runs
 
     reconcile_orphaned_runs(store)
-    with store._connect() as connection:
-        rows = connection.execute(
-            run_summary_select_sql(
-                where_clause="WHERE runs.status != 'created'",
-                order_clause="ORDER BY runs.created_at DESC, runs.id DESC",
-            )
-        ).fetchall()
-    return tuple(run_summary_from_row(row) for row in rows)
+    with store._orm_session() as session:
+        return list_visible_managed_run_summaries(session)
 
 
 def list_recent_run_events(
@@ -190,43 +176,12 @@ def list_recent_run_events(
     if not run_ids:
         return {}
     store.initialize()
-    with store._connect() as connection:
-        rows = connection.execute(
-            f"""
-            SELECT run_id, created_at, kind, message
-            FROM (
-                SELECT
-                    run_id,
-                    id,
-                    created_at,
-                    kind,
-                    message,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY run_id
-                        ORDER BY created_at DESC, id DESC
-                    ) AS row_num
-                FROM run_events
-                WHERE run_id IN ({sql_placeholders(len(run_ids))})
-            )
-            WHERE row_num <= ?
-            ORDER BY created_at DESC, id DESC
-            """,
-            (*run_ids, limit_per_run),
-        ).fetchall()
-    events_by_run_id: dict[str, list[ManagedRunEvent]] = {run_id: [] for run_id in run_ids}
-    for row in rows:
-        event_run_id = str(row["run_id"])
-        events_by_run_id.setdefault(event_run_id, []).append(
-            ManagedRunEvent(
-                run_id=event_run_id,
-                created_at=str(row["created_at"]),
-                kind=str(row["kind"]),
-                message=str(row["message"]),
-            )
+    with store._orm_session() as session:
+        return list_recent_managed_run_events(
+            session,
+            run_ids,
+            limit_per_run=limit_per_run,
         )
-    return {
-        event_run_id: tuple(events) for event_run_id, events in events_by_run_id.items() if events
-    }
 
 
 def update_run_status(
@@ -240,44 +195,16 @@ def update_run_status(
 ) -> ManagedRun | None:
     store.initialize()
     event_at = utc_now()
-    with store._connect() as connection:
-        row = connection.execute(
-            """
-            UPDATE runs
-            SET
-                status = ?,
-                started_at = CASE
-                    WHEN ? IS NULL THEN started_at
-                    ELSE ?
-                END,
-                stopped_at = ?
-            WHERE id = ?
-            RETURNING id
-            """,
-            (
-                status,
-                started_at,
-                started_at,
-                stopped_at,
-                run_id,
-            ),
-        ).fetchone()
-        if row is None:
-            return None
-        if status != "running":
-            connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
-        connection.execute(
-            """
-            INSERT INTO run_events(run_id, created_at, kind, message)
-            VALUES (?, ?, ?, ?)
-            """,
-            (run_id, event_at, status, message),
+    with store._orm_session() as session:
+        return set_run_status(
+            session,
+            run_id=run_id,
+            status=status,
+            message=message,
+            started_at=started_at,
+            stopped_at=stopped_at,
+            event_at=event_at,
         )
-        selected_row = connection.execute(
-            run_select_sql(where_clause="WHERE runs.id = ?"),
-            (run_id,),
-        ).fetchone()
-    return None if selected_row is None else run_from_row(selected_row)
 
 
 def update_run_name(
@@ -290,30 +217,21 @@ def update_run_name(
     normalized_name = name.strip() or run_id
     renamed_at = utc_now()
     try:
-        with store._connect() as connection:
-            row = connection.execute(
-                """
-                UPDATE runs
-                SET name = ?
-                WHERE id = ?
-                RETURNING id
-                """,
-                (normalized_name, run_id),
-            ).fetchone()
-            if row is None:
-                return None
-            connection.execute(
-                """
-                INSERT INTO run_events(run_id, created_at, kind, message)
-                VALUES (?, ?, ?, ?)
-                """,
-                (run_id, renamed_at, "renamed", f"run renamed to {normalized_name}"),
+        with store._orm_session() as session:
+            return rename_run(
+                session,
+                run_id=run_id,
+                name=normalized_name,
+                renamed_at=renamed_at,
             )
-            selected_row = connection.execute(
-                run_select_sql(where_clause="WHERE runs.id = ?"),
-                (run_id,),
-            ).fetchone()
+    except SqlAlchemyIntegrityError as error:
+        raise_name_conflict(
+            sqlite3.IntegrityError(str(error.orig)),
+            table="runs",
+            kind="run",
+            name=normalized_name,
+        )
+        raise
     except sqlite3.IntegrityError as error:
         raise_name_conflict(error, table="runs", kind="run", name=normalized_name)
         raise
-    return None if selected_row is None else run_from_row(selected_row)
