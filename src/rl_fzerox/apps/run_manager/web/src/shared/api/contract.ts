@@ -302,7 +302,7 @@ const policyConfigSchema = z.object({
 const rewardConfigSchema = z
   .object({
     time_penalty_per_frame: z.number(),
-    progress_bucket_distance: z.number().positive(),
+    progress_bucket_distance: z.number().nonnegative(),
     progress_bucket_reward: z.number().nonnegative(),
     progress_reward_interval_frames: z.number().int().positive(),
     suspend_progress_while_outside_track_bounds: z.boolean(),
