@@ -41,30 +41,6 @@ def raise_name_conflict(
         raise ManagerNameConflictError(kind=kind, name=name) from error
 
 
-def assert_name_available(
-    connection: sqlite3.Connection,
-    name: str,
-    *,
-    exclude_draft_id: str | None = None,
-) -> None:
-    row = connection.execute(
-        """
-        SELECT 'draft' AS source
-        FROM run_drafts
-        WHERE name = ? COLLATE NOCASE
-          AND (? IS NULL OR id != ?)
-        LIMIT 1
-        """,
-        (
-            name,
-            exclude_draft_id,
-            exclude_draft_id,
-        ),
-    ).fetchone()
-    if row is not None:
-        raise ManagerNameConflictError(kind=str(row["source"]), name=name)
-
-
 def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
     return slug.strip("-")[:48]

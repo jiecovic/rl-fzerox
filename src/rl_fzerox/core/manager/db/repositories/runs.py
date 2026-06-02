@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -21,7 +22,14 @@ from rl_fzerox.core.manager.db.models.runtime import (
     RunWorkerModel,
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
-from rl_fzerox.core.manager.models import ManagedRun, ManagedRunDraft, ManagedRunRuntime
+from rl_fzerox.core.manager.models import (
+    ManagedRun,
+    ManagedRunDraft,
+    ManagedRunEvent,
+    ManagedRunRuntime,
+    ManagedRunSummary,
+    RunStatus,
+)
 from rl_fzerox.core.manager.registry.common import (
     optional_source_artifact,
     run_command,
@@ -197,6 +205,124 @@ def append_run_event(
     )
 
 
+def get_managed_run(session: Session, run_id: str) -> ManagedRun | None:
+    """Return one managed run by id."""
+
+    run = session.get(RunModel, run_id)
+    return None if run is None else managed_run_from_model(session, run)
+
+
+def list_managed_runs(session: Session) -> tuple[ManagedRun, ...]:
+    """Return all managed runs in manager display order."""
+
+    runs = tuple(
+        session.scalars(select(RunModel).order_by(RunModel.created_at.desc(), RunModel.id.desc()))
+    )
+    return tuple(managed_run_from_model(session, run) for run in runs)
+
+
+def list_visible_managed_run_summaries(session: Session) -> tuple[ManagedRunSummary, ...]:
+    """Return run-list summaries for launched runs."""
+
+    runs = tuple(
+        session.scalars(
+            select(RunModel)
+            .where(RunModel.status != "created")
+            .order_by(RunModel.created_at.desc(), RunModel.id.desc())
+        )
+    )
+    return tuple(managed_run_summary_from_model(session, run) for run in runs)
+
+
+def list_recent_managed_run_events(
+    session: Session,
+    run_ids: tuple[str, ...],
+    *,
+    limit_per_run: int,
+) -> dict[str, tuple[ManagedRunEvent, ...]]:
+    """Return the most recent events per requested run id."""
+
+    if not run_ids:
+        return {}
+    events = tuple(
+        session.scalars(
+            select(RunEventModel)
+            .where(RunEventModel.run_id.in_(run_ids))
+            .order_by(RunEventModel.created_at.desc(), RunEventModel.id.desc())
+        )
+    )
+    events_by_run_id: dict[str, list[ManagedRunEvent]] = {run_id: [] for run_id in run_ids}
+    for event in events:
+        run_events = events_by_run_id.setdefault(event.run_id, [])
+        if len(run_events) >= limit_per_run:
+            continue
+        run_events.append(
+            ManagedRunEvent(
+                run_id=event.run_id,
+                created_at=event.created_at,
+                kind=event.kind,
+                message=event.message,
+            )
+        )
+    return {
+        event_run_id: tuple(run_events)
+        for event_run_id, run_events in events_by_run_id.items()
+        if run_events
+    }
+
+
+def set_run_status(
+    session: Session,
+    *,
+    run_id: str,
+    status: RunStatus,
+    message: str,
+    started_at: str | None,
+    stopped_at: str | None,
+    event_at: str,
+) -> ManagedRun | None:
+    """Update one run status and append the corresponding event."""
+
+    run = session.get(RunModel, run_id)
+    if run is None:
+        return None
+    run.status = status
+    if started_at is not None:
+        run.started_at = started_at
+    run.stopped_at = stopped_at
+    if status != "running":
+        worker = session.get(RunWorkerModel, run_id)
+        if worker is not None:
+            session.delete(worker)
+    append_run_event(session, run_id=run_id, created_at=event_at, kind=status, message=message)
+    session.flush()
+    return managed_run_from_model(session, run)
+
+
+def rename_run(
+    session: Session,
+    *,
+    run_id: str,
+    name: str,
+    renamed_at: str,
+) -> ManagedRun | None:
+    """Rename one run and append a manager event."""
+
+    run = session.get(RunModel, run_id)
+    if run is None:
+        return None
+    run.name = name
+    append_run_event(
+        session,
+        run_id=run_id,
+        created_at=renamed_at,
+        kind="renamed",
+        message=f"run renamed to {name}",
+    )
+    session.flush()
+    return managed_run_from_model(session, run)
+
+
 def managed_run_from_model(session: Session, run: RunModel) -> ManagedRun:
     """Build the public run dataclass from ORM rows in the current transaction."""
 
@@ -237,6 +363,42 @@ def managed_run_from_model(session: Session, run: RunModel) -> ManagedRun:
     )
 
 
+def managed_run_summary_from_model(session: Session, run: RunModel) -> ManagedRunSummary:
+    """Build the lightweight run-list dataclass from ORM rows."""
+
+    lineage_id = run.lineage_id or run.id
+    lineage_groups = tuple(
+        session.scalars(
+            select(LineageGroupModel.group_name)
+            .where(LineageGroupModel.lineage_id == lineage_id)
+            .order_by(LineageGroupModel.group_name)
+        )
+    )
+    runtime = session.get(RunRuntimeModel, run.id)
+    worker = session.get(RunWorkerModel, run.id)
+    pending_command = session.get(RunCommandModel, run.id)
+    return ManagedRunSummary(
+        id=run.id,
+        name=run.name,
+        status=run_status(run.status),
+        config_hash=run.config_snapshot.config_hash,
+        action_repeat=_action_repeat_from_config_json(run.config_snapshot.config_json),
+        lineage_id=lineage_id,
+        lineage_groups=lineage_groups,
+        lineage_step_offset=run.lineage_step_offset,
+        parent_run_id=run.parent_run_id,
+        source_run_id=run.source_run_id,
+        source_artifact=optional_source_artifact(run.source_artifact),
+        source_num_timesteps=run.source_num_timesteps,
+        created_at=run.created_at,
+        started_at=run.started_at,
+        stopped_at=run.stopped_at,
+        worker_heartbeat_at=None if worker is None else worker.heartbeat_at,
+        runtime=None if runtime is None else _managed_runtime_from_model(runtime),
+        pending_command=run_command(None if pending_command is None else pending_command.command),
+    )
+
+
 def _managed_runtime_from_model(runtime: RunRuntimeModel) -> ManagedRunRuntime:
     return ManagedRunRuntime(
         total_timesteps=runtime.total_timesteps,
@@ -251,3 +413,19 @@ def _managed_runtime_from_model(runtime: RunRuntimeModel) -> ManagedRunRuntime:
         value_loss=runtime.value_loss,
         policy_gradient_loss=runtime.policy_gradient_loss,
     )
+
+
+def _action_repeat_from_config_json(config_json: str) -> int:
+    try:
+        loaded = json.loads(config_json)
+    except json.JSONDecodeError:
+        return 1
+    if not isinstance(loaded, dict):
+        return 1
+    action = loaded.get("action")
+    if not isinstance(action, dict):
+        return 1
+    action_repeat = action.get("action_repeat")
+    if not isinstance(action_repeat, int | float):
+        return 1
+    return max(1, int(action_repeat))

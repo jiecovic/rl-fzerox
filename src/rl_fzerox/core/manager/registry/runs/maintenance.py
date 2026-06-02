@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import rl_fzerox.core.manager.artifacts.filesystem as filesystem_ops
 from rl_fzerox.core.manager.registry.common import pid_exists, utc_now
-from rl_fzerox.core.manager.registry.rows import run_worker_lease_from_row
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -18,6 +17,15 @@ if TYPE_CHECKING:
 class RunWorkerLeasePolicy:
     heartbeat_interval: timedelta = timedelta(seconds=3)
     heartbeat_timeout: timedelta = timedelta(seconds=90)
+
+
+@dataclass(frozen=True, slots=True)
+class RunWorkerLease:
+    run_id: str
+    launch_token: str
+    pid: int
+    launched_at: str
+    heartbeat_at: str
 
 
 RUN_WORKER_LEASE_POLICY = RunWorkerLeasePolicy()
@@ -41,7 +49,7 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
             """
         ).fetchall()
         worker_by_run_id = {
-            str(row["run_id"]): run_worker_lease_from_row(row) for row in worker_rows
+            str(row["run_id"]): _run_worker_lease_from_row(row) for row in worker_rows
         }
         for row in rows:
             run_id = str(row["id"])
@@ -54,6 +62,16 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
             if not pid_exists(worker.pid):
                 _mark_orphaned_run_failed(connection, run_id=run_id)
                 continue
+
+
+def _run_worker_lease_from_row(row: sqlite3.Row) -> RunWorkerLease:
+    return RunWorkerLease(
+        run_id=str(row["run_id"]),
+        launch_token=str(row["launch_token"]),
+        pid=int(row["pid"]),
+        launched_at=str(row["launched_at"]),
+        heartbeat_at=str(row["heartbeat_at"]),
+    )
 
 
 def _mark_orphaned_run_failed(connection: sqlite3.Connection, *, run_id: str) -> None:
