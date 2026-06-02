@@ -19,6 +19,7 @@ class XCupRotationDefaults:
 
     completion_threshold: float = 0.9
     min_episodes: int = 24
+    max_episodes: int | None = None
     ema_alpha: float = 0.3
 
 

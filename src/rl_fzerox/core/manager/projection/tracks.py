@@ -36,6 +36,7 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
             "enabled": config.tracks.x_cup_auto_regeneration.enabled,
             "completion_threshold": (config.tracks.x_cup_auto_regeneration.completion_threshold),
             "min_episodes": config.tracks.x_cup_auto_regeneration.min_episodes,
+            "max_episodes": config.tracks.x_cup_auto_regeneration.max_episodes,
             "ema_alpha": config.tracks.x_cup_auto_regeneration.ema_alpha,
         },
     }

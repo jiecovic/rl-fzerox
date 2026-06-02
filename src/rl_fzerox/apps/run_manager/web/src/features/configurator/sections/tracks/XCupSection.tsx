@@ -34,6 +34,7 @@ export function XCupSection({
 }: XCupSectionProps) {
   const rotation = config.tracks.x_cup_auto_regeneration;
   const defaultRotation = defaultConfig.tracks.x_cup_auto_regeneration;
+  const defaultMaxEpisodes = Math.max(rotation.min_episodes * 4, 100);
   const updateRotation = (patch: Partial<typeof rotation>) =>
     updateTracks({
       x_cup_auto_regeneration: {
@@ -143,8 +144,39 @@ export function XCupSection({
                       min={1}
                       resetValue={defaultRotation.min_episodes}
                       value={rotation.min_episodes}
-                      onChange={(value) => updateRotation({ min_episodes: value })}
+                      onChange={(value) =>
+                        updateRotation({
+                          min_episodes: value,
+                          max_episodes:
+                            rotation.max_episodes !== null && rotation.max_episodes < value
+                              ? value
+                              : rotation.max_episodes,
+                        })
+                      }
                     />
+                    <BooleanField
+                      help="When enabled, regenerate a slot once this many sampled episodes is reached, even if the current generated course is still below the completion threshold."
+                      label="Episode cap"
+                      resetValue={defaultRotation.max_episodes !== null}
+                      value={rotation.max_episodes !== null}
+                      onChange={(value) =>
+                        updateRotation({
+                          max_episodes: value
+                            ? (rotation.max_episodes ?? defaultMaxEpisodes)
+                            : null,
+                        })
+                      }
+                    />
+                    {rotation.max_episodes !== null ? (
+                      <IntegerField
+                        help="Maximum sampled episodes before replacing a generated slot regardless of completion. Disable the cap to keep trying until the completion threshold is reached."
+                        label="Max episodes"
+                        min={rotation.min_episodes}
+                        resetValue={defaultRotation.max_episodes ?? defaultMaxEpisodes}
+                        value={rotation.max_episodes}
+                        onChange={(value) => updateRotation({ max_episodes: value })}
+                      />
+                    ) : null}
                     <NumberField
                       help="EMA smoothing for replacement eligibility completion stats. Higher values react faster to the latest generated course."
                       label="EMA alpha"

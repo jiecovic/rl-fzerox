@@ -137,10 +137,17 @@ class XCupRotationConfig(BaseModel):
         le=1.0,
     )
     min_episodes: PositiveInt = X_CUP_COURSE.rotation_defaults.min_episodes
+    max_episodes: PositiveInt | None = X_CUP_COURSE.rotation_defaults.max_episodes
     ema_alpha: PositiveFloat = Field(
         default=X_CUP_COURSE.rotation_defaults.ema_alpha,
         le=1.0,
     )
+
+    @model_validator(mode="after")
+    def _validate_episode_window(self) -> XCupRotationConfig:
+        if self.max_episodes is not None and self.max_episodes < self.min_episodes:
+            raise ValueError("x_cup_rotation.max_episodes must be >= min_episodes")
+        return self
 
 
 class TrackSamplingConfig(BaseModel):

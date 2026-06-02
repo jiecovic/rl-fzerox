@@ -181,6 +181,143 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     assert new_state_path.exists()
 
 
+def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="x-cup-cap")
+    ensure_run_dirs(run_paths)
+
+    old_state_path = run_paths.baselines_dir / "old_x_cup.state"
+    old_state_path.write_bytes(b"old")
+    old_state_path.with_suffix(".json").write_text(
+        json.dumps({"materializer_mode": X_CUP_COURSE.materializer_mode}) + "\n",
+        encoding="utf-8",
+    )
+    slot_key = generated_x_cup_slot_key(0)
+    entry = TrackSamplingEntryConfig(
+        id="x_cup_old_gp_race_novice_blue_falcon_balanced",
+        course_id="x_cup_old",
+        runtime_course_key=slot_key,
+        course_name="X Cup old",
+        course_index=X_CUP_COURSE.course_index,
+        mode=X_CUP_COURSE.race_mode,
+        gp_difficulty="novice",
+        vehicle="blue_falcon",
+        engine_setting="balanced",
+        engine_setting_raw_value=50,
+        baseline_state_path=old_state_path,
+        generated_course_kind=X_CUP_COURSE.generated_kind,
+        generated_course_seed=1,
+        generated_course_hash="old",
+        generated_course_slot=0,
+        generated_course_generation=1,
+        log_per_course=False,
+    )
+    env_config = EnvConfig(
+        track_sampling=TrackSamplingConfig(
+            enabled=True,
+            sampling_mode="adaptive_step_balanced",
+            entries=(entry,),
+            x_cup_rotation=XCupRotationConfig(
+                enabled=True,
+                completion_threshold=0.9,
+                min_episodes=3,
+                max_episodes=5,
+            ),
+        ),
+    )
+    train_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=env_config,
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="x-cup-cap"),
+    )
+    new_state_path = run_paths.baselines_dir / "new_x_cup.state"
+
+    def fake_materialize_baseline(*args: object, **kwargs: object) -> BaselineArtifact:
+        del args, kwargs
+        new_state_path.write_bytes(b"new")
+        new_state_path.with_suffix(".json").write_text(
+            json.dumps({"materializer_mode": X_CUP_COURSE.materializer_mode}) + "\n",
+            encoding="utf-8",
+        )
+        return BaselineArtifact(
+            state_path=new_state_path,
+            metadata_path=new_state_path.with_suffix(".json"),
+            cache_key="new-cache",
+            source_course_index=X_CUP_COURSE.course_index,
+            source_vehicle="blue_falcon",
+            source_gp_difficulty="novice",
+            source_engine_setting="balanced",
+            source_engine_setting_raw_value=50,
+        )
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.callbacks.track_sampling.x_cup_rotation.materialize_baseline",
+        fake_materialize_baseline,
+    )
+    state = TrackSamplingRuntimeState(
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=1,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.35,
+        adaptive_target_completion=0.9,
+        adaptive_min_confidence_episodes=1,
+        adaptive_confidence_scale=1.0,
+        update_count=1,
+        episodes_since_update=0,
+        entries=(
+            TrackSamplingRuntimeEntry(
+                track_id=slot_key,
+                course_key=slot_key,
+                label="X Cup old",
+                base_weight=1.0,
+                current_weight=1.0,
+                completed_frames=100,
+                episode_count=5,
+                finished_episode_count=0,
+                success_sample_count=5,
+                ema_episode_frames=100.0,
+                ema_completion_fraction=0.2,
+                generation_episode_count=5,
+                generation_finished_episode_count=0,
+                generation_success_sample_count=5,
+                generation_ema_completion_fraction=0.2,
+                generated_course_slot=0,
+                generated_course_generation=1,
+                generated_entry_id="x_cup_old_gp_race_novice_blue_falcon_balanced",
+                generated_course_id="x_cup_old",
+                generated_course_name="X Cup old",
+                generated_course_hash="old",
+                generated_course_seed=1,
+                generated_baseline_state_path=str(old_state_path),
+            ),
+        ),
+    )
+
+    update = XCupRotationManager(
+        config=train_config,
+        run_paths=run_paths,
+        cache_root=tmp_path,
+        persist_manifest_on_commit=False,
+    ).rotate_once(env_config=env_config, state=state)
+
+    assert update is not None
+    replacement = update.env_config.track_sampling.entries[0]
+    assert replacement.course_id is not None
+    assert replacement.course_id != "x_cup_old"
+    assert replacement.runtime_course_key == slot_key
+    assert replacement.generated_course_generation == 2
+    assert replacement.baseline_state_path == new_state_path
+
+
 def _write_x_cup_state(path: Path, *, timestamp: int) -> Path:
     path.write_bytes(b"stale")
     path.with_suffix(".json").write_text(

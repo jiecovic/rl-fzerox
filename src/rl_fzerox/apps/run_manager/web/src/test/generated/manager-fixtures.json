@@ -1489,6 +1489,7 @@
         "completion_threshold": 0.9,
         "ema_alpha": 0.3,
         "enabled": false,
+        "max_episodes": null,
         "min_episodes": 24
       },
       "x_cup_course_count": 6

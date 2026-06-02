@@ -128,6 +128,7 @@ const tracksConfigSchema = z.object({
     enabled: z.boolean(),
     completion_threshold: z.number().min(0).max(1),
     min_episodes: z.number().int().positive(),
+    max_episodes: z.number().int().positive().nullable(),
     ema_alpha: z.number().gt(0).max(1),
   }),
   sampling_mode: trackSamplingModeSchema,
