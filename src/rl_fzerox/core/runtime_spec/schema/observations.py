@@ -43,7 +43,6 @@ class ObservationStateComponentConfig(BaseModel):
     length: PositiveInt | None = Field(default=None, le=16)
     controls: tuple[ActionHistoryControlName, ...] | None = None
     included_features: tuple[str, ...] | None = None
-    optional_features: tuple[str, ...] | None = Field(default=None, exclude=True, repr=False)
 
     @model_validator(mode="before")
     @classmethod
@@ -62,7 +61,6 @@ class ObservationStateComponentConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_component_settings(self) -> ObservationStateComponentConfig:
-        self._normalize_legacy_optional_features()
         configured_fields = {
             name
             for name in (
@@ -71,7 +69,6 @@ class ObservationStateComponentConfig(BaseModel):
                 "length",
                 "controls",
                 "included_features",
-                "optional_features",
             )
             if getattr(self, name) is not None
         }
@@ -96,35 +93,16 @@ class ObservationStateComponentConfig(BaseModel):
                 raise ValueError(f"{self.name} does not support included feature(s): {joined}")
         return self
 
-    def _normalize_legacy_optional_features(self) -> None:
-        if self.optional_features is None:
-            return
-        if self.included_features is not None:
-            raise ValueError(
-                "state component cannot define both included_features and optional_features"
-            )
-        if len(set(self.optional_features)) != len(self.optional_features):
-            raise ValueError("state component optional_features must not contain duplicates")
-        supported_names = _supported_state_feature_names(self)
-        default_names = set(_default_state_feature_names(self))
-        requested_names = default_names | set(self.optional_features)
-        unsupported = sorted(requested_names - set(supported_names))
-        if unsupported:
-            joined = ", ".join(unsupported)
-            raise ValueError(f"{self.name} does not support included feature(s): {joined}")
-        self.included_features = tuple(name for name in supported_names if name in requested_names)
-        self.optional_features = None
-
     def _allowed_fields(self) -> frozenset[str]:
         match self.name:
             case "course_context":
-                return frozenset({"encoding", "included_features", "optional_features"})
+                return frozenset({"encoding", "included_features"})
             case "control_history":
-                return frozenset({"length", "controls", "included_features", "optional_features"})
+                return frozenset({"length", "controls", "included_features"})
             case "track_position":
-                return frozenset({"progress_source", "included_features", "optional_features"})
+                return frozenset({"progress_source", "included_features"})
             case "vehicle_state" | "machine_context" | "surface_state":
-                return frozenset({"included_features", "optional_features"})
+                return frozenset({"included_features"})
             case _:
                 raise ValueError(f"Unsupported state component: {self.name!r}")
 
@@ -243,13 +221,6 @@ def _supported_state_feature_names(component: ObservationStateComponentConfig) -
             if feature.name not in feature_names:
                 feature_names.append(feature.name)
     return tuple(feature_names)
-
-
-def _default_state_feature_names(component: ObservationStateComponentConfig) -> tuple[str, ...]:
-    from rl_fzerox.core.envs.observations.state.components import state_component_features
-
-    settings = _component_settings(component, included_features=None)
-    return tuple(feature.name for feature in state_component_features(settings))
 
 
 def _component_settings(
