@@ -360,6 +360,12 @@ describe("Configurator", () => {
     await user.click(screen.getByRole("button", { name: "Auto regenerate" }));
     expect(screen.getByRole("textbox", { name: "Completion threshold" })).toHaveValue("0.9");
     expect(screen.getByRole("textbox", { name: "Min episodes" })).toHaveValue("24");
+    expect(screen.getByRole("button", { name: "Episode cap" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    await user.click(screen.getByRole("button", { name: "Episode cap" }));
+    expect(screen.getByRole("textbox", { name: "Max episodes" })).toHaveValue("100");
     expect(screen.getByRole("button", { name: "Mute City" })).toBeInTheDocument();
   });
 

@@ -47,11 +47,21 @@ class ManagedXCupAutoRegenerationConfig(BaseModel):
         default=X_CUP_COURSE.rotation_defaults.min_episodes,
         ge=1,
     )
+    max_episodes: int | None = Field(
+        default=X_CUP_COURSE.rotation_defaults.max_episodes,
+        ge=1,
+    )
     ema_alpha: float = Field(
         default=X_CUP_COURSE.rotation_defaults.ema_alpha,
         gt=0.0,
         le=1.0,
     )
+
+    @model_validator(mode="after")
+    def _validate_episode_window(self) -> ManagedXCupAutoRegenerationConfig:
+        if self.max_episodes is not None and self.max_episodes < self.min_episodes:
+            raise ValueError("tracks.x_cup_auto_regeneration.max_episodes must be >= min_episodes")
+        return self
 
 
 class ManagedTracksConfig(BaseModel):

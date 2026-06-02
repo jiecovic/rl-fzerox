@@ -231,10 +231,7 @@ def _first_eligible_course(
     candidates = [
         entry
         for entry in entries
-        if entry.course_key in groups
-        and entry.generation_episode_count >= rotation.min_episodes
-        and entry.generation_ema_completion_fraction is not None
-        and entry.generation_ema_completion_fraction >= rotation.completion_threshold
+        if entry.course_key in groups and _rotation_eligible(entry, rotation=rotation)
     ]
     if not candidates:
         return None
@@ -242,6 +239,21 @@ def _first_eligible_course(
         candidates,
         key=lambda entry: (entry.course_key, entry.generation_episode_count),
     )[0]
+
+
+def _rotation_eligible(
+    entry: TrackSamplingRuntimeEntry,
+    *,
+    rotation: XCupRotationConfig,
+) -> bool:
+    max_episodes = rotation.max_episodes
+    if max_episodes is not None and entry.generation_episode_count >= max_episodes:
+        return True
+    return (
+        entry.generation_episode_count >= rotation.min_episodes
+        and entry.generation_ema_completion_fraction is not None
+        and entry.generation_ema_completion_fraction >= rotation.completion_threshold
+    )
 
 
 def _entry_runtime_course_key(entry: TrackSamplingEntryConfig) -> str:
