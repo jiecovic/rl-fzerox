@@ -302,12 +302,13 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
         ),
     )
 
-    update = XCupRotationManager(
+    manager = XCupRotationManager(
         config=train_config,
         run_paths=run_paths,
         cache_root=tmp_path,
         persist_manifest_on_commit=False,
-    ).rotate_once(env_config=env_config, state=state)
+    )
+    update = manager.rotate_once(env_config=env_config, state=state)
 
     assert update is not None
     replacement = update.env_config.track_sampling.entries[0]
@@ -316,6 +317,10 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
     assert replacement.runtime_course_key == slot_key
     assert replacement.generated_course_generation == 2
     assert replacement.baseline_state_path == new_state_path
+
+    manager.commit(update)
+
+    assert not (run_paths.run_dir / "train_config.yaml").exists()
 
 
 def _write_x_cup_state(path: Path, *, timestamp: int) -> Path:

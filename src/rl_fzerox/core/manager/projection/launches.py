@@ -69,6 +69,7 @@ def build_managed_resume_train_app_config(
                     "resume_source_auxiliary_state_head_arch": (
                         train_config.policy.auxiliary_state.head_arch
                     ),
+                    "resume_source_metadata_required": True,
                     "resume_artifact": "latest",
                     "resume_mode": "full_model",
                     "tensorboard_step_offset": tensorboard_step_offset,
@@ -85,7 +86,7 @@ def build_managed_fork_train_app_config(
     run_dir: Path,
     source_run_dir: Path,
     source_artifact: str,
-    source_config: ManagedRunConfig | None = None,
+    source_config: ManagedRunConfig,
     tensorboard_step_offset: int = 0,
 ) -> TrainAppConfig:
     """Project one manager config into a child run warm-started from another run."""
@@ -99,12 +100,12 @@ def build_managed_fork_train_app_config(
         "resume_run_dir": source_run_dir,
         "resume_artifact": source_artifact,
         "resume_mode": "weights_only",
+        "resume_source_metadata_required": True,
         "tensorboard_step_offset": tensorboard_step_offset,
     }
-    if source_config is not None:
-        resume_updates.update(
-            _managed_resume_source_metadata(source_config),
-        )
+    resume_updates.update(
+        _managed_resume_source_metadata(source_config),
+    )
     return train_config.model_copy(
         update={
             "train": train_config.train.model_copy(

@@ -101,6 +101,7 @@ class TrainConfig(BaseModel):
     resume_source_algorithm: TrainAlgorithmName | None = None
     resume_source_auxiliary_state_enabled: bool | None = None
     resume_source_auxiliary_state_head_arch: tuple[PositiveInt, ...] = ()
+    resume_source_metadata_required: bool = False
     resume_artifact: ResumeArtifact = "latest"
     resume_mode: ResumeMode = "weights_only"
 
@@ -108,6 +109,21 @@ class TrainConfig(BaseModel):
     def _validate_algorithm_specific_values(self) -> TrainConfig:
         if self.resume_run_dir is None and self.resume_mode == "full_model":
             raise ValueError("train.resume_mode=full_model requires train.resume_run_dir")
+        if self.resume_source_metadata_required:
+            if self.resume_run_dir is None:
+                raise ValueError(
+                    "train.resume_source_metadata_required requires train.resume_run_dir"
+                )
+            if self.resume_source_algorithm is None:
+                raise ValueError(
+                    "train.resume_source_metadata_required requires "
+                    "train.resume_source_algorithm"
+                )
+            if self.resume_source_auxiliary_state_enabled is None:
+                raise ValueError(
+                    "train.resume_source_metadata_required requires "
+                    "train.resume_source_auxiliary_state_enabled"
+                )
         if (
             self.explicit_run_dir is not None
             and self.continue_run_dir is not None
