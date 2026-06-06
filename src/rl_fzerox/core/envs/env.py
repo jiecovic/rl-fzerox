@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/env.py
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import gymnasium as gym
 
 from fzerox_emulator import EmulatorBackend, RaceControlState
@@ -114,6 +116,16 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Replace the active reset candidates after generated-course rotation."""
 
         self._engine.set_track_sampling_config(config)
+
+    def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
+        """Append externally scheduled course ids for deficit-budget resets."""
+
+        self._engine.extend_track_sampling_reset_queue(course_ids)
+
+    def track_sampling_reset_queue_length(self) -> int:
+        """Return queued deficit-budget reset course count."""
+
+        return self._engine.track_sampling_reset_queue_length()
 
     def set_locked_reset_course(self, course_id: str | None) -> None:
         """Lock subsequent sampled resets to one course for watch/manual inspection."""

@@ -21,7 +21,13 @@ ConfigVersion = Literal[1]
 StackMode = Literal["rgb", "gray", "luma_chroma"]
 RaceMode = Literal["time_attack", "gp_race"]
 GpDifficulty = RaceDifficultyName
-TrackSamplingMode = Literal["equal", "step_balanced", "adaptive_step_balanced"]
+TrackSamplingMode = Literal[
+    "equal",
+    "step_balanced",
+    "adaptive_step_balanced",
+    "fixed_env",
+    "deficit_budget",
+]
 VehicleSelectionMode = Literal["fixed", "pool"]
 EngineSettingMode = Literal["fixed", "random_range"]
 ActionAxisMode = Literal["continuous", "discrete"]

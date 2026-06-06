@@ -92,6 +92,11 @@ export function buildTrackPoolView(
   );
   return {
     cups: sortedCups,
+    stepMetricLabel:
+      state?.sampling_mode === "deficit_budget"
+        ? "tracked scheduler env steps"
+        : "completed episode env steps",
+    showStepTarget: run.config.tracks.sampling_mode !== "fixed_env",
     totalCourses: sortedCups.reduce((sum, cup) => sum + cup.entries.length, 0),
     totalEnvSteps: sortedCups.reduce((sum, cup) => sum + cup.completedEnvSteps, 0),
     totalEpisodes: sortedCups.reduce((sum, cup) => sum + cup.episodeCount, 0),
@@ -130,8 +135,8 @@ export function successLabel(entry: TrackPoolCourseView) {
   if (successSampleCount <= 0 || entry.successRate === null) {
     return `${prefix}${generationLabel === null ? "" : "sampling: "}${
       completionLabel === null
-        ? "Finish rate not tracked yet"
-        : `Finish rate not tracked yet · ${completionLabel}`
+        ? "No completed episode samples yet"
+        : `No completed episode samples yet · ${completionLabel}`
     }`;
   }
   return `${prefix}${generationLabel === null ? "" : "sampling: "}${(entry.finishedEpisodeCount ?? 0).toLocaleString()} of ${successSampleCount.toLocaleString()} finished · ${formatPercent(entry.successRate)} finish${
@@ -141,7 +146,7 @@ export function successLabel(entry: TrackPoolCourseView) {
 
 export function successSummary(entry: TrackPoolCourseView) {
   if ((entry.successSampleCount ?? 0) <= 0 || entry.successRate === null) {
-    return "finish n/a";
+    return "no episode samples";
   }
   return `${formatPercent(entry.successRate)} finish`;
 }
@@ -215,8 +220,14 @@ export function trackPoolEmptyMessage(run: ManagedRunDetail) {
 export function trackSamplingModeLabel(
   samplingMode: ManagedRunDetail["config"]["tracks"]["sampling_mode"],
 ) {
+  if (samplingMode === "fixed_env") {
+    return "fixed env assignment";
+  }
   if (samplingMode === "adaptive_step_balanced") {
     return "adaptive step-balanced";
+  }
+  if (samplingMode === "deficit_budget") {
+    return "deficit budget";
   }
   if (samplingMode === "step_balanced") {
     return "step-balanced";
@@ -231,7 +242,12 @@ export function displaySuccessRate(entry: TrackPoolCourseView) {
 function usesDynamicTrackSampling(
   samplingMode: ManagedRunDetail["config"]["tracks"]["sampling_mode"],
 ) {
-  return samplingMode === "step_balanced" || samplingMode === "adaptive_step_balanced";
+  return (
+    samplingMode === "step_balanced" ||
+    samplingMode === "adaptive_step_balanced" ||
+    samplingMode === "deficit_budget" ||
+    samplingMode === "fixed_env"
+  );
 }
 
 function emptyCup(id: string, label: string): TrackPoolCupView {

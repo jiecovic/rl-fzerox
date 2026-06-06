@@ -184,6 +184,9 @@ function boostOutputSummary(action: ManagedActionConfig): string {
   if (action.mask_boost_when_active) {
     guards.push("idle only");
   }
+  if (action.mask_boost_when_airborne) {
+    guards.push("grounded only");
+  }
   if (action.boost_decision_interval_steps > 1) {
     guards.push(`every ${action.boost_decision_interval_steps} env steps`);
   }

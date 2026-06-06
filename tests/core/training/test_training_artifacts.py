@@ -321,6 +321,7 @@ def test_save_train_run_config_persists_configured_action_layout(
     assert "configured_mask_overrides" not in action_data
     assert action_data["boost_decision_interval_frames"] == 1
     assert action_data["mask_boost_when_active"] is True
+    assert action_data["mask_boost_when_airborne"] is True
     assert action_data["boost_request_lockout_frames"] == 5
 
     loaded_config = load_train_run_config(run_paths.run_dir)
@@ -332,6 +333,7 @@ def test_save_train_run_config_persists_configured_action_layout(
     assert action_config.boost_decision_interval_frames == 1
     assert action_config.boost_request_lockout_frames == 5
     assert action_config.mask_boost_when_active is True
+    assert action_config.mask_boost_when_airborne is True
 
 
 def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(

@@ -13,7 +13,13 @@ export const runCommandSchema = z.enum(["pause", "stop"]);
 export const observationPresetSchema = z.enum(["crop_72x96", "crop_84x84"]);
 export const raceModeSchema = z.enum(["time_attack", "gp_race"]);
 export const gpDifficultySchema = z.enum(["novice", "standard", "expert", "master"]);
-export const trackSamplingModeSchema = z.enum(["equal", "step_balanced", "adaptive_step_balanced"]);
+export const trackSamplingModeSchema = z.enum([
+  "equal",
+  "step_balanced",
+  "adaptive_step_balanced",
+  "deficit_budget",
+  "fixed_env",
+]);
 export const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
 export const engineSettingModeSchema = z.enum(["fixed", "random_range"]);
 export const actionAxisModeSchema = z.enum(["continuous", "discrete"]);

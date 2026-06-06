@@ -107,6 +107,11 @@ const tracksConfigSchema = z.object({
   adaptive_step_balance_target_completion: z.number().min(0).max(1),
   adaptive_step_balance_min_confidence_episodes: z.number().int().positive(),
   adaptive_step_balance_confidence_scale: z.number().min(1),
+  deficit_budget_uniform_fraction: z.number().min(0).max(1),
+  deficit_budget_min_weight: z.number().positive(),
+  deficit_budget_max_weight: z.number().positive(),
+  deficit_budget_ema_alpha: z.number().gt(0).max(1),
+  deficit_budget_weight_update_rollouts: z.number().int().positive(),
   selected_course_ids: z.array(z.string()),
 });
 
@@ -147,6 +152,7 @@ const actionConfigSchema = z
     include_boost: z.boolean(),
     enable_boost: z.boolean(),
     mask_boost_when_active: z.boolean(),
+    mask_boost_when_airborne: z.boolean(),
     boost_decision_interval_steps: z.number().int().positive(),
     boost_request_lockout_frames: z.number().int().nonnegative(),
     boost_unmask_max_speed_kph: z.number().nonnegative().nullable(),

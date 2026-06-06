@@ -76,6 +76,8 @@ def action_branch_previews(config: ManagedRunConfig) -> tuple[ActionBranchPrevie
                 boost_guards.append(f"≥ {config.action.boost_min_energy_fraction * 100:g}% energy")
             if config.action.mask_boost_when_active:
                 boost_guards.append("idle only")
+            if config.action.mask_boost_when_airborne:
+                boost_guards.append("grounded only")
             if config.action.boost_decision_interval_steps > 1:
                 boost_guards.append(
                     f"every {config.action.boost_decision_interval_steps:d} env steps"

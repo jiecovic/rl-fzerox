@@ -77,6 +77,8 @@ export function RunTrackPoolPanel({
       ) : activeCup === null ? null : (
         <TrackPoolBody
           activeCup={activeCup}
+          stepMetricLabel={poolView.stepMetricLabel}
+          showStepTarget={poolView.showStepTarget}
           xCupRegenerationMinEpisodes={
             run.config.tracks.x_cup_auto_regeneration.enabled
               ? run.config.tracks.x_cup_auto_regeneration.min_episodes

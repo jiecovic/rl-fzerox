@@ -150,6 +150,7 @@ class ActionRuntimeConfig:
     lean_mode: LeanMode
     lean_output_mode: LeanOutputMode
     mask_boost_when_active: bool
+    mask_boost_when_airborne: bool
     boost_unmask_max_speed_kph: float | None
     boost_decision_interval_frames: int
     boost_request_lockout_frames: int
@@ -222,6 +223,7 @@ class ActionRuntimeConfig:
             lean_mode=config.lean_mode,
             lean_output_mode=config.lean_output_mode,
             mask_boost_when_active=bool(config.mask_boost_when_active),
+            mask_boost_when_airborne=bool(config.mask_boost_when_airborne),
             boost_unmask_max_speed_kph=(
                 None
                 if config.boost_unmask_max_speed_kph is None
@@ -263,6 +265,7 @@ class ActionConfig(BaseModel):
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     lean_output_mode: LeanOutputMode = "three_way"
     mask_boost_when_active: bool = True
+    mask_boost_when_airborne: bool = True
     boost_decision_interval_frames: PositiveInt = 1
     boost_request_lockout_frames: NonNegativeInt = 5
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None

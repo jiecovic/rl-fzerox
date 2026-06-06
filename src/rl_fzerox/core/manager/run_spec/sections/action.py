@@ -45,6 +45,7 @@ class ManagedActionConfig(BaseModel):
     include_boost: bool = True
     enable_boost: bool = True
     mask_boost_when_active: bool = True
+    mask_boost_when_airborne: bool = True
     boost_decision_interval_steps: PositiveInt = 1
     boost_request_lockout_frames: NonNegativeInt = 5
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None

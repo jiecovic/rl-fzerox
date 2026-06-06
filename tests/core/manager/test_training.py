@@ -90,6 +90,64 @@ def test_manager_training_bridge_projects_equal_sampling_to_balanced_cycle(
     assert train_config.env.track_sampling.sampling_mode == "balanced"
 
 
+def test_manager_training_bridge_projects_fixed_env_sampling(tmp_path: Path) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.train.num_envs = len(config.tracks.selected_course_ids)
+    config.tracks.sampling_mode = "fixed_env"
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-fixed-env-track-sampling",
+        run_dir=tmp_path / "runs" / "bridge-fixed-env-track-sampling_0001",
+    )
+
+    assert train_config.env.track_sampling.sampling_mode == "fixed_env"
+
+
+def test_fixed_env_sampling_allows_env_multiples() -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.train.num_envs = 24
+    config.tracks.sampling_mode = "fixed_env"
+    config.tracks.selected_course_ids = config.tracks.selected_course_ids[:12]
+
+    validated = ManagedRunConfig.model_validate(config.model_dump(mode="python"))
+
+    assert validated.tracks.active_course_count() == 12
+
+
+def test_fixed_env_sampling_rejects_non_divisible_env_counts() -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.train.num_envs = 24
+    config.tracks.sampling_mode = "fixed_env"
+    config.tracks.selected_course_ids = config.tracks.selected_course_ids[:10]
+
+    with pytest.raises(ValueError, match="fixed_env"):
+        ManagedRunConfig.model_validate(config.model_dump(mode="python"))
+
+
+def test_fixed_env_sampling_rejects_too_few_envs() -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.train.num_envs = 12
+    config.tracks.sampling_mode = "fixed_env"
+
+    with pytest.raises(ValueError, match="at least the active course count"):
+        ManagedRunConfig.model_validate(config.model_dump(mode="python"))
+
+
+def test_fixed_env_sampling_counts_x_cup_slots() -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.train.num_envs = 24
+    config.tracks.race_mode = "gp_race"
+    config.tracks.include_x_cup = True
+    config.tracks.x_cup_course_count = 2
+    config.tracks.sampling_mode = "fixed_env"
+    config.tracks.selected_course_ids = config.tracks.selected_course_ids[:22]
+
+    validated = ManagedRunConfig.model_validate(config.model_dump(mode="python"))
+
+    assert validated.tracks.active_course_count() == 24
+
+
 def test_manager_training_bridge_supports_discrete_and_continuous_mixed_actions(
     tmp_path: Path,
 ) -> None:
@@ -271,6 +329,7 @@ def test_manager_training_bridge_can_mask_air_brake_on_ground(
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.action.mask_air_brake_on_ground = True
+    config.action.mask_boost_when_airborne = False
     config.action.boost_decision_interval_steps = 4
 
     train_config = build_managed_train_app_config(
@@ -280,6 +339,7 @@ def test_manager_training_bridge_can_mask_air_brake_on_ground(
     )
 
     assert train_config.env.action.mask_air_brake_on_ground is True
+    assert train_config.env.action.mask_boost_when_airborne is False
     assert train_config.env.action.boost_decision_interval_frames == 8
 
 
@@ -366,6 +426,31 @@ def test_manager_training_bridge_projects_adaptive_track_sampling_settings(
     assert train_config.env.track_sampling.adaptive_step_balance_confidence_scale == (
         pytest.approx(2.5)
     )
+
+
+def test_manager_training_bridge_projects_deficit_budget_track_sampling_settings(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.tracks.sampling_mode = "deficit_budget"
+    config.tracks.deficit_budget_uniform_fraction = 0.6
+    config.tracks.deficit_budget_min_weight = 1.2
+    config.tracks.deficit_budget_max_weight = 4.0
+    config.tracks.deficit_budget_ema_alpha = 0.01
+    config.tracks.deficit_budget_weight_update_rollouts = 30
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-deficit-track-sampling",
+        run_dir=tmp_path / "runs" / "bridge-deficit-track-sampling_0001",
+    )
+
+    assert train_config.env.track_sampling.sampling_mode == "deficit_budget"
+    assert train_config.env.track_sampling.deficit_budget_uniform_fraction == pytest.approx(0.6)
+    assert train_config.env.track_sampling.deficit_budget_min_weight == pytest.approx(1.2)
+    assert train_config.env.track_sampling.deficit_budget_max_weight == pytest.approx(4.0)
+    assert train_config.env.track_sampling.deficit_budget_ema_alpha == pytest.approx(0.01)
+    assert train_config.env.track_sampling.deficit_budget_weight_update_rollouts == 30
 
 
 def test_manager_training_bridge_supports_continuous_air_brake_lane(

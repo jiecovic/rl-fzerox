@@ -35,6 +35,30 @@ def test_select_reset_track_by_course_id_uses_matching_entry() -> None:
     assert selected.sampling_mode == "locked"
 
 
+def test_select_reset_track_by_course_id_can_label_external_scheduler() -> None:
+    config = TrackSamplingConfig(
+        enabled=True,
+        sampling_mode="balanced",
+        entries=(
+            TrackSamplingEntryConfig(
+                id="silence",
+                course_id="silence",
+                course_name="Silence",
+                baseline_state_path=Path("silence.state"),
+            ),
+        ),
+    )
+
+    selected = select_reset_track_by_course_id(
+        config,
+        course_id="silence",
+        sampling_mode="deficit_budget",
+    )
+
+    assert selected is not None
+    assert selected.sampling_mode == "deficit_budget"
+
+
 def test_select_reset_track_by_course_id_returns_none_without_match() -> None:
     config = TrackSamplingConfig(
         enabled=True,
@@ -83,3 +107,67 @@ def test_track_reset_selector_resyncs_when_entry_metadata_changes() -> None:
     assert second is not None
     assert first.engine_setting_raw_value == 20
     assert second.engine_setting_raw_value == 80
+
+
+def test_fixed_env_track_sampling_pins_course_by_env_index() -> None:
+    config = TrackSamplingConfig(
+        enabled=True,
+        sampling_mode="fixed_env",
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute_city",
+                course_id="mute_city",
+                baseline_state_path=Path("mute_city.state"),
+            ),
+            TrackSamplingEntryConfig(
+                id="silence",
+                course_id="silence",
+                baseline_state_path=Path("silence.state"),
+            ),
+            TrackSamplingEntryConfig(
+                id="sand_ocean",
+                course_id="sand_ocean",
+                baseline_state_path=Path("sand_ocean.state"),
+            ),
+        ),
+    )
+
+    selected_by_env = tuple(
+        TrackResetSelector(env_index=env_index).select(config, seed=123) for env_index in range(4)
+    )
+
+    selected_course_ids = [
+        selected.course_id if selected is not None else None for selected in selected_by_env
+    ]
+    assert selected_course_ids == ["mute_city", "silence", "sand_ocean", "mute_city"]
+    assert selected_by_env[0] is not None
+    assert selected_by_env[0].sampling_mode == "fixed_env"
+    assert selected_by_env[0].cycle_position == 0
+    assert selected_by_env[3] is not None
+    assert selected_by_env[3].cycle_position == 0
+
+
+def test_deficit_budget_track_sampling_falls_back_to_env_index_assignment() -> None:
+    config = TrackSamplingConfig(
+        enabled=True,
+        sampling_mode="deficit_budget",
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute_city",
+                course_id="mute_city",
+                baseline_state_path=Path("mute_city.state"),
+            ),
+            TrackSamplingEntryConfig(
+                id="silence",
+                course_id="silence",
+                baseline_state_path=Path("silence.state"),
+            ),
+        ),
+    )
+
+    selected = TrackResetSelector(env_index=3).select(config, seed=123)
+
+    assert selected is not None
+    assert selected.course_id == "silence"
+    assert selected.sampling_mode == "deficit_budget"
+    assert selected.cycle_position == 1

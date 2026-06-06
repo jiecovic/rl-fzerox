@@ -90,6 +90,19 @@ class ManagedRunConfig(BaseModel):
             raise ValueError(
                 f"observation.state_feature_dropouts must reference active state features: {joined}"
             )
+        if self.tracks.sampling_mode == "fixed_env":
+            active_course_count = self.tracks.active_course_count()
+            if self.train.num_envs < active_course_count:
+                raise ValueError(
+                    "tracks.sampling_mode=fixed_env requires train.num_envs to be at least "
+                    f"the active course count ({active_course_count}); got {self.train.num_envs}"
+                )
+            if self.train.num_envs % active_course_count != 0:
+                raise ValueError(
+                    "tracks.sampling_mode=fixed_env requires train.num_envs to be an even "
+                    f"multiple of the active course count ({active_course_count}); got "
+                    f"{self.train.num_envs}"
+                )
         return self
 
 

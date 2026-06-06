@@ -163,6 +163,7 @@ describe("RunTrackPoolPanel", () => {
     expect(screen.getByRole("tab", { name: /jack/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /queen/i })).toBeInTheDocument();
     expect(screen.getByText(selectedCourses[0]?.display_name ?? "")).toBeInTheDocument();
+    expect(screen.getByText("Completion")).toBeInTheDocument();
     expect(screen.getByText(/finish 33.3%/i)).toBeInTheDocument();
     expect(screen.queryByText(selectedCourses[2]?.display_name ?? "")).not.toBeInTheDocument();
 
@@ -406,6 +407,81 @@ describe("RunTrackPoolPanel", () => {
     expect(screen.getByText(/step target/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /target 70\.0%/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /target 30\.0%/i })).toBeInTheDocument();
+  });
+
+  it("hides step targets for fixed env assignment", () => {
+    const firstCup = configMetadataFixture.track_cups[0];
+    if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
+      throw new Error("fixture cup must provide at least two courses");
+    }
+    const selectedCourseIds = [firstCup.course_ids[0], firstCup.course_ids[1]];
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          config: {
+            ...managedRunConfigFixture,
+            tracks: {
+              ...managedRunConfigFixture.tracks,
+              sampling_mode: "fixed_env",
+              selected_course_ids: selectedCourseIds as string[],
+            },
+          },
+        })}
+        state={{
+          ...trackSamplingStateForCourses(selectedCourseIds),
+          sampling_mode: "fixed_env",
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/step target/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /target/i })).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /completed episode env steps/i }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("shows track-pool stats for deficit budget sampling", () => {
+    const firstCup = configMetadataFixture.track_cups[0];
+    if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
+      throw new Error("fixture cup must provide at least two courses");
+    }
+    const selectedCourseIds = [firstCup.course_ids[0], firstCup.course_ids[1]];
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          config: {
+            ...managedRunConfigFixture,
+            tracks: {
+              ...managedRunConfigFixture.tracks,
+              sampling_mode: "deficit_budget",
+              selected_course_ids: selectedCourseIds as string[],
+            },
+          },
+        })}
+        state={{
+          ...trackSamplingStateForCourses(selectedCourseIds),
+          sampling_mode: "deficit_budget",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Track pool")).toBeInTheDocument();
+    expect(screen.getByText(/deficit budget/i)).toBeInTheDocument();
+    expect(screen.getByText(/step target/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /tracked scheduler env steps/i }).length,
+    ).toBeGreaterThan(0);
   });
 });
 
