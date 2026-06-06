@@ -10,31 +10,24 @@ from rl_fzerox.core.envs.actions import (
     ActionValue,
     DecodedAction,
     ResettableActionAdapter,
-    build_action_adapter,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
+from rl_fzerox.core.envs.engine.components import build_engine_runtime_components
 from rl_fzerox.core.envs.engine.controls import (
     ActionMaskBranches,
-    ActionMaskController,
     ActionMaskSnapshot,
-    ControlStateTracker,
     apply_control_semantics,
     apply_spin_semantics,
     sync_dynamic_action_masks,
 )
-from rl_fzerox.core.envs.engine.episode import EngineEpisodeState
 from rl_fzerox.core.envs.engine.info import backend_step_info, set_curriculum_info, telemetry_info
-from rl_fzerox.core.envs.engine.observation import EngineObservationBuilder
 from rl_fzerox.core.envs.engine.policy_drive.frame import PolicyDriveFrame
-from rl_fzerox.core.envs.engine.rendering import backend_renderer
 from rl_fzerox.core.envs.engine.stepping import (
-    EngineStepAssembler,
     EnvStepRequest,
     PolicyDriveStep,
     set_episode_boost_pad_info,
 )
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.envs.rewards import build_reward_tracker
 
 if TYPE_CHECKING:
     from fzerox_emulator import Emulator
@@ -53,49 +46,22 @@ class PolicyDriveRuntime:
         self.train_config = train_config
         self._backend = emulator
         self._config = train_config.env
-        self._action_config = self._config.action.runtime()
-        self._renderer = backend_renderer(emulator)
-        self._action_adapter = build_action_adapter(self._action_config)
-        self._observation_builder = EngineObservationBuilder.from_engine_config(
+        components = build_engine_runtime_components(
             backend=emulator,
             config=self._config,
-            renderer=self._renderer,
-        )
-        self._reward_tracker = build_reward_tracker(
-            config=train_config.reward,
-            max_episode_steps=self._config.max_episode_steps,
-        )
-        self._reward_summary_config = self._reward_tracker.summary_config()
-        self._mask_controller = ActionMaskController.from_config(
-            adapter=self._action_adapter,
-            base_overrides=self._action_config.mask_overrides,
+            reward_config=train_config.reward,
             curriculum_config=train_config.curriculum,
-            boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
-            lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
-            mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
-            pitch_neutral_index=self._action_config.pitch_buckets // 2,
         )
-        self._control_state = ControlStateTracker(
-            lean_mode=self._action_config.lean_mode,
-            lean_initial_lockout_frames=self._action_config.lean_initial_lockout_frames,
-            boost_decision_interval_frames=self._action_config.boost_decision_interval_frames,
-            boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
-            action_history_len=self._observation_builder.action_history_len,
-            action_history_controls=self._observation_builder.action_history_controls,
-            split_lean_history=self._action_config.split_lean_history,
-        )
-        self._step_assembler = EngineStepAssembler(
-            backend=emulator,
-            config=self._config,
-            action_config=self._action_config,
-            reward_summary_config=self._reward_summary_config,
-            reward_tracker=self._reward_tracker,
-            observation_builder=self._observation_builder,
-            mask_controller=self._mask_controller,
-            control_state=self._control_state,
-            renderer=self._renderer,
-        )
-        self._episode = EngineEpisodeState()
+        self._renderer = components.renderer
+        self._action_config = components.action_config
+        self._action_adapter = components.action_adapter
+        self._observation_builder = components.observation_builder
+        self._reward_tracker = components.reward_tracker
+        self._reward_summary_config = self._reward_tracker.summary_config()
+        self._mask_controller = components.mask_controller
+        self._control_state = components.control_state
+        self._step_assembler = components.step_assembler
+        self._episode = components.episode
 
     @property
     def last_requested_control_state(self) -> RaceControlState:
