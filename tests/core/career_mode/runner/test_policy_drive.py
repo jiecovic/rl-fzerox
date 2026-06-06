@@ -1,4 +1,4 @@
-# tests/ui/test_career_policy_race.py
+# tests/core/career_mode/runner/test_policy_drive.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -36,9 +36,7 @@ def test_policy_drive_info_keeps_native_terminal_reason() -> None:
 
 
 def test_career_policy_race_uses_policy_drive_boundary() -> None:
-    source = Path("src/rl_fzerox/ui/watch/runtime/career_mode/policy_race.py").read_text(
-        encoding="utf-8"
-    )
+    source = Path("src/rl_fzerox/core/career_mode/runner/policy.py").read_text(encoding="utf-8")
 
     assert "WatchEnvStep" not in source
     assert "step_watch(" not in source
