@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/engine/runtime.py
+# src/rl_fzerox/core/envs/runtime.py
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -14,6 +14,24 @@ from rl_fzerox.core.envs.actions import (
     ResettableActionAdapter,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
+from rl_fzerox.core.envs.engine.components import build_engine_runtime_components
+from rl_fzerox.core.envs.engine.controls import (
+    ActionMaskBranches,
+    ActionMaskSnapshot,
+    apply_control_semantics,
+    apply_spin_semantics,
+    sync_dynamic_action_masks,
+)
+from rl_fzerox.core.envs.engine.info import (
+    set_curriculum_info,
+    telemetry_info,
+)
+from rl_fzerox.core.envs.engine.reset import EngineResetCoordinator
+from rl_fzerox.core.envs.engine.stepping import (
+    EnvStepRequest,
+    WatchEnvStep,
+    set_episode_boost_pad_info,
+)
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_vector_or_zeros,
@@ -26,32 +44,13 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingConfig,
 )
 
-from .components import build_engine_runtime_components
-from .controls import (
-    ActionMaskBranches,
-    ActionMaskSnapshot,
-    apply_control_semantics,
-    apply_spin_semantics,
-    sync_dynamic_action_masks,
-)
-from .info import (
-    set_curriculum_info,
-    telemetry_info,
-)
-from .reset import EngineResetCoordinator
-from .stepping import (
-    EnvStepRequest,
-    WatchEnvStep,
-    set_episode_boost_pad_info,
-)
 
-
-class FZeroXEnvEngine:
-    """Environment step engine around one emulator backend.
+class FZeroXEnvRuntime:
+    """Training/watch runtime around one emulator backend.
 
     Rust owns the repeated inner-frame loop for one outer env step. Python
-    consumes the returned step summary and stop state to apply reward shaping,
-    build policy observations, and assemble Gym-facing info.
+    consumes the returned step summary and stop state to apply Gym termination,
+    reward shaping, policy observations, and watch-facing info.
     """
 
     def __init__(
