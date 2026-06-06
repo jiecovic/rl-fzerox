@@ -6,17 +6,17 @@ from typing import TYPE_CHECKING
 
 from fzerox_emulator import Emulator, RaceControlState
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
+from rl_fzerox.core.career_mode.runner.policy import (
+    CareerModePolicyControl,
+    CareerPolicyRaceDriver,
+    CareerPolicyRaceStep,
+)
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.engine.info import backend_step_info, telemetry_info
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
-from rl_fzerox.ui.watch.runtime.career_mode.policy_race import (
-    CareerPolicyRace,
-    CareerPolicyRaceStep,
-)
 from rl_fzerox.ui.watch.runtime.observation import configured_watch_zeroed_features
 from rl_fzerox.ui.watch.runtime.timing import _resolve_control_fps, _target_seconds
 
@@ -36,7 +36,7 @@ class CareerModeRuntimeSession:
     target_control_seconds: float | None
     watch_zeroed_state_features: frozenset[str]
     auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...]
-    _policy_race: CareerPolicyRace | None = field(init=False, repr=False)
+    _policy_race: CareerPolicyRaceDriver | None = field(init=False, repr=False)
     _active_policy_key: tuple[str, str] | None = field(init=False, repr=False)
     _active_policy_control: CareerModePolicyControl | None = field(
         init=False,
@@ -44,7 +44,7 @@ class CareerModeRuntimeSession:
     )
 
     def __post_init__(self) -> None:
-        self._policy_race: CareerPolicyRace | None = None
+        self._policy_race: CareerPolicyRaceDriver | None = None
         self._active_policy_key: tuple[str, str] | None = None
         self._active_policy_control: CareerModePolicyControl | None = None
 
@@ -133,7 +133,7 @@ class CareerModeRuntimeSession:
     def _ensure_policy_race(self, policy_control: CareerModePolicyControl) -> None:
         if self._active_policy_key == policy_control.key and self._policy_race is not None:
             return
-        self._policy_race = CareerPolicyRace(
+        self._policy_race = CareerPolicyRaceDriver(
             emulator=self.emulator,
             policy_control=policy_control,
         )
@@ -153,7 +153,7 @@ class CareerModeRuntimeSession:
             loss.name for loss in train_config.policy.auxiliary_state.losses
         )
 
-    def _require_policy_race(self) -> CareerPolicyRace:
+    def _require_policy_race(self) -> CareerPolicyRaceDriver:
         if self._policy_race is None:
             raise RuntimeError("Career Mode policy race is not active")
         return self._policy_race
