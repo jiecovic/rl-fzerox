@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/view/screen/render.py
 from __future__ import annotations
 
+import math
+
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.runtime_spec.schema import (
@@ -16,6 +18,7 @@ from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
+from rl_fzerox.ui.watch.view.panels.core.tabs import WATCH_PANEL_TABS, PanelTabRegistry
 from rl_fzerox.ui.watch.view.screen.frame import FrameRenderData, _draw_frame
 from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,
@@ -37,9 +40,11 @@ def draw_watch_frame(
     target_render_fps: float | None,
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
     live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
+    panel_tabs: PanelTabRegistry = WATCH_PANEL_TABS,
     panel_tab_index: int = 0,
     cnn_layer_tab_index: int = 0,
     record_tab_index: int = 0,
+    policy_observation_layout_shape: tuple[int, ...] | None = None,
 ) -> ViewerHitboxes:
     """Render one worker state packet without leaking env/policy logic into drawing."""
 
@@ -48,7 +53,7 @@ def draw_watch_frame(
     draw_info = _with_viewer_rates(
         snapshot.info,
         native_fps=snapshot.native_fps,
-        action_repeat=config.env.action_repeat,
+        action_repeat=snapshot.action_repeat,
         current_control_fps=snapshot.control_fps,
         current_render_fps=render_rate.rate_hz(),
         target_control_fps=snapshot.target_control_fps,
@@ -61,15 +66,28 @@ def draw_watch_frame(
         policy_stage_name=snapshot.policy_curriculum_stage,
     )
     _add_config_track_info(draw_info, config, track_pool_records=track_pool_records)
+    _add_career_mode_info(draw_info, config)
+    policy_observation = snapshot.policy_observation
+    observation_layout_shape = (
+        snapshot.policy_observation_shape
+        or policy_observation_layout_shape
+        or _default_policy_observation_layout_shape()
+    )
     return _draw_frame(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
         data=FrameRenderData(
             raw_frame=snapshot.raw_frame,
-            observation=snapshot.observation_image,
-            observation_state=snapshot.observation_state,
-            observation_state_reference=snapshot.observation_state_reference,
+            policy_observation_image=(
+                None if policy_observation is None else policy_observation.image
+            ),
+            policy_observation_shape=snapshot.policy_observation_shape,
+            policy_observation_layout_shape=observation_layout_shape,
+            observation_state=None if policy_observation is None else policy_observation.state,
+            observation_state_reference=(
+                None if policy_observation is None else policy_observation.state_reference
+            ),
             observation_state_feature_names=_observation_state_feature_names(
                 config,
                 snapshot.info,
@@ -111,6 +129,7 @@ def draw_watch_frame(
             panel_tab_index=panel_tab_index,
             cnn_layer_tab_index=cnn_layer_tab_index,
             record_tab_index=record_tab_index,
+            panel_tabs=panel_tabs,
             continuous_drive_deadzone=action_config.continuous_drive_deadzone,
             continuous_drive_enabled=action_config.uses_continuous_drive(),
             force_full_throttle=bool(action_config.force_full_throttle),
@@ -124,7 +143,7 @@ def draw_watch_frame(
             continuous_air_brake_min_duty=action_config.continuous_air_brake_min_duty,
             continuous_air_brake_mode=action_config.continuous_air_brake_mode,
             continuous_air_brake_disabled=snapshot.continuous_air_brake_disabled,
-            action_repeat=config.env.action_repeat,
+            action_repeat=snapshot.action_repeat,
             max_episode_steps=config.env.max_episode_steps,
             progress_frontier_stall_limit_frames=config.env.progress_frontier_stall_limit_frames,
             stuck_min_speed_kph=config.env.stuck_min_speed_kph,
@@ -135,6 +154,10 @@ def draw_watch_frame(
             policy_config=config.policy,
         ),
     )
+
+
+def _default_policy_observation_layout_shape() -> tuple[int, int, int]:
+    return (72, 96, 3)
 
 
 def _thrust_warning_threshold(config: WatchAppConfig) -> float | None:
@@ -171,6 +194,15 @@ def _add_config_track_info(
     if has_runtime_track:
         return
     info.update(_track_config_record(config.track))
+
+
+def _add_career_mode_info(info: dict[str, object], config: WatchAppConfig) -> None:
+    if config.watch.managed_save_game_id is None:
+        return
+    if config.watch.unlock_target_label is not None:
+        info["career_mode_target_label"] = config.watch.unlock_target_label
+    if config.watch.save_attempt_id is not None:
+        info["career_mode_attempt_id"] = config.watch.save_attempt_id
 
 
 def _track_pool_records(
@@ -275,6 +307,8 @@ def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]
         info["track_vehicle_name"] = entry.vehicle_name
     if entry.engine_setting is not None:
         info["track_engine_setting"] = entry.engine_setting
+    if entry.engine_setting_raw_value is not None:
+        info["track_engine_setting_raw_value"] = int(entry.engine_setting_raw_value)
     if entry.records is not None:
         info.update(entry.records.info())
     return info
@@ -303,6 +337,8 @@ def _track_config_record(track: TrackConfig) -> dict[str, object]:
         info["track_vehicle_name"] = track.vehicle_name
     if track.engine_setting is not None:
         info["track_engine_setting"] = track.engine_setting
+    if track.engine_setting_raw_value is not None:
+        info["track_engine_setting_raw_value"] = int(track.engine_setting_raw_value)
     if track.baseline_state_path is not None:
         info["track_baseline_state_path"] = str(track.baseline_state_path)
     if track.records is not None:
@@ -369,13 +405,32 @@ def _with_viewer_rates(
     draw_info["viewer_fps"] = current_render_fps
     draw_info["render_fps"] = current_render_fps
     draw_info["control_fps"] = current_control_fps
-    draw_info["game_fps"] = current_control_fps * float(action_repeat)
+    explicit_game_fps = _finite_number(draw_info.get("game_fps"))
+    draw_info["game_fps"] = (
+        explicit_game_fps
+        if explicit_game_fps is not None
+        else current_control_fps * float(action_repeat)
+    )
     draw_info["native_fps"] = native_fps
     draw_info["control_fps_target"] = (
         "unlimited" if target_control_fps is None else target_control_fps
     )
+    explicit_game_fps_target = _finite_number(draw_info.get("game_fps_target"))
     draw_info["game_fps_target"] = (
-        "unlimited" if target_control_fps is None else target_control_fps * float(action_repeat)
+        explicit_game_fps_target
+        if explicit_game_fps_target is not None
+        else (
+            "unlimited"
+            if target_control_fps is None
+            else target_control_fps * float(action_repeat)
+        )
     )
     draw_info["render_fps_target"] = "unlimited" if target_render_fps is None else target_render_fps
     return draw_info
+
+
+def _finite_number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) and number >= 0.0 else None

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
@@ -51,6 +52,7 @@ class EngineResetCoordinator:
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
         self._locked_reset_course_id: str | None = None
         self._sequential_track_sampling = False
+        self._queued_reset_course_ids: list[str] = []
         self._track_selector = TrackResetSelector(env_index=env_index)
         self._track_baseline_cache = TrackBaselineCache()
         self._reset_seeds = EngineResetSeeds()
@@ -76,7 +78,18 @@ class EngineResetCoordinator:
         """Replace the base track-sampling config used at future episode resets."""
 
         self._config = self._config.model_copy(update={"track_sampling": config})
+        self._queued_reset_course_ids.clear()
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
+
+    def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
+        """Append externally scheduled course ids for deficit-budget resets."""
+
+        self._queued_reset_course_ids.extend(str(course_id) for course_id in course_ids)
+
+    def track_sampling_reset_queue_length(self) -> int:
+        """Return how many externally scheduled reset courses remain queued."""
+
+        return len(self._queued_reset_course_ids)
 
     def set_locked_reset_course(self, course_id: str | None) -> None:
         """Lock subsequent sampled resets to one course for watch/manual inspection."""
@@ -113,6 +126,8 @@ class EngineResetCoordinator:
                 self._active_track_sampling,
                 seed=self._reset_seeds.track_sampling_seed(seed),
             )
+        if self._active_track_sampling.sampling_mode == "deficit_budget":
+            return self._select_queued_track(seed=seed)
         return self._track_selector.select(
             self._active_track_sampling,
             seed=self._reset_seeds.track_sampling_seed(seed),
@@ -193,6 +208,27 @@ class EngineResetCoordinator:
             for entry in config.entries
         )
         return config.model_copy(update={"entries": entries})
+
+    def _select_queued_track(self, *, seed: int | None) -> SelectedTrack | None:
+        if not self._active_track_sampling.enabled:
+            return None
+        if not self._queued_reset_course_ids:
+            return self._track_selector.select(
+                self._active_track_sampling,
+                seed=self._reset_seeds.track_sampling_seed(seed),
+            )
+        course_id = self._queued_reset_course_ids.pop(0)
+        selected_track = select_reset_track_by_course_id(
+            self._active_track_sampling,
+            course_id=course_id,
+            sampling_mode="deficit_budget",
+            seed=self._reset_seeds.track_sampling_seed(seed),
+        )
+        if selected_track is None:
+            raise RuntimeError(
+                f"deficit-budget reset queue referenced unknown course {course_id!r}"
+            )
+        return selected_track
 
     def _maybe_randomize_game_rng(
         self,

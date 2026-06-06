@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+
 
 @dataclass(frozen=True, slots=True)
 class PanelTab:
@@ -35,8 +37,12 @@ class PanelTabRegistry:
         return self.index("live")
 
     @property
-    def records_index(self) -> int:
-        return self.index("records")
+    def records_index(self) -> int | None:
+        return self.optional_index("records")
+
+    @property
+    def career_index(self) -> int | None:
+        return self.optional_index("career")
 
     @property
     def state_index(self) -> int:
@@ -52,6 +58,12 @@ class PanelTabRegistry:
                 return index
         raise ValueError(f"Unknown panel tab key: {key!r}")
 
+    def optional_index(self, key: str) -> int | None:
+        for index, tab in enumerate(self.tabs):
+            if tab.key == key:
+                return index
+        return None
+
     def key(self, index: int) -> str:
         return self.tabs[self.normalize(index)].key
 
@@ -59,7 +71,7 @@ class PanelTabRegistry:
         return index % self.count
 
 
-PANEL_TABS = PanelTabRegistry(
+WATCH_PANEL_TABS = PanelTabRegistry(
     tabs=(
         PanelTab(key="run", label="Run"),
         PanelTab(key="live", label="Live"),
@@ -71,3 +83,26 @@ PANEL_TABS = PanelTabRegistry(
         PanelTab(key="train", label="Train"),
     )
 )
+
+CAREER_PANEL_TABS = PanelTabRegistry(
+    tabs=(
+        PanelTab(key="run", label="Run"),
+        PanelTab(key="live", label="Live"),
+        PanelTab(key="details", label="Details"),
+        PanelTab(key="state", label="State"),
+        PanelTab(key="aux", label="Aux"),
+        PanelTab(key="cnn", label="CNN"),
+        PanelTab(key="career", label="Career"),
+        PanelTab(key="train", label="Train"),
+    )
+)
+
+PANEL_TABS = WATCH_PANEL_TABS
+
+
+def panel_tabs_for_config(config: WatchAppConfig) -> PanelTabRegistry:
+    """Return the tab set for the active viewer session controller."""
+
+    if config.watch.managed_save_game_id is not None:
+        return CAREER_PANEL_TABS
+    return WATCH_PANEL_TABS

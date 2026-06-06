@@ -118,6 +118,8 @@ def sample_telemetry(
     acceleration_force: float = 0.0,
     drift_attack_force: float = 0.0,
     collision_mass: float = 0.0,
+    machine_character_index: int = -1,
+    engine_setting: float = 0.0,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         state_labels=state_labels,
@@ -159,4 +161,6 @@ def sample_telemetry(
         acceleration_force=acceleration_force,
         drift_attack_force=drift_attack_force,
         collision_mass=collision_mass,
+        machine_character_index=machine_character_index,
+        engine_setting=engine_setting,
     )

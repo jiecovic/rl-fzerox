@@ -144,6 +144,11 @@ class EngineStepAssembler:
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
         info["impact_frames"] = int(step_result.summary.impact_frames)
         info["airborne_frames"] = int(step_result.summary.airborne_frames)
+        info["entered_state_flags"] = int(step_result.summary.entered_state_flags)
+        info["entered_state_labels"] = tuple(step_result.summary.entered_state_labels)
+        info["entered_crashed"] = bool(step_result.summary.entered_crashed)
+        info["entered_retired"] = bool(step_result.summary.entered_retired)
+        info["entered_finished"] = bool(step_result.summary.entered_finished)
         info["episode_airborne_frames"] = episode_airborne_frames
         info["boost_pad_entered"] = boost_pad_entered
         info["gas_level"] = gas_level
@@ -206,6 +211,7 @@ class EngineStepAssembler:
             telemetry=telemetry,
             boost_min_energy_fraction=self.config.boost_min_energy_fraction,
             mask_boost_when_active=self.action_config.mask_boost_when_active,
+            mask_boost_when_airborne=self.action_config.mask_boost_when_airborne,
         )
 
         image_observation = step_result.observation

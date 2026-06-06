@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/engine/runtime.py
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, RaceControlState, SpinRequest
@@ -37,6 +39,7 @@ from .controls import (
 )
 from .episode import EngineEpisodeState
 from .info import (
+    backend_step_info,
     set_curriculum_info,
     telemetry_info,
 )
@@ -180,6 +183,16 @@ class FZeroXEnvEngine:
 
         self._reset_coordinator.set_track_sampling_config(config)
 
+    def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
+        """Append externally scheduled course ids for deficit-budget resets."""
+
+        self._reset_coordinator.extend_track_sampling_reset_queue(course_ids)
+
+    def track_sampling_reset_queue_length(self) -> int:
+        """Return queued deficit-budget reset course count."""
+
+        return self._reset_coordinator.track_sampling_reset_queue_length()
+
     def set_locked_reset_course(self, course_id: str | None) -> None:
         """Lock subsequent sampled resets to one course for watch/manual inspection."""
 
@@ -236,6 +249,7 @@ class FZeroXEnvEngine:
             telemetry=telemetry,
             boost_min_energy_fraction=self.config.boost_min_energy_fraction,
             mask_boost_when_active=self._action_config.mask_boost_when_active,
+            mask_boost_when_airborne=self._action_config.mask_boost_when_airborne,
         )
         self._episode.last_telemetry = telemetry
         self._reward_tracker.reset(
@@ -273,6 +287,75 @@ class FZeroXEnvEngine:
         )
         self._episode.last_info = dict(info)
         self._reset_coordinator.advance_reset_count()
+        return observation, info
+
+    def begin_live_race(
+        self,
+        *,
+        seed: int | None = None,
+        course_id: str | None = None,
+    ) -> tuple[ObservationValue, dict[str, object]]:
+        """Initialize policy stepping from the emulator's current live race state.
+
+        Career Mode reaches races through menu navigation instead of a materialized
+        reset baseline. This method prepares only the policy/reward bookkeeping
+        around that already-running emulator state.
+        """
+
+        self._episode.begin_reset(active_track=None)
+        self._episode.uses_custom_baseline = False
+        self.backend.set_controller_state(ControllerState())
+        self._control_state.reset()
+        self._mask_controller.set_lean_allowed_values(
+            self._control_state.lean_action_mask_override()
+        )
+        self._mask_controller.set_spin_allowed_values(None)
+        telemetry = self.backend.try_read_telemetry()
+        sync_dynamic_action_masks(
+            mask_controller=self._mask_controller,
+            control_state=self._control_state,
+            telemetry=telemetry,
+            boost_min_energy_fraction=self.config.boost_min_energy_fraction,
+            mask_boost_when_active=self._action_config.mask_boost_when_active,
+            mask_boost_when_airborne=self._action_config.mask_boost_when_airborne,
+        )
+        self._episode.last_telemetry = telemetry
+        self._reward_tracker.reset(
+            telemetry,
+            episode_seed=seed,
+            course_id=course_id,
+        )
+        self._reward_summary_config = self._reward_tracker.summary_config()
+        self._step_assembler.reward_summary_config = self._reward_summary_config
+        if isinstance(self._action_adapter, ResettableActionAdapter):
+            self._action_adapter.reset()
+
+        info = backend_step_info(self.backend)
+        info["seed"] = seed
+        set_curriculum_info(
+            info,
+            stage_index=self.curriculum_stage_index,
+            stage_name=self.curriculum_stage_name,
+        )
+        if telemetry is not None:
+            info.update(telemetry_info(telemetry))
+        info.update(self._reward_tracker.info(telemetry))
+        set_episode_boost_pad_info(
+            info,
+            episode_boost_pad_entries=self._episode.boost_pad_entries,
+        )
+        info["episode_airborne_frames"] = self._episode.airborne_frames
+        image_observation = self._observation_builder.render_image()
+        observation = self._observation_builder.build_observation(
+            image=image_observation,
+            telemetry=telemetry,
+            control_state=self._control_state,
+        )
+        self._observation_builder.set_info(
+            info,
+            image_shape=tuple(int(value) for value in image_observation.shape),
+        )
+        self._episode.last_info = dict(info)
         return observation, info
 
     def step(

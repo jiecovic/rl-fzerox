@@ -27,6 +27,7 @@ from rl_fzerox.ui.watch.view.panels.core.model import (
     _preview_frame,
     _window_size,
 )
+from rl_fzerox.ui.watch.view.panels.core.tabs import PanelTabRegistry
 from rl_fzerox.ui.watch.view.panels.rendering.draw import SidePanelData, _draw_side_panel
 from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz, _control_viz_height
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
@@ -51,7 +52,9 @@ class FrameRenderData:
     """Complete state snapshot needed to render one watch frame."""
 
     raw_frame: RgbFrame
-    observation: ObservationFrame
+    policy_observation_image: ObservationFrame | None
+    policy_observation_shape: tuple[int, ...] | None
+    policy_observation_layout_shape: tuple[int, ...]
     observation_state: StateVector | None
     observation_state_reference: StateVector | None
     observation_state_feature_names: tuple[str, ...]
@@ -92,6 +95,7 @@ class FrameRenderData:
     panel_tab_index: int
     cnn_layer_tab_index: int
     record_tab_index: int
+    panel_tabs: PanelTabRegistry
     continuous_drive_deadzone: float
     continuous_drive_enabled: bool
     force_full_throttle: bool
@@ -248,15 +252,17 @@ def _watch_window_size(
         game_display_size[1]
         + LAYOUT.preview_gap
         + _control_viz_height(fonts)
-        + LAYOUT.preview_gap
+    )
+    left_column_height += (
+        LAYOUT.preview_gap
         + _native_observation_preview_height(
             fonts=fonts,
             observation_shape=observation_shape,
             info=info,
             width=left_content_width,
         )
-        + LAYOUT.preview_padding
     )
+    left_column_height += LAYOUT.preview_padding
     _, baseline_height = _window_size(
         game_display_size,
         observation_shape,
@@ -276,21 +282,13 @@ def _draw_frame(
     data: FrameRenderData,
 ) -> ViewerHitboxes:
     game_display_size = _watch_game_display_size()
+    observation_layout_shape = data.policy_observation_layout_shape
     left_column_width = _watch_left_column_width(
         game_display_size,
-        data.observation.shape,
+        observation_layout_shape,
         info=data.info,
     )
     game_surface = _rgb_surface(pygame, data.raw_frame)
-
-    preview_frame = _preview_frame(data.observation, info=data.info)
-    observation_display_size = _observation_preview_size(data.observation.shape, info=data.info)
-    observation_surface = _rgb_surface(pygame, preview_frame)
-    if observation_surface.get_size() != observation_display_size:
-        raise RuntimeError(
-            "Native observation preview size did not match the expected preview size: "
-            f"frame={observation_surface.get_size()}, expected={observation_display_size}"
-        )
 
     screen.fill(PALETTE.app_background)
     _draw_glass_game_view(
@@ -337,6 +335,19 @@ def _draw_frame(
         left_column_size=(left_column_width, game_display_size[1]),
         control_viz=control_viz,
     )
+    observation_surface = None
+    if data.policy_observation_image is not None:
+        preview_frame = _preview_frame(data.policy_observation_image, info=data.info)
+        observation_display_size = _observation_preview_size(
+            observation_layout_shape,
+            info=data.info,
+        )
+        observation_surface = _rgb_surface(pygame, preview_frame)
+        if observation_surface.get_size() != observation_display_size:
+            raise RuntimeError(
+                "Native observation preview size did not match the expected preview size: "
+                f"frame={observation_surface.get_size()}, expected={observation_display_size}"
+            )
     _draw_observation_preview_in_rect(
         pygame=pygame,
         screen=screen,
@@ -345,8 +356,12 @@ def _draw_frame(
         x=LAYOUT.preview_padding,
         y=control_bottom + LAYOUT.preview_gap,
         width=left_column_width - (2 * LAYOUT.preview_padding),
-        height=screen.get_height() - control_bottom - LAYOUT.preview_gap - LAYOUT.preview_padding,
-        observation_shape=data.observation.shape,
+        height=screen.get_height()
+        - control_bottom
+        - LAYOUT.preview_gap
+        - LAYOUT.preview_padding,
+        observation_shape=data.policy_observation_shape,
+        layout_shape=observation_layout_shape,
         info=data.info,
     )
     panel_rect = pygame.Rect(
@@ -355,7 +370,7 @@ def _draw_frame(
         LAYOUT.panel_width,
         _watch_window_size(
             game_display_size,
-            data.observation.shape,
+            observation_layout_shape,
             fonts=fonts,
             info=data.info,
             panel_tab_index=data.panel_tab_index,
@@ -398,6 +413,7 @@ def _draw_frame(
             panel_tab_index=data.panel_tab_index,
             cnn_layer_tab_index=data.cnn_layer_tab_index,
             record_tab_index=data.record_tab_index,
+            panel_tabs=data.panel_tabs,
             continuous_drive_deadzone=data.continuous_drive_deadzone,
             continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
             continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,
@@ -410,7 +426,7 @@ def _draw_frame(
             progress_frontier_stall_limit_frames=data.progress_frontier_stall_limit_frames,
             stuck_min_speed_kph=data.stuck_min_speed_kph,
             game_display_size=game_display_size,
-            observation_shape=data.observation.shape,
+            observation_shape=data.policy_observation_shape,
             observation_state=data.observation_state,
             observation_state_reference=data.observation_state_reference,
             observation_state_feature_names=data.observation_state_feature_names,

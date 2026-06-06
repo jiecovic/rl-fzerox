@@ -10,7 +10,7 @@ from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
-from rl_fzerox.ui.watch.runtime.snapshots import _publish_step_snapshots
+from rl_fzerox.ui.watch.runtime.snapshots import _build_snapshot, _publish_step_snapshots
 
 
 class _SnapshotQueue:
@@ -140,7 +140,11 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         True,
     ]
     assert [_pixel(snapshot.raw_frame) for snapshot in snapshots] == [1, 2, 3]
-    assert [_pixel(snapshot.observation_image) for snapshot in snapshots] == [10, 10, 20]
+    assert [
+        _pixel(snapshot.policy_observation.image)
+        for snapshot in snapshots
+        if snapshot.policy_observation is not None
+    ] == [10, 10, 20]
     assert [snapshot.info["phase"] for snapshot in snapshots] == [
         "previous",
         "previous",
@@ -238,6 +242,100 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
     for snapshot in snapshots:
         assert isinstance(snapshot.policy_action, np.ndarray)
         assert np.array_equal(snapshot.policy_action, final_action)
+
+
+def test_menu_snapshot_has_layout_shape_without_policy_observation(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+    )
+
+    snapshot = _build_snapshot(
+        config=config,
+        env=_Env(),
+        emulator=_Emulator(),
+        observation=None,
+        info={"game_mode": "select_mode"},
+        reset_info={},
+        episode=0,
+        episode_reward=0.0,
+        control_fps=60.0,
+        target_control_fps=60.0,
+        control_state=race_control_state(),
+        gas_level=0.0,
+        boost_lamp_level=0.0,
+        action_mask_branches={},
+        policy_action=None,
+        policy_runner=None,
+        deterministic_policy=False,
+        manual_control_enabled=False,
+        policy_reload_error=None,
+        cnn_activations=None,
+        active_track_sampling=None,
+        best_finish_position=None,
+        best_finish_ranks={},
+        best_finish_times={},
+        latest_finish_times={},
+        latest_finish_deltas_ms={},
+        failed_track_attempts=frozenset(),
+    )
+
+    assert snapshot.policy_observation is None
+    assert snapshot.policy_observation_shape == (84, 84, 12)
+    assert _pixel(snapshot.raw_frame) == 0
+
+
+def test_career_menu_snapshot_has_no_policy_observation_shape(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+    )
+    config = config.model_copy(
+        update={
+            "watch": config.watch.model_copy(
+                update={"managed_save_game_id": "save-a"},
+            ),
+        }
+    )
+
+    snapshot = _build_snapshot(
+        config=config,
+        env=_Env(),
+        emulator=_Emulator(),
+        observation=None,
+        info={"game_mode": "select_mode"},
+        reset_info={},
+        episode=0,
+        episode_reward=0.0,
+        control_fps=60.0,
+        target_control_fps=60.0,
+        control_state=race_control_state(),
+        gas_level=0.0,
+        boost_lamp_level=0.0,
+        action_mask_branches={},
+        policy_action=None,
+        policy_runner=None,
+        deterministic_policy=False,
+        manual_control_enabled=False,
+        policy_reload_error=None,
+        cnn_activations=None,
+        active_track_sampling=None,
+        best_finish_position=None,
+        best_finish_ranks={},
+        best_finish_times={},
+        latest_finish_times={},
+        latest_finish_deltas_ms={},
+        failed_track_attempts=frozenset(),
+    )
+
+    assert snapshot.policy_observation is None
+    assert snapshot.policy_observation_shape is None
 
 
 def _rgb(value: int) -> RgbFrame:

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
 from typing import TYPE_CHECKING
 
@@ -11,7 +10,10 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
-from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
+from rl_fzerox.ui.watch.live_series import (
+    LIVE_SERIES_PUBLISH_POLICY,
+    EpisodeLiveSeriesTracker,
+)
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
@@ -80,14 +82,6 @@ __all__ = (
     "_watch_sequential_course_ids",
     "run_simulation_worker",
 )
-
-
-@dataclass(frozen=True, slots=True)
-class _LiveSeriesPublishPolicy:
-    interval_seconds: float = 0.10
-
-
-_LIVE_SERIES_PUBLISH_POLICY = _LiveSeriesPublishPolicy()
 
 
 def run_simulation_worker(
@@ -159,7 +153,7 @@ def _run_simulation_loop(
                 current_time = time.perf_counter()
                 if (
                     current_time - last_live_series_publish_time
-                    >= _LIVE_SERIES_PUBLISH_POLICY.interval_seconds
+                    >= LIVE_SERIES_PUBLISH_POLICY.interval_seconds
                 ):
                     live_episode_series = live_series.snapshot()
                     last_live_series_publish_time = current_time
@@ -533,7 +527,7 @@ def _run_simulation_loop(
                     current_time = time.perf_counter()
                     if (
                         current_time - last_live_series_publish_time
-                        >= _LIVE_SERIES_PUBLISH_POLICY.interval_seconds
+                        >= LIVE_SERIES_PUBLISH_POLICY.interval_seconds
                     ):
                         live_episode_series = live_series.snapshot()
                         last_live_series_publish_time = current_time
