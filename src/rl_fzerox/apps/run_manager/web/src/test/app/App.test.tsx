@@ -16,6 +16,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@/test/rend
 
 const loadManagerDataMock = vi.fn();
 const createDraftWithSourceMock = vi.fn();
+const createSaveGameMock = vi.fn();
 const updateDraftWithSourceMock = vi.fn();
 const deleteDraftMock = vi.fn();
 const deleteRunMock = vi.fn();
@@ -28,6 +29,7 @@ const fetchPolicyPreviewMock = vi.fn();
 const importRunBundleMock = vi.fn();
 const launchRunMock = vi.fn();
 const openRunDirectoryMock = vi.fn();
+const openSaveGameDirectoryMock = vi.fn();
 const renameRunMock = vi.fn();
 const resumeRunMock = vi.fn();
 const stopRunMock = vi.fn();
@@ -49,6 +51,7 @@ vi.mock("@/shared/api/client", async () => {
       sourceRunId: string | null,
       sourceArtifact: "latest" | "best" | null,
     ) => createDraftWithSourceMock(name, config, sourceRunId, sourceArtifact),
+    createSaveGame: (name: string) => createSaveGameMock(name),
     deleteDraft: (id: string) => deleteDraftMock(id),
     deleteRun: (id: string) => deleteRunMock(id),
     exportRunBundle: (run: ReturnType<typeof runFixture>) => exportRunBundleMock(run),
@@ -60,6 +63,7 @@ vi.mock("@/shared/api/client", async () => {
     importRunBundle: (file: File) => importRunBundleMock(file),
     launchRun: (...args: unknown[]) => launchRunMock(...args),
     openRunDirectory: (runId: string) => openRunDirectoryMock(runId),
+    openSaveGameDirectory: (saveGameId: string) => openSaveGameDirectoryMock(saveGameId),
     renameRun: (runId: string, name: string) => renameRunMock(runId, name),
     resumeRun: (runId: string) => resumeRunMock(runId),
     stopRun: (runId: string) => stopRunMock(runId),
@@ -89,6 +93,7 @@ describe("App", () => {
       drafts: [draftFixture()],
       metadata: configMetadataFixture,
       runs: [],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
     createDraftWithSourceMock.mockImplementation(
@@ -111,6 +116,15 @@ describe("App", () => {
         draftFixture({ config, id, name }),
     );
     deleteDraftMock.mockResolvedValue(undefined);
+    createSaveGameMock.mockResolvedValue({
+      created_at: "2026-06-02T10:30:00+00:00",
+      id: "save-001",
+      last_finished_at: null,
+      name: "unlock save",
+      save_path: "/tmp/save-001/fzerox.srm",
+      status: "created",
+      updated_at: "2026-06-02T10:30:00+00:00",
+    });
     deleteRunMock.mockResolvedValue(undefined);
     exportRunBundleMock.mockResolvedValue(undefined);
     fetchRunMock.mockResolvedValue(runFixture());
@@ -121,6 +135,7 @@ describe("App", () => {
     importRunBundleMock.mockResolvedValue(runFixture({ id: "imported-run", name: "imported" }));
     launchRunMock.mockResolvedValue(runFixture());
     openRunDirectoryMock.mockResolvedValue(undefined);
+    openSaveGameDirectoryMock.mockResolvedValue(undefined);
     renameRunMock.mockResolvedValue(runFixture({ name: "renamed run" }));
     resumeRunMock.mockResolvedValue(runFixture({ status: "running", pending_command: null }));
     stopRunMock.mockResolvedValue(runFixture({ pending_command: "stop" }));
@@ -175,6 +190,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -206,6 +222,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -246,6 +263,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -299,6 +317,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [runFixture({ id: "run-001", name: "ppo_test_1", config: sourceConfig })],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -335,6 +354,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -370,6 +390,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -454,6 +475,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [parentRun, childRun],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -496,6 +518,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [run],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
     watchRunMock.mockRejectedValueOnce(
@@ -562,6 +585,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [parentRun, staleStartedRun],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -602,6 +626,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [failedForkRun],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -640,6 +665,7 @@ describe("App", () => {
       drafts: [],
       metadata: configMetadataFixture,
       runs: [failedRun],
+      saveGames: [],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 

@@ -51,7 +51,7 @@ export interface RunWorkspaceActionState {
   isResuming: boolean;
   isStopping: boolean;
   openRunDirectoryInBrowser: () => Promise<void>;
-  renameRunLabel: () => Promise<void>;
+  renameRunLabel: (name?: string) => Promise<boolean>;
   resetTrackPoolState: () => Promise<void>;
   resumeRun: () => Promise<void>;
   selectedArtifact: CheckpointArtifact;
@@ -157,14 +157,21 @@ export function useRunWorkspaceActions({
     }
   }
 
-  async function renameRunLabel() {
+  async function renameRunLabel(name?: string) {
+    const nextName = (name ?? runName).trim();
+    if (nextName.length === 0) {
+      setControlError("run name is required");
+      return false;
+    }
     setIsRenaming(true);
     setControlError(null);
     setWatchToast(null);
     try {
-      await onRename(run.id, runName.trim());
+      await onRename(run.id, nextName);
+      return true;
     } catch (caught) {
       setControlError(caught instanceof Error ? caught.message : "failed to rename run");
+      return false;
     } finally {
       setIsRenaming(false);
     }

@@ -4,3 +4,4 @@ export * from "@/shared/api/contract/enums";
 export * from "@/shared/api/contract/metadata";
 export * from "@/shared/api/contract/policyPreview";
 export * from "@/shared/api/contract/runs";
+export * from "@/shared/api/contract/saveGames";

@@ -16,11 +16,17 @@ import type {
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
+  ManagedSaveGame,
 } from "@/shared/api/contract";
+
+interface ReloadManagerDataOptions {
+  showLoading?: boolean;
+}
 
 export function useManagerData() {
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
   const [runs, setRuns] = useState<ManagedRun[]>([]);
+  const [saveGames, setSaveGames] = useState<ManagedSaveGame[]>([]);
   const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
   const [defaultConfig, setDefaultConfig] = useState<ManagedRunConfig | null>(null);
   const [runDetailsById, setRunDetailsById] = useState<Record<string, ManagedRunDetail>>({});
@@ -63,8 +69,11 @@ export function useManagerData() {
     return request;
   }, []);
 
-  const reloadManagerData = useCallback(async () => {
-    setIsLoading(true);
+  const reloadManagerData = useCallback(async (options: ReloadManagerDataOptions = {}) => {
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
       const managerData = await loadManagerData();
@@ -74,6 +83,7 @@ export function useManagerData() {
       }
       setDrafts(managerData.drafts);
       setRuns(managerData.runs.map((run) => (hasRunDetail(run) ? runSummaryFromDetail(run) : run)));
+      setSaveGames(managerData.saveGames);
       setRunDetailsById((current) =>
         trimRunDetailCache(
           {
@@ -89,7 +99,9 @@ export function useManagerData() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to load run manager data");
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -114,9 +126,11 @@ export function useManagerData() {
     reloadManagerData,
     runs,
     runDetailsById,
+    saveGames,
     setDefaultConfig,
     setDrafts,
     setRuns,
+    setSaveGames,
     upsertRunDetail,
   };
 }

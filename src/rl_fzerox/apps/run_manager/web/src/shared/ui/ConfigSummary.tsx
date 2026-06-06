@@ -123,6 +123,7 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
           ? `≥ ${Math.round(config.action.boost_min_energy_fraction * 100)}% energy`
           : null,
         config.action.mask_boost_when_active ? "idle only" : null,
+        config.action.mask_boost_when_airborne ? "grounded only" : null,
         config.action.boost_decision_interval_steps > 1
           ? `every ${config.action.boost_decision_interval_steps} env steps`
           : null,

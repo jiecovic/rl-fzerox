@@ -1,12 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/shared/ui/Tabs.tsx
 
 import { cn } from "@/shared/ui/cn";
-import { CloseIcon } from "@/shared/ui/icons";
+import { CareerTabIcon, ChartIcon, CloseIcon, DraftTabIcon, RunTabIcon } from "@/shared/ui/icons";
 
 export interface TabItem<T extends string> {
   id: T;
   label: string;
   closable?: boolean;
+  icon?: "career" | "charts" | "draft" | "run";
   tone?: "draft" | "run";
 }
 
@@ -39,7 +40,10 @@ export function Tabs<T extends string>({
             type="button"
             onClick={() => onSelect(item.id)}
           >
-            {item.label}
+            <span className="inline-flex items-center gap-2">
+              <TabIcon icon={item.icon} />
+              <span>{item.label}</span>
+            </span>
           </button>
           {item.closable === true && onClose !== undefined ? (
             <button
@@ -55,6 +59,21 @@ export function Tabs<T extends string>({
       ))}
     </nav>
   );
+}
+
+function TabIcon({ icon }: { icon: TabItem<string>["icon"] }) {
+  switch (icon) {
+    case "career":
+      return <CareerTabIcon />;
+    case "charts":
+      return <ChartIcon />;
+    case "draft":
+      return <DraftTabIcon />;
+    case "run":
+      return <RunTabIcon />;
+    default:
+      return null;
+  }
 }
 
 function tabShellClass<T extends string>(item: TabItem<T>, active: boolean) {

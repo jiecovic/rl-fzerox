@@ -3,9 +3,15 @@ import type {
   DraftEditorSession,
   ForkSource,
   RunSession,
+  SaveGameSession,
   WorkspaceTab,
 } from "@/app/workspace/types";
-import type { ManagedDraft, ManagedRun, ManagedRunDetail } from "@/shared/api/contract";
+import type {
+  ManagedDraft,
+  ManagedRun,
+  ManagedRunDetail,
+  ManagedSaveGame,
+} from "@/shared/api/contract";
 
 export function editorSessionId(seed: string): `editor:${string}` {
   return `editor:${seed}`;
@@ -13,6 +19,10 @@ export function editorSessionId(seed: string): `editor:${string}` {
 
 export function runSessionId(seed: string): `run:${string}` {
   return `run:${seed}`;
+}
+
+export function saveGameSessionId(seed: string): `save-game:${string}` {
+  return `save-game:${seed}`;
 }
 
 export function normalizeDraftTabTitle(title: string) {
@@ -36,6 +46,17 @@ export function nextAvailableDraftName(baseName: string, takenNames: Iterable<st
     suffix += 1;
   }
   return `${baseName} ${suffix}`;
+}
+
+export function nextAvailableSaveGameName(takenNames: Iterable<string>) {
+  return nextCounterName(defaultCareerSaveName(new Date()), takenNames);
+}
+
+function defaultCareerSaveName(createdAt: Date) {
+  const iso = createdAt.toISOString();
+  const date = iso.slice(0, 10).replaceAll("-", "");
+  const time = iso.slice(11, 16).replace(":", "");
+  return `career ${date}-${time}`;
 }
 
 export function nextForkDraftName(
@@ -125,6 +146,11 @@ export function upsertRun(current: ManagedRun[], nextRun: ManagedRun) {
   return [nextRun, ...withoutPrevious].sort(compareRuns);
 }
 
+export function upsertSaveGame(current: ManagedSaveGame[], nextSaveGame: ManagedSaveGame) {
+  const withoutPrevious = current.filter((saveGame) => saveGame.id !== nextSaveGame.id);
+  return [nextSaveGame, ...withoutPrevious].sort(compareSaveGames);
+}
+
 export function runSummaryFromDetail(run: ManagedRunDetail): ManagedRun {
   const { config: _config, ...summary } = run;
   void _config;
@@ -132,6 +158,13 @@ export function runSummaryFromDetail(run: ManagedRunDetail): ManagedRun {
 }
 
 export function compareRuns(left: ManagedRun, right: ManagedRun) {
+  if (left.created_at !== right.created_at) {
+    return right.created_at.localeCompare(left.created_at);
+  }
+  return right.id.localeCompare(left.id);
+}
+
+export function compareSaveGames(left: ManagedSaveGame, right: ManagedSaveGame) {
   if (left.created_at !== right.created_at) {
     return right.created_at.localeCompare(left.created_at);
   }
@@ -152,22 +185,32 @@ export function buildWorkspaceTabs(
   draftEditors: readonly DraftEditorSession[],
   runTabs: readonly RunSession[],
   runs: readonly ManagedRun[],
+  saveGameSessions: readonly SaveGameSession[],
 ): WorkspaceTab[] {
   return [
-    { id: "drafts", label: "Drafts" },
-    { id: "runs", label: "Runs" },
-    { id: "charts", label: "Charts" },
+    { id: "drafts", icon: "draft", label: "Drafts" },
+    { id: "runs", icon: "run", label: "Runs" },
+    { id: "charts", icon: "charts", label: "Charts" },
+    { id: "save-games", icon: "career", label: "Career Mode" },
     ...runTabs.map((session) => ({
       id: session.sessionId,
+      icon: "run" as const,
       label: `Run · ${runs.find((run) => run.id === session.runId)?.name ?? session.title}`,
       closable: true,
       tone: "run" as const,
     })),
     ...draftEditors.map((session) => ({
       id: session.sessionId,
+      icon: "draft" as const,
       label: `${session.forkSource === null ? "Draft" : "Fork draft"} · ${session.title}`,
       closable: true,
       tone: "draft" as const,
+    })),
+    ...saveGameSessions.map((session) => ({
+      id: session.sessionId,
+      icon: "career" as const,
+      label: `Career · ${session.title}`,
+      closable: true,
     })),
   ];
 }

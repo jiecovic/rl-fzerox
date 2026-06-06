@@ -124,6 +124,7 @@ export function RunRuntimeSummary({
           {run.lineage_step_offset > 0 ? (
             <RunMetric label="Lineage steps">{lineageStepsLabel(run)}</RunMetric>
           ) : null}
+          <RunMetric label="Seed">{run.config.seed}</RunMetric>
           <RunMetric label="Run id">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <code className="font-mono text-[13px] leading-normal break-words whitespace-normal text-app-text">

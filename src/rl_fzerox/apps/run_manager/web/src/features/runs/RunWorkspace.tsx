@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import type { ConfigSection } from "@/features/configurator/configurator/sections";
 import { useRunWorkspaceActions } from "@/features/runs/workspace/actions";
-import { RunIdentityPanel } from "@/features/runs/workspace/IdentityPanel";
 import { useRunPolicyPreview, useRunTrackSamplingState } from "@/features/runs/workspace/polling";
 import { RunReadonlyConfig } from "@/features/runs/workspace/ReadonlyConfig";
 import { RunRuntimeSummary, runWorkspaceSubtitle } from "@/features/runs/workspace/RuntimeSummary";
@@ -13,7 +12,10 @@ import type {
   WatchDevice,
   WatchRenderer,
 } from "@/shared/api/contract";
+import { RenameIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
+import { RenameDialog } from "@/shared/ui/RenameDialog";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface RunWorkspaceProps {
   allRuns: ManagedRun[];
@@ -50,6 +52,7 @@ export function RunWorkspace({
   run,
 }: RunWorkspaceProps) {
   const [runName, setRunName] = useState(run.name);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [configSection, setConfigSection] = useState<ConfigSection>("training");
   const previewEnabled = configSection === "observation" || configSection === "policy";
   const { policyPreview, previewError } = useRunPolicyPreview(run.config, previewEnabled);
@@ -77,9 +80,44 @@ export function RunWorkspace({
     setRunName(run.name);
   }, [run.name]);
 
+  async function submitRunRename(name: string) {
+    setRunName(name);
+    const renamed = await actions.renameRunLabel(name);
+    if (renamed) {
+      setRenameDialogOpen(false);
+    }
+  }
+
   return (
     <Panel>
-      <PanelHeader title={run.name} subtitle={runWorkspaceSubtitle(run)} />
+      <PanelHeader
+        title={
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              {run.name}
+            </span>
+            <TooltipIconButton
+              aria-label="Rename run"
+              disabled={actions.isRenaming}
+              size="small"
+              tooltip="Rename"
+              onClick={() => setRenameDialogOpen(true)}
+            >
+              <RenameIcon />
+            </TooltipIconButton>
+          </span>
+        }
+        subtitle={runWorkspaceSubtitle(run)}
+      />
+      <RenameDialog
+        busy={actions.isRenaming}
+        initialName={run.name}
+        label="Run name"
+        open={renameDialogOpen}
+        title="Rename run"
+        onClose={() => setRenameDialogOpen(false)}
+        onSubmit={(name) => void submitRunRename(name)}
+      />
 
       <RunRuntimeSummary
         actions={actions}
@@ -101,15 +139,6 @@ export function RunWorkspace({
           ) : null}
         </div>
       ) : null}
-
-      <RunIdentityPanel
-        canRename={actions.canRename}
-        isRenaming={actions.isRenaming}
-        onRename={actions.renameRunLabel}
-        onRunNameChange={setRunName}
-        run={run}
-        runName={runName}
-      />
 
       <RunReadonlyConfig
         metadata={metadata}

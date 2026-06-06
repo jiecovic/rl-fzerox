@@ -5,6 +5,7 @@ import type {
   ManagedRunConfig,
   ManagedRunDetail,
   ManagedRunMetricSample,
+  ManagedSaveGame,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
 import generatedFixtures from "@/test/generated/manager-fixtures.json";
@@ -105,6 +106,56 @@ export function runMetricSampleFixture(
     entropy_loss: -1.1,
     value_loss: 0.27,
     policy_gradient_loss: -0.03,
+    ...overrides,
+  };
+}
+
+export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): ManagedSaveGame {
+  return {
+    id: "save-001",
+    name: "unlock save",
+    status: "created",
+    runner_active: false,
+    save_path: "/tmp/save-001/fzerox.srm",
+    created_at: "2026-06-02T10:30:00+00:00",
+    updated_at: "2026-06-02T10:30:00+00:00",
+    last_finished_at: null,
+    unlock_progress: {
+      inspection_status: "not_inspected",
+      completed_count: 0,
+      total_count: 2,
+      next_target: {
+        sequence_index: 0,
+        kind: "clear_gp_cup",
+        status: "pending",
+        label: "Clear Novice Jack Cup",
+        difficulty: "novice",
+        cup_id: "jack",
+        course_id: null,
+      },
+      targets: [
+        {
+          sequence_index: 0,
+          kind: "clear_gp_cup",
+          status: "pending",
+          label: "Clear Novice Jack Cup",
+          difficulty: "novice",
+          cup_id: "jack",
+          course_id: null,
+        },
+        {
+          sequence_index: 1,
+          kind: "clear_gp_cup",
+          status: "pending",
+          label: "Clear Novice Queen Cup",
+          difficulty: "novice",
+          cup_id: "queen",
+          course_id: null,
+        },
+      ],
+    },
+    attempts: [],
+    course_setups: [],
     ...overrides,
   };
 }

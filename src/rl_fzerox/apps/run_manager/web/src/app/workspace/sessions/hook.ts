@@ -6,7 +6,9 @@ import {
   defaultDraftName,
   editorSessionId,
   nextAvailableDraftName,
+  nextAvailableSaveGameName,
   runSessionId,
+  saveGameSessionId,
 } from "@/app/workspace/model";
 import {
   closeDraftSession,
@@ -35,35 +37,45 @@ import type {
   DraftEditorSession,
   ForkSource,
   RunSession,
+  SaveGameSession,
   WorkspaceTabId,
 } from "@/app/workspace/types";
 
 export function useWorkspaceSessions({
   drafts,
   runs,
+  saveGames,
 }: UseWorkspaceSessionsOptions): WorkspaceSessions {
   const [activeTabId, setActiveTabId] = useState<WorkspaceTabId>("drafts");
   const [draftEditors, setDraftEditors] = useState<DraftEditorSession[]>([]);
   const [runTabs, setRunTabs] = useState<RunSession[]>([]);
+  const [saveGameSessions, setSaveGameSessions] = useState<SaveGameSession[]>([]);
   const [chartsFocusRunId, setChartsFocusRunId] = useState<string | null>(null);
 
   const activeDraftEditor = useMemo(
     () =>
-      activeTabId === "drafts" || activeTabId === "runs" || activeTabId === "charts"
-        ? null
-        : (draftEditors.find((session) => session.sessionId === activeTabId) ?? null),
+      activeTabId.startsWith("editor:")
+        ? (draftEditors.find((session) => session.sessionId === activeTabId) ?? null)
+        : null,
     [activeTabId, draftEditors],
   );
   const activeRunTab = useMemo(
     () =>
-      activeTabId === "drafts" || activeTabId === "runs" || activeTabId === "charts"
-        ? null
-        : (runTabs.find((session) => session.sessionId === activeTabId) ?? null),
+      activeTabId.startsWith("run:")
+        ? (runTabs.find((session) => session.sessionId === activeTabId) ?? null)
+        : null,
     [activeTabId, runTabs],
   );
+  const activeSaveGameSession = useMemo(
+    () =>
+      activeTabId.startsWith("save-game:")
+        ? (saveGameSessions.find((session) => session.sessionId === activeTabId) ?? null)
+        : null,
+    [activeTabId, saveGameSessions],
+  );
   const workspaceTabs = useMemo(
-    () => buildWorkspaceTabs(draftEditors, runTabs, runs),
-    [draftEditors, runTabs, runs],
+    () => buildWorkspaceTabs(draftEditors, runTabs, runs, saveGameSessions),
+    [draftEditors, runTabs, runs, saveGameSessions],
   );
 
   function openDraft(draft: UseWorkspaceSessionsOptions["drafts"][number]) {
@@ -94,6 +106,39 @@ export function useWorkspaceSessions({
         initialDraftName,
         sessionId,
       }),
+    );
+    setActiveTabId(sessionId);
+  }
+
+  function createNewSaveGame() {
+    const sessionId = saveGameSessionId(crypto.randomUUID());
+    const nameText = nextAvailableSaveGameName(saveGames.map((saveGame) => saveGame.name));
+    setSaveGameSessions((current) =>
+      upsertSaveGameSession(current, {
+        nameText,
+        attemptSeedText: randomAttemptSeedText(),
+        policyMode: "deterministic",
+        runnerDevice: "cuda",
+        runnerRenderer: "gliden64",
+        saveGameId: null,
+        sessionId,
+        title: nameText,
+      }),
+    );
+    setActiveTabId(sessionId);
+  }
+
+  function openSaveGame(saveGame: UseWorkspaceSessionsOptions["saveGames"][number]) {
+    const sessionId = saveGameSessionId(saveGame.id);
+    setSaveGameSessions((current) =>
+      upsertSaveGameSession(
+        current,
+        saveGameSessionForManagedSave(current, {
+          name: saveGame.name,
+          saveGameId: saveGame.id,
+          sessionId,
+        }),
+      ),
     );
     setActiveTabId(sessionId);
   }
@@ -143,6 +188,17 @@ export function useWorkspaceSessions({
     }
   }
 
+  function closeSaveGameTab(sessionId: SaveGameSession["sessionId"]) {
+    const remaining = saveGameSessions.filter((session) => session.sessionId !== sessionId);
+    if (remaining.length === saveGameSessions.length) {
+      return;
+    }
+    setSaveGameSessions(remaining);
+    if (activeTabId === sessionId) {
+      setActiveTabId("save-games");
+    }
+  }
+
   function closeRunTabsForRun(runId: string) {
     closeRunTabsForRuns([runId]);
   }
@@ -169,6 +225,10 @@ export function useWorkspaceSessions({
     }
     if (id.startsWith("run:")) {
       closeRunTab(id as RunSession["sessionId"]);
+      return;
+    }
+    if (id.startsWith("save-game:")) {
+      closeSaveGameTab(id as SaveGameSession["sessionId"]);
     }
   }
 
@@ -181,6 +241,17 @@ export function useWorkspaceSessions({
     patch: Partial<Omit<DraftEditorSession, "sessionId">>,
   ) {
     setDraftEditors((current) => patchDraftSessions(current, sessionId, patch));
+  }
+
+  function patchSaveGameSession(
+    sessionId: SaveGameSession["sessionId"],
+    patch: Partial<Omit<SaveGameSession, "sessionId">>,
+  ) {
+    setSaveGameSessions((current) =>
+      current.map((session) =>
+        session.sessionId === sessionId ? { ...session, ...patch } : session,
+      ),
+    );
   }
 
   function closeEditorsForDraft(id: string) {
@@ -220,6 +291,7 @@ export function useWorkspaceSessions({
   return {
     activeDraftEditor,
     activeRunTab,
+    activeSaveGameSession,
     activeTabId,
     chartsFocusRunId,
     closeEditorsForDraft,
@@ -229,17 +301,63 @@ export function useWorkspaceSessions({
     closeWorkspaceTab,
     createForkDraft,
     createNewDraft,
+    createNewSaveGame,
     draftEditors,
     forkSourceRunLabel,
     openDraft,
     openRun,
+    openSaveGame,
     patchDraftEditor,
+    patchSaveGameSession,
     reservedNamesForSession,
     runTabs,
+    saveGameSessions,
     setActiveTabId,
     setChartsFocusRunId,
     setDraftEditorTitle,
     showRunCharts,
     workspaceTabs,
   };
+}
+
+function upsertSaveGameSession(
+  current: readonly SaveGameSession[],
+  next: SaveGameSession,
+): SaveGameSession[] {
+  const existingIndex = current.findIndex((session) => session.sessionId === next.sessionId);
+  if (existingIndex < 0) {
+    return [...current, next];
+  }
+  return current.map((session, index) => (index === existingIndex ? next : session));
+}
+
+function saveGameSessionForManagedSave(
+  current: readonly SaveGameSession[],
+  {
+    name,
+    saveGameId,
+    sessionId,
+  }: {
+    name: string;
+    saveGameId: string;
+    sessionId: SaveGameSession["sessionId"];
+  },
+): SaveGameSession {
+  const existing = current.find((session) => session.sessionId === sessionId);
+  return {
+    attemptSeedText: existing?.attemptSeedText ?? randomAttemptSeedText(),
+    nameText: name,
+    policyMode: existing?.policyMode ?? "deterministic",
+    runnerDevice: existing?.runnerDevice ?? "cuda",
+    runnerRenderer: existing?.runnerRenderer ?? "gliden64",
+    saveGameId,
+    sessionId,
+    title: name,
+  };
+}
+
+function randomAttemptSeedText(): string {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return String(values[0]);
 }

@@ -5,13 +5,16 @@ import {
   nextAvailableDraftName,
   nextForkDraftName,
   runSummaryFromDetail,
+  saveGameSessionId,
   upsertDraft,
   upsertRun,
+  upsertSaveGame,
 } from "@/app/workspace/model";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import type { DraftEditorSession } from "@/app/workspace/types";
 import {
   createDraftWithSource,
+  createSaveGame,
   deleteDraft,
   deleteLineage,
   deleteRun,
@@ -19,19 +22,27 @@ import {
   importRunBundle,
   launchRun,
   openRunDirectory,
+  openSaveGameDirectory,
   renameRun,
+  renameSaveGame,
   resetRunTrackSamplingState,
   resumeRun,
+  startCareerModeRunner,
   stopRun,
   updateDraftWithSource,
   updateLineageGroups,
+  upsertSaveCourseSetup,
   watchRun,
 } from "@/shared/api/client";
 import type {
+  CourseSetupScope,
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
+  ManagedSaveGame,
+  PolicyPlaybackMode,
+  SavePolicyArtifact,
   WatchDevice,
   WatchRenderer,
 } from "@/shared/api/contract";
@@ -44,11 +55,13 @@ interface UseWorkspaceActionsOptions {
   sessions: WorkspaceSessions;
   setDrafts: Dispatch<SetStateAction<ManagedDraft[]>>;
   setRuns: Dispatch<SetStateAction<ManagedRun[]>>;
+  setSaveGames: Dispatch<SetStateAction<ManagedSaveGame[]>>;
   upsertRunDetail: (run: ManagedRunDetail) => void;
 }
 
 export interface WorkspaceActions {
   createDraftFromManagedRun: (runId: string) => Promise<void>;
+  createManagedSaveGame: (name: string) => Promise<ManagedSaveGame>;
   forkManagedRun: (runId: string, artifact: "latest" | "best") => Promise<void>;
   launchTrainingRun: (
     sessionId: DraftEditorSession["sessionId"],
@@ -57,12 +70,23 @@ export interface WorkspaceActions {
     draftId: string | null,
   ) => Promise<ManagedRunDetail>;
   openManagedRunDirectory: (runId: string) => Promise<void>;
+  openManagedSaveGameDirectory: (saveGameId: string) => Promise<void>;
+  upsertManagedSaveCourseSetup: (request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
+    scope: CourseSetupScope;
+    courseId?: string | null;
+    cupId?: string | null;
+    difficulty?: string | null;
+  }) => Promise<ManagedSaveGame>;
   exportManagedRun: (run: ManagedRun) => Promise<void>;
   importManagedRunBundle: (file: File) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
   removeLineage: (lineageId: string) => Promise<void>;
   removeRun: (run: ManagedRun) => Promise<void>;
   renameManagedRun: (runId: string, name: string) => Promise<void>;
+  renameManagedSaveGame: (saveGameId: string, name: string) => Promise<void>;
   resetManagedRunTrackPool: (runId: string) => Promise<void>;
   resumeManagedRun: (runId: string) => Promise<void>;
   saveDraft: (
@@ -84,6 +108,13 @@ export interface WorkspaceActions {
     device: WatchDevice,
     renderer: WatchRenderer,
   ) => Promise<"started" | "already_running">;
+  startManagedCareerMode: (
+    saveGameId: string,
+    device: WatchDevice,
+    renderer: WatchRenderer | null,
+    attemptSeed: string | null,
+    policyMode: PolicyPlaybackMode,
+  ) => Promise<"started" | "already_running">;
 }
 
 export function useWorkspaceActions({
@@ -94,8 +125,34 @@ export function useWorkspaceActions({
   sessions,
   setDrafts,
   setRuns,
+  setSaveGames,
   upsertRunDetail,
 }: UseWorkspaceActionsOptions): WorkspaceActions {
+  async function createManagedSaveGame(name: string) {
+    try {
+      const saveGame = await createSaveGame(name);
+      setSaveGames((current) => upsertSaveGame(current, saveGame));
+      return saveGame;
+    } catch (caught) {
+      await reloadManagerData();
+      throw caught;
+    }
+  }
+
+  async function upsertManagedSaveCourseSetup(request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
+    scope: CourseSetupScope;
+    courseId?: string | null;
+    cupId?: string | null;
+    difficulty?: string | null;
+  }) {
+    const saveGame = await upsertSaveCourseSetup(request);
+    setSaveGames((current) => upsertSaveGame(current, saveGame));
+    return saveGame;
+  }
+
   async function saveDraft(
     sessionId: DraftEditorSession["sessionId"],
     name: string,
@@ -242,6 +299,15 @@ export function useWorkspaceActions({
     upsertRunDetail(run);
   }
 
+  async function renameManagedSaveGame(saveGameId: string, name: string) {
+    const saveGame = await renameSaveGame(saveGameId, name);
+    setSaveGames((current) => upsertSaveGame(current, saveGame));
+    sessions.patchSaveGameSession(saveGameSessionId(saveGameId), {
+      nameText: saveGame.name,
+      title: saveGame.name,
+    });
+  }
+
   async function updateManagedLineageGroups(lineageId: string, groupNames: readonly string[]) {
     const lineageGroups = await updateLineageGroups(lineageId, groupNames);
     setRuns((current) =>
@@ -253,6 +319,10 @@ export function useWorkspaceActions({
 
   async function openManagedRunDirectory(runId: string) {
     await openRunDirectory(runId);
+  }
+
+  async function openManagedSaveGameDirectory(saveGameId: string) {
+    await openSaveGameDirectory(saveGameId);
   }
 
   async function exportManagedRun(run: ManagedRun) {
@@ -276,6 +346,24 @@ export function useWorkspaceActions({
     return await watchRun(runId, artifact, device, renderer);
   }
 
+  async function startManagedCareerMode(
+    saveGameId: string,
+    device: WatchDevice,
+    renderer: WatchRenderer | null,
+    attemptSeed: string | null,
+    policyMode: PolicyPlaybackMode,
+  ): Promise<"started" | "already_running"> {
+    const status = await startCareerModeRunner(
+      saveGameId,
+      device,
+      renderer,
+      attemptSeed,
+      policyMode,
+    );
+    await reloadManagerData();
+    return status;
+  }
+
   async function resetManagedRunTrackPool(runId: string) {
     await resetRunTrackSamplingState(runId);
   }
@@ -296,21 +384,26 @@ export function useWorkspaceActions({
 
   return {
     createDraftFromManagedRun,
+    createManagedSaveGame,
     forkManagedRun,
     launchTrainingRun,
     openManagedRunDirectory,
+    openManagedSaveGameDirectory,
     exportManagedRun,
     importManagedRunBundle,
     removeDraft,
     removeLineage,
     removeRun,
     renameManagedRun,
+    renameManagedSaveGame,
     resetManagedRunTrackPool,
     resumeManagedRun,
     saveDraft,
     stopManagedRun,
     updateManagedLineageGroups,
     updateExistingDraft,
+    upsertManagedSaveCourseSetup,
     watchManagedRun,
+    startManagedCareerMode,
   };
 }
