@@ -38,8 +38,18 @@ def test_policy_drive_info_keeps_native_terminal_reason() -> None:
 def test_career_policy_race_uses_policy_drive_boundary() -> None:
     source = Path("src/rl_fzerox/core/career_mode/runner/policy.py").read_text(encoding="utf-8")
 
+    assert "FZeroXEnvEngine" not in source
+    assert "PolicyDriveRuntime" in source
     assert "WatchEnvStep" not in source
     assert "step_watch(" not in source
     assert "step_control_watch(" not in source
+
+
+def test_env_policy_drive_runtime_owns_engine_policy_drive_calls() -> None:
+    source = Path("src/rl_fzerox/core/envs/engine/policy_drive/runtime.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "FZeroXEnvEngine" in source
     assert "step_policy_drive(" in source
     assert "step_control_policy_drive(" in source

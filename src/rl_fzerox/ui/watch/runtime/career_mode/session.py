@@ -9,11 +9,11 @@ from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.career_mode.runner.policy import (
     CareerModePolicyControl,
     CareerPolicyRaceDriver,
-    CareerPolicyRaceStep,
 )
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.engine.info import backend_step_info, telemetry_info
+from rl_fzerox.core.envs.engine.policy_drive import PolicyDriveFrame
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
@@ -88,10 +88,10 @@ class CareerModeRuntimeSession:
         self._ensure_policy_race(policy_control)
         return self._require_policy_race().begin(seed=seed, course_id=course_id)
 
-    def step_policy(self, action: ActionValue) -> CareerPolicyRaceStep:
+    def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
         return self._require_policy_race().step_policy(action)
 
-    def step_manual_race(self, control_state: RaceControlState) -> CareerPolicyRaceStep:
+    def step_manual_race(self, control_state: RaceControlState) -> PolicyDriveFrame:
         return self._require_policy_race().step_manual(control_state)
 
     def sync_policy_curriculum_stage(self, stage_index: int | None) -> None:

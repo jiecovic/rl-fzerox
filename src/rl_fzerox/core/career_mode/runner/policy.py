@@ -7,11 +7,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fzerox_emulator import RaceControlState
-from fzerox_emulator.arrays import ControllerMaskBatch, DisplayFrames
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
-from rl_fzerox.core.envs.engine.stepping import PolicyDriveStep
+from rl_fzerox.core.envs.engine.policy_drive import PolicyDriveFrame, PolicyDriveRuntime
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
@@ -38,17 +36,6 @@ class CareerModePolicyControl:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class CareerPolicyRaceStep:
-    """Policy-facing race step data for viewer updates."""
-
-    observation: ObservationValue
-    reward: float
-    info: dict[str, object]
-    display_frames: DisplayFrames
-    display_controller_masks: ControllerMaskBatch
-
-
 class CareerPolicyRaceDriver:
     """Policy adapter for one Career Mode race handoff."""
 
@@ -60,11 +47,9 @@ class CareerPolicyRaceDriver:
     ) -> None:
         self.policy_control = policy_control
         self.train_config = _policy_train_config(policy_control)
-        self._engine = FZeroXEnvEngine(
-            backend=emulator,
-            config=self.train_config.env,
-            reward_config=self.train_config.reward,
-            curriculum_config=self.train_config.curriculum,
+        self._runtime = PolicyDriveRuntime(
+            emulator=emulator,
+            train_config=self.train_config,
         )
 
     @property
@@ -73,11 +58,11 @@ class CareerPolicyRaceDriver:
 
     @property
     def last_requested_control_state(self) -> RaceControlState:
-        return self._engine.last_requested_control_state
+        return self._runtime.last_requested_control_state
 
     @property
     def last_gas_level(self) -> float:
-        return self._engine.last_gas_level
+        return self._runtime.last_gas_level
 
     def begin(
         self,
@@ -85,36 +70,26 @@ class CareerPolicyRaceDriver:
         seed: int | None,
         course_id: str | None,
     ) -> tuple[ObservationValue, dict[str, object]]:
-        observation, info = self._engine.begin_policy_drive(
+        observation, info = self._runtime.begin(
             seed=seed,
             course_id=course_id,
         )
         return observation, _race_start_info(info)
 
-    def step_policy(self, action: ActionValue) -> CareerPolicyRaceStep:
-        return self._from_policy_engine_step(self._engine.step_policy_drive(action))
+    def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
+        return self._runtime.step_policy(action)
 
-    def step_manual(self, control_state: RaceControlState) -> CareerPolicyRaceStep:
-        return self._from_policy_engine_step(self._engine.step_control_policy_drive(control_state))
+    def step_manual(self, control_state: RaceControlState) -> PolicyDriveFrame:
+        return self._runtime.step_manual(control_state)
 
     def action_mask_branches(self) -> ActionMaskBranches:
-        return self._engine.action_mask_branches()
+        return self._runtime.action_mask_branches()
 
     def action_mask_snapshot(self) -> ActionMaskSnapshot:
-        return self._engine.action_mask_snapshot()
+        return self._runtime.action_mask_snapshot()
 
     def sync_curriculum_stage(self, stage_index: int | None) -> None:
-        self._engine.sync_checkpoint_curriculum_stage(stage_index)
-
-    @staticmethod
-    def _from_policy_engine_step(step: PolicyDriveStep) -> CareerPolicyRaceStep:
-        return CareerPolicyRaceStep(
-            observation=step.observation,
-            reward=step.reward,
-            info=dict(step.info),
-            display_frames=step.display_frames,
-            display_controller_masks=step.display_controller_masks,
-        )
+        self._runtime.sync_curriculum_stage(stage_index)
 
 
 def _policy_train_config(policy_control: CareerModePolicyControl) -> TrainAppConfig:
