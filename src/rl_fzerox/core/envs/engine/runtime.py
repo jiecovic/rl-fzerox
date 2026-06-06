@@ -48,7 +48,9 @@ from .reset import EngineResetCoordinator
 from .stepping import (
     EngineStepAssembler,
     EnvStepRequest,
+    PolicyDriveStep,
     WatchEnvStep,
+    policy_drive_info,
     set_episode_boost_pad_info,
 )
 
@@ -358,6 +360,17 @@ class FZeroXEnvEngine:
         self._episode.last_info = dict(info)
         return observation, info
 
+    def begin_policy_drive(
+        self,
+        *,
+        seed: int | None = None,
+        course_id: str | None = None,
+    ) -> tuple[ObservationValue, dict[str, object]]:
+        """Initialize policy driving from the emulator's current race state."""
+
+        observation, info = self.begin_live_race(seed=seed, course_id=course_id)
+        return observation, policy_drive_info(info)
+
     def step(
         self,
         action: ActionValue,
@@ -383,6 +396,18 @@ class FZeroXEnvEngine:
             ),
         )
 
+    def step_policy_drive(self, action: ActionValue) -> PolicyDriveStep:
+        """Step a live-race policy action without Gym lifecycle semantics."""
+
+        return self._step_decoded_action_policy_drive(
+            self._action_adapter.decode_request(action),
+            action_drive_axis=action_drive_axis(
+                action,
+                self._action_space,
+                drive_axis_index=self._action_config.continuous_drive_axis_index(),
+            ),
+        )
+
     def action_to_control_state(self, action: ActionValue) -> RaceControlState:
         """Decode one policy action into the held semantic control state."""
 
@@ -398,6 +423,17 @@ class FZeroXEnvEngine:
         """Step manual controls while collecting watch-only intermediate frames."""
 
         return self._step_control_state_watch(control_state, action_drive_axis=None)
+
+    def step_control_policy_drive(
+        self,
+        control_state: RaceControlState,
+    ) -> PolicyDriveStep:
+        """Step live-race manual controls without Gym lifecycle semantics."""
+
+        return self._step_control_state_policy_drive(
+            control_state,
+            action_drive_axis=None,
+        )
 
     def _step_control_state(
         self,
@@ -452,6 +488,25 @@ class FZeroXEnvEngine:
             capture_display_frames=True,
         )
 
+    def _step_control_state_policy_drive(
+        self,
+        control_state: RaceControlState,
+        *,
+        action_drive_axis: float | None,
+    ) -> PolicyDriveStep:
+        requested_control_state = control_state
+        applied_control_state = self._apply_control_semantics(requested_control_state)
+        self._episode.held_control_state = applied_control_state
+        return self._run_env_step_result(
+            applied_control_state,
+            action_repeat=self.config.action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            spin_request="none",
+            capture_display_frames=True,
+            episode_done_on_truncation=False,
+        ).policy_drive_result()
+
     def _step_decoded_action_watch(
         self,
         decoded_action: DecodedAction,
@@ -470,6 +525,26 @@ class FZeroXEnvEngine:
             spin_request=spin_request,
             capture_display_frames=True,
         )
+
+    def _step_decoded_action_policy_drive(
+        self,
+        decoded_action: DecodedAction,
+        *,
+        action_drive_axis: float | None,
+    ) -> PolicyDriveStep:
+        requested_control_state = decoded_action.control_state
+        applied_control_state = self._apply_control_semantics(requested_control_state)
+        spin_request = self._apply_spin_semantics(decoded_action.spin_request)
+        self._episode.held_control_state = applied_control_state
+        return self._run_env_step_result(
+            applied_control_state,
+            action_repeat=self.config.action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            spin_request=spin_request,
+            capture_display_frames=True,
+            episode_done_on_truncation=False,
+        ).policy_drive_result()
 
     def step_frame(
         self,
@@ -524,6 +599,7 @@ class FZeroXEnvEngine:
         action_drive_axis: float | None,
         spin_request: SpinRequest,
         capture_display_frames: bool,
+        episode_done_on_truncation: bool = True,
     ) -> WatchEnvStep:
         assembly = self._step_assembler.run(
             EnvStepRequest(
@@ -548,7 +624,8 @@ class FZeroXEnvEngine:
             return_value=assembly.episode_return,
             boost_pad_entries=assembly.episode_boost_pad_entries,
             airborne_frames=assembly.episode_airborne_frames,
-            done=assembly.step.terminated or assembly.step.truncated,
+            done=assembly.step.terminated
+            or (episode_done_on_truncation and assembly.step.truncated),
             info=assembly.step.info,
         )
         return assembly.step
