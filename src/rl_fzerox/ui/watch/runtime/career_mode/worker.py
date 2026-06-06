@@ -3,20 +3,16 @@ from __future__ import annotations
 
 import time
 from multiprocessing.queues import Queue as ProcessQueue
-from typing import Protocol
+from typing import Protocol, TypeAlias
 
-from fzerox_emulator import RaceControlState
-from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.engine.controls import action_mask_violations
-from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from fzerox_emulator import FZeroXTelemetry, RaceControlState
+from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.menu import (
     MenuInput,
     RawMenuStep,
     course_id_from_info,
     in_gp_race,
 )
-from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.career_mode.runner.save_file import (
     load_save_ram,
@@ -24,7 +20,13 @@ from rl_fzerox.core.career_mode.runner.save_file import (
     save_game_id_from_config,
     store_from_config,
 )
+from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.engine.controls import action_mask_violations
+from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+from rl_fzerox.core.training.inference import PolicyRunner
 from rl_fzerox.ui.watch.live_series import (
     LIVE_SERIES_PUBLISH_POLICY,
     EpisodeLiveSeriesTracker,
@@ -39,7 +41,9 @@ from rl_fzerox.ui.watch.runtime.career_mode.session import (
 )
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    CnnActivationNormalizationMode,
     CnnActivationSampler,
+    CnnActivationSnapshot,
 )
 from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerClosed,
@@ -285,10 +289,10 @@ def _run_career_mode_loop_body(
     live_visualization_enabled: bool,
     live_series: EpisodeLiveSeriesTracker,
     last_live_series_publish_time: float,
-    cnn_normalization,
+    cnn_normalization: CnnActivationNormalizationMode,
     cnn_sampler: CnnActivationSampler,
     watch_zeroed_state_features: frozenset[str],
-    auxiliary_target_names,
+    auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...],
     active_policy_control: CareerModePolicyControl | None,
     active_policy_started: bool,
     current_policy_action: ActionValue | None,
@@ -297,12 +301,12 @@ def _run_career_mode_loop_body(
     raw_info: dict[str, object],
     info: dict[str, object],
     reset_info: dict[str, object],
-    current_telemetry,
-    current_auxiliary_predictions,
-    current_auxiliary_targets,
-    cnn_activations,
+    current_telemetry: FZeroXTelemetry | None,
+    current_auxiliary_predictions: dict[str, object] | None,
+    current_auxiliary_targets: dict[str, object] | None,
+    cnn_activations: CnnActivationSnapshot | None,
     last_menu_step: RawMenuStep | None,
-):
+) -> None:
     def publish_snapshot(*, policy_visible: bool) -> None:
         policy_active = policy_visible and observation is not None
         snapshot_target_control_fps = _snapshot_target_control_fps(
@@ -776,7 +780,7 @@ def _career_runtime_error_context(
 
 def _fresh_menu_runtime_state(
     session: CareerModeRuntimeSession,
-) -> tuple[dict[str, object], dict[str, object], object]:
+) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
     raw_info = _menu_viewer_info(session)
     info = dict(raw_info)
     telemetry = _read_live_telemetry(session.emulator)
@@ -821,6 +825,24 @@ class _PolicyTimingSession(Protocol):
     native_fps: float
 
     def snapshot_config(self, base_config: WatchAppConfig) -> WatchAppConfig: ...
+
+
+_PolicyStepResult: TypeAlias = tuple[
+    ObservationValue,
+    dict[str, object],
+    ObservationValue,
+    dict[str, object],
+    float,
+    RaceControlState,
+    float,
+    float,
+    ActionValue | None,
+    CnnActivationSnapshot | None,
+    FZeroXTelemetry | None,
+    dict[str, object] | None,
+    dict[str, object] | None,
+    float,
+]
 
 
 def _active_policy_timing(
@@ -891,7 +913,7 @@ def _step_policy_or_manual(
     controller: CareerModeController,
     snapshot_queue: ProcessQueue,
     active_policy_control: CareerModePolicyControl,
-    policy_runner,
+    policy_runner: PolicyRunner,
     observation: ObservationValue,
     info: dict[str, object],
     reset_info: dict[str, object],
@@ -905,15 +927,15 @@ def _step_policy_or_manual(
     current_control_state: RaceControlState,
     boost_lamp_level: float,
     cnn_visualization_enabled: bool,
-    cnn_normalization,
+    cnn_normalization: CnnActivationNormalizationMode,
     cnn_sampler: CnnActivationSampler,
     auxiliary_visualization_enabled: bool,
-    auxiliary_target_names,
+    auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...],
     watch_zeroed_state_features: frozenset[str],
     live_visualization_enabled: bool,
     live_series: EpisodeLiveSeriesTracker,
     last_live_series_publish_time: float,
-):
+) -> _PolicyStepResult:
     previous_observation = observation
     previous_info = controller.viewer_info(
         info=dict(info),

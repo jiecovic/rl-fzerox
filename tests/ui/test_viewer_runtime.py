@@ -1,10 +1,13 @@
 # tests/ui/test_viewer_runtime.py
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 
+from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import Float32Array, UInt8Array
+from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.career_mode.runner.controller import (
     CareerModeController,
     CareerRuntimeSession,
@@ -17,15 +20,29 @@ from rl_fzerox.core.career_mode.runner.menu import (
     RawMenuStep,
     camera_setting,
 )
+from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan, SaveRaceSetup
+from rl_fzerox.core.career_mode.runner.setup import career_mode_race_setup_config
+from rl_fzerox.core.domain.observation_image import CustomResolutionChoice
 from rl_fzerox.core.envs.engine.reset.camera import CAMERA_SYNC_CONTROLS
 from rl_fzerox.core.envs.observations import (
     ImageStateObservation,
     observation_state,
     state_feature_names,
 )
+from rl_fzerox.core.manager.models import (
+    ManagedRun,
+    ManagedSaveAttempt,
+    ManagedSaveCourseSetup,
+    ManagedSaveGame,
+    ManagedSaveUnlockProgress,
+    SaveAttemptStatus,
+    SaveGameStatus,
+)
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
+    CareerModeRaceSetupConfig,
     CurriculumConfig,
     CurriculumStageConfig,
     EmulatorConfig,
@@ -40,6 +57,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainConfig,
     WatchAppConfig,
 )
+from rl_fzerox.core.training.inference import PolicyRunner
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
     open_career_mode_runtime_session,
@@ -78,7 +96,7 @@ from rl_fzerox.ui.watch.view.screen.render import (
     _observation_state_feature_names,
     _track_pool_records,
 )
-from tests.core.envs.helpers import CameraSyncBackend
+from tests.core.envs.helpers import CameraSyncBackend as NativeCameraSyncBackend
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
 
@@ -231,13 +249,13 @@ def test_career_mode_session_renders_display_without_policy_crop(tmp_path: Path)
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    emulator = _Emulator()
+    emulator: Any = _Emulator()
     session = CareerModeRuntimeSession(
         config=WatchAppConfig(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
             env=EnvConfig(
                 observation=ObservationConfig(
-                    resolution={"mode": "custom", "height": 72, "width": 96},
+                    resolution=CustomResolutionChoice(height=72, width=96),
                 ),
             ),
         ),
@@ -440,7 +458,7 @@ def test_career_mode_camera_setting_reads_live_viewer_telemetry_key() -> None:
 def test_career_mode_clears_active_policy_runner_outside_gp_race() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.POLICY_RACE)
     session = object.__new__(WatchRuntimeSession)
-    policy_control = object()
+    policy_control = _stub_policy_control()
 
     active_control = controller.active_policy_control(
         session=session,
@@ -466,7 +484,7 @@ def test_career_mode_does_not_expose_policy_before_policy_phase() -> None:
 
 def test_career_mode_enters_policy_phase_with_explicit_handoff_frame() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.ENTER_RACE)
-    controller._resolve_policy_control = lambda info: object()
+    controller._resolve_policy_control = lambda info: _stub_policy_control()
     controller._next_camera_sync_step = lambda info: None
 
     step = controller.next_raw_step(
@@ -574,7 +592,7 @@ def test_career_mode_observe_step_handles_post_gp_screen_as_finished() -> None:
 
 def test_career_mode_continues_explicit_terminal_result_edge() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
-    controller._resolve_policy_control = lambda info: object()
+    controller._resolve_policy_control = lambda info: _stub_policy_control()
     controller._pending_steps.clear()
     controller._awaiting_new_race_after_terminal = True
 
@@ -595,7 +613,7 @@ def test_career_mode_continues_explicit_terminal_result_edge() -> None:
 
 def test_career_mode_does_not_continue_lap_three_without_terminal_result() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
-    controller._resolve_policy_control = lambda info: object()
+    controller._resolve_policy_control = lambda info: _stub_policy_control()
     controller._pending_steps.clear()
     controller._awaiting_new_race_after_terminal = True
     controller._continuing_race_result = True
@@ -634,7 +652,7 @@ def test_career_mode_clears_stale_post_race_inputs_on_unknown_screen() -> None:
 
 def test_career_mode_result_continuation_releases_accept_between_pulses() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
-    controller._resolve_policy_control = lambda info: object()
+    controller._resolve_policy_control = lambda info: _stub_policy_control()
     controller._pending_steps.clear()
     controller._awaiting_new_race_after_terminal = True
     controller._observed_terminal_race_result = True
@@ -674,7 +692,7 @@ def test_career_mode_post_race_never_drains_start_pulses_inside_gp_race() -> Non
 
 def test_career_mode_enter_race_waits_out_stale_post_result_gp_race() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.ENTER_RACE)
-    controller._resolve_policy_control = lambda info: object()
+    controller._resolve_policy_control = lambda info: _stub_policy_control()
     controller._awaiting_new_race_after_terminal = True
     controller._observed_terminal_race_result = True
 
@@ -880,16 +898,7 @@ def test_career_mode_menu_transition_does_not_skip_race_entry() -> None:
 
 def test_career_mode_rejects_non_default_engine_without_ram_patch() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.APPLY_ENGINE)
-    controller._setup = SaveRaceSetup(
-        difficulty="novice",
-        cup_id="jack",
-        course_id=None,
-        vehicle_id="blue_falcon",
-        vehicle_display_name="Blue Falcon",
-        character_index=0,
-        machine_select_slot=0,
-        machine_select_row=0,
-        machine_select_column=0,
+    controller._setup = _career_setup(
         engine_setting_id="70",
         engine_setting_raw_value=70,
     )
@@ -938,7 +947,7 @@ def test_career_mode_menu_accepts_already_advanced_screens(
 
 def test_career_mode_fsm_reaches_policy_handoff_from_menu_path() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.BOOT_TO_DIFFICULTY)
-    controller._resolve_policy_control = lambda info: object()
+    controller._resolve_policy_control = lambda info: _stub_policy_control()
     controller._next_camera_sync_step = lambda info: None
 
     assert _next_active_menu_phase(controller, {"game_mode": "main_menu"}) == (
@@ -1571,13 +1580,53 @@ def _sample_state(values: list[float]) -> Float32Array:
 
 
 class _ExecutionPlanStore:
-    def list_save_course_setups(self, save_game_id: str):
+    def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None:
+        raise AssertionError(f"unexpected get_save_game({save_game_id!r})")
+
+    def get_run(self, run_id: str) -> ManagedRun | None:
+        raise AssertionError(f"unexpected get_run({run_id!r})")
+
+    def list_save_course_setups(self, save_game_id: str) -> tuple[ManagedSaveCourseSetup, ...]:
         assert save_game_id == "save-a"
         return ()
 
-    def save_game_unlock_progress(self, save_game_id: str):
+    def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
         assert save_game_id == "save-a"
-        return None
+        return ManagedSaveUnlockProgress(
+            inspection_status="inspected",
+            completed_count=0,
+            total_count=0,
+            next_target=None,
+            targets=(),
+        )
+
+    def finish_save_attempt(
+        self,
+        *,
+        attempt_id: str,
+        status: SaveAttemptStatus,
+        finish_position: int | None = None,
+        finish_time_s: float | None = None,
+        failure_reason: str | None = None,
+    ) -> ManagedSaveAttempt | None:
+        raise AssertionError(f"unexpected finish_save_attempt({attempt_id!r}, {status!r})")
+
+    def update_save_game_status(
+        self,
+        *,
+        save_game_id: str,
+        status: SaveGameStatus,
+    ) -> object | None:
+        raise AssertionError(f"unexpected update_save_game_status({save_game_id!r}, {status!r})")
+
+    def start_next_save_attempt(self, save_game_id: str) -> ManagedSaveAttempt:
+        raise AssertionError(f"unexpected start_next_save_attempt({save_game_id!r})")
+
+    def get_save_attempt_execution_context(
+        self,
+        attempt_id: str,
+    ) -> SaveAttemptExecutionContext | None:
+        raise AssertionError(f"unexpected get_save_attempt_execution_context({attempt_id!r})")
 
 
 def _minimal_career_controller(
@@ -1592,19 +1641,7 @@ def _minimal_career_controller(
     controller._pending_steps = deque()
     controller._start_presses_in_phase = 0
     controller._engine_applied = engine_applied
-    controller._setup = SaveRaceSetup(
-        difficulty="novice",
-        cup_id="jack",
-        course_id=None,
-        vehicle_id="blue_falcon",
-        vehicle_display_name="Blue Falcon",
-        character_index=0,
-        machine_select_slot=0,
-        machine_select_row=0,
-        machine_select_column=0,
-        engine_setting_id="50",
-        engine_setting_raw_value=50,
-    )
+    controller._setup = _career_setup()
     controller._camera_setting = None
     controller._camera_synced = True
     controller._camera_sync_taps = 0
@@ -1614,6 +1651,56 @@ def _minimal_career_controller(
     controller._continue_after_race_pulses = 0
     controller._fresh_race_ready_frames = 0
     return controller
+
+
+def _career_setup(
+    *,
+    engine_setting_id: str = "50",
+    engine_setting_raw_value: int = 50,
+) -> CareerModeRaceSetupConfig:
+    return career_mode_race_setup_config(
+        SaveRaceSetup(
+            difficulty="novice",
+            cup_id="jack",
+            course_id=None,
+            vehicle_id="blue_falcon",
+            vehicle_display_name="Blue Falcon",
+            character_index=0,
+            machine_select_slot=0,
+            machine_select_row=0,
+            machine_select_column=0,
+            engine_setting_id=engine_setting_id,
+            engine_setting_raw_value=engine_setting_raw_value,
+        )
+    )
+
+
+def _stub_policy_control() -> CareerModePolicyControl:
+    return CareerModePolicyControl(
+        course_setup=ManagedSaveCourseSetup(
+            id="setup-a",
+            save_game_id="save-a",
+            scope="course",
+            policy_run_id="run-a",
+            policy_artifact="best",
+            created_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+            difficulty="novice",
+            cup_id="jack",
+            course_id="mute_city",
+        ),
+        policy_run=ManagedRun(
+            id="run-a",
+            name="Run A",
+            status="stopped",
+            config=ManagedRunConfig(),
+            config_hash="hash-a",
+            run_dir=Path("/tmp/run-a"),
+            created_at="2026-01-01T00:00:00Z",
+            lineage_id="lineage-a",
+        ),
+        runner=object.__new__(PolicyRunner),
+    )
 
 
 def _next_active_menu_phase(
@@ -1652,6 +1739,22 @@ def _session_without_telemetry() -> CareerRuntimeSession:
         def try_read_telemetry() -> None:
             return None
 
+        @staticmethod
+        def set_controller_state(controller_state: ControllerState) -> None:
+            del controller_state
+
+        @staticmethod
+        def step_frames(count: int, *, capture_video: bool = True) -> None:
+            del count, capture_video
+
+        @staticmethod
+        def read_save_ram() -> bytes:
+            return b""
+
+        @staticmethod
+        def write_save_ram(data: bytes) -> None:
+            del data
+
     class _Session:
         emulator = _Emulator()
 
@@ -1660,7 +1763,17 @@ def _session_without_telemetry() -> CareerRuntimeSession:
 
 class _CameraSyncCareerSession:
     def __init__(self) -> None:
-        self.emulator = CameraSyncBackend(camera_setting_raw=2)
+        self.emulator = _CareerCameraSyncBackend(camera_setting_raw=2)
+
+
+class _CareerCameraSyncBackend(NativeCameraSyncBackend):
+    @staticmethod
+    def read_save_ram() -> bytes:
+        return b""
+
+    @staticmethod
+    def write_save_ram(data: bytes) -> None:
+        del data
 
 
 class _StubCareerSession:
@@ -1670,6 +1783,18 @@ class _StubCareerSession:
 
     def try_read_telemetry(self) -> None:
         return None
+
+    def set_controller_state(self, controller_state: ControllerState) -> None:
+        del controller_state
+
+    def step_frames(self, count: int, *, capture_video: bool = True) -> None:
+        del count, capture_video
+
+    def read_save_ram(self) -> bytes:
+        return b""
+
+    def write_save_ram(self, data: bytes) -> None:
+        del data
 
     def patch_engine_settings(
         self,

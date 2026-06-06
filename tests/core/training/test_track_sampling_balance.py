@@ -219,9 +219,11 @@ def test_deficit_budget_payload_uses_uniform_adaptive_target_mix() -> None:
     )
 
     payload = track_sampling_state_payload(state)
+    payload_entries = payload["entries"]
+    assert isinstance(payload_entries, list)
     entries = {
         entry["course_key"]: entry
-        for entry in payload["entries"]
+        for entry in payload_entries
         if isinstance(entry, dict) and isinstance(entry.get("course_key"), str)
     }
 

@@ -5,13 +5,14 @@ from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.career_mode.course_setup import (
     CourseSetupTarget,
     resolve_course_setup,
 )
+from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.career_mode.runner.menu import (
     CAREER_MENU_DEFAULTS,
     GP_MENU_ORDER,
@@ -35,7 +36,10 @@ from rl_fzerox.core.career_mode.runner.race import (
     SaveRaceExecutionPlan,
     build_save_race_execution_plan,
 )
-from rl_fzerox.core.career_mode.runner.save_file import persist_save_ram_for_store
+from rl_fzerox.core.career_mode.runner.save_file import (
+    SaveRamSession,
+    persist_save_ram_for_store,
+)
 from rl_fzerox.core.career_mode.runner.setup import (
     career_mode_race_setup_config,
     save_race_setup_from_config,
@@ -44,26 +48,75 @@ from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.envs.engine.info import telemetry_info
 from rl_fzerox.core.envs.engine.reset.camera import (
     CAMERA_SYNC_CONTROLS,
+    CameraSyncBackend,
     sync_camera_setting,
 )
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.models import (
     ManagedRun,
+    ManagedSaveAttempt,
+    ManagedSaveCourseSetup,
+    ManagedSaveGame,
     ManagedSaveUnlockProgress,
     SaveAttemptStatus,
+    SaveGameStatus,
 )
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchAppConfig
 from rl_fzerox.core.training.inference import PolicyRunner, load_policy_runner
 
-if TYPE_CHECKING:
-    from fzerox_emulator import Emulator
+
+class CareerRuntimeEmulator(CameraSyncBackend, SaveRamSession, Protocol):
+    """Emulator operations needed by the Career Mode controller."""
 
 
 class CareerRuntimeSession(Protocol):
     """Narrow runtime surface Career Mode needs from its session loop."""
 
-    emulator: Emulator
+    @property
+    def emulator(self) -> CareerRuntimeEmulator: ...
+
+
+class CareerModeStore(Protocol):
+    """Manager operations the Career controller mutates while running."""
+
+    def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None: ...
+
+    def get_run(self, run_id: str) -> ManagedRun | None: ...
+
+    def list_save_course_setups(
+        self,
+        save_game_id: str,
+    ) -> tuple[ManagedSaveCourseSetup, ...]: ...
+
+    def save_game_unlock_progress(
+        self,
+        save_game_id: str,
+    ) -> ManagedSaveUnlockProgress: ...
+
+    def finish_save_attempt(
+        self,
+        *,
+        attempt_id: str,
+        status: SaveAttemptStatus,
+        finish_position: int | None = None,
+        finish_time_s: float | None = None,
+        failure_reason: str | None = None,
+    ) -> ManagedSaveAttempt | None: ...
+
+    def update_save_game_status(
+        self,
+        *,
+        save_game_id: str,
+        status: SaveGameStatus,
+    ) -> object | None: ...
+
+    def start_next_save_attempt(self, save_game_id: str) -> ManagedSaveAttempt: ...
+
+    def get_save_attempt_execution_context(
+        self,
+        attempt_id: str,
+    ) -> SaveAttemptExecutionContext | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +138,7 @@ class CareerModeController:
         device: str,
     ) -> None:
         self._setup = setup
-        self._store = ManagerStore(db_path)
+        self._store: CareerModeStore = ManagerStore(db_path)
         self._save_game_id = save_game_id
         self._attempt_id: str | None = attempt_id
         self._device = device
@@ -533,16 +586,12 @@ class CareerModeController:
 
         key = (course_setup.policy_run_id, course_setup.policy_artifact)
         loaded_policy = self._policy_cache.get(key)
-        if loaded_policy is None or key != self._active_policy_key:
+        if loaded_policy is None:
             policy_run = self._store.get_run(course_setup.policy_run_id)
             if policy_run is None:
                 raise RuntimeError(
                     f"Career Mode policy run not found: {course_setup.policy_run_id}"
                 )
-        elif loaded_policy is not None:
-            policy_run = loaded_policy.run
-
-        if loaded_policy is None:
             runner = load_policy_runner(
                 policy_run.run_dir,
                 artifact=course_setup.policy_artifact,
@@ -551,6 +600,8 @@ class CareerModeController:
             )
             loaded_policy = _LoadedPolicy(run=policy_run, runner=runner)
             self._policy_cache[key] = loaded_policy
+        else:
+            policy_run = loaded_policy.run
         if key != self._active_policy_key:
             self._active_policy_key = key
             self._camera_setting = _validated_camera_setting(
@@ -826,7 +877,8 @@ class CareerModeController:
         info.update(telemetry_info(telemetry))
         if telemetry.camera_setting_name == self._camera_setting:
             self._camera_synced = True
-            self._camera_sync_taps = int(info.get("camera_setting_taps") or 0)
+            tap_count = info.get("camera_setting_taps")
+            self._camera_sync_taps = tap_count if isinstance(tap_count, int) else 0
         return True
 
     def _reset_camera_sync(self) -> None:

@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, joypad_mask
-
 from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.core.envs.engine.reset.camera import CAMERA_SYNC_CONTROLS
 
