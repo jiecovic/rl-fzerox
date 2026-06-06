@@ -54,4 +54,4 @@ def test_env_policy_drive_runtime_owns_engine_policy_drive_calls() -> None:
     assert "step_watch(" not in source
     assert "step_control_watch(" not in source
     assert "WatchEnvStep" not in source
-    assert "EngineStepAssembler" in source
+    assert "build_engine_runtime_components" in source

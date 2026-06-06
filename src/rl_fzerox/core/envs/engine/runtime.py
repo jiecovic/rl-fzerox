@@ -12,11 +12,9 @@ from rl_fzerox.core.envs.actions import (
     DecodedAction,
     DiscreteActionDimension,
     ResettableActionAdapter,
-    build_action_adapter,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.envs.rewards import build_reward_tracker
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_vector_or_zeros,
 )
@@ -28,25 +26,20 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingConfig,
 )
 
+from .components import build_engine_runtime_components
 from .controls import (
     ActionMaskBranches,
-    ActionMaskController,
     ActionMaskSnapshot,
-    ControlStateTracker,
     apply_control_semantics,
     apply_spin_semantics,
     sync_dynamic_action_masks,
 )
-from .episode import EngineEpisodeState
 from .info import (
     set_curriculum_info,
     telemetry_info,
 )
-from .observation import EngineObservationBuilder
-from .rendering import backend_renderer
 from .reset import EngineResetCoordinator
 from .stepping import (
-    EngineStepAssembler,
     EnvStepRequest,
     WatchEnvStep,
     set_episode_boost_pad_info,
@@ -72,31 +65,21 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
-        self._renderer: RendererName = backend_renderer(backend)
-        self._curriculum_config = curriculum_config
-        self._action_config = config.action.runtime()
-        self._action_adapter = build_action_adapter(self._action_config)
-        self._observation_builder = EngineObservationBuilder.from_engine_config(
+        components = build_engine_runtime_components(
             backend=backend,
             config=config,
-            renderer=self._renderer,
+            reward_config=reward_config,
+            curriculum_config=curriculum_config,
         )
-        self._reward_tracker = build_reward_tracker(
-            config=reward_config,
-            max_episode_steps=config.max_episode_steps,
-        )
+        self._renderer: RendererName = components.renderer
+        self._action_config = components.action_config
+        self._action_adapter = components.action_adapter
+        self._observation_builder = components.observation_builder
+        self._reward_tracker = components.reward_tracker
         self._reward_summary_config = self._reward_tracker.summary_config()
         self._action_space = self._action_adapter.action_space
         self._observation_space = self._observation_builder.space
-        self._mask_controller = ActionMaskController.from_config(
-            adapter=self._action_adapter,
-            base_overrides=self._action_config.mask_overrides,
-            curriculum_config=curriculum_config,
-            boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
-            lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
-            mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
-            pitch_neutral_index=self._action_config.pitch_buckets // 2,
-        )
+        self._mask_controller = components.mask_controller
         self._reset_coordinator = EngineResetCoordinator(
             backend=backend,
             config=config,
@@ -104,27 +87,9 @@ class FZeroXEnvEngine:
             env_index=env_index,
         )
         self._reset_coordinator.set_curriculum_stage(self._mask_controller.stage_index)
-        self._control_state = ControlStateTracker(
-            lean_mode=self._action_config.lean_mode,
-            lean_initial_lockout_frames=self._action_config.lean_initial_lockout_frames,
-            boost_decision_interval_frames=self._action_config.boost_decision_interval_frames,
-            boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
-            action_history_len=self._observation_builder.action_history_len,
-            action_history_controls=self._observation_builder.action_history_controls,
-            split_lean_history=self._action_config.split_lean_history,
-        )
-        self._step_assembler = EngineStepAssembler(
-            backend=self.backend,
-            config=self.config,
-            action_config=self._action_config,
-            reward_summary_config=self._reward_summary_config,
-            reward_tracker=self._reward_tracker,
-            observation_builder=self._observation_builder,
-            mask_controller=self._mask_controller,
-            control_state=self._control_state,
-            renderer=self._renderer,
-        )
-        self._episode = EngineEpisodeState()
+        self._control_state = components.control_state
+        self._step_assembler = components.step_assembler
+        self._episode = components.episode
 
     @property
     def action_space(self) -> spaces.Space:
