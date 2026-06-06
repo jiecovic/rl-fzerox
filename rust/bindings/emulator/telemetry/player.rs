@@ -98,6 +98,7 @@ impl PyPlayerTelemetry {
                     collision_mass: optional_item(data, "collision_mass", 0.0)?,
                 },
                 machine_context: MachineContextTelemetry {
+                    character_index: optional_item(data, "machine_character_index", -1)?,
                     body_stat: optional_item(data, "machine_body_stat", 0)?,
                     boost_stat: optional_item(data, "machine_boost_stat", 0)?,
                     grip_stat: optional_item(data, "machine_grip_stat", 0)?,
@@ -304,6 +305,11 @@ impl PyPlayerTelemetry {
     }
 
     #[getter]
+    fn machine_character_index(&self) -> i16 {
+        self.inner.machine_context.character_index
+    }
+
+    #[getter]
     fn machine_body_stat(&self) -> i8 {
         self.inner.machine_context.body_stat
     }
@@ -456,6 +462,7 @@ impl PyPlayerTelemetry {
         dict.set_item("acceleration_force", self.acceleration_force())?;
         dict.set_item("drift_attack_force", self.drift_attack_force())?;
         dict.set_item("collision_mass", self.collision_mass())?;
+        dict.set_item("machine_character_index", self.machine_character_index())?;
         dict.set_item("machine_body_stat", self.machine_body_stat())?;
         dict.set_item("machine_boost_stat", self.machine_boost_stat())?;
         dict.set_item("machine_grip_stat", self.machine_grip_stat())?;

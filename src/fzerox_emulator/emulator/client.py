@@ -147,6 +147,21 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
 
         self._native.write_system_ram(offset, data)
 
+    def save_ram_size(self) -> int:
+        """Return the active libretro save-RAM buffer size in bytes."""
+
+        return int(self._native.save_ram_size())
+
+    def read_save_ram(self) -> bytes:
+        """Read the full portable save-RAM buffer exposed by the core."""
+
+        return bytes(self._native.read_save_ram())
+
+    def write_save_ram(self, data: bytes) -> None:
+        """Replace the full portable save-RAM buffer exposed by the core."""
+
+        self._native.write_save_ram(data)
+
     def step_repeat_raw(
         self,
         control_state: RaceControlState,

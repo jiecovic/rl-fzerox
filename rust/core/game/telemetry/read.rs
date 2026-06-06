@@ -71,6 +71,10 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         race_intro_timer: read_i32(system_ram, GLOBALS.race_intro_timer)?,
         game_mode_raw,
         game_mode_name: game_mode.map_or("unknown", GameMode::wire_name),
+        menu_selected_mode_raw: read_i32(system_ram, GLOBALS.selected_mode)?,
+        menu_transition_state_raw: read_i16(system_ram, GLOBALS.game_mode_change_state)?,
+        menu_current_ghost_type_raw: read_i32(system_ram, GLOBALS.current_ghost_type)?,
+        queued_game_mode_raw: read_i32(system_ram, GLOBALS.queued_game_mode)?,
         in_race_mode: game_mode.is_some_and(GameMode::is_race),
         total_racers: read_i32(system_ram, GLOBALS.total_racers)?,
         course_index: read_u32(system_ram, GLOBALS.course_index)?,
@@ -108,10 +112,18 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
     let camera_setting_end = player_camera_setting_offset() + size_of::<i32>();
     let reverse_timer_end = player_reverse_timer_offset() + size_of::<i32>();
     let ko_star_count_end = GLOBALS.player_ko_stars + size_of::<u8>();
+    let menu_selected_mode_end = GLOBALS.selected_mode + size_of::<i32>();
+    let menu_transition_state_end = GLOBALS.game_mode_change_state + size_of::<i16>();
+    let menu_current_ghost_type_end = GLOBALS.current_ghost_type + size_of::<i32>();
+    let queued_game_mode_end = GLOBALS.queued_game_mode + size_of::<i32>();
     let required_end = player_end
         .max(camera_setting_end)
         .max(reverse_timer_end)
-        .max(ko_star_count_end);
+        .max(ko_star_count_end)
+        .max(menu_selected_mode_end)
+        .max(menu_transition_state_end)
+        .max(menu_current_ghost_type_end)
+        .max(queued_game_mode_end);
     if required_end > system_ram.len() {
         return Err(CoreError::MemoryOutOfRange {
             memory_id: MEMORY_SYSTEM_RAM,
@@ -140,6 +152,7 @@ fn read_machine_context(system_ram: &[u8]) -> Result<MachineContextTelemetry, Co
     let engine_setting = read_f32(system_ram, GLOBALS.player_engine)?;
     if character_index < 0 || character_index as usize >= MACHINE_TABLE.machine_count {
         return Ok(MachineContextTelemetry {
+            character_index,
             engine_setting,
             ..MachineContextTelemetry::default()
         });
@@ -148,6 +161,7 @@ fn read_machine_context(system_ram: &[u8]) -> Result<MachineContextTelemetry, Co
     let machine_base =
         MACHINE_TABLE.machines + ((character_index as usize) * MACHINE_TABLE.machine_size);
     Ok(MachineContextTelemetry {
+        character_index,
         body_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.body_stat)?,
         boost_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.boost_stat)?,
         grip_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.grip_stat)?,

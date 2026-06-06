@@ -8,7 +8,7 @@ from pathlib import Path
 from rl_fzerox.apps.recording.progress import format_race_time_ms, format_recording_target
 from rl_fzerox.apps.recording.runner import record_policy_episode
 from rl_fzerox.apps.watch import resolve_watch_app_config
-from rl_fzerox.apps.watch_cli.args import require_policy_run_locator
+from rl_fzerox.apps.watch_cli.args import require_watch_locator
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
 
@@ -139,7 +139,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Watch overrides. Use `-- key=value` to separate them from CLI flags.",
     )
     args = parser.parse_args(argv)
-    require_policy_run_locator(
+    require_watch_locator(
         policy_run_dir=args.policy_run_dir,
         managed_run_id=args.managed_run_id,
     )

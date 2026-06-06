@@ -26,6 +26,7 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
             "lap": 2,
             "laps_completed": 1,
             "position": 3,
+            "machine_character_index": 4,
             "machine_body_stat": 4,
             "machine_boost_stat": 3,
             "machine_grip_stat": 2,
@@ -43,6 +44,7 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
     assert player.course_effect_name == "none"
     assert player.on_energy_refill is False
     assert player.state_labels == ("can_boost", "active")
+    assert player.machine_character_index == 4
     assert player.machine_body_stat == 4
     assert player.machine_boost_stat == 3
     assert player.machine_grip_stat == 2
@@ -128,6 +130,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
                     "position": 3,
                     "local_lateral_velocity": -9.5,
                     "signed_lateral_offset": 42.0,
+                    "machine_character_index": 4,
                     "machine_body_stat": 4,
                     "machine_boost_stat": 3,
                     "machine_grip_stat": 2,
@@ -140,6 +143,10 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             "camera_setting_raw": 3,
             "camera_setting_name": "wide",
             "race_intro_timer": 39,
+            "menu_selected_mode_raw": 0,
+            "menu_transition_state_raw": 3,
+            "menu_current_ghost_type_raw": 0,
+            "queued_game_mode_raw": 14,
         }
     )
 
@@ -151,6 +158,10 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     assert payload["camera_setting_raw"] == 3
     assert payload["camera_setting_name"] == "wide"
     assert payload["race_intro_timer"] == 39
+    assert payload["menu_selected_mode_raw"] == 0
+    assert payload["menu_transition_state_raw"] == 3
+    assert payload["menu_current_ghost_type_raw"] == 0
+    assert payload["queued_game_mode_raw"] == 14
     assert payload["game_mode_name"] == "gp_race"
     assert payload["total_racers"] == 30
     assert payload["course_segment_count"] == 64
@@ -159,6 +170,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     assert isinstance(player_payload, dict)
     assert player_payload["recoil_tilt_magnitude"] == 0.5
     assert player_payload["ko_star_count"] == 4
+    assert player_payload["machine_character_index"] == 4
     assert player_payload["machine_body_stat"] == 4
     assert player_payload["machine_boost_stat"] == 3
     assert player_payload["machine_grip_stat"] == 2

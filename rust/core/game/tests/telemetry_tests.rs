@@ -16,6 +16,13 @@ fn read_snapshot_decodes_player_one_race_values() {
     memory[GLOBALS.race_intro_timer..GLOBALS.race_intro_timer + 4]
         .copy_from_slice(&39_i32.to_le_bytes());
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
+    memory[GLOBALS.selected_mode..GLOBALS.selected_mode + 4].copy_from_slice(&2_i32.to_le_bytes());
+    memory[GLOBALS.game_mode_change_state..GLOBALS.game_mode_change_state + 2]
+        .copy_from_slice(&3_i16.to_le_bytes());
+    memory[GLOBALS.current_ghost_type..GLOBALS.current_ghost_type + 4]
+        .copy_from_slice(&1_i32.to_le_bytes());
+    memory[GLOBALS.queued_game_mode..GLOBALS.queued_game_mode + 4]
+        .copy_from_slice(&14_i32.to_le_bytes());
     memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
     memory[GLOBALS.player_characters..GLOBALS.player_characters + 2]
         .copy_from_slice(&4_i16.to_le_bytes());
@@ -142,6 +149,10 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.race_intro_timer, 39);
     assert_eq!(telemetry.camera_setting_raw, 3);
     assert_eq!(telemetry.camera_setting_name, "wide");
+    assert_eq!(telemetry.menu_selected_mode_raw, 2);
+    assert_eq!(telemetry.menu_transition_state_raw, 3);
+    assert_eq!(telemetry.menu_current_ghost_type_raw, 1);
+    assert_eq!(telemetry.queued_game_mode_raw, 14);
     assert_eq!(telemetry.total_racers, 30);
     assert_eq!(telemetry.course_index, 0);
     assert_eq!(telemetry.course_segment_count, 64);
@@ -196,6 +207,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert!((telemetry.player.geometry.acceleration_force - 9.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.drift_attack_force - 10.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.collision_mass - 0.5).abs() < f32::EPSILON);
+    assert_eq!(telemetry.player.machine_context.character_index, 4);
     assert_eq!(telemetry.player.machine_context.body_stat, 4);
     assert_eq!(telemetry.player.machine_context.boost_stat, 3);
     assert_eq!(telemetry.player.machine_context.grip_stat, 2);
@@ -312,6 +324,7 @@ fn read_snapshot_machine_context_prefers_live_racer_character() {
 
     let telemetry = read_snapshot(&memory).expect("telemetry should decode");
 
+    assert_eq!(telemetry.player.machine_context.character_index, 5);
     assert_eq!(telemetry.player.machine_context.body_stat, 4);
     assert_eq!(telemetry.player.machine_context.boost_stat, 3);
     assert_eq!(telemetry.player.machine_context.grip_stat, 2);

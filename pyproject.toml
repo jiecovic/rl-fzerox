@@ -44,6 +44,9 @@ train = [
 
 [project.scripts]
 fzerox-probe = "rl_fzerox.apps.probe:main"
+fzerox-save-diff = "rl_fzerox.apps.dev.save_diff:main"
+fzerox-save-inspect = "rl_fzerox.apps.dev.save_inspect:main"
+fzerox-save-snapshot = "rl_fzerox.apps.dev.save_snapshot:main"
 fzerox-smoke = "rl_fzerox.apps.smoke:main"
 fzerox-train = "rl_fzerox.apps.train:main"
 fzerox-watch = "rl_fzerox.apps.watch:main"
