@@ -21,6 +21,10 @@ from rl_fzerox.core.envs.engine.controls.mask_queries import (
     selected_action_branches,
 )
 from rl_fzerox.core.envs.engine.controls.masks import ActionMaskController
+from rl_fzerox.core.envs.engine.controls.semantics import (
+    apply_control_semantics,
+    apply_spin_semantics,
+)
 
 __all__ = [
     "ActionMaskBranches",
@@ -30,7 +34,9 @@ __all__ = [
     "action_branch_non_neutral_allowed",
     "action_branch_value_allowed",
     "action_mask_violations",
+    "apply_control_semantics",
     "apply_dynamic_control_gates",
+    "apply_spin_semantics",
     "selected_action_branches",
     "sync_dynamic_action_masks",
     "with_pitch",

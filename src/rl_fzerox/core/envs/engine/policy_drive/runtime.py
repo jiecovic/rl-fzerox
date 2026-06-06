@@ -18,8 +18,8 @@ from rl_fzerox.core.envs.engine.controls import (
     ActionMaskController,
     ActionMaskSnapshot,
     ControlStateTracker,
-    action_branch_value_allowed,
-    apply_dynamic_control_gates,
+    apply_control_semantics,
+    apply_spin_semantics,
     sync_dynamic_action_masks,
 )
 from rl_fzerox.core.envs.engine.episode import EngineEpisodeState
@@ -257,27 +257,19 @@ class PolicyDriveRuntime:
         return assembly.step.policy_drive_result()
 
     def _apply_control_semantics(self, control_state: RaceControlState) -> RaceControlState:
-        gated_control_state = apply_dynamic_control_gates(
+        return apply_control_semantics(
             control_state,
             mask_controller=self._mask_controller,
-            mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
-            continuous_air_brake_mode=self._action_config.continuous_air_brake_mode,
+            action_config=self._action_config,
+            control_state_tracker=self._control_state,
             last_telemetry=self._episode.last_telemetry,
         )
-        return self._control_state.apply_lean_semantics(gated_control_state)
 
     def _apply_spin_semantics(self, spin_request: SpinRequest) -> SpinRequest:
-        if spin_request == "none":
-            return "none"
-        spin_index = 1 if spin_request == "left" else 2
-        if action_branch_value_allowed(
-            self._mask_controller.action_mask_branches(),
-            "spin",
-            spin_index,
-            missing_allowed=True,
-        ):
-            return spin_request
-        return "none"
+        return apply_spin_semantics(
+            spin_request,
+            mask_controller=self._mask_controller,
+        )
 
 
 def _policy_drive_frame(step: PolicyDriveStep) -> PolicyDriveFrame:
