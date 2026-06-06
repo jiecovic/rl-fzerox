@@ -20,7 +20,7 @@ from rl_fzerox.core.envs.rewards import build_reward_tracker
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_vector_or_zeros,
 )
-from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, KNOWN_RENDERERS, RendererName
+from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -39,18 +39,16 @@ from .controls import (
 )
 from .episode import EngineEpisodeState
 from .info import (
-    backend_step_info,
     set_curriculum_info,
     telemetry_info,
 )
 from .observation import EngineObservationBuilder
+from .rendering import backend_renderer
 from .reset import EngineResetCoordinator
 from .stepping import (
     EngineStepAssembler,
     EnvStepRequest,
-    PolicyDriveStep,
     WatchEnvStep,
-    policy_drive_info,
     set_episode_boost_pad_info,
 )
 
@@ -74,7 +72,7 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
-        self._renderer: RendererName = _backend_renderer(backend)
+        self._renderer: RendererName = backend_renderer(backend)
         self._curriculum_config = curriculum_config
         self._action_config = config.action.runtime()
         self._action_adapter = build_action_adapter(self._action_config)
@@ -291,86 +289,6 @@ class FZeroXEnvEngine:
         self._reset_coordinator.advance_reset_count()
         return observation, info
 
-    def begin_live_race(
-        self,
-        *,
-        seed: int | None = None,
-        course_id: str | None = None,
-    ) -> tuple[ObservationValue, dict[str, object]]:
-        """Initialize policy stepping from the emulator's current live race state.
-
-        Career Mode reaches races through menu navigation instead of a materialized
-        reset baseline. This method prepares only the policy/reward bookkeeping
-        around that already-running emulator state.
-        """
-
-        self._episode.begin_reset(active_track=None)
-        self._episode.uses_custom_baseline = False
-        self.backend.set_controller_state(ControllerState())
-        self._control_state.reset()
-        self._mask_controller.set_lean_allowed_values(
-            self._control_state.lean_action_mask_override()
-        )
-        self._mask_controller.set_spin_allowed_values(None)
-        telemetry = self.backend.try_read_telemetry()
-        sync_dynamic_action_masks(
-            mask_controller=self._mask_controller,
-            control_state=self._control_state,
-            telemetry=telemetry,
-            boost_min_energy_fraction=self.config.boost_min_energy_fraction,
-            mask_boost_when_active=self._action_config.mask_boost_when_active,
-            mask_boost_when_airborne=self._action_config.mask_boost_when_airborne,
-        )
-        self._episode.last_telemetry = telemetry
-        self._reward_tracker.reset(
-            telemetry,
-            episode_seed=seed,
-            course_id=course_id,
-        )
-        self._reward_summary_config = self._reward_tracker.summary_config()
-        self._step_assembler.reward_summary_config = self._reward_summary_config
-        if isinstance(self._action_adapter, ResettableActionAdapter):
-            self._action_adapter.reset()
-
-        info = backend_step_info(self.backend)
-        info["seed"] = seed
-        set_curriculum_info(
-            info,
-            stage_index=self.curriculum_stage_index,
-            stage_name=self.curriculum_stage_name,
-        )
-        if telemetry is not None:
-            info.update(telemetry_info(telemetry))
-        info.update(self._reward_tracker.info(telemetry))
-        set_episode_boost_pad_info(
-            info,
-            episode_boost_pad_entries=self._episode.boost_pad_entries,
-        )
-        info["episode_airborne_frames"] = self._episode.airborne_frames
-        image_observation = self._observation_builder.render_image()
-        observation = self._observation_builder.build_observation(
-            image=image_observation,
-            telemetry=telemetry,
-            control_state=self._control_state,
-        )
-        self._observation_builder.set_info(
-            info,
-            image_shape=tuple(int(value) for value in image_observation.shape),
-        )
-        self._episode.last_info = dict(info)
-        return observation, info
-
-    def begin_policy_drive(
-        self,
-        *,
-        seed: int | None = None,
-        course_id: str | None = None,
-    ) -> tuple[ObservationValue, dict[str, object]]:
-        """Initialize policy driving from the emulator's current race state."""
-
-        observation, info = self.begin_live_race(seed=seed, course_id=course_id)
-        return observation, policy_drive_info(info)
-
     def step(
         self,
         action: ActionValue,
@@ -396,18 +314,6 @@ class FZeroXEnvEngine:
             ),
         )
 
-    def step_policy_drive(self, action: ActionValue) -> PolicyDriveStep:
-        """Step a live-race policy action without Gym lifecycle semantics."""
-
-        return self._step_decoded_action_policy_drive(
-            self._action_adapter.decode_request(action),
-            action_drive_axis=action_drive_axis(
-                action,
-                self._action_space,
-                drive_axis_index=self._action_config.continuous_drive_axis_index(),
-            ),
-        )
-
     def action_to_control_state(self, action: ActionValue) -> RaceControlState:
         """Decode one policy action into the held semantic control state."""
 
@@ -423,17 +329,6 @@ class FZeroXEnvEngine:
         """Step manual controls while collecting watch-only intermediate frames."""
 
         return self._step_control_state_watch(control_state, action_drive_axis=None)
-
-    def step_control_policy_drive(
-        self,
-        control_state: RaceControlState,
-    ) -> PolicyDriveStep:
-        """Step live-race manual controls without Gym lifecycle semantics."""
-
-        return self._step_control_state_policy_drive(
-            control_state,
-            action_drive_axis=None,
-        )
 
     def _step_control_state(
         self,
@@ -488,25 +383,6 @@ class FZeroXEnvEngine:
             capture_display_frames=True,
         )
 
-    def _step_control_state_policy_drive(
-        self,
-        control_state: RaceControlState,
-        *,
-        action_drive_axis: float | None,
-    ) -> PolicyDriveStep:
-        requested_control_state = control_state
-        applied_control_state = self._apply_control_semantics(requested_control_state)
-        self._episode.held_control_state = applied_control_state
-        return self._run_env_step_result(
-            applied_control_state,
-            action_repeat=self.config.action_repeat,
-            requested_control_state=requested_control_state,
-            action_drive_axis=action_drive_axis,
-            spin_request="none",
-            capture_display_frames=True,
-            episode_done_on_truncation=False,
-        ).policy_drive_result()
-
     def _step_decoded_action_watch(
         self,
         decoded_action: DecodedAction,
@@ -525,26 +401,6 @@ class FZeroXEnvEngine:
             spin_request=spin_request,
             capture_display_frames=True,
         )
-
-    def _step_decoded_action_policy_drive(
-        self,
-        decoded_action: DecodedAction,
-        *,
-        action_drive_axis: float | None,
-    ) -> PolicyDriveStep:
-        requested_control_state = decoded_action.control_state
-        applied_control_state = self._apply_control_semantics(requested_control_state)
-        spin_request = self._apply_spin_semantics(decoded_action.spin_request)
-        self._episode.held_control_state = applied_control_state
-        return self._run_env_step_result(
-            applied_control_state,
-            action_repeat=self.config.action_repeat,
-            requested_control_state=requested_control_state,
-            action_drive_axis=action_drive_axis,
-            spin_request=spin_request,
-            capture_display_frames=True,
-            episode_done_on_truncation=False,
-        ).policy_drive_result()
 
     def step_frame(
         self,
@@ -599,7 +455,6 @@ class FZeroXEnvEngine:
         action_drive_axis: float | None,
         spin_request: SpinRequest,
         capture_display_frames: bool,
-        episode_done_on_truncation: bool = True,
     ) -> WatchEnvStep:
         assembly = self._step_assembler.run(
             EnvStepRequest(
@@ -624,8 +479,7 @@ class FZeroXEnvEngine:
             return_value=assembly.episode_return,
             boost_pad_entries=assembly.episode_boost_pad_entries,
             airborne_frames=assembly.episode_airborne_frames,
-            done=assembly.step.terminated
-            or (episode_done_on_truncation and assembly.step.truncated),
+            done=assembly.step.terminated or assembly.step.truncated,
             info=assembly.step.info,
         )
         return assembly.step
@@ -656,13 +510,3 @@ class FZeroXEnvEngine:
         ):
             return spin_request
         return "none"
-
-
-_RENDERERS_BY_NAME: dict[str, RendererName] = {name: name for name in KNOWN_RENDERERS}
-
-
-def _backend_renderer(backend: EmulatorBackend) -> RendererName:
-    """Return the backend renderer name used for renderer-sized observations."""
-
-    renderer = getattr(backend, "renderer", DEFAULT_RENDERER)
-    return _RENDERERS_BY_NAME.get(str(renderer), DEFAULT_RENDERER)
