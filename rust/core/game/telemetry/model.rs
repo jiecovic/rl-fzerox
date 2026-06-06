@@ -189,6 +189,7 @@ impl Default for RacerGeometryTelemetry {
 
 #[derive(Clone, Copy, Debug)]
 pub struct MachineContextTelemetry {
+    pub character_index: i16,
     pub body_stat: i8,
     pub boost_stat: i8,
     pub grip_stat: i8,
@@ -199,6 +200,7 @@ pub struct MachineContextTelemetry {
 impl Default for MachineContextTelemetry {
     fn default() -> Self {
         Self {
+            character_index: -1,
             body_stat: 0,
             boost_stat: 0,
             grip_stat: 0,
@@ -262,6 +264,10 @@ pub struct TelemetrySnapshot {
     pub race_intro_timer: i32,
     pub game_mode_raw: u32,
     pub game_mode_name: &'static str,
+    pub menu_selected_mode_raw: i32,
+    pub menu_transition_state_raw: i16,
+    pub menu_current_ghost_type_raw: i32,
+    pub queued_game_mode_raw: i32,
     pub in_race_mode: bool,
     pub total_racers: i32,
     pub course_index: u32,

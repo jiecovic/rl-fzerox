@@ -416,6 +416,18 @@ impl PyEmulator {
         methods::control::write_system_ram(self, py, offset, data)
     }
 
+    fn save_ram_size(&mut self, py: Python<'_>) -> PyResult<usize> {
+        methods::control::save_ram_size(self, py)
+    }
+
+    fn read_save_ram<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        methods::control::read_save_ram(self, py)
+    }
+
+    fn write_save_ram(&mut self, py: Python<'_>, data: &Bound<'_, PyBytes>) -> PyResult<()> {
+        methods::control::write_save_ram(self, py, data)
+    }
+
     fn game_rng_state(&mut self, py: Python<'_>) -> PyResult<(u32, u32, u32, u32)> {
         methods::control::game_rng_state(self, py)
     }

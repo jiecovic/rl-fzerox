@@ -55,8 +55,8 @@ class VehicleSetupInfoDict(TypedDict):
     racer_character_index_ram: int
     engine_setting_ram: float
     engine_setting_percent_ram: float
-    character_engine_setting_ram: float
-    racer_engine_curve_ram: float
+    character_engine_setting_ram: float | None
+    racer_engine_curve_ram: float | None
 
 
 class RaceStartRequestDict(TypedDict, total=False):
@@ -157,6 +157,7 @@ class PlayerTelemetryDict(TypedDict, total=False):
     acceleration_force: float
     drift_attack_force: float
     collision_mass: float
+    machine_character_index: int
     machine_body_stat: int
     machine_boost_stat: int
     machine_grip_stat: int
@@ -181,6 +182,10 @@ class FZeroXTelemetryDict(TypedDict, total=False):
     camera_setting_raw: int
     camera_setting_name: str | None
     race_intro_timer: int
+    menu_selected_mode_raw: int
+    menu_transition_state_raw: int
+    menu_current_ghost_type_raw: int
+    queued_game_mode_raw: int
 
 
 class StepSummaryDict(TypedDict, total=False):

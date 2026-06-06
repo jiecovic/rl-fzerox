@@ -252,6 +252,34 @@ pub(in crate::bindings::emulator) fn write_system_ram(
         .map_err(map_core_error)
 }
 
+pub(in crate::bindings::emulator) fn save_ram_size(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+) -> PyResult<usize> {
+    py.detach(|| emulator.host.save_ram_size())
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn read_save_ram<'py>(
+    emulator: &mut PyEmulator,
+    py: Python<'py>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let bytes = py
+        .detach(|| emulator.host.read_save_ram())
+        .map_err(map_core_error)?;
+    Ok(PyBytes::new(py, &bytes))
+}
+
+pub(in crate::bindings::emulator) fn write_save_ram(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    data: &Bound<'_, PyBytes>,
+) -> PyResult<()> {
+    let bytes = data.as_bytes().to_vec();
+    py.detach(|| emulator.host.write_save_ram(&bytes))
+        .map_err(map_core_error)
+}
+
 pub(in crate::bindings::emulator) fn game_rng_state(
     emulator: &mut PyEmulator,
     py: Python<'_>,

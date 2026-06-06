@@ -21,6 +21,10 @@ pub enum CoreError {
         length: usize,
         available: usize,
     },
+    InvalidSaveRamSize {
+        expected: usize,
+        actual: usize,
+    },
     SerializeFailed,
     UnserializeFailed,
     CreateDirectory {
@@ -127,6 +131,12 @@ impl Display for CoreError {
                 write!(
                     formatter,
                     "Memory read is out of range for memory id {memory_id}: offset={offset}, length={length}, available={available}"
+                )
+            }
+            Self::InvalidSaveRamSize { expected, actual } => {
+                write!(
+                    formatter,
+                    "Save RAM buffer has wrong size: expected {expected} bytes, got {actual}"
                 )
             }
             Self::SerializeFailed => {

@@ -21,6 +21,26 @@ impl Host {
         self.write_memory(libretro_sys::MEMORY_SYSTEM_RAM, offset, bytes)
     }
 
+    pub fn save_ram_size(&mut self) -> Result<usize, CoreError> {
+        self.memory_size(libretro_sys::MEMORY_SAVE_RAM)
+    }
+
+    pub fn read_save_ram(&mut self) -> Result<Vec<u8>, CoreError> {
+        let size = self.save_ram_size()?;
+        self.read_memory(libretro_sys::MEMORY_SAVE_RAM, 0, size)
+    }
+
+    pub fn write_save_ram(&mut self, bytes: &[u8]) -> Result<(), CoreError> {
+        let expected = self.save_ram_size()?;
+        if bytes.len() != expected {
+            return Err(CoreError::InvalidSaveRamSize {
+                expected,
+                actual: bytes.len(),
+            });
+        }
+        self.write_memory(libretro_sys::MEMORY_SAVE_RAM, 0, bytes)
+    }
+
     pub(super) fn memory_size(&mut self, memory_id: u32) -> Result<usize, CoreError> {
         self.ensure_open()?;
         let size = self.call_core(|core| unsafe { core.memory_size(memory_id) });

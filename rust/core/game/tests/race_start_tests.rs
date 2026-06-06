@@ -1,9 +1,9 @@
 // rust/core/game/tests/race_start_tests.rs
 use super::{
-    RaceStartMode, RaceStartSetup, force_race_reinit, validate_race_setup, write_machine_settings,
-    write_race_setup, write_time_attack_menu_mode,
+    RaceStartMode, RaceStartSetup, force_race_reinit, validate_race_setup, vehicle_setup_info,
+    write_machine_settings, write_race_setup, write_time_attack_menu_mode,
 };
-use crate::core::game::telemetry::layout::{GLOBALS, TELEMETRY_CONFIG};
+use crate::core::game::telemetry::layout::{GLOBALS, RACER, TELEMETRY_CONFIG};
 
 #[test]
 fn time_attack_setup_writes_expected_menu_and_live_fields() {
@@ -123,6 +123,43 @@ fn time_attack_menu_mode_sets_time_attack_selection_without_full_setup() {
     assert_eq!(read_i32(&memory, GLOBALS.current_ghost_type), 0);
 }
 
+#[test]
+fn vehicle_setup_info_keeps_menu_vehicle_when_live_racer_is_uninitialized() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let racer_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
+
+    write_i16(&mut memory, GLOBALS.player_characters, 7);
+    write_i8(&mut memory, racer_base + RACER.character, -1);
+    write_f32(&mut memory, GLOBALS.player_engine, 0.75);
+    write_f32(&mut memory, GLOBALS.character_last_engine + (7 * 4), 0.75);
+
+    let setup = vehicle_setup_info(&memory).expect("setup probe should return partial data");
+
+    assert_eq!(setup.player_character_index, 7);
+    assert_eq!(setup.racer_character_index, -1);
+    assert_eq!(setup.engine_setting, 0.75);
+    assert_eq!(setup.character_engine_setting, Some(0.75));
+    assert_eq!(setup.racer_engine_curve, None);
+}
+
+#[test]
+fn vehicle_setup_info_does_not_fail_when_machine_indices_are_uninitialized() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let racer_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
+
+    write_i16(&mut memory, GLOBALS.player_characters, -1);
+    write_i8(&mut memory, racer_base + RACER.character, -1);
+    write_f32(&mut memory, GLOBALS.player_engine, 0.5);
+
+    let setup = vehicle_setup_info(&memory).expect("setup probe should return partial data");
+
+    assert_eq!(setup.player_character_index, -1);
+    assert_eq!(setup.racer_character_index, -1);
+    assert_eq!(setup.engine_setting, 0.5);
+    assert_eq!(setup.character_engine_setting, None);
+    assert_eq!(setup.racer_engine_curve, None);
+}
+
 fn sample_setup() -> RaceStartSetup {
     RaceStartSetup {
         course_index: 5,
@@ -144,4 +181,12 @@ fn read_i16(memory: &[u8], offset: usize) -> i16 {
 
 fn write_i16(memory: &mut [u8], offset: usize, value: i16) {
     memory[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+}
+
+fn write_i8(memory: &mut [u8], offset: usize, value: i8) {
+    memory[offset] = value.to_le_bytes()[0];
+}
+
+fn write_f32(memory: &mut [u8], offset: usize, value: f32) {
+    memory[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
 }

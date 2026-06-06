@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from fzerox_emulator import Emulator
-from rl_fzerox.apps.watch_cli.args import require_policy_run_locator
+from rl_fzerox.apps.watch_cli.args import require_watch_locator
 from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 from rl_fzerox.core.boot import boot_into_first_race
 
@@ -46,7 +46,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Additional frames to advance after reset/bootstrap.",
     )
     args = parser.parse_args(argv)
-    require_policy_run_locator(
+    require_watch_locator(
         policy_run_dir=args.policy_run_dir,
         managed_run_id=args.managed_run_id,
     )

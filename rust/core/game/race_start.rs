@@ -30,8 +30,8 @@ pub struct VehicleSetupInfo {
     pub player_character_index: i16,
     pub racer_character_index: i16,
     pub engine_setting: f32,
-    pub character_engine_setting: f32,
-    pub racer_engine_curve: f32,
+    pub character_engine_setting: Option<f32>,
+    pub racer_engine_curve: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -87,15 +87,22 @@ pub fn vehicle_setup_info(system_ram: &[u8]) -> Result<VehicleSetupInfo, CoreErr
     let player_character_index = read_i16(system_ram, GLOBALS.player_characters)?;
     let racer_character_index = read_i8(system_ram, player_racer_base() + RACER.character)? as i16;
     let player_base = player_racer_base();
+    let active_character_index = active_character_index(system_ram)?;
     Ok(VehicleSetupInfo {
         player_character_index,
         racer_character_index,
         engine_setting: read_f32(system_ram, GLOBALS.player_engine)?,
-        character_engine_setting: read_f32(
-            system_ram,
-            GLOBALS.character_last_engine + ((active_character_index(system_ram)? as usize) * 4),
-        )?,
-        racer_engine_curve: read_f32(system_ram, player_base + RACER.engine_curve)?,
+        character_engine_setting: valid_character_index(active_character_index)
+            .then(|| {
+                read_f32(
+                    system_ram,
+                    GLOBALS.character_last_engine + ((active_character_index as usize) * 4),
+                )
+            })
+            .transpose()?,
+        racer_engine_curve: valid_character_index(racer_character_index)
+            .then(|| read_f32(system_ram, player_base + RACER.engine_curve))
+            .transpose()?,
     })
 }
 
@@ -392,11 +399,14 @@ fn player_racer_base() -> usize {
 
 fn active_character_index(system_ram: &[u8]) -> Result<i16, CoreError> {
     let racer_character_index = read_i8(system_ram, player_racer_base() + RACER.character)? as i16;
-    if racer_character_index >= 0 && (racer_character_index as usize) < MACHINE_TABLE.machine_count
-    {
+    if valid_character_index(racer_character_index) {
         return Ok(racer_character_index);
     }
     read_i16(system_ram, GLOBALS.player_characters)
+}
+
+fn valid_character_index(character_index: i16) -> bool {
+    character_index >= 0 && (character_index as usize) < MACHINE_TABLE.machine_count
 }
 
 impl RaceStartMode {
