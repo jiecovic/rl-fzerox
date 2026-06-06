@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
-    uses_dynamic_runtime_mode,
+    uses_track_sampling_runtime_mode,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
@@ -118,7 +118,7 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
     if not isinstance(loaded, Mapping):
         return None
     sampling_mode = loaded.get("sampling_mode")
-    if not isinstance(sampling_mode, str) or not uses_dynamic_runtime_mode(sampling_mode):
+    if not isinstance(sampling_mode, str) or not uses_track_sampling_runtime_mode(sampling_mode):
         return None
     raw_entries = loaded.get("entries")
     if not isinstance(raw_entries, list):

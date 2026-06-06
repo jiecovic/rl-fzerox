@@ -5,13 +5,14 @@ from collections.abc import Mapping, Sequence
 
 from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
 from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
-    dynamic_step_balanced_sampling_configs,
     episode_completion_fraction,
     episode_finished,
     episode_frame_count,
     episode_track_id,
+    runtime_track_sampling_configs,
     sanitize_log_key,
-    uses_dynamic_runtime_mode,
+    uses_step_balance_scheduler,
+    uses_track_sampling_runtime_mode,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
@@ -181,8 +182,8 @@ class StepBalancedTrackSamplingController:
             )
             for course_key in self._course_entry_ids
         }
-        if not uses_dynamic_runtime_mode(sampling_mode):
-            raise ValueError(f"Unsupported dynamic track sampling mode: {sampling_mode!r}")
+        if not uses_track_sampling_runtime_mode(sampling_mode):
+            raise ValueError(f"Unsupported track sampling runtime mode: {sampling_mode!r}")
         self._sampling_mode = sampling_mode
         self._action_repeat = max(1, int(action_repeat))
         self._update_episodes = max(1, int(update_episodes))
@@ -196,7 +197,9 @@ class StepBalancedTrackSamplingController:
         self._log_details = log_details
         self._episodes_since_update = 0
         self.update_count = 0
-        if self._restore_state(restored_state):
+        if self._restore_state(restored_state) and uses_step_balance_scheduler(
+            self._sampling_mode,
+        ):
             self._compute_weights()
 
     @classmethod
@@ -207,7 +210,7 @@ class StepBalancedTrackSamplingController:
         curriculum_config: CurriculumConfig,
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> StepBalancedTrackSamplingController | None:
-        configs = dynamic_step_balanced_sampling_configs(env_config, curriculum_config)
+        configs = runtime_track_sampling_configs(env_config, curriculum_config)
         if not configs:
             return None
 
@@ -347,9 +350,13 @@ class StepBalancedTrackSamplingController:
 
         self._episodes_since_update = 0
         self.update_count += 1
+        if not uses_step_balance_scheduler(self._sampling_mode):
+            return self.current_weights()
         return self._compute_weights()
 
     def log_values(self) -> dict[str, float]:
+        if not uses_step_balance_scheduler(self._sampling_mode):
+            return {}
         if not self._log_details:
             return {}
 
@@ -562,7 +569,9 @@ class StepBalancedTrackSamplingController:
         )
 
     def _restore_state(self, restored_state: TrackSamplingRuntimeState | None) -> bool:
-        if restored_state is None or not uses_dynamic_runtime_mode(restored_state.sampling_mode):
+        if restored_state is None or not uses_track_sampling_runtime_mode(
+            restored_state.sampling_mode,
+        ):
             return False
         state_by_course_key = {
             entry.course_key: entry for entry in aggregate_runtime_entries(restored_state.entries)

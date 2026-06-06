@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3.py
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
@@ -21,6 +21,8 @@ from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumContr
 from .checkpoints import CheckpointPolicy, resolve_checkpoint_policy
 from .metrics import RolloutInfoAccumulator, episode_dicts, info_sequence
 from .track_sampling import (
+    DEFICIT_QUEUE_SETTINGS,
+    DeficitBudgetTrackSamplingController,
     StepBalancedTrackSamplingController,
     TrackSamplingRuntimePersistence,
     TrackSamplingRuntimeState,
@@ -321,6 +323,137 @@ def build_callbacks(
             self._runtime_persistence.save(self._controller.runtime_state())
             self._runtime_state_dirty = False
 
+    class DeficitBudgetTrackSamplingCallback(BaseCallback):
+        """Schedule reset queues from deterministic per-course step deficits."""
+
+        def __init__(
+            self,
+            *,
+            controller: DeficitBudgetTrackSamplingController,
+            env_config: EnvConfig,
+            curriculum_config: CurriculumConfig,
+            rotation_manager: XCupRotationManager | None,
+            runtime_persistence: TrackSamplingRuntimePersistence,
+        ) -> None:
+            super().__init__(verbose=0)
+            self._controller = controller
+            self._env_config = env_config
+            self._curriculum_config = curriculum_config
+            self._rotation_manager = rotation_manager
+            self._runtime_persistence = runtime_persistence
+            self._runtime_state_dirty = False
+
+        def _on_training_start(self) -> None:
+            self._extend_env_queues(
+                self._controller.initial_queues(
+                    num_envs=train_config.num_envs,
+                    queue_length=DEFICIT_QUEUE_SETTINGS.initial_queue_length,
+                )
+            )
+            self._save_runtime_state()
+
+        def _on_rollout_start(self) -> None:
+            self._controller.add_rollout_budget(
+                total_steps=train_config.num_envs * train_config.n_steps,
+            )
+            self._refill_env_queues()
+
+        def _on_step(self) -> bool:
+            infos = info_sequence(self.locals.get("infos"))
+            if infos is None:
+                return True
+            self._controller.record_step_infos(infos)
+            episodes = episode_dicts(infos)
+            if episodes:
+                self._controller.record_episodes(episodes)
+                self._runtime_state_dirty = True
+                self._maybe_rotate_x_cup()
+            return True
+
+        def _on_rollout_end(self) -> None:
+            self._controller.maybe_update_weights()
+            for key, value in self._controller.log_values().items():
+                self.logger.record(key, value)
+            if self._runtime_state_dirty:
+                self._save_runtime_state()
+
+        def _on_training_end(self) -> None:
+            self._save_runtime_state()
+
+        def _maybe_rotate_x_cup(self) -> None:
+            runtime_state = self._controller.runtime_state()
+            rotation_manager = self._rotation_manager
+            rotation_update = (
+                None
+                if rotation_manager is None
+                else rotation_manager.rotate_once(
+                    env_config=self._env_config,
+                    state=runtime_state,
+                )
+            )
+            if rotation_update is None:
+                return
+            runtime_state = replace_runtime_generation(
+                runtime_state,
+                course_key=rotation_update.replaced_course_key,
+                replacement_label=rotation_update.replacement_label,
+                generated_course_slot=rotation_update.generated_course_slot,
+                generated_course_generation=rotation_update.generated_course_generation,
+                generated_entry_id=rotation_update.generated_entry_id,
+                generated_course_id=rotation_update.generated_course_id,
+                generated_course_name=rotation_update.generated_course_name,
+                generated_course_hash=rotation_update.generated_course_hash,
+                generated_course_seed=rotation_update.generated_course_seed,
+                generated_baseline_state_path=rotation_update.generated_baseline_state_path,
+                generated_course_segment_count=rotation_update.generated_course_segment_count,
+                generated_course_length=rotation_update.generated_course_length,
+            )
+            self._env_config = rotation_update.env_config
+            self.training_env.env_method(
+                "set_track_sampling_config",
+                self._env_config.track_sampling,
+            )
+            self._controller = _rebuild_deficit_budget_track_sampling_controller(
+                env_config=self._env_config,
+                curriculum_config=self._curriculum_config,
+                restored_state=runtime_state,
+            )
+            self._extend_env_queues(
+                self._controller.initial_queues(
+                    num_envs=train_config.num_envs,
+                    queue_length=DEFICIT_QUEUE_SETTINGS.initial_queue_length,
+                )
+            )
+            if rotation_manager is not None:
+                rotation_manager.commit(rotation_update)
+            self._save_runtime_state()
+
+        def _refill_env_queues(self) -> None:
+            raw_lengths = self.training_env.env_method("track_sampling_reset_queue_length")
+            queue_lengths = tuple(
+                int(length) if isinstance(length, int | float) else 0 for length in raw_lengths
+            )
+            self._extend_env_queues(
+                self._controller.refill_queues(
+                    queue_lengths,
+                    rollout_steps=train_config.n_steps,
+                )
+            )
+
+        def _extend_env_queues(self, queues: Mapping[int, Sequence[str]]) -> None:
+            for env_index, course_ids in queues.items():
+                if not course_ids:
+                    continue
+                self.training_env.env_method(
+                    "extend_track_sampling_reset_queue",
+                    tuple(course_ids),
+                    indices=[env_index],
+                )
+
+        def _save_runtime_state(self) -> None:
+            self._runtime_persistence.save(self._controller.runtime_state())
+            self._runtime_state_dirty = False
+
     checkpoint_policy = resolve_checkpoint_policy(train_config)
     callbacks: list[BaseCallback] = [
         RollingArtifactCallback(
@@ -335,15 +468,15 @@ def build_callbacks(
             runtime_persistence = file_track_sampling_runtime_persistence(
                 run_paths.track_sampling_state_path
             )
-        track_balance_controller = StepBalancedTrackSamplingController.from_configs(
+        deficit_controller = DeficitBudgetTrackSamplingController.from_configs(
             env_config=env_config,
             curriculum_config=curriculum_config,
             restored_state=runtime_persistence.load(),
         )
-        if track_balance_controller is not None:
+        if deficit_controller is not None:
             callbacks.append(
-                StepBalancedTrackSamplingCallback(
-                    controller=track_balance_controller,
+                DeficitBudgetTrackSamplingCallback(
+                    controller=deficit_controller,
                     env_config=env_config,
                     curriculum_config=curriculum_config,
                     rotation_manager=_x_cup_rotation_manager(
@@ -354,6 +487,27 @@ def build_callbacks(
                     runtime_persistence=runtime_persistence,
                 )
             )
+
+        if deficit_controller is None:
+            track_balance_controller = StepBalancedTrackSamplingController.from_configs(
+                env_config=env_config,
+                curriculum_config=curriculum_config,
+                restored_state=runtime_persistence.load(),
+            )
+            if track_balance_controller is not None:
+                callbacks.append(
+                    StepBalancedTrackSamplingCallback(
+                        controller=track_balance_controller,
+                        env_config=env_config,
+                        curriculum_config=curriculum_config,
+                        rotation_manager=_x_cup_rotation_manager(
+                            train_app_config=train_app_config,
+                            run_paths=run_paths,
+                            persist_manifest_on_commit=track_sampling_runtime_persistence is None,
+                        ),
+                        runtime_persistence=runtime_persistence,
+                    )
+                )
     if curriculum_config.enabled:
         callbacks.append(
             CurriculumCallback(
@@ -379,6 +533,22 @@ def _rebuild_track_sampling_controller(
     )
     if controller is None:
         raise RuntimeError("X Cup rotation removed the dynamic track-sampling controller")
+    return controller
+
+
+def _rebuild_deficit_budget_track_sampling_controller(
+    *,
+    env_config: EnvConfig,
+    curriculum_config: CurriculumConfig,
+    restored_state: TrackSamplingRuntimeState,
+) -> DeficitBudgetTrackSamplingController:
+    controller = DeficitBudgetTrackSamplingController.from_configs(
+        env_config=env_config,
+        curriculum_config=curriculum_config,
+        restored_state=restored_state,
+    )
+    if controller is None:
+        raise RuntimeError("X Cup rotation removed the deficit-budget track-sampling controller")
     return controller
 
 

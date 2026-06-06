@@ -43,6 +43,8 @@ class TrackResetSelector:
                 seed=seed,
                 sampling_mode=config.sampling_mode,
             )
+        if config.sampling_mode in {"deficit_budget", "fixed_env"}:
+            return self._select_fixed_env(config, sampling_mode=config.sampling_mode, seed=seed)
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
 
     def select_sequential(
@@ -126,11 +128,33 @@ class TrackResetSelector:
         self._sequential_course_buckets = _sequential_course_buckets(config.entries)
         self._cursor = 0
 
+    def _select_fixed_env(
+        self,
+        config: TrackSamplingConfig,
+        *,
+        sampling_mode: str,
+        seed: int | None,
+    ) -> SelectedTrack | None:
+        if not config.enabled:
+            return None
+        if not config.entries:
+            raise ValueError("track sampling is enabled but has no entries")
+        course_buckets = _sequential_course_buckets(config.entries)
+        position = self._env_index % len(course_buckets)
+        entry = _pick_track_entry(course_buckets[position], seed=seed)
+        return _selected_track_from_entry(
+            entry,
+            sampling_mode=sampling_mode,
+            cycle_position=position,
+            seed=seed,
+        )
+
 
 def select_reset_track_by_course_id(
     config: TrackSamplingConfig,
     *,
     course_id: str,
+    sampling_mode: str = "locked",
     seed: int | None = None,
 ) -> SelectedTrack | None:
     """Select one configured reset baseline for a specific course id."""
@@ -143,7 +167,7 @@ def select_reset_track_by_course_id(
     if matching_entries:
         return _selected_track_from_entry(
             _pick_track_entry(matching_entries, seed=seed),
-            sampling_mode="locked",
+            sampling_mode=sampling_mode,
             seed=seed,
         )
     return None

@@ -1024,6 +1024,9 @@ def test_terminal_step_exposes_monitor_info_keys() -> None:
     assert terminated
     assert not truncated
     assert info["termination_reason"] == "finished"
+    assert info["entered_finished"] is True
+    assert info["entered_retired"] is False
+    assert info["entered_crashed"] is False
     assert "truncation_reason" in info
     assert info["truncation_reason"] is None
     assert isinstance(info["episode_return"], float)

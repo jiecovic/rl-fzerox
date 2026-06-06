@@ -32,6 +32,13 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
         "adaptive_step_balance_confidence_scale": (
             config.tracks.adaptive_step_balance_confidence_scale
         ),
+        "deficit_budget_uniform_fraction": config.tracks.deficit_budget_uniform_fraction,
+        "deficit_budget_min_weight": config.tracks.deficit_budget_min_weight,
+        "deficit_budget_max_weight": config.tracks.deficit_budget_max_weight,
+        "deficit_budget_ema_alpha": config.tracks.deficit_budget_ema_alpha,
+        "deficit_budget_weight_update_rollouts": (
+            config.tracks.deficit_budget_weight_update_rollouts
+        ),
         "x_cup_rotation": {
             "enabled": config.tracks.x_cup_auto_regeneration.enabled,
             "completion_threshold": (config.tracks.x_cup_auto_regeneration.completion_threshold),

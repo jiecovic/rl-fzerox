@@ -52,6 +52,8 @@ export type TrackPoolCupView = {
 
 export type TrackPoolView = {
   cups: TrackPoolCupView[];
+  stepMetricLabel: string;
+  showStepTarget: boolean;
   totalCourses: number;
   totalEnvSteps: number;
   totalEpisodes: number;

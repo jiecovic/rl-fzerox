@@ -6,25 +6,27 @@ from collections.abc import Mapping
 from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
 
 
-def dynamic_step_balanced_sampling_configs(
+def runtime_track_sampling_configs(
     env_config: EnvConfig,
     curriculum_config: CurriculumConfig,
 ) -> tuple[TrackSamplingConfig, ...]:
     configs: list[TrackSamplingConfig] = []
-    if uses_dynamic_step_balancing(env_config.track_sampling):
+    if uses_track_sampling_runtime(env_config.track_sampling):
         configs.append(env_config.track_sampling)
     if curriculum_config.enabled:
         for stage in curriculum_config.stages:
-            if stage.track_sampling is not None and uses_dynamic_step_balancing(
-                stage.track_sampling
+            if stage.track_sampling is not None and uses_track_sampling_runtime(
+                stage.track_sampling,
             ):
                 configs.append(stage.track_sampling)
     return tuple(configs)
 
 
-def uses_dynamic_step_balancing(config: TrackSamplingConfig) -> bool:
+def uses_track_sampling_runtime(config: TrackSamplingConfig) -> bool:
     return (
-        config.enabled and uses_dynamic_runtime_mode(config.sampling_mode) and bool(config.entries)
+        config.enabled
+        and uses_track_sampling_runtime_mode(config.sampling_mode)
+        and bool(config.entries)
     )
 
 
@@ -65,8 +67,14 @@ def episode_completion_fraction(episode: Mapping[str, object]) -> float | None:
     return None
 
 
-def uses_dynamic_runtime_mode(sampling_mode: str) -> bool:
+def uses_step_balance_scheduler(sampling_mode: str) -> bool:
     return sampling_mode in {"step_balanced", "adaptive_step_balanced"}
+
+
+def uses_track_sampling_runtime_mode(sampling_mode: str) -> bool:
+    return sampling_mode in {"deficit_budget", "fixed_env"} or uses_step_balance_scheduler(
+        sampling_mode
+    )
 
 
 def sanitize_log_key(value: str) -> str:

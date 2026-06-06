@@ -1,3 +1,5 @@
+/* src/rl_fzerox/apps/run_manager/web/src/shared/styles/runs/trackPool.css */
+
 .run-track-distribution-legend-swatch-sample {
   background: color-mix(in srgb, var(--accent) 78%, white);
 }
@@ -14,6 +16,12 @@
   background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
 }
 
+.run-track-distribution-legend-swatch-completion {
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed color-mix(in srgb, #f8fafc 86%, var(--accent));
+}
+
 .run-track-distribution-legend-swatch-target {
   width: 12px;
   height: 0;
@@ -26,6 +34,12 @@
 
 .run-track-distribution-bar-target {
   border-top: 2px solid color-mix(in srgb, #f5c542 82%, white);
+}
+
+.run-track-distribution-completion-marker {
+  height: 0;
+  border-top: 2px dashed color-mix(in srgb, #f8fafc 86%, var(--accent));
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 34%, transparent));
 }
 
 .run-track-distribution-bar-fill-sample {

@@ -22,6 +22,9 @@ export const TRACK_SAMPLING_DESCRIPTIONS: Record<TracksConfig["sampling_mode"], 
   equal: "Sample courses uniformly by episode.",
   step_balanced: "Bias toward courses with fewer recent frames.",
   adaptive_step_balanced: "Keep step balance, then tilt a bit toward lower-completion courses.",
+  deficit_budget:
+    "Deterministically spend step-budget slices: equal coverage plus difficulty focus.",
+  fixed_env: "Pin each vector env slot to one course for deterministic per-rollout coverage.",
 };
 
 export function formatTrackOptionLabel(value: string) {

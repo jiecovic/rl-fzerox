@@ -18,6 +18,8 @@ TrackSamplingMode: TypeAlias = Literal[
     "balanced",
     "step_balanced",
     "adaptive_step_balanced",
+    "fixed_env",
+    "deficit_budget",
 ]
 ObservationPresetName: TypeAlias = DomainObservationPresetName
 ObservationResizeFilter: TypeAlias = DomainObservationResizeFilter

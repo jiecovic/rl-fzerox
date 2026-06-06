@@ -6,6 +6,10 @@ from __future__ import annotations
 from rl_fzerox.core.training.session.callbacks.track_sampling.controller import (
     StepBalancedTrackSamplingController,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.deficit import (
+    DEFICIT_QUEUE_SETTINGS,
+    DeficitBudgetTrackSamplingController,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.persistence import (
     TrackSamplingRuntimePersistence,
     file_track_sampling_runtime_persistence,
@@ -31,6 +35,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.x_cup_rotation imp
 
 __all__ = (
     "StepBalancedTrackSamplingController",
+    "DEFICIT_QUEUE_SETTINGS",
+    "DeficitBudgetTrackSamplingController",
     "TrackSamplingRuntimeEntry",
     "TrackSamplingRuntimePersistence",
     "TrackSamplingRuntimeState",

@@ -16,17 +16,28 @@ import { cn } from "@/shared/ui/cn";
 import { AppTooltip } from "@/shared/ui/Tooltip";
 
 interface DistributionBarProps {
+  completionValue?: number | null;
   kind: "sample" | "success" | "episodes" | "steps";
   label: string;
   targetValue?: number | null;
   value: number;
 }
 
-export function DistributionBar({ kind, label, targetValue, value }: DistributionBarProps) {
+export function DistributionBar({
+  completionValue,
+  kind,
+  label,
+  targetValue,
+  value,
+}: DistributionBarProps) {
   const clampedTarget =
     targetValue === undefined || targetValue === null
       ? null
       : Math.max(0, Math.min(targetValue, 1));
+  const clampedCompletion =
+    completionValue === undefined || completionValue === null
+      ? null
+      : Math.max(0, Math.min(completionValue, 1));
   return (
     <AppTooltip content={label}>
       <button aria-label={label} className="grid h-full items-end" type="button">
@@ -44,6 +55,12 @@ export function DistributionBar({ kind, label, targetValue, value }: Distributio
               style={{ bottom: `${clampedTarget * 100}%` }}
             />
           )}
+          {clampedCompletion === null ? null : (
+            <div
+              className="run-track-distribution-completion-marker pointer-events-none absolute -left-px -right-px z-[2] translate-y-1/2"
+              style={{ bottom: `${clampedCompletion * 100}%` }}
+            />
+          )}
         </div>
       </button>
     </AppTooltip>
@@ -51,7 +68,7 @@ export function DistributionBar({ kind, label, targetValue, value }: Distributio
 }
 
 interface LegendItemProps {
-  kind: "sample" | "success" | "episodes" | "steps" | "target";
+  kind: "sample" | "success" | "episodes" | "steps" | "completion" | "target";
   label: string;
 }
 
@@ -135,10 +152,14 @@ export function CupTabs({
 
 export function TrackPoolBody({
   activeCup,
+  stepMetricLabel,
+  showStepTarget,
   xCupRegenerationMinEpisodes,
   xCupRegenerationThreshold,
 }: {
   activeCup: TrackPoolCupView;
+  stepMetricLabel: string;
+  showStepTarget: boolean;
   xCupRegenerationMinEpisodes: number | null;
   xCupRegenerationThreshold: number | null;
 }) {
@@ -163,7 +184,8 @@ export function TrackPoolBody({
         <LegendItem kind="success" label="Finish" />
         <LegendItem kind="episodes" label="Episodes" />
         <LegendItem kind="steps" label="Env steps" />
-        <LegendItem kind="target" label="Step target" />
+        <LegendItem kind="completion" label="Completion" />
+        {showStepTarget ? <LegendItem kind="target" label="Step target" /> : null}
       </div>
       <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2.5">
         <div className="grid h-44 items-stretch text-[11px] tabular-nums text-app-muted">
@@ -179,6 +201,8 @@ export function TrackPoolBody({
             <TrackPoolColumn
               entry={entry}
               key={entry.id}
+              stepMetricLabel={stepMetricLabel}
+              showStepTarget={showStepTarget}
               xCupRegenerationMinEpisodes={xCupRegenerationMinEpisodes}
               xCupRegenerationThreshold={xCupRegenerationThreshold}
             />
@@ -191,10 +215,14 @@ export function TrackPoolBody({
 
 function TrackPoolColumn({
   entry,
+  stepMetricLabel,
+  showStepTarget,
   xCupRegenerationMinEpisodes,
   xCupRegenerationThreshold,
 }: {
   entry: TrackPoolCourseView;
+  stepMetricLabel: string;
+  showStepTarget: boolean;
   xCupRegenerationMinEpisodes: number | null;
   xCupRegenerationThreshold: number | null;
 }) {
@@ -214,6 +242,7 @@ function TrackPoolColumn({
           value={entry.currentProbability ?? 0}
         />
         <DistributionBar
+          completionValue={entry.emaCompletionFraction}
           kind="success"
           label={successLabel(entry)}
           value={displaySuccessRate(entry) ?? 0}
@@ -225,8 +254,8 @@ function TrackPoolColumn({
         />
         <DistributionBar
           kind="steps"
-          label={`${(entry.completedEnvSteps ?? 0).toLocaleString()} env steps · ${formatPercent(entry.stepShare ?? 0)} · target ${formatPercent(entry.targetStepShare ?? 0)}`}
-          targetValue={entry.targetStepShare}
+          label={stepShareLabel(entry, stepMetricLabel, showStepTarget)}
+          targetValue={showStepTarget ? entry.targetStepShare : null}
           value={entry.stepShare ?? 0}
         />
       </div>
@@ -249,6 +278,18 @@ function TrackPoolColumn({
       </div>
     </div>
   );
+}
+
+function stepShareLabel(
+  entry: TrackPoolCourseView,
+  stepMetricLabel: string,
+  showStepTarget: boolean,
+) {
+  const baseLabel = `${(entry.completedEnvSteps ?? 0).toLocaleString()} ${stepMetricLabel} · ${formatPercent(entry.stepShare ?? 0)}`;
+  if (!showStepTarget) {
+    return baseLabel;
+  }
+  return `${baseLabel} · target ${formatPercent(entry.targetStepShare ?? 0)}`;
 }
 
 function trackCupTabClass(active: boolean) {

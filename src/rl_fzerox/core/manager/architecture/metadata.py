@@ -73,7 +73,15 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
         gp_difficulties=tuple(
             SelectOption(value=name, label=name.title()) for name in race_difficulty_names()
         ),
-        track_sampling_modes=_options(("step_balanced", "adaptive_step_balanced", "equal")),
+        track_sampling_modes=_options(
+            (
+                "step_balanced",
+                "adaptive_step_balanced",
+                "deficit_budget",
+                "fixed_env",
+                "equal",
+            )
+        ),
         track_cups=tuple(cup_infos()),
         built_in_courses=tuple(course_infos()),
         vehicles=tuple(vehicle_infos()),

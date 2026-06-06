@@ -165,6 +165,11 @@ class TrackSamplingConfig(BaseModel):
     adaptive_step_balance_target_completion: float = Field(default=0.9, ge=0.0, le=1.0)
     adaptive_step_balance_min_confidence_episodes: PositiveInt = 24
     adaptive_step_balance_confidence_scale: PositiveFloat = 4.0
+    deficit_budget_uniform_fraction: float = Field(default=0.7, ge=0.0, le=1.0)
+    deficit_budget_min_weight: PositiveFloat = 1.0
+    deficit_budget_max_weight: PositiveFloat = 3.0
+    deficit_budget_ema_alpha: float = Field(default=0.02, gt=0.0, le=1.0)
+    deficit_budget_weight_update_rollouts: PositiveInt = 20
     step_balance_log_details: bool = False
     x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
 
@@ -176,6 +181,10 @@ class TrackSamplingConfig(BaseModel):
             raise ValueError("track_sampling.step_balance_max_weight_scale must be >= 1.0")
         if self.adaptive_step_balance_confidence_scale < 1.0:
             raise ValueError("track_sampling.adaptive_step_balance_confidence_scale must be >= 1.0")
+        if self.deficit_budget_max_weight < self.deficit_budget_min_weight:
+            raise ValueError(
+                "track_sampling.deficit_budget_max_weight must be >= deficit_budget_min_weight"
+            )
         return self
 
 

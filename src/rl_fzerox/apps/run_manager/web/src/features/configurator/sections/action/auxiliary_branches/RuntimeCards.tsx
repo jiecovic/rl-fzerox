@@ -231,6 +231,36 @@ export function RuntimeCards({
                 ]}
               />
             </div>
+            <div className="field-shell">
+              <FieldLabel
+                help="When enabled, manual boost is masked while the vehicle is airborne."
+                label="Mask while airborne"
+                onReset={() =>
+                  updateAction({
+                    mask_boost_when_airborne: defaultAction.mask_boost_when_airborne,
+                  })
+                }
+              />
+              <SegmentedChoiceStrip
+                ariaLabel="Boost airborne mask"
+                options={[
+                  {
+                    active: !action.mask_boost_when_airborne,
+                    key: "allow_airborne_boost",
+                    label: "Off",
+                    onClick: () => updateAction({ mask_boost_when_airborne: false }),
+                  },
+                  {
+                    active: action.mask_boost_when_airborne,
+                    key: "mask_airborne_boost",
+                    label: "On",
+                    onClick: () => updateAction({ mask_boost_when_airborne: true }),
+                  },
+                ]}
+              />
+            </div>
+          </div>
+          <div className="action-runtime-two-col">
             <IntegerField
               help="Allow a manual boost decision only once per this many env steps. The native-frame spacing is derived from action repeat."
               label="Decision interval env steps"

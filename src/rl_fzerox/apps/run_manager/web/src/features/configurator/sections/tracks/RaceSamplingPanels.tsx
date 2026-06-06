@@ -3,6 +3,7 @@ import { ConfigGrid } from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import { IntegerField, NumberField } from "@/features/configurator/fields";
 import { ChoiceStrip } from "@/features/configurator/sections/tracks/ChoiceStrip";
+import { fixedEnvAssignmentSummary } from "@/features/configurator/sections/tracks/fixedEnvAssignment";
 import {
   formatTrackOptionLabel,
   GP_DIFFICULTY_DESCRIPTIONS,
@@ -40,6 +41,11 @@ interface CourseSamplingPanelProps {
     | "adaptive_step_balance_confidence_scale"
     | "adaptive_step_balance_min_confidence_episodes"
     | "adaptive_step_balance_target_completion"
+    | "deficit_budget_ema_alpha"
+    | "deficit_budget_max_weight"
+    | "deficit_budget_min_weight"
+    | "deficit_budget_uniform_fraction"
+    | "deficit_budget_weight_update_rollouts"
     | "step_balance_ema_alpha"
     | "step_balance_max_weight_scale"
     | "step_balance_update_episodes"
@@ -145,8 +151,12 @@ export function CourseSamplingPanel({
   samplingDefaults,
   updateTracks,
 }: CourseSamplingPanelProps) {
-  const usesDynamicStepBalancing = config.tracks.sampling_mode !== "equal";
+  const usesDynamicStepBalancing =
+    config.tracks.sampling_mode === "step_balanced" ||
+    config.tracks.sampling_mode === "adaptive_step_balanced";
   const usesAdaptiveStepBalancing = config.tracks.sampling_mode === "adaptive_step_balanced";
+  const usesDeficitBudget = config.tracks.sampling_mode === "deficit_budget";
+  const usesFixedEnvAssignment = config.tracks.sampling_mode === "fixed_env";
   return (
     <ConfigGrid className="items-stretch">
       <ConfigPanel
@@ -202,10 +212,56 @@ export function CourseSamplingPanel({
               ) : null}
             </div>
           ) : null}
+          {usesFixedEnvAssignment ? <FixedEnvAssignmentPreview config={config} /> : null}
+          {usesDeficitBudget ? (
+            <DeficitBudgetFields
+              config={config}
+              defaultConfig={defaultConfig}
+              updateTracks={updateTracks}
+            />
+          ) : null}
         </div>
       </ConfigPanel>
     </ConfigGrid>
   );
+}
+
+function FixedEnvAssignmentPreview({ config }: { config: ManagedRunConfig }) {
+  const summary = fixedEnvAssignmentSummary(config);
+  const allowedCourseCounts = allowedFixedCourseCounts(config.train.num_envs);
+  return (
+    <div
+      className={[
+        "border px-3 py-2 text-[13px]",
+        summary.issue === null
+          ? "border-app-border bg-app-surface"
+          : "border-app-danger/70 bg-app-danger/10 text-app-danger",
+      ].join(" ")}
+    >
+      {summary.issue === null && summary.envsPerCourse !== null ? (
+        <span>
+          {config.train.num_envs} envs · {summary.activeCourseCount} courses ·{" "}
+          {summary.envsPerCourse} env{summary.envsPerCourse === 1 ? "" : "s"}/course
+        </span>
+      ) : (
+        <span>{summary.issue}</span>
+      )}
+      <span className="ml-3 text-app-muted">
+        Allowed active course counts for {config.train.num_envs} envs:{" "}
+        {allowedCourseCounts.join(", ")}
+      </span>
+    </div>
+  );
+}
+
+function allowedFixedCourseCounts(numEnvs: number): number[] {
+  const counts: number[] = [];
+  for (let count = 1; count <= numEnvs; count += 1) {
+    if (numEnvs % count === 0) {
+      counts.push(count);
+    }
+  }
+  return counts;
 }
 
 function AdaptiveSamplingFields({
@@ -261,4 +317,84 @@ function AdaptiveSamplingFields({
       />
     </>
   );
+}
+
+function DeficitBudgetFields({
+  config,
+  defaultConfig,
+  updateTracks,
+}: {
+  config: ManagedRunConfig;
+  defaultConfig: ManagedRunConfig;
+  updateTracks: TrackUpdate;
+}) {
+  const equalCoverageShare = Math.max(
+    0,
+    Math.min(1, config.tracks.deficit_budget_uniform_fraction),
+  );
+  const difficultyFocusShare = 1 - equalCoverageShare;
+  const equalCoverageEnvEquivalent = equalCoverageShare * config.train.num_envs;
+  const difficultyFocusEnvEquivalent = difficultyFocusShare * config.train.num_envs;
+
+  return (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+      <NumberField
+        help="Fraction of each rollout step budget reserved as equal coverage for every active course."
+        label="Equal coverage share"
+        resetValue={defaultConfig.tracks.deficit_budget_uniform_fraction}
+        step="0.05"
+        value={config.tracks.deficit_budget_uniform_fraction}
+        onChange={(value) => updateTracks({ deficit_budget_uniform_fraction: value })}
+      />
+      <div className="grid content-start gap-1 border border-app-border bg-app-surface-muted px-3 py-2">
+        <span className="text-[11px] tracking-[0.05em] text-app-muted uppercase">
+          Difficulty focus share
+        </span>
+        <strong className="text-base tabular-nums text-app-text">
+          {formatPercent(difficultyFocusShare)}
+        </strong>
+        <span className="text-xs leading-normal text-app-muted">
+          Budget-equivalent split at {config.train.num_envs} envs:{" "}
+          {equalCoverageEnvEquivalent.toFixed(1)} equal · {difficultyFocusEnvEquivalent.toFixed(1)}{" "}
+          difficulty.
+        </span>
+      </div>
+      <NumberField
+        help="Lowest adaptive difficulty weight before uniform budget mixing."
+        label="Min weight"
+        resetValue={defaultConfig.tracks.deficit_budget_min_weight}
+        step="0.1"
+        value={config.tracks.deficit_budget_min_weight}
+        onChange={(value) => updateTracks({ deficit_budget_min_weight: value })}
+      />
+      <NumberField
+        help="Highest adaptive difficulty weight before uniform budget mixing."
+        label="Max weight"
+        resetValue={defaultConfig.tracks.deficit_budget_max_weight}
+        step="0.1"
+        value={config.tracks.deficit_budget_max_weight}
+        onChange={(value) => updateTracks({ deficit_budget_max_weight: value })}
+      />
+      <NumberField
+        help="EMA smoothing for the per-course difficulty score."
+        label="Difficulty EMA"
+        resetValue={defaultConfig.tracks.deficit_budget_ema_alpha}
+        step="0.005"
+        value={config.tracks.deficit_budget_ema_alpha}
+        onChange={(value) => updateTracks({ deficit_budget_ema_alpha: value })}
+      />
+      <IntegerField
+        help="Rollouts between difficulty-weight recomputations. Step deficits still update every rollout."
+        label="Update rollouts"
+        min={1}
+        resetValue={defaultConfig.tracks.deficit_budget_weight_update_rollouts}
+        value={config.tracks.deficit_budget_weight_update_rollouts}
+        onChange={(value) => updateTracks({ deficit_budget_weight_update_rollouts: value })}
+      />
+    </div>
+  );
+}
+
+function formatPercent(value: number) {
+  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(0)}%`;
 }
