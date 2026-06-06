@@ -19,7 +19,7 @@ def manager_engine(db_path: Path) -> Engine:
     engine = create_engine(
         f"sqlite:///{db_path}",
         future=True,
-        connect_args={"timeout": 30.0},
+        connect_args={"timeout": 30.0, "check_same_thread": False},
     )
 
     @event.listens_for(engine, "connect")

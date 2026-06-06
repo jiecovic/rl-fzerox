@@ -38,6 +38,17 @@ from rl_fzerox.apps.run_manager.api.handlers.runs import (
     update_run_payload,
     watch_run_payload,
 )
+from rl_fzerox.apps.run_manager.api.handlers.save_games import (
+    create_save_game_payload,
+    open_save_game_dir_payload,
+    save_attempt_execution_context_payload_for_attempt,
+    save_attempt_execution_plan_payload_for_attempt,
+    save_games_payload,
+    start_career_mode_payload,
+    start_next_save_attempt_payload,
+    update_save_game_payload,
+    upsert_save_course_setup_payload,
+)
 from rl_fzerox.apps.run_manager.api.handlers.transfer import (
     export_run_bundle_path,
     import_run_bundle_payload,
@@ -46,6 +57,7 @@ from rl_fzerox.apps.run_manager.api.handlers.transfer import (
 __all__ = [
     "config_metadata_payload",
     "create_draft_payload",
+    "create_save_game_payload",
     "delete_draft_payload",
     "delete_lineage_payload",
     "delete_run_payload",
@@ -55,6 +67,7 @@ __all__ = [
     "import_run_bundle_payload",
     "launch_run_payload",
     "open_run_dir_payload",
+    "open_save_game_dir_payload",
     "pause_run_payload",
     "policy_preview_payload",
     "rebuild_tensorboard_views_payload",
@@ -64,11 +77,18 @@ __all__ = [
     "run_response_for_id",
     "run_track_sampling_payload",
     "runs_payload",
+    "save_attempt_execution_context_payload_for_attempt",
+    "save_attempt_execution_plan_payload_for_attempt",
+    "save_games_payload",
+    "start_career_mode_payload",
+    "start_next_save_attempt_payload",
     "stop_run_payload",
     "templates_payload",
     "update_draft_payload",
     "update_lineage_groups_payload",
     "update_run_payload",
+    "update_save_game_payload",
+    "upsert_save_course_setup_payload",
     "validate_source_fields",
     "watch_run_payload",
 ]

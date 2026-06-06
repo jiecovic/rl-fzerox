@@ -5,6 +5,7 @@ from rl_fzerox.apps.run_manager.launching.manifest import (
     default_fork_name,
     persist_launch_manifest,
 )
+from rl_fzerox.apps.run_manager.launching.save_games import launch_career_mode_runner
 from rl_fzerox.apps.run_manager.launching.watch import WatchLaunchStatus, launch_watch_artifact
 from rl_fzerox.apps.run_manager.launching.worker import (
     manager_worker_log_path,
@@ -15,6 +16,7 @@ from rl_fzerox.apps.run_manager.launching.worker import (
 __all__ = (
     "WatchLaunchStatus",
     "default_fork_name",
+    "launch_career_mode_runner",
     "launch_watch_artifact",
     "manager_worker_log_path",
     "persist_launch_manifest",

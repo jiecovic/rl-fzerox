@@ -4,7 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    model_validator,
+)
 
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema.common import WatchFpsSetting
@@ -13,6 +20,24 @@ from rl_fzerox.core.runtime_spec.schema.env import EmulatorConfig, EnvConfig, Re
 from rl_fzerox.core.runtime_spec.schema.policy import PolicyConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackConfig
 from rl_fzerox.core.runtime_spec.schema.training import TrainConfig
+
+
+class CareerModeRaceSetupConfig(BaseModel):
+    """Resolved race setup used by the Career Mode menu runner."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    difficulty: str
+    cup_id: str
+    course_id: str | None = None
+    vehicle_id: str
+    vehicle_display_name: str
+    character_index: NonNegativeInt
+    machine_select_slot: NonNegativeInt
+    machine_select_row: NonNegativeInt
+    machine_select_column: NonNegativeInt
+    engine_setting_id: str
+    engine_setting_raw_value: int
 
 
 class WatchConfig(BaseModel):
@@ -25,12 +50,19 @@ class WatchConfig(BaseModel):
     render_fps: WatchFpsSetting | None = None
     deterministic_policy: bool = True
     device: Literal["auto", "cpu", "cuda"] = "cpu"
+    attempt_seed: int | None = Field(default=None, ge=0, le=(1 << 32) - 1)
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
     policy_algorithm: TrainAlgorithmName | None = None
     lineage_frame_offset: NonNegativeInt | None = None
     manager_db_path: Path | None = None
     managed_run_id: str | None = None
+    managed_save_game_id: str | None = None
+    save_attempt_id: str | None = None
+    unlock_target_label: str | None = None
+    start_manual_control: bool = False
+    career_mode_race_setup: CareerModeRaceSetupConfig | None = None
+    policy_observation_shape_hint: tuple[PositiveInt, PositiveInt, PositiveInt] | None = None
 
     @model_validator(mode="after")
     def _default_split_fps(self) -> WatchConfig:

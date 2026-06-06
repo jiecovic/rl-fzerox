@@ -284,6 +284,26 @@ class ManagerRunLauncher:
             renderer=renderer,
         )
 
+    def start_career_mode(
+        self,
+        *,
+        save_game_id: str,
+        device: Literal["cpu", "cuda"],
+        renderer: Literal["angrylion", "gliden64"] | None,
+        attempt_seed: int | None,
+        deterministic_policy: bool,
+    ) -> launching.WatchLaunchStatus:
+        """Launch the visible Career Mode runner for one save game."""
+
+        return launching.launch_career_mode_runner(
+            store=self._store,
+            save_game_id=save_game_id,
+            device=device,
+            renderer=renderer,
+            attempt_seed=attempt_seed,
+            deterministic_policy=deterministic_policy,
+        )
+
     def _request_command(self, *, run_id: str, command: RunCommand) -> ManagedRun:
         run = self._store.get_run(run_id)
         if run is None:

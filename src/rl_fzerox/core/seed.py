@@ -16,11 +16,13 @@ class _SeedDomains:
 
     python: int
     numpy: int
+    torch: int
 
 
 _SEED_DOMAINS = _SeedDomains(
     python=0xB5AD4ECEDA1CE2A9,
     numpy=0x94D049BB133111EB,
+    torch=0xD2B74407B1CE6E93,
 )
 
 
@@ -64,3 +66,20 @@ def seed_process(seed: int | None) -> None:
 
     random.seed(python_seed)
     np.random.seed(np.uint32(numpy_seed & 0xFFFFFFFF))
+    _seed_torch(seed)
+
+
+def _seed_torch(seed: int) -> None:
+    """Seed PyTorch when it is present in the current runtime."""
+
+    try:
+        import torch
+    except ImportError:
+        return
+
+    torch_seed = derive_seed(seed, _SEED_DOMAINS.torch)
+    if torch_seed is None:
+        return
+    torch.manual_seed(torch_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(torch_seed)

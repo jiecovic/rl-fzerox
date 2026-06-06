@@ -9,6 +9,12 @@ from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 
 RunStatus = Literal["created", "running", "paused", "stopped", "finished", "failed"]
 RunCommand = Literal["pause", "stop"]
+SaveGameStatus = Literal["created", "running", "paused", "finished", "failed"]
+SaveAttemptStatus = Literal["running", "succeeded", "failed"]
+SaveUnlockInspectionStatus = Literal["not_inspected", "inspected"]
+SaveUnlockTargetStatus = Literal["pending", "succeeded", "failed", "skipped"]
+CourseSetupScope = Literal["global", "difficulty", "cup", "course"]
+ViewerLeaseKind = Literal["run_watch", "career_mode"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +62,19 @@ class ManagedRunMetricSample:
     entropy_loss: float | None = None
     value_loss: float | None = None
     policy_gradient_loss: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedViewerLease:
+    """One manager-owned visible viewer process lease."""
+
+    id: str
+    kind: ViewerLeaseKind
+    owner_id: str
+    pid: int
+    launched_at: str
+    heartbeat_at: str
+    qualifier: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,3 +153,76 @@ class ManagedRunDraft:
     source_artifact: Literal["latest", "best"] | None = None
     source_snapshot_dir: Path | None = None
     source_num_timesteps: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedSaveGame:
+    """One manager-owned portable save game and career-runner state root."""
+
+    id: str
+    name: str
+    status: SaveGameStatus
+    save_path: Path
+    created_at: str
+    updated_at: str
+    last_finished_at: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedSaveUnlockTarget:
+    """One unlock-path target for a portable save game."""
+
+    sequence_index: int
+    kind: str
+    status: SaveUnlockTargetStatus
+    label: str
+    difficulty: str | None = None
+    cup_id: str | None = None
+    course_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedSaveUnlockProgress:
+    """Progress for one save game, based on inspected save state when available."""
+
+    inspection_status: SaveUnlockInspectionStatus
+    completed_count: int
+    total_count: int
+    next_target: ManagedSaveUnlockTarget | None
+    targets: tuple[ManagedSaveUnlockTarget, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedSaveCourseSetup:
+    """Policy selection rule used by the career runner."""
+
+    id: str
+    save_game_id: str
+    scope: CourseSetupScope
+    policy_run_id: str
+    policy_artifact: Literal["latest", "best"]
+    created_at: str
+    updated_at: str
+    difficulty: str | None = None
+    cup_id: str | None = None
+    course_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedSaveAttempt:
+    """One concrete policy attempt for one unlock-path target."""
+
+    id: str
+    save_game_id: str
+    status: SaveAttemptStatus
+    started_at: str
+    policy_run_id: str | None = None
+    policy_artifact: Literal["latest", "best"] | None = None
+    target_kind: str | None = None
+    difficulty: str | None = None
+    cup_id: str | None = None
+    course_id: str | None = None
+    finished_at: str | None = None
+    finish_position: int | None = None
+    finish_time_s: float | None = None
+    failure_reason: str | None = None

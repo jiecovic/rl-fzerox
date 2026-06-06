@@ -48,3 +48,17 @@ class RunWorkerModel(ManagerBase):
     pid: Mapped[int]
     launched_at: Mapped[str]
     heartbeat_at: Mapped[str]
+
+
+class ViewerLeaseModel(ManagerBase):
+    """Current visible viewer process lease for manager-launched apps."""
+
+    __tablename__ = "viewer_leases"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    kind: Mapped[str]
+    owner_id: Mapped[str]
+    qualifier: Mapped[str | None]
+    pid: Mapped[int]
+    launched_at: Mapped[str]
+    heartbeat_at: Mapped[str]

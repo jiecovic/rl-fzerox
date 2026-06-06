@@ -111,6 +111,15 @@ def vehicle_by_id(vehicle_id: str) -> VehicleInfo:
     raise ValueError(f"unknown vehicle {vehicle_id!r}; known: {known}")
 
 
+def vehicle_by_character_index(character_index: int) -> VehicleInfo | None:
+    """Return a stock vehicle identity from the native character index."""
+
+    for vehicle in CATALOG.vehicles:
+        if vehicle.character_index == character_index:
+            return vehicle
+    return None
+
+
 def known_vehicle_ids() -> tuple[str, ...]:
     """Return all stock vehicle ids accepted by config."""
 
@@ -178,6 +187,12 @@ def engine_setting_display_name(engine_setting: str) -> str:
     if raw_value is not None:
         return f"Engine {raw_value}"
     return engine_setting.replace("_", " ").title()
+
+
+def engine_setting_display_name_for_raw(raw_value: int) -> str:
+    """Return a short display label for a native 0..100 engine-slider value."""
+
+    return f"Engine {raw_value}"
 
 
 def _raw_value_from_generated_engine_setting_id(engine_setting: str) -> int | None:

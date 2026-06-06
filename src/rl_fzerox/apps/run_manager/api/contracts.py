@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
+from rl_fzerox.core.manager import CourseSetupScope, ManagedRun, ManagedRunConfig
 
 WatchDevice = Literal["cpu", "cuda"]
 WatchRenderer = Literal["angrylion", "gliden64"]
+PolicyPlaybackMode = Literal["deterministic", "stochastic"]
 
 
 class CreateDraftRequest(BaseModel):
@@ -20,6 +21,46 @@ class CreateDraftRequest(BaseModel):
     config: ManagedRunConfig
     source_run_id: str | None = None
     source_artifact: Literal["latest", "best"] | None = None
+
+
+class CreateSaveGameRequest(BaseModel):
+    """Request body for creating one managed career-runner save game."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class StartCareerModeRequest(BaseModel):
+    """Request body for launching one Career Mode runner."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    device: WatchDevice = "cuda"
+    renderer: WatchRenderer | None = None
+    attempt_seed: int | None = Field(default=None, ge=0, le=(1 << 32) - 1)
+    policy_mode: PolicyPlaybackMode = "deterministic"
+
+
+class UpdateSaveGameRequest(BaseModel):
+    """Request body for renaming one manager-owned save game."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class UpsertSaveCourseSetupRequest(BaseModel):
+    """Request body for assigning a policy to one save-game scope."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: CourseSetupScope
+    policy_run_id: str
+    policy_artifact: Literal["latest", "best"] = "best"
+    difficulty: str | None = None
+    cup_id: str | None = None
+    course_id: str | None = None
 
 
 class UpdateDraftRequest(BaseModel):
@@ -113,4 +154,14 @@ class RunLauncher(Protocol):
         artifact: str,
         device: WatchDevice,
         renderer: WatchRenderer | None,
+    ) -> Literal["started", "already_running"]: ...
+
+    def start_career_mode(
+        self,
+        *,
+        save_game_id: str,
+        device: WatchDevice,
+        renderer: WatchRenderer | None,
+        attempt_seed: int | None,
+        deterministic_policy: bool,
     ) -> Literal["started", "already_running"]: ...
