@@ -8,15 +8,9 @@ from rl_fzerox.ui.watch.runtime.career_mode.menu import controller_step_from_men
 
 
 def test_career_menu_accept_uses_a_and_start_stays_explicit() -> None:
-    accept = controller_step_from_menu_step(
-        RawMenuStep(MenuInput.ACCEPT, frames=1, phase="accept")
-    )
-    a_button = controller_step_from_menu_step(
-        RawMenuStep(MenuInput.A_BUTTON, frames=1, phase="a")
-    )
-    start = controller_step_from_menu_step(
-        RawMenuStep(MenuInput.START, frames=1, phase="start")
-    )
+    accept = controller_step_from_menu_step(RawMenuStep(MenuInput.ACCEPT, frames=1, phase="accept"))
+    a_button = controller_step_from_menu_step(RawMenuStep(MenuInput.A_BUTTON, frames=1, phase="a"))
+    start = controller_step_from_menu_step(RawMenuStep(MenuInput.START, frames=1, phase="start"))
 
     assert accept.controller_state.joypad_mask == joypad_mask(JOYPAD_BUTTONS.a)
     assert a_button.controller_state.joypad_mask == joypad_mask(JOYPAD_BUTTONS.a)

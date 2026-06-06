@@ -243,9 +243,7 @@ def _build_panel_columns(
                         "-"
                         if observation_shape is None
                         else _format_observation_shape(observation_shape),
-                        PALETTE.text_muted
-                        if observation_shape is None
-                        else PALETTE.text_primary,
+                        PALETTE.text_muted if observation_shape is None else PALETTE.text_primary,
                     ),
                 ],
             ),

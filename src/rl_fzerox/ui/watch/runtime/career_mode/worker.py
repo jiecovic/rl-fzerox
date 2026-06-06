@@ -314,9 +314,7 @@ def _run_career_mode_loop_body(
         )
         snapshot_info = controller.viewer_info(
             info=info if policy_active else _reset_race_progress_info(info),
-            active_policy_control=(
-                active_policy_control if policy_active else None
-            ),
+            active_policy_control=(active_policy_control if policy_active else None),
         )
         snapshot_config = session.snapshot_config(config) if policy_active else config
         snapshot_action_repeat = _snapshot_action_repeat(
@@ -365,9 +363,7 @@ def _run_career_mode_loop_body(
                 policy_auxiliary_state_targets=(
                     current_auxiliary_targets if policy_active else None
                 ),
-                include_auxiliary_state=(
-                    policy_active and auxiliary_visualization_enabled
-                ),
+                include_auxiliary_state=(policy_active and auxiliary_visualization_enabled),
                 auxiliary_target_names=auxiliary_target_names,
                 deterministic_policy=deterministic_policy,
                 manual_control_enabled=manual_control_enabled if policy_active else False,
@@ -469,9 +465,7 @@ def _run_career_mode_loop_body(
             ):
                 current_auxiliary_predictions = _current_auxiliary_predictions(
                     policy_runner=(
-                        active_policy_control.runner
-                        if active_policy_control is not None
-                        else None
+                        active_policy_control.runner if active_policy_control is not None else None
                     ),
                     enabled=auxiliary_visualization_enabled,
                     observation=observation,
@@ -522,9 +516,7 @@ def _run_career_mode_loop_body(
                     info=info,
                 )
                 if not terminal_handled and not in_gp_race(info):
-                    raise RuntimeError(
-                        "Career Mode left a race before observing a game result"
-                    )
+                    raise RuntimeError("Career Mode left a race before observing a game result")
                 if terminal_handled:
                     control_rate.reset()
                     raw_observation = None
@@ -532,9 +524,7 @@ def _run_career_mode_loop_body(
                     episode_reward = 0.0
                     live_series = EpisodeLiveSeriesTracker()
                     last_live_series_publish_time = 0.0
-                    raw_info, info, current_telemetry = _fresh_menu_runtime_state(
-                        session
-                    )
+                    raw_info, info, current_telemetry = _fresh_menu_runtime_state(session)
                     info = controller.viewer_info(
                         info=info,
                         active_policy_control=None,
@@ -733,9 +723,7 @@ def _run_career_mode_loop_body(
                     episode_reward = 0.0
                     live_series = EpisodeLiveSeriesTracker()
                     last_live_series_publish_time = 0.0
-                    raw_info, info, current_telemetry = _fresh_menu_runtime_state(
-                        session
-                    )
+                    raw_info, info, current_telemetry = _fresh_menu_runtime_state(session)
                     info = controller.viewer_info(
                         info=info,
                         active_policy_control=None,
@@ -958,9 +946,7 @@ def _step_policy_or_manual(
         policy_runner.refresh_if_due(interval_seconds=10.0)
         session.sync_policy_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
         decision_action_mask = session.action_mask_snapshot()
-        policy_action_mask = (
-            decision_action_mask if policy_runner.supports_action_masks else None
-        )
+        policy_action_mask = decision_action_mask if policy_runner.supports_action_masks else None
         action = policy_runner.predict(
             observation,
             deterministic=deterministic_policy,

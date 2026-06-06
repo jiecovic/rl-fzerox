@@ -56,11 +56,7 @@ def launch_career_mode_runner(
         save_game_id,
         "--viewer-lease-id",
         lease_id,
-        *(
-            ("--attempt-seed", str(attempt_seed))
-            if attempt_seed is not None
-            else ()
-        ),
+        *(("--attempt-seed", str(attempt_seed)) if attempt_seed is not None else ()),
         "--policy-mode",
         "deterministic" if deterministic_policy else "stochastic",
         "--",

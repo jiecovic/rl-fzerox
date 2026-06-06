@@ -30,9 +30,7 @@ def test_tap_steps_emit_active_input_then_neutral_settle() -> None:
 
 def test_select_difficulty_opens_popup_before_selecting_novice() -> None:
     steps = select_difficulty_steps(_race_setup(difficulty="novice"))
-    active_inputs = [
-        step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL
-    ]
+    active_inputs = [step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL]
 
     assert active_inputs == [MenuInput.ACCEPT, MenuInput.ACCEPT]
     assert steps[0].phase == "select_difficulty:open"
@@ -43,9 +41,7 @@ def test_select_difficulty_opens_popup_before_selecting_novice() -> None:
 
 def test_select_difficulty_opens_popup_before_moving_to_expert() -> None:
     steps = select_difficulty_steps(_race_setup(difficulty="expert"))
-    active_inputs = [
-        step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL
-    ]
+    active_inputs = [step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL]
 
     assert active_inputs == [
         MenuInput.ACCEPT,
@@ -74,12 +70,8 @@ def test_continue_next_course_uses_menu_confirm() -> None:
 
 
 def test_machine_select_moves_to_target_slot_before_selecting() -> None:
-    steps = machine_select_steps(
-        _race_setup(difficulty="novice", machine_select_column=1)
-    )
-    active_inputs = [
-        step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL
-    ]
+    steps = machine_select_steps(_race_setup(difficulty="novice", machine_select_column=1))
+    active_inputs = [step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL]
 
     assert active_inputs == [MenuInput.RIGHT]
 
@@ -213,12 +205,8 @@ def test_menu_facts_reject_unknown_course_as_fresh_race() -> None:
 
 
 def test_menu_facts_detect_skippable_post_gp_screens() -> None:
-    assert MenuFacts.from_info(
-        {"game_mode": "gp_end_cutscene"}
-    ).is_skippable_post_gp_screen
-    assert MenuFacts.from_info(
-        {"game_mode": "skippable_credits"}
-    ).is_skippable_post_gp_screen
+    assert MenuFacts.from_info({"game_mode": "gp_end_cutscene"}).is_skippable_post_gp_screen
+    assert MenuFacts.from_info({"game_mode": "skippable_credits"}).is_skippable_post_gp_screen
 
 
 def test_raw_step_rejects_invalid_frame_count() -> None:

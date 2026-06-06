@@ -13,9 +13,7 @@ from rl_fzerox.core.save_game import (
 
 
 def test_parse_memory_probe_definition_accepts_hex_offsets_and_labels() -> None:
-    definition = parse_memory_probe_definition(
-        "cup_flags=save_ram:0x10:4:bytes:Cup clear flags"
-    )
+    definition = parse_memory_probe_definition("cup_flags=save_ram:0x10:4:bytes:Cup clear flags")
 
     assert definition.key == "cup_flags"
     assert definition.region == "save_ram"

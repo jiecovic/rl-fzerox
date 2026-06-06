@@ -414,7 +414,9 @@ def _policy_observation_shape(
     observation: ObservationValue | None,
 ) -> tuple[int, ...] | None:
     if observation is not None:
-        return tuple(int(value) for value in observation_access.observation_image(observation).shape)
+        return tuple(
+            int(value) for value in observation_access.observation_image(observation).shape
+        )
     if config.watch.policy_observation_shape_hint is not None:
         return tuple(int(value) for value in config.watch.policy_observation_shape_hint)
     if config.watch.managed_save_game_id is not None:

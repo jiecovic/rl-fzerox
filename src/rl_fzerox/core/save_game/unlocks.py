@@ -142,7 +142,6 @@ def _logical_sra_payload(save_data: bytes, *, layout: FZeroXSaveLayout) -> bytes
 
 def _byteswap_chunks(payload: bytes, *, chunk_size: int) -> bytes:
     chunks = (
-        payload[index : index + chunk_size][::-1]
-        for index in range(0, len(payload), chunk_size)
+        payload[index : index + chunk_size][::-1] for index in range(0, len(payload), chunk_size)
     )
     return b"".join(chunks)

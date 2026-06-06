@@ -166,15 +166,11 @@ class CareerModeController:
         if self._phase == CareerPhase.POLICY_RACE:
             if facts.in_gp_race:
                 return None
-            raise RuntimeError(
-                "Career Mode left a race before observing a game result"
-            )
+            raise RuntimeError("Career Mode left a race before observing a game result")
 
         if self._phase == CareerPhase.CONTINUE_AFTER_RACE:
             if facts.in_gp_race:
-                if self._pending_steps and _is_neutral_settle_step(
-                    self._pending_steps[0]
-                ):
+                if self._pending_steps and _is_neutral_settle_step(self._pending_steps[0]):
                     step = self._pending_steps.popleft()
                     self._phase = phase_from_step(step)
                     return step
@@ -222,10 +218,7 @@ class CareerModeController:
         if facts.in_gp_race:
             self._pending_steps.clear()
             self._start_presses_in_phase = 0
-            if (
-                self._awaiting_new_race_after_terminal
-                and not self._new_race_ready_for_policy(info)
-            ):
+            if self._awaiting_new_race_after_terminal and not self._new_race_ready_for_policy(info):
                 return raw_step(
                     MenuInput.NEUTRAL,
                     1,
@@ -468,8 +461,7 @@ class CareerModeController:
                     "career_mode_policy_run_name": active_policy_control.policy_run.name,
                     "career_mode_policy_scope": active_policy_control.course_setup.scope,
                     "career_mode_policy_course_id": (
-                        active_policy_control.course_setup.course_id
-                        or course_id_from_info(info)
+                        active_policy_control.course_setup.course_id or course_id_from_info(info)
                     ),
                 }
             )
@@ -478,9 +470,7 @@ class CareerModeController:
     def _viewer_fsm_facts(self, info: dict[str, object]) -> dict[str, object]:
         facts = MenuFacts.from_info(info)
         return {
-            "career_mode_fsm_awaiting_fresh_race": (
-                self._awaiting_new_race_after_terminal
-            ),
+            "career_mode_fsm_awaiting_fresh_race": (self._awaiting_new_race_after_terminal),
             "career_mode_fsm_camera_synced": self._camera_synced,
             "career_mode_fsm_camera_target": self._camera_setting,
             "career_mode_fsm_completed_laps": facts.completed_laps,
@@ -488,9 +478,7 @@ class CareerModeController:
             "career_mode_fsm_continuing_result": self._continuing_race_result,
             "career_mode_fsm_course_index": facts.course_index,
             "career_mode_fsm_fresh_race_ready": facts.fresh_race_ready_for_policy,
-            "career_mode_fsm_fresh_race_ready_frames": (
-                self._fresh_race_ready_frames
-            ),
+            "career_mode_fsm_fresh_race_ready_frames": (self._fresh_race_ready_frames),
             "career_mode_fsm_game_mode": facts.game_mode,
             "career_mode_fsm_intro_timer": facts.race_intro_timer,
             "career_mode_fsm_pending_steps": len(self._pending_steps),
@@ -522,11 +510,7 @@ class CareerModeController:
             ("position", info.get("position")),
             ("termination_reason", info.get("termination_reason")),
         )
-        parts = [
-            f"{name}={value!r}"
-            for name, value in fields
-            if value is not None
-        ]
+        parts = [f"{name}={value!r}" for name, value in fields if value is not None]
         return ", ".join(parts)
 
     def _resolve_policy_control(
@@ -732,9 +716,7 @@ class CareerModeController:
             attempt_id=self._attempt_id,
             status=status,
             finish_position=_positive_int_info(info, "position"),
-            finish_time_s=(
-                finish_time_ms / 1000.0 if finish_time_ms is not None else None
-            ),
+            finish_time_s=(finish_time_ms / 1000.0 if finish_time_ms is not None else None),
             failure_reason=failure_reason,
         )
 
@@ -753,8 +735,7 @@ class CareerModeController:
         context = self._store.get_save_attempt_execution_context(next_attempt.id)
         if context is None:
             raise RuntimeError(
-                f"save attempt disappeared before Career Mode could continue: "
-                f"{next_attempt.id}"
+                f"save attempt disappeared before Career Mode could continue: {next_attempt.id}"
             )
         self._apply_execution_plan(build_save_race_execution_plan(context))
 
@@ -886,6 +867,7 @@ class CareerModeController:
             )
         )
         return step
+
 
 def _is_neutral_settle_step(step: RawMenuStep) -> bool:
     return step.menu_input is MenuInput.NEUTRAL and step.phase.endswith(":settle")
