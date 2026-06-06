@@ -1,13 +1,13 @@
 # tests/ui/test_career_policy_race.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.runtime.career_mode.policy_race import (
-    career_policy_race_info,
-)
+from pathlib import Path
+
+from rl_fzerox.core.envs.engine.stepping import policy_drive_info
 
 
-def test_career_policy_race_info_drops_training_lifecycle_state() -> None:
-    info = career_policy_race_info(
+def test_policy_drive_info_drops_training_lifecycle_state() -> None:
+    info = policy_drive_info(
         {
             "game_mode": "gp_race",
             "termination_reason": "progress_stalled",
@@ -20,8 +20,8 @@ def test_career_policy_race_info_drops_training_lifecycle_state() -> None:
     assert info == {"game_mode": "gp_race"}
 
 
-def test_career_policy_race_info_keeps_native_terminal_reason() -> None:
-    info = career_policy_race_info(
+def test_policy_drive_info_keeps_native_terminal_reason() -> None:
+    info = policy_drive_info(
         {
             "game_mode": "gp_race",
             "termination_reason": "finished",
@@ -33,3 +33,15 @@ def test_career_policy_race_info_keeps_native_terminal_reason() -> None:
         "game_mode": "gp_race",
         "termination_reason": "finished",
     }
+
+
+def test_career_policy_race_uses_policy_drive_boundary() -> None:
+    source = Path("src/rl_fzerox/ui/watch/runtime/career_mode/policy_race.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "WatchEnvStep" not in source
+    assert "step_watch(" not in source
+    assert "step_control_watch(" not in source
+    assert "step_policy_drive(" in source
+    assert "step_control_policy_drive(" in source
