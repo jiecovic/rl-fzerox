@@ -1,7 +1,20 @@
 // src/rl_fzerox/apps/run_manager/web/src/app/workspace/types.ts
-import type { ManagedDraft, ManagedRunConfig } from "@/shared/api/contract";
+import type {
+  ManagedDraft,
+  ManagedRunConfig,
+  PolicyPlaybackMode,
+  WatchDevice,
+  WatchRenderer,
+} from "@/shared/api/contract";
 
-export type WorkspaceTabId = "drafts" | "runs" | "charts" | `editor:${string}` | `run:${string}`;
+export type WorkspaceTabId =
+  | "drafts"
+  | "runs"
+  | "charts"
+  | "save-games"
+  | `editor:${string}`
+  | `run:${string}`
+  | `save-game:${string}`;
 
 export interface ForkSource {
   artifact: "latest" | "best";
@@ -26,9 +39,21 @@ export interface RunSession {
   title: string;
 }
 
+export interface SaveGameSession {
+  nameText: string;
+  attemptSeedText: string;
+  policyMode: PolicyPlaybackMode;
+  runnerDevice: WatchDevice;
+  runnerRenderer: WatchRenderer;
+  saveGameId: string | null;
+  sessionId: `save-game:${string}`;
+  title: string;
+}
+
 export interface WorkspaceTab {
   closable?: boolean;
   id: WorkspaceTabId;
+  icon?: "career" | "charts" | "draft" | "run";
   label: string;
   tone?: "draft" | "run";
 }

@@ -62,6 +62,27 @@ export function SaveDraftIcon({ size = 14 }: IconProps) {
   );
 }
 
+export function RenameIcon({ size = 14 }: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
+      <path
+        d="M4.25 15.75 5 12.1 13.05 4.05a1.6 1.6 0 0 1 2.26 0l.64.64a1.6 1.6 0 0 1 0 2.26L7.9 15z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+      <path
+        d="m11.85 5.25 2.9 2.9M4 16h12"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
 export function ResetIcon({ size = 12 }: IconProps) {
   return (
     <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size}>
@@ -154,6 +175,53 @@ export function ChartIcon({ size = 14 }: IconProps) {
   );
 }
 
+export function DraftTabIcon({ size = 14 }: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
+      <path
+        d="M5 3.5h6.7L15 6.8v9.7H5zM11.5 3.7v3.6h3.3M7.5 10h5M7.5 13h4"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+export function RunTabIcon({ size = 14 }: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
+      <rect height="11" rx="2" stroke="currentColor" strokeWidth="1.5" width="13" x="3.5" y="4.5" />
+      <path
+        d="m8.25 7.5 4.25 2.5-4.25 2.5z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+export function CareerTabIcon({ size = 14 }: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
+      <path
+        d="M5 15.5V4.5M5 5h8.5l-1.2 2 1.2 2H5M6.5 15.5h-3"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M9.5 11.5c.75 0 1.35.6 1.35 1.35S10.25 14.2 9.5 14.2s-1.35-.6-1.35-1.35.6-1.35 1.35-1.35Z"
+        stroke="currentColor"
+        strokeWidth="1.35"
+      />
+    </svg>
+  );
+}
+
 export function WatchIcon({ size = 14 }: IconProps) {
   return (
     <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
@@ -195,6 +263,10 @@ export function ResumeIcon({ size = 14 }: IconProps) {
       />
     </svg>
   );
+}
+
+export function PlayIcon({ size = 14 }: IconProps) {
+  return <ResumeIcon size={size} />;
 }
 
 export function ExportIcon({ size = 14 }: IconProps) {

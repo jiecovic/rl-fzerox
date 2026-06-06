@@ -17,6 +17,7 @@ import { PolicySection } from "@/features/configurator/sections/PolicySection";
 import { RewardSection } from "@/features/configurator/sections/RewardSection";
 import { TracksSection } from "@/features/configurator/sections/TracksSection";
 import { TrainingSection } from "@/features/configurator/sections/TrainingSection";
+import { fixedEnvAssignmentIssue } from "@/features/configurator/sections/tracks/fixedEnvAssignment";
 import { VehicleSection } from "@/features/configurator/sections/VehicleSection";
 import { fetchPolicyPreview } from "@/shared/api/client";
 import type {
@@ -288,6 +289,8 @@ export function Configurator({
 
   const forkedAtLabel = loadedDraft === null ? null : formatDate(loadedDraft.created_at);
   const forkSourceStepCount = loadedDraft?.source_num_timesteps ?? null;
+  const configIssue = fixedEnvAssignmentIssue(config);
+  const canSubmitConfig = configIssue === null;
 
   return (
     <Panel>
@@ -296,15 +299,23 @@ export function Configurator({
           !isSaving &&
           !isUpdating &&
           !isTraining &&
+          canSubmitConfig &&
           !createNameConflict &&
           normalizedDraftName.length > 0
         }
-        canTrain={!isSaving && !isUpdating && !isTraining && normalizedDraftName.length > 0}
+        canTrain={
+          !isSaving &&
+          !isUpdating &&
+          !isTraining &&
+          canSubmitConfig &&
+          normalizedDraftName.length > 0
+        }
         canUpdate={
           loadedDraft !== null &&
           !isSaving &&
           !isUpdating &&
           !isTraining &&
+          canSubmitConfig &&
           !updateNameConflict &&
           normalizedDraftName.length > 0
         }
@@ -324,6 +335,11 @@ export function Configurator({
         <div className="configurator-feedback-stack">
           {error !== null ? <Notice tone="error">{error}</Notice> : null}
           {previewError !== null ? <Notice tone="error">{previewError}</Notice> : null}
+        </div>
+      ) : null}
+      {configIssue !== null ? (
+        <div className="configurator-feedback-stack">
+          <Notice tone="error">{configIssue}</Notice>
         </div>
       ) : null}
 

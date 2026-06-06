@@ -15,15 +15,17 @@ export function App() {
   const sessions = useWorkspaceSessions({
     drafts: managerData.drafts,
     runs: managerData.runs,
+    saveGames: managerData.saveGames,
   });
   const actions = useWorkspaceActions({
     drafts: managerData.drafts,
     loadRunDetail: managerData.loadRunDetail,
-    reloadManagerData: managerData.reloadManagerData,
+    reloadManagerData: () => managerData.reloadManagerData(),
     runs: managerData.runs,
     sessions,
     setDrafts: managerData.setDrafts,
     setRuns: managerData.setRuns,
+    setSaveGames: managerData.setSaveGames,
     upsertRunDetail: managerData.upsertRunDetail,
   });
 
@@ -69,7 +71,9 @@ export function App() {
           metadata={managerData.metadata}
           runs={managerData.runs}
           runDetailsById={managerData.runDetailsById}
+          saveGames={managerData.saveGames}
           sessions={sessions}
+          onRefresh={() => managerData.reloadManagerData({ showLoading: false })}
         />
         <ScrollButtons />
       </main>

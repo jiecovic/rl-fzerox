@@ -8,13 +8,17 @@ import { DraftsPanel } from "@/features/drafts/DraftsPanel";
 import { ChartsPanel } from "@/features/runs/ChartsPanel";
 import { RunsPanel } from "@/features/runs/RunsPanel";
 import { RunWorkspace } from "@/features/runs/RunWorkspace";
+import { SaveGamesPanel } from "@/features/save_games/SaveGamesPanel";
+import { SaveGameWorkspace } from "@/features/save_games/SaveGameWorkspace";
 import type {
   ConfigMetadata,
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
+  ManagedSaveGame,
 } from "@/shared/api/contract";
+import { FloatingNotice } from "@/shared/ui/FloatingNotice";
 import { Notice } from "@/shared/ui/Panel";
 
 interface WorkspaceBodyProps {
@@ -27,7 +31,9 @@ interface WorkspaceBodyProps {
   metadata: ConfigMetadata | null;
   runs: ManagedRun[];
   runDetailsById: Record<string, ManagedRunDetail>;
+  saveGames: ManagedSaveGame[];
   sessions: WorkspaceSessions;
+  onRefresh: () => Promise<void>;
 }
 
 export function WorkspaceBody({
@@ -40,11 +46,14 @@ export function WorkspaceBody({
   metadata,
   runs,
   runDetailsById,
+  saveGames,
   sessions,
+  onRefresh,
 }: WorkspaceBodyProps) {
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const activeRunTab = sessions.activeRunTab;
   const activeDraftEditor = sessions.activeDraftEditor;
+  const activeSaveGameSession = sessions.activeSaveGameSession;
   const activeRunSummary =
     activeRunTab === null
       ? null
@@ -75,7 +84,7 @@ export function WorkspaceBody({
 
   return (
     <div className="workspace">
-      {error !== null ? <Notice tone="error">{error}</Notice> : null}
+      {error !== null ? <FloatingNotice tone="error">{error}</FloatingNotice> : null}
       {isLoading ? <Notice>Loading manager data...</Notice> : null}
 
       {!isLoading && sessions.activeTabId === "drafts" ? (
@@ -107,8 +116,37 @@ export function WorkspaceBody({
           runs={runs}
         />
       ) : null}
-      {!isLoading && activeRunTab !== null && metadata !== null ? (
-        activeRunSummary === null ? (
+      {!isLoading && sessions.activeTabId === "save-games" ? (
+        <SaveGamesPanel
+          saveGames={saveGames}
+          onCreateSaveGame={sessions.createNewSaveGame}
+          onOpenSaveGame={sessions.openSaveGame}
+        />
+      ) : null}
+      {!isLoading && activeSaveGameSession !== null ? (
+        <SaveGameWorkspace
+          metadata={metadata}
+          runs={runs}
+          saveGame={
+            activeSaveGameSession.saveGameId === null
+              ? null
+              : (saveGames.find((saveGame) => saveGame.id === activeSaveGameSession.saveGameId) ??
+                null)
+          }
+          session={activeSaveGameSession}
+          onCreateSaveGame={actions.createManagedSaveGame}
+          onOpenSaveGameDirectory={actions.openManagedSaveGameDirectory}
+          onPatchSession={sessions.patchSaveGameSession}
+          onRenameSaveGame={actions.renameManagedSaveGame}
+          onRefresh={onRefresh}
+          onUpsertCourseSetup={actions.upsertManagedSaveCourseSetup}
+          onStartCareerMode={actions.startManagedCareerMode}
+        />
+      ) : null}
+      {!isLoading && activeRunTab !== null ? (
+        metadata === null ? (
+          <Notice tone="error">Run manager metadata is missing.</Notice>
+        ) : activeRunSummary === null ? (
           <Notice tone="error">This run is no longer available.</Notice>
         ) : activeRun === null ? (
           <Notice tone={runDetailError === null ? undefined : "error"}>
