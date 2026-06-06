@@ -12,12 +12,16 @@ from rl_fzerox.ui.watch.view.panels.core.model import (
     _panel_content_height,
     _window_size,
 )
+from rl_fzerox.ui.watch.view.panels.core.tabs import CAREER_PANEL_TABS
 from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import (
     _draw_labeled_value_line,
 )
 from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
     _draw_panel_tabs,
     _panel_tab_hint,
+)
+from rl_fzerox.ui.watch.view.components.observation_strip import (
+    _draw_observation_preview_in_rect,
 )
 from rl_fzerox.ui.watch.view.screen.frame import _create_fonts, _watch_window_size
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
@@ -144,6 +148,22 @@ def test_panel_tab_hint_shows_active_tab_position() -> None:
     assert _panel_tab_hint(8) == "Tab 1/8"
 
 
+def test_career_panel_tabs_replace_records_with_career() -> None:
+    assert CAREER_PANEL_TABS.labels == (
+        "Run",
+        "Live",
+        "Details",
+        "State",
+        "Aux",
+        "CNN",
+        "Career",
+        "Train",
+    )
+    assert CAREER_PANEL_TABS.records_index is None
+    assert CAREER_PANEL_TABS.career_index == 6
+    assert _panel_tab_hint(6, panel_tabs=CAREER_PANEL_TABS) == "Tab 7/8"
+
+
 def test_panel_tabs_fit_side_panel_content_width() -> None:
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     pygame.init()
@@ -195,6 +215,69 @@ def test_watch_window_size_fits_native_observation_preview() -> None:
 
         assert size[0] >= 240 * 2 + (2 * LAYOUT.preview_padding) + LAYOUT.preview_gap
         assert size[1] > 980
+    finally:
+        pygame.quit()
+
+
+def test_watch_window_size_keeps_layout_when_policy_preview_is_hidden() -> None:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+
+    try:
+        fonts = _create_fonts(pygame)
+        with_preview = _watch_window_size(
+            (592, 444),
+            (180, 240, 6),
+            fonts=fonts,
+            info={
+                "observation_stack": 2,
+                "observation_stack_mode": "rgb",
+            },
+        )
+        without_preview = _watch_window_size(
+            (592, 444),
+            (180, 240, 6),
+            fonts=fonts,
+            info={
+                "observation_stack": 2,
+                "observation_stack_mode": "rgb",
+            },
+        )
+
+        assert without_preview == with_preview
+    finally:
+        pygame.quit()
+
+
+def test_observation_preview_draws_blank_panel_without_policy_image() -> None:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+
+    try:
+        fonts = _create_fonts(pygame)
+        screen = pygame.Surface((420, 260))
+        screen.fill(PALETTE.app_background)
+        before = pygame.surfarray.array3d(screen).copy()
+
+        _draw_observation_preview_in_rect(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            surface=None,
+            x=12,
+            y=12,
+            width=396,
+            height=236,
+            observation_shape=(84, 84, 12),
+            layout_shape=(84, 84, 12),
+            info={
+                "observation_stack": 4,
+                "observation_stack_mode": "rgb",
+            },
+        )
+
+        after = pygame.surfarray.array3d(screen)
+        assert np.any(after != before)
     finally:
         pygame.quit()
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from rl_fzerox.ui.watch.runtime.ipc.messages import (
+    PolicyObservationSnapshot,
     ViewerCommand,
     WatchSnapshot,
     WorkerClosed,
@@ -16,12 +17,14 @@ from rl_fzerox.ui.watch.runtime.ipc.queues import (
     drain_worker_commands,
     publish_worker_message,
     send_command,
+    start_career_mode_worker,
     start_watch_worker,
     wait_initial_snapshot,
 )
 
 __all__ = [
     "ViewerCommand",
+    "PolicyObservationSnapshot",
     "WatchSnapshot",
     "WatchWorker",
     "WorkerClosed",
@@ -33,6 +36,7 @@ __all__ = [
     "drain_worker_commands",
     "publish_worker_message",
     "send_command",
+    "start_career_mode_worker",
     "start_watch_worker",
     "wait_initial_snapshot",
 ]

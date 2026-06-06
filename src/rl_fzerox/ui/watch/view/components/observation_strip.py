@@ -122,21 +122,28 @@ def _draw_observation_preview_in_rect(
     pygame: PygameModule,
     screen: PygameSurface,
     fonts: ViewerFonts,
-    surface: PygameSurface,
+    surface: PygameSurface | None,
     x: int,
     y: int,
     width: int,
     height: int,
-    observation_shape: tuple[int, ...],
+    observation_shape: tuple[int, ...] | None,
+    layout_shape: tuple[int, ...],
     info: dict[str, object],
 ) -> None:
     if width <= 0 or height <= 0:
         return
 
+    effective_shape = layout_shape if observation_shape is None else observation_shape
     bottom = y + height
     title_surface = fonts.section.render("Policy Obs", True, PALETTE.text_primary)
+    subtitle = (
+        "no active policy input"
+        if observation_shape is None
+        else _format_observation_summary(observation_shape, info=info)
+    )
     subtitle_surface = fonts.small.render(
-        _format_observation_summary(observation_shape, info=info),
+        subtitle,
         True,
         PALETTE.text_muted,
     )
@@ -145,10 +152,13 @@ def _draw_observation_preview_in_rect(
     screen.blit(subtitle_surface, (x, y))
     y += subtitle_surface.get_height() + LAYOUT.section_rule_gap
 
-    preview_width, preview_height = surface.get_size()
     style = _OBSERVATION_GLASS_STYLE
     glass_padding = style.padding
-    labels = _observation_tile_label_texts(observation_shape, info=info)
+    labels = (
+        ()
+        if observation_shape is None
+        else _observation_tile_label_texts(observation_shape, info=info)
+    )
     label_gap = style.label_gap if labels else 0
     label_row_height = _observation_label_row_height(font=fonts.body, labels=labels)
     legend_height = _macro_legend_height(fonts=fonts, width=width)
@@ -160,9 +170,23 @@ def _draw_observation_preview_in_rect(
     if max_preview_width <= 0 or max_preview_height <= 0:
         return
 
+    native_preview_width, native_preview_height = (
+        _observation_preview_size(effective_shape, info=info)
+        if surface is None
+        else surface.get_size()
+    )
+    if surface is None:
+        preview_width, preview_height = _fit_size(
+            (native_preview_width, native_preview_height),
+            max_width=max_preview_width,
+            max_height=max_preview_height,
+        )
+    else:
+        preview_width, preview_height = native_preview_width, native_preview_height
+    if preview_width <= 0 or preview_height <= 0:
+        return
     if preview_width > max_preview_width or preview_height > max_preview_height:
         return
-
     scaled_size = (preview_width, preview_height)
     glass_size = (
         scaled_size[0] + (2 * glass_padding),
@@ -176,29 +200,32 @@ def _draw_observation_preview_in_rect(
     preview_x = glass_rect.left + glass_padding
     preview_rect = pygame.Rect(preview_x, preview_y, *scaled_size)
     pygame.draw.rect(screen, PALETTE.panel_background, preview_rect)
-    screen.blit(surface, preview_rect.topleft)
-    _draw_observation_tile_borders(
-        pygame=pygame,
-        screen=screen,
-        rect=preview_rect,
-        observation_shape=observation_shape,
-        info=info,
-    )
+    if surface is not None:
+        screen.blit(surface, preview_rect.topleft)
+    if observation_shape is not None:
+        _draw_observation_tile_borders(
+            pygame=pygame,
+            screen=screen,
+            rect=preview_rect,
+            observation_shape=observation_shape,
+            info=info,
+        )
     _draw_outer_preview_border(pygame=pygame, screen=screen, rect=preview_rect)
     screen.blit(
         _glass_overlay_surface(pygame, glass_rect.size, 10),
         glass_rect.topleft,
     )
-    _draw_observation_tile_labels(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        rect=preview_rect,
-        y=preview_rect.bottom + label_gap,
-        height=label_row_height,
-        observation_shape=observation_shape,
-        info=info,
-    )
+    if observation_shape is not None:
+        _draw_observation_tile_labels(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            rect=preview_rect,
+            y=preview_rect.bottom + label_gap,
+            height=label_row_height,
+            observation_shape=observation_shape,
+            info=info,
+        )
     legend_y = glass_rect.bottom + legend_gap
     if legend_y + legend_height <= bottom:
         _draw_macro_legend(
@@ -226,6 +253,19 @@ def _draw_outer_preview_border(
         width=style.preview_border_width,
         border_radius=4,
     )
+
+
+def _fit_size(
+    size: tuple[int, int],
+    *,
+    max_width: int,
+    max_height: int,
+) -> tuple[int, int]:
+    width, height = size
+    if width <= 0 or height <= 0 or max_width <= 0 or max_height <= 0:
+        return (0, 0)
+    scale = min(1.0, max_width / width, max_height / height)
+    return (max(1, int(width * scale)), max(1, int(height * scale)))
 
 
 def _draw_observation_glass_box(

@@ -40,6 +40,9 @@ class RateMeter:
         self._timestamps.clear()
         self._timestamps.extend(recent)
 
+    def reset(self) -> None:
+        self._timestamps.clear()
+
 
 def _resolve_control_fps(
     setting: object,

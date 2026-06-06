@@ -17,6 +17,10 @@ class CameraSyncControls:
 
     setting_count: int = len(CAMERA_SETTINGS)
     ready_intro_timer: int = 160
+    tap_hold_frames: int = 1
+    tap_settle_frames: int = 1
+    menu_tap_hold_frames: int = 3
+    menu_tap_settle_frames: int = 3
     next_camera: ControllerState = ControllerState(right_stick_x=1.0)
     idle: ControllerState = ControllerState()
 
@@ -64,7 +68,7 @@ def _tap_next_camera_setting(backend: EmulatorBackend) -> FZeroXTelemetry | None
     # F-Zero X handles camera changes through BTN_CRIGHT. Tapping the real input
     # lets the game update the associated FOV/distance/pitch state coherently.
     backend.set_controller_state(CAMERA_SYNC_CONTROLS.next_camera)
-    backend.step_frames(1, capture_video=False)
+    backend.step_frames(CAMERA_SYNC_CONTROLS.tap_hold_frames, capture_video=False)
     backend.set_controller_state(CAMERA_SYNC_CONTROLS.idle)
-    backend.step_frames(1, capture_video=True)
+    backend.step_frames(CAMERA_SYNC_CONTROLS.tap_settle_frames, capture_video=True)
     return backend.try_read_telemetry()

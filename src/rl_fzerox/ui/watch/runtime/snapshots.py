@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from fzerox_emulator import FZeroXTelemetry, RaceControlState
+from fzerox_emulator import FZeroXTelemetry, RaceControlState, stacked_observation_channels
 from fzerox_emulator.arrays import ControllerMaskBatch, DisplayFrames, RgbFrame, StateVector
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.actions import ActionValue
@@ -20,6 +20,7 @@ from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (
+    PolicyObservationSnapshot,
     WatchSnapshot,
     WorkerMessageQueue,
     publish_worker_message,
@@ -117,6 +118,7 @@ def _publish_step_snapshots(
     final_auxiliary_predictions: dict[str, object] | None = None,
     final_auxiliary_targets: dict[str, object] | None = None,
     live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
+    frame_interval_seconds: float | None = None,
 ) -> None:
     resolved_control_state = control_state
     if previous_control_state is None:
@@ -160,9 +162,8 @@ def _publish_step_snapshots(
         fallback_previous=previous_control_state,
         fallback_final=final_control_state,
     )
-    frame_interval_seconds = (
-        None if target_control_seconds is None else target_control_seconds / len(frames)
-    )
+    if frame_interval_seconds is None and target_control_seconds is not None:
+        frame_interval_seconds = target_control_seconds / len(frames)
     for index, frame in enumerate(frames):
         is_final_frame = index == len(frames) - 1
         publish_worker_message(
@@ -271,7 +272,7 @@ def _build_snapshot(
     env: _SnapshotEnv,
     emulator: TelemetryReader,
     raw_frame: RgbFrame | None = None,
-    observation: ObservationValue,
+    observation: ObservationValue | None,
     info: dict[str, object],
     reset_info: dict[str, object],
     episode: int,
@@ -294,6 +295,7 @@ def _build_snapshot(
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
+    action_repeat: int | None = None,
     active_track_sampling: TrackSamplingConfig | None = None,
     telemetry: FZeroXTelemetry | None = None,
     policy_auxiliary_state_predictions: dict[str, object] | None = None,
@@ -308,22 +310,26 @@ def _build_snapshot(
     if telemetry is None:
         telemetry = _read_live_telemetry(emulator)
     best_finish_position = _update_best_finish_position(best_finish_position, info, telemetry)
+    policy_observation = _policy_observation_snapshot(
+        config=config,
+        observation=observation,
+        telemetry=telemetry,
+        info=info,
+    )
     return WatchSnapshot(
         raw_frame=env.render() if raw_frame is None else raw_frame,
-        observation_image=observation_access.observation_image(observation),
-        observation_state=observation_access.observation_state(observation),
-        observation_state_reference=_reference_observation_state(
-            config=config,
-            observation=observation,
-            telemetry=telemetry,
-            info=info,
-        ),
+        policy_observation_shape=_policy_observation_shape(config, observation),
+        policy_observation=policy_observation,
         info=dict(info),
         reset_info=dict(reset_info),
         episode=episode,
         episode_reward=episode_reward,
         control_fps=control_fps,
         target_control_fps=target_control_fps,
+        action_repeat=max(
+            1,
+            int(config.env.action_repeat if action_repeat is None else action_repeat),
+        ),
         native_fps=float(env.backend.native_fps),
         control_state=control_state,
         gas_level=gas_level,
@@ -363,7 +369,11 @@ def _build_snapshot(
                 observation=observation,
                 target_names=auxiliary_target_names,
             )
-            if include_auxiliary_state and policy_auxiliary_state_predictions is None
+            if (
+                include_auxiliary_state
+                and observation is not None
+                and policy_auxiliary_state_predictions is None
+            )
             else policy_auxiliary_state_predictions
         ),
         policy_auxiliary_state_targets=(
@@ -376,6 +386,47 @@ def _build_snapshot(
         policy_decision_frame=bool(policy_decision_frame),
         live_episode_series=live_episode_series,
     )
+
+
+def _policy_observation_snapshot(
+    *,
+    config: WatchAppConfig,
+    observation: ObservationValue | None,
+    telemetry: FZeroXTelemetry | None,
+    info: dict[str, object],
+) -> PolicyObservationSnapshot | None:
+    if observation is None:
+        return None
+    return PolicyObservationSnapshot(
+        image=observation_access.observation_image(observation),
+        state=observation_access.observation_state(observation),
+        state_reference=_reference_observation_state(
+            config=config,
+            observation=observation,
+            telemetry=telemetry,
+            info=info,
+        ),
+    )
+
+
+def _policy_observation_shape(
+    config: WatchAppConfig,
+    observation: ObservationValue | None,
+) -> tuple[int, ...] | None:
+    if observation is not None:
+        return tuple(int(value) for value in observation_access.observation_image(observation).shape)
+    if config.watch.policy_observation_shape_hint is not None:
+        return tuple(int(value) for value in config.watch.policy_observation_shape_hint)
+    if config.watch.managed_save_game_id is not None:
+        return None
+    height, width = config.env.observation.image_geometry(renderer=config.emulator.renderer)
+    channels = stacked_observation_channels(
+        3,
+        frame_stack=config.env.observation.frame_stack,
+        stack_mode=config.env.observation.stack_mode,
+        minimap_layer=config.env.observation.minimap_layer,
+    )
+    return int(height), int(width), int(channels)
 
 
 def _reference_observation_state(

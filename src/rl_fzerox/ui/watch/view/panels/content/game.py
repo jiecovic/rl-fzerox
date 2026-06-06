@@ -1,10 +1,16 @@
 # src/rl_fzerox/ui/watch/view/panels/content/game.py
 from __future__ import annotations
 
+import math
+
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.envs.track_bounds import track_edge_state
+from rl_fzerox.core.runtime_spec.vehicle_catalog import (
+    VehicleInfo,
+    vehicle_by_character_index,
+)
 from rl_fzerox.ui.watch.view.panels.core.format import (
     _float_info,
     _format_distance,
@@ -104,7 +110,7 @@ def race_setup_section(
     return PanelSection(
         title="Race Setup",
         lines=[
-            panel_line("Vehicle", _format_vehicle_setup(info), PALETTE.text_primary),
+            panel_line("Vehicle", _format_vehicle_setup(info, telemetry), PALETTE.text_primary),
             panel_line("Camera", _format_camera_setting(telemetry), PALETTE.text_primary),
         ],
     )
@@ -149,21 +155,90 @@ def _format_course_name(info: dict[str, object], telemetry: FZeroXTelemetry) -> 
     return "unknown"
 
 
-def _format_vehicle_setup(info: dict[str, object]) -> str:
-    vehicle = info.get("track_vehicle_name", info.get("track_vehicle"))
-    engine_setting = info.get("track_engine_setting")
-    parts = [
-        _format_mode_name(value)
-        for value in (vehicle, engine_setting)
-        if isinstance(value, str) and value
-    ]
-    return " / ".join(parts) if parts else "unknown"
+def _format_vehicle_setup(info: dict[str, object], telemetry: FZeroXTelemetry) -> str:
+    if live_setup := _format_telemetry_vehicle_setup(telemetry):
+        return live_setup
+    if live_setup := _format_live_vehicle_setup(info):
+        return live_setup
+    return "unknown"
+
+
+def _format_telemetry_vehicle_setup(telemetry: FZeroXTelemetry) -> str | None:
+    character_index = _int_setup_value(getattr(telemetry.player, "machine_character_index", None))
+    vehicle = None if character_index is None else vehicle_by_character_index(character_index)
+    if vehicle is None:
+        return None
+
+    engine_setting = getattr(telemetry.player, "engine_setting", None)
+    engine_raw = _int_setup_value(None if engine_setting is None else float(engine_setting) * 100.0)
+    parts = [vehicle.display_name]
+    if engine_raw is not None and 0 <= engine_raw <= 100:
+        parts.append(_format_engine_setting_raw(engine_raw))
+    return " / ".join(parts)
+
+
+def _format_live_vehicle_setup(info: dict[str, object]) -> str | None:
+    character_index = _first_known_character_index(
+        (
+            info.get("racer_character_index"),
+            info.get("racer_character_index_ram"),
+            info.get("player_character_index"),
+            info.get("player_character_index_ram"),
+        )
+    )
+    engine_raw = _int_setup_value(
+        info.get(
+            "engine_setting_raw_value",
+            info.get(
+                "track_engine_setting_raw_value",
+                info.get("engine_setting_percent_ram"),
+            ),
+        )
+    )
+    if engine_raw is not None and not 0 <= engine_raw <= 100:
+        engine_raw = None
+    parts: list[str] = []
+    if character_index is not None:
+        parts.append(character_index.display_name)
+    if engine_raw is not None:
+        parts.append(_format_engine_setting_raw(engine_raw))
+    return " / ".join(parts) if parts else None
+
+
+def _format_engine_setting_raw(raw_value: int) -> str:
+    return f"Engine {raw_value}"
+
+
+def _first_known_character_index(values: tuple[object, ...]) -> VehicleInfo | None:
+    for value in values:
+        character_index = _int_setup_value(value)
+        if character_index is None:
+            continue
+        vehicle = vehicle_by_character_index(character_index)
+        if vehicle is not None:
+            return vehicle
+    return None
+
+
+def _int_setup_value(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        if not math.isfinite(float(value)):
+            return None
+        return int(round(value))
+    return None
 
 
 def _short_track_name(value: str) -> str:
-    suffixes = (
-        " Time Attack - Blue Falcon Balanced",
-        " time attack blue falcon balanced",
+    suffixes = tuple(
+        f" {mode} - Blue Falcon {engine}"
+        for mode in ("Time Attack", "GP Race")
+        for engine in ("Balanced", "Engine 50")
+    ) + tuple(
+        f" {mode} - Blue Falcon {engine}".lower()
+        for mode in ("Time Attack", "GP Race")
+        for engine in ("Balanced", "Engine 50")
     )
     for suffix in suffixes:
         if value.endswith(suffix):

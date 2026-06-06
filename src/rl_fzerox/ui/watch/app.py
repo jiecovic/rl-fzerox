@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/app.py
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import (
     SpeedKeyRepeat,
@@ -9,6 +11,7 @@ from rl_fzerox.ui.watch.input import (
     mouse_over_clickable,
 )
 from rl_fzerox.ui.watch.runtime import (
+    WatchWorker,
     apply_viewer_input,
     drain_snapshot_queue,
     start_watch_worker,
@@ -23,7 +26,11 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_render_fps,
 )
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsTracker
-from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
+from rl_fzerox.ui.watch.view.panels.core.tabs import (
+    WATCH_PANEL_TABS,
+    PanelTabRegistry,
+    panel_tabs_for_config,
+)
 from rl_fzerox.ui.watch.view.screen.frame import (
     _create_fonts,
     _ensure_screen,
@@ -32,10 +39,16 @@ from rl_fzerox.ui.watch.view.screen.frame import (
 from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
 from rl_fzerox.ui.watch.view.screen.types import PygameModule, ViewerHitboxes
 
-__all__ = ["run_viewer"]
+WatchWorkerFactory = Callable[[WatchAppConfig], WatchWorker]
+
+__all__ = ["WatchWorkerFactory", "run_viewer"]
 
 
-def run_viewer(config: WatchAppConfig) -> None:
+def run_viewer(
+    config: WatchAppConfig,
+    *,
+    worker_factory: WatchWorkerFactory = start_watch_worker,
+) -> None:
     """Run the watch UI while a worker process advances emulator state."""
 
     try:
@@ -46,7 +59,8 @@ def run_viewer(config: WatchAppConfig) -> None:
             "Install with `pip install -e .[watch]`."
         ) from exc
 
-    worker = start_watch_worker(config)
+    worker = worker_factory(config)
+    panel_tabs = panel_tabs_for_config(config)
     pygame.init()
     render_clock = pygame.time.Clock()
     try:
@@ -69,6 +83,10 @@ def run_viewer(config: WatchAppConfig) -> None:
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
         auxiliary_metrics.observe_snapshot(snapshot)
         live_episode_series = getattr(snapshot, "live_episode_series", None)
+        policy_observation_layout_shape = (
+            getattr(snapshot, "policy_observation_shape", None)
+            or _default_policy_observation_layout_shape()
+        )
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -84,7 +102,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                 state_feature_hitboxes=hitboxes.state_features,
                 speed_repeat=speed_repeat,
             )
-            panel_tab_index = _next_panel_tab_index(panel_tab_index, viewer_input)
+            panel_tab_index = _next_panel_tab_index(
+                panel_tab_index,
+                viewer_input,
+                panel_tabs=panel_tabs,
+            )
             if viewer_input.cnn_layer_tab_index is not None:
                 cnn_layer_tab_index = viewer_input.cnn_layer_tab_index
             if viewer_input.record_tab_index is not None:
@@ -95,10 +117,10 @@ def run_viewer(config: WatchAppConfig) -> None:
                 worker.command_queue,
                 viewer_input,
                 paused=paused,
-                cnn_visualization_enabled=panel_tab_index == PANEL_TABS.cnn_index,
+                cnn_visualization_enabled=panel_tab_index == panel_tabs.cnn_index,
                 auxiliary_visualization_enabled=panel_tab_index
-                in {PANEL_TABS.state_index, PANEL_TABS.aux_index},
-                live_visualization_enabled=panel_tab_index == PANEL_TABS.live_index,
+                in {panel_tabs.state_index, panel_tabs.aux_index},
+                live_visualization_enabled=panel_tab_index == panel_tabs.live_index,
                 cnn_normalization=cnn_normalization,
             )
             if viewer_input.quit_requested:
@@ -110,6 +132,8 @@ def run_viewer(config: WatchAppConfig) -> None:
             )
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
+                if getattr(snapshot, "policy_observation_shape", None) is not None:
+                    policy_observation_layout_shape = snapshot.policy_observation_shape
                 auxiliary_metrics.observe_snapshot(snapshot)
                 latest_live_episode_series = getattr(snapshot, "live_episode_series", None)
                 if latest_live_episode_series is not None:
@@ -123,7 +147,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 pygame,
                 screen,
                 game_display_size,
-                snapshot.observation_image.shape,
+                policy_observation_layout_shape,
                 fonts=fonts,
                 info=snapshot.info,
                 panel_tab_index=panel_tab_index,
@@ -140,9 +164,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                 target_render_fps=target_render_fps,
                 auxiliary_episode_metrics=auxiliary_metrics.snapshot(),
                 live_episode_series=live_episode_series,
+                panel_tabs=panel_tabs,
                 panel_tab_index=panel_tab_index,
                 cnn_layer_tab_index=cnn_layer_tab_index,
                 record_tab_index=record_tab_index,
+                policy_observation_layout_shape=policy_observation_layout_shape,
             )
             _sync_mouse_cursor(pygame, hitboxes)
     except KeyboardInterrupt:
@@ -152,13 +178,18 @@ def run_viewer(config: WatchAppConfig) -> None:
         pygame.quit()
 
 
-def _next_panel_tab_index(current_index: int, viewer_input: ViewerInput) -> int:
+def _next_panel_tab_index(
+    current_index: int,
+    viewer_input: ViewerInput,
+    *,
+    panel_tabs: PanelTabRegistry = WATCH_PANEL_TABS,
+) -> int:
     selected_index = viewer_input.panel_tab_index
     if selected_index is not None:
-        return max(0, min(PANEL_TABS.count - 1, selected_index))
+        return max(0, min(panel_tabs.count - 1, selected_index))
     if viewer_input.panel_tab_delta == 0:
         return current_index
-    return PANEL_TABS.normalize(current_index + viewer_input.panel_tab_delta)
+    return panel_tabs.normalize(current_index + viewer_input.panel_tab_delta)
 
 
 def _sync_mouse_cursor(pygame: PygameModule, hitboxes: ViewerHitboxes) -> None:
@@ -179,7 +210,16 @@ def _sync_mouse_cursor(pygame: PygameModule, hitboxes: ViewerHitboxes) -> None:
         "SYSTEM_CURSOR_HAND" if hover_clickable else "SYSTEM_CURSOR_ARROW",
     )
     if cursor is not None:
-        pygame.mouse.set_cursor(cursor)
+        try:
+            pygame.mouse.set_cursor(cursor)
+        except Exception as exc:
+            pygame_error = getattr(pygame, "error", None)
+            if not isinstance(pygame_error, type) or not isinstance(exc, pygame_error):
+                raise
+
+
+def _default_policy_observation_layout_shape() -> tuple[int, int, int]:
+    return (72, 96, 3)
 
 
 def _system_cursor(pygame: PygameModule, name: str) -> object | None:

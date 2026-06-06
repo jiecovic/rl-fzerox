@@ -6,12 +6,17 @@ from collections.abc import Sequence
 from pathlib import Path
 
 
-def require_policy_run_locator(*, policy_run_dir: Path | None, managed_run_id: str | None) -> None:
-    """Reject ambiguous or missing policy sources before runtime config resolution."""
+def require_watch_locator(
+    *,
+    managed_run_id: str | None,
+    policy_run_dir: Path | None,
+) -> None:
+    """Reject ambiguous or missing watch sources before runtime config resolution."""
 
-    if policy_run_dir is not None and managed_run_id is not None:
-        raise SystemExit("--run-dir cannot be combined with --managed-run-id")
-    if policy_run_dir is None and managed_run_id is None:
+    source_count = sum(value is not None for value in (policy_run_dir, managed_run_id))
+    if source_count > 1:
+        raise SystemExit("--run-dir and --managed-run-id are mutually exclusive")
+    if source_count == 0:
         raise SystemExit("--run-dir or --managed-run-id is required")
 
 
@@ -57,9 +62,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional run-manager run id to resolve watch config from SQLite.",
     )
     parser.add_argument(
-        "--watch-pid-file",
-        dest="watch_pid_file",
-        type=Path,
+        "--viewer-lease-id",
+        dest="viewer_lease_id",
         default=None,
         help=argparse.SUPPRESS,
     )
@@ -70,8 +74,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         and args.managed_run_id is None
     ):
         raise SystemExit("--artifact requires --run-dir or --managed-run-id")
-    require_policy_run_locator(
-        policy_run_dir=args.policy_run_dir,
+    require_watch_locator(
         managed_run_id=args.managed_run_id,
+        policy_run_dir=args.policy_run_dir,
     )
     return args

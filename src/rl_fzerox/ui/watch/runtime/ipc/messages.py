@@ -73,19 +73,28 @@ class WorkerClosed:
 
 
 @dataclass(frozen=True)
+class PolicyObservationSnapshot:
+    """Policy-owned observation payload for frames where a policy is active."""
+
+    image: ObservationFrame
+    state: StateVector | None
+    state_reference: StateVector | None
+
+
+@dataclass(frozen=True)
 class WatchSnapshot:
     """Pickle-safe frame and HUD payload published by the simulation process."""
 
     raw_frame: RgbFrame
-    observation_image: ObservationFrame
-    observation_state: StateVector | None
-    observation_state_reference: StateVector | None
+    policy_observation_shape: tuple[int, ...] | None
+    policy_observation: PolicyObservationSnapshot | None
     info: dict[str, object]
     reset_info: dict[str, object]
     episode: int
     episode_reward: float
     control_fps: float
     target_control_fps: float | None
+    action_repeat: int
     native_fps: float
     control_state: RaceControlState
     gas_level: float

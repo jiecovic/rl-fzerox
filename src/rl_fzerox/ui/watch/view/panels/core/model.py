@@ -38,11 +38,20 @@ def _panel_content_height(
     stats_height = _column_content_height(fonts, columns.stats, width=content_width)
     aux_height = _column_content_height(fonts, columns.aux, width=content_width)
     records_height = _column_content_height(fonts, columns.records, width=content_width)
+    career_height = _column_content_height(fonts, columns.career, width=content_width)
     train_height = _column_content_height(fonts, columns.train, width=content_width)
     return (
         y
         + tab_height
         + LAYOUT.title_section_gap
-        + max(left_height, middle_height, stats_height, aux_height, records_height, train_height)
+        + max(
+            left_height,
+            middle_height,
+            stats_height,
+            aux_height,
+            records_height,
+            career_height,
+            train_height,
+        )
         + LAYOUT.panel_padding
     )

@@ -89,6 +89,27 @@ def start_watch_worker(config: WatchAppConfig) -> WatchWorker:
     )
 
 
+def start_career_mode_worker(config: WatchAppConfig) -> WatchWorker:
+    context = _multiprocessing_context()
+    command_queue = context.Queue()
+    snapshot_queue = context.Queue(maxsize=2)
+
+    from rl_fzerox.ui.watch.runtime.career_mode import run_career_mode_worker
+
+    process = context.Process(
+        target=run_career_mode_worker,
+        args=(config, command_queue, snapshot_queue),
+        name="fzerox-career-mode",
+    )
+    process.daemon = True
+    process.start()
+    return WatchWorker(
+        process=process,
+        command_queue=command_queue,
+        snapshot_queue=snapshot_queue,
+    )
+
+
 def _multiprocessing_context():
     if hasattr(os, "fork"):
         return mp.get_context("fork")

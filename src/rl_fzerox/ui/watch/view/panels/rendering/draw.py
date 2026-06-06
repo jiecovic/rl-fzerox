@@ -12,7 +12,7 @@ from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
-from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
+from rl_fzerox.ui.watch.view.panels.core.tabs import PanelTabRegistry
 from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import _draw_column
 from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
     _draw_panel_tabs,
@@ -70,6 +70,7 @@ class SidePanelData:
     panel_tab_index: int
     cnn_layer_tab_index: int
     record_tab_index: int
+    panel_tabs: PanelTabRegistry
     continuous_drive_deadzone: float
     continuous_air_brake_axis_index: int | None
     continuous_air_brake_deadzone: float
@@ -82,7 +83,7 @@ class SidePanelData:
     progress_frontier_stall_limit_frames: int | None
     stuck_min_speed_kph: float
     game_display_size: tuple[int, int]
-    observation_shape: tuple[int, ...]
+    observation_shape: tuple[int, ...] | None
     observation_state: StateVector | None
     observation_state_reference: StateVector | None
     observation_state_feature_names: tuple[str, ...]
@@ -171,7 +172,7 @@ def _draw_side_panel(
         policy_config=data.policy_config,
     )
 
-    selected_tab_index = PANEL_TABS.normalize(data.panel_tab_index)
+    selected_tab_index = data.panel_tabs.normalize(data.panel_tab_index)
 
     y = _draw_panel_title(
         screen=screen,
@@ -194,6 +195,7 @@ def _draw_side_panel(
         y=y,
         width=panel_width,
         selected_index=selected_tab_index,
+        panel_tabs=data.panel_tabs,
     )
     y += LAYOUT.title_section_gap
 
@@ -201,7 +203,8 @@ def _draw_side_panel(
     cnn_layer_tab_rects: tuple[tuple[int, int, int, int] | None, ...] = ()
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = ()
     state_feature_hitboxes = ()
-    if selected_tab_index == PANEL_TABS.cnn_index:
+    selected_tab_key = data.panel_tabs.key(selected_tab_index)
+    if selected_tab_key == "cnn":
         _, cnn_layer_tab_rects = _draw_cnn_tab(
             pygame=pygame,
             screen=screen,
@@ -212,7 +215,7 @@ def _draw_side_panel(
             activations=data.cnn_activations,
             selected_layer_page_index=data.cnn_layer_tab_index,
         )
-    elif selected_tab_index == PANEL_TABS.live_index:
+    elif selected_tab_key == "live":
         _draw_live_tab(
             pygame=pygame,
             screen=screen,
@@ -224,7 +227,7 @@ def _draw_side_panel(
             info=data.info,
             live_series=data.live_episode_series,
         )
-    elif selected_tab_index == PANEL_TABS.records_index:
+    elif selected_tab_key == "records":
         record_sections = columns.records
         if len(record_sections) > 1:
             y, record_tab_rects = _draw_text_tabs(
@@ -257,7 +260,11 @@ def _draw_side_panel(
             x=x,
             y=y,
             width=panel_width,
-            sections=_panel_tab_sections(columns, selected_tab_index),
+            sections=_panel_tab_sections(
+                columns,
+                selected_tab_index,
+                panel_tabs=data.panel_tabs,
+            ),
         )
         state_feature_hitboxes = panel_hitboxes.state_features
     return ViewerHitboxes(
@@ -277,8 +284,13 @@ def _panel_subtitle(policy_label: str | None, *, manual_control_enabled: bool) -
     return f"policy: {policy_label}"
 
 
-def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[PanelSection]:
-    tab_key = PANEL_TABS.key(selected_index)
+def _panel_tab_sections(
+    columns: PanelColumns,
+    selected_index: int,
+    *,
+    panel_tabs: PanelTabRegistry,
+) -> list[PanelSection]:
+    tab_key = panel_tabs.key(selected_index)
     if tab_key == "run":
         return columns.left
     if tab_key == "details":
@@ -289,6 +301,8 @@ def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[Pane
         return columns.aux
     if tab_key == "records":
         return columns.records
+    if tab_key == "career":
+        return columns.career
     if tab_key == "train":
         return columns.train
     return []

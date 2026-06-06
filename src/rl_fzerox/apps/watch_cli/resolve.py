@@ -10,7 +10,11 @@ from rl_fzerox.apps.watch_cli.delta import (
     apply_watch_config_delta,
     watch_config_delta_from_dotlist,
 )
-from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_manager_db_path
+from rl_fzerox.core.manager import (
+    ManagedRun,
+    ManagerStore,
+    default_manager_db_path,
+)
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
     restore_generated_x_cup_entries_from_state,
 )
@@ -36,8 +40,9 @@ def resolve_watch_app_config(
     """Resolve watch config from the canonical managed or saved-run surfaces."""
 
     normalized_overrides = normalize_cli_overrides(overrides)
-    if policy_run_dir is not None and managed_run_id is not None:
-        raise ValueError("--run-dir cannot be combined with --managed-run-id")
+    source_count = sum(value is not None for value in (policy_run_dir, managed_run_id))
+    if source_count > 1:
+        raise ValueError("--run-dir and --managed-run-id are mutually exclusive")
     cli_run_dir = policy_run_dir.expanduser().resolve() if policy_run_dir is not None else None
     resolved_manager_db_path = (
         manager_db_path.expanduser().resolve()
@@ -47,9 +52,14 @@ def resolve_watch_app_config(
     cli_override_delta: dict[str, object] = {}
     train_config: TrainAppConfig | None = None
     lineage_frame_offset: int | None = None
-    if policy_artifact is not None and cli_run_dir is None and managed_run_id is None:
+    resolved_policy_artifact: Literal["latest", "best", "final"] = policy_artifact or "latest"
+    if (
+        policy_artifact is not None
+        and cli_run_dir is None
+        and managed_run_id is None
+    ):
         raise ValueError("--artifact requires --run-dir or --managed-run-id")
-    if cli_run_dir is None and managed_run_id is None:
+    if source_count == 0:
         raise ValueError("--run-dir or --managed-run-id is required")
     if normalized_overrides:
         cli_override_delta = watch_config_delta_from_dotlist(normalized_overrides)
@@ -65,7 +75,7 @@ def resolve_watch_app_config(
     config = default_watch_config_from_train_run(
         train_config,
         run_dir=cli_run_dir,
-        artifact=policy_artifact or "latest",
+        artifact=resolved_policy_artifact,
     )
     if lineage_frame_offset is not None:
         config = config.model_copy(

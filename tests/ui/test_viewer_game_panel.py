@@ -1,6 +1,7 @@
 # tests/ui/test_viewer_game_panel.py
 from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from rl_fzerox.ui.watch.view.panels.content.game import _format_telemetry_vehicle_setup
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.rendering.draw import _record_tab_sections
 from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
@@ -29,6 +30,10 @@ def _race_section(columns: PanelColumns) -> PanelSection:
 
 def _setup_section(columns: PanelColumns) -> PanelSection:
     return next(section for section in columns.left if section.title == "Race Setup")
+
+
+def _career_section(columns: PanelColumns, title: str) -> PanelSection:
+    return next(section for section in columns.career if section.title == title)
 
 
 def test_game_flags_are_rendered_in_fixed_rows() -> None:
@@ -68,6 +73,71 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         active_labels
     )
     assert "dash" not in active_labels
+
+
+def test_career_mode_panel_shows_structured_fsm_facts() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_completed_targets": 1,
+            "career_mode_fsm_awaiting_fresh_race": True,
+            "career_mode_fsm_camera_synced": False,
+            "career_mode_fsm_camera_target": "close_behind",
+            "career_mode_fsm_completed_laps": 3,
+            "career_mode_fsm_completion_fraction": 1.0,
+            "career_mode_fsm_continuing_result": True,
+            "career_mode_fsm_course_index": 0,
+            "career_mode_fsm_fresh_race_ready": False,
+            "career_mode_fsm_game_mode": "gp_race",
+            "career_mode_fsm_intro_timer": 0,
+            "career_mode_fsm_pending_steps": 1,
+            "career_mode_fsm_race_time_ms": 94_200.0,
+            "career_mode_fsm_selected_mode_raw": 0,
+            "career_mode_fsm_terminal_reason": "finished",
+            "career_mode_fsm_terminal_result": True,
+            "career_mode_fsm_total_laps": 3,
+            "career_mode_fsm_transition_raw": 0,
+            "career_mode_inspection_status": "partial",
+            "career_mode_next_target_label": "Clear Novice Queen Cup",
+            "career_mode_phase": "continue_after_race",
+            "career_mode_policy_active": False,
+            "career_mode_target_label": "Clear Novice Jack Cup",
+            "career_mode_total_targets": 16,
+            "frame_index": 0,
+            "native_fps": 60.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    controller_values = {
+        line.label: line.value
+        for line in _career_section(columns, "Career Controller").lines
+    }
+    policy_values = {
+        line.label: line.value
+        for line in _career_section(columns, "Career Policy").lines
+    }
+
+    assert "mode=gp_race" in controller_values["Game facts"]
+    assert "terminal=yes" in controller_values["Race boundary"]
+    assert "fresh=no" in controller_values["Race boundary"]
+    assert "laps=3 / 3" in controller_values["Race progress"]
+    assert "comp=100.0%" in controller_values["Race progress"]
+    assert "target=close_behind" in controller_values["Camera"]
+    assert policy_values["Policy control"] == "inactive"
 
 
 def test_energy_refill_course_effect_lights_refill_flag() -> None:
@@ -182,6 +252,137 @@ def test_game_section_shows_ko_star_ram_count() -> None:
 
     values = {line.label: line.value for line in _race_section(columns).lines}
     assert values["KO stars"] == "4"
+
+
+def test_race_setup_uses_native_live_vehicle_setup_keys() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "racer_character_index": 0,
+            "engine_setting_raw_value": 50,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(camera_setting_name="close_behind"),
+    )
+
+    values = {line.label: line.value for line in _setup_section(columns).lines}
+    assert values["Vehicle"] == "Blue Falcon / Engine 50"
+    assert values["Camera"] == "close behind"
+
+
+def test_race_setup_prefers_live_telemetry_vehicle_setup() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_vehicle_name": "Blue Falcon",
+            "racer_character_index_ram": 0,
+            "engine_setting_percent_ram": 50.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            machine_character_index=3,
+            engine_setting=1.0,
+        ),
+    )
+
+    values = {line.label: line.value for line in _setup_section(columns).lines}
+    assert values["Vehicle"] == "Fire Stingray / Engine 100"
+
+
+def test_race_setup_ignores_missing_live_vehicle_setup_fields() -> None:
+    class PlayerWithoutLiveSetup:
+        pass
+
+    class TelemetryWithoutLiveSetup:
+        player = PlayerWithoutLiveSetup()
+
+    assert _format_telemetry_vehicle_setup(TelemetryWithoutLiveSetup()) is None
+
+
+def test_race_setup_does_not_fallback_to_configured_track_vehicle() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_vehicle_name": "Blue Falcon",
+            "track_engine_setting": "Balanced",
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    values = {line.label: line.value for line in _setup_section(columns).lines}
+    assert values["Vehicle"] == "unknown"
+
+
+def test_race_setup_camera_tracks_live_telemetry() -> None:
+    common_args = {
+        "episode": 0,
+        "info": {"frame_index": 0, "native_fps": 60.0},
+        "reset_info": {},
+        "episode_reward": 0.0,
+        "paused": False,
+        "control_state": race_control_state(),
+        "policy_curriculum_stage": None,
+        "policy_action": None,
+        "policy_reload_age_seconds": None,
+        "policy_reload_error": None,
+        "action_repeat": 3,
+        "stuck_min_speed_kph": 50.0,
+        "game_display_size": (592, 444),
+        "observation_shape": (84, 116, 12),
+    }
+    first_columns = _build_panel_columns(
+        **common_args,
+        telemetry=_sample_telemetry(camera_setting_name="regular"),
+    )
+    second_columns = _build_panel_columns(
+        **common_args,
+        telemetry=_sample_telemetry(camera_setting_name="close_behind"),
+    )
+
+    first_values = {line.label: line.value for line in _setup_section(first_columns).lines}
+    second_values = {line.label: line.value for line in _setup_section(second_columns).lines}
+    assert first_values["Camera"] == "regular"
+    assert second_values["Camera"] == "close behind"
 
 
 def test_dirt_course_effect_lights_dirt_flag() -> None:
@@ -462,6 +663,101 @@ def test_game_section_shows_camera_setting() -> None:
     setup_section = _setup_section(columns)
     camera_line = next(line for line in setup_section.lines if line.label == "Camera")
     assert camera_line.value == "close behind"
+
+
+def test_game_section_prefers_live_vehicle_setup_over_track_metadata() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_vehicle_name": "Blue Falcon",
+            "track_engine_setting": "Balanced",
+            "racer_character_index_ram": 3,
+            "engine_setting_percent_ram": 100.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    setup_section = _setup_section(columns)
+    vehicle_line = next(line for line in setup_section.lines if line.label == "Vehicle")
+    assert vehicle_line.value == "Fire Stingray / Engine 100"
+
+
+def test_game_section_falls_back_to_menu_vehicle_when_live_racer_is_uninitialized() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_vehicle_name": "Blue Falcon",
+            "track_engine_setting": "Balanced",
+            "racer_character_index_ram": -1,
+            "player_character_index_ram": 7,
+            "engine_setting_percent_ram": 75.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    setup_section = _setup_section(columns)
+    vehicle_line = next(line for line in setup_section.lines if line.label == "Vehicle")
+    assert vehicle_line.value == "Iron Tiger / Engine 75"
+
+
+def test_game_section_ignores_invalid_live_engine_value() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_vehicle_name": "Blue Falcon",
+            "track_engine_setting": "Balanced",
+            "racer_character_index_ram": -1,
+            "player_character_index_ram": 0,
+            "engine_setting_percent_ram": 5000.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    setup_section = _setup_section(columns)
+    vehicle_line = next(line for line in setup_section.lines if line.label == "Vehicle")
+    assert vehicle_line.value == "Blue Falcon"
 
 
 def test_game_section_shows_unknown_camera_setting_raw_value() -> None:

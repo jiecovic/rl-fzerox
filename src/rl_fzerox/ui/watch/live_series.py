@@ -40,7 +40,15 @@ class LiveSeriesLimits:
     max_ko_events: int = 64
 
 
+@dataclass(frozen=True, slots=True)
+class LiveSeriesPublishPolicy:
+    """Throttle live-chart snapshots independently from video frame publishing."""
+
+    interval_seconds: float = 0.10
+
+
 LIVE_SERIES_LIMITS = LiveSeriesLimits()
+LIVE_SERIES_PUBLISH_POLICY = LiveSeriesPublishPolicy()
 
 
 def _int_buffer() -> deque[int]:

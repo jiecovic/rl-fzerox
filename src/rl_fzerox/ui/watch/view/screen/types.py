@@ -135,6 +135,7 @@ class PanelColumns:
     stats: list[PanelSection]
     aux: list[PanelSection]
     records: list[PanelSection]
+    career: list[PanelSection]
     train: list[PanelSection]
 
 

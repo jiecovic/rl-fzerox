@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/view/panels/rendering/tab_bar.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
+from rl_fzerox.ui.watch.view.panels.core.tabs import WATCH_PANEL_TABS, PanelTabRegistry
 from rl_fzerox.ui.watch.view.panels.rendering.text import _font_line_height
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
@@ -22,6 +22,7 @@ def _draw_panel_tabs(
     y: int,
     width: int,
     selected_index: int,
+    panel_tabs: PanelTabRegistry = WATCH_PANEL_TABS,
 ) -> tuple[int, tuple[MouseRect | None, ...]]:
     return _draw_text_tabs(
         pygame=pygame,
@@ -30,9 +31,9 @@ def _draw_panel_tabs(
         x=x,
         y=y,
         width=width,
-        labels=PANEL_TABS.labels,
+        labels=panel_tabs.labels,
         selected_index=selected_index,
-        hint_text=_panel_tab_hint(selected_index),
+        hint_text=_panel_tab_hint(selected_index, panel_tabs=panel_tabs),
     )
 
 
@@ -119,6 +120,10 @@ def _draw_text_tabs(
     return tab_y + tab_height, tuple(tab_rects)
 
 
-def _panel_tab_hint(selected_index: int) -> str:
-    tab_number = PANEL_TABS.normalize(selected_index) + 1
-    return f"Tab {tab_number}/{PANEL_TABS.count}"
+def _panel_tab_hint(
+    selected_index: int,
+    *,
+    panel_tabs: PanelTabRegistry = WATCH_PANEL_TABS,
+) -> str:
+    tab_number = panel_tabs.normalize(selected_index) + 1
+    return f"Tab {tab_number}/{panel_tabs.count}"

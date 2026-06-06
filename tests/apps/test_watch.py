@@ -1,7 +1,6 @@
 # tests/apps/test_watch.py
 from __future__ import annotations
 
-import json
 import os
 import sys
 from pathlib import Path
@@ -27,6 +26,7 @@ from rl_fzerox.core.runtime_spec.schema import (
 )
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.ui.watch.app import run_viewer
+from rl_fzerox.ui.watch.runtime import WatchWorker
 from rl_fzerox.ui.watch.runtime.policy import (
     _load_policy_runner,
     _policy_experience_frames,
@@ -75,22 +75,36 @@ def test_watch_rejects_artifact_without_run_dir() -> None:
 
 
 def test_watch_rejects_missing_run_locator() -> None:
-    with pytest.raises(SystemExit, match="--run-dir or --managed-run-id is required"):
+    with pytest.raises(
+        SystemExit,
+        match="--run-dir or --managed-run-id is required",
+    ):
         main([])
 
 
-def test_watch_removes_owned_pid_file_on_exit(
+def test_watch_clears_owned_viewer_lease_on_exit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
     run_dir = tmp_path / "runs" / "ppo_cnn_0001"
     core_path.touch()
     rom_path.touch()
     run_dir.mkdir(parents=True)
-    pid_path = tmp_path / "watch.json"
-    pid_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+    lease_id = store.viewer_lease_id(
+        kind="run_watch",
+        owner_id="run-a",
+        qualifier="latest",
+    )
+    store.upsert_viewer_lease(
+        lease_id=lease_id,
+        kind="run_watch",
+        owner_id="run-a",
+        pid=os.getpid(),
+        qualifier="latest",
+    )
     train_config = TrainAppConfig(
         seed=7,
         emulator=EmulatorConfig(
@@ -112,9 +126,18 @@ def test_watch_removes_owned_pid_file_on_exit(
     )
     monkeypatch.setattr("rl_fzerox.apps.watch.run_viewer", lambda _config: None)
 
-    main(["--run-dir", str(run_dir), "--watch-pid-file", str(pid_path)])
+    main(
+        [
+            "--run-dir",
+            str(run_dir),
+            "--manager-db-path",
+            str(store.db_path),
+            "--viewer-lease-id",
+            lease_id,
+        ]
+    )
 
-    assert not pid_path.exists()
+    assert store.get_viewer_lease(lease_id) is None
 
 
 def test_watch_allows_run_dir_overrides_without_config(
@@ -507,7 +530,10 @@ def test_run_viewer_exits_quietly_on_keyboard_interrupt(
         time=SimpleNamespace(Clock=lambda: _FakeClock()),
     )
 
-    class _FakeWorker:
+    class _FakeWorker(WatchWorker):
+        def __init__(self) -> None:
+            pass
+
         def shutdown(self) -> None:
             calls.append("shutdown")
 
@@ -527,6 +553,6 @@ def test_run_viewer_exits_quietly_on_keyboard_interrupt(
         lambda: (640, 480),
     )
 
-    run_viewer(config)
+    run_viewer(config, worker_factory=lambda _config: _FakeWorker())
 
     assert calls == ["init", "shutdown", "quit"]
