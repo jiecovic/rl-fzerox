@@ -53,11 +53,7 @@ def resolve_watch_app_config(
     train_config: TrainAppConfig | None = None
     lineage_frame_offset: int | None = None
     resolved_policy_artifact: Literal["latest", "best", "final"] = policy_artifact or "latest"
-    if (
-        policy_artifact is not None
-        and cli_run_dir is None
-        and managed_run_id is None
-    ):
+    if policy_artifact is not None and cli_run_dir is None and managed_run_id is None:
         raise ValueError("--artifact requires --run-dir or --managed-run-id")
     if source_count == 0:
         raise ValueError("--run-dir or --managed-run-id is required")

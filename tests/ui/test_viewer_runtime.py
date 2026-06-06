@@ -593,7 +593,6 @@ def test_career_mode_continues_explicit_terminal_result_edge() -> None:
     assert not controller.policy_owns_control()
 
 
-
 def test_career_mode_does_not_continue_lap_three_without_terminal_result() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
     controller._resolve_policy_control = lambda info: object()
@@ -629,8 +628,7 @@ def test_career_mode_clears_stale_post_race_inputs_on_unknown_screen() -> None:
     assert step.menu_input is MenuInput.NEUTRAL
     assert step.phase == "continue_after_race:wait_for_known_screen"
     assert all(
-        pending_step.menu_input is not MenuInput.START
-        for pending_step in controller._pending_steps
+        pending_step.menu_input is not MenuInput.START for pending_step in controller._pending_steps
     )
 
 
@@ -641,9 +639,7 @@ def test_career_mode_result_continuation_releases_accept_between_pulses() -> Non
     controller._awaiting_new_race_after_terminal = True
     controller._observed_terminal_race_result = True
 
-    first_step = controller.next_raw_step(
-        info={"game_mode": "gp_race", "entered_finished": True}
-    )
+    first_step = controller.next_raw_step(info={"game_mode": "gp_race", "entered_finished": True})
     release_step = controller.next_raw_step(info={"game_mode": "gp_race"})
 
     assert first_step is not None
@@ -951,17 +947,23 @@ def test_career_mode_fsm_reaches_policy_handoff_from_menu_path() -> None:
     assert _next_active_menu_phase(controller, {"game_mode": "main_menu"}) == (
         "select_difficulty:accept"
     )
-    assert _next_active_menu_phase(
-        controller,
-        {"game_mode": "course_select", "course_index": 0},
-    ) == "enter_machine_select:start:1"
+    assert (
+        _next_active_menu_phase(
+            controller,
+            {"game_mode": "course_select", "course_index": 0},
+        )
+        == "enter_machine_select:start:1"
+    )
     assert _next_active_menu_phase(controller, {"game_mode": "machine_select"}) == (
         "enter_machine_settings:start:1"
     )
-    assert _next_non_settle_menu_phase(
-        controller,
-        {"game_mode": "machine_settings"},
-    ) == "apply_engine:wait"
+    assert (
+        _next_non_settle_menu_phase(
+            controller,
+            {"game_mode": "machine_settings"},
+        )
+        == "apply_engine:wait"
+    )
     controller._engine_applied = True
     assert _next_active_menu_phase(controller, {"game_mode": "machine_settings"}) == (
         "enter_race:start:1"

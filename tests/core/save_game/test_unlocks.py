@@ -51,7 +51,6 @@ def _logical_sra(cup_progress: dict[str, int]) -> bytes:
 def _byteswap_words(payload: bytes) -> bytes:
     word_size = FZEROX_SAVE_LAYOUT.byteswap_word_size
     chunks = (
-        payload[index : index + word_size][::-1]
-        for index in range(0, len(payload), word_size)
+        payload[index : index + word_size][::-1] for index in range(0, len(payload), word_size)
     )
     return b"".join(chunks)

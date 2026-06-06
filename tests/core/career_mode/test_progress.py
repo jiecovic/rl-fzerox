@@ -53,9 +53,7 @@ def test_build_unlock_progress_marks_completed_gp_cups_from_save(tmp_path: Path)
 
 def test_build_unlock_progress_finishes_when_all_targets_are_clear(tmp_path: Path) -> None:
     save_path = tmp_path / "fzerox.sra"
-    save_path.write_bytes(
-        _logical_sra({"jack": 4, "queen": 4, "king": 4, "joker": 4})
-    )
+    save_path.write_bytes(_logical_sra({"jack": 4, "queen": 4, "king": 4, "joker": 4}))
 
     progress = build_unlock_progress(save_path)
 

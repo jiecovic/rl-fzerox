@@ -92,9 +92,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="Initial policy playback mode; the viewer hotkey can still toggle it.",
     )
     args = parser.parse_args(argv)
-    if args.attempt_seed is not None and not (
-        0 <= args.attempt_seed <= 0xFFFFFFFF
-    ):
+    if args.attempt_seed is not None and not (0 <= args.attempt_seed <= 0xFFFFFFFF):
         parser.error("--attempt-seed must be between 0 and 4294967295")
     return args
 
@@ -124,7 +122,7 @@ def _resolve_career_mode_config(
         race_setup=_career_mode_race_setup_config(plan.race_setup),
         label=context.target.label,
     )
-    if (delta := watch_config_delta_from_dotlist(normalize_cli_overrides(overrides))):
+    if delta := watch_config_delta_from_dotlist(normalize_cli_overrides(overrides)):
         config = apply_watch_config_delta(config, delta)
 
     store.update_save_game_status(save_game_id=save_game_id, status="running")

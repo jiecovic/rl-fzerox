@@ -420,9 +420,7 @@ def _with_viewer_rates(
         explicit_game_fps_target
         if explicit_game_fps_target is not None
         else (
-            "unlimited"
-            if target_control_fps is None
-            else target_control_fps * float(action_repeat)
+            "unlimited" if target_control_fps is None else target_control_fps * float(action_repeat)
         )
     )
     draw_info["render_fps_target"] = "unlimited" if target_render_fps is None else target_render_fps

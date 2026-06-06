@@ -90,15 +90,11 @@ class GpMenuOrder:
             return values.index(value)
         except ValueError as exc:
             known = ", ".join(values)
-            raise RuntimeError(
-                f"unknown Career Mode {label} {value!r}; known: {known}"
-            ) from exc
+            raise RuntimeError(f"unknown Career Mode {label} {value!r}; known: {known}") from exc
 
 
 GP_MENU_ORDER = GpMenuOrder()
-BUILT_IN_COURSES_BY_INDEX = {
-    course.course_index: course for course in BUILT_IN_COURSES
-}
+BUILT_IN_COURSES_BY_INDEX = {course.course_index: course for course in BUILT_IN_COURSES}
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,10 +266,7 @@ class MenuFacts:
             return False
         if self.race_intro_timer is None or self.race_intro_timer <= 0:
             return False
-        if (
-            self.completion_fraction is not None
-            and self.completion_fraction >= 0.95
-        ):
+        if self.completion_fraction is not None and self.completion_fraction >= 0.95:
             return False
         if self.race_time_ms is None:
             return False

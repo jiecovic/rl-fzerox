@@ -123,12 +123,10 @@ def test_career_mode_panel_shows_structured_fsm_facts() -> None:
     )
 
     controller_values = {
-        line.label: line.value
-        for line in _career_section(columns, "Career Controller").lines
+        line.label: line.value for line in _career_section(columns, "Career Controller").lines
     }
     policy_values = {
-        line.label: line.value
-        for line in _career_section(columns, "Career Policy").lines
+        line.label: line.value for line in _career_section(columns, "Career Policy").lines
     }
 
     assert "mode=gp_race" in controller_values["Game facts"]

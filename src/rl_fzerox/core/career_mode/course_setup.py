@@ -38,9 +38,7 @@ def resolve_course_setup(
 
     for scope in COURSE_SETUP_RESOLUTION_ORDER:
         matching = [
-            setup
-            for setup in setups
-            if setup.scope == scope and _setup_matches(setup, target)
+            setup for setup in setups if setup.scope == scope and _setup_matches(setup, target)
         ]
         if matching:
             return max(matching, key=_setup_preference_key)
@@ -82,9 +80,8 @@ def _setup_matches(
         case "difficulty":
             return setup.difficulty == target.difficulty
         case "cup":
-            return (
-                setup.cup_id == target.cup_id
-                and _optional_match(setup.difficulty, target.difficulty)
+            return setup.cup_id == target.cup_id and _optional_match(
+                setup.difficulty, target.difficulty
             )
         case "course":
             return (

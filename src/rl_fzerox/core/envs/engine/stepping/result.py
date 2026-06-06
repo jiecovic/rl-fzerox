@@ -56,9 +56,7 @@ def policy_drive_info(info: dict[str, object]) -> dict[str, object]:
     """Return live policy-drive info without env episode lifecycle state."""
 
     normalized = {
-        key: value
-        for key, value in info.items()
-        if key not in _POLICY_DRIVE_EXCLUDED_INFO_KEYS
+        key: value for key, value in info.items() if key not in _POLICY_DRIVE_EXCLUDED_INFO_KEYS
     }
     reason = normalized.get("termination_reason")
     if reason not in _POLICY_DRIVE_TERMINAL_REASONS:

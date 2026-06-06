@@ -248,19 +248,12 @@ def _watch_window_size(
         info=info,
     )
     left_content_width = left_column_width - (2 * LAYOUT.preview_padding)
-    left_column_height = (
-        game_display_size[1]
-        + LAYOUT.preview_gap
-        + _control_viz_height(fonts)
-    )
-    left_column_height += (
-        LAYOUT.preview_gap
-        + _native_observation_preview_height(
-            fonts=fonts,
-            observation_shape=observation_shape,
-            info=info,
-            width=left_content_width,
-        )
+    left_column_height = game_display_size[1] + LAYOUT.preview_gap + _control_viz_height(fonts)
+    left_column_height += LAYOUT.preview_gap + _native_observation_preview_height(
+        fonts=fonts,
+        observation_shape=observation_shape,
+        info=info,
+        width=left_content_width,
     )
     left_column_height += LAYOUT.preview_padding
     _, baseline_height = _window_size(
@@ -356,10 +349,7 @@ def _draw_frame(
         x=LAYOUT.preview_padding,
         y=control_bottom + LAYOUT.preview_gap,
         width=left_column_width - (2 * LAYOUT.preview_padding),
-        height=screen.get_height()
-        - control_bottom
-        - LAYOUT.preview_gap
-        - LAYOUT.preview_padding,
+        height=screen.get_height() - control_bottom - LAYOUT.preview_gap - LAYOUT.preview_padding,
         observation_shape=data.policy_observation_shape,
         layout_shape=observation_layout_shape,
         info=data.info,

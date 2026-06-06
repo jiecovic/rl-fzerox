@@ -143,12 +143,8 @@ def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
     for table_name in SAVE_GAME_CHILD_TABLES:
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "save_game_id" not in columns:
-            raise RuntimeError(
-                f"manager DB is not current: {table_name} is missing save_game_id"
-            )
-    attempt_columns = {
-        column["name"] for column in inspector.get_columns("save_game_attempts")
-    }
+            raise RuntimeError(f"manager DB is not current: {table_name} is missing save_game_id")
+    attempt_columns = {column["name"] for column in inspector.get_columns("save_game_attempts")}
     if "target_kind" not in attempt_columns:
         raise RuntimeError("manager DB is not current: save_game_attempts is missing target_kind")
 
