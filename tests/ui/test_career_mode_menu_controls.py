@@ -1,8 +1,7 @@
 # tests/ui/test_career_mode_menu_controls.py
 
-from fzerox_emulator.control import ControllerState
 from fzerox_emulator import JOYPAD_BUTTONS, joypad_mask
-
+from fzerox_emulator.control import ControllerState
 from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.ui.watch.runtime.career_mode.menu import controller_step_from_menu_step
 

@@ -83,10 +83,7 @@ def run_viewer(
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
         auxiliary_metrics.observe_snapshot(snapshot)
         live_episode_series = getattr(snapshot, "live_episode_series", None)
-        policy_observation_layout_shape = (
-            getattr(snapshot, "policy_observation_shape", None)
-            or _default_policy_observation_layout_shape()
-        )
+        policy_observation_layout_shape = _snapshot_policy_observation_shape(snapshot)
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -132,8 +129,9 @@ def run_viewer(
             )
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
-                if getattr(snapshot, "policy_observation_shape", None) is not None:
-                    policy_observation_layout_shape = snapshot.policy_observation_shape
+                policy_observation_layout_shape = _snapshot_policy_observation_shape(
+                    snapshot,
+                )
                 auxiliary_metrics.observe_snapshot(snapshot)
                 latest_live_episode_series = getattr(snapshot, "live_episode_series", None)
                 if latest_live_episode_series is not None:
@@ -220,6 +218,13 @@ def _sync_mouse_cursor(pygame: PygameModule, hitboxes: ViewerHitboxes) -> None:
 
 def _default_policy_observation_layout_shape() -> tuple[int, int, int]:
     return (72, 96, 3)
+
+
+def _snapshot_policy_observation_shape(snapshot: object) -> tuple[int, ...]:
+    value = getattr(snapshot, "policy_observation_shape", None)
+    if isinstance(value, tuple) and all(isinstance(item, int) for item in value):
+        return value
+    return _default_policy_observation_layout_shape()
 
 
 def _system_cursor(pygame: PygameModule, name: str) -> object | None:

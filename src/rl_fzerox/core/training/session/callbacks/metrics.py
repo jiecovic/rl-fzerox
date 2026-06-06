@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/session/callbacks/metrics.py
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -329,16 +329,20 @@ class RolloutInfoAccumulator:
         )
 
 
-def info_sequence(infos: object) -> Sequence[object] | None:
+def info_sequence(infos: object) -> Sequence[Mapping[str, object]] | None:
     if isinstance(infos, list | tuple):
-        return infos
+        typed_infos: list[Mapping[str, object]] = []
+        for info in infos:
+            if isinstance(info, Mapping):
+                typed_infos.append(info)
+        return typed_infos
     return None
 
 
 def episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
     episodes: list[dict[str, object]] = []
     for info in infos:
-        if not isinstance(info, dict):
+        if not isinstance(info, Mapping):
             continue
         episode = info.get("episode")
         if isinstance(episode, dict):

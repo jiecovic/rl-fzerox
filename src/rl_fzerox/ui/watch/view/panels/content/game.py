@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
@@ -22,6 +23,11 @@ from rl_fzerox.ui.watch.view.panels.core.lines import panel_line
 from rl_fzerox.ui.watch.view.panels.visuals.viz import _flag_viz
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection
+
+
+class _VehicleSetupTelemetry(Protocol):
+    @property
+    def player(self) -> object: ...
 
 
 def race_state_section(
@@ -163,7 +169,7 @@ def _format_vehicle_setup(info: dict[str, object], telemetry: FZeroXTelemetry) -
     return "unknown"
 
 
-def _format_telemetry_vehicle_setup(telemetry: FZeroXTelemetry) -> str | None:
+def _format_telemetry_vehicle_setup(telemetry: _VehicleSetupTelemetry) -> str | None:
     character_index = _int_setup_value(getattr(telemetry.player, "machine_character_index", None))
     vehicle = None if character_index is None else vehicle_by_character_index(character_index)
     if vehicle is None:

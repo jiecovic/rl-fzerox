@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
-from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
+from fzerox_emulator import ControllerState, FZeroXTelemetry
 from rl_fzerox.core.domain.camera import (
     CAMERA_SETTING_BY_NAME,
     CAMERA_SETTINGS,
@@ -28,8 +29,23 @@ class CameraSyncControls:
 CAMERA_SYNC_CONTROLS = CameraSyncControls()
 
 
+class CameraSyncBackend(Protocol):
+    """Backend surface needed to change the in-game camera with real inputs."""
+
+    def set_controller_state(self, controller_state: ControllerState) -> None: ...
+
+    def step_frames(
+        self,
+        count: int,
+        *,
+        capture_video: bool = True,
+    ) -> None: ...
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None: ...
+
+
 def sync_camera_setting(
-    backend: EmulatorBackend,
+    backend: CameraSyncBackend,
     *,
     target_name: CameraSettingName | None,
     telemetry: FZeroXTelemetry | None,
@@ -64,7 +80,7 @@ def sync_camera_setting(
     )
 
 
-def _tap_next_camera_setting(backend: EmulatorBackend) -> FZeroXTelemetry | None:
+def _tap_next_camera_setting(backend: CameraSyncBackend) -> FZeroXTelemetry | None:
     # F-Zero X handles camera changes through BTN_CRIGHT. Tapping the real input
     # lets the game update the associated FOV/distance/pitch state coherently.
     backend.set_controller_state(CAMERA_SYNC_CONTROLS.next_camera)

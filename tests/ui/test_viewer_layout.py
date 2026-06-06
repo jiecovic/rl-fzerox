@@ -7,6 +7,9 @@ import pygame
 from fzerox_emulator import RaceControlState, display_size
 from rl_fzerox.ui.watch.app import _next_panel_tab_index
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
+from rl_fzerox.ui.watch.view.components.observation_strip import (
+    _draw_observation_preview_in_rect,
+)
 from rl_fzerox.ui.watch.view.panels.core.model import (
     _build_panel_columns,
     _panel_content_height,
@@ -19,9 +22,6 @@ from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import (
 from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
     _draw_panel_tabs,
     _panel_tab_hint,
-)
-from rl_fzerox.ui.watch.view.components.observation_strip import (
-    _draw_observation_preview_in_rect,
 )
 from rl_fzerox.ui.watch.view.screen.frame import _create_fonts, _watch_window_size
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT

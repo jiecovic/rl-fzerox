@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Protocol
 
 from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager.models import ManagedSaveGame
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
 
@@ -15,7 +16,12 @@ class SaveRamSession(Protocol):
 
 
 class SaveRamRuntimeSession(Protocol):
-    emulator: SaveRamSession
+    @property
+    def emulator(self) -> SaveRamSession: ...
+
+
+class SaveRamGameStore(Protocol):
+    def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None: ...
 
 
 def load_save_ram(config: WatchAppConfig, session: SaveRamRuntimeSession) -> None:
@@ -29,7 +35,7 @@ def persist_save_ram(config: WatchAppConfig, session: SaveRamRuntimeSession) -> 
 
 
 def persist_save_ram_for_store(
-    store: ManagerStore,
+    store: SaveRamGameStore,
     save_game_id: str,
     session: SaveRamRuntimeSession,
 ) -> None:
