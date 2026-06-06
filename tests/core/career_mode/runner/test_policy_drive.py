@@ -50,6 +50,8 @@ def test_env_policy_drive_runtime_owns_engine_policy_drive_calls() -> None:
         encoding="utf-8"
     )
 
-    assert "FZeroXEnvEngine" in source
-    assert "step_policy_drive(" in source
-    assert "step_control_policy_drive(" in source
+    assert "FZeroXEnvEngine" not in source
+    assert "step_watch(" not in source
+    assert "step_control_watch(" not in source
+    assert "WatchEnvStep" not in source
+    assert "EngineStepAssembler" in source
