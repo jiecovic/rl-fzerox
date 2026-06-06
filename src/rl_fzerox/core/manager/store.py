@@ -12,8 +12,10 @@ from typing import TYPE_CHECKING, Literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager.artifacts.paths import (
     manager_runs_root,
+    manager_save_games_root,
     manager_tensorboard_views_root,
 )
 from rl_fzerox.core.manager.artifacts.tensorboard_views import (
@@ -22,17 +24,28 @@ from rl_fzerox.core.manager.artifacts.tensorboard_views import (
 )
 from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
+    CourseSetupScope,
     ManagedRun,
     ManagedRunDraft,
     ManagedRunEvent,
     ManagedRunSummary,
     ManagedRunTemplate,
+    ManagedSaveAttempt,
+    ManagedSaveCourseSetup,
+    ManagedSaveGame,
+    ManagedSaveUnlockProgress,
+    ManagedViewerLease,
     RunCommand,
     RunStatus,
+    SaveAttemptStatus,
+    SaveGameStatus,
+    ViewerLeaseKind,
 )
 from rl_fzerox.core.manager.registry import drafts as draft_registry
 from rl_fzerox.core.manager.registry import lineages as lineage_registry
 from rl_fzerox.core.manager.registry import runs as run_registry
+from rl_fzerox.core.manager.registry import save_games as save_game_registry
+from rl_fzerox.core.manager.registry import viewers as viewer_registry
 from rl_fzerox.core.manager.registry.common import new_run_id
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.schema import (
@@ -119,6 +132,11 @@ class ManagerStore:
         if output_root is None:
             return self.db_path.parent.parent / "tensorboard_views"
         return manager_tensorboard_views_root(output_root=output_root)
+
+    def save_games_root(self, *, output_root: Path | None = None) -> Path:
+        if output_root is None:
+            return self.db_path.parent.parent / "save_games"
+        return manager_save_games_root(output_root=output_root)
 
     def path(self, value: str | Path) -> Path:
         return Path(value).expanduser().resolve()
@@ -419,6 +437,207 @@ class ManagerStore:
 
     def default_template(self) -> ManagedRunTemplate:
         return draft_registry.default_template(self)
+
+    def create_save_game(
+        self,
+        *,
+        name: str,
+        save_games_root: Path | None = None,
+    ) -> ManagedSaveGame:
+        return save_game_registry.create_save_game(
+            self,
+            name=name,
+            save_games_root=save_games_root or self.save_games_root(),
+        )
+
+    def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None:
+        return save_game_registry.get_save_game(self, save_game_id)
+
+    def list_save_games(self) -> tuple[ManagedSaveGame, ...]:
+        return save_game_registry.list_save_games(self)
+
+    def rename_save_game(
+        self,
+        *,
+        save_game_id: str,
+        name: str,
+    ) -> ManagedSaveGame | None:
+        return save_game_registry.rename_save_game(
+            self,
+            save_game_id=save_game_id,
+            name=name,
+        )
+
+    def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
+        return save_game_registry.unlock_progress(self, save_game_id)
+
+    def list_save_course_setups(
+        self,
+        save_game_id: str,
+    ) -> tuple[ManagedSaveCourseSetup, ...]:
+        return save_game_registry.list_course_setups(self, save_game_id)
+
+    def start_save_attempt(
+        self,
+        *,
+        save_game_id: str,
+        target_kind: str | None = None,
+        policy_run_id: str | None = None,
+        policy_artifact: Literal["latest", "best"] | None = None,
+        difficulty: str | None = None,
+        cup_id: str | None = None,
+        course_id: str | None = None,
+    ) -> ManagedSaveAttempt:
+        return save_game_registry.start_save_attempt(
+            self,
+            save_game_id=save_game_id,
+            target_kind=target_kind,
+            policy_run_id=policy_run_id,
+            policy_artifact=policy_artifact,
+            difficulty=difficulty,
+            cup_id=cup_id,
+            course_id=course_id,
+        )
+
+    def start_next_save_attempt(
+        self,
+        save_game_id: str,
+    ) -> ManagedSaveAttempt:
+        return save_game_registry.start_next_save_attempt(self, save_game_id)
+
+    def start_or_reuse_next_save_attempt(
+        self,
+        save_game_id: str,
+    ) -> ManagedSaveAttempt:
+        return save_game_registry.start_or_reuse_next_save_attempt(self, save_game_id)
+
+    def list_save_attempts(
+        self,
+        save_game_id: str,
+    ) -> tuple[ManagedSaveAttempt, ...]:
+        return save_game_registry.list_save_attempts(self, save_game_id)
+
+    def fail_running_save_attempts(
+        self,
+        *,
+        save_game_id: str,
+        failure_reason: str,
+    ) -> int:
+        return save_game_registry.fail_running_save_attempts(
+            self,
+            save_game_id=save_game_id,
+            failure_reason=failure_reason,
+        )
+
+    def discard_running_save_attempts(
+        self,
+        *,
+        save_game_id: str,
+    ) -> int:
+        return save_game_registry.discard_running_save_attempts(
+            self,
+            save_game_id=save_game_id,
+        )
+
+    def get_save_attempt_execution_context(
+        self,
+        attempt_id: str,
+    ) -> SaveAttemptExecutionContext | None:
+        return save_game_registry.get_save_attempt_execution_context(self, attempt_id)
+
+    def finish_save_attempt(
+        self,
+        *,
+        attempt_id: str,
+        status: SaveAttemptStatus,
+        finish_position: int | None = None,
+        finish_time_s: float | None = None,
+        failure_reason: str | None = None,
+    ) -> ManagedSaveAttempt | None:
+        return save_game_registry.finish_save_attempt(
+            self,
+            attempt_id=attempt_id,
+            status=status,
+            finish_position=finish_position,
+            finish_time_s=finish_time_s,
+            failure_reason=failure_reason,
+        )
+
+    def upsert_save_course_setup(
+        self,
+        *,
+        save_game_id: str,
+        scope: CourseSetupScope,
+        policy_run_id: str,
+        policy_artifact: Literal["latest", "best"],
+        difficulty: str | None = None,
+        cup_id: str | None = None,
+        course_id: str | None = None,
+    ) -> ManagedSaveCourseSetup:
+        return save_game_registry.upsert_course_setup(
+            self,
+            save_game_id=save_game_id,
+            scope=scope,
+            policy_run_id=policy_run_id,
+            policy_artifact=policy_artifact,
+            difficulty=difficulty,
+            cup_id=cup_id,
+            course_id=course_id,
+        )
+
+    def update_save_game_status(
+        self,
+        *,
+        save_game_id: str,
+        status: SaveGameStatus,
+    ) -> ManagedSaveGame | None:
+        return save_game_registry.update_save_game_status(
+            self,
+            save_game_id=save_game_id,
+            status=status,
+        )
+
+    def viewer_lease_id(
+        self,
+        *,
+        kind: ViewerLeaseKind,
+        owner_id: str,
+        qualifier: str | None = None,
+    ) -> str:
+        return viewer_registry.viewer_lease_id(
+            kind=kind,
+            owner_id=owner_id,
+            qualifier=qualifier,
+        )
+
+    def upsert_viewer_lease(
+        self,
+        *,
+        lease_id: str,
+        kind: ViewerLeaseKind,
+        owner_id: str,
+        pid: int,
+        qualifier: str | None = None,
+    ) -> ManagedViewerLease:
+        return viewer_registry.upsert_viewer_lease(
+            self,
+            lease_id=lease_id,
+            kind=kind,
+            owner_id=owner_id,
+            pid=pid,
+            qualifier=qualifier,
+        )
+
+    def get_viewer_lease(self, lease_id: str) -> ManagedViewerLease | None:
+        return viewer_registry.get_viewer_lease(self, lease_id)
+
+    def clear_viewer_lease(
+        self,
+        *,
+        lease_id: str,
+        pid: int | None = None,
+    ) -> bool:
+        return viewer_registry.clear_viewer_lease(self, lease_id=lease_id, pid=pid)
 
     def reconcile_orphaned_runs(self) -> None:
         run_registry.reconcile_orphaned_runs(self)

@@ -1,7 +1,6 @@
 # src/rl_fzerox/apps/run_manager/launching/watch.py
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -31,10 +30,15 @@ def launch_watch_artifact(
     if artifact not in {"latest", "best"}:
         raise ValueError(f"unsupported watch artifact: {artifact}")
     resolve_model_artifact_path(run.run_dir, artifact=artifact)
-    pid_path = manager_watch_pid_path(run.id, artifact=artifact)
+    lease_id = store.viewer_lease_id(
+        kind="run_watch",
+        owner_id=run.id,
+        qualifier=artifact,
+    )
     if (
         active_watch_pid(
-            pid_path=pid_path,
+            store=store,
+            lease_id=lease_id,
             run_id=run.id,
             run_dir=run.run_dir,
             artifact=artifact,
@@ -62,8 +66,8 @@ def launch_watch_artifact(
         run.id,
         "--artifact",
         artifact,
-        "--watch-pid-file",
-        str(pid_path),
+        "--viewer-lease-id",
+        lease_id,
         "--",
         *overrides,
     ]
@@ -76,14 +80,18 @@ def launch_watch_artifact(
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-    write_watch_pid_file(
-        pid_path=pid_path,
+    store.upsert_viewer_lease(
+        lease_id=lease_id,
+        kind="run_watch",
+        owner_id=run.id,
         pid=process.pid,
-        run_id=run.id,
-        run_dir=run.run_dir,
-        artifact=artifact,
+        qualifier=artifact,
     )
-    raise_if_watch_exited_early(process=process, log_path=log_path, pid_path=pid_path)
+    try:
+        raise_if_watch_exited_early(process=process, log_path=log_path)
+    except RuntimeError:
+        store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
+        raise
     reap_child_when_done(process)
     return "started"
 
@@ -105,24 +113,16 @@ def manager_watch_log_path(run_id: str, *, artifact: str) -> Path:
     ).resolve()
 
 
-def manager_watch_pid_path(run_id: str, *, artifact: str) -> Path:
-    return (
-        project_root_dir() / "local" / "manager" / "watch" / f"{run_id}.watch-{artifact}.json"
-    ).resolve()
-
-
 def raise_if_watch_exited_early(
     *,
     process: subprocess.Popen[bytes],
     log_path: Path,
-    pid_path: Path,
 ) -> None:
     try:
         return_code = process.wait(timeout=0.35)
     except subprocess.TimeoutExpired:
         return
 
-    pid_path.unlink(missing_ok=True)
     detail = watch_failure_detail(log_path)
     if detail is None:
         raise RuntimeError(f"watch exited immediately with code {return_code}; see {log_path}")
@@ -141,53 +141,29 @@ def watch_failure_detail(log_path: Path) -> str | None:
     return None
 
 
-def active_watch_pid(*, pid_path: Path, run_id: str, run_dir: Path, artifact: str) -> int | None:
-    payload = read_watch_pid_file(pid_path)
-    if payload is None:
-        return None
-    pid = payload.get("pid")
-    if not isinstance(pid, int):
-        pid_path.unlink(missing_ok=True)
-        return None
-    if watch_process_matches(pid=pid, run_id=run_id, run_dir=run_dir, artifact=artifact):
-        return pid
-    pid_path.unlink(missing_ok=True)
-    return None
-
-
-def write_watch_pid_file(
+def active_watch_pid(
     *,
-    pid_path: Path,
-    pid: int,
+    store: ManagerStore,
+    lease_id: str,
     run_id: str,
     run_dir: Path,
     artifact: str,
-) -> None:
-    pid_path.parent.mkdir(parents=True, exist_ok=True)
-    pid_path.write_text(
-        json.dumps(
-            {
-                "pid": pid,
-                "run_id": run_id,
-                "run_dir": str(run_dir),
-                "artifact": artifact,
-            },
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-
-def read_watch_pid_file(pid_path: Path) -> dict[str, object] | None:
-    try:
-        return json.loads(pid_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
+) -> int | None:
+    lease = store.get_viewer_lease(lease_id)
+    if lease is None:
         return None
-    except (OSError, json.JSONDecodeError):
-        pid_path.unlink(missing_ok=True)
+    if lease.kind != "run_watch" or lease.owner_id != run_id or lease.qualifier != artifact:
+        store.clear_viewer_lease(lease_id=lease_id)
         return None
+    if watch_process_matches(
+        pid=lease.pid,
+        run_id=run_id,
+        run_dir=run_dir,
+        artifact=artifact,
+    ):
+        return lease.pid
+    store.clear_viewer_lease(lease_id=lease_id, pid=lease.pid)
+    return None
 
 
 def watch_process_matches(*, pid: int, run_id: str, run_dir: Path, artifact: str) -> bool:

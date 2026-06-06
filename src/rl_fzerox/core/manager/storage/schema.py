@@ -18,9 +18,13 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 22
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
+SAVE_GAME_CHILD_TABLES = (
+    "save_game_attempts",
+    "save_game_course_setups",
+)
 RUN_CHILD_TABLES = (
     "run_commands",
     "run_events",
@@ -29,6 +33,7 @@ RUN_CHILD_TABLES = (
     "run_track_sampling_runtime",
     "run_workers",
 )
+MANAGER_RUNTIME_TABLES = ("viewer_leases",)
 
 
 def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
@@ -115,7 +120,37 @@ def _assert_current_schema(
             )
     if "config_snapshots" not in table_names:
         raise RuntimeError("manager DB is not current: missing config_snapshots")
+    if "save_games" not in table_names:
+        raise RuntimeError("manager DB is not current: missing save_games")
+    for table_name in SAVE_GAME_CHILD_TABLES:
+        if table_name not in table_names:
+            raise RuntimeError(f"manager DB is not current: missing {table_name}")
+    for table_name in MANAGER_RUNTIME_TABLES:
+        if table_name not in table_names:
+            raise RuntimeError(f"manager DB is not current: missing {table_name}")
+    _assert_save_game_child_columns(inspector=inspector)
     _assert_run_foreign_keys(inspector=inspector, table_names=table_names)
+
+
+def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
+    save_game_columns = {column["name"] for column in inspector.get_columns("save_games")}
+    legacy_columns = save_game_columns & {"last_started_at", "seed"}
+    if legacy_columns:
+        joined_columns = ", ".join(sorted(legacy_columns))
+        raise RuntimeError(
+            f"manager DB is not current: save_games has legacy columns {joined_columns}"
+        )
+    for table_name in SAVE_GAME_CHILD_TABLES:
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if "save_game_id" not in columns:
+            raise RuntimeError(
+                f"manager DB is not current: {table_name} is missing save_game_id"
+            )
+    attempt_columns = {
+        column["name"] for column in inspector.get_columns("save_game_attempts")
+    }
+    if "target_kind" not in attempt_columns:
+        raise RuntimeError("manager DB is not current: save_game_attempts is missing target_kind")
 
 
 def _assert_run_foreign_keys(

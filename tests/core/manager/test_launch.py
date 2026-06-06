@@ -355,7 +355,7 @@ def test_watch_artifact_skips_duplicate_window(
     )
 
 
-def test_watch_artifact_passes_pid_file_to_watch_process(
+def test_watch_artifact_passes_viewer_lease_to_watch_process(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -390,11 +390,6 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         "rl_fzerox.apps.run_manager.launching.watch.resolve_watch_app_config",
         lambda **_kwargs: None,
     )
-    pid_path = tmp_path / "manager" / "watch" / f"{run.id}.watch-latest.json"
-    monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launching.watch.manager_watch_pid_path",
-        lambda *_args, **_kwargs: pid_path,
-    )
     monkeypatch.setattr(
         "rl_fzerox.apps.run_manager.launching.watch.subprocess.Popen",
         _fake_popen,
@@ -408,6 +403,11 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
     )
 
     assert status == "started"
+    lease_id = store.viewer_lease_id(
+        kind="run_watch",
+        owner_id=run.id,
+        qualifier="latest",
+    )
     assert captured["command"] == [
         sys.executable,
         "-m",
@@ -418,10 +418,84 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         run.id,
         "--artifact",
         "latest",
-        "--watch-pid-file",
-        str(pid_path),
+        "--viewer-lease-id",
+        lease_id,
         "--",
         "watch.device=cuda",
         "emulator.renderer=angrylion",
     ]
-    assert pid_path.is_file()
+    lease = store.get_viewer_lease(lease_id)
+    assert lease is not None
+    assert lease.kind == "run_watch"
+    assert lease.owner_id == run.id
+    assert lease.qualifier == "latest"
+    assert lease.pid == 4321
+
+
+def test_start_career_mode_passes_viewer_lease_and_runtime_options(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Unlock Save",
+        save_games_root=tmp_path / "career-saves",
+    )
+    launcher = ManagerRunLauncher(store)
+    captured: dict[str, object] = {}
+
+    class _FakeProcess:
+        pid = 8765
+
+        def wait(self, timeout: float | None = None) -> int:
+            if timeout is None:
+                return 0
+            raise subprocess.TimeoutExpired(cmd="career-mode", timeout=timeout or 0.0)
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        captured["command"] = command
+        return _FakeProcess()
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.save_games.manager_career_mode_log_path",
+        lambda save_game_id: tmp_path / "logs" / f"{save_game_id}.log",
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.save_games.subprocess.Popen",
+        _fake_popen,
+    )
+
+    status = launcher.start_career_mode(
+        save_game_id=save_game.id,
+        device="cpu",
+        renderer="angrylion",
+        attempt_seed=1234,
+        deterministic_policy=False,
+    )
+
+    assert status == "started"
+    lease_id = store.viewer_lease_id(kind="career_mode", owner_id=save_game.id)
+    assert captured["command"] == [
+        sys.executable,
+        "-m",
+        "rl_fzerox.apps.career_mode",
+        "--manager-db-path",
+        str(store.db_path),
+        "--save-game-id",
+        save_game.id,
+        "--viewer-lease-id",
+        lease_id,
+        "--attempt-seed",
+        "1234",
+        "--policy-mode",
+        "stochastic",
+        "--",
+        "watch.device=cpu",
+        "emulator.renderer=angrylion",
+    ]
+    lease = store.get_viewer_lease(lease_id)
+    assert lease is not None
+    assert lease.kind == "career_mode"
+    assert lease.owner_id == save_game.id
+    assert lease.qualifier is None
+    assert lease.pid == 8765

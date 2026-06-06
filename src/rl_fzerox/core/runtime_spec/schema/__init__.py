@@ -15,6 +15,7 @@ from rl_fzerox.core.runtime_spec.schema.actions import (
     ActionRuntimeConfig,
 )
 from rl_fzerox.core.runtime_spec.schema.apps import (
+    CareerModeRaceSetupConfig,
     TrainAppConfig,
     WatchAppConfig,
     WatchConfig,
@@ -72,6 +73,7 @@ __all__ = [
     "ActionMaskOverrides",
     "ActionRuntimeConfig",
     "ContinuousAirBrakeMode",
+    "CareerModeRaceSetupConfig",
     "CurriculumConfig",
     "CurriculumStageConfig",
     "CurriculumTrainOverridesConfig",

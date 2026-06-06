@@ -18,6 +18,7 @@ import rl_fzerox.core.manager.registry.drafts.fork_sources as draft_fork_sources
 import rl_fzerox.core.manager.registry.paths as registry_paths
 import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 import rl_fzerox.core.manager.store as store_module
+from rl_fzerox.core.career_mode.progress import default_unlock_targets
 from rl_fzerox.core.manager import (
     ManagedRunConfig,
     ManagerStore,
@@ -33,7 +34,9 @@ from rl_fzerox.core.manager.db.models import (
     RunModel,
     RunTemplateModel,
     RunWorkerModel,
+    SaveGameModel,
 )
+from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json, load_config_json
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
@@ -171,6 +174,13 @@ def _stored_run_dir(store: ManagerStore, run_id: str) -> Path:
         return Path(run.run_dir)
 
 
+def _write_policy_artifact(run_dir: Path, artifact: Literal["latest", "best"]) -> Path:
+    policy_path = run_dir / "checkpoints" / artifact / "policy.zip"
+    policy_path.parent.mkdir(parents=True, exist_ok=True)
+    policy_path.write_bytes(b"fake policy checkpoint")
+    return policy_path
+
+
 def test_manager_store_refreshes_system_template_to_current_defaults(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "runs.db")
     store.initialize()
@@ -215,6 +225,50 @@ def test_manager_store_saves_draft_without_filesystem_artifacts(tmp_path: Path) 
     assert drafts[0].name == "Prototype Run"
     assert drafts[0].config == config
     assert not (tmp_path / "managed_runs").exists()
+
+
+def test_manager_store_creates_save_game_record(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_games_root = tmp_path / "save_games"
+
+    save_game = store.create_save_game(
+        name="Unlock Run",
+        save_games_root=save_games_root,
+    )
+
+    assert save_game.name == "Unlock Run"
+    assert save_game.status == "created"
+    assert save_game.save_path == save_games_root / save_game.id / "fzerox.srm"
+    assert save_game.save_path.parent.is_dir()
+    assert not save_game.save_path.exists()
+
+    save_games = store.list_save_games()
+    assert len(save_games) == 1
+    assert save_games[0] == save_game
+    progress = store.save_game_unlock_progress(save_game.id)
+    assert progress.inspection_status == "not_inspected"
+    assert progress.completed_count == 0
+    assert progress.total_count == len(default_unlock_targets())
+    assert progress.next_target is not None
+    assert progress.next_target.kind == "clear_gp_cup"
+    assert progress.next_target.difficulty == "novice"
+    assert progress.next_target.cup_id == "jack"
+    with manager_session(store.db_path) as session:
+        assert session.get(SaveGameModel, save_game.id) is not None
+
+
+def test_manager_store_rejects_duplicate_save_game_names_without_directory(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_games_root = tmp_path / "save_games"
+    store.create_save_game(name="Unlock Run", save_games_root=save_games_root)
+    existing_dirs = {path.name for path in save_games_root.iterdir()}
+
+    with pytest.raises(ManagerNameConflictError, match="name already exists"):
+        store.create_save_game(name="unlock run", save_games_root=save_games_root)
+
+    assert {path.name for path in save_games_root.iterdir()} == existing_dirs
 
 
 def test_manager_store_pins_and_cleans_fork_draft_snapshot(
@@ -370,6 +424,9 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     columns = _table_columns(store, "runs")
     group_columns = _table_columns(store, "lineage_groups")
     snapshot_columns = _table_columns(store, "config_snapshots")
+    save_game_columns = _table_columns(store, "save_games")
+    save_attempt_columns = _table_columns(store, "save_game_attempts")
+    course_setup_columns = _table_columns(store, "save_game_course_setups")
 
     assert columns == {
         "id",
@@ -397,6 +454,171 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "config_json",
         "config_hash",
     }
+    assert save_game_columns == {
+        "id",
+        "name",
+        "status",
+        "save_path",
+        "created_at",
+        "updated_at",
+        "last_finished_at",
+    }
+    assert save_attempt_columns == {
+        "id",
+        "save_game_id",
+        "policy_run_id",
+        "policy_artifact",
+        "status",
+        "target_kind",
+        "difficulty",
+        "cup_id",
+        "course_id",
+        "started_at",
+        "finished_at",
+        "finish_position",
+        "finish_time_s",
+        "failure_reason",
+    }
+    assert course_setup_columns == {
+        "id",
+        "save_game_id",
+        "scope",
+        "difficulty",
+        "cup_id",
+        "course_id",
+        "policy_run_id",
+        "policy_artifact",
+        "created_at",
+        "updated_at",
+    }
+
+
+def test_manager_store_upserts_save_course_setups(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="policy-run",
+        name="Policy Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    save_game = store.create_save_game(
+        name="Unlock Save",
+        save_games_root=tmp_path / "save-games",
+    )
+
+    created = store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        scope="global",
+        policy_run_id=run.id,
+        policy_artifact="best",
+    )
+    updated = store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        scope="global",
+        policy_run_id=run.id,
+        policy_artifact="latest",
+    )
+
+    assignments = store.list_save_course_setups(save_game.id)
+    assert len(assignments) == 1
+    assert created.id == updated.id
+    assert assignments[0].save_game_id == save_game.id
+    assert assignments[0].policy_run_id == "policy-run"
+    assert assignments[0].policy_artifact == "latest"
+    assert assignments[0].scope == "global"
+
+
+def test_manager_store_records_save_target_attempts(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Unlock Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    attempt = store.start_save_attempt(
+        save_game_id=save_game.id,
+        target_kind="clear_gp_cup",
+        difficulty="novice",
+        cup_id="jack",
+    )
+    finished = store.finish_save_attempt(
+        attempt_id=attempt.id,
+        status="succeeded",
+        finish_position=1,
+        finish_time_s=123.4,
+    )
+
+    attempts = store.list_save_attempts(save_game.id)
+    assert len(attempts) == 1
+    assert finished == attempts[0]
+    assert attempts[0].save_game_id == save_game.id
+    assert attempts[0].target_kind == "clear_gp_cup"
+    assert attempts[0].status == "succeeded"
+    assert attempts[0].finish_position == 1
+    assert attempts[0].finish_time_s == 123.4
+    assert attempts[0].finished_at is not None
+
+
+def test_manager_store_starts_next_save_attempt_from_course_setup(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Policy Attempt Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    run = store.create_run(
+        name="Unlock Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        scope="global",
+        policy_run_id=run.id,
+        policy_artifact="best",
+    )
+
+    attempt = store.start_next_save_attempt(save_game.id)
+
+    assert attempt.save_game_id == save_game.id
+    assert attempt.target_kind == "clear_gp_cup"
+    assert attempt.policy_run_id == run.id
+    assert attempt.policy_artifact == "best"
+    assert attempt.difficulty == "novice"
+    assert attempt.cup_id == "jack"
+    assert attempt.status == "running"
+
+
+def test_manager_store_resolves_save_attempt_execution_context(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Context Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    run = store.create_run(
+        name="Context Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    policy_path = _write_policy_artifact(run.run_dir, "best")
+    store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        scope="global",
+        policy_run_id=run.id,
+        policy_artifact="best",
+    )
+
+    attempt = store.start_next_save_attempt(save_game.id)
+    context = store.get_save_attempt_execution_context(attempt.id)
+
+    assert context is not None
+    assert context.save_game == save_game
+    assert context.attempt == attempt
+    assert context.target.kind == "clear_gp_cup"
+    assert context.target.difficulty == "novice"
+    assert context.target.cup_id == "jack"
+    assert context.policy_run.id == run.id
+    assert context.policy_path == policy_path.resolve()
 
 
 def test_manager_store_rejects_removed_observation_fields(tmp_path: Path) -> None:

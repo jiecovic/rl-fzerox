@@ -1,6 +1,7 @@
 # src/rl_fzerox/apps/run_manager/api/payloads.py
 from __future__ import annotations
 
+from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager import (
     ManagedRun,
     ManagedRunDraft,
@@ -8,6 +9,11 @@ from rl_fzerox.core.manager import (
     ManagedRunMetricSample,
     ManagedRunSummary,
     ManagedRunTemplate,
+    ManagedSaveAttempt,
+    ManagedSaveCourseSetup,
+    ManagedSaveGame,
+    ManagedSaveUnlockProgress,
+    ManagedSaveUnlockTarget,
 )
 from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
@@ -37,6 +43,112 @@ def draft_payload(draft: ManagedRunDraft) -> dict[str, object]:
         "created_at": draft.created_at,
         "updated_at": draft.updated_at,
         "config": draft.config.model_dump(mode="json"),
+    }
+
+
+def save_course_setup_payload(
+    assignment: ManagedSaveCourseSetup,
+) -> dict[str, object]:
+    return {
+        "id": assignment.id,
+        "save_game_id": assignment.save_game_id,
+        "scope": assignment.scope,
+        "difficulty": assignment.difficulty,
+        "cup_id": assignment.cup_id,
+        "course_id": assignment.course_id,
+        "policy_run_id": assignment.policy_run_id,
+        "policy_artifact": assignment.policy_artifact,
+        "created_at": assignment.created_at,
+        "updated_at": assignment.updated_at,
+    }
+
+
+def save_attempt_payload(attempt: ManagedSaveAttempt) -> dict[str, object]:
+    return {
+        "id": attempt.id,
+        "save_game_id": attempt.save_game_id,
+        "target_kind": attempt.target_kind,
+        "policy_run_id": attempt.policy_run_id,
+        "policy_artifact": attempt.policy_artifact,
+        "status": attempt.status,
+        "difficulty": attempt.difficulty,
+        "cup_id": attempt.cup_id,
+        "course_id": attempt.course_id,
+        "started_at": attempt.started_at,
+        "finished_at": attempt.finished_at,
+        "finish_position": attempt.finish_position,
+        "finish_time_s": attempt.finish_time_s,
+        "failure_reason": attempt.failure_reason,
+    }
+
+
+def save_attempt_execution_context_payload(
+    context: SaveAttemptExecutionContext,
+) -> dict[str, object]:
+    """Serialize one resolved career-runner attempt context."""
+
+    return {
+        "save_game": save_game_payload(context.save_game),
+        "attempt": save_attempt_payload(context.attempt),
+        "target": {
+            "kind": context.target.kind,
+            "label": context.target.label,
+            "difficulty": context.course_setup_target.difficulty,
+            "cup_id": context.course_setup_target.cup_id,
+            "course_id": context.course_setup_target.course_id,
+        },
+        "policy_run": run_summary_payload(context.policy_run),
+        "policy_artifact": context.policy_artifact,
+        "policy_path": str(context.policy_path),
+    }
+
+
+def save_unlock_target_payload(target: ManagedSaveUnlockTarget) -> dict[str, object]:
+    return {
+        "sequence_index": target.sequence_index,
+        "kind": target.kind,
+        "status": target.status,
+        "label": target.label,
+        "difficulty": target.difficulty,
+        "cup_id": target.cup_id,
+        "course_id": target.course_id,
+    }
+
+
+def save_unlock_progress_payload(progress: ManagedSaveUnlockProgress) -> dict[str, object]:
+    return {
+        "inspection_status": progress.inspection_status,
+        "completed_count": progress.completed_count,
+        "total_count": progress.total_count,
+        "next_target": None
+        if progress.next_target is None
+        else save_unlock_target_payload(progress.next_target),
+        "targets": [save_unlock_target_payload(target) for target in progress.targets],
+    }
+
+
+def save_game_payload(
+    save_game: ManagedSaveGame,
+    *,
+    runner_active: bool = False,
+    unlock_progress: ManagedSaveUnlockProgress | None = None,
+    attempts: tuple[ManagedSaveAttempt, ...] = (),
+    course_setups: tuple[ManagedSaveCourseSetup, ...] = (),
+) -> dict[str, object]:
+    return {
+        "id": save_game.id,
+        "name": save_game.name,
+        "status": save_game.status,
+        "save_path": str(save_game.save_path),
+        "created_at": save_game.created_at,
+        "updated_at": save_game.updated_at,
+        "last_finished_at": save_game.last_finished_at,
+        "runner_active": runner_active,
+        "unlock_progress": None
+        if unlock_progress is None
+        else save_unlock_progress_payload(unlock_progress),
+        "attempts": [save_attempt_payload(attempt) for attempt in attempts],
+        "course_setups": [save_course_setup_payload(assignment) for assignment in course_setups],
     }
 
 
@@ -139,7 +251,7 @@ def run_metric_payload(sample: ManagedRunMetricSample) -> dict[str, object]:
 def track_sampling_state_payload(
     state: TrackSamplingRuntimeState,
 ) -> dict[str, object]:
-    total_weight = sum(entry.current_weight for entry in state.entries)
+    current_probabilities = _current_probabilities(state)
     target_step_shares = _target_step_shares(state)
     total_episodes = sum(entry.episode_count for entry in state.entries)
     total_frames = sum(entry.completed_frames for entry in state.entries)
@@ -161,9 +273,7 @@ def track_sampling_state_payload(
                 "course_key": entry.course_key,
                 "label": entry.label,
                 "current_weight": entry.current_weight,
-                "current_probability": (
-                    0.0 if total_weight <= 0.0 else entry.current_weight / total_weight
-                ),
+                "current_probability": current_probabilities.get(entry.course_key, 0.0),
                 "episode_count": entry.episode_count,
                 "finished_episode_count": entry.finished_episode_count,
                 "success_sample_count": entry.success_sample_count,
@@ -201,7 +311,21 @@ def track_sampling_state_payload(
     }
 
 
+def _current_probabilities(state: TrackSamplingRuntimeState) -> dict[str, float]:
+    if state.sampling_mode == "fixed_env":
+        probability = 0.0 if not state.entries else 1.0 / len(state.entries)
+        return {entry.course_key: probability for entry in state.entries}
+    total_weight = sum(entry.current_weight for entry in state.entries)
+    if total_weight <= 0.0:
+        return {entry.course_key: 0.0 for entry in state.entries}
+    return {entry.course_key: entry.current_weight / total_weight for entry in state.entries}
+
+
 def _target_step_shares(state: TrackSamplingRuntimeState) -> dict[str, float]:
+    if state.sampling_mode == "fixed_env":
+        return {entry.course_key: 0.0 for entry in state.entries}
+    if state.sampling_mode == "deficit_budget":
+        return _deficit_budget_target_step_shares(state)
     raw_targets = {
         entry.course_key: max(0.0, float(entry.base_weight)) * _target_step_bonus(state, entry)
         for entry in state.entries
@@ -210,6 +334,24 @@ def _target_step_shares(state: TrackSamplingRuntimeState) -> dict[str, float]:
     if total_target <= 0.0:
         return {entry.course_key: 0.0 for entry in state.entries}
     return {course_key: raw_target / total_target for course_key, raw_target in raw_targets.items()}
+
+
+def _deficit_budget_target_step_shares(
+    state: TrackSamplingRuntimeState,
+) -> dict[str, float]:
+    if not state.entries:
+        return {}
+    uniform_share = 1.0 / len(state.entries)
+    adaptive_fraction = max(0.0, min(1.0, float(state.adaptive_completion_weight)))
+    uniform_fraction = 1.0 - adaptive_fraction
+    total_weight = sum(max(0.0, float(entry.current_weight)) for entry in state.entries)
+    if total_weight <= 0.0:
+        return {entry.course_key: uniform_share for entry in state.entries}
+    return {
+        entry.course_key: uniform_fraction * uniform_share
+        + adaptive_fraction * (max(0.0, float(entry.current_weight)) / total_weight)
+        for entry in state.entries
+    }
 
 
 def _target_step_bonus(

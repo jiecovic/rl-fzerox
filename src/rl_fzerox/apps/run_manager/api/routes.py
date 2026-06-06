@@ -1,7 +1,6 @@
 # src/rl_fzerox/apps/run_manager/api/routes.py
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
 from functools import partial
 from typing import Annotated, Literal, ParamSpec, TypeVar
@@ -15,12 +14,16 @@ from starlette.requests import Request
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.contracts import (
     CreateDraftRequest,
+    CreateSaveGameRequest,
     ForkRunRequest,
     LaunchRunRequest,
     RunLauncher,
+    StartCareerModeRequest,
     UpdateDraftRequest,
     UpdateLineageGroupsRequest,
     UpdateRunRequest,
+    UpdateSaveGameRequest,
+    UpsertSaveCourseSetupRequest,
     WatchRenderer,
     WatchRunRequest,
 )
@@ -87,6 +90,94 @@ def create_manager_api_app(
     @app.get("/api/runs")
     async def runs() -> dict[str, list[dict[str, object]]]:
         return await _run_sync(handlers.runs_payload, store)
+
+    @app.get("/api/save-games")
+    async def save_games() -> dict[str, list[dict[str, object]]]:
+        return await _run_sync(handlers.save_games_payload, store)
+
+    @app.post("/api/save-games", status_code=201)
+    async def create_save_game(
+        request: CreateSaveGameRequest,
+    ) -> dict[str, dict[str, object]]:
+        name = request.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="save-game name is required")
+        return await _run_sync(handlers.create_save_game_payload, store, request, name)
+
+    @app.post("/api/save-games/{save_game_id}/open-dir")
+    async def open_save_game_dir(
+        save_game_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, bool]:
+        return await _run_sync(handlers.open_save_game_dir_payload, store, save_game_id)
+
+    @app.put("/api/save-games/{save_game_id}")
+    async def update_save_game(
+        save_game_id: Annotated[str, Path(min_length=1)],
+        request: UpdateSaveGameRequest,
+    ) -> dict[str, dict[str, object]]:
+        name = request.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="save-game name is required")
+        return await _run_sync(
+            handlers.update_save_game_payload,
+            store,
+            save_game_id,
+            UpdateSaveGameRequest(name=name),
+        )
+
+    @app.post("/api/save-games/{save_game_id}/runner")
+    async def start_career_mode(
+        save_game_id: Annotated[str, Path(min_length=1)],
+        request: StartCareerModeRequest | None = None,
+    ) -> dict[str, str]:
+        return await _run_sync(
+            handlers.start_career_mode_payload,
+            launcher,
+            save_game_id,
+            StartCareerModeRequest() if request is None else request,
+        )
+
+    @app.put("/api/save-games/{save_game_id}/course-setups")
+    async def upsert_save_course_setup(
+        save_game_id: Annotated[str, Path(min_length=1)],
+        request: UpsertSaveCourseSetupRequest,
+    ) -> dict[str, dict[str, object]]:
+        return await _run_sync(
+            handlers.upsert_save_course_setup_payload,
+            store,
+            save_game_id,
+            request,
+        )
+
+    @app.post("/api/save-games/{save_game_id}/attempts/next")
+    async def start_next_save_attempt(
+        save_game_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, dict[str, object]]:
+        return await _run_sync(
+            handlers.start_next_save_attempt_payload,
+            store,
+            save_game_id,
+        )
+
+    @app.get("/api/save-attempts/{attempt_id}/execution-context")
+    async def save_attempt_execution_context(
+        attempt_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, object]:
+        return await _run_sync(
+            handlers.save_attempt_execution_context_payload_for_attempt,
+            store,
+            attempt_id,
+        )
+
+    @app.get("/api/save-attempts/{attempt_id}/execution-plan")
+    async def save_attempt_execution_plan(
+        attempt_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, object]:
+        return await _run_sync(
+            handlers.save_attempt_execution_plan_payload_for_attempt,
+            store,
+            attempt_id,
+        )
 
     @app.websocket("/api/runs/live")
     async def live_runs(websocket: WebSocket) -> None:
@@ -276,4 +367,4 @@ def create_manager_api_app(
 
 
 async def _run_sync(function: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
-    return await asyncio.to_thread(partial(function, *args, **kwargs))
+    return partial(function, *args, **kwargs)()

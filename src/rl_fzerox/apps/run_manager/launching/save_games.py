@@ -1,0 +1,129 @@
+# src/rl_fzerox/apps/run_manager/launching/save_games.py
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+from typing import Literal
+
+from rl_fzerox.apps.run_manager.launching.processes import reap_child_when_done
+from rl_fzerox.apps.run_manager.launching.watch import (
+    WatchLaunchStatus,
+    raise_if_watch_exited_early,
+    watch_config_overrides,
+)
+from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.runtime_spec.paths import project_root_dir
+
+WatchRenderer = Literal["angrylion", "gliden64"]
+
+
+def launch_career_mode_runner(
+    *,
+    store: ManagerStore,
+    save_game_id: str,
+    device: Literal["cpu", "cuda"],
+    renderer: WatchRenderer | None,
+    attempt_seed: int | None,
+    deterministic_policy: bool,
+) -> WatchLaunchStatus:
+    """Launch the visible Career Mode runner for one manager-owned save game."""
+
+    save_game = store.get_save_game(save_game_id)
+    if save_game is None:
+        raise ValueError(f"save game not found: {save_game_id}")
+    lease_id = store.viewer_lease_id(kind="career_mode", owner_id=save_game_id)
+    if (
+        active_career_mode_runner_pid(
+            store=store,
+            lease_id=lease_id,
+            save_game_id=save_game_id,
+        )
+        is not None
+    ):
+        return "already_running"
+    store.discard_running_save_attempts(save_game_id=save_game_id)
+    overrides = watch_config_overrides(device=device, renderer=renderer)
+    log_path = manager_career_mode_log_path(save_game_id)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        sys.executable,
+        "-m",
+        "rl_fzerox.apps.career_mode",
+        "--manager-db-path",
+        str(store.db_path),
+        "--save-game-id",
+        save_game_id,
+        "--viewer-lease-id",
+        lease_id,
+        *(
+            ("--attempt-seed", str(attempt_seed))
+            if attempt_seed is not None
+            else ()
+        ),
+        "--policy-mode",
+        "deterministic" if deterministic_policy else "stochastic",
+        "--",
+        *overrides,
+    ]
+    with log_path.open("ab") as log_handle:
+        process = subprocess.Popen(
+            command,
+            cwd=project_root_dir(),
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    store.upsert_viewer_lease(
+        lease_id=lease_id,
+        kind="career_mode",
+        owner_id=save_game_id,
+        pid=process.pid,
+    )
+    try:
+        raise_if_watch_exited_early(process=process, log_path=log_path)
+    except RuntimeError:
+        store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
+        raise
+    reap_child_when_done(process)
+    return "started"
+
+
+def manager_career_mode_log_path(save_game_id: str) -> Path:
+    return (
+        project_root_dir() / "local" / "manager" / "logs" / f"{save_game_id}.career-mode.log"
+    ).resolve()
+
+
+def active_career_mode_runner_pid(
+    *,
+    store: ManagerStore,
+    lease_id: str,
+    save_game_id: str,
+) -> int | None:
+    lease = store.get_viewer_lease(lease_id)
+    if lease is None:
+        return None
+    if lease.kind != "career_mode" or lease.owner_id != save_game_id:
+        store.clear_viewer_lease(lease_id=lease_id)
+        return None
+    if career_mode_process_matches(pid=lease.pid, save_game_id=save_game_id):
+        return lease.pid
+    store.clear_viewer_lease(lease_id=lease_id, pid=lease.pid)
+    return None
+
+
+def career_mode_process_matches(*, pid: int, save_game_id: str) -> bool:
+    proc_dir = Path("/proc") / str(pid)
+    if not proc_dir.is_dir():
+        return False
+    try:
+        cmdline = (proc_dir / "cmdline").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    normalized = cmdline.replace("\x00", " ")
+    return (
+        "rl_fzerox.apps.career_mode" in normalized
+        and f"--save-game-id {save_game_id}" in normalized
+    )

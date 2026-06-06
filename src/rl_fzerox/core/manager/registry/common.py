@@ -10,7 +10,13 @@ from typing import Literal
 from uuid import uuid4
 
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
-from rl_fzerox.core.manager.models import RunCommand, RunStatus
+from rl_fzerox.core.manager.models import (
+    CourseSetupScope,
+    RunCommand,
+    RunStatus,
+    SaveAttemptStatus,
+    SaveGameStatus,
+)
 
 
 def sql_placeholders(count: int) -> str:
@@ -77,6 +83,45 @@ def run_status(value: object) -> RunStatus:
         case "failed":
             return "failed"
     raise ValueError(f"Unsupported managed run status: {value!r}")
+
+
+def save_game_status(value: object) -> SaveGameStatus:
+    match value:
+        case "created":
+            return "created"
+        case "running":
+            return "running"
+        case "paused":
+            return "paused"
+        case "finished":
+            return "finished"
+        case "failed":
+            return "failed"
+    raise ValueError(f"Unsupported managed save-game status: {value!r}")
+
+
+def save_attempt_status(value: object) -> SaveAttemptStatus:
+    match value:
+        case "running":
+            return "running"
+        case "succeeded":
+            return "succeeded"
+        case "failed":
+            return "failed"
+    raise ValueError(f"Unsupported managed save attempt status: {value!r}")
+
+
+def course_setup_scope(value: object) -> CourseSetupScope:
+    match value:
+        case "global":
+            return "global"
+        case "difficulty":
+            return "difficulty"
+        case "cup":
+            return "cup"
+        case "course":
+            return "course"
+    raise ValueError(f"Unsupported save course setup scope: {value!r}")
 
 
 def run_command(value: object) -> RunCommand | None:

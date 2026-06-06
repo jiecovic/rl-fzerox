@@ -13,9 +13,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import rl_fzerox.apps.run_manager.api.handlers.metrics as manager_api_metrics
+import rl_fzerox.apps.run_manager.api.handlers.save_games as manager_api_save_games
 import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
+from rl_fzerox.core.career_mode.progress import default_unlock_targets
 from rl_fzerox.core.manager import (
     ManagedRun,
     ManagedRunConfig,
@@ -77,6 +79,18 @@ class _LauncherStub:
     ) -> Literal["started", "already_running"]:
         del run_id, artifact, device, renderer
         raise AssertionError("watch should not be called")
+
+    def start_career_mode(
+        self,
+        *,
+        save_game_id: str,
+        device: Literal["cpu", "cuda"],
+        renderer: WatchRenderer | None,
+        attempt_seed: int | None,
+        deterministic_policy: bool,
+    ) -> Literal["started", "already_running"]:
+        del save_game_id, device, renderer, attempt_seed, deterministic_policy
+        raise AssertionError("career mode runner should not be called")
 
 
 class _ApiClient:
@@ -145,6 +159,226 @@ async def test_manager_api_creates_draft(tmp_path: Path) -> None:
     assert response.status_code == 201
     payload = response.json()
     assert payload["draft"]["name"] == "Draft"
+
+
+async def test_manager_api_creates_save_game(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["save_game"]["name"] == "Unlock Run"
+    assert "seed" not in payload["save_game"]
+    assert payload["save_game"]["status"] == "created"
+    assert payload["save_game"]["unlock_progress"]["completed_count"] == 0
+    assert payload["save_game"]["unlock_progress"]["total_count"] == len(default_unlock_targets())
+    assert payload["save_game"]["unlock_progress"]["next_target"]["difficulty"] == "novice"
+    assert payload["save_game"]["unlock_progress"]["next_target"]["cup_id"] == "jack"
+    assert payload["save_game"]["attempts"] == []
+    assert payload["save_game"]["course_setups"] == []
+
+    list_response = await client.get("/api/save-games")
+
+    assert list_response.status_code == 200
+    assert list_response.json()["save_games"] == [payload["save_game"]]
+
+
+async def test_manager_api_resets_stale_unstarted_save_game_status(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(name="Unlock Run", save_games_root=tmp_path / "saves")
+    updated = store.update_save_game_status(save_game_id=save_game.id, status="paused")
+    assert updated is not None
+    client = _client(tmp_path, store=store)
+
+    response = await client.get("/api/save-games")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["save_games"][0]["id"] == save_game.id
+    assert payload["save_games"][0]["status"] == "created"
+    assert payload["save_games"][0]["attempts"] == []
+
+
+async def test_manager_api_ignores_old_race_truncation_artifacts_for_start_state(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(name="Unlock Run", save_games_root=tmp_path / "saves")
+    attempt = store.start_save_attempt(
+        save_game_id=save_game.id,
+        target_kind="clear_gp_cup",
+        difficulty="novice",
+        cup_id="jack",
+    )
+    finished = store.finish_save_attempt(
+        attempt_id=attempt.id,
+        status="failed",
+        finish_position=1,
+        failure_reason="race truncated",
+    )
+    assert finished is not None
+    updated = store.update_save_game_status(save_game_id=save_game.id, status="paused")
+    assert updated is not None
+    client = _client(tmp_path, store=store)
+
+    response = await client.get("/api/save-games")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["save_games"][0]["id"] == save_game.id
+    assert payload["save_games"][0]["status"] == "created"
+    assert payload["save_games"][0]["attempts"][0]["failure_reason"] == "race truncated"
+
+
+async def test_manager_api_upserts_save_course_setup(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="policy-run",
+        name="Policy Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    client = _client(tmp_path, store=store)
+    create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+    save_game_id = create_response.json()["save_game"]["id"]
+
+    response = await client.put(
+        f"/api/save-games/{save_game_id}/course-setups",
+        json={
+            "policy_artifact": "best",
+            "policy_run_id": run.id,
+            "scope": "global",
+        },
+    )
+
+    assert response.status_code == 200
+    save_game = response.json()["save_game"]
+    assignments = save_game["course_setups"]
+    assert len(assignments) == 1
+    assert assignments[0]["save_game_id"] == save_game_id
+    assert assignments[0]["policy_run_id"] == "policy-run"
+    assert assignments[0]["policy_artifact"] == "best"
+    assert assignments[0]["scope"] == "global"
+
+
+async def test_manager_api_starts_next_save_attempt(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="policy-run",
+        name="Policy Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    client = _client(tmp_path, store=store)
+    create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+    save_game_id = create_response.json()["save_game"]["id"]
+    await client.put(
+        f"/api/save-games/{save_game_id}/course-setups",
+        json={
+            "policy_artifact": "best",
+            "policy_run_id": run.id,
+            "scope": "global",
+        },
+    )
+
+    response = await client.post(f"/api/save-games/{save_game_id}/attempts/next")
+
+    assert response.status_code == 200
+    save_game = response.json()["save_game"]
+    assert len(save_game["attempts"]) == 1
+    assert save_game["attempts"][0]["save_game_id"] == save_game_id
+    assert save_game["attempts"][0]["target_kind"] == "clear_gp_cup"
+    assert save_game["attempts"][0]["difficulty"] == "novice"
+    assert save_game["attempts"][0]["cup_id"] == "jack"
+    assert save_game["attempts"][0]["policy_run_id"] == "policy-run"
+    assert save_game["attempts"][0]["policy_artifact"] == "best"
+
+    repeated_response = await client.post(f"/api/save-games/{save_game_id}/attempts/next")
+
+    assert repeated_response.status_code == 400
+    assert repeated_response.json()["error"] == "save game already has a running attempt"
+
+
+async def test_manager_api_returns_save_attempt_execution_context(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="policy-run",
+        name="Policy Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    policy_path = _write_policy_artifact(run.run_dir, "best")
+    client = _client(tmp_path, store=store)
+    create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+    save_game_id = create_response.json()["save_game"]["id"]
+    await client.put(
+        f"/api/save-games/{save_game_id}/course-setups",
+        json={
+            "policy_artifact": "best",
+            "policy_run_id": run.id,
+            "scope": "global",
+        },
+    )
+    attempt_response = await client.post(f"/api/save-games/{save_game_id}/attempts/next")
+    attempt = attempt_response.json()["save_game"]["attempts"][0]
+
+    response = await client.get(f"/api/save-attempts/{attempt['id']}/execution-context")
+
+    assert response.status_code == 200
+    context = response.json()["execution_context"]
+    assert context["attempt"]["id"] == attempt["id"]
+    assert context["target"] == {
+        "kind": "clear_gp_cup",
+        "label": "Clear Novice Jack Cup",
+        "difficulty": "novice",
+        "cup_id": "jack",
+        "course_id": None,
+    }
+    assert context["policy_run"]["id"] == "policy-run"
+    assert context["policy_artifact"] == "best"
+    assert context["policy_path"] == str(policy_path.resolve())
+
+    plan_response = await client.get(f"/api/save-attempts/{attempt['id']}/execution-plan")
+
+    assert plan_response.status_code == 200
+    plan = plan_response.json()["execution_plan"]
+    assert plan["attempt"]["id"] == attempt["id"]
+    assert plan["policy"]["run_id"] == "policy-run"
+    assert plan["policy"]["artifact"] == "best"
+    assert plan["policy"]["path"] == str(policy_path.resolve())
+    assert plan["race_setup"]["difficulty"] == "novice"
+    assert plan["race_setup"]["cup_id"] == "jack"
+    assert plan["race_setup"]["vehicle_id"] == "blue_falcon"
+
+
+async def test_manager_api_rejects_duplicate_save_game_name(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    first_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+    assert first_response.status_code == 201
+
+    response = await client.post("/api/save-games", json={"name": "unlock run"})
+
+    assert response.status_code == 409
+    assert response.json()["error"] == "name already exists: unlock run"
+
+
+async def test_manager_api_opens_save_game_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client(tmp_path)
+    create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+    payload = create_response.json()["save_game"]
+    opened_paths: list[Path] = []
+
+    monkeypatch.setattr(manager_api_save_games, "open_directory", opened_paths.append)
+
+    response = await client.post(f"/api/save-games/{payload['id']}/open-dir")
+
+    assert response.status_code == 200
+    assert response.json() == {"opened": True}
+    assert opened_paths == [Path(payload["save_path"]).parent]
 
 
 async def test_manager_api_launches_run(tmp_path: Path) -> None:
@@ -498,6 +732,71 @@ async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) ->
     assert payload["entries"][0]["success_sample_count"] == 2
     assert payload["entries"][0]["success_rate"] == pytest.approx(1.0)
     assert payload["entries"][0]["step_share"] == pytest.approx(0.6)
+
+
+async def test_manager_api_reports_fixed_env_equal_sampling_share(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="run-with-fixed-env-track-pool",
+        name="Fixed Env Track Pool Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "run-with-fixed-env-track-pool",
+    )
+    store.upsert_run_track_sampling_state(
+        run_id=run.id,
+        state=TrackSamplingRuntimeState(
+            sampling_mode="fixed_env",
+            action_repeat=2,
+            update_episodes=4,
+            ema_alpha=0.5,
+            max_weight_scale=5.0,
+            adaptive_completion_weight=0.35,
+            adaptive_target_completion=0.9,
+            adaptive_min_confidence_episodes=24,
+            adaptive_confidence_scale=4.0,
+            update_count=0,
+            episodes_since_update=0,
+            entries=(
+                TrackSamplingRuntimeEntry(
+                    track_id="mute",
+                    course_key="mute_city",
+                    label="Mute City",
+                    base_weight=1.0,
+                    current_weight=1.0,
+                    completed_frames=1200,
+                    episode_count=3,
+                    finished_episode_count=2,
+                    success_sample_count=3,
+                    ema_episode_frames=400.0,
+                    ema_completion_fraction=0.8,
+                ),
+                TrackSamplingRuntimeEntry(
+                    track_id="silence",
+                    course_key="silence",
+                    label="Silence",
+                    base_weight=1.0,
+                    current_weight=1.0,
+                    completed_frames=800,
+                    episode_count=1,
+                    finished_episode_count=1,
+                    success_sample_count=1,
+                    ema_episode_frames=800.0,
+                    ema_completion_fraction=1.0,
+                ),
+            ),
+        ),
+    )
+
+    client = _client(tmp_path, store=store)
+
+    response = await client.get(f"/api/runs/{run.id}/track-sampling")
+
+    assert response.status_code == 200
+    entries = response.json()["state"]["entries"]
+    assert entries[0]["current_probability"] == pytest.approx(0.5)
+    assert entries[1]["current_probability"] == pytest.approx(0.5)
+    assert entries[0]["target_step_share"] == pytest.approx(0.0)
+    assert entries[1]["target_step_share"] == pytest.approx(0.0)
 
 
 def test_manager_api_live_track_sampling_sends_initial_snapshot(tmp_path: Path) -> None:
@@ -984,6 +1283,7 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert "master" in {mode["value"] for mode in payload["gp_difficulties"]}
     assert "step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}
     assert "adaptive_step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}
+    assert "deficit_budget" in {mode["value"] for mode in payload["track_sampling_modes"]}
     assert "jack" in {cup["id"] for cup in payload["track_cups"]}
     assert "mute_city" in {course["id"] for course in payload["built_in_courses"]}
     assert "blue_falcon" in {vehicle["id"] for vehicle in payload["vehicles"]}
@@ -1289,6 +1589,13 @@ def _write_track_sampling_state(store: ManagerStore, run_id: str) -> None:
             ),
         ),
     )
+
+
+def _write_policy_artifact(run_dir: Path, artifact: Literal["latest", "best"]) -> Path:
+    policy_path = run_dir / "checkpoints" / artifact / "policy.zip"
+    policy_path.parent.mkdir(parents=True, exist_ok=True)
+    policy_path.write_bytes(b"fake policy checkpoint")
+    return policy_path
 
 
 def _client(tmp_path: Path, *, store: ManagerStore | None = None) -> _ApiClient:
