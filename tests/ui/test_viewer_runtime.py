@@ -58,17 +58,17 @@ from rl_fzerox.core.runtime_spec.schema import (
     WatchAppConfig,
 )
 from rl_fzerox.core.training.inference import PolicyRunner
+from rl_fzerox.ui.watch.runtime.career_mode.menu import reset_race_progress_info
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
     open_career_mode_runtime_session,
 )
-from rl_fzerox.ui.watch.runtime.career_mode.worker import (
-    _active_policy_timing,
-    _reset_race_progress_info,
-    _set_session_control_timing,
-    _snapshot_action_repeat,
-    _snapshot_target_control_fps,
-    _target_game_fps,
+from rl_fzerox.ui.watch.runtime.career_mode.timing import (
+    active_policy_timing,
+    set_session_control_timing,
+    snapshot_action_repeat,
+    snapshot_target_control_fps,
+    target_game_fps,
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
@@ -350,7 +350,7 @@ def test_career_mode_session_uses_native_menu_cadence(
 
 
 def test_career_mode_menu_info_clears_policy_race_progress() -> None:
-    info = _reset_race_progress_info(
+    info = reset_race_progress_info(
         {
             "episode_step": 123,
             "episode_return": 456.0,
@@ -806,7 +806,7 @@ def test_career_mode_active_policy_timing_preserves_speed_multiplier(
         def snapshot_config(base_config: WatchAppConfig) -> WatchAppConfig:
             return policy_config
 
-    timing = _active_policy_timing(
+    timing = active_policy_timing(
         config,
         _Session(),
         native_control_fps=30.0,
@@ -840,7 +840,7 @@ def test_career_mode_snapshot_target_control_fps_tracks_current_controller(
             return policy_config
 
     assert (
-        _snapshot_target_control_fps(
+        snapshot_target_control_fps(
             config=config,
             session=_Session(),
             native_control_fps=60.0,
@@ -850,7 +850,7 @@ def test_career_mode_snapshot_target_control_fps_tracks_current_controller(
         == 60.0
     )
     assert (
-        _snapshot_target_control_fps(
+        snapshot_target_control_fps(
             config=config,
             session=_Session(),
             native_control_fps=60.0,
@@ -862,8 +862,8 @@ def test_career_mode_snapshot_target_control_fps_tracks_current_controller(
 
 
 def test_career_mode_target_game_fps_uses_active_action_repeat() -> None:
-    assert _target_game_fps(target_control_fps=15.0, action_repeat=4) == 60.0
-    assert _target_game_fps(target_control_fps=None, action_repeat=4) is None
+    assert target_game_fps(target_control_fps=15.0, action_repeat=4) == 60.0
+    assert target_game_fps(target_control_fps=None, action_repeat=4) is None
 
 
 def test_career_mode_menu_snapshots_use_native_frame_repeat(tmp_path: Path) -> None:
@@ -876,8 +876,8 @@ def test_career_mode_menu_snapshots_use_native_frame_repeat(tmp_path: Path) -> N
         env=EnvConfig(action_repeat=4),
     )
 
-    assert _snapshot_action_repeat(config, policy_active=False) == 1
-    assert _snapshot_action_repeat(config, policy_active=True) == 4
+    assert snapshot_action_repeat(config, policy_active=False) == 1
+    assert snapshot_action_repeat(config, policy_active=True) == 4
 
 
 def test_career_mode_session_timing_updates_with_viewer_commands() -> None:
@@ -887,7 +887,7 @@ def test_career_mode_session_timing_updates_with_viewer_commands() -> None:
 
     session = _Session()
 
-    _set_session_control_timing(
+    set_session_control_timing(
         session,
         target_control_fps=60.0,
         target_control_seconds=1.0 / 60.0,
