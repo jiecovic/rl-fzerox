@@ -224,6 +224,33 @@ async def test_manager_api_resets_stale_unstarted_save_game_status(tmp_path: Pat
     assert payload["save_games"][0]["attempts"] == []
 
 
+async def test_manager_api_marks_orphaned_running_save_attempt_failed(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(name="Unlock Run", save_games_root=tmp_path / "saves")
+    attempt = store.start_save_attempt(
+        save_game_id=save_game.id,
+        target_kind="clear_gp_cup",
+        difficulty="novice",
+        cup_id="jack",
+    )
+    updated = store.update_save_game_status(save_game_id=save_game.id, status="running")
+    assert updated is not None
+    client = _client(tmp_path, store=store)
+
+    response = await client.get("/api/save-games")
+
+    assert response.status_code == 200
+    payload = response.json()
+    save_payload = payload["save_games"][0]
+    assert save_payload["id"] == save_game.id
+    assert save_payload["status"] == "created"
+    assert save_payload["attempts"][0]["id"] == attempt.id
+    assert save_payload["attempts"][0]["status"] == "failed"
+    assert save_payload["attempts"][0]["failure_reason"] == "career mode runner process disappeared"
+
+
 async def test_manager_api_ignores_old_race_truncation_artifacts_for_start_state(
     tmp_path: Path,
 ) -> None:

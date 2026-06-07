@@ -22,6 +22,8 @@ from rl_fzerox.core.manager import ManagedSaveAttempt, ManagedSaveGame, ManagerS
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.models import SaveGameStatus
 
+_ORPHAN_RUNNER_FAILURE_REASON = "career mode runner process disappeared"
+
 
 def save_games_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
     items = store.list_save_games()
@@ -186,7 +188,10 @@ def _save_game_payload(
         and any(attempt.status == "running" for attempt in attempts)
         and not runner_active
     ):
-        store.discard_running_save_attempts(save_game_id=save_game.id)
+        store.fail_running_save_attempts(
+            save_game_id=save_game.id,
+            failure_reason=_ORPHAN_RUNNER_FAILURE_REASON,
+        )
         updated = store.update_save_game_status(
             save_game_id=save_game.id,
             status=_status_after_orphan_runner_cleanup(

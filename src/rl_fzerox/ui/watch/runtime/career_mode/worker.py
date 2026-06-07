@@ -25,6 +25,7 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.training.inference import PolicyRunner
@@ -98,6 +99,9 @@ from rl_fzerox.ui.watch.runtime.visualization import (
     refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
 
+_RUNNER_FAILED_REASON = "career mode runner failed"
+_RUNNER_CLOSED_REASON = "career mode runner closed"
+
 
 def run_career_mode_worker(
     config: WatchAppConfig,
@@ -126,6 +130,7 @@ def _run_career_mode_loop(
     controller = CareerModeController.from_config(config)
     load_save_ram(config, session)
 
+    failure_reason = _RUNNER_CLOSED_REASON
     try:
         _run_loaded_career_mode_loop(
             config=config,
@@ -134,8 +139,11 @@ def _run_career_mode_loop(
             command_queue=command_queue,
             snapshot_queue=snapshot_queue,
         )
+    except BaseException:
+        failure_reason = _RUNNER_FAILED_REASON
+        raise
     finally:
-        _close_career_mode(config, session)
+        _close_career_mode(config, session, failure_reason=failure_reason)
         session.close()
 
 
@@ -1048,21 +1056,39 @@ def _required_episode_return(info: Mapping[str, object]) -> float:
     raise RuntimeError("Career Mode policy step did not publish episode_return")
 
 
-def _close_career_mode(config: WatchAppConfig, session: CareerModeRuntimeSession) -> None:
+def _close_career_mode(
+    config: WatchAppConfig,
+    session: CareerModeRuntimeSession,
+    *,
+    failure_reason: str,
+) -> None:
     persist_save_ram(config, session)
     store = store_from_config(config)
     save_game_id = save_game_id_from_config(config)
-    store.discard_running_save_attempts(save_game_id=save_game_id)
-    save_game = store.get_save_game(save_game_id)
-    if save_game is not None and save_game.status == "running":
-        store.update_save_game_status(save_game_id=save_game_id, status="paused")
+    _fail_running_attempts(store, save_game_id=save_game_id, failure_reason=failure_reason)
 
 
 def _mark_runner_failed(config: WatchAppConfig) -> None:
     store = store_from_config(config)
     save_game_id = config.watch.managed_save_game_id
     if save_game_id is not None:
-        store.discard_running_save_attempts(save_game_id=save_game_id)
-        save_game = store.get_save_game(save_game_id)
-        if save_game is not None and save_game.status == "running":
-            store.update_save_game_status(save_game_id=save_game_id, status="paused")
+        _fail_running_attempts(
+            store,
+            save_game_id=save_game_id,
+            failure_reason=_RUNNER_FAILED_REASON,
+        )
+
+
+def _fail_running_attempts(
+    store: ManagerStore,
+    *,
+    save_game_id: str,
+    failure_reason: str,
+) -> None:
+    store.fail_running_save_attempts(
+        save_game_id=save_game_id,
+        failure_reason=failure_reason,
+    )
+    save_game = store.get_save_game(save_game_id)
+    if save_game is not None and save_game.status == "running":
+        store.update_save_game_status(save_game_id=save_game_id, status="paused")
