@@ -99,6 +99,27 @@ def test_missing_course_setup_targets_accepts_course_rows_for_cup_target() -> No
     assert missing == ()
 
 
+def test_resolve_course_setup_preserves_per_course_engine_values() -> None:
+    setups = (
+        _setup("course", "run-1", cup_id="jack", course_id="mute_city", engine=60),
+        _setup("course", "run-2", cup_id="jack", course_id="silence", engine=40),
+    )
+
+    mute_city = resolve_course_setup(
+        setups,
+        CourseSetupTarget(difficulty="novice", cup_id="jack", course_id="mute_city"),
+    )
+    silence = resolve_course_setup(
+        setups,
+        CourseSetupTarget(difficulty="novice", cup_id="jack", course_id="silence"),
+    )
+
+    assert mute_city is not None
+    assert silence is not None
+    assert mute_city.engine_setting_raw_value == 60
+    assert silence.engine_setting_raw_value == 40
+
+
 def test_missing_course_setup_targets_reports_missing_cup_courses() -> None:
     setups = (
         _setup("course", "run-1", cup_id="jack", course_id="mute_city"),
@@ -179,6 +200,7 @@ def _setup(
     difficulty: str | None = None,
     cup_id: str | None = None,
     course_id: str | None = None,
+    engine: int = 50,
     updated_at: str = "2026-01-01T00:00:00Z",
 ) -> ManagedSaveCourseSetup:
     return ManagedSaveCourseSetup(
@@ -188,7 +210,7 @@ def _setup(
         policy_run_id=policy_run_id,
         policy_artifact=policy_artifact,
         vehicle_id="blue_falcon",
-        engine_setting_raw_value=50,
+        engine_setting_raw_value=engine,
         difficulty=difficulty,
         cup_id=cup_id,
         course_id=course_id,

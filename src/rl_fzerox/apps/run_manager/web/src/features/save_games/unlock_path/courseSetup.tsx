@@ -233,15 +233,15 @@ function CupSetupBlock({
   const courseDrafts = courseScopeValues
     .map((scopeValues) => exactCourseSetupDraft(courseSetupDrafts, scopeValues))
     .filter((draft): draft is CourseSetupDraft => draft !== null);
-  const bulkDraft = courseDrafts[0] ?? legacyCupDraft ?? EMPTY_COURSE_SETUP_DRAFT;
+  const fallbackDraft = legacyCupDraft ?? EMPTY_COURSE_SETUP_DRAFT;
+  const bulkDraft = sharedCourseDraft(courseDrafts, courseScopeValues.length) ?? fallbackDraft;
 
   function applyBulkCourseDraft(
     nextDraft: PolicyArtifactDraft,
     options: { replaceEngine: boolean },
   ) {
     for (const scopeValues of courseScopeValues) {
-      const currentDraft =
-        exactCourseSetupDraft(courseSetupDrafts, scopeValues) ?? legacyCupDraft ?? bulkDraft;
+      const currentDraft = exactCourseSetupDraft(courseSetupDrafts, scopeValues) ?? fallbackDraft;
       onCourseSetupDraftChange(scopeValues, {
         ...nextDraft,
         engineSettingRawValue: options.replaceEngine
@@ -299,9 +299,7 @@ function CupSetupBlock({
           {cup.courses.map((course, courseIndex) => {
             const courseScopeValues = courseSetupScopeValues(cup, course.id);
             const courseDraft =
-              exactCourseSetupDraft(courseSetupDrafts, courseScopeValues) ??
-              legacyCupDraft ??
-              bulkDraft;
+              exactCourseSetupDraft(courseSetupDrafts, courseScopeValues) ?? fallbackDraft;
             const updateCourseDraft = (nextDraft: PolicyArtifactDraft) =>
               onCourseSetupDraftChange(courseScopeValues, {
                 ...nextDraft,
@@ -589,6 +587,29 @@ function exactCourseSetupDraft(
   scopeValues: CourseSetupScopeValues,
 ): CourseSetupDraft | null {
   return courseSetupDrafts[courseSetupKey(scopeValues)] ?? null;
+}
+
+function sharedCourseDraft(
+  drafts: readonly CourseSetupDraft[],
+  expectedCount: number,
+): CourseSetupDraft | null {
+  if (expectedCount === 0 || drafts.length !== expectedCount) {
+    return null;
+  }
+  const [firstDraft] = drafts;
+  if (firstDraft === undefined) {
+    return null;
+  }
+  return drafts.every((draft) => policyArtifactDraftsEqual(draft, firstDraft)) ? firstDraft : null;
+}
+
+function policyArtifactDraftsEqual(left: PolicyArtifactDraft, right: PolicyArtifactDraft): boolean {
+  return (
+    left.policyRunId === right.policyRunId &&
+    left.policyArtifact === right.policyArtifact &&
+    left.vehicleId === right.vehicleId &&
+    left.engineSettingRawValue === right.engineSettingRawValue
+  );
 }
 
 export function countDirtyCourseSetups(

@@ -114,6 +114,8 @@ describe("SaveGameWorkspace", () => {
     await user.clear(muteCityEngine);
     await user.type(muteCityEngine, "40");
 
+    expect(screen.getByRole("spinbutton", { name: "Silence engine" })).toHaveValue(50);
+
     await user.click(screen.getByRole("button", { name: "Save 1 change" }));
 
     expect(onUpsertCourseSetup).toHaveBeenCalledTimes(1);
