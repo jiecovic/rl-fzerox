@@ -118,7 +118,7 @@ def test_menu_facts_normalize_native_menu_info() -> None:
     assert not facts.terminal_race_result
 
 
-def test_observed_menu_screen_does_not_let_popup_latch_override_practice() -> None:
+def test_observed_menu_screen_keeps_open_difficulty_popup_owned() -> None:
     facts = MenuFacts.from_info(
         {
             "game_mode": "main_menu",
@@ -131,7 +131,7 @@ def test_observed_menu_screen_does_not_let_popup_latch_override_practice() -> No
             facts,
             difficulty_popup_state=DifficultyPopupState.OPEN,
         )
-        is ObservedMenuScreen.MAIN_MENU_OTHER
+        is ObservedMenuScreen.DIFFICULTY_POPUP
     )
 
 

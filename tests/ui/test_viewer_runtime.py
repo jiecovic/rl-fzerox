@@ -1200,7 +1200,7 @@ def test_career_mode_selects_open_difficulty_after_popup_request() -> None:
     assert controller.phase is CareerPhase.SELECT_DIFFICULTY
 
 
-def test_career_mode_recovers_when_popup_latch_sees_practice_highlight() -> None:
+def test_career_mode_keeps_open_difficulty_popup_owned_with_practice_highlight() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.SELECT_DIFFICULTY)
     controller._difficulty_popup_state = DifficultyPopupState.OPEN
 
@@ -1209,8 +1209,8 @@ def test_career_mode_recovers_when_popup_latch_sees_practice_highlight() -> None
         {"game_mode": "main_menu", "menu_selected_mode_raw": 5},
     )
 
-    assert step.menu_input is MenuInput.UP
-    assert step.phase == "main_menu:practice_to_gp"
+    assert step.menu_input is MenuInput.ACCEPT
+    assert step.phase == "select_difficulty:accept"
 
 
 def test_career_mode_returned_main_menu_waits_when_cursor_is_not_gp() -> None:
