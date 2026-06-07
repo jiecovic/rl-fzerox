@@ -1,17 +1,16 @@
-# src/rl_fzerox/core/envs/runtime.py
+# src/rl_fzerox/core/envs/gym_runtime/runtime.py
 from __future__ import annotations
 
 from collections.abc import Sequence
 
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState, EmulatorBackend, RaceControlState, SpinRequest
+from fzerox_emulator import EmulatorBackend, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import (
     ActionValue,
     DecodedAction,
     DiscreteActionDimension,
-    ResettableActionAdapter,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.engine.components import build_engine_runtime_components
@@ -20,18 +19,13 @@ from rl_fzerox.core.envs.engine.controls import (
     ActionMaskSnapshot,
     apply_control_semantics,
     apply_spin_semantics,
-    sync_dynamic_action_masks,
-)
-from rl_fzerox.core.envs.engine.info import (
-    set_curriculum_info,
-    telemetry_info,
 )
 from rl_fzerox.core.envs.engine.reset import EngineResetCoordinator
 from rl_fzerox.core.envs.engine.stepping import (
     EnvStepRequest,
     WatchEnvStep,
-    set_episode_boost_pad_info,
 )
+from rl_fzerox.core.envs.gym_runtime.reset import reset_gym_episode
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_vector_or_zeros,
@@ -64,18 +58,18 @@ class FZeroXEnvRuntime:
     ) -> None:
         self.backend = backend
         self.config = config
-        components = build_engine_runtime_components(
+        self._components = build_engine_runtime_components(
             backend=backend,
             config=config,
             reward_config=reward_config,
             curriculum_config=curriculum_config,
         )
+        components = self._components
         self._renderer: RendererName = components.renderer
         self._action_config = components.action_config
         self._action_adapter = components.action_adapter
         self._observation_builder = components.observation_builder
         self._reward_tracker = components.reward_tracker
-        self._reward_summary_config = self._reward_tracker.summary_config()
         self._action_space = self._action_adapter.action_space
         self._observation_space = self._observation_builder.space
         self._mask_controller = components.mask_controller
@@ -192,66 +186,13 @@ class FZeroXEnvRuntime:
     def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode and return the first policy observation."""
 
-        selected_track = self._reset_coordinator.select_episode_track(seed)
-        self._episode.begin_reset(active_track=selected_track)
-        reset_result = self._reset_coordinator.reset_race(
+        return reset_gym_episode(
+            backend=self.backend,
+            config=self.config,
+            components=self._components,
+            reset_coordinator=self._reset_coordinator,
             seed=seed,
-            selected_track=selected_track,
         )
-        info = reset_result.info
-        telemetry = reset_result.telemetry
-        self._episode.uses_custom_baseline = reset_result.uses_custom_baseline
-        self.backend.set_controller_state(ControllerState())
-        self._control_state.reset()
-        self._mask_controller.set_lean_allowed_values(
-            self._control_state.lean_action_mask_override()
-        )
-        self._mask_controller.set_spin_allowed_values(None)
-        sync_dynamic_action_masks(
-            mask_controller=self._mask_controller,
-            control_state=self._control_state,
-            telemetry=telemetry,
-            boost_min_energy_fraction=self.config.boost_min_energy_fraction,
-            mask_boost_when_active=self._action_config.mask_boost_when_active,
-            mask_boost_when_airborne=self._action_config.mask_boost_when_airborne,
-        )
-        self._episode.last_telemetry = telemetry
-        self._reward_tracker.reset(
-            telemetry,
-            episode_seed=self._reset_coordinator.reward_episode_seed(seed),
-            course_id=None if selected_track is None else selected_track.course_id,
-        )
-        self._reward_summary_config = self._reward_tracker.summary_config()
-        self._step_assembler.reward_summary_config = self._reward_summary_config
-        if isinstance(self._action_adapter, ResettableActionAdapter):
-            self._action_adapter.reset()
-        info["seed"] = seed
-        set_curriculum_info(
-            info,
-            stage_index=self.curriculum_stage_index,
-            stage_name=self.curriculum_stage_name,
-        )
-        if telemetry is not None:
-            info.update(telemetry_info(telemetry))
-        info.update(self._reward_tracker.info(telemetry))
-        set_episode_boost_pad_info(
-            info,
-            episode_boost_pad_entries=self._episode.boost_pad_entries,
-        )
-        info["episode_airborne_frames"] = self._episode.airborne_frames
-        image_observation = self._observation_builder.render_image()
-        observation = self._observation_builder.build_observation(
-            image=image_observation,
-            telemetry=telemetry,
-            control_state=self._control_state,
-        )
-        self._observation_builder.set_info(
-            info,
-            image_shape=tuple(int(value) for value in image_observation.shape),
-        )
-        self._episode.last_info = dict(info)
-        self._reset_coordinator.advance_reset_count()
-        return observation, info
 
     def step(
         self,
