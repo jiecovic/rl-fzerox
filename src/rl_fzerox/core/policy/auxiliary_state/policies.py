@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/policy/auxiliary_state/policies.py
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 
 import numpy as np
@@ -107,6 +108,8 @@ class _AuxiliaryStatePolicyMixin:
     _auxiliary_state_losses: tuple[AuxiliaryStateLossTerm, ...]
     _auxiliary_state_heads: AuxiliaryStateHeadBank | None
     _grounded_pitch_neutral_loss_weight: float
+    _pitch_std_cap_loss_weight: float
+    _pitch_std_cap: float
     _continuous_pitch_index: int | None
 
     def _init_auxiliary_state(
@@ -131,9 +134,11 @@ class _AuxiliaryStatePolicyMixin:
         self._grounded_pitch_neutral_loss_weight = _grounded_pitch_neutral_loss_weight(
             actor_regularization
         )
+        self._pitch_std_cap_loss_weight = _pitch_std_cap_loss_weight(actor_regularization)
+        self._pitch_std_cap = _pitch_std_cap(actor_regularization)
         self._continuous_pitch_index = _continuous_pitch_index(continuous_action_group_names)
-        if self._grounded_pitch_neutral_loss_weight > 0.0 and self._continuous_pitch_index is None:
-            raise ValueError("grounded pitch neutral loss requires a continuous pitch action group")
+        if self._pitch_actor_regularization_enabled() and self._continuous_pitch_index is None:
+            raise ValueError("pitch actor regularization requires a continuous pitch action group")
 
     def _auxiliary_state_loss(
         self,
@@ -155,18 +160,80 @@ class _AuxiliaryStatePolicyMixin:
         self,
         distribution: object,
         *,
+        actions: torch.Tensor,
         obs: PyTorchObs,
         sample_mask: torch.Tensor | None = None,
     ) -> PolicyAuxiliaryLoss | None:
-        if self._grounded_pitch_neutral_loss_weight <= 0.0:
+        if not self._pitch_actor_regularization_enabled():
             return None
         if self._continuous_pitch_index is None:
             raise RuntimeError("continuous pitch action group was not initialized")
 
-        # Penalize the actor mean rather than sampled actions so the loss
-        # directly pulls the grounded pitch preference toward neutral.
         continuous_mode = _continuous_action_mode(distribution)
         pitch_mean = continuous_mode[:, self._continuous_pitch_index]
+
+        total_loss = pitch_mean.new_zeros(())
+        metrics: dict[str, float] = {}
+
+        mean_loss = self._grounded_pitch_mean_loss(
+            pitch_mean,
+            obs=obs,
+            sample_mask=sample_mask,
+        )
+        if mean_loss is not None:
+            loss_value, weighted_loss = mean_loss
+            total_loss = total_loss + weighted_loss
+            loss = float(loss_value.detach().cpu().item())
+            weighted = float(weighted_loss.detach().cpu().item())
+            metrics.update(
+                {
+                    "actor/grounded_pitch_mean_loss": loss,
+                    "actor/grounded_pitch_mean_loss_weighted": weighted,
+                    "actor/grounded_pitch_neutral": loss,
+                    "actor/grounded_pitch_neutral_weighted": weighted,
+                }
+            )
+
+        std_loss = self._pitch_std_cap_loss(pitch_mean.device)
+        if std_loss is not None:
+            pitch_log_std, pitch_std, loss_value, weighted_loss = std_loss
+            total_loss = total_loss + weighted_loss
+            entropy = pitch_log_std + 0.5 * math.log(2.0 * math.pi * math.e)
+            metrics.update(
+                {
+                    "pitch/log_std": float(pitch_log_std.detach().cpu().item()),
+                    "pitch/std": float(pitch_std.detach().cpu().item()),
+                    "pitch/entropy": float(entropy.detach().cpu().item()),
+                    "pitch/std_cap_loss": float(loss_value.detach().cpu().item()),
+                    "pitch/std_cap_loss_weighted": float(weighted_loss.detach().cpu().item()),
+                }
+            )
+
+        aux_targets = _optional_auxiliary_targets(obs)
+        if aux_targets is not None:
+            metrics.update(
+                _pitch_sample_metrics(
+                    actions,
+                    pitch_mean=pitch_mean,
+                    continuous_pitch_index=self._continuous_pitch_index,
+                    aux_targets=aux_targets,
+                    sample_mask=sample_mask,
+                )
+            )
+
+        if not metrics:
+            return None
+        return PolicyAuxiliaryLoss(total_loss=total_loss, metrics=metrics)
+
+    def _grounded_pitch_mean_loss(
+        self,
+        pitch_mean: torch.Tensor,
+        *,
+        obs: PyTorchObs,
+        sample_mask: torch.Tensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor] | None:
+        if self._grounded_pitch_neutral_loss_weight <= 0.0:
+            return None
         aux_targets = _require_auxiliary_targets(obs)
         airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
         grounded = (aux_targets[:, airborne_index] < 0.5).to(dtype=pitch_mean.dtype)
@@ -174,14 +241,33 @@ class _AuxiliaryStatePolicyMixin:
         loss_value, has_active_samples = _masked_mean(per_sample, sample_mask)
         if not has_active_samples:
             return None
+        return (
+            loss_value,
+            self._grounded_pitch_neutral_loss_weight * loss_value,
+        )
 
-        weighted_loss = self._grounded_pitch_neutral_loss_weight * loss_value
-        return PolicyAuxiliaryLoss(
-            total_loss=weighted_loss,
-            metrics={
-                "actor/grounded_pitch_neutral": float(loss_value.detach().cpu().item()),
-                "actor/grounded_pitch_neutral_weighted": float(weighted_loss.detach().cpu().item()),
-            },
+    def _pitch_std_cap_loss(
+        self,
+        device: torch.device,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | None:
+        if self._pitch_std_cap_loss_weight <= 0.0:
+            return None
+        if self._continuous_pitch_index is None:
+            raise RuntimeError("continuous pitch action group was not initialized")
+        log_std = getattr(self, "log_std", None)
+        if not isinstance(log_std, torch.Tensor):
+            raise TypeError("pitch std cap requires a tensor log_std parameter")
+        pitch_log_std = log_std[self._continuous_pitch_index].to(device=device)
+        pitch_std = pitch_log_std.exp()
+        cap = pitch_std.new_tensor(self._pitch_std_cap)
+        loss_value = torch.relu(pitch_std - cap).square()
+        weighted_loss = self._pitch_std_cap_loss_weight * loss_value
+        return pitch_log_std, pitch_std, loss_value, weighted_loss
+
+    def _pitch_actor_regularization_enabled(self) -> bool:
+        return (
+            self._grounded_pitch_neutral_loss_weight > 0.0
+            or self._pitch_std_cap_loss_weight > 0.0
         )
 
     def _combined_policy_auxiliary_loss(
@@ -189,6 +275,7 @@ class _AuxiliaryStatePolicyMixin:
         *,
         source_latent: torch.Tensor,
         distribution: object,
+        actions: torch.Tensor,
         obs: PyTorchObs,
         sample_mask: torch.Tensor | None = None,
     ) -> PolicyAuxiliaryLoss | None:
@@ -201,6 +288,7 @@ class _AuxiliaryStatePolicyMixin:
                 ),
                 self._actor_regularization_loss(
                     distribution,
+                    actions=actions,
                     obs=obs,
                     sample_mask=sample_mask,
                 ),
@@ -233,6 +321,34 @@ def _grounded_pitch_neutral_loss_weight(
     return weight
 
 
+def _pitch_std_cap_loss_weight(
+    config: Mapping[str, object] | None,
+) -> float:
+    if config is None:
+        return 0.0
+    value = config.get("pitch_std_cap_loss_weight", 0.0)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TypeError("pitch std cap loss weight must be numeric")
+    weight = float(value)
+    if weight < 0.0:
+        raise ValueError("pitch std cap loss weight must be non-negative")
+    return weight
+
+
+def _pitch_std_cap(
+    config: Mapping[str, object] | None,
+) -> float:
+    if config is None:
+        return 0.5
+    value = config.get("pitch_std_cap", 0.5)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TypeError("pitch std cap must be numeric")
+    cap = float(value)
+    if cap <= 0.0:
+        raise ValueError("pitch std cap must be positive")
+    return cap
+
+
 def _continuous_pitch_index(names: Sequence[str]) -> int | None:
     try:
         return tuple(names).index("pitch")
@@ -249,6 +365,62 @@ def _continuous_action_mode(distribution: object) -> torch.Tensor:
     if not isinstance(value, torch.Tensor):
         raise TypeError("Continuous distribution mode must return a tensor")
     return value
+
+
+def _optional_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor | None:
+    if not isinstance(obs, Mapping):
+        return None
+    field_name = auxiliary_state_targets_field()
+    aux_targets = obs.get(field_name)
+    if not isinstance(aux_targets, torch.Tensor):
+        return None
+    return torch.flatten(aux_targets.float(), start_dim=1)
+
+
+def _pitch_sample_metrics(
+    actions: torch.Tensor,
+    *,
+    pitch_mean: torch.Tensor,
+    continuous_pitch_index: int,
+    aux_targets: torch.Tensor,
+    sample_mask: torch.Tensor | None,
+) -> dict[str, float]:
+    airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
+    airborne = (aux_targets[:, airborne_index] >= 0.5).to(dtype=torch.bool)
+    grounded = ~airborne
+    pitch_sample = actions[:, continuous_pitch_index].to(dtype=pitch_mean.dtype)
+    near_saturation = (pitch_sample.abs() > 0.95).to(dtype=pitch_mean.dtype)
+    metrics: dict[str, float] = {
+        "pitch/raw_sample_saturation_fraction": _metric_mean(near_saturation, sample_mask),
+    }
+    scoped_metrics = {
+        "pitch/mean_ground_abs": (pitch_mean.abs(), grounded),
+        "pitch/mean_air_abs": (pitch_mean.abs(), airborne),
+        "pitch/raw_sample_ground_abs": (pitch_sample.abs(), grounded),
+        "pitch/raw_sample_air_abs": (pitch_sample.abs(), airborne),
+    }
+    for name, (values, scope_mask) in scoped_metrics.items():
+        combined_mask = _combined_mask(scope_mask, sample_mask)
+        value, has_active_samples = _masked_mean(values, combined_mask)
+        if has_active_samples:
+            metrics[name] = float(value.detach().cpu().item())
+    return metrics
+
+
+def _metric_mean(values: torch.Tensor, sample_mask: torch.Tensor | None) -> float:
+    value, has_active_samples = _masked_mean(values, sample_mask)
+    if not has_active_samples:
+        return 0.0
+    return float(value.detach().cpu().item())
+
+
+def _combined_mask(
+    scope_mask: torch.Tensor,
+    sample_mask: torch.Tensor | None,
+) -> torch.Tensor:
+    if sample_mask is None:
+        return scope_mask
+    return scope_mask & sample_mask
 
 
 def _masked_mean(
@@ -354,6 +526,7 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
         aux_loss = self._combined_policy_auxiliary_loss(
             source_latent=source_latent,
             distribution=distribution,
+            actions=actions,
             obs=obs,
             sample_mask=auxiliary_mask,
         )
@@ -573,6 +746,7 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         aux_loss = self._combined_policy_auxiliary_loss(
             source_latent=latent_pi_source,
             distribution=distribution,
+            actions=actions,
             obs=obs,
             sample_mask=auxiliary_mask,
         )

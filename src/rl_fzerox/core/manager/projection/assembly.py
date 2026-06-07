@@ -179,10 +179,17 @@ def _entropy_group_weights(config: ManagedRunConfig) -> dict[str, float]:
 
 
 def _actor_regularization_data(config: ManagedRunConfig) -> dict[str, float]:
-    weight = config.train.actor_regularization.grounded_pitch_neutral_loss_weight
+    actor_regularization = config.train.actor_regularization
+    grounded_pitch_neutral_loss_weight = actor_regularization.grounded_pitch_neutral_loss_weight
+    pitch_std_cap_loss_weight = actor_regularization.pitch_std_cap_loss_weight
     if "pitch" not in continuous_action_axes(config):
-        weight = 0.0
-    return {"grounded_pitch_neutral_loss_weight": float(weight)}
+        grounded_pitch_neutral_loss_weight = 0.0
+        pitch_std_cap_loss_weight = 0.0
+    return {
+        "grounded_pitch_neutral_loss_weight": float(grounded_pitch_neutral_loss_weight),
+        "pitch_std_cap_loss_weight": float(pitch_std_cap_loss_weight),
+        "pitch_std_cap": float(actor_regularization.pitch_std_cap),
+    }
 
 
 def effective_train_algorithm(config: ManagedRunConfig) -> str:

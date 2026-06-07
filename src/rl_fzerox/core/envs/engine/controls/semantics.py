@@ -27,6 +27,7 @@ def apply_control_semantics(
         mask_controller=mask_controller,
         mask_air_brake_on_ground=action_config.mask_air_brake_on_ground,
         continuous_air_brake_mode=action_config.continuous_air_brake_mode,
+        hard_zero_ground_pitch=action_config.hard_zero_ground_pitch,
         last_telemetry=last_telemetry,
     )
     return control_state_tracker.apply_lean_semantics(gated_control_state)

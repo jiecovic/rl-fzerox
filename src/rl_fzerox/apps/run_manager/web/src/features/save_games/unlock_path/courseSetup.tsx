@@ -636,7 +636,7 @@ function preferredVehicleSetup({
   const unlockedVehicleSet = new Set(unlockedVehicleIds);
   const fallbackVehicleId = unlockedVehicleSet.has("blue_falcon")
     ? "blue_falcon"
-    : unlockedVehicleIds[0] ?? metadata.vehicles[0]?.id ?? currentDraft.vehicleId;
+    : (unlockedVehicleIds[0] ?? metadata.vehicles[0]?.id ?? currentDraft.vehicleId);
   if (run === null) {
     return {
       engineSettingRawValue: currentDraft.engineSettingRawValue,

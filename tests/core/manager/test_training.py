@@ -199,6 +199,8 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
         "pitch": 0.25,
     }
     config.train.actor_regularization.grounded_pitch_neutral_loss_weight = 0.02
+    config.train.actor_regularization.pitch_std_cap_loss_weight = 0.05
+    config.train.actor_regularization.pitch_std_cap = 0.5
 
     train_config = build_managed_train_app_config(
         config,
@@ -214,6 +216,8 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
         train_config.train.actor_regularization.grounded_pitch_neutral_loss_weight
         == pytest.approx(0.02)
     )
+    assert train_config.train.actor_regularization.pitch_std_cap_loss_weight == pytest.approx(0.05)
+    assert train_config.train.actor_regularization.pitch_std_cap == pytest.approx(0.5)
 
     config.action.pitch_mode = "discrete"
     train_config = build_managed_train_app_config(
@@ -223,6 +227,7 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
     )
 
     assert train_config.train.actor_regularization.grounded_pitch_neutral_loss_weight == 0.0
+    assert train_config.train.actor_regularization.pitch_std_cap_loss_weight == 0.0
 
 
 def test_manager_training_bridge_supports_four_way_categorical_lean(

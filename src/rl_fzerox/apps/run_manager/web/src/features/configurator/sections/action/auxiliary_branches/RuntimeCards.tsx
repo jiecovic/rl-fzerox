@@ -42,6 +42,7 @@ export function RuntimeCards({
   updateTrain,
 }: RuntimeCardsProps) {
   const groundedPitchLossWeight = train.actor_regularization.grounded_pitch_neutral_loss_weight;
+  const pitchStdCapLossWeight = train.actor_regularization.pitch_std_cap_loss_weight;
 
   return (
     <div className="action-behavior-grid">
@@ -461,6 +462,7 @@ export function RuntimeCards({
                         onClick: () =>
                           updateTrain({
                             actor_regularization: {
+                              ...train.actor_regularization,
                               grounded_pitch_neutral_loss_weight: 0,
                             },
                           }),
@@ -472,6 +474,7 @@ export function RuntimeCards({
                         onClick: () =>
                           updateTrain({
                             actor_regularization: {
+                              ...train.actor_regularization,
                               grounded_pitch_neutral_loss_weight:
                                 groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0.01,
                             },
@@ -483,7 +486,7 @@ export function RuntimeCards({
                 <fieldset className="dependent-fieldset" disabled={groundedPitchLossWeight <= 0}>
                   <NumberField
                     help="Coefficient for squared continuous pitch mean while grounded. It affects the actor loss only and does not mask the action."
-                    label="Loss weight"
+                    label="Mean loss weight"
                     resetValue={
                       defaultTrain.actor_regularization.grounded_pitch_neutral_loss_weight
                     }
@@ -492,12 +495,118 @@ export function RuntimeCards({
                     onChange={(value) =>
                       updateTrain({
                         actor_regularization: {
+                          ...train.actor_regularization,
                           grounded_pitch_neutral_loss_weight: Math.max(0, value),
                         },
                       })
                     }
                   />
                 </fieldset>
+              </div>
+              <div className="action-runtime-two-col">
+                <div className="field-shell">
+                  <FieldLabel
+                    help="Add a pitch-only soft cap on the Gaussian std so stochastic pitch cannot stay excessively noisy."
+                    label="Pitch std cap"
+                    onReset={() =>
+                      updateTrain({
+                        actor_regularization: {
+                          ...defaultTrain.actor_regularization,
+                        },
+                      })
+                    }
+                  />
+                  <SegmentedChoiceStrip
+                    ariaLabel="Pitch std cap loss"
+                    options={[
+                      {
+                        active: pitchStdCapLossWeight <= 0,
+                        key: "off",
+                        label: "Off",
+                        onClick: () =>
+                          updateTrain({
+                            actor_regularization: {
+                              ...train.actor_regularization,
+                              pitch_std_cap_loss_weight: 0,
+                            },
+                          }),
+                      },
+                      {
+                        active: pitchStdCapLossWeight > 0,
+                        key: "on",
+                        label: "On",
+                        onClick: () =>
+                          updateTrain({
+                            actor_regularization: {
+                              ...train.actor_regularization,
+                              pitch_std_cap_loss_weight:
+                                pitchStdCapLossWeight > 0 ? pitchStdCapLossWeight : 0.05,
+                            },
+                          }),
+                      },
+                    ]}
+                  />
+                </div>
+                <fieldset className="dependent-fieldset" disabled={pitchStdCapLossWeight <= 0}>
+                  <NumberField
+                    help="Soft upper bound for the pitch Gaussian std. Steering std is not affected."
+                    label="Std cap"
+                    resetValue={defaultTrain.actor_regularization.pitch_std_cap}
+                    step="0.05"
+                    value={train.actor_regularization.pitch_std_cap}
+                    onChange={(value) =>
+                      updateTrain({
+                        actor_regularization: {
+                          ...train.actor_regularization,
+                          pitch_std_cap: Math.max(0.001, value),
+                        },
+                      })
+                    }
+                  />
+                  <NumberField
+                    help="Coefficient for relu(pitch_std - cap)^2. The loss is applied only to the pitch std dimension."
+                    label="Std cap loss weight"
+                    resetValue={defaultTrain.actor_regularization.pitch_std_cap_loss_weight}
+                    step="0.001"
+                    value={pitchStdCapLossWeight > 0 ? pitchStdCapLossWeight : 0}
+                    onChange={(value) =>
+                      updateTrain({
+                        actor_regularization: {
+                          ...train.actor_regularization,
+                          pitch_std_cap_loss_weight: Math.max(0, value),
+                        },
+                      })
+                    }
+                  />
+                </fieldset>
+              </div>
+              <div className="field-shell">
+                <FieldLabel
+                  help="Choose whether the controller forwards raw sampled pitch on the ground or forces the executed pitch value to neutral. This does not change the policy distribution."
+                  label="Grounded pitch output"
+                  onReset={() =>
+                    updateAction({
+                      hard_zero_ground_pitch: defaultAction.hard_zero_ground_pitch,
+                    })
+                  }
+                />
+                <SegmentedChoiceStrip
+                  ariaLabel="Grounded pitch execution"
+                  options={[
+                    {
+                      active: !action.hard_zero_ground_pitch,
+                      key: "raw",
+                      label: "Raw sample",
+                      onClick: () => updateAction({ hard_zero_ground_pitch: false }),
+                    },
+                    {
+                      active: action.hard_zero_ground_pitch,
+                      key: "neutral",
+                      label: "Force neutral",
+                      onClick: () => updateAction({ hard_zero_ground_pitch: true }),
+                    },
+                  ]}
+                />
               </div>
             </>
           ) : null}

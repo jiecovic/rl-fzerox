@@ -209,6 +209,8 @@ def test_hybrid_ppo_accepts_group_entropy_and_pitch_actor_loss() -> None:
         entropy_group_weights={"pitch": 1.0, "steer": 0.0},
         actor_regularization=TrainActorRegularizationConfig(
             grounded_pitch_neutral_loss_weight=0.01,
+            pitch_std_cap_loss_weight=0.05,
+            pitch_std_cap=0.5,
         ),
     )
     env = DummyVecEnv(

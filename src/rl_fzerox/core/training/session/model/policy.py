@@ -25,11 +25,10 @@ def resolve_policy_entry(
 
     from gymnasium import spaces
 
-    actor_regularization_enabled = train_config.actor_regularization.requires_auxiliary_targets()
+    actor_regularization_enabled = train_config.actor_regularization.enabled()
     if actor_regularization_enabled and effective_algorithm not in TRAINING_ALGORITHMS.hybrid:
         raise RuntimeError(
-            "train.actor_regularization.grounded_pitch_neutral_loss_weight requires "
-            "a hybrid action algorithm with continuous pitch"
+            "train.actor_regularization requires a hybrid action algorithm with continuous pitch"
         )
 
     auxiliary_state_enabled = _needs_auxiliary_policy(policy_config, train_config)
@@ -114,7 +113,7 @@ def build_policy_kwargs(
             "continuous": tuple(env_config.action.layout_continuous_axes),
             "discrete": tuple(env_config.action.layout_discrete_axes),
         }
-    if train_config.actor_regularization.requires_auxiliary_targets():
+    if train_config.actor_regularization.enabled():
         policy_kwargs["actor_regularization"] = train_config.actor_regularization.model_dump(
             mode="python"
         )
@@ -130,5 +129,5 @@ def _needs_auxiliary_policy(
 ) -> bool:
     return (
         policy_config.auxiliary_state.enabled
-        or train_config.actor_regularization.requires_auxiliary_targets()
+        or train_config.actor_regularization.enabled()
     )
