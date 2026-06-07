@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import rl_fzerox.core.manager.transfer.archive as transfer_archive
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.manager.transfer import RunBundleError, export_run_bundle, import_run_bundle
 
@@ -131,6 +132,47 @@ def test_run_bundle_import_rejects_path_traversal(tmp_path: Path) -> None:
         )
 
 
+def test_run_bundle_import_rejects_payload_size_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle_path = tmp_path / "too-large.zip"
+    _write_minimal_bundle(
+        bundle_path,
+        payloads={"run/checkpoints/latest/model.zip": b"12345"},
+    )
+    monkeypatch.setattr(transfer_archive, "MAX_RUN_BUNDLE_PAYLOAD_BYTES", 4)
+
+    with pytest.raises(RunBundleError, match="bundle payload exceeds 4 bytes"):
+        import_run_bundle(
+            store=ManagerStore(tmp_path / "manager" / "runs.db"),
+            bundle_path=bundle_path,
+            managed_runs_root=tmp_path / "runs",
+        )
+
+
+def test_run_bundle_import_rejects_payload_file_count_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle_path = tmp_path / "too-many-files.zip"
+    _write_minimal_bundle(
+        bundle_path,
+        payloads={
+            "run/a.txt": b"a",
+            "run/b.txt": b"b",
+        },
+    )
+    monkeypatch.setattr(transfer_archive, "MAX_RUN_BUNDLE_PAYLOAD_FILES", 1)
+
+    with pytest.raises(RunBundleError, match="bundle payload has more than 1 files"):
+        import_run_bundle(
+            store=ManagerStore(tmp_path / "manager" / "runs.db"),
+            bundle_path=bundle_path,
+            managed_runs_root=tmp_path / "runs",
+        )
+
+
 def test_run_bundle_import_does_not_delete_existing_target_dir(tmp_path: Path) -> None:
     source_store = ManagerStore(tmp_path / "source" / "manager" / "runs.db")
     source_run_dir = tmp_path / "source" / "runs" / "run-a" / "run-a"
@@ -161,3 +203,33 @@ def test_run_bundle_import_does_not_delete_existing_target_dir(tmp_path: Path) -
         )
 
     assert sentinel.read_text(encoding="utf-8") == "keep"
+
+
+def _write_minimal_bundle(bundle_path: Path, *, payloads: dict[str, bytes]) -> None:
+    with zipfile.ZipFile(bundle_path, mode="w") as archive:
+        archive.writestr(
+            "run_export.json",
+            json.dumps(
+                {
+                    "format_name": "rl-fzerox-run-bundle",
+                    "schema_version": 1,
+                    "exported_at": "2026-05-20T10:00:00+00:00",
+                    "project_root": "/old/project",
+                    "run": {
+                        "id": "limited-run",
+                        "name": "Limited",
+                        "status": "stopped",
+                        "config": {},
+                        "run_dir": "/old/project/local/runs/limited-run/limited-run",
+                        "lineage_id": "limited-run",
+                        "created_at": "2026-05-20T10:00:00+00:00",
+                    },
+                    "files": [
+                        {"path": path, "size_bytes": len(payload)}
+                        for path, payload in payloads.items()
+                    ],
+                }
+            ),
+        )
+        for path, payload in payloads.items():
+            archive.writestr(path, payload)

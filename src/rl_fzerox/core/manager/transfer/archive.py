@@ -37,6 +37,10 @@ class RunBundleError(RuntimeError):
     """Raised when a run bundle cannot be exported or imported safely."""
 
 
+MAX_RUN_BUNDLE_PAYLOAD_BYTES = 16 * 1024 * 1024 * 1024
+MAX_RUN_BUNDLE_PAYLOAD_FILES = 100_000
+
+
 def default_run_export_path(run_id: str) -> Path:
     """Return the default local export path for one run bundle."""
 
@@ -331,6 +335,8 @@ def _extract_run_payload(
 ) -> None:
     target_run_dir.mkdir(parents=True, exist_ok=False)
     try:
+        payload_bytes = 0
+        payload_files = 0
         for info in archive.infolist():
             if info.filename == layout.manifest_path:
                 continue
@@ -343,6 +349,14 @@ def _extract_run_payload(
             if info.is_dir():
                 target_path.mkdir(parents=True, exist_ok=True)
                 continue
+            payload_files += 1
+            if payload_files > MAX_RUN_BUNDLE_PAYLOAD_FILES:
+                raise RunBundleError(
+                    f"bundle payload has more than {MAX_RUN_BUNDLE_PAYLOAD_FILES} files"
+                )
+            payload_bytes += info.file_size
+            if payload_bytes > MAX_RUN_BUNDLE_PAYLOAD_BYTES:
+                raise RunBundleError(f"bundle payload exceeds {MAX_RUN_BUNDLE_PAYLOAD_BYTES} bytes")
             target_path.parent.mkdir(parents=True, exist_ok=True)
             with archive.open(info, mode="r") as source, target_path.open("wb") as target:
                 shutil.copyfileobj(source, target)

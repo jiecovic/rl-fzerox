@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 import rl_fzerox.apps.run_manager.api.handlers.metrics as manager_api_metrics
 import rl_fzerox.apps.run_manager.api.handlers.save_games as manager_api_save_games
+import rl_fzerox.apps.run_manager.api.handlers.transfer as manager_api_transfer
 import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
@@ -1321,6 +1322,23 @@ def test_manager_api_imports_run_bundle(
     imported_manifest = (imported_run.run_dir / "train_config.yaml").read_text(encoding="utf-8")
     assert str(source_run_dir) not in imported_manifest
     assert str(imported_run.run_dir) in imported_manifest
+
+
+def test_manager_api_rejects_oversized_run_bundle_upload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    monkeypatch.setattr(manager_api_transfer, "MAX_RUN_BUNDLE_UPLOAD_BYTES", 4)
+
+    with TestClient(create_manager_api_app(store, run_launcher=_LauncherStub())) as client:
+        response = client.post(
+            "/api/run-imports",
+            files={"bundle": ("too-large.zip", b"12345", "application/zip")},
+        )
+
+    assert response.status_code == 413
+    assert response.json()["error"] == "run bundle upload exceeds 4 bytes"
 
 
 async def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(
