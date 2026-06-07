@@ -422,6 +422,8 @@ def _career_game_facts(info: dict[str, object]) -> str:
         ("mode", _non_empty_text(info.get("career_mode_fsm_game_mode"))),
         ("course", _format_optional_int(info, "career_mode_fsm_course_index")),
         ("selected", _format_optional_int(info, "career_mode_fsm_selected_mode_raw")),
+        ("diff_state", _format_optional_int(info, "career_mode_fsm_difficulty_state_raw")),
+        ("diff_cursor", _format_optional_int(info, "career_mode_fsm_difficulty_cursor_raw")),
         ("transition", _format_optional_int(info, "career_mode_fsm_transition_raw")),
         ("popup", _non_empty_text(info.get("career_mode_fsm_popup_state"))),
     ]

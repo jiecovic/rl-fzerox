@@ -118,6 +118,15 @@ def _telemetry_from_data(data: dict[str, object] | None) -> FZeroXTelemetry | No
             "camera_setting_raw": _mapping_int(data, "camera_setting_raw"),
             "camera_setting_name": _mapping_str(data, "camera_setting_name"),
             "race_intro_timer": _mapping_int(data, "race_intro_timer"),
+            "menu_selected_mode_raw": _mapping_int(data, "menu_selected_mode_raw"),
+            "menu_difficulty_state_raw": _mapping_int(data, "menu_difficulty_state_raw"),
+            "menu_difficulty_cursor_raw": _mapping_int(data, "menu_difficulty_cursor_raw"),
+            "menu_transition_state_raw": _mapping_int(data, "menu_transition_state_raw"),
+            "menu_current_ghost_type_raw": _mapping_int(
+                data,
+                "menu_current_ghost_type_raw",
+            ),
+            "queued_game_mode_raw": _mapping_int(data, "queued_game_mode_raw"),
         }
     )
 

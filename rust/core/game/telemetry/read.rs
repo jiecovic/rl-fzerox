@@ -72,6 +72,8 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         game_mode_raw,
         game_mode_name: game_mode.map_or("unknown", GameMode::wire_name),
         menu_selected_mode_raw: read_i32(system_ram, GLOBALS.selected_mode)?,
+        menu_difficulty_state_raw: read_i32(system_ram, GLOBALS.difficulty_menu_state)?,
+        menu_difficulty_cursor_raw: read_i32(system_ram, GLOBALS.difficulty_menu_cursor)?,
         menu_transition_state_raw: read_i16(system_ram, GLOBALS.game_mode_change_state)?,
         menu_current_ghost_type_raw: read_i32(system_ram, GLOBALS.current_ghost_type)?,
         queued_game_mode_raw: read_i32(system_ram, GLOBALS.queued_game_mode)?,
@@ -113,6 +115,8 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
     let reverse_timer_end = player_reverse_timer_offset() + size_of::<i32>();
     let ko_star_count_end = GLOBALS.player_ko_stars + size_of::<u8>();
     let menu_selected_mode_end = GLOBALS.selected_mode + size_of::<i32>();
+    let menu_difficulty_state_end = GLOBALS.difficulty_menu_state + size_of::<i32>();
+    let menu_difficulty_cursor_end = GLOBALS.difficulty_menu_cursor + size_of::<i32>();
     let menu_transition_state_end = GLOBALS.game_mode_change_state + size_of::<i16>();
     let menu_current_ghost_type_end = GLOBALS.current_ghost_type + size_of::<i32>();
     let queued_game_mode_end = GLOBALS.queued_game_mode + size_of::<i32>();
@@ -121,6 +125,8 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
         .max(reverse_timer_end)
         .max(ko_star_count_end)
         .max(menu_selected_mode_end)
+        .max(menu_difficulty_state_end)
+        .max(menu_difficulty_cursor_end)
         .max(menu_transition_state_end)
         .max(menu_current_ghost_type_end)
         .max(queued_game_mode_end);

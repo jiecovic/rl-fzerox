@@ -183,6 +183,8 @@ class FZeroXTelemetryDict(TypedDict, total=False):
     camera_setting_name: str | None
     race_intro_timer: int
     menu_selected_mode_raw: int
+    menu_difficulty_state_raw: int
+    menu_difficulty_cursor_raw: int
     menu_transition_state_raw: int
     menu_current_ghost_type_raw: int
     queued_game_mode_raw: int

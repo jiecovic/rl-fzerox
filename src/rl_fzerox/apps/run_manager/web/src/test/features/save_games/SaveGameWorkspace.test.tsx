@@ -52,7 +52,7 @@ describe("SaveGameWorkspace", () => {
     expect(onOpenSaveGameDirectory).toHaveBeenCalledWith("save-002");
   });
 
-  it("stages broad course setup controls and saves concrete courses", async () => {
+  it("stages broad course setup controls and saves cup setups", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture();
     const run = runFixture({ id: "run-policy", name: "fast policy", status: "finished" });
@@ -67,27 +67,69 @@ describe("SaveGameWorkspace", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "Default policy" }), run.id);
     expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
+    await user.click(screen.getByRole("button", { name: "Apply to all cups" }));
     expect(onUpsertCourseSetup).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Save 24 changes" }));
+    await user.click(screen.getByRole("button", { name: "Save 4 changes" }));
 
-    expect(onUpsertCourseSetup).toHaveBeenCalledTimes(24);
+    expect(onUpsertCourseSetup).toHaveBeenCalledTimes(4);
     expect(onUpsertCourseSetup).toHaveBeenCalledWith({
-      courseId: "mute_city",
+      courseId: null,
       cupId: "jack",
       difficulty: null,
       engineSettingRawValue: 50,
       policyArtifact: "best",
       policyRunId: "run-policy",
       saveGameId: "save-001",
-      scope: "course",
+      scope: "cup",
       vehicleId: "blue_falcon",
     });
     expect(onUpsertCourseSetup).not.toHaveBeenCalledWith(
       expect.objectContaining({ scope: "global" }),
     );
-    expect(onUpsertCourseSetup).not.toHaveBeenCalledWith(expect.objectContaining({ scope: "cup" }));
+    expect(onUpsertCourseSetup).not.toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "course" }),
+    );
+  });
+
+  it("counts one dirty change for one course engine override", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture({
+      course_setups: [
+        {
+          ...globalCourseSetupFixture(),
+          id: "assignment-jack-cup",
+          course_id: null,
+          cup_id: "jack",
+          scope: "cup",
+        },
+      ],
+    });
+    const onUpsertCourseSetup = vi.fn().mockResolvedValue(saveGame);
+
+    renderSaveGameWorkspace({
+      saveGame,
+      onUpsertCourseSetup,
+    });
+
+    const muteCityEngine = screen.getByRole("spinbutton", { name: "Mute City engine" });
+    await user.clear(muteCityEngine);
+    await user.type(muteCityEngine, "40");
+
+    await user.click(screen.getByRole("button", { name: "Save 1 change" }));
+
+    expect(onUpsertCourseSetup).toHaveBeenCalledTimes(1);
+    expect(onUpsertCourseSetup).toHaveBeenCalledWith({
+      courseId: "mute_city",
+      cupId: "jack",
+      difficulty: null,
+      engineSettingRawValue: 40,
+      policyArtifact: "best",
+      policyRunId: "run-policy",
+      saveGameId: "save-001",
+      scope: "course",
+      vehicleId: "blue_falcon",
+    });
   });
 
   it("starts the visible career runner for the next target", async () => {
@@ -122,16 +164,16 @@ describe("SaveGameWorkspace", () => {
     expect(await screen.findByText("Runner started.")).toBeInTheDocument();
   });
 
-  it("starts a cup target from concrete course setups", async () => {
+  it("starts a cup target from a cup setup", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
       course_setups: [
         {
           ...globalCourseSetupFixture(),
           id: "assignment-king-1",
-          course_id: "fire_field",
+          course_id: null,
           cup_id: "king",
-          scope: "course",
+          scope: "cup",
         },
       ],
       unlock_progress: {

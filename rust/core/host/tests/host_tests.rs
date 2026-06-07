@@ -292,6 +292,8 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
         game_mode_raw: 1,
         game_mode_name: if in_race_mode { "gp_race" } else { "title" },
         menu_selected_mode_raw: 0,
+        menu_difficulty_state_raw: 0,
+        menu_difficulty_cursor_raw: 0,
         menu_transition_state_raw: 0,
         menu_current_ghost_type_raw: 0,
         queued_game_mode_raw: 0,

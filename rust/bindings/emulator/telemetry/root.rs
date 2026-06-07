@@ -26,6 +26,8 @@ pub struct PyTelemetry {
     game_mode_raw: u32,
     game_mode_name: String,
     menu_selected_mode_raw: i32,
+    menu_difficulty_state_raw: i32,
+    menu_difficulty_cursor_raw: i32,
     menu_transition_state_raw: i16,
     menu_current_ghost_type_raw: i32,
     queued_game_mode_raw: i32,
@@ -55,6 +57,8 @@ impl PyTelemetry {
             game_mode_raw: required_item(data, TELEMETRY_PAYLOAD, "game_mode_raw")?.extract()?,
             game_mode_name: required_item(data, TELEMETRY_PAYLOAD, "game_mode_name")?.extract()?,
             menu_selected_mode_raw: optional_item(data, "menu_selected_mode_raw", 0)?,
+            menu_difficulty_state_raw: optional_item(data, "menu_difficulty_state_raw", 0)?,
+            menu_difficulty_cursor_raw: optional_item(data, "menu_difficulty_cursor_raw", 0)?,
             menu_transition_state_raw: optional_item(data, "menu_transition_state_raw", 0)?,
             menu_current_ghost_type_raw: optional_item(data, "menu_current_ghost_type_raw", 0)?,
             queued_game_mode_raw: optional_item(data, "queued_game_mode_raw", 0)?,
@@ -113,6 +117,16 @@ impl PyTelemetry {
     }
 
     #[getter]
+    fn menu_difficulty_state_raw(&self) -> i32 {
+        self.menu_difficulty_state_raw
+    }
+
+    #[getter]
+    fn menu_difficulty_cursor_raw(&self) -> i32 {
+        self.menu_difficulty_cursor_raw
+    }
+
+    #[getter]
     fn menu_transition_state_raw(&self) -> i16 {
         self.menu_transition_state_raw
     }
@@ -168,7 +182,18 @@ impl PyTelemetry {
         dict.set_item("game_mode_raw", self.game_mode_raw())?;
         dict.set_item("game_mode_name", self.game_mode_name())?;
         dict.set_item("menu_selected_mode_raw", self.menu_selected_mode_raw())?;
-        dict.set_item("menu_transition_state_raw", self.menu_transition_state_raw())?;
+        dict.set_item(
+            "menu_difficulty_state_raw",
+            self.menu_difficulty_state_raw(),
+        )?;
+        dict.set_item(
+            "menu_difficulty_cursor_raw",
+            self.menu_difficulty_cursor_raw(),
+        )?;
+        dict.set_item(
+            "menu_transition_state_raw",
+            self.menu_transition_state_raw(),
+        )?;
         dict.set_item(
             "menu_current_ghost_type_raw",
             self.menu_current_ghost_type_raw(),
@@ -201,6 +226,8 @@ impl PyTelemetry {
             game_mode_raw: telemetry.game_mode_raw,
             game_mode_name: telemetry.game_mode_name.to_owned(),
             menu_selected_mode_raw: telemetry.menu_selected_mode_raw,
+            menu_difficulty_state_raw: telemetry.menu_difficulty_state_raw,
+            menu_difficulty_cursor_raw: telemetry.menu_difficulty_cursor_raw,
             menu_transition_state_raw: telemetry.menu_transition_state_raw,
             menu_current_ghost_type_raw: telemetry.menu_current_ghost_type_raw,
             queued_game_mode_raw: telemetry.queued_game_mode_raw,
