@@ -6,6 +6,8 @@ from typing import Literal
 
 from rl_fzerox.core.career_mode.course_setup import (
     CourseSetupTarget,
+    missing_course_setup_targets,
+    required_course_setup_targets,
     resolve_course_setup,
 )
 from rl_fzerox.core.manager.models import CourseSetupScope, ManagedSaveCourseSetup
@@ -62,6 +64,58 @@ def test_resolve_course_setup_does_not_use_course_rows_for_cup_target() -> None:
     )
 
     assert resolved is None
+
+
+def test_required_course_setup_targets_expands_cup_target_in_game_order() -> None:
+    targets = required_course_setup_targets(
+        CourseSetupTarget(difficulty="novice", cup_id="jack"),
+    )
+
+    assert [target.course_id for target in targets] == [
+        "mute_city",
+        "silence",
+        "sand_ocean",
+        "devils_forest",
+        "big_blue",
+        "port_town",
+    ]
+
+
+def test_missing_course_setup_targets_accepts_course_rows_for_cup_target() -> None:
+    setups = (
+        _setup("course", "run-1", cup_id="jack", course_id="mute_city"),
+        _setup("course", "run-2", cup_id="jack", course_id="silence"),
+        _setup("course", "run-3", cup_id="jack", course_id="sand_ocean"),
+        _setup("course", "run-4", cup_id="jack", course_id="devils_forest"),
+        _setup("course", "run-5", cup_id="jack", course_id="big_blue"),
+        _setup("course", "run-6", cup_id="jack", course_id="port_town"),
+    )
+
+    missing = missing_course_setup_targets(
+        setups,
+        CourseSetupTarget(difficulty="novice", cup_id="jack"),
+    )
+
+    assert missing == ()
+
+
+def test_missing_course_setup_targets_reports_missing_cup_courses() -> None:
+    setups = (
+        _setup("course", "run-1", cup_id="jack", course_id="mute_city"),
+        _setup("course", "run-2", cup_id="jack", course_id="silence"),
+    )
+
+    missing = missing_course_setup_targets(
+        setups,
+        CourseSetupTarget(difficulty="novice", cup_id="jack"),
+    )
+
+    assert [target.course_id for target in missing] == [
+        "sand_ocean",
+        "devils_forest",
+        "big_blue",
+        "port_town",
+    ]
 
 
 def test_resolve_course_setup_treats_missing_scope_fields_as_wildcards() -> None:

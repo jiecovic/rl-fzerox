@@ -249,7 +249,9 @@ export function SaveGameWorkspace({
   const completion = unlockCompletionFraction(targetSummary);
   const nextTarget = nextUnlockTarget(saveGame);
   const nextSetup =
-    nextTarget === null ? null : resolveSavedCourseSetup(saveGame.course_setups, nextTarget);
+    nextTarget === null
+      ? null
+      : resolveSavedCourseSetup(saveGame.course_setups, nextTarget, metadata.built_in_courses);
   const canStartRunner =
     !saveGame.runner_active && !courseSetupDirty && nextTarget !== null && nextSetup !== null;
   const startLabel = saveGame.runner_active
@@ -587,6 +589,28 @@ function DetailRow({
 }
 
 function resolveSavedCourseSetup(
+  setups: readonly ManagedSaveCourseSetup[],
+  target: ManagedSaveUnlockTarget,
+  courses: ConfigMetadata["built_in_courses"],
+): ManagedSaveCourseSetup | null {
+  if (target.course_id === null && target.cup_id !== null) {
+    const cupCourses = courses
+      .filter((course) => course.cup === target.cup_id)
+      .sort((left, right) => left.course_index - right.course_index);
+    if (cupCourses.length > 0) {
+      const resolvedSetups = cupCourses.map((course) =>
+        resolveSavedCourseSetupForCourse(setups, {
+          ...target,
+          course_id: course.id,
+        }),
+      );
+      return resolvedSetups.every((setup) => setup !== null) ? (resolvedSetups[0] ?? null) : null;
+    }
+  }
+  return resolveSavedCourseSetupForCourse(setups, target);
+}
+
+function resolveSavedCourseSetupForCourse(
   setups: readonly ManagedSaveCourseSetup[],
   target: ManagedSaveUnlockTarget,
 ): ManagedSaveCourseSetup | null {

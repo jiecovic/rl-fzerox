@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Literal
 
 from rl_fzerox.core.career_mode.course_setup import (
     CourseSetupTarget,
+    missing_course_setup_targets,
+    required_course_setup_targets,
     resolve_course_setup,
 )
 from rl_fzerox.core.career_mode.progress import (
@@ -201,6 +203,14 @@ def start_next_save_attempt(
             cup_id=target.cup_id,
             course_id=target.course_id,
         )
+        missing_targets = missing_course_setup_targets(course_setups, course_setup_target)
+        if missing_targets:
+            missing_labels = ", ".join(_course_setup_target_label(item) for item in missing_targets)
+            raise ValueError(
+                f"next unlock target has no matching course setup for {missing_labels}"
+            )
+        resolved_targets = required_course_setup_targets(course_setup_target)
+        course_setup_target = resolved_targets[0]
         course_setup = resolve_course_setup(course_setups, course_setup_target)
         if course_setup is None:
             raise ValueError("next unlock target has no matching course setup")
@@ -329,13 +339,25 @@ def get_save_attempt_execution_context(
         if policy_run is None:
             raise KeyError("policy run not found")
 
+        course_setups = save_game_repository.list_course_setups(session, attempt.save_game_id)
         course_setup_target = CourseSetupTarget(
             difficulty=attempt.difficulty,
             cup_id=attempt.cup_id,
             course_id=attempt.course_id,
         )
+        missing_targets = missing_course_setup_targets(
+            course_setups,
+            course_setup_target,
+        )
+        if missing_targets:
+            missing_labels = ", ".join(_course_setup_target_label(item) for item in missing_targets)
+            raise ValueError(
+                f"save attempt is missing a resolved course setup for {missing_labels}"
+            )
+        resolved_targets = required_course_setup_targets(course_setup_target)
+        course_setup_target = resolved_targets[0]
         course_setup = resolve_course_setup(
-            save_game_repository.list_course_setups(session, attempt.save_game_id),
+            course_setups,
             course_setup_target,
         )
         if course_setup is None:
@@ -396,8 +418,8 @@ def upsert_course_setup(
     scope: CourseSetupScope,
     policy_run_id: str,
     policy_artifact: Literal["latest", "best"],
-    vehicle_id: str,
-    engine_setting_raw_value: int,
+    vehicle_id: str = "blue_falcon",
+    engine_setting_raw_value: int = 50,
     difficulty: str | None = None,
     cup_id: str | None = None,
     course_id: str | None = None,
@@ -498,6 +520,15 @@ def _validate_course_setup_scope(
         raise ValueError("cup course setups require cup and may include difficulty")
     if scope == "course" and course_id is None:
         raise ValueError("course course setups require course")
+
+
+def _course_setup_target_label(target: CourseSetupTarget) -> str:
+    parts = [
+        target.difficulty or "*",
+        target.cup_id or "*",
+        target.course_id or "*",
+    ]
+    return "/".join(parts)
 
 
 def _validate_vehicle_setup(*, vehicle_id: str, engine_setting_raw_value: int) -> None:
