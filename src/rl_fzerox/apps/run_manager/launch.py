@@ -292,6 +292,10 @@ class ManagerRunLauncher:
         renderer: Literal["angrylion", "gliden64"] | None,
         attempt_seed: int | None,
         deterministic_policy: bool,
+        target_kind: str | None = None,
+        difficulty: str | None = None,
+        cup_id: str | None = None,
+        course_id: str | None = None,
     ) -> launching.WatchLaunchStatus:
         """Launch the visible Career Mode runner for one save game."""
 
@@ -302,6 +306,10 @@ class ManagerRunLauncher:
             renderer=renderer,
             attempt_seed=attempt_seed,
             deterministic_policy=deterministic_policy,
+            target_kind=target_kind,
+            difficulty=difficulty,
+            cup_id=cup_id,
+            course_id=course_id,
         )
 
     def _request_command(self, *, run_id: str, command: RunCommand) -> ManagedRun:

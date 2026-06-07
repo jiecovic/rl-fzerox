@@ -441,6 +441,17 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         name="Unlock Save",
         save_games_root=tmp_path / "career-saves",
     )
+    run = store.create_run(
+        name="Unlock Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        scope="global",
+        policy_run_id=run.id,
+        policy_artifact="best",
+    )
     launcher = ManagerRunLauncher(store)
     captured: dict[str, object] = {}
 
@@ -475,6 +486,9 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
 
     assert status == "started"
     lease_id = store.viewer_lease_id(kind="career_mode", owner_id=save_game.id)
+    attempts = store.list_save_attempts(save_game.id)
+    assert len(attempts) == 1
+    assert attempts[0].cup_id == "jack"
     assert captured["command"] == [
         sys.executable,
         "-m",
@@ -483,6 +497,8 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         str(store.db_path),
         "--save-game-id",
         save_game.id,
+        "--save-attempt-id",
+        attempts[0].id,
         "--viewer-lease-id",
         lease_id,
         "--attempt-seed",

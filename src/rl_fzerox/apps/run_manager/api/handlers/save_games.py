@@ -162,6 +162,10 @@ def start_career_mode_payload(
             renderer=request.renderer,
             attempt_seed=request.attempt_seed,
             deterministic_policy=request.policy_mode == "deterministic",
+            target_kind=request.target_kind,
+            difficulty=request.difficulty,
+            cup_id=request.cup_id,
+            course_id=request.course_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

@@ -27,6 +27,7 @@ from rl_fzerox.core.manager.models import (
     ManagedSaveCourseSetup,
     ManagedSaveGame,
     ManagedSaveUnlockProgress,
+    ManagedSaveUnlockTarget,
     SaveAttemptStatus,
     SaveGameStatus,
 )
@@ -35,6 +36,8 @@ from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from rl_fzerox.core.manager.store import ManagerStore
 
 
@@ -196,45 +199,54 @@ def start_next_save_attempt(
         progress = build_unlock_progress(save_game.save_path, attempts=attempts)
         if progress.next_target is None:
             raise ValueError("save game has no pending unlock target")
-        target = progress.next_target
-        course_setups = save_game_repository.list_course_setups(session, save_game_id)
-        course_setup_target = CourseSetupTarget(
-            difficulty=target.difficulty,
-            cup_id=target.cup_id,
-            course_id=target.course_id,
-        )
-        missing_targets = missing_course_setup_targets(course_setups, course_setup_target)
-        if missing_targets:
-            missing_labels = ", ".join(_course_setup_target_label(item) for item in missing_targets)
-            raise ValueError(
-                f"next unlock target has no matching course setup for {missing_labels}"
-            )
-        resolved_targets = required_course_setup_targets(course_setup_target)
-        course_setup_target = resolved_targets[0]
-        course_setup = resolve_course_setup(course_setups, course_setup_target)
-        if course_setup is None:
-            raise ValueError("next unlock target has no matching course setup")
-        if not save_game_repository.run_exists(session, course_setup.policy_run_id):
-            raise KeyError("policy run not found")
-        attempt = ManagedSaveAttempt(
-            id=new_record_id(f"{save_game_id} attempt"),
-            save_game_id=save_game_id,
-            target_kind=target.kind,
-            policy_run_id=course_setup.policy_run_id,
-            policy_artifact=course_setup.policy_artifact,
-            status="running",
-            difficulty=target.difficulty,
-            cup_id=target.cup_id,
-            course_id=target.course_id,
-            started_at=started_at,
-        )
-        save_game_repository.insert_save_attempt(session, attempt)
-        save_game_repository.touch_save_game(
+        return _insert_policy_backed_save_attempt(
             session,
             save_game_id=save_game_id,
-            updated_at=started_at,
+            target=progress.next_target,
+            started_at=started_at,
+            error_subject="next unlock target",
         )
-        return attempt
+
+
+def start_target_save_attempt(
+    store: ManagerStore,
+    save_game_id: str,
+    *,
+    target_kind: str,
+    difficulty: str,
+    cup_id: str,
+    course_id: str | None = None,
+) -> ManagedSaveAttempt:
+    """Resolve and record one selected policy-backed unlock attempt."""
+
+    store.initialize()
+    started_at = utc_now()
+    with store._orm_session() as session:
+        save_game = save_game_repository.get_save_game(session, save_game_id)
+        if save_game is None:
+            raise KeyError("save game not found")
+        attempts = save_game_repository.list_save_attempts(session, save_game_id)
+        if any(attempt.status == "running" for attempt in attempts):
+            raise ValueError("save game already has a running attempt")
+        progress = build_unlock_progress(save_game.save_path, attempts=attempts)
+        target = _progress_target(
+            progress,
+            target_kind=target_kind,
+            difficulty=difficulty,
+            cup_id=cup_id,
+            course_id=course_id,
+        )
+        if target is None:
+            raise ValueError("selected unlock target is not part of the unlock path")
+        if target.status != "pending":
+            raise ValueError(f"selected unlock target is {target.status}")
+        return _insert_policy_backed_save_attempt(
+            session,
+            save_game_id=save_game_id,
+            target=target,
+            started_at=started_at,
+            error_subject="selected unlock target",
+        )
 
 
 def start_or_reuse_next_save_attempt(
@@ -489,6 +501,73 @@ def update_save_game_status(
             updated_at=now,
             last_finished_at=last_finished_at,
         )
+
+
+def _insert_policy_backed_save_attempt(
+    session: Session,
+    *,
+    save_game_id: str,
+    target: ManagedSaveUnlockTarget,
+    started_at: str,
+    error_subject: str,
+) -> ManagedSaveAttempt:
+    course_setups = save_game_repository.list_course_setups(session, save_game_id)
+    course_setup_target = CourseSetupTarget(
+        difficulty=target.difficulty,
+        cup_id=target.cup_id,
+        course_id=target.course_id,
+    )
+    missing_targets = missing_course_setup_targets(course_setups, course_setup_target)
+    if missing_targets:
+        missing_labels = ", ".join(_course_setup_target_label(item) for item in missing_targets)
+        raise ValueError(f"{error_subject} has no matching course setup for {missing_labels}")
+    resolved_targets = required_course_setup_targets(course_setup_target)
+    course_setup_target = resolved_targets[0]
+    course_setup = resolve_course_setup(course_setups, course_setup_target)
+    if course_setup is None:
+        raise ValueError(f"{error_subject} has no matching course setup")
+    if not save_game_repository.run_exists(session, course_setup.policy_run_id):
+        raise KeyError("policy run not found")
+    attempt = ManagedSaveAttempt(
+        id=new_record_id(f"{save_game_id} attempt"),
+        save_game_id=save_game_id,
+        target_kind=target.kind,
+        policy_run_id=course_setup.policy_run_id,
+        policy_artifact=course_setup.policy_artifact,
+        status="running",
+        difficulty=target.difficulty,
+        cup_id=target.cup_id,
+        course_id=target.course_id,
+        started_at=started_at,
+    )
+    save_game_repository.insert_save_attempt(session, attempt)
+    save_game_repository.touch_save_game(
+        session,
+        save_game_id=save_game_id,
+        updated_at=started_at,
+    )
+    return attempt
+
+
+def _progress_target(
+    progress: ManagedSaveUnlockProgress,
+    *,
+    target_kind: str,
+    difficulty: str,
+    cup_id: str,
+    course_id: str | None,
+) -> ManagedSaveUnlockTarget | None:
+    return next(
+        (
+            target
+            for target in progress.targets
+            if target.kind == target_kind
+            and target.difficulty == difficulty
+            and target.cup_id == cup_id
+            and target.course_id == course_id
+        ),
+        None,
+    )
 
 
 def _target_for_attempt(attempt: ManagedSaveAttempt) -> UnlockRuleTarget:

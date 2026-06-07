@@ -505,6 +505,24 @@ class ManagerStore:
     ) -> ManagedSaveAttempt:
         return save_game_registry.start_next_save_attempt(self, save_game_id)
 
+    def start_target_save_attempt(
+        self,
+        save_game_id: str,
+        *,
+        target_kind: str,
+        difficulty: str,
+        cup_id: str,
+        course_id: str | None = None,
+    ) -> ManagedSaveAttempt:
+        return save_game_registry.start_target_save_attempt(
+            self,
+            save_game_id,
+            target_kind=target_kind,
+            difficulty=difficulty,
+            cup_id=cup_id,
+            course_id=course_id,
+        )
+
     def start_or_reuse_next_save_attempt(
         self,
         save_game_id: str,

@@ -60,6 +60,7 @@ interface SaveGameWorkspaceProps {
     renderer: WatchRenderer | null,
     attemptSeed: string | null,
     policyMode: PolicyPlaybackMode,
+    target: ManagedSaveUnlockTarget | null,
   ) => Promise<"started" | "already_running">;
   runs: ManagedRun[];
   saveGame: ManagedSaveGame | null;
@@ -175,10 +176,33 @@ export function SaveGameWorkspace({
     }
   }
 
-  async function startCareerMode(target: ManagedSaveGame) {
+  async function startCareerMode(
+    target: ManagedSaveGame,
+    requestedTarget: ManagedSaveUnlockTarget | null = null,
+  ) {
     const attemptSeed = parseAttemptSeed(session.attemptSeedText);
     if (attemptSeed === "invalid") {
       setError("runtime seed must be an integer from 0 to 4294967295");
+      return;
+    }
+    const launchTarget = requestedTarget ?? nextUnlockTarget(target);
+    if (launchTarget === null) {
+      setError("career save has no pending unlock target");
+      return;
+    }
+    if (launchTarget.status !== "pending") {
+      setError("selected unlock target is not pending");
+      return;
+    }
+    if (metadata === null) {
+      setError("run manager metadata is missing");
+      return;
+    }
+    if (
+      resolveSavedCourseSetup(target.course_setups, launchTarget, metadata.built_in_courses) ===
+      null
+    ) {
+      setError("choose a policy for the selected cup");
       return;
     }
     setError(null);
@@ -191,6 +215,7 @@ export function SaveGameWorkspace({
         session.runnerRenderer,
         attemptSeed,
         session.policyMode,
+        requestedTarget,
       );
       setRunnerStatus(status === "started" ? "Runner started." : "Runner is already open.");
       await onRefresh();
@@ -245,15 +270,33 @@ export function SaveGameWorkspace({
     );
   }
 
-  const targetSummary = summarizeSaveGameTargets(saveGame);
+  const activeSaveGame = saveGame;
+  const activeMetadata = metadata;
+  const targetSummary = summarizeSaveGameTargets(activeSaveGame);
   const completion = unlockCompletionFraction(targetSummary);
-  const nextTarget = nextUnlockTarget(saveGame);
+  const nextTarget = nextUnlockTarget(activeSaveGame);
   const nextSetup =
     nextTarget === null
       ? null
-      : resolveSavedCourseSetup(saveGame.course_setups, nextTarget, metadata.built_in_courses);
-  const canStartRunner =
-    !saveGame.runner_active && !courseSetupDirty && nextTarget !== null && nextSetup !== null;
+      : resolveSavedCourseSetup(
+          activeSaveGame.course_setups,
+          nextTarget,
+          activeMetadata.built_in_courses,
+        );
+  function canStartUnlockTarget(target: ManagedSaveUnlockTarget): boolean {
+    return (
+      startingRunnerSaveGameId === null &&
+      !activeSaveGame.runner_active &&
+      !courseSetupDirty &&
+      target.status === "pending" &&
+      resolveSavedCourseSetup(
+        activeSaveGame.course_setups,
+        target,
+        activeMetadata.built_in_courses,
+      ) !== null
+    );
+  }
+  const canStartRunner = nextTarget !== null && canStartUnlockTarget(nextTarget);
   const startLabel = saveGame.runner_active
     ? "Running"
     : careerSaveHasStarted(saveGame)
@@ -377,7 +420,9 @@ export function SaveGameWorkspace({
           metadata={metadata}
           saveGame={saveGame}
           updating={updatingSaveGameId === saveGame.id}
+          canStartTarget={canStartUnlockTarget}
           onCourseSetupDirtyChange={setCourseSetupDirty}
+          onStartTarget={(target) => void startCareerMode(saveGame, target)}
           onUpsertCourseSetup={upsertCourseSetup}
         />
       </article>

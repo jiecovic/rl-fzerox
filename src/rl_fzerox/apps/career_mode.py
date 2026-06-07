@@ -41,6 +41,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 db_path=db_path,
                 attempt_seed=args.attempt_seed,
                 deterministic_policy=args.policy_mode == "deterministic",
+                save_attempt_id=args.save_attempt_id,
                 save_game_id=args.save_game_id,
                 overrides=args.overrides,
             )
@@ -73,6 +74,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="Managed save-game id to run.",
     )
     parser.add_argument(
+        "--save-attempt-id",
+        dest="save_attempt_id",
+        default=None,
+        help="Managed save-attempt id to run.",
+    )
+    parser.add_argument(
         "--viewer-lease-id",
         dest="viewer_lease_id",
         default=None,
@@ -102,14 +109,19 @@ def _resolve_career_mode_config(
     db_path: Path,
     attempt_seed: int | None,
     deterministic_policy: bool,
+    save_attempt_id: str | None,
     save_game_id: str,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
     store = ManagerStore(db_path)
-    attempt = store.start_or_reuse_next_save_attempt(save_game_id)
-    context = store.get_save_attempt_execution_context(attempt.id)
+    if save_attempt_id is None:
+        attempt = store.start_or_reuse_next_save_attempt(save_game_id)
+        save_attempt_id = attempt.id
+    context = store.get_save_attempt_execution_context(save_attempt_id)
     if context is None:
-        raise RuntimeError(f"save attempt disappeared before launch: {attempt.id}")
+        raise RuntimeError(f"save attempt disappeared before launch: {save_attempt_id}")
+    if context.save_game.id != save_game_id:
+        raise ValueError("save attempt does not belong to the requested save game")
     plan = build_save_race_execution_plan(context)
     config = _career_mode_base_config(
         db_path=db_path,

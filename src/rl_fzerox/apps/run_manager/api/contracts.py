@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from rl_fzerox.core.manager import CourseSetupScope, ManagedRun, ManagedRunConfig
 
@@ -40,6 +40,19 @@ class StartCareerModeRequest(BaseModel):
     renderer: WatchRenderer | None = None
     attempt_seed: int | None = Field(default=None, ge=0, le=(1 << 32) - 1)
     policy_mode: PolicyPlaybackMode = "deterministic"
+    target_kind: str | None = None
+    difficulty: str | None = None
+    cup_id: str | None = None
+    course_id: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_target_fields(self) -> StartCareerModeRequest:
+        values = (self.target_kind, self.difficulty, self.cup_id, self.course_id)
+        if not any(value is not None for value in values):
+            return self
+        if self.target_kind is None or self.difficulty is None or self.cup_id is None:
+            raise ValueError("target_kind, difficulty, and cup_id are required together")
+        return self
 
 
 class UpdateSaveGameRequest(BaseModel):
@@ -166,4 +179,8 @@ class RunLauncher(Protocol):
         renderer: WatchRenderer | None,
         attempt_seed: int | None,
         deterministic_policy: bool,
+        target_kind: str | None,
+        difficulty: str | None,
+        cup_id: str | None,
+        course_id: str | None,
     ) -> Literal["started", "already_running"]: ...

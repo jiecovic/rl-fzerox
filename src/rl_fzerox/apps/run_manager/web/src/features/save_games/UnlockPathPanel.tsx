@@ -41,14 +41,18 @@ interface UnlockPathPanelProps {
     vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onCourseSetupDirtyChange: (dirty: boolean) => void;
+  canStartTarget: (target: ManagedSaveUnlockTarget) => boolean;
+  onStartTarget: (target: ManagedSaveUnlockTarget) => void;
   saveGame: ManagedSaveGame;
   updating: boolean;
 }
 
 export function UnlockPathPanel({
   assignableRuns,
+  canStartTarget,
   metadata,
   onCourseSetupDirtyChange,
+  onStartTarget,
   onUpsertCourseSetup,
   saveGame,
   updating,
@@ -154,7 +158,13 @@ export function UnlockPathPanel({
           Game-rule order for GP cup clears. Progress is read from the save file.
         </p>
       </div>
-      <TargetMatrix cups={cups} metadata={metadata} targets={targets} />
+      <TargetMatrix
+        canStartTarget={canStartTarget}
+        cups={cups}
+        metadata={metadata}
+        targets={targets}
+        onStartTarget={onStartTarget}
+      />
       <GlobalPolicyPanel
         assignableRuns={assignableRuns}
         cups={cups}
@@ -180,12 +190,16 @@ export function UnlockPathPanel({
 }
 
 function TargetMatrix({
+  canStartTarget,
   cups,
   metadata,
+  onStartTarget,
   targets,
 }: {
+  canStartTarget: (target: ManagedSaveUnlockTarget) => boolean;
   cups: readonly CupView[];
   metadata: ConfigMetadata;
+  onStartTarget: (target: ManagedSaveUnlockTarget) => void;
   targets: readonly ManagedSaveUnlockTarget[];
 }) {
   const difficulties = metadata.gp_difficulties;
@@ -205,10 +219,27 @@ function TargetMatrix({
                 candidate.difficulty === difficulty.value && candidate.cup_id === cup.id,
             );
             const status = target?.status ?? "pending";
+            const startable = target !== undefined && canStartTarget(target);
             return (
-              <div
+              <button
                 key={`${difficulty.value}:${cup.id}`}
-                className={`grid min-w-0 gap-2 border p-2 ${unlockTargetStatusClass(status)}`}
+                aria-label={
+                  target === undefined
+                    ? `${difficulty.label} ${cup.label} not targeted`
+                    : startable
+                      ? `Start ${target.label}`
+                      : target.label
+                }
+                className={`grid min-w-0 gap-2 border p-2 text-left transition ${
+                  startable ? "cursor-pointer hover:border-app-accent" : "cursor-default"
+                } ${unlockTargetStatusClass(status)}`}
+                disabled={!startable}
+                type="button"
+                onClick={() => {
+                  if (target !== undefined && startable) {
+                    onStartTarget(target);
+                  }
+                }}
               >
                 <div className="flex items-center gap-2">
                   <TrackCupBanner cupId={cup.id} label={cup.label} />
@@ -225,7 +256,7 @@ function TargetMatrix({
                     style={{ width: `${targetCompletionPercent(target)}%` }}
                   />
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

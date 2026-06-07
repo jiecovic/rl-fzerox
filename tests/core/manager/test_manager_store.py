@@ -591,6 +591,42 @@ def test_manager_store_starts_next_save_attempt_from_course_setup(
     assert attempt.status == "running"
 
 
+def test_manager_store_starts_selected_save_attempt_from_course_setup(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Selected Policy Attempt Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    run = store.create_run(
+        name="Selected Unlock Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        scope="global",
+        policy_run_id=run.id,
+        policy_artifact="best",
+    )
+
+    attempt = store.start_target_save_attempt(
+        save_game.id,
+        target_kind="clear_gp_cup",
+        difficulty="novice",
+        cup_id="king",
+    )
+
+    assert attempt.save_game_id == save_game.id
+    assert attempt.target_kind == "clear_gp_cup"
+    assert attempt.policy_run_id == run.id
+    assert attempt.policy_artifact == "best"
+    assert attempt.difficulty == "novice"
+    assert attempt.cup_id == "king"
+    assert attempt.status == "running"
+
+
 def test_manager_store_resolves_save_attempt_execution_context(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     save_game = store.create_save_game(

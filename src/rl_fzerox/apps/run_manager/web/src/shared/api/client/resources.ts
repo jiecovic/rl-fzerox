@@ -16,6 +16,7 @@ import {
   type ManagedRunConfig,
   type ManagedRunDetail,
   type ManagedSaveGame,
+  type ManagedSaveUnlockTarget,
   type ManagedTemplate,
   openRunDirectoryResponseSchema,
   openSaveGameDirectoryResponseSchema,
@@ -134,6 +135,7 @@ export async function startCareerModeRunner(
   renderer: WatchRenderer | null,
   attemptSeed: string | null,
   policyMode: PolicyPlaybackMode,
+  target: ManagedSaveUnlockTarget | null = null,
 ): Promise<"started" | "already_running"> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/runner`, {
     method: "POST",
@@ -143,6 +145,14 @@ export async function startCareerModeRunner(
       renderer,
       attempt_seed: attemptSeed === null ? null : Number(attemptSeed),
       policy_mode: policyMode,
+      ...(target === null
+        ? {}
+        : {
+            target_kind: target.kind,
+            difficulty: target.difficulty,
+            cup_id: target.cup_id,
+            course_id: target.course_id,
+          }),
     }),
   });
   const payload = parseApiPayload(watchRunResponseSchema, await parseJson(response));

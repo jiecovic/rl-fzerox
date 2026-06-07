@@ -157,9 +157,38 @@ describe("SaveGameWorkspace", () => {
       "gliden64",
       "123",
       "stochastic",
+      null,
     );
     expect(onRefresh).toHaveBeenCalled();
     expect(await screen.findByText("Runner started.")).toBeInTheDocument();
+  });
+
+  it("starts the visible career runner for a clicked unlock target", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture({
+      course_setups: [globalCourseSetupFixture()],
+    });
+    const selectedTarget = saveGame.unlock_progress?.targets[1];
+    if (selectedTarget === undefined) {
+      throw new Error("fixture is missing the selected target");
+    }
+    const onStartCareerMode = vi.fn().mockResolvedValue("started");
+
+    renderSaveGameWorkspace({
+      saveGame,
+      onStartCareerMode,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start Clear Novice Queen Cup" }));
+
+    expect(onStartCareerMode).toHaveBeenCalledWith(
+      "save-001",
+      "cuda",
+      "gliden64",
+      "123",
+      "deterministic",
+      selectedTarget,
+    );
   });
 
   it("starts a cup target from a cup setup", async () => {

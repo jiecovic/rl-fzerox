@@ -12,7 +12,7 @@ from rl_fzerox.apps.run_manager.launching.watch import (
     raise_if_watch_exited_early,
     watch_config_overrides,
 )
-from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager import ManagedSaveAttempt, ManagerStore
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
 WatchRenderer = Literal["angrylion", "gliden64"]
@@ -26,6 +26,10 @@ def launch_career_mode_runner(
     renderer: WatchRenderer | None,
     attempt_seed: int | None,
     deterministic_policy: bool,
+    target_kind: str | None = None,
+    difficulty: str | None = None,
+    cup_id: str | None = None,
+    course_id: str | None = None,
 ) -> WatchLaunchStatus:
     """Launch the visible Career Mode runner for one manager-owned save game."""
 
@@ -43,6 +47,14 @@ def launch_career_mode_runner(
     ):
         return "already_running"
     store.discard_running_save_attempts(save_game_id=save_game_id)
+    attempt = _start_runner_attempt(
+        store=store,
+        save_game_id=save_game_id,
+        target_kind=target_kind,
+        difficulty=difficulty,
+        cup_id=cup_id,
+        course_id=course_id,
+    )
     overrides = watch_config_overrides(device=device, renderer=renderer)
     log_path = manager_career_mode_log_path(save_game_id)
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,6 +66,8 @@ def launch_career_mode_runner(
         str(store.db_path),
         "--save-game-id",
         save_game_id,
+        "--save-attempt-id",
+        attempt.id,
         "--viewer-lease-id",
         lease_id,
         *(("--attempt-seed", str(attempt_seed)) if attempt_seed is not None else ()),
@@ -62,15 +76,19 @@ def launch_career_mode_runner(
         "--",
         *overrides,
     ]
-    with log_path.open("ab") as log_handle:
-        process = subprocess.Popen(
-            command,
-            cwd=project_root_dir(),
-            stdin=subprocess.DEVNULL,
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+    try:
+        with log_path.open("ab") as log_handle:
+            process = subprocess.Popen(
+                command,
+                cwd=project_root_dir(),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+    except OSError:
+        store.discard_running_save_attempts(save_game_id=save_game_id)
+        raise
     store.upsert_viewer_lease(
         lease_id=lease_id,
         kind="career_mode",
@@ -81,9 +99,32 @@ def launch_career_mode_runner(
         raise_if_watch_exited_early(process=process, log_path=log_path)
     except RuntimeError:
         store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
+        store.discard_running_save_attempts(save_game_id=save_game_id)
         raise
     reap_child_when_done(process)
     return "started"
+
+
+def _start_runner_attempt(
+    *,
+    store: ManagerStore,
+    save_game_id: str,
+    target_kind: str | None,
+    difficulty: str | None,
+    cup_id: str | None,
+    course_id: str | None,
+) -> ManagedSaveAttempt:
+    if not any(value is not None for value in (target_kind, difficulty, cup_id, course_id)):
+        return store.start_next_save_attempt(save_game_id)
+    if target_kind is None or difficulty is None or cup_id is None:
+        raise ValueError("target_kind, difficulty, and cup_id are required together")
+    return store.start_target_save_attempt(
+        save_game_id,
+        target_kind=target_kind,
+        difficulty=difficulty,
+        cup_id=cup_id,
+        course_id=course_id,
+    )
 
 
 def manager_career_mode_log_path(save_game_id: str) -> Path:

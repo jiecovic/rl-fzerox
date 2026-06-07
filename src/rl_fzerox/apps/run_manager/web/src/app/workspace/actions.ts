@@ -41,6 +41,7 @@ import type {
   ManagedRunConfig,
   ManagedRunDetail,
   ManagedSaveGame,
+  ManagedSaveUnlockTarget,
   PolicyPlaybackMode,
   SavePolicyArtifact,
   WatchDevice,
@@ -116,6 +117,7 @@ export interface WorkspaceActions {
     renderer: WatchRenderer | null,
     attemptSeed: string | null,
     policyMode: PolicyPlaybackMode,
+    target: ManagedSaveUnlockTarget | null,
   ) => Promise<"started" | "already_running">;
 }
 
@@ -356,6 +358,7 @@ export function useWorkspaceActions({
     renderer: WatchRenderer | null,
     attemptSeed: string | null,
     policyMode: PolicyPlaybackMode,
+    target: ManagedSaveUnlockTarget | null,
   ): Promise<"started" | "already_running"> {
     const status = await startCareerModeRunner(
       saveGameId,
@@ -363,6 +366,7 @@ export function useWorkspaceActions({
       renderer,
       attemptSeed,
       policyMode,
+      target,
     );
     await reloadManagerData();
     return status;

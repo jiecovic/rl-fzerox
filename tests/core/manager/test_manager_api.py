@@ -88,8 +88,22 @@ class _LauncherStub:
         renderer: WatchRenderer | None,
         attempt_seed: int | None,
         deterministic_policy: bool,
+        target_kind: str | None,
+        difficulty: str | None,
+        cup_id: str | None,
+        course_id: str | None,
     ) -> Literal["started", "already_running"]:
-        del save_game_id, device, renderer, attempt_seed, deterministic_policy
+        del (
+            save_game_id,
+            device,
+            renderer,
+            attempt_seed,
+            deterministic_policy,
+            target_kind,
+            difficulty,
+            cup_id,
+            course_id,
+        )
         raise AssertionError("career mode runner should not be called")
 
 
@@ -298,6 +312,68 @@ async def test_manager_api_starts_next_save_attempt(tmp_path: Path) -> None:
 
     assert repeated_response.status_code == 400
     assert repeated_response.json()["error"] == "save game already has a running attempt"
+
+
+async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path) -> None:
+    class _RecordingLauncher(_LauncherStub):
+        request: dict[str, object] | None = None
+
+        def start_career_mode(
+            self,
+            *,
+            save_game_id: str,
+            device: Literal["cpu", "cuda"],
+            renderer: WatchRenderer | None,
+            attempt_seed: int | None,
+            deterministic_policy: bool,
+            target_kind: str | None,
+            difficulty: str | None,
+            cup_id: str | None,
+            course_id: str | None,
+        ) -> Literal["started", "already_running"]:
+            self.request = {
+                "save_game_id": save_game_id,
+                "device": device,
+                "renderer": renderer,
+                "attempt_seed": attempt_seed,
+                "deterministic_policy": deterministic_policy,
+                "target_kind": target_kind,
+                "difficulty": difficulty,
+                "cup_id": cup_id,
+                "course_id": course_id,
+            }
+            return "started"
+
+    launcher = _RecordingLauncher()
+    client = _client(tmp_path, launcher=launcher)
+
+    response = await client.post(
+        "/api/save-games/save-001/runner",
+        json={
+            "device": "cpu",
+            "renderer": "gliden64",
+            "attempt_seed": 42,
+            "policy_mode": "stochastic",
+            "target_kind": "clear_gp_cup",
+            "difficulty": "novice",
+            "cup_id": "queen",
+            "course_id": None,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "started"}
+    assert launcher.request == {
+        "save_game_id": "save-001",
+        "device": "cpu",
+        "renderer": "gliden64",
+        "attempt_seed": 42,
+        "deterministic_policy": False,
+        "target_kind": "clear_gp_cup",
+        "difficulty": "novice",
+        "cup_id": "queen",
+        "course_id": None,
+    }
 
 
 async def test_manager_api_returns_save_attempt_execution_context(tmp_path: Path) -> None:
@@ -1598,6 +1674,13 @@ def _write_policy_artifact(run_dir: Path, artifact: Literal["latest", "best"]) -
     return policy_path
 
 
-def _client(tmp_path: Path, *, store: ManagerStore | None = None) -> _ApiClient:
+def _client(
+    tmp_path: Path,
+    *,
+    launcher: _LauncherStub | None = None,
+    store: ManagerStore | None = None,
+) -> _ApiClient:
     resolved_store = store or ManagerStore(tmp_path / "manager" / "runs.db")
-    return _ApiClient(create_manager_api_app(resolved_store, run_launcher=_LauncherStub()))
+    return _ApiClient(
+        create_manager_api_app(resolved_store, run_launcher=launcher or _LauncherStub())
+    )
