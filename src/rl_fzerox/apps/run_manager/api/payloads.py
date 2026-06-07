@@ -95,9 +95,9 @@ def save_attempt_execution_context_payload(
         "target": {
             "kind": context.target.kind,
             "label": context.target.label,
-            "difficulty": context.course_setup_target.difficulty,
-            "cup_id": context.course_setup_target.cup_id,
-            "course_id": context.course_setup_target.course_id,
+            "difficulty": context.target.difficulty,
+            "cup_id": context.target.cup_id,
+            "course_id": context.target.course_id,
         },
         "course_setup": save_course_setup_payload(context.course_setup),
         "policy_run": run_summary_payload(context.policy_run),

@@ -488,6 +488,8 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "course_id",
         "policy_run_id",
         "policy_artifact",
+        "vehicle_id",
+        "engine_setting_raw_value",
         "created_at",
         "updated_at",
     }

@@ -64,7 +64,7 @@ export function GlobalPolicyPanel({
 }) {
   const [draft, setDraft] = useState<PolicyArtifactDraft>(EMPTY_COURSE_SETUP_DRAFT);
   const canApply = !updating && draft.policyRunId !== "";
-  const allCupSetups = cupSetupsForCups(cups);
+  const allCourseSetups = courseSetupsForCups(cups);
 
   return (
     <div className="grid content-start gap-3 border border-app-border bg-app-surface-muted p-4">
@@ -74,16 +74,16 @@ export function GlobalPolicyPanel({
             Default setup
           </h4>
           <p className="m-0 text-sm text-app-muted">
-            Stage a trained policy artifact, then copy it into each cup setup.
+            Stage a trained policy artifact, then copy it into each course setup.
           </p>
         </div>
         <Button
           className="min-w-[160px]"
           disabled={!canApply}
           type="button"
-          onClick={() => onApplySetups(allCupSetups, draft)}
+          onClick={() => onApplySetups(allCourseSetups, draft)}
         >
-          Apply to all cups
+          Apply to all courses
         </Button>
       </div>
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
@@ -155,7 +155,7 @@ export function CourseSetupPanel({
             Course setup
           </h4>
           <p className="m-0 text-sm text-app-muted">
-            Set the cup machine once, then override course policy or engine where needed.
+            Use cup controls as shortcuts, then adjust individual course policy or engine values.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -228,8 +228,28 @@ function CupSetupBlock({
   unlockedVehicleIds: readonly string[];
 }) {
   const cupScopeValues = cupSetupScopeValues(cup);
-  const cupDraft =
-    exactCourseSetupDraft(courseSetupDrafts, cupScopeValues) ?? EMPTY_COURSE_SETUP_DRAFT;
+  const legacyCupDraft = exactCourseSetupDraft(courseSetupDrafts, cupScopeValues);
+  const courseScopeValues = cup.courses.map((course) => courseSetupScopeValues(cup, course.id));
+  const courseDrafts = courseScopeValues
+    .map((scopeValues) => exactCourseSetupDraft(courseSetupDrafts, scopeValues))
+    .filter((draft): draft is CourseSetupDraft => draft !== null);
+  const bulkDraft = courseDrafts[0] ?? legacyCupDraft ?? EMPTY_COURSE_SETUP_DRAFT;
+
+  function applyBulkCourseDraft(
+    nextDraft: PolicyArtifactDraft,
+    options: { replaceEngine: boolean },
+  ) {
+    for (const scopeValues of courseScopeValues) {
+      const currentDraft =
+        exactCourseSetupDraft(courseSetupDrafts, scopeValues) ?? legacyCupDraft ?? bulkDraft;
+      onCourseSetupDraftChange(scopeValues, {
+        ...nextDraft,
+        engineSettingRawValue: options.replaceEngine
+          ? nextDraft.engineSettingRawValue
+          : currentDraft.engineSettingRawValue,
+      });
+    }
+  }
 
   return (
     <details
@@ -251,39 +271,41 @@ function CupSetupBlock({
           <PolicyDraftSelect
             assignableRuns={assignableRuns}
             disabled={updating}
-            draft={cupDraft}
+            draft={bulkDraft}
             label={`${cup.label} policy`}
             metadata={metadata}
             unlockedVehicleIds={unlockedVehicleIds}
             visibleLabel="Policy"
-            onDraftChange={(nextDraft) => onCourseSetupDraftChange(cupScopeValues, nextDraft)}
+            onDraftChange={(nextDraft) => applyBulkCourseDraft(nextDraft, { replaceEngine: true })}
           />
           <ArtifactDraftSelect
             disabled={updating}
-            draft={cupDraft}
+            draft={bulkDraft}
             label={`${cup.label} artifact`}
             visibleLabel="Artifact"
-            onDraftChange={(nextDraft) => onCourseSetupDraftChange(cupScopeValues, nextDraft)}
+            onDraftChange={(nextDraft) => applyBulkCourseDraft(nextDraft, { replaceEngine: false })}
           />
           <VehicleDraftSelect
             disabled={updating}
-            draft={cupDraft}
+            draft={bulkDraft}
             label={`${cup.label} vehicle`}
             metadata={metadata}
             unlockedVehicleIds={unlockedVehicleIds}
             visibleLabel="Vehicle"
-            onDraftChange={(nextDraft) => onCourseSetupDraftChange(cupScopeValues, nextDraft)}
+            onDraftChange={(nextDraft) => applyBulkCourseDraft(nextDraft, { replaceEngine: false })}
           />
         </div>
         <div className="grid grid-cols-1 gap-3 border-t border-app-border pt-3 xl:grid-cols-2 2xl:grid-cols-3">
           {cup.courses.map((course, courseIndex) => {
             const courseScopeValues = courseSetupScopeValues(cup, course.id);
             const courseDraft =
-              exactCourseSetupDraft(courseSetupDrafts, courseScopeValues) ?? cupDraft;
+              exactCourseSetupDraft(courseSetupDrafts, courseScopeValues) ??
+              legacyCupDraft ??
+              bulkDraft;
             const updateCourseDraft = (nextDraft: PolicyArtifactDraft) =>
               onCourseSetupDraftChange(courseScopeValues, {
                 ...nextDraft,
-                vehicleId: cupDraft.vehicleId,
+                vehicleId: bulkDraft.vehicleId,
               });
             return (
               <div
@@ -315,7 +337,7 @@ function CupSetupBlock({
                     disabled={updating}
                     draft={courseDraft}
                     label={`${course.display_name} policy`}
-                    lockedVehicleId={cupDraft.vehicleId}
+                    lockedVehicleId={bulkDraft.vehicleId}
                     metadata={metadata}
                     unlockedVehicleIds={unlockedVehicleIds}
                     visibleLabel="Policy"
@@ -345,8 +367,8 @@ function CupSetupBlock({
   );
 }
 
-function cupSetupsForCups(cups: readonly CupView[]): CourseSetupScopeValues[] {
-  return cups.map(cupSetupScopeValues);
+function courseSetupsForCups(cups: readonly CupView[]): CourseSetupScopeValues[] {
+  return cups.flatMap((cup) => cup.courses.map((course) => courseSetupScopeValues(cup, course.id)));
 }
 
 function cupSetupScopeValues(cup: CupView): CourseSetupScopeValues {

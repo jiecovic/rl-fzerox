@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager.models import CourseSetupScope, ManagedSaveCourseSetup
 
 
@@ -38,6 +39,38 @@ def resolve_course_setup(
         if matching:
             return max(matching, key=_setup_preference_key)
     return None
+
+
+def required_course_setup_targets(
+    target: CourseSetupTarget,
+) -> tuple[CourseSetupTarget, ...]:
+    """Return concrete course targets required to run one unlock target."""
+
+    if target.course_id is not None or target.cup_id is None:
+        return (target,)
+    course_targets = tuple(
+        CourseSetupTarget(
+            difficulty=target.difficulty,
+            cup_id=target.cup_id,
+            course_id=course.id,
+        )
+        for course in sorted(BUILT_IN_COURSES, key=lambda course: course.course_index)
+        if course.cup == target.cup_id
+    )
+    return course_targets or (target,)
+
+
+def missing_course_setup_targets(
+    setups: tuple[ManagedSaveCourseSetup, ...],
+    target: CourseSetupTarget,
+) -> tuple[CourseSetupTarget, ...]:
+    """Return concrete course targets that cannot resolve a setup."""
+
+    return tuple(
+        course_target
+        for course_target in required_course_setup_targets(target)
+        if resolve_course_setup(setups, course_target) is None
+    )
 
 
 def _setup_matches(
