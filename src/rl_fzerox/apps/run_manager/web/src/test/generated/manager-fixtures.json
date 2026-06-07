@@ -1042,14 +1042,6 @@
         "menu_row": 0
       },
       {
-        "character_index": 6,
-        "display_name": "Great Star",
-        "id": "great_star",
-        "machine_select_slot": 9,
-        "menu_column": 3,
-        "menu_row": 1
-      },
-      {
         "character_index": 7,
         "display_name": "Iron Tiger",
         "id": "iron_tiger",
@@ -1066,12 +1058,116 @@
         "menu_row": 1
       },
       {
+        "character_index": 23,
+        "display_name": "Crazy Bear",
+        "id": "crazy_bear",
+        "machine_select_slot": 8,
+        "menu_column": 2,
+        "menu_row": 1
+      },
+      {
+        "character_index": 6,
+        "display_name": "Great Star",
+        "id": "great_star",
+        "machine_select_slot": 9,
+        "menu_column": 3,
+        "menu_row": 1
+      },
+      {
+        "character_index": 25,
+        "display_name": "Big Fang",
+        "id": "big_fang",
+        "machine_select_slot": 10,
+        "menu_column": 4,
+        "menu_row": 1
+      },
+      {
+        "character_index": 27,
+        "display_name": "Mad Wolf",
+        "id": "mad_wolf",
+        "machine_select_slot": 11,
+        "menu_column": 5,
+        "menu_row": 1
+      },
+      {
+        "character_index": 24,
+        "display_name": "Night Thunder",
+        "id": "night_thunder",
+        "machine_select_slot": 12,
+        "menu_column": 0,
+        "menu_row": 2
+      },
+      {
         "character_index": 9,
         "display_name": "Twin Noritta",
         "id": "twin_noritta",
         "machine_select_slot": 13,
         "menu_column": 1,
         "menu_row": 2
+      },
+      {
+        "character_index": 20,
+        "display_name": "Wonder Wasp",
+        "id": "wonder_wasp",
+        "machine_select_slot": 14,
+        "menu_column": 2,
+        "menu_row": 2
+      },
+      {
+        "character_index": 19,
+        "display_name": "Queen Meteor",
+        "id": "queen_meteor",
+        "machine_select_slot": 15,
+        "menu_column": 3,
+        "menu_row": 2
+      },
+      {
+        "character_index": 29,
+        "display_name": "Blood Hawk",
+        "id": "blood_hawk",
+        "machine_select_slot": 16,
+        "menu_column": 4,
+        "menu_row": 2
+      },
+      {
+        "character_index": 17,
+        "display_name": "Astro Robin",
+        "id": "astro_robin",
+        "machine_select_slot": 17,
+        "menu_column": 5,
+        "menu_row": 2
+      },
+      {
+        "character_index": 12,
+        "display_name": "Little Wyvern",
+        "id": "little_wyvern",
+        "machine_select_slot": 18,
+        "menu_column": 0,
+        "menu_row": 3
+      },
+      {
+        "character_index": 22,
+        "display_name": "Death Anchor",
+        "id": "death_anchor",
+        "machine_select_slot": 19,
+        "menu_column": 1,
+        "menu_row": 3
+      },
+      {
+        "character_index": 16,
+        "display_name": "Wild Boar",
+        "id": "wild_boar",
+        "machine_select_slot": 20,
+        "menu_column": 2,
+        "menu_row": 3
+      },
+      {
+        "character_index": 18,
+        "display_name": "King Meteor",
+        "id": "king_meteor",
+        "machine_select_slot": 21,
+        "menu_column": 3,
+        "menu_row": 3
       },
       {
         "character_index": 10,
@@ -1090,19 +1186,27 @@
         "menu_row": 3
       },
       {
-        "character_index": 12,
-        "display_name": "Little Wyvern",
-        "id": "little_wyvern",
-        "machine_select_slot": 18,
-        "menu_column": 0,
-        "menu_row": 3
-      },
-      {
         "character_index": 13,
         "display_name": "Space Angler",
         "id": "space_angler",
         "machine_select_slot": 24,
         "menu_column": 0,
+        "menu_row": 4
+      },
+      {
+        "character_index": 26,
+        "display_name": "Mighty Typhoon",
+        "id": "mighty_typhoon",
+        "machine_select_slot": 25,
+        "menu_column": 1,
+        "menu_row": 4
+      },
+      {
+        "character_index": 21,
+        "display_name": "Hyper Speeder",
+        "id": "hyper_speeder",
+        "machine_select_slot": 26,
+        "menu_column": 2,
         "menu_row": 4
       },
       {
@@ -1122,116 +1226,12 @@
         "menu_row": 4
       },
       {
-        "character_index": 16,
-        "display_name": "Wild Boar",
-        "id": "wild_boar",
-        "machine_select_slot": 20,
-        "menu_column": 2,
-        "menu_row": 3
-      },
-      {
-        "character_index": 17,
-        "display_name": "Astro Robin",
-        "id": "astro_robin",
-        "machine_select_slot": 17,
-        "menu_column": 5,
-        "menu_row": 2
-      },
-      {
-        "character_index": 18,
-        "display_name": "King Meteor",
-        "id": "king_meteor",
-        "machine_select_slot": 21,
-        "menu_column": 3,
-        "menu_row": 3
-      },
-      {
-        "character_index": 19,
-        "display_name": "Queen Meteor",
-        "id": "queen_meteor",
-        "machine_select_slot": 15,
-        "menu_column": 3,
-        "menu_row": 2
-      },
-      {
-        "character_index": 20,
-        "display_name": "Wonder Wasp",
-        "id": "wonder_wasp",
-        "machine_select_slot": 14,
-        "menu_column": 2,
-        "menu_row": 2
-      },
-      {
-        "character_index": 21,
-        "display_name": "Hyper Speeder",
-        "id": "hyper_speeder",
-        "machine_select_slot": 26,
-        "menu_column": 2,
-        "menu_row": 4
-      },
-      {
-        "character_index": 22,
-        "display_name": "Death Anchor",
-        "id": "death_anchor",
-        "machine_select_slot": 19,
-        "menu_column": 1,
-        "menu_row": 3
-      },
-      {
-        "character_index": 23,
-        "display_name": "Crazy Bear",
-        "id": "crazy_bear",
-        "machine_select_slot": 8,
-        "menu_column": 2,
-        "menu_row": 1
-      },
-      {
-        "character_index": 24,
-        "display_name": "Night Thunder",
-        "id": "night_thunder",
-        "machine_select_slot": 12,
-        "menu_column": 0,
-        "menu_row": 2
-      },
-      {
-        "character_index": 25,
-        "display_name": "Big Fang",
-        "id": "big_fang",
-        "machine_select_slot": 10,
-        "menu_column": 4,
-        "menu_row": 1
-      },
-      {
-        "character_index": 26,
-        "display_name": "Mighty Typhoon",
-        "id": "mighty_typhoon",
-        "machine_select_slot": 25,
-        "menu_column": 1,
-        "menu_row": 4
-      },
-      {
-        "character_index": 27,
-        "display_name": "Mad Wolf",
-        "id": "mad_wolf",
-        "machine_select_slot": 11,
-        "menu_column": 5,
-        "menu_row": 1
-      },
-      {
         "character_index": 28,
         "display_name": "Sonic Phantom",
         "id": "sonic_phantom",
         "machine_select_slot": 29,
         "menu_column": 5,
         "menu_row": 4
-      },
-      {
-        "character_index": 29,
-        "display_name": "Blood Hawk",
-        "id": "blood_hawk",
-        "machine_select_slot": 16,
-        "menu_column": 4,
-        "menu_row": 2
       }
     ]
   },
@@ -1256,6 +1256,7 @@
       "enable_pitch": true,
       "enable_spin": false,
       "force_full_throttle": false,
+      "hard_zero_ground_pitch": false,
       "include_air_brake": true,
       "include_boost": true,
       "include_lean": true,
@@ -1510,7 +1511,9 @@
     },
     "train": {
       "actor_regularization": {
-        "grounded_pitch_neutral_loss_weight": 0.0
+        "grounded_pitch_neutral_loss_weight": 0.0,
+        "pitch_std_cap": 0.5,
+        "pitch_std_cap_loss_weight": 0.0
       },
       "batch_size": 1024,
       "checkpoint_every_rollouts": 5,

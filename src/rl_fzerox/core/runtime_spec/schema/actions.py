@@ -156,6 +156,7 @@ class ActionRuntimeConfig:
     boost_request_lockout_frames: int
     lean_unmask_min_speed_kph: float | None
     lean_initial_lockout_frames: int
+    hard_zero_ground_pitch: bool
     pitch_deadzone: float
     pitch_buckets: int
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...]
@@ -237,6 +238,7 @@ class ActionRuntimeConfig:
                 else float(config.lean_unmask_min_speed_kph)
             ),
             lean_initial_lockout_frames=int(config.lean_initial_lockout_frames),
+            hard_zero_ground_pitch=bool(config.hard_zero_ground_pitch),
             pitch_deadzone=float(config.pitch_deadzone),
             pitch_buckets=int(config.pitch_buckets),
             layout_continuous_axes=tuple(config.layout_continuous_axes),
@@ -271,6 +273,7 @@ class ActionConfig(BaseModel):
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0
+    hard_zero_ground_pitch: bool = False
     pitch_deadzone: float = Field(default=0.1, ge=0.0, lt=1.0)
     pitch_buckets: int = Field(default=5, ge=3)
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...] = ()

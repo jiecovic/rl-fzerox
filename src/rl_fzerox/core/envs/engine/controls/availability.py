@@ -66,6 +66,7 @@ def apply_dynamic_control_gates(
     mask_controller: ActionMaskController,
     mask_air_brake_on_ground: bool,
     continuous_air_brake_mode: ContinuousAirBrakeMode,
+    hard_zero_ground_pitch: bool,
     last_telemetry: FZeroXTelemetry | None,
 ) -> RaceControlState:
     """Suppress requested controls that are not available for the current frame."""
@@ -112,6 +113,8 @@ def apply_dynamic_control_gates(
     if last_telemetry is not None and not last_telemetry.player.airborne:
         if mask_air_brake_on_ground or continuous_air_brake_mode == "disable_on_ground":
             control_state = without_controls(control_state, air_brake=True)
+        if hard_zero_ground_pitch:
+            control_state = with_pitch(control_state, 0.0)
     return control_state
 
 
