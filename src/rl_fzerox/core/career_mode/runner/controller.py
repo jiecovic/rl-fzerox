@@ -158,6 +158,7 @@ class CareerModeController:
         self._continuing_race_result = False
         self._observed_terminal_race_result = False
         self._continue_after_race_pulses = 0
+        self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
         self._course_setups = self._store.list_save_course_setups(save_game_id)
         self._unlock_progress = self._store.save_game_unlock_progress(save_game_id)
@@ -202,6 +203,8 @@ class CareerModeController:
         session: CareerRuntimeSession,
         info: dict[str, object],
     ) -> bool:
+        if self._sync_post_terminal_save_progress(session=session, info=info):
+            return True
         return self._sync_camera_before_policy_handoff(session=session, info=info)
 
     def next_raw_step(self, *, info: dict[str, object]) -> RawMenuStep | None:
@@ -798,6 +801,7 @@ class CareerModeController:
         self._continuing_race_result = True
         self._observed_terminal_race_result = True
         self._continue_after_race_pulses = 0
+        self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
@@ -811,6 +815,7 @@ class CareerModeController:
         self._continuing_race_result = True
         self._observed_terminal_race_result = True
         self._continue_after_race_pulses = 0
+        self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
@@ -877,6 +882,35 @@ class CareerModeController:
             self._camera_sync_taps = tap_count if isinstance(tap_count, int) else 0
         return True
 
+    def _sync_post_terminal_save_progress(
+        self,
+        *,
+        session: CareerRuntimeSession,
+        info: dict[str, object],
+    ) -> bool:
+        if (
+            self._phase != CareerPhase.CONTINUE_AFTER_RACE
+            or self._attempt_id is None
+            or not self._observed_terminal_race_result
+        ):
+            return False
+        facts = MenuFacts.from_info(info)
+        if not _post_terminal_progress_screen(facts):
+            return False
+        if self._last_progress_sync_continue_pulse == self._continue_after_race_pulses:
+            return False
+
+        self._last_progress_sync_continue_pulse = self._continue_after_race_pulses
+        persist_save_ram_for_store(self._store, self._save_game_id, session)
+        progress = self._store.save_game_unlock_progress(self._save_game_id)
+        self._unlock_progress = progress
+        if not _target_succeeded(progress.targets, self._setup):
+            return False
+
+        self._finish_attempt(info=info, status="succeeded", failure_reason=None)
+        self._advance_after_finished_attempt()
+        return True
+
     def _reset_camera_sync(self) -> None:
         self._camera_synced = self._camera_setting is None
         self._camera_sync_taps = 0
@@ -919,6 +953,15 @@ class CareerModeController:
 
 def _is_neutral_settle_step(step: RawMenuStep) -> bool:
     return step.menu_input is MenuInput.NEUTRAL and step.phase.endswith(":settle")
+
+
+def _post_terminal_progress_screen(facts: MenuFacts) -> bool:
+    return (
+        facts.is_gp_result_screen
+        or facts.is_gp_next_course_screen
+        or facts.is_skippable_post_gp_screen
+        or (facts.in_gp_race and facts.terminal_race_result)
+    )
 
 
 def _target_succeeded(
