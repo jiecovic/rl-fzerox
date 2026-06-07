@@ -9,8 +9,8 @@ from fzerox_emulator import EmulatorBackend, RaceControlState
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
+from rl_fzerox.core.envs.gym_runtime import FZeroXEnvRuntime
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.envs.runtime import FZeroXEnvRuntime
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
