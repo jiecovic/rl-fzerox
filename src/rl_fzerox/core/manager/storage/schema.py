@@ -147,9 +147,7 @@ def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
     attempt_columns = {column["name"] for column in inspector.get_columns("save_game_attempts")}
     if "target_kind" not in attempt_columns:
         raise RuntimeError("manager DB is not current: save_game_attempts is missing target_kind")
-    setup_columns = {
-        column["name"] for column in inspector.get_columns("save_game_course_setups")
-    }
+    setup_columns = {column["name"] for column in inspector.get_columns("save_game_course_setups")}
     for column_name in ("vehicle_id", "engine_setting_raw_value"):
         if column_name not in setup_columns:
             raise RuntimeError(

@@ -130,7 +130,8 @@ def vehicle_ids_by_menu_slot() -> tuple[str, ...]:
     """Return stock vehicle ids in machine-select unlock row order."""
 
     return tuple(
-        vehicle.id for vehicle in sorted(CATALOG.vehicles, key=lambda item: item.machine_select_slot)
+        vehicle.id
+        for vehicle in sorted(CATALOG.vehicles, key=lambda item: item.machine_select_slot)
     )
 
 
