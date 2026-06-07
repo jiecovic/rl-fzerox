@@ -15,13 +15,14 @@ from rl_fzerox.core.career_mode.runner.race import (
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedSaveAttempt,
+    ManagedSaveCourseSetup,
     ManagedSaveGame,
 )
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig, default_managed_run_config
 
 
-def test_build_save_race_execution_plan_resolves_policy_vehicle_setup() -> None:
+def test_build_save_race_execution_plan_uses_course_setup_vehicle() -> None:
     base_config = default_managed_run_config()
     config = base_config.model_copy(
         update={
@@ -34,7 +35,11 @@ def test_build_save_race_execution_plan_resolves_policy_vehicle_setup() -> None:
             )
         }
     )
-    context = _context(config=config)
+    context = _context(
+        config=config,
+        vehicle_id="fire_stingray",
+        engine_setting_raw_value=100,
+    )
 
     plan = build_save_race_execution_plan(context)
 
@@ -56,7 +61,7 @@ def test_build_save_race_execution_plan_resolves_policy_vehicle_setup() -> None:
     assert plan.race_setup.engine_setting_raw_value == 100
 
 
-def test_build_save_race_execution_plan_accepts_degenerate_engine_range() -> None:
+def test_build_save_race_execution_plan_uses_course_setup_engine() -> None:
     base_config = default_managed_run_config()
     config = base_config.model_copy(
         update={
@@ -70,45 +75,27 @@ def test_build_save_race_execution_plan_accepts_degenerate_engine_range() -> Non
         }
     )
 
-    plan = build_save_race_execution_plan(_context(config=config))
+    plan = build_save_race_execution_plan(
+        _context(config=config, engine_setting_raw_value=70)
+    )
 
     assert plan.race_setup.engine_setting_id == "engine_70"
     assert plan.race_setup.engine_setting_raw_value == 70
 
 
-def test_build_save_race_execution_plan_rejects_multiple_selected_vehicles() -> None:
-    base_config = default_managed_run_config()
-    config = base_config.model_copy(
-        update={
-            "vehicle": base_config.vehicle.model_copy(
-                update={"selected_vehicle_ids": ("blue_falcon", "fire_stingray")}
-            )
-        }
-    )
+def test_build_save_race_execution_plan_rejects_invalid_course_setup_engine() -> None:
+    context = _context(engine_setting_raw_value=200)
 
-    with pytest.raises(ValueError, match="exactly one selected vehicle"):
-        build_save_race_execution_plan(_context(config=config))
+    with pytest.raises(ValueError, match="engine"):
+        build_save_race_execution_plan(context)
 
 
-def test_build_save_race_execution_plan_rejects_engine_range() -> None:
-    base_config = default_managed_run_config()
-    config = base_config.model_copy(
-        update={
-            "vehicle": base_config.vehicle.model_copy(
-                update={
-                    "engine_mode": "random_range",
-                    "engine_setting_min_raw_value": 20,
-                    "engine_setting_max_raw_value": 80,
-                }
-            )
-        }
-    )
-
-    with pytest.raises(ValueError, match="deterministic engine setting"):
-        build_save_race_execution_plan(_context(config=config))
-
-
-def _context(*, config: ManagedRunConfig | None = None) -> SaveAttemptExecutionContext:
+def _context(
+    *,
+    config: ManagedRunConfig | None = None,
+    engine_setting_raw_value: int = 50,
+    vehicle_id: str = "blue_falcon",
+) -> SaveAttemptExecutionContext:
     resolved_config = config if config is not None else default_managed_run_config()
     rule_target = next(
         target
@@ -138,6 +125,20 @@ def _context(*, config: ManagedRunConfig | None = None) -> SaveAttemptExecutionC
         ),
         target=target,
         course_setup_target=CourseSetupTarget(difficulty="expert", cup_id="jack"),
+        course_setup=ManagedSaveCourseSetup(
+            id="setup",
+            save_game_id="save",
+            scope="course",
+            policy_run_id="policy-run",
+            policy_artifact="best",
+            difficulty="expert",
+            cup_id="jack",
+            course_id=None,
+            vehicle_id=vehicle_id,
+            engine_setting_raw_value=engine_setting_raw_value,
+            created_at="2026-06-01T00:00:00+00:00",
+            updated_at="2026-06-01T00:00:00+00:00",
+        ),
         policy_run=ManagedRun(
             id="policy-run",
             name="Policy Run",

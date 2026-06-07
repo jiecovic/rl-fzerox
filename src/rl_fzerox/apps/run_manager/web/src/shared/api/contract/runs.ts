@@ -2,7 +2,21 @@
 import { z } from "zod";
 
 import { managedRunConfigSchema } from "@/shared/api/contract/config";
-import { runCommandSchema, runStatusSchema } from "@/shared/api/contract/enums";
+import {
+  engineSettingModeSchema,
+  runCommandSchema,
+  runStatusSchema,
+  vehicleSelectionModeSchema,
+} from "@/shared/api/contract/enums";
+
+const managedRunVehicleSetupSchema = z.object({
+  selection_mode: vehicleSelectionModeSchema,
+  selected_vehicle_ids: z.array(z.string()).min(1),
+  engine_mode: engineSettingModeSchema,
+  engine_setting_raw_value: z.number().int().min(0).max(100),
+  engine_setting_min_raw_value: z.number().int().min(0).max(100),
+  engine_setting_max_raw_value: z.number().int().min(0).max(100),
+});
 
 export const managedTemplateSchema = z.object({
   id: z.string(),
@@ -29,6 +43,7 @@ export const managedRunSummarySchema = z.object({
   status: runStatusSchema,
   config_hash: z.string(),
   action_repeat: z.number().int().positive(),
+  vehicle_setup: managedRunVehicleSetupSchema,
   created_at: z.string(),
   lineage_id: z.string(),
   lineage_groups: z.array(z.string()),

@@ -134,6 +134,8 @@ def _setup(
         scope=scope,
         policy_run_id=policy_run_id,
         policy_artifact=policy_artifact,
+        vehicle_id="blue_falcon",
+        engine_setting_raw_value=50,
         difficulty=difficulty,
         cup_id=cup_id,
         course_id=course_id,

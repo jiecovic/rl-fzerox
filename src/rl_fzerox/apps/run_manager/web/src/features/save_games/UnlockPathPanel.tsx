@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/save_games/UnlockPathPanel.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCupBanner";
 import { formatUnlockTargetStatus, unlockTargetStatusClass } from "@/features/save_games/model";
@@ -33,10 +33,12 @@ interface UnlockPathPanelProps {
     courseId?: string | null;
     cupId?: string | null;
     difficulty?: string | null;
+    engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
     scope: CourseSetupScope;
+    vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onCourseSetupDirtyChange: (dirty: boolean) => void;
   saveGame: ManagedSaveGame;
@@ -60,10 +62,19 @@ export function UnlockPathPanel({
   const [courseSetupDrafts, setCourseSetupDrafts] = useState<CourseSetupDraftMap>(
     () => savedCourseSetupDrafts,
   );
+  const previousSavedCourseSetupDrafts = useRef<CourseSetupDraftMap>(savedCourseSetupDrafts);
   const [savingCourseSetups, setSavingSetups] = useState(false);
 
   useEffect(() => {
-    setCourseSetupDrafts(savedCourseSetupDrafts);
+    const previousSavedDrafts = previousSavedCourseSetupDrafts.current;
+    setCourseSetupDrafts((current) => {
+      const next = { ...savedCourseSetupDrafts };
+      for (const dirtyDraft of dirtyCourseSetupDrafts(current, previousSavedDrafts)) {
+        next[courseSetupKey(dirtyDraft)] = dirtyDraft;
+      }
+      return next;
+    });
+    previousSavedCourseSetupDrafts.current = savedCourseSetupDrafts;
   }, [savedCourseSetupDrafts]);
 
   const dirtyCourseSetupCount = countDirtyCourseSetups(courseSetupDrafts, savedCourseSetupDrafts);
@@ -78,8 +89,10 @@ export function UnlockPathPanel({
       ...current,
       [courseSetupKey(scopeValues)]: {
         ...scopeValues,
+        engineSettingRawValue: draft.engineSettingRawValue,
         policyArtifact: draft.policyArtifact,
         policyRunId: draft.policyRunId,
+        vehicleId: draft.vehicleId,
       },
     }));
   }
@@ -96,8 +109,10 @@ export function UnlockPathPanel({
       for (const setup of setups) {
         next[courseSetupKey(setup)] = {
           ...setup,
+          engineSettingRawValue: draft.engineSettingRawValue,
           policyArtifact: draft.policyArtifact,
           policyRunId: draft.policyRunId,
+          vehicleId: draft.vehicleId,
         };
       }
       return next;
@@ -118,10 +133,12 @@ export function UnlockPathPanel({
           courseId: draft.courseId ?? null,
           cupId: draft.cupId ?? null,
           difficulty: draft.difficulty ?? null,
+          engineSettingRawValue: draft.engineSettingRawValue,
           policyArtifact: draft.policyArtifact,
           policyRunId: draft.policyRunId,
           saveGameId: saveGame.id,
           scope: draft.scope,
+          vehicleId: draft.vehicleId,
         });
       }
     } finally {
@@ -141,7 +158,9 @@ export function UnlockPathPanel({
       <GlobalPolicyPanel
         assignableRuns={assignableRuns}
         cups={cups}
+        metadata={metadata}
         updating={updating || savingCourseSetups}
+        unlockedVehicleIds={saveGame.unlock_progress?.unlocked_vehicle_ids ?? []}
         onApplySetups={applyCourseSetupDrafts}
       />
       <CourseSetupPanel
@@ -149,8 +168,10 @@ export function UnlockPathPanel({
         cups={cups}
         dirtyCourseSetupCount={dirtyCourseSetupCount}
         courseSetupDrafts={courseSetupDrafts}
+        metadata={metadata}
         savingCourseSetups={savingCourseSetups}
         updating={updating}
+        unlockedVehicleIds={saveGame.unlock_progress?.unlocked_vehicle_ids ?? []}
         onApplySetups={applyCourseSetupDrafts}
         onCourseSetupDraftChange={updateCourseSetupDraft}
         onSaveSetups={() => void saveCourseSetups()}
@@ -185,23 +206,16 @@ function TargetMatrix({
                 candidate.difficulty === difficulty.value && candidate.cup_id === cup.id,
             );
             const status = target?.status ?? "pending";
-            const locked = isInitiallyLockedCup(cup.id);
             return (
               <div
                 key={`${difficulty.value}:${cup.id}`}
-                className={`grid min-w-0 gap-2 border p-2 ${
-                  locked
-                    ? "border-app-border bg-app-surface text-app-muted opacity-60"
-                    : unlockTargetStatusClass(status)
-                }`}
+                className={`grid min-w-0 gap-2 border p-2 ${unlockTargetStatusClass(status)}`}
               >
                 <div className="flex items-center gap-2">
                   <TrackCupBanner cupId={cup.id} label={cup.label} />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-app-text">{cup.label}</div>
-                    <div className="text-xs text-app-muted">
-                      {locked ? `locked · ${targetStatusLabel(target)}` : targetStatusLabel(target)}
-                    </div>
+                    <div className="text-xs text-app-muted">{targetStatusLabel(target)}</div>
                   </div>
                 </div>
                 <div className="h-1 overflow-hidden bg-app-surface">
@@ -244,8 +258,4 @@ function targetCompletionPercent(target: ManagedSaveUnlockTarget | undefined): n
     return 0;
   }
   return target.status === "succeeded" ? 100 : 0;
-}
-
-function isInitiallyLockedCup(cupId: string): boolean {
-  return cupId === "joker";
 }

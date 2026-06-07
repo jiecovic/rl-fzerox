@@ -15,11 +15,14 @@ from fzerox_emulator.control.state import ControllerState
 
 if TYPE_CHECKING:
     from fzerox_emulator.control.buttons import JOYPAD_BUTTONS, JoypadButtons
+    from fzerox_emulator.control.menu import MENU_BUTTON_MASKS, MenuButtonMasks
     from fzerox_emulator.control.spin import SpinRequest, spin_request_from_index
 
 _EXPORT_MODULES = {
     "JOYPAD_BUTTONS": "fzerox_emulator.control.buttons",
     "JoypadButtons": "fzerox_emulator.control.buttons",
+    "MENU_BUTTON_MASKS": "fzerox_emulator.control.menu",
+    "MenuButtonMasks": "fzerox_emulator.control.menu",
     "SpinRequest": "fzerox_emulator.control.spin",
     "spin_request_from_index": "fzerox_emulator.control.spin",
 }
@@ -28,6 +31,8 @@ __all__ = [
     "ControllerState",
     "JOYPAD_BUTTONS",
     "JoypadButtons",
+    "MENU_BUTTON_MASKS",
+    "MenuButtonMasks",
     "RACE_CONTROL_MASKS",
     "RaceControlMaskCatalog",
     "RaceControlState",

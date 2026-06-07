@@ -418,10 +418,12 @@ def _format_career_progress(completed: int | None, total: int | None) -> str:
 
 def _career_game_facts(info: dict[str, object]) -> str:
     fields = [
+        ("screen", _non_empty_text(info.get("career_mode_fsm_observed_screen"))),
         ("mode", _non_empty_text(info.get("career_mode_fsm_game_mode"))),
         ("course", _format_optional_int(info, "career_mode_fsm_course_index")),
         ("selected", _format_optional_int(info, "career_mode_fsm_selected_mode_raw")),
         ("transition", _format_optional_int(info, "career_mode_fsm_transition_raw")),
+        ("popup", _non_empty_text(info.get("career_mode_fsm_popup_state"))),
     ]
     return _join_named_values(fields)
 

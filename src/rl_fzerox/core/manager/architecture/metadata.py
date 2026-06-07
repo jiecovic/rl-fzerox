@@ -229,7 +229,7 @@ def vehicle_infos() -> tuple[VehicleInfo, ...]:
             menu_row=vehicle_menu_row_and_column(vehicle.machine_select_slot)[0],
             menu_column=vehicle_menu_row_and_column(vehicle.machine_select_slot)[1],
         )
-        for vehicle in CATALOG.vehicles
+        for vehicle in sorted(CATALOG.vehicles, key=lambda item: item.machine_select_slot)
     )
 
 

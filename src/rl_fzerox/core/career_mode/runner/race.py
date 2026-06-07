@@ -9,15 +9,13 @@ from typing import Literal
 
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
-from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
-    EngineSetting,
     vehicle_by_id,
-    vehicle_menu_row_and_column,
 )
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
     resolve_engine_setting as resolve_catalog_engine_setting,
 )
+from rl_fzerox.core.training.runs.race_start.menu_route import machine_select_route_for_slot
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,10 +58,13 @@ def build_save_race_execution_plan(
     if context.course_setup_target.difficulty is None or context.course_setup_target.cup_id is None:
         raise ValueError("save-game unlock attempt requires difficulty and cup")
 
-    vehicle_id = _single_vehicle_id(context.policy_run.config)
+    vehicle_id = context.course_setup.vehicle_id
     vehicle = vehicle_by_id(vehicle_id)
-    row, column = vehicle_menu_row_and_column(vehicle.machine_select_slot)
-    engine_setting = _deterministic_engine_setting(context.policy_run.config)
+    route = machine_select_route_for_slot(vehicle.machine_select_slot)
+    engine_setting = resolve_catalog_engine_setting(
+        context.course_setup.engine_setting_raw_value,
+        context="career course setup",
+    )
     return SaveRaceExecutionPlan(
         attempt_id=context.attempt.id,
         policy_run_id=context.policy_run.id,
@@ -79,30 +80,9 @@ def build_save_race_execution_plan(
             vehicle_display_name=vehicle.display_name,
             character_index=vehicle.character_index,
             machine_select_slot=vehicle.machine_select_slot,
-            machine_select_row=row,
-            machine_select_column=column,
+            machine_select_row=route.down_count,
+            machine_select_column=route.right_count,
             engine_setting_id=engine_setting.id,
             engine_setting_raw_value=engine_setting.raw_value,
         ),
-    )
-
-
-def _single_vehicle_id(config: ManagedRunConfig) -> str:
-    selected_vehicle_ids = config.vehicle.selected_vehicle_ids
-    if len(selected_vehicle_ids) != 1:
-        raise ValueError("save-game unlock attempts require exactly one selected vehicle")
-    return selected_vehicle_ids[0]
-
-
-def _deterministic_engine_setting(config: ManagedRunConfig) -> EngineSetting:
-    vehicle_config = config.vehicle
-    if vehicle_config.engine_mode == "fixed":
-        raw_value = vehicle_config.engine_setting_raw_value
-    elif vehicle_config.engine_setting_min_raw_value == vehicle_config.engine_setting_max_raw_value:
-        raw_value = vehicle_config.engine_setting_min_raw_value
-    else:
-        raise ValueError("save-game unlock attempts require a deterministic engine setting")
-    return resolve_catalog_engine_setting(
-        raw_value,
-        context="save-game unlock vehicle setup",
     )

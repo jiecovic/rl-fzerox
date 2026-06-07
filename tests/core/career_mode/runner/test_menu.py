@@ -12,6 +12,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     continue_next_course_step,
     machine_select_steps,
     select_difficulty_steps,
+    select_open_difficulty_steps,
     tap_steps,
 )
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
@@ -28,23 +29,20 @@ def test_tap_steps_emit_active_input_then_neutral_settle() -> None:
     assert [step.phase for step in steps] == ["open", "open:settle"]
 
 
-def test_select_difficulty_opens_popup_before_selecting_novice() -> None:
+def test_select_difficulty_only_opens_popup() -> None:
     steps = select_difficulty_steps(_race_setup(difficulty="novice"))
     active_inputs = [step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL]
 
-    assert active_inputs == [MenuInput.ACCEPT, MenuInput.ACCEPT]
+    assert active_inputs == [MenuInput.ACCEPT]
     assert steps[0].phase == "select_difficulty:open"
     assert steps[0].frames == MENU_TIMING.menu_hold_frames
-    assert steps[-2].phase == "select_difficulty:accept"
-    assert steps[-2].frames == MENU_TIMING.menu_hold_frames
 
 
-def test_select_difficulty_opens_popup_before_moving_to_expert() -> None:
-    steps = select_difficulty_steps(_race_setup(difficulty="expert"))
+def test_select_open_difficulty_moves_to_expert() -> None:
+    steps = select_open_difficulty_steps(_race_setup(difficulty="expert"))
     active_inputs = [step.menu_input for step in steps if step.menu_input != MenuInput.NEUTRAL]
 
     assert active_inputs == [
-        MenuInput.ACCEPT,
         MenuInput.DOWN,
         MenuInput.DOWN,
         MenuInput.ACCEPT,

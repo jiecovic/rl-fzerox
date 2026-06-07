@@ -29,6 +29,7 @@ from rl_fzerox.core.manager.models import (
     SaveGameStatus,
 )
 from rl_fzerox.core.manager.registry.common import new_record_id, utc_now
+from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 if TYPE_CHECKING:
@@ -333,11 +334,18 @@ def get_save_attempt_execution_context(
             cup_id=attempt.cup_id,
             course_id=attempt.course_id,
         )
+        course_setup = resolve_course_setup(
+            save_game_repository.list_course_setups(session, attempt.save_game_id),
+            course_setup_target,
+        )
+        if course_setup is None:
+            raise ValueError("save attempt is missing a resolved course setup")
         return SaveAttemptExecutionContext(
             save_game=save_game,
             attempt=attempt,
             target=target.to_progress_target(status="pending"),
             course_setup_target=course_setup_target,
+            course_setup=course_setup,
             policy_run=policy_run,
             policy_artifact=attempt.policy_artifact,
             policy_path=resolve_policy_artifact_path(
@@ -388,6 +396,8 @@ def upsert_course_setup(
     scope: CourseSetupScope,
     policy_run_id: str,
     policy_artifact: Literal["latest", "best"],
+    vehicle_id: str,
+    engine_setting_raw_value: int,
     difficulty: str | None = None,
     cup_id: str | None = None,
     course_id: str | None = None,
@@ -400,11 +410,19 @@ def upsert_course_setup(
         cup_id=cup_id,
         course_id=course_id,
     )
+    _validate_vehicle_setup(
+        vehicle_id=vehicle_id,
+        engine_setting_raw_value=engine_setting_raw_value,
+    )
     store.initialize()
     now = utc_now()
     with store._orm_session() as session:
-        if save_game_repository.get_save_game(session, save_game_id) is None:
+        save_game = save_game_repository.get_save_game(session, save_game_id)
+        if save_game is None:
             raise KeyError("save game not found")
+        progress = build_unlock_progress(save_game.save_path)
+        if vehicle_id not in progress.unlocked_vehicle_ids:
+            raise ValueError(f"vehicle {vehicle_id!r} is not unlocked in this save game")
         if not save_game_repository.run_exists(session, policy_run_id):
             raise KeyError("policy run not found")
         course_setup = save_game_repository.upsert_course_setup(
@@ -414,6 +432,8 @@ def upsert_course_setup(
             scope=scope,
             policy_run_id=policy_run_id,
             policy_artifact=policy_artifact,
+            vehicle_id=vehicle_id,
+            engine_setting_raw_value=engine_setting_raw_value,
             created_at=now,
             updated_at=now,
             difficulty=difficulty,
@@ -478,3 +498,11 @@ def _validate_course_setup_scope(
         raise ValueError("cup course setups require cup and may include difficulty")
     if scope == "course" and course_id is None:
         raise ValueError("course course setups require course")
+
+
+def _validate_vehicle_setup(*, vehicle_id: str, engine_setting_raw_value: int) -> None:
+    vehicle_by_id(vehicle_id)
+    if not 0 <= engine_setting_raw_value <= 100:
+        raise ValueError(
+            f"engine_setting_raw_value must be in [0, 100], got {engine_setting_raw_value}"
+        )

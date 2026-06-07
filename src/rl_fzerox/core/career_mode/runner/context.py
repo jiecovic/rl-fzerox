@@ -11,6 +11,7 @@ from rl_fzerox.core.career_mode.course_setup import CourseSetupTarget
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedSaveAttempt,
+    ManagedSaveCourseSetup,
     ManagedSaveGame,
     ManagedSaveUnlockTarget,
 )
@@ -24,6 +25,7 @@ class SaveAttemptExecutionContext:
     attempt: ManagedSaveAttempt
     target: ManagedSaveUnlockTarget
     course_setup_target: CourseSetupTarget
+    course_setup: ManagedSaveCourseSetup
     policy_run: ManagedRun
     policy_artifact: Literal["latest", "best"]
     policy_path: Path

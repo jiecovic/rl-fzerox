@@ -4,8 +4,9 @@
 
 use libretro_sys::{
     DEVICE_ID_ANALOG_X, DEVICE_ID_ANALOG_Y, DEVICE_ID_JOYPAD_A, DEVICE_ID_JOYPAD_B,
-    DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R2, DEVICE_ID_JOYPAD_Y, DEVICE_INDEX_ANALOG_LEFT,
-    DEVICE_INDEX_ANALOG_RIGHT,
+    DEVICE_ID_JOYPAD_DOWN, DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_LEFT,
+    DEVICE_ID_JOYPAD_R2, DEVICE_ID_JOYPAD_RIGHT, DEVICE_ID_JOYPAD_START, DEVICE_ID_JOYPAD_UP,
+    DEVICE_ID_JOYPAD_Y, DEVICE_INDEX_ANALOG_LEFT, DEVICE_INDEX_ANALOG_RIGHT,
 };
 
 const LIBRETRO_ANALOG_MAX: f32 = i16::MAX as f32;
@@ -69,6 +70,30 @@ const RACE_INPUT_MAPPING: Mupen64PlusNextRaceMapping = Mupen64PlusNextRaceMappin
     lean_left: DEVICE_ID_JOYPAD_L2,
     lean_right: DEVICE_ID_JOYPAD_R2,
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FZeroXMenuButton {
+    Confirm,
+    Cancel,
+    Start,
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+pub fn fzerox_menu_button_mask(button: FZeroXMenuButton) -> u16 {
+    let button_id = match button {
+        FZeroXMenuButton::Confirm => RACE_INPUT_MAPPING.gas,
+        FZeroXMenuButton::Cancel => RACE_INPUT_MAPPING.boost,
+        FZeroXMenuButton::Start => DEVICE_ID_JOYPAD_START,
+        FZeroXMenuButton::Up => DEVICE_ID_JOYPAD_UP,
+        FZeroXMenuButton::Down => DEVICE_ID_JOYPAD_DOWN,
+        FZeroXMenuButton::Left => DEVICE_ID_JOYPAD_LEFT,
+        FZeroXMenuButton::Right => DEVICE_ID_JOYPAD_RIGHT,
+    };
+    1_u16 << button_id
+}
 
 /// Packed controller state for a single libretro polling step.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

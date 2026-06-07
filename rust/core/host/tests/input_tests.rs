@@ -6,7 +6,7 @@ use libretro_sys::{
     DEVICE_INDEX_ANALOG_RIGHT,
 };
 
-use super::{ControllerState, RaceControlState};
+use super::{fzerox_menu_button_mask, ControllerState, FZeroXMenuButton, RaceControlState};
 
 #[test]
 fn controller_state_clamps_normalized_axes_to_libretro_range() {
@@ -48,4 +48,31 @@ fn race_control_state_maps_semantics_to_pinned_mupen_buttons() {
     assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_Y), 0);
     assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_L2), 0);
     assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_R2), 0);
+}
+
+#[test]
+fn menu_button_masks_reuse_fzerox_semantics_instead_of_retropad_names() {
+    let confirm = fzerox_menu_button_mask(FZeroXMenuButton::Confirm);
+    let cancel = fzerox_menu_button_mask(FZeroXMenuButton::Cancel);
+
+    assert_eq!(
+        confirm,
+        RaceControlState {
+            gas: true,
+            ..RaceControlState::default()
+        }
+        .to_controller_state()
+        .joypad_mask()
+    );
+    assert_eq!(
+        cancel,
+        RaceControlState {
+            boost: true,
+            ..RaceControlState::default()
+        }
+        .to_controller_state()
+        .joypad_mask()
+    );
+    assert_ne!(confirm, 1 << DEVICE_ID_JOYPAD_A);
+    assert_ne!(cancel, 1 << DEVICE_ID_JOYPAD_B);
 }

@@ -42,6 +42,32 @@ class CareerPhase(StrEnum):
     WAIT_FOR_GP_RACE = "wait_for_gp_race"
 
 
+class DifficultyPopupState(StrEnum):
+    """Controller-owned state for the GP difficulty overlay."""
+
+    CLOSED = "closed"
+    OPEN = "open"
+    SUBMITTED = "submitted"
+
+
+class ObservedMenuScreen(StrEnum):
+    """Visible game screen inferred from native telemetry."""
+
+    TITLE = "title"
+    MAIN_MENU_GP = "main_menu_gp"
+    MAIN_MENU_OTHER = "main_menu_other"
+    DIFFICULTY_POPUP = "difficulty_popup"
+    TRANSITION = "transition"
+    COURSE_SELECT = "course_select"
+    MACHINE_SELECT = "machine_select"
+    MACHINE_SETTINGS = "machine_settings"
+    GP_RACE = "gp_race"
+    RESULTS = "results"
+    GP_NEXT_COURSE = "gp_next_course"
+    POST_GP = "post_gp"
+    UNKNOWN = "unknown"
+
+
 @dataclass(frozen=True, slots=True)
 class CareerMenuTiming:
     """Frame cadence for runner-owned menu inputs."""
@@ -50,7 +76,11 @@ class CareerMenuTiming:
     start_settle_frames: int = 38
     menu_hold_frames: int = 8
     menu_settle_frames: int = 16
+    difficulty_popup_open_settle_frames: int = 60
+    result_continue_hold_frames: int = 4
+    result_continue_settle_frames: int = 2
     max_start_presses_per_phase: int = 12
+    max_engine_adjust_taps: int = 128
     fresh_race_ready_frames: int = 2
     new_race_ready_time_ms: int = 1_000
 
@@ -60,7 +90,11 @@ class CareerMenuTiming:
             self.start_settle_frames,
             self.menu_hold_frames,
             self.menu_settle_frames,
+            self.difficulty_popup_open_settle_frames,
+            self.result_continue_hold_frames,
+            self.result_continue_settle_frames,
             self.max_start_presses_per_phase,
+            self.max_engine_adjust_taps,
             self.fresh_race_ready_frames,
             self.new_race_ready_time_ms,
         )
@@ -137,6 +171,7 @@ class MenuFacts:
     camera_setting: str | None
     race_intro_timer: int | None
     race_time_ms: float | None
+    engine_setting_percent: float | None
     completion_fraction: float | None
     completed_laps: int | None
     total_laps: int | None
@@ -165,6 +200,7 @@ class MenuFacts:
             camera_setting=camera_setting(info),
             race_intro_timer=_int_info(info, "race_intro_timer"),
             race_time_ms=_number_info(info, "race_time_ms"),
+            engine_setting_percent=_number_info(info, "engine_setting_percent_ram"),
             completion_fraction=_number_info(info, "episode_completion_fraction"),
             completed_laps=_int_info(info, "race_laps_completed"),
             total_laps=_int_info(info, "total_lap_count"),
@@ -187,9 +223,9 @@ class MenuFacts:
 
     @property
     def is_game_mode_transition(self) -> bool:
-        if self.game_mode_raw is None:
-            return False
-        return (self.game_mode_raw & ~0x1F) != 0
+        if self.transition_state_raw is not None:
+            return self.transition_state_raw != 0
+        return False
 
     @property
     def selected_gp_mode(self) -> bool:
@@ -218,6 +254,10 @@ class MenuFacts:
     @property
     def is_gp_next_course_screen(self) -> bool:
         return self.game_mode == "gp_race_next_course"
+
+    @property
+    def is_gp_result_screen(self) -> bool:
+        return self.game_mode == "results"
 
     @property
     def is_skippable_post_gp_screen(self) -> bool:
@@ -272,19 +312,68 @@ class MenuFacts:
             return False
         return self.race_time_ms <= MENU_TIMING.new_race_ready_time_ms
 
+    @property
+    def engine_setting_raw_value(self) -> int | None:
+        if self.engine_setting_percent is None:
+            return None
+        if not 0.0 <= self.engine_setting_percent <= 100.0:
+            return None
+        return round(self.engine_setting_percent)
+
+
+def observed_menu_screen(
+    facts: MenuFacts,
+    *,
+    difficulty_popup_state: DifficultyPopupState,
+) -> ObservedMenuScreen:
+    """Classify the current screen from RAM-backed telemetry where available."""
+
+    if facts.is_title:
+        return ObservedMenuScreen.TITLE
+    if facts.is_course_select:
+        return ObservedMenuScreen.COURSE_SELECT
+    if facts.is_machine_select:
+        return ObservedMenuScreen.MACHINE_SELECT
+    if facts.is_machine_settings:
+        return ObservedMenuScreen.MACHINE_SETTINGS
+    if facts.is_gp_result_screen:
+        return ObservedMenuScreen.RESULTS
+    if facts.is_gp_next_course_screen:
+        return ObservedMenuScreen.GP_NEXT_COURSE
+    if facts.is_skippable_post_gp_screen:
+        return ObservedMenuScreen.POST_GP
+    if facts.in_gp_race:
+        return ObservedMenuScreen.GP_RACE
+    if facts.is_mode_select:
+        if difficulty_popup_state is DifficultyPopupState.OPEN:
+            return ObservedMenuScreen.DIFFICULTY_POPUP
+        if difficulty_popup_state is DifficultyPopupState.SUBMITTED:
+            return ObservedMenuScreen.TRANSITION
+        if facts.is_game_mode_transition:
+            return ObservedMenuScreen.TRANSITION
+        if facts.selected_gp_mode:
+            return ObservedMenuScreen.MAIN_MENU_GP
+        return ObservedMenuScreen.MAIN_MENU_OTHER
+    if facts.is_game_mode_transition:
+        return ObservedMenuScreen.TRANSITION
+    return ObservedMenuScreen.UNKNOWN
+
 
 def select_difficulty_steps(
+    _setup: CareerModeRaceSetupConfig,
+) -> tuple[RawMenuStep, ...]:
+    return tap_steps(
+        MenuInput.ACCEPT,
+        hold_frames=MENU_TIMING.menu_hold_frames,
+        settle_frames=MENU_TIMING.difficulty_popup_open_settle_frames,
+        phase="select_difficulty:open",
+    )
+
+
+def select_open_difficulty_steps(
     setup: CareerModeRaceSetupConfig,
 ) -> tuple[RawMenuStep, ...]:
     steps: list[RawMenuStep] = []
-    steps.extend(
-        tap_steps(
-            MenuInput.ACCEPT,
-            hold_frames=MENU_TIMING.menu_hold_frames,
-            settle_frames=MENU_TIMING.menu_settle_frames,
-            phase="select_difficulty:open",
-        )
-    )
     for tap_index in range(GP_MENU_ORDER.difficulty_down_count(setup.difficulty)):
         steps.extend(
             tap_steps(
@@ -335,7 +424,7 @@ def continue_after_race_step(press_index: int) -> RawMenuStep:
 
     return raw_step(
         MenuInput.ACCEPT,
-        MENU_TIMING.menu_hold_frames,
+        MENU_TIMING.result_continue_hold_frames,
         phase=f"continue_after_race:accept:{press_index + 1}",
     )
 

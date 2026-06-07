@@ -58,6 +58,8 @@ def save_course_setup_payload(
         "course_id": assignment.course_id,
         "policy_run_id": assignment.policy_run_id,
         "policy_artifact": assignment.policy_artifact,
+        "vehicle_id": assignment.vehicle_id,
+        "engine_setting_raw_value": assignment.engine_setting_raw_value,
         "created_at": assignment.created_at,
         "updated_at": assignment.updated_at,
     }
@@ -97,6 +99,7 @@ def save_attempt_execution_context_payload(
             "cup_id": context.course_setup_target.cup_id,
             "course_id": context.course_setup_target.course_id,
         },
+        "course_setup": save_course_setup_payload(context.course_setup),
         "policy_run": run_summary_payload(context.policy_run),
         "policy_artifact": context.policy_artifact,
         "policy_path": str(context.policy_path),
@@ -120,6 +123,8 @@ def save_unlock_progress_payload(progress: ManagedSaveUnlockProgress) -> dict[st
         "inspection_status": progress.inspection_status,
         "completed_count": progress.completed_count,
         "total_count": progress.total_count,
+        "unlocked_vehicle_count": progress.unlocked_vehicle_count,
+        "unlocked_vehicle_ids": list(progress.unlocked_vehicle_ids),
         "next_target": None
         if progress.next_target is None
         else save_unlock_target_payload(progress.next_target),
@@ -181,6 +186,7 @@ def run_summary_payload(
         "status": run.status,
         "config_hash": run.config_hash,
         "action_repeat": resolved_action_repeat,
+        "vehicle_setup": _run_vehicle_setup_payload(run),
         "created_at": run.created_at,
         "lineage_id": run.lineage_id,
         "lineage_groups": list(run.lineage_groups),
@@ -216,6 +222,28 @@ def run_summary_payload(
             }
             for event in recent_events
         ],
+    }
+
+
+def _run_vehicle_setup_payload(run: ManagedRun | ManagedRunSummary) -> dict[str, object]:
+    if isinstance(run, ManagedRunSummary):
+        vehicle = run.vehicle_setup
+        return {
+            "selection_mode": vehicle.selection_mode,
+            "selected_vehicle_ids": list(vehicle.selected_vehicle_ids),
+            "engine_mode": vehicle.engine_mode,
+            "engine_setting_raw_value": vehicle.engine_setting_raw_value,
+            "engine_setting_min_raw_value": vehicle.engine_setting_min_raw_value,
+            "engine_setting_max_raw_value": vehicle.engine_setting_max_raw_value,
+        }
+    vehicle = run.config.vehicle
+    return {
+        "selection_mode": vehicle.selection_mode,
+        "selected_vehicle_ids": list(vehicle.selected_vehicle_ids),
+        "engine_mode": vehicle.engine_mode,
+        "engine_setting_raw_value": vehicle.engine_setting_raw_value,
+        "engine_setting_min_raw_value": vehicle.engine_setting_min_raw_value,
+        "engine_setting_max_raw_value": vehicle.engine_setting_max_raw_value,
     }
 
 

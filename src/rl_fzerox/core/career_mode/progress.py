@@ -14,6 +14,7 @@ from rl_fzerox.core.manager.models import (
     SaveUnlockInspectionStatus,
     SaveUnlockTargetStatus,
 )
+from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_ids_by_menu_slot
 from rl_fzerox.core.save_game import FZeroXUnlockState, read_fzerox_unlock_state
 
 
@@ -104,10 +105,13 @@ def build_unlock_progress(
         (target for target in progress_targets if target.status == "pending"),
         None,
     )
+    unlocked_vehicle_ids = _unlocked_vehicle_ids(unlock_state)
     return ManagedSaveUnlockProgress(
         inspection_status=inspection_status,
         completed_count=sum(1 for target in progress_targets if target.status == "succeeded"),
         total_count=len(progress_targets),
+        unlocked_vehicle_count=len(unlocked_vehicle_ids),
+        unlocked_vehicle_ids=unlocked_vehicle_ids,
         next_target=next_target,
         targets=progress_targets,
     )
@@ -122,6 +126,8 @@ def _target_status_from_save(
         return "pending"
     if target.kind != "clear_gp_cup":
         return "pending"
+    if not _target_available(target, unlock_state=unlock_state):
+        return "locked"
     return (
         "succeeded"
         if unlock_state.gp_cup_cleared(
@@ -130,3 +136,36 @@ def _target_status_from_save(
         )
         else "pending"
     )
+
+
+def _target_available(
+    target: UnlockRuleTarget,
+    *,
+    unlock_state: FZeroXUnlockState,
+) -> bool:
+    if target.difficulty == "master" and not _master_difficulty_available(unlock_state):
+        return False
+    if target.cup_id == "joker" and not _joker_cup_available(unlock_state):
+        return False
+    return True
+
+
+def _joker_cup_available(unlock_state: FZeroXUnlockState) -> bool:
+    return all(
+        unlock_state.gp_cup_cleared(difficulty="standard", cup_id=cup_id)
+        for cup_id in ("jack", "queen", "king")
+    )
+
+
+def _master_difficulty_available(unlock_state: FZeroXUnlockState) -> bool:
+    return all(
+        unlock_state.gp_cup_cleared(difficulty="expert", cup_id=cup_id)
+        for cup_id in ("jack", "queen", "king", "joker")
+    )
+
+
+def _unlocked_vehicle_ids(unlock_state: FZeroXUnlockState | None) -> tuple[str, ...]:
+    vehicle_ids = vehicle_ids_by_menu_slot()
+    if unlock_state is None:
+        return vehicle_ids[:6]
+    return vehicle_ids[: unlock_state.unlocked_vehicle_count]

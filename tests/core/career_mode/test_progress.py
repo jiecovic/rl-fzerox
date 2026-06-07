@@ -32,6 +32,8 @@ def test_build_unlock_progress_returns_pending_targets_when_save_is_missing() ->
     assert progress.inspection_status == "not_inspected"
     assert progress.completed_count == 0
     assert progress.total_count == len(default_unlock_targets())
+    assert progress.unlocked_vehicle_count == 6
+    assert progress.unlocked_vehicle_ids[:2] == ("blue_falcon", "golden_fox")
     assert progress.next_target is not None
     assert progress.next_target.difficulty == "novice"
     assert progress.next_target.cup_id == "jack"
@@ -49,6 +51,72 @@ def test_build_unlock_progress_marks_completed_gp_cups_from_save(tmp_path: Path)
     assert progress.next_target is not None
     assert progress.next_target.difficulty == "novice"
     assert progress.next_target.cup_id == "king"
+
+
+def test_build_unlock_progress_skips_joker_until_standard_initial_cups_are_clear(
+    tmp_path: Path,
+) -> None:
+    save_path = tmp_path / "fzerox.sra"
+    save_path.write_bytes(_logical_sra({"jack": 1, "queen": 1, "king": 1}))
+
+    progress = build_unlock_progress(save_path)
+
+    novice_joker = next(
+        target
+        for target in progress.targets
+        if target.difficulty == "novice" and target.cup_id == "joker"
+    )
+    assert novice_joker.status == "locked"
+    assert progress.next_target is not None
+    assert progress.next_target.difficulty == "standard"
+    assert progress.next_target.cup_id == "jack"
+    assert progress.unlocked_vehicle_count == 12
+    assert progress.unlocked_vehicle_ids[-1] == "mad_wolf"
+    assert "mighty_hurricane" not in progress.unlocked_vehicle_ids
+
+
+def test_build_unlock_progress_unlocks_joker_after_standard_initial_cups_are_clear(
+    tmp_path: Path,
+) -> None:
+    save_path = tmp_path / "fzerox.sra"
+    save_path.write_bytes(_logical_sra({"jack": 2, "queen": 2, "king": 2}))
+
+    progress = build_unlock_progress(save_path)
+
+    assert progress.next_target is not None
+    assert progress.next_target.difficulty == "novice"
+    assert progress.next_target.cup_id == "joker"
+
+
+def test_build_unlock_progress_unlocks_master_after_all_expert_cups_are_clear(
+    tmp_path: Path,
+) -> None:
+    save_path = tmp_path / "fzerox.sra"
+    save_path.write_bytes(_logical_sra({"jack": 3, "queen": 3, "king": 3, "joker": 3}))
+
+    progress = build_unlock_progress(save_path)
+
+    master_targets = tuple(
+        target for target in progress.targets if target.difficulty == "master"
+    )
+    assert {target.status for target in master_targets} == {"pending"}
+    assert progress.next_target is not None
+    assert progress.next_target.difficulty == "master"
+    assert progress.next_target.cup_id == "jack"
+
+
+def test_build_unlock_progress_locks_master_until_all_expert_cups_are_clear(
+    tmp_path: Path,
+) -> None:
+    save_path = tmp_path / "fzerox.sra"
+    save_path.write_bytes(_logical_sra({"jack": 2, "queen": 3, "king": 3, "joker": 3}))
+
+    progress = build_unlock_progress(save_path)
+
+    master_targets = tuple(
+        target for target in progress.targets if target.difficulty == "master"
+    )
+    assert {target.status for target in master_targets} == {"locked"}
 
 
 def test_build_unlock_progress_finishes_when_all_targets_are_clear(tmp_path: Path) -> None:

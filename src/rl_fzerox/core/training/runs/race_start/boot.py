@@ -8,11 +8,13 @@ from fzerox_emulator import (
     joypad_mask,
 )
 from rl_fzerox.core.boot import UNLOCK_EVERYTHING_SEQUENCE
-from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_menu_row_and_column
 from rl_fzerox.core.training.runs.race_start.boundary import (
     race_start_gp_difficulty_raw_value,
 )
 from rl_fzerox.core.training.runs.race_start.exact import write_engine_settings
+from rl_fzerox.core.training.runs.race_start.menu_route import (
+    machine_select_route_for_variant,
+)
 from rl_fzerox.core.training.runs.race_start.models import MENU_TIMING, RaceStartVariant
 from rl_fzerox.core.training.runs.race_start.validation import (
     validate_boot_materialized_setup,
@@ -288,19 +290,13 @@ def _select_time_attack_course(emulator: EmulatorBackend, course_index: int) -> 
 
 def _select_machine(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-    row, column = _machine_select_row_and_column(variant)
-    for _ in range(row):
+    route = machine_select_route_for_variant(variant)
+    for _ in range(route.down_count):
         _tap_menu_down(emulator)
-    for _ in range(column):
+    for _ in range(route.right_count):
         _tap_menu_right(emulator)
     _tap_start(emulator)
     _tap_start(emulator)
-
-
-def _machine_select_row_and_column(variant: RaceStartVariant) -> tuple[int, int]:
-    if variant.machine_select_slot is not None:
-        return vehicle_menu_row_and_column(variant.machine_select_slot)
-    return vehicle_menu_row_and_column(variant.character_index)
 
 
 def _apply_exact_race_start_setup(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
