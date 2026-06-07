@@ -252,12 +252,14 @@ class _AuxiliaryStatePolicyMixin:
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | None:
         if self._pitch_std_cap_loss_weight <= 0.0:
             return None
-        if self._continuous_pitch_index is None:
+        continuous_pitch_index = self._continuous_pitch_index
+        if continuous_pitch_index is None:
             raise RuntimeError("continuous pitch action group was not initialized")
-        log_std = getattr(self, "log_std", None)
-        if not isinstance(log_std, torch.Tensor):
+        raw_log_std = getattr(self, "log_std", None)
+        if not isinstance(raw_log_std, torch.Tensor):
             raise TypeError("pitch std cap requires a tensor log_std parameter")
-        pitch_log_std = log_std[self._continuous_pitch_index].to(device=device)
+        log_std: torch.Tensor = raw_log_std
+        pitch_log_std = log_std[continuous_pitch_index].to(device=device)
         pitch_std = pitch_log_std.exp()
         cap = pitch_std.new_tensor(self._pitch_std_cap)
         loss_value = torch.relu(pitch_std - cap).square()
@@ -266,8 +268,7 @@ class _AuxiliaryStatePolicyMixin:
 
     def _pitch_actor_regularization_enabled(self) -> bool:
         return (
-            self._grounded_pitch_neutral_loss_weight > 0.0
-            or self._pitch_std_cap_loss_weight > 0.0
+            self._grounded_pitch_neutral_loss_weight > 0.0 or self._pitch_std_cap_loss_weight > 0.0
         )
 
     def _combined_policy_auxiliary_loss(
@@ -374,7 +375,8 @@ def _optional_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor | None:
     aux_targets = obs.get(field_name)
     if not isinstance(aux_targets, torch.Tensor):
         return None
-    return torch.flatten(aux_targets.float(), start_dim=1)
+    aux_target_tensor: torch.Tensor = aux_targets
+    return torch.flatten(aux_target_tensor.float(), start_dim=1)
 
 
 def _pitch_sample_metrics(

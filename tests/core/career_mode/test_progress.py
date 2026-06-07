@@ -96,9 +96,7 @@ def test_build_unlock_progress_unlocks_master_after_all_expert_cups_are_clear(
 
     progress = build_unlock_progress(save_path)
 
-    master_targets = tuple(
-        target for target in progress.targets if target.difficulty == "master"
-    )
+    master_targets = tuple(target for target in progress.targets if target.difficulty == "master")
     assert {target.status for target in master_targets} == {"pending"}
     assert progress.next_target is not None
     assert progress.next_target.difficulty == "master"
@@ -113,9 +111,7 @@ def test_build_unlock_progress_locks_master_until_all_expert_cups_are_clear(
 
     progress = build_unlock_progress(save_path)
 
-    master_targets = tuple(
-        target for target in progress.targets if target.difficulty == "master"
-    )
+    master_targets = tuple(target for target in progress.targets if target.difficulty == "master")
     assert {target.status for target in master_targets} == {"locked"}
 
 

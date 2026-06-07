@@ -127,7 +127,4 @@ def _needs_auxiliary_policy(
     policy_config: PolicyConfig,
     train_config: TrainConfig,
 ) -> bool:
-    return (
-        policy_config.auxiliary_state.enabled
-        or train_config.actor_regularization.enabled()
-    )
+    return policy_config.auxiliary_state.enabled or train_config.actor_regularization.enabled()
