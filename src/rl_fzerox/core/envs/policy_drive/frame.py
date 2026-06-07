@@ -21,7 +21,7 @@ _EXCLUDED_INFO_KEYS = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class PolicyDriveStep:
-    """Policy-facing live-race step without Gym episode lifecycle fields."""
+    """Policy-facing live-race step without Gym done/truncation fields."""
 
     observation: ObservationValue
     reward: float
@@ -32,7 +32,7 @@ class PolicyDriveStep:
 
 @dataclass(frozen=True, slots=True)
 class PolicyDriveFrame:
-    """One policy-owned race frame without Gym episode lifecycle semantics."""
+    """One policy-owned race frame without Gym done/truncation semantics."""
 
     observation: ObservationValue
     reward: float
@@ -42,7 +42,7 @@ class PolicyDriveFrame:
 
 
 def policy_drive_info(info: dict[str, object]) -> dict[str, object]:
-    """Return live policy-drive info without env episode lifecycle state."""
+    """Return live policy-drive info without Gym done/truncation state."""
 
     normalized = {key: value for key, value in info.items() if key not in _EXCLUDED_INFO_KEYS}
     reason = normalized.get("termination_reason")

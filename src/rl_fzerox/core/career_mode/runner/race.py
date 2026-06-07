@@ -10,10 +10,10 @@ from typing import Literal
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
-    vehicle_by_id,
+    resolve_engine_setting as resolve_catalog_engine_setting,
 )
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
-    resolve_engine_setting as resolve_catalog_engine_setting,
+    vehicle_by_id,
 )
 from rl_fzerox.core.training.runs.race_start.menu_route import machine_select_route_for_slot
 

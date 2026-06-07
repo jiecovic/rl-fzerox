@@ -134,16 +134,6 @@ BUILT_IN_COURSES_BY_INDEX = {course.course_index: course for course in BUILT_IN_
 
 
 @dataclass(frozen=True, slots=True)
-class CareerMenuDefaults:
-    """Game menu defaults Career Mode can rely on before menu editing exists."""
-
-    engine_setting_raw_value: int = 50
-
-
-CAREER_MENU_DEFAULTS = CareerMenuDefaults()
-
-
-@dataclass(frozen=True, slots=True)
 class RawMenuStep:
     """One semantic input pulse emitted by the Career Mode FSM."""
 

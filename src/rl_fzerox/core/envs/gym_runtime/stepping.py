@@ -210,6 +210,15 @@ class GymStepRuntime:
                 spin_request=spin_request,
                 capture_display_frames=capture_display_frames,
                 active_track=components.episode.active_track,
+                episode_frame_count=components.episode.frame_count,
+                episode_stalled_steps=components.episode.stalled_steps,
+                episode_progress_frontier_stalled_frames=(
+                    components.episode.progress_frontier_stalled_frames
+                ),
+                episode_progress_frontier_distance=(components.episode.progress_frontier_distance),
+                episode_progress_frontier_initialized=(
+                    components.episode.progress_frontier_initialized
+                ),
                 episode_return=components.episode.return_value,
                 episode_boost_pad_entries=components.episode.boost_pad_entries,
                 episode_airborne_frames=components.episode.airborne_frames,
@@ -221,6 +230,11 @@ class GymStepRuntime:
             telemetry=assembly.telemetry,
             requested_control_state=assembly.requested_control_state,
             gas_level=assembly.gas_level,
+            frame_count=assembly.episode_frame_count,
+            stalled_steps=assembly.episode_stalled_steps,
+            progress_frontier_stalled_frames=(assembly.episode_progress_frontier_stalled_frames),
+            progress_frontier_distance=assembly.episode_progress_frontier_distance,
+            progress_frontier_initialized=(assembly.episode_progress_frontier_initialized),
             return_value=assembly.episode_return,
             boost_pad_entries=assembly.episode_boost_pad_entries,
             airborne_frames=assembly.episode_airborne_frames,

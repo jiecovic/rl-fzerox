@@ -33,7 +33,7 @@ from rl_fzerox.core.envs.policy_drive.frame import (
 )
 
 if TYPE_CHECKING:
-    from fzerox_emulator import Emulator
+    from fzerox_emulator import EmulatorBackend
     from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 
 
@@ -43,7 +43,7 @@ class PolicyDriveRuntime:
     def __init__(
         self,
         *,
-        emulator: Emulator,
+        emulator: EmulatorBackend,
         train_config: TrainAppConfig,
     ) -> None:
         self.train_config = train_config
@@ -118,6 +118,8 @@ class PolicyDriveRuntime:
             info,
             episode_boost_pad_entries=self._episode.boost_pad_entries,
         )
+        info["episode_step"] = self._episode.frame_count
+        info["episode_return"] = self._episode.return_value
         info["episode_airborne_frames"] = self._episode.airborne_frames
         image_observation = self._observation_builder.render_image()
         observation = self._observation_builder.build_observation(
@@ -197,7 +199,7 @@ class PolicyDriveRuntime:
         action_drive_axis: float | None,
         spin_request: SpinRequest,
     ) -> PolicyDriveStep:
-        assembly = self._step_assembler.run(
+        assembly = self._step_assembler.run_live_race(
             EnvStepRequest(
                 control_state=control_state,
                 action_repeat=self._config.action_repeat,
@@ -206,6 +208,13 @@ class PolicyDriveRuntime:
                 spin_request=spin_request,
                 capture_display_frames=True,
                 active_track=None,
+                episode_frame_count=self._episode.frame_count,
+                episode_stalled_steps=self._episode.stalled_steps,
+                episode_progress_frontier_stalled_frames=(
+                    self._episode.progress_frontier_stalled_frames
+                ),
+                episode_progress_frontier_distance=self._episode.progress_frontier_distance,
+                episode_progress_frontier_initialized=(self._episode.progress_frontier_initialized),
                 episode_return=self._episode.return_value,
                 episode_boost_pad_entries=self._episode.boost_pad_entries,
                 episode_airborne_frames=self._episode.airborne_frames,
@@ -217,6 +226,11 @@ class PolicyDriveRuntime:
             telemetry=assembly.telemetry,
             requested_control_state=assembly.requested_control_state,
             gas_level=assembly.gas_level,
+            frame_count=assembly.episode_frame_count,
+            stalled_steps=assembly.episode_stalled_steps,
+            progress_frontier_stalled_frames=(assembly.episode_progress_frontier_stalled_frames),
+            progress_frontier_distance=assembly.episode_progress_frontier_distance,
+            progress_frontier_initialized=(assembly.episode_progress_frontier_initialized),
             return_value=assembly.episode_return,
             boost_pad_entries=assembly.episode_boost_pad_entries,
             airborne_frames=assembly.episode_airborne_frames,
