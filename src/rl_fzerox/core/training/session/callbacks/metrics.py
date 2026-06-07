@@ -330,12 +330,10 @@ class RolloutInfoAccumulator:
 
 
 def info_sequence(infos: object) -> Sequence[Mapping[str, object]] | None:
-    if isinstance(infos, list | tuple):
-        typed_infos: list[Mapping[str, object]] = []
-        for info in infos:
-            if isinstance(info, Mapping):
-                typed_infos.append(info)
-        return typed_infos
+    if isinstance(infos, tuple):
+        return tuple(info for info in infos if isinstance(info, Mapping))
+    if isinstance(infos, list):
+        return [info for info in infos if isinstance(info, Mapping)]
     return None
 
 
