@@ -632,6 +632,28 @@ def test_career_mode_does_not_continue_lap_three_without_terminal_result() -> No
     assert step.phase == "continue_after_race:wait_for_fresh_race"
 
 
+def test_career_mode_continues_result_after_terminal_edge_disappears() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
+    controller._resolve_policy_control = lambda info: _stub_policy_control()
+    controller._pending_steps.clear()
+    controller._awaiting_new_race_after_terminal = True
+    controller._continuing_race_result = True
+    controller._observed_terminal_race_result = True
+
+    step = controller.next_raw_step(
+        info={
+            "game_mode": "gp_race",
+            "race_laps_completed": 3,
+            "race_time_ms": 105_000,
+            "total_lap_count": 3,
+        }
+    )
+
+    assert step is not None
+    assert step.menu_input is MenuInput.ACCEPT
+    assert step.phase.startswith("continue_after_race:accept:")
+
+
 def test_career_mode_clears_stale_post_race_inputs_on_unknown_screen() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
     controller._pending_steps.append(

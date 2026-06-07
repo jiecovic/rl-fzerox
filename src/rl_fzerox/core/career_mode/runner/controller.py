@@ -227,16 +227,14 @@ class CareerModeController:
                     step = self._pending_steps.popleft()
                     self._phase = phase_from_step(step)
                     return step
-                if self._continuing_race_result and facts.terminal_race_result:
+                if facts.terminal_race_result:
                     self._observed_terminal_race_result = True
+                    self._continuing_race_result = True
+                if self._continuing_race_result and self._observed_terminal_race_result:
                     if self._new_race_ready_for_policy(info):
                         self._continuing_race_result = False
                     else:
                         return self._continue_after_race_pulse()
-                if facts.terminal_race_result:
-                    self._observed_terminal_race_result = True
-                    self._continuing_race_result = True
-                    return self._continue_after_race_pulse()
                 self._continuing_race_result = False
                 self._pending_steps.clear()
                 if not self._new_race_ready_for_policy(info):
