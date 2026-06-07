@@ -1,20 +1,23 @@
 # tests/ui/test_career_mode_menu_controls.py
 
-from fzerox_emulator import JOYPAD_BUTTONS, joypad_mask
+from fzerox_emulator import MENU_BUTTON_MASKS
 from fzerox_emulator.control import ControllerState
 from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.ui.watch.runtime.career_mode.menu import controller_step_from_menu_step
 
 
-def test_career_menu_accept_uses_a_and_start_stays_explicit() -> None:
+def test_career_menu_accept_uses_n64_a_and_start_stays_explicit() -> None:
     accept = controller_step_from_menu_step(RawMenuStep(MenuInput.ACCEPT, frames=1, phase="accept"))
     a_button = controller_step_from_menu_step(RawMenuStep(MenuInput.A_BUTTON, frames=1, phase="a"))
+    cancel = controller_step_from_menu_step(RawMenuStep(MenuInput.CANCEL, frames=1, phase="cancel"))
     start = controller_step_from_menu_step(RawMenuStep(MenuInput.START, frames=1, phase="start"))
 
-    assert accept.controller_state.joypad_mask == joypad_mask(JOYPAD_BUTTONS.a)
-    assert a_button.controller_state.joypad_mask == joypad_mask(JOYPAD_BUTTONS.a)
-    assert start.controller_state.joypad_mask == joypad_mask(JOYPAD_BUTTONS.start)
+    assert accept.controller_state.joypad_mask == MENU_BUTTON_MASKS.confirm
+    assert a_button.controller_state.joypad_mask == MENU_BUTTON_MASKS.confirm
+    assert cancel.controller_state.joypad_mask == MENU_BUTTON_MASKS.cancel
+    assert start.controller_state.joypad_mask == MENU_BUTTON_MASKS.start
     assert accept.controller_state.joypad_mask == a_button.controller_state.joypad_mask
+    assert accept.controller_state.joypad_mask != cancel.controller_state.joypad_mask
     assert accept.controller_state.joypad_mask != start.controller_state.joypad_mask
 
 

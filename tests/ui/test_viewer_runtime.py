@@ -19,6 +19,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     MenuInput,
     RawMenuStep,
     camera_setting,
+    select_difficulty_steps,
 )
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan, SaveRaceSetup
@@ -654,7 +655,7 @@ def test_career_mode_continues_result_after_terminal_edge_disappears() -> None:
     assert step.phase.startswith("continue_after_race:accept:")
 
 
-def test_career_mode_clears_stale_post_race_inputs_on_unknown_screen() -> None:
+def test_career_mode_continues_result_screen_after_terminal_edge() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
     controller._pending_steps.append(
         RawMenuStep(menu_input=MenuInput.START, frames=2, phase="unsafe:start")
@@ -665,8 +666,27 @@ def test_career_mode_clears_stale_post_race_inputs_on_unknown_screen() -> None:
     step = controller.next_raw_step(info={"game_mode": "results"})
 
     assert step is not None
+    assert step.menu_input is MenuInput.ACCEPT
+    assert step.phase.startswith("continue_after_race:accept:")
+    assert controller._pending_steps
+    assert controller._pending_steps[0].frames == MENU_TIMING.result_continue_settle_frames
+    assert all(
+        pending_step.menu_input is not MenuInput.START for pending_step in controller._pending_steps
+    )
+
+
+def test_career_mode_waits_on_result_screen_without_terminal_edge() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
+    controller._pending_steps.append(
+        RawMenuStep(menu_input=MenuInput.START, frames=2, phase="unsafe:start")
+    )
+    controller._awaiting_new_race_after_terminal = True
+
+    step = controller.next_raw_step(info={"game_mode": "results"})
+
+    assert step is not None
     assert step.menu_input is MenuInput.NEUTRAL
-    assert step.phase == "continue_after_race:wait_for_known_screen"
+    assert step.phase == "continue_after_race:wait_for_terminal_result"
     assert all(
         pending_step.menu_input is not MenuInput.START for pending_step in controller._pending_steps
     )
@@ -918,18 +938,38 @@ def test_career_mode_menu_transition_does_not_skip_race_entry() -> None:
     assert step.phase.startswith("enter_race:start:")
 
 
-def test_career_mode_rejects_non_default_engine_without_ram_patch() -> None:
+def test_career_mode_adjusts_engine_right_from_live_menu_value() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.APPLY_ENGINE)
     controller._setup = _career_setup(
         engine_setting_id="70",
         engine_setting_raw_value=70,
     )
 
-    with pytest.raises(RuntimeError, match="non-default engine"):
-        controller.before_step(
-            session=_StubCareerSession(),
-            info={"game_mode": "machine_settings"},
-        )
+    step = controller._next_menu_step(
+        {"game_mode": "machine_settings", "engine_setting_percent_ram": 50.0}
+    )
+
+    assert step is not None
+    assert step.menu_input is MenuInput.RIGHT
+    assert step.phase == "apply_engine:right"
+    assert not controller._engine_applied
+
+
+def test_career_mode_adjusts_engine_left_from_live_menu_value() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.APPLY_ENGINE)
+    controller._setup = _career_setup(
+        engine_setting_id="30",
+        engine_setting_raw_value=30,
+    )
+
+    step = controller._next_menu_step(
+        {"game_mode": "machine_settings", "engine_setting_percent_ram": 50.0}
+    )
+
+    assert step is not None
+    assert step.menu_input is MenuInput.LEFT
+    assert step.phase == "apply_engine:left"
+    assert not controller._engine_applied
 
 
 def test_career_mode_accepts_default_engine_without_ram_patch() -> None:
@@ -940,31 +980,66 @@ def test_career_mode_accepts_default_engine_without_ram_patch() -> None:
         session=session,
         info={"game_mode": "machine_settings"},
     )
+    step = controller._next_menu_step(
+        {"game_mode": "machine_settings", "engine_setting_percent_ram": 50.0}
+    )
 
+    assert step is not None
+    assert step.phase == "apply_engine:ready"
     assert controller._engine_applied
     assert not session.patch_calls
 
 
 @pytest.mark.parametrize(
-    ("phase", "mode", "expected_step_prefix"),
+    ("phase", "info", "expected_step_prefix"),
     (
-        (CareerPhase.BOOT_TO_DIFFICULTY, "course_select", "select_cup:"),
-        (CareerPhase.ENTER_COURSE_SELECT, "machine_select", "enter_machine_settings:"),
-        (CareerPhase.SELECT_CUP, "machine_settings", "apply_engine:"),
-        (CareerPhase.CONTINUE_AFTER_RACE, "machine_select", "enter_machine_settings:"),
+        (
+            CareerPhase.BOOT_TO_DIFFICULTY,
+            {"game_mode": "course_select", "difficulty_raw": 0},
+            "select_cup:",
+        ),
+        (
+            CareerPhase.ENTER_COURSE_SELECT,
+            {"game_mode": "machine_select"},
+            "enter_machine_settings:",
+        ),
+        (
+            CareerPhase.SELECT_CUP,
+            {"game_mode": "machine_settings"},
+            "apply_engine:",
+        ),
+        (
+            CareerPhase.CONTINUE_AFTER_RACE,
+            {"game_mode": "machine_select"},
+            "enter_machine_settings:",
+        ),
     ),
 )
 def test_career_mode_menu_accepts_already_advanced_screens(
     phase: CareerPhase,
-    mode: str,
+    info: dict[str, object],
     expected_step_prefix: str,
 ) -> None:
     controller = _minimal_career_controller(phase=phase)
 
-    step = controller._next_menu_step({"game_mode": mode})
+    step = controller._next_menu_step(info)
 
     assert step is not None
     assert step.phase.startswith(expected_step_prefix)
+
+
+def test_career_mode_reselects_difficulty_from_stale_course_select() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.BOOT_TO_DIFFICULTY)
+    controller._setup = _career_setup(difficulty="standard")
+
+    step = _next_non_settle_menu_step(
+        controller,
+        {"game_mode": "course_select", "difficulty_raw": 0, "course_index": 0},
+    )
+
+    assert step.menu_input is MenuInput.CANCEL
+    assert step.phase == "course_select:wrong_difficulty:cancel"
+    assert controller.phase is CareerPhase.BOOT_TO_DIFFICULTY
 
 
 def test_career_mode_fsm_reaches_policy_handoff_from_menu_path() -> None:
@@ -975,13 +1050,13 @@ def test_career_mode_fsm_reaches_policy_handoff_from_menu_path() -> None:
     assert _next_active_menu_phase(controller, {"game_mode": "main_menu"}) == (
         "select_difficulty:open"
     )
-    assert _next_active_menu_phase(controller, {"game_mode": "main_menu"}) == (
+    assert _next_active_menu_phase(controller, {"game_mode": "main_menu", "menu_selected_mode_raw": 5}) == (
         "select_difficulty:accept"
     )
     assert (
         _next_active_menu_phase(
             controller,
-            {"game_mode": "course_select", "course_index": 0},
+            {"game_mode": "course_select", "course_index": 0, "difficulty_raw": 0},
         )
         == "enter_machine_select:start:1"
     )
@@ -1014,59 +1089,8 @@ def test_career_mode_fsm_reaches_policy_handoff_from_menu_path() -> None:
     assert controller.policy_owns_control()
 
 
-def test_career_mode_uses_start_to_enter_course_select_from_gp_mode() -> None:
+def test_career_mode_opens_difficulty_popup_from_gp_mode() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.ENTER_COURSE_SELECT)
-
-    step = _next_non_settle_menu_step(
-        controller,
-        {"game_mode": "main_menu", "menu_selected_mode_raw": 0},
-    )
-
-    assert step.menu_input is MenuInput.START
-    assert step.phase == "enter_course_select:start:1"
-    assert step.frames == MENU_TIMING.start_hold_frames
-
-
-def test_career_mode_reselects_gp_mode_before_difficulty_popup() -> None:
-    controller = _minimal_career_controller(phase=CareerPhase.ENTER_COURSE_SELECT)
-
-    step = _next_non_settle_menu_step(
-        controller,
-        {"game_mode": "main_menu", "menu_selected_mode_raw": 2},
-    )
-
-    assert step.menu_input is MenuInput.START
-    assert step.phase == "enter_course_select:start:1"
-    assert step.frames == MENU_TIMING.start_hold_frames
-
-
-def test_career_mode_waits_for_course_select_during_main_menu_transition() -> None:
-    controller = _minimal_career_controller(phase=CareerPhase.ENTER_COURSE_SELECT)
-
-    step = controller.next_raw_step(
-        info={
-            "game_mode": "main_menu",
-            "game_mode_raw": 0x8007,
-            "menu_selected_mode_raw": 0,
-        }
-    )
-
-    assert step is not None
-    assert step.menu_input is MenuInput.NEUTRAL
-    assert step.phase == "enter_course_select:wait_for_transition"
-
-
-def test_career_mode_selects_gp_mode_before_difficulty_popup() -> None:
-    controller = _minimal_career_controller(phase=CareerPhase.BOOT_TO_DIFFICULTY)
-
-    step = _next_non_settle_menu_step(
-        controller,
-        {"game_mode": "main_menu", "menu_selected_mode_raw": 2},
-    )
-
-    assert step.menu_input is MenuInput.LEFT
-    assert step.phase == "select_mode:left_to_gp"
-    assert controller.phase is CareerPhase.BOOT_TO_DIFFICULTY
 
     step = _next_non_settle_menu_step(
         controller,
@@ -1075,9 +1099,105 @@ def test_career_mode_selects_gp_mode_before_difficulty_popup() -> None:
 
     assert step.menu_input is MenuInput.ACCEPT
     assert step.phase == "select_difficulty:open"
+    assert step.frames == MENU_TIMING.menu_hold_frames
 
 
-def test_career_mode_returned_main_menu_selects_gp_before_retry() -> None:
+def test_career_mode_difficulty_open_step_does_not_queue_menu_movement() -> None:
+    steps = select_difficulty_steps(_career_setup(difficulty="standard"))
+    active_inputs = [step.menu_input for step in steps if step.menu_input is not MenuInput.NEUTRAL]
+
+    assert active_inputs == [MenuInput.ACCEPT]
+
+
+def test_career_mode_moves_main_menu_cursor_toward_gp() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.ENTER_COURSE_SELECT)
+
+    step = _next_non_settle_menu_step(
+        controller,
+        {"game_mode": "main_menu", "menu_selected_mode_raw": 2},
+    )
+
+    assert step.menu_input is MenuInput.LEFT
+    assert step.phase == "main_menu:left_to_gp"
+
+
+def test_career_mode_advances_selected_gp_mode_with_raw_high_bit() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.ENTER_COURSE_SELECT)
+
+    step = _next_non_settle_menu_step(
+        controller,
+        info={
+            "game_mode": "main_menu",
+            "game_mode_raw": 0x8007,
+            "menu_selected_mode_raw": 0,
+            "menu_transition_state_raw": 0,
+        },
+    )
+
+    assert step is not None
+    assert step.menu_input is MenuInput.ACCEPT
+    assert step.phase == "select_difficulty:open"
+
+
+def test_career_mode_waits_for_explicit_menu_transition() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.ENTER_COURSE_SELECT)
+
+    step = _next_non_settle_menu_step(
+        controller,
+        info={
+            "game_mode": "main_menu",
+            "game_mode_raw": 0x8007,
+            "menu_selected_mode_raw": 0,
+            "menu_transition_state_raw": 1,
+        },
+    )
+
+    assert step is not None
+    assert step.menu_input is MenuInput.NEUTRAL
+    assert step.phase == "enter_course_select:wait_for_transition"
+
+
+def test_career_mode_boot_to_difficulty_moves_main_menu_cursor_toward_gp() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.BOOT_TO_DIFFICULTY)
+
+    step = _next_non_settle_menu_step(
+        controller,
+        {"game_mode": "main_menu", "menu_selected_mode_raw": 2},
+    )
+
+    assert step.menu_input is MenuInput.LEFT
+    assert step.phase == "main_menu:left_to_gp"
+
+
+def test_career_mode_does_not_treat_practice_highlight_as_difficulty_popup() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.ENTER_COURSE_SELECT)
+    controller._setup = _career_setup(difficulty="standard")
+
+    step = _next_non_settle_menu_step(
+        controller,
+        {"game_mode": "main_menu", "menu_selected_mode_raw": 5},
+    )
+
+    assert step.menu_input is MenuInput.UP
+    assert step.phase == "main_menu:practice_to_gp"
+
+
+def test_career_mode_selects_open_difficulty_after_popup_request() -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.SELECT_DIFFICULTY)
+    controller._setup = _career_setup(difficulty="standard")
+    controller._difficulty_popup_requested = True
+
+    step = _next_non_settle_menu_step(
+        controller,
+        {"game_mode": "main_menu", "menu_selected_mode_raw": 5},
+    )
+
+    assert step.menu_input is MenuInput.DOWN
+    assert step.phase == "select_difficulty:down:1"
+    assert controller.phase is CareerPhase.SELECT_DIFFICULTY
+
+
+def test_career_mode_returned_main_menu_waits_when_cursor_is_not_gp() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
 
     step = _next_non_settle_menu_step(
@@ -1085,9 +1205,8 @@ def test_career_mode_returned_main_menu_selects_gp_before_retry() -> None:
         {"game_mode": "main_menu", "menu_selected_mode_raw": 3},
     )
 
-    assert step.menu_input is MenuInput.LEFT
-    assert step.phase == "select_mode:left_to_gp"
-    assert controller.phase is CareerPhase.BOOT_TO_DIFFICULTY
+    assert step.menu_input is MenuInput.NEUTRAL
+    assert step.phase == "select_difficulty:wait_for_gp_mode"
 
 
 def test_career_mode_apply_execution_plan_resumes_post_race_continuation() -> None:
@@ -1663,6 +1782,8 @@ def _minimal_career_controller(
     controller._pending_steps = deque()
     controller._start_presses_in_phase = 0
     controller._engine_applied = engine_applied
+    controller._engine_adjust_taps = 0
+    controller._difficulty_popup_requested = False
     controller._setup = _career_setup()
     controller._camera_setting = None
     controller._camera_synced = True
@@ -1677,12 +1798,13 @@ def _minimal_career_controller(
 
 def _career_setup(
     *,
+    difficulty: str = "novice",
     engine_setting_id: str = "50",
     engine_setting_raw_value: int = 50,
 ) -> CareerModeRaceSetupConfig:
     return career_mode_race_setup_config(
         SaveRaceSetup(
-            difficulty="novice",
+            difficulty=difficulty,
             cup_id="jack",
             course_id=None,
             vehicle_id="blue_falcon",
@@ -1705,6 +1827,8 @@ def _stub_policy_control() -> CareerModePolicyControl:
             scope="course",
             policy_run_id="run-a",
             policy_artifact="best",
+            vehicle_id="blue_falcon",
+            engine_setting_raw_value=50,
             created_at="2026-01-01T00:00:00Z",
             updated_at="2026-01-01T00:00:00Z",
             difficulty="novice",

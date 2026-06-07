@@ -47,10 +47,12 @@ interface SaveGameWorkspaceProps {
     courseId?: string | null;
     cupId?: string | null;
     difficulty?: string | null;
+    engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
     scope: CourseSetupScope;
+    vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onStartCareerMode: (
     saveGameId: string,
@@ -154,10 +156,12 @@ export function SaveGameWorkspace({
     courseId?: string | null;
     cupId?: string | null;
     difficulty?: string | null;
+    engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
     scope: CourseSetupScope;
+    vehicleId: string;
   }) {
     setError(null);
     setUpdatingSaveGameId(request.saveGameId);

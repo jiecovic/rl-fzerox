@@ -28,6 +28,7 @@ from rl_fzerox.core.manager.models import (
     ManagedRunEvent,
     ManagedRunRuntime,
     ManagedRunSummary,
+    ManagedRunVehicleSummary,
     RunStatus,
 )
 from rl_fzerox.core.manager.registry.common import (
@@ -383,6 +384,7 @@ def managed_run_summary_from_model(session: Session, run: RunModel) -> ManagedRu
         status=run_status(run.status),
         config_hash=run.config_snapshot.config_hash,
         action_repeat=_action_repeat_from_config_json(run.config_snapshot.config_json),
+        vehicle_setup=_vehicle_summary_from_config_json(run.config_snapshot.config_json),
         lineage_id=lineage_id,
         lineage_groups=lineage_groups,
         lineage_step_offset=run.lineage_step_offset,
@@ -429,3 +431,45 @@ def _action_repeat_from_config_json(config_json: str) -> int:
     if not isinstance(action_repeat, int | float):
         return 1
     return max(1, int(action_repeat))
+
+
+def _vehicle_summary_from_config_json(config_json: str) -> ManagedRunVehicleSummary:
+    try:
+        loaded = json.loads(config_json)
+    except json.JSONDecodeError:
+        loaded = {}
+    vehicle = loaded.get("vehicle") if isinstance(loaded, dict) else None
+    if not isinstance(vehicle, dict):
+        vehicle = {}
+    selected_vehicle_ids = vehicle.get("selected_vehicle_ids")
+    if isinstance(selected_vehicle_ids, list):
+        vehicle_ids = tuple(value for value in selected_vehicle_ids if isinstance(value, str))
+    else:
+        vehicle_ids = ()
+    return ManagedRunVehicleSummary(
+        selection_mode=_string_value(vehicle.get("selection_mode"), fallback="fixed"),
+        selected_vehicle_ids=vehicle_ids or ("blue_falcon",),
+        engine_mode=_string_value(vehicle.get("engine_mode"), fallback="fixed"),
+        engine_setting_raw_value=_bounded_int(
+            vehicle.get("engine_setting_raw_value"),
+            fallback=50,
+        ),
+        engine_setting_min_raw_value=_bounded_int(
+            vehicle.get("engine_setting_min_raw_value"),
+            fallback=20,
+        ),
+        engine_setting_max_raw_value=_bounded_int(
+            vehicle.get("engine_setting_max_raw_value"),
+            fallback=80,
+        ),
+    )
+
+
+def _string_value(value: object, *, fallback: str) -> str:
+    return value if isinstance(value, str) and value else fallback
+
+
+def _bounded_int(value: object, *, fallback: int) -> int:
+    if not isinstance(value, int | float):
+        return fallback
+    return max(0, min(100, int(value)))

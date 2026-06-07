@@ -13,7 +13,7 @@ import type {
   SavePolicyArtifact,
 } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
-import { FieldSelect, FieldShell } from "@/shared/ui/Field";
+import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { SaveDraftIcon } from "@/shared/ui/icons";
 
 export interface CupView {
@@ -31,28 +31,36 @@ export type CourseSetupScopeValues = {
 };
 
 export type PolicyArtifactDraft = {
+  engineSettingRawValue: number;
   policyArtifact: SavePolicyArtifact;
   policyRunId: string;
+  vehicleId: string;
 };
 
 export type CourseSetupDraft = CourseSetupScopeValues & PolicyArtifactDraft;
 export type CourseSetupDraftMap = Record<string, CourseSetupDraft>;
 
 const EMPTY_COURSE_SETUP_DRAFT: PolicyArtifactDraft = {
+  engineSettingRawValue: 50,
   policyArtifact: "best",
   policyRunId: "",
+  vehicleId: "blue_falcon",
 };
 
 export function GlobalPolicyPanel({
   assignableRuns,
   cups,
+  metadata,
   onApplySetups,
   updating,
+  unlockedVehicleIds,
 }: {
   assignableRuns: readonly ManagedRun[];
   cups: readonly CupView[];
+  metadata: ConfigMetadata;
   onApplySetups: (setups: readonly CourseSetupScopeValues[], draft: PolicyArtifactDraft) => void;
   updating: boolean;
+  unlockedVehicleIds: readonly string[];
 }) {
   const [draft, setDraft] = useState<PolicyArtifactDraft>(EMPTY_COURSE_SETUP_DRAFT);
   const canApply = !updating && draft.policyRunId !== "";
@@ -84,6 +92,8 @@ export function GlobalPolicyPanel({
           disabled={updating}
           draft={draft}
           label="Default policy"
+          metadata={metadata}
+          unlockedVehicleIds={unlockedVehicleIds}
           onDraftChange={setDraft}
         />
         <ArtifactDraftSelect
@@ -101,16 +111,19 @@ export function CourseSetupPanel({
   assignableRuns,
   cups,
   dirtyCourseSetupCount,
+  metadata,
   onApplySetups,
   onCourseSetupDraftChange,
   onSaveSetups,
   courseSetupDrafts,
   savingCourseSetups,
   updating,
+  unlockedVehicleIds,
 }: {
   assignableRuns: readonly ManagedRun[];
   cups: readonly CupView[];
   dirtyCourseSetupCount: number;
+  metadata: ConfigMetadata;
   onApplySetups: (setups: readonly CourseSetupScopeValues[], draft: PolicyArtifactDraft) => void;
   onCourseSetupDraftChange: (
     scopeValues: CourseSetupScopeValues,
@@ -120,6 +133,7 @@ export function CourseSetupPanel({
   courseSetupDrafts: CourseSetupDraftMap;
   savingCourseSetups: boolean;
   updating: boolean;
+  unlockedVehicleIds: readonly string[];
 }) {
   const [collapsedCupIds, setCollapsedCupIds] = useState<readonly string[]>([]);
   const collapsedCupIdSet = new Set(collapsedCupIds);
@@ -179,7 +193,9 @@ export function CourseSetupPanel({
             collapsed={collapsedCupIdSet.has(cup.id)}
             cup={cup}
             courseSetupDrafts={courseSetupDrafts}
+            metadata={metadata}
             updating={updating || savingCourseSetups}
+            unlockedVehicleIds={unlockedVehicleIds}
             onApplySetups={onApplySetups}
             onCollapsedChange={setCupCollapsed}
             onCourseSetupDraftChange={onCourseSetupDraftChange}
@@ -194,15 +210,18 @@ function CupSetupBlock({
   assignableRuns,
   collapsed,
   cup,
+  metadata,
   onApplySetups,
   onCollapsedChange,
   onCourseSetupDraftChange,
   courseSetupDrafts,
   updating,
+  unlockedVehicleIds,
 }: {
   assignableRuns: readonly ManagedRun[];
   collapsed: boolean;
   cup: CupView;
+  metadata: ConfigMetadata;
   onApplySetups: (setups: readonly CourseSetupScopeValues[], draft: PolicyArtifactDraft) => void;
   onCollapsedChange: (cupId: string, collapsed: boolean) => void;
   onCourseSetupDraftChange: (
@@ -211,6 +230,7 @@ function CupSetupBlock({
   ) => void;
   courseSetupDrafts: CourseSetupDraftMap;
   updating: boolean;
+  unlockedVehicleIds: readonly string[];
 }) {
   const [draft, setDraft] = useState<PolicyArtifactDraft>(EMPTY_COURSE_SETUP_DRAFT);
   const canApply = !updating && draft.policyRunId !== "";
@@ -232,12 +252,14 @@ function CupSetupBlock({
         </span>
       </summary>
       <div className="config-disclosure-body gap-3">
-        <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_150px_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_130px_minmax(180px,240px)_96px_auto] md:items-end">
           <PolicyDraftSelect
             assignableRuns={assignableRuns}
             disabled={updating}
             draft={draft}
             label={`${cup.label} policy`}
+            metadata={metadata}
+            unlockedVehicleIds={unlockedVehicleIds}
             visibleLabel="Policy"
             onDraftChange={setDraft}
           />
@@ -246,6 +268,22 @@ function CupSetupBlock({
             draft={draft}
             label={`${cup.label} artifact`}
             visibleLabel="Artifact"
+            onDraftChange={setDraft}
+          />
+          <VehicleDraftSelect
+            disabled={updating}
+            draft={draft}
+            label={`${cup.label} vehicle`}
+            metadata={metadata}
+            unlockedVehicleIds={unlockedVehicleIds}
+            visibleLabel="Vehicle"
+            onDraftChange={setDraft}
+          />
+          <EngineDraftInput
+            disabled={updating}
+            draft={draft}
+            label={`${cup.label} engine`}
+            visibleLabel="Engine"
             onDraftChange={setDraft}
           />
           <Button
@@ -299,6 +337,8 @@ function CupSetupBlock({
                       disabled={updating}
                       draft={courseDraft}
                       label={`${course.display_name} policy`}
+                      metadata={metadata}
+                      unlockedVehicleIds={unlockedVehicleIds}
                       visibleLabel="Policy"
                       onDraftChange={(nextDraft) =>
                         onCourseSetupDraftChange(courseScopeValues, nextDraft)
@@ -309,6 +349,26 @@ function CupSetupBlock({
                       draft={courseDraft}
                       label={`${course.display_name} artifact`}
                       visibleLabel="Artifact"
+                      onDraftChange={(nextDraft) =>
+                        onCourseSetupDraftChange(courseScopeValues, nextDraft)
+                      }
+                    />
+                    <VehicleDraftSelect
+                      disabled={updating}
+                      draft={courseDraft}
+                      label={`${course.display_name} vehicle`}
+                      metadata={metadata}
+                      unlockedVehicleIds={unlockedVehicleIds}
+                      visibleLabel="Vehicle"
+                      onDraftChange={(nextDraft) =>
+                        onCourseSetupDraftChange(courseScopeValues, nextDraft)
+                      }
+                    />
+                    <EngineDraftInput
+                      disabled={updating}
+                      draft={courseDraft}
+                      label={`${course.display_name} engine`}
+                      visibleLabel="Engine"
                       onDraftChange={(nextDraft) =>
                         onCourseSetupDraftChange(courseScopeValues, nextDraft)
                       }
@@ -343,14 +403,18 @@ function PolicyDraftSelect({
   disabled,
   draft,
   label,
+  metadata,
   onDraftChange,
+  unlockedVehicleIds,
   visibleLabel,
 }: {
   assignableRuns: readonly ManagedRun[];
   disabled: boolean;
   draft: PolicyArtifactDraft;
   label: string;
+  metadata: ConfigMetadata;
   onDraftChange: (draft: PolicyArtifactDraft) => void;
+  unlockedVehicleIds: readonly string[];
   visibleLabel?: string;
 }) {
   return (
@@ -361,7 +425,18 @@ function PolicyDraftSelect({
         disabled={disabled || assignableRuns.length === 0}
         value={draft.policyRunId}
         onChange={(event) => {
-          onDraftChange({ ...draft, policyRunId: event.currentTarget.value });
+          const policyRunId = event.currentTarget.value;
+          const selectedRun = assignableRuns.find((run) => run.id === policyRunId) ?? null;
+          onDraftChange({
+            ...draft,
+            ...preferredVehicleSetup({
+              currentDraft: draft,
+              metadata,
+              run: selectedRun,
+              unlockedVehicleIds,
+            }),
+            policyRunId,
+          });
         }}
       >
         <option disabled value="">
@@ -373,6 +448,85 @@ function PolicyDraftSelect({
           </option>
         ))}
       </FieldSelect>
+    </FieldShell>
+  );
+}
+
+function VehicleDraftSelect({
+  disabled,
+  draft,
+  label,
+  metadata,
+  onDraftChange,
+  unlockedVehicleIds,
+  visibleLabel,
+}: {
+  disabled: boolean;
+  draft: PolicyArtifactDraft;
+  label: string;
+  metadata: ConfigMetadata;
+  onDraftChange: (draft: PolicyArtifactDraft) => void;
+  unlockedVehicleIds: readonly string[];
+  visibleLabel?: string;
+}) {
+  const unlockedVehicleSet = new Set(unlockedVehicleIds);
+  const vehicleOptions = metadata.vehicles.filter((vehicle) => unlockedVehicleSet.has(vehicle.id));
+  return (
+    <FieldShell>
+      <span>{visibleLabel ?? label}</span>
+      <FieldSelect
+        aria-label={label}
+        disabled={disabled || vehicleOptions.length === 0}
+        value={draft.vehicleId}
+        onChange={(event) => {
+          onDraftChange({ ...draft, vehicleId: event.currentTarget.value });
+        }}
+      >
+        {vehicleOptions.map((vehicle) => (
+          <option key={vehicle.id} value={vehicle.id}>
+            {vehicle.display_name}
+          </option>
+        ))}
+      </FieldSelect>
+    </FieldShell>
+  );
+}
+
+function EngineDraftInput({
+  disabled,
+  draft,
+  label,
+  onDraftChange,
+  visibleLabel,
+}: {
+  disabled: boolean;
+  draft: PolicyArtifactDraft;
+  label: string;
+  onDraftChange: (draft: PolicyArtifactDraft) => void;
+  visibleLabel?: string;
+}) {
+  return (
+    <FieldShell>
+      <span>{visibleLabel ?? label}</span>
+      <FieldInput
+        aria-label={label}
+        disabled={disabled}
+        inputMode="numeric"
+        max={100}
+        min={0}
+        type="number"
+        value={draft.engineSettingRawValue}
+        onChange={(event) => {
+          const value = Number(event.currentTarget.value);
+          if (!Number.isFinite(value)) {
+            return;
+          }
+          onDraftChange({
+            ...draft,
+            engineSettingRawValue: Math.max(0, Math.min(100, Math.trunc(value))),
+          });
+        }}
+      />
     </FieldShell>
   );
 }
@@ -419,8 +573,10 @@ export function courseSetupDraftsFromSavedSetups(
     const scopeValues = scopeValuesFromSetup(setup);
     drafts[courseSetupKey(scopeValues)] = {
       ...scopeValues,
+      engineSettingRawValue: setup.engine_setting_raw_value,
       policyArtifact: setup.policy_artifact,
       policyRunId: setup.policy_run_id,
+      vehicleId: setup.vehicle_id,
     };
   }
   return drafts;
@@ -459,9 +615,54 @@ export function dirtyCourseSetupDrafts(
       draft.policyRunId !== "" &&
       (savedDraft === null ||
         savedDraft.policyRunId !== draft.policyRunId ||
-        savedDraft.policyArtifact !== draft.policyArtifact)
+        savedDraft.policyArtifact !== draft.policyArtifact ||
+        savedDraft.vehicleId !== draft.vehicleId ||
+        savedDraft.engineSettingRawValue !== draft.engineSettingRawValue)
     );
   });
+}
+
+function preferredVehicleSetup({
+  currentDraft,
+  metadata,
+  run,
+  unlockedVehicleIds,
+}: {
+  currentDraft: PolicyArtifactDraft;
+  metadata: ConfigMetadata;
+  run: ManagedRun | null;
+  unlockedVehicleIds: readonly string[];
+}): Pick<PolicyArtifactDraft, "engineSettingRawValue" | "vehicleId"> {
+  const unlockedVehicleSet = new Set(unlockedVehicleIds);
+  const fallbackVehicleId = unlockedVehicleSet.has("blue_falcon")
+    ? "blue_falcon"
+    : unlockedVehicleIds[0] ?? metadata.vehicles[0]?.id ?? currentDraft.vehicleId;
+  if (run === null) {
+    return {
+      engineSettingRawValue: currentDraft.engineSettingRawValue,
+      vehicleId: currentDraft.vehicleId,
+    };
+  }
+  const trainedVehicleId = run.vehicle_setup.selected_vehicle_ids[0] ?? null;
+  const vehicleId =
+    trainedVehicleId !== null && unlockedVehicleSet.has(trainedVehicleId)
+      ? trainedVehicleId
+      : fallbackVehicleId;
+  return {
+    engineSettingRawValue: preferredEngineSetting(run),
+    vehicleId,
+  };
+}
+
+function preferredEngineSetting(run: ManagedRun): number {
+  const vehicle = run.vehicle_setup;
+  if (vehicle.engine_mode === "fixed") {
+    return vehicle.engine_setting_raw_value;
+  }
+  if (vehicle.engine_setting_min_raw_value === vehicle.engine_setting_max_raw_value) {
+    return vehicle.engine_setting_min_raw_value;
+  }
+  return 50;
 }
 
 export function courseSetupKey(scopeValues: CourseSetupScopeValues): string {

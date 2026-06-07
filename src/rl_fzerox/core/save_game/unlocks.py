@@ -33,6 +33,16 @@ class FZeroXSaveLayout:
     gp_progress_offsets: tuple[GpCupProgressOffset, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class FZeroXVehicleUnlockLayout:
+    """Machine-row unlock math derived from GP clear marks."""
+
+    stock_vehicle_count: int
+    starting_vehicle_count: int
+    vehicles_per_unlock_group: int
+    clear_marks_per_unlock_group: int
+
+
 FZEROX_SAVE_LAYOUT = FZeroXSaveLayout(
     title=b"F-ZERO X",
     raw_sra_size=0x8000,
@@ -45,6 +55,13 @@ FZEROX_SAVE_LAYOUT = FZeroXSaveLayout(
         GpCupProgressOffset(cup_id="king", offset=0x0C),
         GpCupProgressOffset(cup_id="joker", offset=0x0D),
     ),
+)
+
+FZEROX_VEHICLE_UNLOCK_LAYOUT = FZeroXVehicleUnlockLayout(
+    stock_vehicle_count=30,
+    starting_vehicle_count=6,
+    vehicles_per_unlock_group=6,
+    clear_marks_per_unlock_group=3,
 )
 
 
@@ -62,6 +79,23 @@ class FZeroXUnlockState:
     """Known unlock state decoded from a normalized F-Zero X save file."""
 
     gp_cup_progress: tuple[GpCupProgress, ...]
+
+    @property
+    def gp_clear_mark_count(self) -> int:
+        """Return the number of GP clear marks represented by save progress."""
+
+        return sum(max(progress.raw_value, 0) for progress in self.gp_cup_progress)
+
+    @property
+    def unlocked_vehicle_count(self) -> int:
+        """Return how many stock machines should be selectable."""
+
+        layout = FZEROX_VEHICLE_UNLOCK_LAYOUT
+        unlock_groups = self.gp_clear_mark_count // layout.clear_marks_per_unlock_group
+        unlocked_count = layout.starting_vehicle_count + (
+            unlock_groups * layout.vehicles_per_unlock_group
+        )
+        return min(layout.stock_vehicle_count, unlocked_count)
 
     def gp_cup_cleared(self, *, difficulty: RaceDifficultyName, cup_id: str) -> bool:
         clear_level = race_difficulty_raw_value(difficulty) + 1

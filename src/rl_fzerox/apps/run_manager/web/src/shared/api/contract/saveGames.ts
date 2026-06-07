@@ -5,7 +5,13 @@ export const saveGameStatusSchema = z.enum(["created", "running", "paused", "fin
 
 export const saveUnlockInspectionStatusSchema = z.enum(["not_inspected", "inspected"]);
 
-export const saveUnlockTargetStatusSchema = z.enum(["pending", "succeeded", "failed", "skipped"]);
+export const saveUnlockTargetStatusSchema = z.enum([
+  "pending",
+  "locked",
+  "succeeded",
+  "failed",
+  "skipped",
+]);
 
 export const saveAttemptStatusSchema = z.enum(["running", "succeeded", "failed"]);
 
@@ -24,6 +30,8 @@ export const managedSaveCourseSetupSchema = z.object({
   course_id: z.string().nullable(),
   policy_run_id: z.string(),
   policy_artifact: savePolicyArtifactSchema,
+  vehicle_id: z.string(),
+  engine_setting_raw_value: z.number().int().min(0).max(100),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -42,6 +50,8 @@ export const managedSaveUnlockProgressSchema = z.object({
   inspection_status: saveUnlockInspectionStatusSchema,
   completed_count: z.number(),
   total_count: z.number(),
+  unlocked_vehicle_count: z.number(),
+  unlocked_vehicle_ids: z.array(z.string()),
   next_target: managedSaveUnlockTargetSchema.nullable(),
   targets: z.array(managedSaveUnlockTargetSchema),
 });

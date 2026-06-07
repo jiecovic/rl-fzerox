@@ -27,6 +27,7 @@ from rl_fzerox.core.save_game.sram import (
 from rl_fzerox.core.save_game.unlocks import (
     FZeroXSaveDecodeError,
     FZeroXUnlockState,
+    FZeroXVehicleUnlockLayout,
     GpCupProgress,
     decode_fzerox_unlock_state,
     read_fzerox_unlock_state,
@@ -35,6 +36,7 @@ from rl_fzerox.core.save_game.unlocks import (
 __all__ = [
     "FZeroXSaveDecodeError",
     "FZeroXUnlockState",
+    "FZeroXVehicleUnlockLayout",
     "GpCupProgress",
     "MEMORY_PROBE_FORMATS",
     "MEMORY_PROBE_REGIONS",

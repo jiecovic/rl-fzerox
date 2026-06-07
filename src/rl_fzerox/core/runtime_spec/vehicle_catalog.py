@@ -126,6 +126,14 @@ def known_vehicle_ids() -> tuple[str, ...]:
     return tuple(vehicle.id for vehicle in CATALOG.vehicles)
 
 
+def vehicle_ids_by_menu_slot() -> tuple[str, ...]:
+    """Return stock vehicle ids in machine-select unlock row order."""
+
+    return tuple(
+        vehicle.id for vehicle in sorted(CATALOG.vehicles, key=lambda item: item.machine_select_slot)
+    )
+
+
 def vehicle_menu_row_and_column(machine_select_slot: int) -> tuple[int, int]:
     """Return the row/column of one machine in the stock vehicle-select grid."""
 

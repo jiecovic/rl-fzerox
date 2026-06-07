@@ -58,6 +58,8 @@ class UpsertSaveCourseSetupRequest(BaseModel):
     scope: CourseSetupScope
     policy_run_id: str
     policy_artifact: Literal["latest", "best"] = "best"
+    vehicle_id: str
+    engine_setting_raw_value: int = Field(ge=0, le=100)
     difficulty: str | None = None
     cup_id: str | None = None
     course_id: str | None = None

@@ -12,7 +12,7 @@ RunCommand = Literal["pause", "stop"]
 SaveGameStatus = Literal["created", "running", "paused", "finished", "failed"]
 SaveAttemptStatus = Literal["running", "succeeded", "failed"]
 SaveUnlockInspectionStatus = Literal["not_inspected", "inspected"]
-SaveUnlockTargetStatus = Literal["pending", "succeeded", "failed", "skipped"]
+SaveUnlockTargetStatus = Literal["pending", "locked", "succeeded", "failed", "skipped"]
 CourseSetupScope = Literal["global", "difficulty", "cup", "course"]
 ViewerLeaseKind = Literal["run_watch", "career_mode"]
 
@@ -104,6 +104,18 @@ class ManagedRun:
 
 
 @dataclass(frozen=True, slots=True)
+class ManagedRunVehicleSummary:
+    """Vehicle settings needed when assigning a trained policy to a save game."""
+
+    selection_mode: str
+    selected_vehicle_ids: tuple[str, ...]
+    engine_mode: str
+    engine_setting_raw_value: int
+    engine_setting_min_raw_value: int
+    engine_setting_max_raw_value: int
+
+
+@dataclass(frozen=True, slots=True)
 class ManagedRunSummary:
     """Lightweight run-list record that avoids deserializing full configs."""
 
@@ -112,6 +124,7 @@ class ManagedRunSummary:
     status: RunStatus
     config_hash: str
     action_repeat: int
+    vehicle_setup: ManagedRunVehicleSummary
     created_at: str
     lineage_id: str
     lineage_groups: tuple[str, ...] = ()
@@ -188,19 +201,23 @@ class ManagedSaveUnlockProgress:
     inspection_status: SaveUnlockInspectionStatus
     completed_count: int
     total_count: int
+    unlocked_vehicle_count: int
+    unlocked_vehicle_ids: tuple[str, ...]
     next_target: ManagedSaveUnlockTarget | None
     targets: tuple[ManagedSaveUnlockTarget, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class ManagedSaveCourseSetup:
-    """Policy selection rule used by the career runner."""
+    """Policy and machine setup rule used by the career runner."""
 
     id: str
     save_game_id: str
     scope: CourseSetupScope
     policy_run_id: str
     policy_artifact: Literal["latest", "best"]
+    vehicle_id: str
+    engine_setting_raw_value: int
     created_at: str
     updated_at: str
     difficulty: str | None = None

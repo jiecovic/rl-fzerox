@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
 
-from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, RaceControlState, joypad_mask
+from fzerox_emulator import MENU_BUTTON_MASKS, ControllerState, RaceControlState
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.core.envs.engine.reset.camera import CAMERA_SYNC_CONTROLS
@@ -43,14 +43,14 @@ class CareerMenuControls:
     """Controller states for Career Mode menu inputs."""
 
     neutral: ControllerState = ControllerState()
-    start: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.start))
-    accept: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.a))
-    a_button: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.a))
-    cancel: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.b))
-    up: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.up))
-    down: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.down))
-    left: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.left))
-    right: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.right))
+    start: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.start)
+    accept: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.confirm)
+    a_button: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.confirm)
+    cancel: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.cancel)
+    up: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.up)
+    down: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.down)
+    left: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.left)
+    right: ControllerState = ControllerState(joypad_mask=MENU_BUTTON_MASKS.right)
     next_camera: ControllerState = CAMERA_SYNC_CONTROLS.next_camera
 
 

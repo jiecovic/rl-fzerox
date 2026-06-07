@@ -77,10 +77,12 @@ describe("SaveGameWorkspace", () => {
       courseId: "mute_city",
       cupId: "jack",
       difficulty: null,
+      engineSettingRawValue: 50,
       policyArtifact: "best",
       policyRunId: "run-policy",
       saveGameId: "save-001",
       scope: "course",
+      vehicleId: "blue_falcon",
     });
     expect(onUpsertCourseSetup).not.toHaveBeenCalledWith(
       expect.objectContaining({ scope: "global" }),
@@ -136,6 +138,15 @@ describe("SaveGameWorkspace", () => {
         inspection_status: "inspected",
         completed_count: 2,
         total_count: 16,
+        unlocked_vehicle_count: 6,
+        unlocked_vehicle_ids: [
+          "blue_falcon",
+          "golden_fox",
+          "wild_goose",
+          "fire_stingray",
+          "white_cat",
+          "red_gazelle",
+        ],
         next_target: {
           sequence_index: 2,
           kind: "clear_gp_cup",
@@ -194,6 +205,15 @@ describe("SaveGameWorkspace", () => {
           inspection_status: "inspected",
           completed_count: 1,
           total_count: 2,
+          unlocked_vehicle_count: 6,
+          unlocked_vehicle_ids: [
+            "blue_falcon",
+            "golden_fox",
+            "wild_goose",
+            "fire_stingray",
+            "white_cat",
+            "red_gazelle",
+          ],
           next_target: {
             sequence_index: 1,
             kind: "clear_gp_cup",
@@ -310,6 +330,8 @@ function globalCourseSetupFixture() {
     policy_run_id: "run-policy",
     save_game_id: "save-001",
     scope: "global" as const,
+    vehicle_id: "blue_falcon",
+    engine_setting_raw_value: 50,
     created_at: "2026-06-02T10:30:00+00:00",
     updated_at: "2026-06-02T10:30:00+00:00",
   };

@@ -291,6 +291,8 @@ def upsert_course_setup(
     scope: CourseSetupScope,
     policy_run_id: str,
     policy_artifact: Literal["latest", "best"],
+    vehicle_id: str,
+    engine_setting_raw_value: int,
     created_at: str,
     updated_at: str,
     difficulty: str | None = None,
@@ -324,6 +326,8 @@ def upsert_course_setup(
             course_id=course_id,
             policy_run_id=policy_run_id,
             policy_artifact=policy_artifact,
+            vehicle_id=vehicle_id,
+            engine_setting_raw_value=engine_setting_raw_value,
             created_at=created_at,
             updated_at=updated_at,
         )
@@ -331,6 +335,8 @@ def upsert_course_setup(
     else:
         row.policy_run_id = policy_run_id
         row.policy_artifact = policy_artifact
+        row.vehicle_id = vehicle_id
+        row.engine_setting_raw_value = engine_setting_raw_value
         row.updated_at = updated_at
     session.flush()
     return course_setup_from_model(row)
@@ -355,12 +361,17 @@ def course_setup_from_model(
 ) -> ManagedSaveCourseSetup:
     """Convert one ORM row into a domain course setup."""
 
+    engine_setting_raw_value = optional_int(row.engine_setting_raw_value)
     return ManagedSaveCourseSetup(
         id=row.id,
         save_game_id=row.save_game_id,
         scope=course_setup_scope(row.scope),
         policy_run_id=row.policy_run_id,
         policy_artifact=_required_policy_artifact(row.policy_artifact),
+        vehicle_id=row.vehicle_id,
+        engine_setting_raw_value=50
+        if engine_setting_raw_value is None
+        else engine_setting_raw_value,
         created_at=row.created_at,
         updated_at=row.updated_at,
         difficulty=row.difficulty,

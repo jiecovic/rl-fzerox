@@ -50,6 +50,8 @@ class SaveGameCourseSetupModel(ManagerBase):
     course_id: Mapped[str | None]
     policy_run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
     policy_artifact: Mapped[str]
+    vehicle_id: Mapped[str]
+    engine_setting_raw_value: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[str]
     updated_at: Mapped[str]
 

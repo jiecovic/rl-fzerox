@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     FrameStep = _results.FrameStep
     JOYPAD_BUTTONS = _control.JOYPAD_BUTTONS
     JoypadButtons = _control.JoypadButtons
+    MENU_BUTTON_MASKS = _control.MENU_BUTTON_MASKS
+    MenuButtonMasks = _control.MenuButtonMasks
     ObservationResizeFilter = _observations.ObservationResizeFilter
     ObservationImageRecipe = _observations.ObservationImageRecipe
     ObservationSpec = _observations.ObservationSpec
@@ -67,6 +69,8 @@ _EXPORT_MODULES = {
     "stacked_observation_channels": "fzerox_emulator.base.observations",
     "JOYPAD_BUTTONS": "fzerox_emulator.control",
     "JoypadButtons": "fzerox_emulator.control",
+    "MENU_BUTTON_MASKS": "fzerox_emulator.control",
+    "MenuButtonMasks": "fzerox_emulator.control",
     "RACE_CONTROL_MASKS": "fzerox_emulator.control",
     "RaceControlMaskCatalog": "fzerox_emulator.control",
     "RaceControlState": "fzerox_emulator.control",
@@ -87,6 +91,8 @@ __all__ = [
     "FrameStep",
     "JOYPAD_BUTTONS",
     "JoypadButtons",
+    "MENU_BUTTON_MASKS",
+    "MenuButtonMasks",
     "ObservationImageRecipe",
     "ObservationResizeFilter",
     "ObservationSpec",

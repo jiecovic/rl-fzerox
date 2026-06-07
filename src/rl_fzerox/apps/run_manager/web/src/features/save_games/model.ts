@@ -7,6 +7,7 @@ import type {
 
 export interface UnlockTargetSummary {
   failed: number;
+  locked: number;
   pending: number;
   skipped: number;
   succeeded: number;
@@ -60,6 +61,8 @@ export function unlockTargetStatusClass(status: SaveUnlockTargetStatus): string 
       return "border-rose-300/40 bg-rose-400/10 text-rose-200";
     case "skipped":
       return "border-amber-300/40 bg-amber-400/10 text-amber-200";
+    case "locked":
+      return "border-app-border bg-app-surface text-app-muted opacity-60";
     case "pending":
       return "border-app-border bg-app-surface-muted text-app-muted";
   }
@@ -75,6 +78,7 @@ export function titleizeIdentifier(value: string): string {
 function summarizeTargets(targets: readonly ManagedSaveUnlockTarget[]): UnlockTargetSummary {
   const summary: UnlockTargetSummary = {
     failed: 0,
+    locked: 0,
     pending: 0,
     skipped: 0,
     succeeded: 0,

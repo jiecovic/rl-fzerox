@@ -72,10 +72,12 @@ export interface WorkspaceActions {
   openManagedRunDirectory: (runId: string) => Promise<void>;
   openManagedSaveGameDirectory: (saveGameId: string) => Promise<void>;
   upsertManagedSaveCourseSetup: (request: {
+    engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
     scope: CourseSetupScope;
+    vehicleId: string;
     courseId?: string | null;
     cupId?: string | null;
     difficulty?: string | null;
@@ -140,10 +142,12 @@ export function useWorkspaceActions({
   }
 
   async function upsertManagedSaveCourseSetup(request: {
+    engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
     scope: CourseSetupScope;
+    vehicleId: string;
     courseId?: string | null;
     cupId?: string | null;
     difficulty?: string | null;

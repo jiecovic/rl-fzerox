@@ -73,6 +73,8 @@ def upsert_save_course_setup_payload(
             course_id=request.course_id,
             policy_run_id=request.policy_run_id,
             policy_artifact=request.policy_artifact,
+            vehicle_id=request.vehicle_id,
+            engine_setting_raw_value=request.engine_setting_raw_value,
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error).strip("'")) from error

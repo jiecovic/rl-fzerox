@@ -11,6 +11,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyTuple};
 
+use crate::core::input::{fzerox_menu_button_mask as semantic_menu_mask, FZeroXMenuButton};
+
 const JOYPAD_BIT_WIDTH: u32 = u16::BITS;
 
 #[pyfunction]
@@ -30,6 +32,26 @@ pub fn joypad_mask(buttons: &Bound<'_, PyTuple>) -> PyResult<u16> {
     }
 
     Ok(mask)
+}
+
+#[pyfunction]
+pub fn fzerox_menu_button_mask(button: &str) -> PyResult<u16> {
+    let semantic_button = match button {
+        "confirm" => FZeroXMenuButton::Confirm,
+        "cancel" => FZeroXMenuButton::Cancel,
+        "start" => FZeroXMenuButton::Start,
+        "up" => FZeroXMenuButton::Up,
+        "down" => FZeroXMenuButton::Down,
+        "left" => FZeroXMenuButton::Left,
+        "right" => FZeroXMenuButton::Right,
+        _ => {
+            return Err(PyValueError::new_err(format!(
+                "Invalid F-Zero X menu button {button:?}"
+            )));
+        }
+    };
+
+    Ok(semantic_menu_mask(semantic_button))
 }
 
 /// Register joypad constants and helper functions onto the Python extension
@@ -52,5 +74,6 @@ pub fn register_input_api(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("JOYPAD_L3", DEVICE_ID_JOYPAD_L3)?;
     module.add("JOYPAD_R3", DEVICE_ID_JOYPAD_R3)?;
     module.add_function(wrap_pyfunction!(joypad_mask, module)?)?;
+    module.add_function(wrap_pyfunction!(fzerox_menu_button_mask, module)?)?;
     Ok(())
 }
