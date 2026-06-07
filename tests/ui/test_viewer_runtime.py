@@ -7,6 +7,7 @@ import pytest
 
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import Float32Array, UInt8Array
+from rl_fzerox.core.career_mode.course_setup import CourseSetupTarget
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.career_mode.runner.controller import (
     CareerModeController,
@@ -38,6 +39,7 @@ from rl_fzerox.core.manager.models import (
     ManagedSaveCourseSetup,
     ManagedSaveGame,
     ManagedSaveUnlockProgress,
+    ManagedSaveUnlockTarget,
     SaveAttemptStatus,
     SaveGameStatus,
 )
@@ -1264,6 +1266,34 @@ def test_career_mode_apply_execution_plan_resumes_post_race_continuation() -> No
     assert controller._continuing_race_result
 
 
+def test_career_mode_refreshes_save_progress_after_terminal_result(
+    tmp_path: Path,
+) -> None:
+    controller = _minimal_career_controller(phase=CareerPhase.CONTINUE_AFTER_RACE)
+    controller._attempt_id = "attempt-a"
+    controller._save_game_id = "save-a"
+    controller._observed_terminal_race_result = True
+    controller._continue_after_race_pulses = 1
+    store = _PostTerminalProgressStore(tmp_path)
+    controller._store = store
+    session = _StubCareerSession()
+
+    refreshed = controller.before_step(
+        session=session,
+        info={
+            "game_mode": "results",
+            "position": 1,
+            "race_time_ms": 90_000,
+        },
+    )
+
+    assert refreshed is True
+    assert store.finished_attempts == [("attempt-a", "succeeded")]
+    assert store.started_attempts == ["save-a"]
+    assert controller._attempt_id == "attempt-b"
+    assert controller._setup.cup_id == "queen"
+
+
 def test_career_mode_camera_sync_uses_normal_reset_camera_helper() -> None:
     controller = _minimal_career_controller(phase=CareerPhase.ENTER_RACE)
     controller._camera_setting = "close_behind"
@@ -1786,6 +1816,144 @@ class _ExecutionPlanStore:
         raise AssertionError(f"unexpected get_save_attempt_execution_context({attempt_id!r})")
 
 
+class _PostTerminalProgressStore(_ExecutionPlanStore):
+    def __init__(self, tmp_path: Path) -> None:
+        self.save_path = tmp_path / "fzerox.srm"
+        self.finished_attempts: list[tuple[str, SaveAttemptStatus]] = []
+        self.started_attempts: list[str] = []
+
+    def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None:
+        assert save_game_id == "save-a"
+        return ManagedSaveGame(
+            id="save-a",
+            name="Save A",
+            status="running",
+            save_path=self.save_path,
+            created_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+        )
+
+    def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
+        assert save_game_id == "save-a"
+        return ManagedSaveUnlockProgress(
+            inspection_status="inspected",
+            completed_count=1,
+            total_count=2,
+            unlocked_vehicle_count=6,
+            unlocked_vehicle_ids=("blue_falcon",),
+            next_target=ManagedSaveUnlockTarget(
+                sequence_index=1,
+                kind="clear_gp_cup",
+                status="pending",
+                label="Clear Novice Queen Cup",
+                difficulty="novice",
+                cup_id="queen",
+            ),
+            targets=(
+                ManagedSaveUnlockTarget(
+                    sequence_index=0,
+                    kind="clear_gp_cup",
+                    status="succeeded",
+                    label="Clear Novice Jack Cup",
+                    difficulty="novice",
+                    cup_id="jack",
+                ),
+                ManagedSaveUnlockTarget(
+                    sequence_index=1,
+                    kind="clear_gp_cup",
+                    status="pending",
+                    label="Clear Novice Queen Cup",
+                    difficulty="novice",
+                    cup_id="queen",
+                ),
+            ),
+        )
+
+    def finish_save_attempt(
+        self,
+        *,
+        attempt_id: str,
+        status: SaveAttemptStatus,
+        finish_position: int | None = None,
+        finish_time_s: float | None = None,
+        failure_reason: str | None = None,
+    ) -> ManagedSaveAttempt | None:
+        assert finish_position == 1
+        assert finish_time_s == 90.0
+        assert failure_reason is None
+        self.finished_attempts.append((attempt_id, status))
+        return None
+
+    def start_next_save_attempt(self, save_game_id: str) -> ManagedSaveAttempt:
+        assert save_game_id == "save-a"
+        self.started_attempts.append(save_game_id)
+        return ManagedSaveAttempt(
+            id="attempt-b",
+            save_game_id=save_game_id,
+            status="running",
+            started_at="2026-01-01T00:00:01Z",
+            target_kind="clear_gp_cup",
+            policy_run_id="run-a",
+            policy_artifact="best",
+            difficulty="novice",
+            cup_id="queen",
+        )
+
+    def get_save_attempt_execution_context(
+        self,
+        attempt_id: str,
+    ) -> SaveAttemptExecutionContext | None:
+        assert attempt_id == "attempt-b"
+        return SaveAttemptExecutionContext(
+            save_game=self.get_save_game("save-a"),
+            attempt=ManagedSaveAttempt(
+                id="attempt-b",
+                save_game_id="save-a",
+                status="running",
+                started_at="2026-01-01T00:00:01Z",
+                target_kind="clear_gp_cup",
+                difficulty="novice",
+                cup_id="queen",
+            ),
+            target=ManagedSaveUnlockTarget(
+                sequence_index=1,
+                kind="clear_gp_cup",
+                status="pending",
+                label="Clear Novice Queen Cup",
+                difficulty="novice",
+                cup_id="queen",
+            ),
+            course_setup_target=CourseSetupTarget(
+                difficulty="novice",
+                cup_id="queen",
+                course_id=None,
+            ),
+            course_setup=ManagedSaveCourseSetup(
+                id="setup-a",
+                save_game_id="save-a",
+                scope="global",
+                policy_run_id="run-a",
+                policy_artifact="best",
+                vehicle_id="blue_falcon",
+                engine_setting_raw_value=50,
+                created_at="2026-01-01T00:00:00Z",
+                updated_at="2026-01-01T00:00:00Z",
+            ),
+            policy_run=ManagedRun(
+                id="run-a",
+                name="Run A",
+                status="stopped",
+                config=ManagedRunConfig(),
+                config_hash="hash-a",
+                run_dir=Path("/tmp/run-a"),
+                created_at="2026-01-01T00:00:00Z",
+                lineage_id="lineage-a",
+            ),
+            policy_artifact="best",
+            policy_path=Path("/tmp/run-a/policy.zip"),
+        )
+
+
 def _minimal_career_controller(
     *,
     phase: CareerPhase,
@@ -1808,6 +1976,7 @@ def _minimal_career_controller(
     controller._continuing_race_result = False
     controller._observed_terminal_race_result = False
     controller._continue_after_race_pulses = 0
+    controller._last_progress_sync_continue_pulse = -1
     controller._fresh_race_ready_frames = 0
     return controller
 
