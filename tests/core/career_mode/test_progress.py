@@ -26,7 +26,7 @@ def test_default_unlock_targets_do_not_include_x_cup() -> None:
     assert all(target.cup_id != "x" for target in targets)
 
 
-def test_build_unlock_progress_returns_pending_targets_when_save_is_missing() -> None:
+def test_build_unlock_progress_only_starts_first_target_when_save_is_missing() -> None:
     progress = build_unlock_progress(Path("/tmp/fzerox.srm"))
 
     assert progress.inspection_status == "not_inspected"
@@ -37,6 +37,8 @@ def test_build_unlock_progress_returns_pending_targets_when_save_is_missing() ->
     assert progress.next_target is not None
     assert progress.next_target.difficulty == "novice"
     assert progress.next_target.cup_id == "jack"
+    assert progress.targets[0].status == "pending"
+    assert {target.status for target in progress.targets[1:]} == {"locked"}
 
 
 def test_build_unlock_progress_marks_completed_gp_cups_from_save(tmp_path: Path) -> None:

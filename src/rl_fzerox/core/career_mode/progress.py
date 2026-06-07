@@ -123,7 +123,7 @@ def _target_status_from_save(
     unlock_state: FZeroXUnlockState | None,
 ) -> SaveUnlockTargetStatus:
     if unlock_state is None:
-        return "pending"
+        return "pending" if target.sequence_index == 0 else "locked"
     if target.kind != "clear_gp_cup":
         return "pending"
     if not _target_available(target, unlock_state=unlock_state):

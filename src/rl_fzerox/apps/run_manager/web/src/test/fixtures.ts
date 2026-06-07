@@ -163,7 +163,7 @@ export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): Manag
         {
           sequence_index: 1,
           kind: "clear_gp_cup",
-          status: "pending",
+          status: "locked",
           label: "Clear Novice Queen Cup",
           difficulty: "novice",
           cup_id: "queen",

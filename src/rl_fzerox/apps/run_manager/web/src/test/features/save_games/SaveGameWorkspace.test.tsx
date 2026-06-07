@@ -165,13 +165,26 @@ describe("SaveGameWorkspace", () => {
 
   it("starts the visible career runner for a clicked unlock target", async () => {
     const user = userEvent.setup();
-    const saveGame = saveGameFixture({
+    const baseSaveGame = saveGameFixture({
       course_setups: [globalCourseSetupFixture()],
     });
-    const selectedTarget = saveGame.unlock_progress?.targets[1];
+    const baseProgress = baseSaveGame.unlock_progress;
+    if (baseProgress === null) {
+      throw new Error("fixture is missing unlock progress");
+    }
+    const selectedTarget = baseProgress.targets[1];
     if (selectedTarget === undefined) {
       throw new Error("fixture is missing the selected target");
     }
+    const launchableSelectedTarget = { ...selectedTarget, status: "pending" } as const;
+    const saveGame = saveGameFixture({
+      course_setups: [globalCourseSetupFixture()],
+      unlock_progress: {
+        ...baseProgress,
+        inspection_status: "inspected",
+        targets: [...baseProgress.targets.slice(0, 1), launchableSelectedTarget],
+      },
+    });
     const onStartCareerMode = vi.fn().mockResolvedValue("started");
 
     renderSaveGameWorkspace({
@@ -187,7 +200,7 @@ describe("SaveGameWorkspace", () => {
       "gliden64",
       "123",
       "deterministic",
-      selectedTarget,
+      launchableSelectedTarget,
     );
   });
 

@@ -38,6 +38,7 @@ from rl_fzerox.core.manager.db.models import (
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json, load_config_json
+from rl_fzerox.core.save_game.unlocks import FZEROX_SAVE_LAYOUT
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
@@ -599,6 +600,7 @@ def test_manager_store_starts_selected_save_attempt_from_course_setup(
         name="Selected Policy Attempt Save",
         save_games_root=tmp_path / "save-games",
     )
+    save_game.save_path.write_bytes(_logical_sra({}))
     run = store.create_run(
         name="Selected Unlock Policy",
         config=default_managed_run_config(),
@@ -625,6 +627,35 @@ def test_manager_store_starts_selected_save_attempt_from_course_setup(
     assert attempt.difficulty == "novice"
     assert attempt.cup_id == "king"
     assert attempt.status == "running"
+
+
+def test_manager_store_rejects_selected_save_attempt_before_save_inspection(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Uninspected Selected Policy Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    run = store.create_run(
+        name="Selected Unlock Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        scope="global",
+        policy_run_id=run.id,
+        policy_artifact="best",
+    )
+
+    with pytest.raises(ValueError, match="selected unlock target is locked"):
+        store.start_target_save_attempt(
+            save_game.id,
+            target_kind="clear_gp_cup",
+            difficulty="novice",
+            cup_id="king",
+        )
 
 
 def test_manager_store_resolves_save_attempt_execution_context(tmp_path: Path) -> None:
@@ -1532,3 +1563,11 @@ def test_manager_store_rejects_deleting_running_run(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="stop or pause the run before deleting it"):
         store.delete_run(run.id)
+
+
+def _logical_sra(cup_progress: dict[str, int]) -> bytes:
+    payload = bytearray(FZEROX_SAVE_LAYOUT.raw_sra_size)
+    payload[: len(FZEROX_SAVE_LAYOUT.title)] = FZEROX_SAVE_LAYOUT.title
+    for progress_offset in FZEROX_SAVE_LAYOUT.gp_progress_offsets:
+        payload[progress_offset.offset] = cup_progress.get(progress_offset.cup_id, 0)
+    return bytes(payload)
