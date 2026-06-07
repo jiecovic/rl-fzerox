@@ -11,7 +11,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyTuple};
 
-use crate::core::input::{fzerox_menu_button_mask as semantic_menu_mask, FZeroXMenuButton};
+use crate::core::input::{FZeroXMenuButton, fzerox_menu_button_mask as semantic_menu_mask};
 
 const JOYPAD_BIT_WIDTH: u32 = u16::BITS;
 

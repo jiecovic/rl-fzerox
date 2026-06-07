@@ -17,6 +17,10 @@ fn read_snapshot_decodes_player_one_race_values() {
         .copy_from_slice(&39_i32.to_le_bytes());
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
     memory[GLOBALS.selected_mode..GLOBALS.selected_mode + 4].copy_from_slice(&2_i32.to_le_bytes());
+    memory[GLOBALS.difficulty_menu_state..GLOBALS.difficulty_menu_state + 4]
+        .copy_from_slice(&1_i32.to_le_bytes());
+    memory[GLOBALS.difficulty_menu_cursor..GLOBALS.difficulty_menu_cursor + 4]
+        .copy_from_slice(&2_i32.to_le_bytes());
     memory[GLOBALS.game_mode_change_state..GLOBALS.game_mode_change_state + 2]
         .copy_from_slice(&3_i16.to_le_bytes());
     memory[GLOBALS.current_ghost_type..GLOBALS.current_ghost_type + 4]
@@ -150,6 +154,8 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.camera_setting_raw, 3);
     assert_eq!(telemetry.camera_setting_name, "wide");
     assert_eq!(telemetry.menu_selected_mode_raw, 2);
+    assert_eq!(telemetry.menu_difficulty_state_raw, 1);
+    assert_eq!(telemetry.menu_difficulty_cursor_raw, 2);
     assert_eq!(telemetry.menu_transition_state_raw, 3);
     assert_eq!(telemetry.menu_current_ghost_type_raw, 1);
     assert_eq!(telemetry.queued_game_mode_raw, 14);

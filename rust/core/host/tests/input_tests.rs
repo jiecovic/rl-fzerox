@@ -6,7 +6,7 @@ use libretro_sys::{
     DEVICE_INDEX_ANALOG_RIGHT,
 };
 
-use super::{fzerox_menu_button_mask, ControllerState, FZeroXMenuButton, RaceControlState};
+use super::{ControllerState, FZeroXMenuButton, RaceControlState, fzerox_menu_button_mask};
 
 #[test]
 fn controller_state_clamps_normalized_axes_to_libretro_range() {

@@ -172,7 +172,6 @@ export function UnlockPathPanel({
         savingCourseSetups={savingCourseSetups}
         updating={updating}
         unlockedVehicleIds={saveGame.unlock_progress?.unlocked_vehicle_ids ?? []}
-        onApplySetups={applyCourseSetupDrafts}
         onCourseSetupDraftChange={updateCourseSetupDraft}
         onSaveSetups={() => void saveCourseSetups()}
       />

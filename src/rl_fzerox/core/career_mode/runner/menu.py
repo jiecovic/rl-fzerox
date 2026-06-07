@@ -46,6 +46,7 @@ class DifficultyPopupState(StrEnum):
     """Controller-owned state for the GP difficulty overlay."""
 
     CLOSED = "closed"
+    OPENING = "opening"
     OPEN = "open"
     SUBMITTED = "submitted"
 
@@ -57,6 +58,7 @@ class ObservedMenuScreen(StrEnum):
     MAIN_MENU_GP = "main_menu_gp"
     MAIN_MENU_OTHER = "main_menu_other"
     DIFFICULTY_POPUP = "difficulty_popup"
+    DIFFICULTY_CONFIRM = "difficulty_confirm"
     TRANSITION = "transition"
     COURSE_SELECT = "course_select"
     MACHINE_SELECT = "machine_select"
@@ -79,7 +81,7 @@ class CareerMenuTiming:
     difficulty_popup_open_settle_frames: int = 60
     result_continue_hold_frames: int = 4
     result_continue_settle_frames: int = 2
-    max_start_presses_per_phase: int = 12
+    max_advance_presses_per_phase: int = 12
     max_engine_adjust_taps: int = 128
     fresh_race_ready_frames: int = 2
     new_race_ready_time_ms: int = 1_000
@@ -93,7 +95,7 @@ class CareerMenuTiming:
             self.difficulty_popup_open_settle_frames,
             self.result_continue_hold_frames,
             self.result_continue_settle_frames,
-            self.max_start_presses_per_phase,
+            self.max_advance_presses_per_phase,
             self.max_engine_adjust_taps,
             self.fresh_race_ready_frames,
             self.new_race_ready_time_ms,
@@ -163,6 +165,8 @@ class MenuFacts:
     game_mode: str | None
     game_mode_raw: int | None
     selected_mode_raw: int | None
+    difficulty_state_raw: int | None
+    difficulty_cursor_raw: int | None
     transition_state_raw: int | None
     current_ghost_type_raw: int | None
     queued_game_mode_raw: int | None
@@ -192,6 +196,8 @@ class MenuFacts:
             game_mode=game_mode(info),
             game_mode_raw=_int_info(info, "game_mode_raw"),
             selected_mode_raw=_int_info(info, "menu_selected_mode_raw"),
+            difficulty_state_raw=_int_info(info, "menu_difficulty_state_raw"),
+            difficulty_cursor_raw=_int_info(info, "menu_difficulty_cursor_raw"),
             transition_state_raw=_int_info(info, "menu_transition_state_raw"),
             current_ghost_type_raw=_int_info(info, "menu_current_ghost_type_raw"),
             queued_game_mode_raw=_int_info(info, "queued_game_mode_raw"),
@@ -220,6 +226,14 @@ class MenuFacts:
     @property
     def is_mode_select(self) -> bool:
         return self.game_mode == "main_menu"
+
+    @property
+    def has_difficulty_popup(self) -> bool:
+        return self.is_mode_select and self.selected_gp_mode and self.difficulty_state_raw == 1
+
+    @property
+    def submitted_difficulty_popup(self) -> bool:
+        return self.is_mode_select and self.selected_gp_mode and self.difficulty_state_raw == 2
 
     @property
     def is_game_mode_transition(self) -> bool:
@@ -345,9 +359,11 @@ def observed_menu_screen(
     if facts.in_gp_race:
         return ObservedMenuScreen.GP_RACE
     if facts.is_mode_select:
-        if difficulty_popup_state is DifficultyPopupState.OPEN:
+        if facts.has_difficulty_popup:
             return ObservedMenuScreen.DIFFICULTY_POPUP
-        if difficulty_popup_state is DifficultyPopupState.SUBMITTED and facts.selected_gp_mode:
+        if facts.submitted_difficulty_popup:
+            return ObservedMenuScreen.DIFFICULTY_CONFIRM
+        if difficulty_popup_state is DifficultyPopupState.OPENING:
             return ObservedMenuScreen.TRANSITION
         if facts.is_game_mode_transition:
             return ObservedMenuScreen.TRANSITION
@@ -357,41 +373,6 @@ def observed_menu_screen(
     if facts.is_game_mode_transition:
         return ObservedMenuScreen.TRANSITION
     return ObservedMenuScreen.UNKNOWN
-
-
-def select_difficulty_steps(
-    _setup: CareerModeRaceSetupConfig,
-) -> tuple[RawMenuStep, ...]:
-    return tap_steps(
-        MenuInput.ACCEPT,
-        hold_frames=MENU_TIMING.menu_hold_frames,
-        settle_frames=MENU_TIMING.difficulty_popup_open_settle_frames,
-        phase="select_difficulty:open",
-    )
-
-
-def select_open_difficulty_steps(
-    setup: CareerModeRaceSetupConfig,
-) -> tuple[RawMenuStep, ...]:
-    steps: list[RawMenuStep] = []
-    for tap_index in range(GP_MENU_ORDER.difficulty_down_count(setup.difficulty)):
-        steps.extend(
-            tap_steps(
-                MenuInput.DOWN,
-                hold_frames=MENU_TIMING.menu_hold_frames,
-                settle_frames=MENU_TIMING.menu_settle_frames,
-                phase=f"select_difficulty:down:{tap_index + 1}",
-            )
-        )
-    steps.extend(
-        tap_steps(
-            MenuInput.ACCEPT,
-            hold_frames=MENU_TIMING.menu_hold_frames,
-            settle_frames=MENU_TIMING.menu_settle_frames,
-            phase="select_difficulty:accept",
-        )
-    )
-    return tuple(steps)
 
 
 def machine_select_steps(

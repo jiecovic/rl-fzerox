@@ -265,6 +265,8 @@ pub struct TelemetrySnapshot {
     pub game_mode_raw: u32,
     pub game_mode_name: &'static str,
     pub menu_selected_mode_raw: i32,
+    pub menu_difficulty_state_raw: i32,
+    pub menu_difficulty_cursor_raw: i32,
     pub menu_transition_state_raw: i16,
     pub menu_current_ghost_type_raw: i32,
     pub queued_game_mode_raw: i32,

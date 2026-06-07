@@ -49,7 +49,7 @@ def test_resolve_course_setup_uses_cup_before_difficulty() -> None:
     assert resolved.policy_run_id == "run-jack"
 
 
-def test_resolve_course_setup_uses_first_course_for_cup_target() -> None:
+def test_resolve_course_setup_does_not_use_course_rows_for_cup_target() -> None:
     setups = (
         _setup("course", "run-port-town", cup_id="jack", course_id="port_town"),
         _setup("course", "run-mute-city", cup_id="jack", course_id="mute_city"),
@@ -61,8 +61,7 @@ def test_resolve_course_setup_uses_first_course_for_cup_target() -> None:
         CourseSetupTarget(difficulty="novice", cup_id="jack"),
     )
 
-    assert resolved is not None
-    assert resolved.policy_run_id == "run-mute-city"
+    assert resolved is None
 
 
 def test_resolve_course_setup_treats_missing_scope_fields_as_wildcards() -> None:

@@ -144,6 +144,8 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             "camera_setting_name": "wide",
             "race_intro_timer": 39,
             "menu_selected_mode_raw": 0,
+            "menu_difficulty_state_raw": 1,
+            "menu_difficulty_cursor_raw": 2,
             "menu_transition_state_raw": 3,
             "menu_current_ghost_type_raw": 0,
             "queued_game_mode_raw": 14,
@@ -159,6 +161,8 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     assert payload["camera_setting_name"] == "wide"
     assert payload["race_intro_timer"] == 39
     assert payload["menu_selected_mode_raw"] == 0
+    assert payload["menu_difficulty_state_raw"] == 1
+    assert payload["menu_difficulty_cursor_raw"] == 2
     assert payload["menu_transition_state_raw"] == 3
     assert payload["menu_current_ghost_type_raw"] == 0
     assert payload["queued_game_mode_raw"] == 14

@@ -130,6 +130,8 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "camera_setting_raw": telemetry.camera_setting_raw,
         "race_intro_timer": telemetry.race_intro_timer,
         "menu_selected_mode_raw": telemetry.menu_selected_mode_raw,
+        "menu_difficulty_state_raw": telemetry.menu_difficulty_state_raw,
+        "menu_difficulty_cursor_raw": telemetry.menu_difficulty_cursor_raw,
         "menu_transition_state_raw": telemetry.menu_transition_state_raw,
         "menu_current_ghost_type_raw": telemetry.menu_current_ghost_type_raw,
         "queued_game_mode_raw": telemetry.queued_game_mode_raw,

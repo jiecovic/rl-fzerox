@@ -598,15 +598,6 @@ function resolveSavedCourseSetup(
         optionalMatch(setup.cup_id, target.cup_id) &&
         optionalMatch(setup.difficulty, target.difficulty),
     ) ??
-    (target.course_id === null
-      ? setups.find(
-          (setup) =>
-            setup.scope === "course" &&
-            setup.cup_id === target.cup_id &&
-            setup.course_id !== null &&
-            optionalMatch(setup.difficulty, target.difficulty),
-        )
-      : undefined) ??
     setups.find(
       (setup) =>
         setup.scope === "cup" &&
