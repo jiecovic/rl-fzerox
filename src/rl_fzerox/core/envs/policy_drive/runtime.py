@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/engine/policy_drive/runtime.py
+# src/rl_fzerox/core/envs/policy_drive/runtime.py
 """Policy-drive runtime around shared emulator stepping components."""
 
 from __future__ import annotations
@@ -21,13 +21,16 @@ from rl_fzerox.core.envs.engine.controls import (
     sync_dynamic_action_masks,
 )
 from rl_fzerox.core.envs.engine.info import backend_step_info, set_curriculum_info, telemetry_info
-from rl_fzerox.core.envs.engine.policy_drive.frame import PolicyDriveFrame
 from rl_fzerox.core.envs.engine.stepping import (
     EnvStepRequest,
-    PolicyDriveStep,
     set_episode_boost_pad_info,
 )
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.envs.policy_drive.frame import (
+    PolicyDriveFrame,
+    PolicyDriveStep,
+    policy_drive_step,
+)
 
 if TYPE_CHECKING:
     from fzerox_emulator import Emulator
@@ -220,7 +223,7 @@ class PolicyDriveRuntime:
             done=assembly.step.terminated,
             info=assembly.step.info,
         )
-        return assembly.step.policy_drive_result()
+        return policy_drive_step(assembly.step)
 
     def _apply_control_semantics(self, control_state: RaceControlState) -> RaceControlState:
         return apply_control_semantics(

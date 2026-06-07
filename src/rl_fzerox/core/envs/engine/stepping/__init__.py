@@ -7,18 +7,12 @@ from rl_fzerox.core.envs.engine.stepping.assembly import (
     EnvStepRequest,
     set_episode_boost_pad_info,
 )
-from rl_fzerox.core.envs.engine.stepping.result import (
-    PolicyDriveStep,
-    WatchEnvStep,
-    policy_drive_info,
-)
+from rl_fzerox.core.envs.engine.stepping.result import WatchEnvStep
 
 __all__ = [
     "EngineStepAssembler",
     "EnvStepAssembly",
     "EnvStepRequest",
-    "PolicyDriveStep",
     "WatchEnvStep",
-    "policy_drive_info",
     "set_episode_boost_pad_info",
 ]

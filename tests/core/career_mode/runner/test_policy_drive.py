@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.envs.engine.stepping import policy_drive_info
+from rl_fzerox.core.envs.policy_drive import policy_drive_info
 
 
 def test_policy_drive_info_drops_training_lifecycle_state() -> None:
@@ -46,12 +46,18 @@ def test_career_policy_race_uses_policy_drive_boundary() -> None:
 
 
 def test_env_policy_drive_runtime_owns_engine_policy_drive_calls() -> None:
-    source = Path("src/rl_fzerox/core/envs/engine/policy_drive/runtime.py").read_text(
-        encoding="utf-8"
-    )
+    source = Path("src/rl_fzerox/core/envs/policy_drive/runtime.py").read_text(encoding="utf-8")
 
     assert "FZeroXEnvEngine" not in source
     assert "step_watch(" not in source
     assert "step_control_watch(" not in source
     assert "WatchEnvStep" not in source
     assert "build_engine_runtime_components" in source
+
+
+def test_shared_step_result_does_not_own_policy_drive_filtering() -> None:
+    source = Path("src/rl_fzerox/core/envs/engine/stepping/result.py").read_text(encoding="utf-8")
+
+    assert "PolicyDriveStep" not in source
+    assert "policy_drive_info" not in source
+    assert "policy_drive_result" not in source
