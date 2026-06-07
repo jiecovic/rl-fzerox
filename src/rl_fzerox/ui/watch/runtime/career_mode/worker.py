@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 from multiprocessing.queues import Queue as ProcessQueue
-from typing import Protocol, TypeAlias
+from typing import TypeAlias
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
@@ -32,12 +32,29 @@ from rl_fzerox.ui.watch.live_series import (
     EpisodeLiveSeriesTracker,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.menu import (
-    controller_step_from_menu_step,
-    neutral_controller_step,
+    menu_viewer_info,
+    reset_race_progress_info,
+    step_menu,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
     open_career_mode_runtime_session,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.timing import (
+    active_policy_timing,
+    measured_game_fps,
+    set_session_control_timing,
+    target_game_fps,
+    with_measured_game_fps,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.timing import (
+    native_frame_seconds as _native_frame_seconds,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.timing import (
+    snapshot_action_repeat as _snapshot_action_repeat,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.timing import (
+    snapshot_target_control_fps as _snapshot_target_control_fps,
 )
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
@@ -160,7 +177,7 @@ def _run_loaded_career_mode_loop(
 
     raw_observation: ObservationValue | None = None
     observation: ObservationValue | None = None
-    raw_info = _menu_viewer_info(session)
+    raw_info = menu_viewer_info(session)
     info = controller.viewer_info(
         info=dict(raw_info),
         active_policy_control=None,
@@ -309,7 +326,7 @@ def _run_career_mode_loop_body(
 ) -> None:
     def publish_snapshot(*, policy_visible: bool) -> None:
         policy_active = policy_visible and observation is not None
-        snapshot_target_control_fps = _snapshot_target_control_fps(
+        snapshot_target_fps = _snapshot_target_control_fps(
             config=config,
             session=session,
             native_control_fps=native_control_fps,
@@ -317,23 +334,23 @@ def _run_career_mode_loop_body(
             policy_active=policy_active,
         )
         snapshot_info = controller.viewer_info(
-            info=info if policy_active else _reset_race_progress_info(info),
+            info=info if policy_active else reset_race_progress_info(info),
             active_policy_control=(active_policy_control if policy_active else None),
         )
         snapshot_config = session.snapshot_config(config) if policy_active else config
-        snapshot_action_repeat = _snapshot_action_repeat(
+        snapshot_repeat = _snapshot_action_repeat(
             snapshot_config,
             policy_active=policy_active,
         )
-        snapshot_info = _with_measured_game_fps(
+        snapshot_info = with_measured_game_fps(
             snapshot_info,
-            game_fps=_measured_game_fps(
+            game_fps=measured_game_fps(
                 control_fps=control_rate.rate_hz(),
-                action_repeat=snapshot_action_repeat,
+                action_repeat=snapshot_repeat,
             ),
-            game_fps_target=_target_game_fps(
-                target_control_fps=snapshot_target_control_fps,
-                action_repeat=snapshot_action_repeat,
+            game_fps_target=target_game_fps(
+                target_control_fps=snapshot_target_fps,
+                action_repeat=snapshot_repeat,
             ),
         )
         runner = (
@@ -353,8 +370,8 @@ def _run_career_mode_loop_body(
                 episode=episode,
                 episode_reward=episode_reward if policy_active else 0.0,
                 control_fps=control_rate.rate_hz(),
-                target_control_fps=snapshot_target_control_fps,
-                action_repeat=snapshot_action_repeat,
+                target_control_fps=snapshot_target_fps,
+                action_repeat=snapshot_repeat,
                 control_state=current_control_state,
                 gas_level=current_gas_level,
                 boost_lamp_level=boost_lamp_level,
@@ -406,7 +423,7 @@ def _run_career_mode_loop_body(
                 target_control_fps = native_control_fps
                 target_control_seconds = _target_seconds(target_control_fps)
                 native_frame_seconds = _native_frame_seconds(target_control_seconds)
-                _set_session_control_timing(
+                set_session_control_timing(
                     session,
                     target_control_fps=target_control_fps,
                     target_control_seconds=target_control_seconds,
@@ -421,7 +438,7 @@ def _run_career_mode_loop_body(
                 )
                 target_control_seconds = _target_seconds(target_control_fps)
                 native_frame_seconds = _native_frame_seconds(target_control_seconds)
-                _set_session_control_timing(
+                set_session_control_timing(
                     session,
                     target_control_fps=target_control_fps,
                     target_control_seconds=target_control_seconds,
@@ -557,7 +574,7 @@ def _run_career_mode_loop_body(
                 boost_lamp_level = 0.0
                 episode_reward = 0.0
                 cnn_activations = None
-                _step_menu(
+                step_menu(
                     config=config,
                     session=session,
                     controller=controller,
@@ -575,7 +592,7 @@ def _run_career_mode_loop_body(
                 current_step_seconds = None
                 raw_observation = None
                 observation = None
-                raw_info = _menu_viewer_info(session)
+                raw_info = menu_viewer_info(session)
                 info = controller.viewer_info(
                     info=dict(raw_info),
                     active_policy_control=None,
@@ -595,7 +612,7 @@ def _run_career_mode_loop_body(
                         phase="policy_resolution:wait",
                     )
                     last_menu_step = step
-                    _step_menu(
+                    step_menu(
                         config=config,
                         session=session,
                         controller=controller,
@@ -617,7 +634,7 @@ def _run_career_mode_loop_body(
                     current_control_state = RaceControlState()
                     current_gas_level = 0.0
                     boost_lamp_level = 0.0
-                    raw_info = _menu_viewer_info(session)
+                    raw_info = menu_viewer_info(session)
                     info = controller.viewer_info(
                         info=dict(raw_info),
                         active_policy_control=None,
@@ -661,7 +678,7 @@ def _run_career_mode_loop_body(
                     raise RuntimeError(
                         "Career Mode policy control started without a policy observation."
                     )
-                policy_timing = _active_policy_timing(
+                policy_timing = active_policy_timing(
                     config,
                     session,
                     native_control_fps=native_control_fps,
@@ -781,50 +798,10 @@ def _career_runtime_error_context(
 def _fresh_menu_runtime_state(
     session: CareerModeRuntimeSession,
 ) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
-    raw_info = _menu_viewer_info(session)
+    raw_info = menu_viewer_info(session)
     info = dict(raw_info)
     telemetry = _read_live_telemetry(session.emulator)
     return raw_info, info, telemetry
-
-
-def _menu_viewer_info(session: CareerModeRuntimeSession) -> dict[str, object]:
-    return _reset_race_progress_info(session.menu_info())
-
-
-def _reset_race_progress_info(info: dict[str, object]) -> dict[str, object]:
-    """Return menu-phase info without stale policy-race counters."""
-
-    normalized = dict(info)
-    normalized.update(
-        {
-            "episode_step": 0,
-            "episode_return": 0.0,
-            "step_reward": 0.0,
-            "progress_frontier_stalled_frames": 0,
-            "stalled_steps": 0,
-            "frames_run": 0,
-            "repeat_index": 0,
-        }
-    )
-    normalized.pop("reward_breakdown", None)
-    return normalized
-
-
-class _PolicyTiming:
-    def __init__(self, *, target_fps: float | None, target_seconds: float | None) -> None:
-        self.target_fps = target_fps
-        self.target_seconds = target_seconds
-
-
-class _ControlTimingSession(Protocol):
-    target_control_fps: float | None
-    target_control_seconds: float | None
-
-
-class _PolicyTimingSession(Protocol):
-    native_fps: float
-
-    def snapshot_config(self, base_config: WatchAppConfig) -> WatchAppConfig: ...
 
 
 _PolicyStepResult: TypeAlias = tuple[
@@ -843,67 +820,6 @@ _PolicyStepResult: TypeAlias = tuple[
     dict[str, object] | None,
     float,
 ]
-
-
-def _active_policy_timing(
-    config: WatchAppConfig,
-    session: _PolicyTimingSession,
-    *,
-    native_control_fps: float,
-    target_control_fps: float | None,
-) -> _PolicyTiming:
-    snapshot_config = session.snapshot_config(config)
-    policy_native_control_fps = session.native_fps / max(
-        1,
-        snapshot_config.env.action_repeat,
-    )
-    if target_control_fps is None:
-        target_fps = None
-    else:
-        speed_multiplier = target_control_fps / max(native_control_fps, 1e-9)
-        target_fps = max(1.0, policy_native_control_fps * speed_multiplier)
-    return _PolicyTiming(
-        target_fps=target_fps,
-        target_seconds=_target_seconds(target_fps),
-    )
-
-
-def _snapshot_target_control_fps(
-    *,
-    config: WatchAppConfig,
-    session: _PolicyTimingSession,
-    native_control_fps: float,
-    target_control_fps: float | None,
-    policy_active: bool,
-) -> float | None:
-    if not policy_active:
-        return target_control_fps
-    return _active_policy_timing(
-        config,
-        session,
-        native_control_fps=native_control_fps,
-        target_control_fps=target_control_fps,
-    ).target_fps
-
-
-def _snapshot_action_repeat(
-    config: WatchAppConfig,
-    *,
-    policy_active: bool,
-) -> int:
-    if not policy_active:
-        return 1
-    return max(1, int(config.env.action_repeat))
-
-
-def _set_session_control_timing(
-    session: _ControlTimingSession,
-    *,
-    target_control_fps: float | None,
-    target_control_seconds: float | None,
-) -> None:
-    session.target_control_fps = target_control_fps
-    session.target_control_seconds = target_control_seconds
 
 
 def _step_policy_or_manual(
@@ -1025,22 +941,22 @@ def _step_policy_or_manual(
     )
     control_rate.tick()
     episode_reward += reward
-    measured_game_fps = _measured_game_fps(
+    measured_game_fps_value = measured_game_fps(
         control_fps=control_rate.rate_hz(),
         action_repeat=snapshot_config.env.action_repeat,
     )
-    previous_info = _with_measured_game_fps(
+    previous_info = with_measured_game_fps(
         previous_info,
-        game_fps=measured_game_fps,
-        game_fps_target=_target_game_fps(
+        game_fps=measured_game_fps_value,
+        game_fps_target=target_game_fps(
             target_control_fps=target_policy_control_fps,
             action_repeat=snapshot_config.env.action_repeat,
         ),
     )
-    info = _with_measured_game_fps(
+    info = with_measured_game_fps(
         info,
-        game_fps=measured_game_fps,
-        game_fps_target=_target_game_fps(
+        game_fps=measured_game_fps_value,
+        game_fps_target=target_game_fps(
             target_control_fps=target_policy_control_fps,
             action_repeat=snapshot_config.env.action_repeat,
         ),
@@ -1124,134 +1040,6 @@ def _step_policy_or_manual(
         final_auxiliary_targets,
         last_live_series_publish_time,
     )
-
-
-def _step_menu(
-    *,
-    config: WatchAppConfig,
-    session: CareerModeRuntimeSession,
-    controller: CareerModeController,
-    snapshot_queue: ProcessQueue,
-    step: RawMenuStep | None,
-    info: dict[str, object],
-    reset_info: dict[str, object],
-    episode: int,
-    episode_reward: float,
-    control_rate: RateMeter,
-    target_control_fps: float | None,
-    native_frame_seconds: float | None,
-    deterministic_policy: bool,
-) -> None:
-    if step is None:
-        step = RawMenuStep(
-            menu_input=MenuInput.NEUTRAL,
-            frames=1,
-            phase="menu:wait",
-        )
-    controller_step = controller_step_from_menu_step(step)
-    session.emulator.set_controller_state(controller_step.controller_state)
-    for frame_index in range(controller_step.frames):
-        session.emulator.step_frames(1, capture_video=True)
-        info = controller.viewer_info(
-            info=_menu_viewer_info(session),
-            active_policy_control=None,
-        )
-        info.update(
-            {
-                "career_mode_last_input": step.menu_input.value,
-                "career_mode_last_step": controller_step.phase,
-                "career_mode_last_step_frames": controller_step.frames,
-            }
-        )
-        control_rate.tick()
-        info = _with_measured_game_fps(
-            info,
-            game_fps=_measured_game_fps(
-                control_fps=control_rate.rate_hz(),
-                action_repeat=1,
-            ),
-            game_fps_target=_target_game_fps(
-                target_control_fps=target_control_fps,
-                action_repeat=1,
-            ),
-        )
-        publish_worker_message(
-            snapshot_queue,
-            _build_snapshot(
-                config=config,
-                env=session,
-                emulator=session.emulator,
-                observation=None,
-                info=info,
-                reset_info=reset_info,
-                episode=episode,
-                episode_reward=0.0,
-                control_fps=control_rate.rate_hz(),
-                target_control_fps=target_control_fps,
-                action_repeat=1,
-                control_state=RaceControlState(),
-                gas_level=0.0,
-                boost_lamp_level=0.0,
-                action_mask_branches=session.action_mask_branches(),
-                policy_action=None,
-                policy_runner=None,
-                deterministic_policy=deterministic_policy,
-                manual_control_enabled=False,
-                policy_reload_error=None,
-                cnn_activations=None,
-                active_track_sampling=None,
-                best_finish_position=None,
-                best_finish_ranks={},
-                best_finish_times={},
-                latest_finish_times={},
-                latest_finish_deltas_ms={},
-                failed_track_attempts=frozenset(),
-                action_hold_frame=frame_index + 1,
-                action_hold_frames=controller_step.frames,
-                policy_decision_frame=False,
-            ),
-        )
-        if native_frame_seconds is not None:
-            time.sleep(native_frame_seconds)
-    session.emulator.set_controller_state(
-        neutral_controller_step(phase="menu:neutral").controller_state
-    )
-
-
-def _native_frame_seconds(target_control_seconds: float | None) -> float | None:
-    if target_control_seconds is None:
-        return None
-    return target_control_seconds
-
-
-def _measured_game_fps(*, control_fps: float, action_repeat: int) -> float:
-    if control_fps <= 0.0:
-        return 0.0
-    return control_fps * max(1, int(action_repeat))
-
-
-def _target_game_fps(
-    *,
-    target_control_fps: float | None,
-    action_repeat: int,
-) -> float | None:
-    if target_control_fps is None:
-        return None
-    return max(0.0, float(target_control_fps) * max(1, int(action_repeat)))
-
-
-def _with_measured_game_fps(
-    info: dict[str, object],
-    *,
-    game_fps: float,
-    game_fps_target: float | None,
-) -> dict[str, object]:
-    if game_fps <= 0.0:
-        return info if game_fps_target is None else info | {"game_fps_target": game_fps_target}
-    next_info = info | {"game_fps": game_fps}
-    if game_fps_target is not None:
-        next_info["game_fps_target"] = game_fps_target
-    return next_info
 
 
 def _close_career_mode(config: WatchAppConfig, session: CareerModeRuntimeSession) -> None:
