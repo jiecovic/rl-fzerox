@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
-from rl_fzerox.core.envs.engine.policy_drive import PolicyDriveFrame, PolicyDriveRuntime
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.envs.policy_drive import PolicyDriveFrame, PolicyDriveRuntime
 from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 
