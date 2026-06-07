@@ -6,11 +6,14 @@ import pytest
 
 from rl_fzerox.core.career_mode.runner.menu import (
     MENU_TIMING,
+    DifficultyPopupState,
     MenuFacts,
     MenuInput,
+    ObservedMenuScreen,
     continue_after_race_step,
     continue_next_course_step,
     machine_select_steps,
+    observed_menu_screen,
     select_difficulty_steps,
     select_open_difficulty_steps,
     tap_steps,
@@ -113,6 +116,40 @@ def test_menu_facts_normalize_native_menu_info() -> None:
     assert facts.completion_fraction == 0.25
     assert not facts.completed_race_laps
     assert not facts.terminal_race_result
+
+
+def test_observed_menu_screen_does_not_let_popup_latch_override_practice() -> None:
+    facts = MenuFacts.from_info(
+        {
+            "game_mode": "main_menu",
+            "menu_selected_mode_raw": 5,
+        }
+    )
+
+    assert (
+        observed_menu_screen(
+            facts,
+            difficulty_popup_state=DifficultyPopupState.OPEN,
+        )
+        is ObservedMenuScreen.MAIN_MENU_OTHER
+    )
+
+
+def test_observed_menu_screen_accepts_popup_latch_only_on_gp_tile() -> None:
+    facts = MenuFacts.from_info(
+        {
+            "game_mode": "main_menu",
+            "menu_selected_mode_raw": 0,
+        }
+    )
+
+    assert (
+        observed_menu_screen(
+            facts,
+            difficulty_popup_state=DifficultyPopupState.OPEN,
+        )
+        is ObservedMenuScreen.DIFFICULTY_POPUP
+    )
 
 
 def test_menu_facts_detect_completed_laps_without_terminal_result() -> None:

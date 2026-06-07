@@ -345,9 +345,9 @@ def observed_menu_screen(
     if facts.in_gp_race:
         return ObservedMenuScreen.GP_RACE
     if facts.is_mode_select:
-        if difficulty_popup_state is DifficultyPopupState.OPEN:
+        if difficulty_popup_state is DifficultyPopupState.OPEN and facts.selected_gp_mode:
             return ObservedMenuScreen.DIFFICULTY_POPUP
-        if difficulty_popup_state is DifficultyPopupState.SUBMITTED:
+        if difficulty_popup_state is DifficultyPopupState.SUBMITTED and facts.selected_gp_mode:
             return ObservedMenuScreen.TRANSITION
         if facts.is_game_mode_transition:
             return ObservedMenuScreen.TRANSITION

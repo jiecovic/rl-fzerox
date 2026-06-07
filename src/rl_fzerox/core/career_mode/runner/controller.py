@@ -318,7 +318,7 @@ class CareerModeController:
                     self._pending_steps.extend(select_open_difficulty_steps(self._setup))
                     self._difficulty_popup_state = DifficultyPopupState.SUBMITTED
                     self._start_presses_in_phase = 0
-                    continue
+                    return self._pending_steps.popleft()
                 case ObservedMenuScreen.TRANSITION:
                     return raw_step(
                         MenuInput.NEUTRAL,
@@ -335,7 +335,7 @@ class CareerModeController:
                     if selected_cup_index == target_cup_index:
                         self._phase = CareerPhase.ENTER_MACHINE_SELECT
                         self._start_presses_in_phase = 0
-                        continue
+                        return self._start_until_phase("enter_machine_select")
                     return self._queue_tap(
                         MenuInput.RIGHT,
                         hold_frames=MENU_TIMING.menu_hold_frames,
@@ -352,7 +352,7 @@ class CareerModeController:
                         return self._pending_steps.popleft()
                     self._phase = CareerPhase.ENTER_MACHINE_SETTINGS
                     self._start_presses_in_phase = 0
-                    continue
+                    return self._start_until_phase("enter_machine_settings")
                 case ObservedMenuScreen.MACHINE_SETTINGS:
                     self._phase = CareerPhase.APPLY_ENGINE
                     self._difficulty_popup_state = DifficultyPopupState.CLOSED
@@ -360,7 +360,7 @@ class CareerModeController:
                         return self._apply_engine_step(facts)
                     self._phase = CareerPhase.ENTER_RACE
                     self._start_presses_in_phase = 0
-                    continue
+                    return self._start_until_phase("enter_race")
                 case ObservedMenuScreen.GP_RACE:
                     return self._menu_start_until_phase(CareerPhase.ENTER_RACE.value)
                 case ObservedMenuScreen.RESULTS:
@@ -635,8 +635,7 @@ class CareerModeController:
             return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_read")
         if self._engine_adjust_taps >= MENU_TIMING.max_engine_adjust_taps:
             raise RuntimeError(
-                "Career Mode could not reach the requested engine setting "
-                f"{target} from {current}"
+                f"Career Mode could not reach the requested engine setting {target} from {current}"
             )
         self._engine_adjust_taps += 1
         delta = target - current
