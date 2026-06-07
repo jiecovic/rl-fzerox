@@ -1,6 +1,7 @@
 # tests/core/manager/test_manager_api.py
 from __future__ import annotations
 
+import threading
 import zipfile
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
@@ -17,6 +18,7 @@ import rl_fzerox.apps.run_manager.api.handlers.save_games as manager_api_save_ga
 import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
+from rl_fzerox.apps.run_manager.api.routes import _run_sync
 from rl_fzerox.core.career_mode.progress import default_unlock_targets
 from rl_fzerox.core.manager import (
     ManagedRun,
@@ -152,6 +154,14 @@ class _ApiClient:
     async def delete(self, url: str, **kwargs: object) -> httpx.Response:
         del kwargs
         return await self.request("DELETE", url)
+
+
+async def test_run_sync_uses_worker_thread() -> None:
+    caller_thread = threading.get_ident()
+
+    worker_thread = await _run_sync(threading.get_ident)
+
+    assert worker_thread != caller_thread
 
 
 async def test_manager_api_lists_default_template(tmp_path: Path) -> None:

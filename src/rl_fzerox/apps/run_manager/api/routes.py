@@ -9,6 +9,7 @@ from fastapi import FastAPI, File, HTTPException, Path, Query, UploadFile, WebSo
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from rl_fzerox.apps.run_manager.api import handlers
@@ -367,4 +368,4 @@ def create_manager_api_app(
 
 
 async def _run_sync(function: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
-    return partial(function, *args, **kwargs)()
+    return await run_in_threadpool(partial(function, *args, **kwargs))
