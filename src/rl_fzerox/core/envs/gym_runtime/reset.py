@@ -67,6 +67,8 @@ def reset_gym_episode(
         info,
         episode_boost_pad_entries=components.episode.boost_pad_entries,
     )
+    info["episode_step"] = components.episode.frame_count
+    info["episode_return"] = components.episode.return_value
     info["episode_airborne_frames"] = components.episode.airborne_frames
     image_observation = components.observation_builder.render_image()
     observation = components.observation_builder.build_observation(

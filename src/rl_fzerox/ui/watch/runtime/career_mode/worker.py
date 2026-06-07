@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from multiprocessing.queues import Queue as ProcessQueue
 from typing import TypeAlias
 
@@ -662,7 +663,7 @@ def _run_career_mode_loop_body(
                         active_policy_control=active_policy_control,
                     )
                     reset_info = dict(info)
-                    episode_reward = 0.0
+                    episode_reward = _required_episode_return(info)
                     current_policy_action = None
                     current_control_state = session.last_requested_control_state
                     current_gas_level = session.last_gas_level
@@ -876,7 +877,6 @@ def _step_policy_or_manual(
     if manual_control_enabled:
         race_step = session.step_manual_race(current_control_state)
         raw_observation = race_step.observation
-        reward = race_step.reward
         raw_info = race_step.info
         current_policy_action = None
         cnn_activations = None
@@ -905,7 +905,6 @@ def _step_policy_or_manual(
         )
         race_step = session.step_policy(action)
         raw_observation = race_step.observation
-        reward = race_step.reward
         raw_info = race_step.info
 
     observation, info = apply_watch_state_feature_zeroing(
@@ -940,7 +939,7 @@ def _step_policy_or_manual(
         action_repeat=snapshot_config.env.action_repeat,
     )
     control_rate.tick()
-    episode_reward += reward
+    episode_reward = _required_episode_return(info)
     measured_game_fps_value = measured_game_fps(
         control_fps=control_rate.rate_hz(),
         action_repeat=snapshot_config.env.action_repeat,
@@ -1040,6 +1039,13 @@ def _step_policy_or_manual(
         final_auxiliary_targets,
         last_live_series_publish_time,
     )
+
+
+def _required_episode_return(info: Mapping[str, object]) -> float:
+    value = info.get("episode_return")
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    raise RuntimeError("Career Mode policy step did not publish episode_return")
 
 
 def _close_career_mode(config: WatchAppConfig, session: CareerModeRuntimeSession) -> None:

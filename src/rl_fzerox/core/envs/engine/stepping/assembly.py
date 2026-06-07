@@ -9,7 +9,9 @@ from fzerox_emulator import (
     FZeroXTelemetry,
     RaceControlState,
     SpinRequest,
+    StepStatus,
 )
+from fzerox_emulator.boundary import StepStatusDict
 from rl_fzerox.core.envs.actions.continuous_controls import requested_gas_level
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.rewards import RewardActionContext, RewardSummaryConfig, RewardTracker
@@ -35,6 +37,11 @@ class EnvStepRequest:
     spin_request: SpinRequest
     capture_display_frames: bool
     active_track: SelectedTrack | None
+    episode_frame_count: int
+    episode_stalled_steps: int
+    episode_progress_frontier_stalled_frames: int
+    episode_progress_frontier_distance: float
+    episode_progress_frontier_initialized: bool
     episode_return: float
     episode_boost_pad_entries: int
     episode_airborne_frames: int
@@ -50,9 +57,21 @@ class EnvStepAssembly:
     telemetry: FZeroXTelemetry | None
     requested_control_state: RaceControlState
     gas_level: float
+    episode_frame_count: int
+    episode_stalled_steps: int
+    episode_progress_frontier_stalled_frames: int
+    episode_progress_frontier_distance: float
+    episode_progress_frontier_initialized: bool
     episode_return: float
     episode_boost_pad_entries: int
     episode_airborne_frames: int
+
+
+@dataclass(frozen=True, slots=True)
+class _EpisodeStepStatus:
+    status: StepStatus
+    progress_frontier_distance: float
+    progress_frontier_initialized: bool
 
 
 @dataclass(slots=True)
@@ -70,9 +89,42 @@ class EngineStepAssembler:
     renderer: RendererName
 
     def run(self, request: EnvStepRequest) -> EnvStepAssembly:
+        return self._run(
+            request,
+            live_race_status=False,
+        )
+
+    def run_live_race(self, request: EnvStepRequest) -> EnvStepAssembly:
+        """Assemble a live race step without Gym truncation semantics."""
+
+        return self._run(
+            request,
+            live_race_status=True,
+        )
+
+    def _run(
+        self,
+        request: EnvStepRequest,
+        *,
+        live_race_status: bool,
+    ) -> EnvStepAssembly:
         requested_control_state = request.requested_control_state or request.control_state
         applied_control_state = request.control_state
         step_result = self._native_step(applied_control_state, request)
+        episode_status = (
+            _live_race_episode_status(
+                request=request,
+                step_result=step_result,
+                config=self.config,
+            )
+            if live_race_status
+            else _native_episode_status(
+                request=request,
+                step_result=step_result,
+                config=self.config,
+            )
+        )
+        status = episode_status.status
 
         info = backend_step_info(self.backend)
         if request.active_track is not None:
@@ -97,7 +149,7 @@ class EngineStepAssembler:
         air_brake_used = applied_control_state.air_brake
         reward_step = self.reward_tracker.step_summary(
             step_result.summary,
-            step_result.status,
+            status,
             telemetry,
             RewardActionContext(
                 air_brake_requested=air_brake_used,
@@ -119,8 +171,8 @@ class EngineStepAssembler:
         reward = reward_step.reward
         raw_reward = reward if reward_step.raw_reward is None else reward_step.raw_reward
         reward_breakdown = dict(reward_step.breakdown)
-        terminated = step_result.status.terminated
-        truncated = step_result.status.truncated
+        terminated = status.terminated
+        truncated = status.truncated
 
         episode_boost_pad_entries = request.episode_boost_pad_entries
         boost_pad_entered = bool(step_result.summary.entered_dash_surface)
@@ -160,21 +212,19 @@ class EngineStepAssembler:
         info["spin_started"] = spin_started
         info["spin_macro_active_frames"] = spin_active_frames
         info["lean_macro_owned_frames"] = int(step_result.summary.lean_macro_owned_frames)
-        info["spin_macro_active"] = bool(step_result.status.spin_macro_active)
-        info["spin_macro_frames_remaining"] = int(step_result.status.spin_macro_frames_remaining)
-        info["spin_macro_cooldown_frames"] = int(step_result.status.spin_macro_cooldown_frames)
+        info["spin_macro_active"] = bool(status.spin_macro_active)
+        info["spin_macro_frames_remaining"] = int(status.spin_macro_frames_remaining)
+        info["spin_macro_cooldown_frames"] = int(status.spin_macro_cooldown_frames)
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
         if reward_step.debug_info:
             info.update(reward_step.debug_info)
-        info["episode_step"] = step_result.status.step_count
-        info["stalled_steps"] = step_result.status.stalled_steps
-        info["reverse_timer"] = step_result.status.reverse_timer
-        info["progress_frontier_stalled_frames"] = (
-            step_result.status.progress_frontier_stalled_frames
-        )
-        info["termination_reason"] = step_result.status.termination_reason
-        info["truncation_reason"] = step_result.status.truncation_reason
+        info["episode_step"] = status.step_count
+        info["stalled_steps"] = status.stalled_steps
+        info["reverse_timer"] = status.reverse_timer
+        info["progress_frontier_stalled_frames"] = status.progress_frontier_stalled_frames
+        info["termination_reason"] = status.termination_reason
+        info["truncation_reason"] = status.truncation_reason
         set_curriculum_info(
             info,
             stage_index=request.curriculum_stage_index,
@@ -193,17 +243,10 @@ class EngineStepAssembler:
             gas_level=gas_level,
         )
         self.mask_controller.set_lean_allowed_values(
-            (
-                (0,)
-                if step_result.status.spin_macro_active
-                else self.control_state.lean_action_mask_override()
-            ),
+            ((0,) if status.spin_macro_active else self.control_state.lean_action_mask_override()),
         )
         self.mask_controller.set_spin_allowed_values(
-            (0,)
-            if step_result.status.spin_macro_active
-            or step_result.status.spin_macro_cooldown_frames > 0
-            else None,
+            (0,) if status.spin_macro_active or status.spin_macro_cooldown_frames > 0 else None,
         )
         sync_dynamic_action_masks(
             mask_controller=self.mask_controller,
@@ -241,6 +284,11 @@ class EngineStepAssembler:
             telemetry=telemetry,
             requested_control_state=requested_control_state,
             gas_level=gas_level,
+            episode_frame_count=status.step_count,
+            episode_stalled_steps=status.stalled_steps,
+            episode_progress_frontier_stalled_frames=(status.progress_frontier_stalled_frames),
+            episode_progress_frontier_distance=episode_status.progress_frontier_distance,
+            episode_progress_frontier_initialized=(episode_status.progress_frontier_initialized),
             episode_return=episode_return,
             episode_boost_pad_entries=episode_boost_pad_entries,
             episode_airborne_frames=episode_airborne_frames,
@@ -306,3 +354,104 @@ def set_episode_boost_pad_info(
         info["boost_pad_entries_per_lap"] = None
         return
     info["boost_pad_entries_per_lap"] = episode_boost_pad_entries / float(laps_completed)
+
+
+def _native_episode_status(
+    *,
+    request: EnvStepRequest,
+    step_result: BackendStepResult,
+    config: EnvConfig,
+) -> _EpisodeStepStatus:
+    """Project native env status while keeping shared episode state current."""
+
+    telemetry = step_result.telemetry
+    _frontier_stalled_frames, frontier_distance, frontier_initialized = _episode_progress_frontier(
+        request=request,
+        step_result=step_result,
+        config=config,
+        in_race_mode=bool(telemetry is not None and telemetry.in_race_mode),
+    )
+    return _EpisodeStepStatus(
+        status=step_result.status,
+        progress_frontier_distance=frontier_distance,
+        progress_frontier_initialized=frontier_initialized,
+    )
+
+
+def _live_race_episode_status(
+    *,
+    request: EnvStepRequest,
+    step_result: BackendStepResult,
+    config: EnvConfig,
+) -> _EpisodeStepStatus:
+    """Build live-race status from shared Python episode state."""
+
+    frames_run = int(step_result.summary.frames_run)
+    telemetry = step_result.telemetry
+    in_race_mode = bool(telemetry is not None and telemetry.in_race_mode)
+    frontier_stalled_frames, frontier_distance, frontier_initialized = _episode_progress_frontier(
+        request=request,
+        step_result=step_result,
+        config=config,
+        in_race_mode=in_race_mode,
+    )
+    step_count = request.episode_frame_count + frames_run
+    status_payload: StepStatusDict = {
+        "step_count": step_count,
+        "stalled_steps": _carried_stalled_steps(
+            previous=request.episode_stalled_steps,
+            trailing_in_step=int(step_result.summary.consecutive_low_speed_frames),
+            frames_run=frames_run,
+            in_race_mode=in_race_mode,
+        ),
+        "reverse_timer": step_result.status.reverse_timer,
+        "progress_frontier_stalled_frames": frontier_stalled_frames,
+        "termination_reason": step_result.status.termination_reason,
+        "spin_macro_active": step_result.status.spin_macro_active,
+        "spin_macro_frames_remaining": step_result.status.spin_macro_frames_remaining,
+        "spin_macro_cooldown_frames": step_result.status.spin_macro_cooldown_frames,
+    }
+    return _EpisodeStepStatus(
+        status=StepStatus(status_payload),
+        progress_frontier_distance=frontier_distance,
+        progress_frontier_initialized=frontier_initialized,
+    )
+
+
+def _carried_stalled_steps(
+    *,
+    previous: int,
+    trailing_in_step: int,
+    frames_run: int,
+    in_race_mode: bool,
+) -> int:
+    if not in_race_mode or trailing_in_step == 0:
+        return 0
+    if trailing_in_step == frames_run:
+        return previous + trailing_in_step
+    return trailing_in_step
+
+
+def _episode_progress_frontier(
+    *,
+    request: EnvStepRequest,
+    step_result: BackendStepResult,
+    config: EnvConfig,
+    in_race_mode: bool,
+) -> tuple[int, float, bool]:
+    if not in_race_mode or int(step_result.summary.frames_run) == 0:
+        return 0, 0.0, False
+
+    max_race_distance = float(step_result.summary.max_race_distance)
+    if not request.episode_progress_frontier_initialized:
+        return 0, max_race_distance, True
+
+    frontier_epsilon = float(config.progress_frontier_epsilon)
+    if max_race_distance >= request.episode_progress_frontier_distance + frontier_epsilon:
+        return 0, max_race_distance, True
+
+    return (
+        request.episode_progress_frontier_stalled_frames + int(step_result.summary.frames_run),
+        request.episode_progress_frontier_distance,
+        True,
+    )

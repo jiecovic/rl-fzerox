@@ -74,7 +74,7 @@ class CareerPolicyRaceDriver:
             seed=seed,
             course_id=course_id,
         )
-        return observation, _race_start_info(info)
+        return observation, info
 
     def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
         return self._runtime.step_policy(action)
@@ -98,19 +98,3 @@ def _policy_train_config(policy_control: CareerModePolicyControl) -> TrainAppCon
         run_id=policy_control.policy_run.id,
         run_dir=policy_control.policy_run.run_dir,
     )
-
-
-def _race_start_info(info: dict[str, object]) -> dict[str, object]:
-    normalized = dict(info)
-    normalized.update(
-        {
-            "episode_step": 0,
-            "step_reward": 0.0,
-            "progress_frontier_stalled_frames": 0,
-            "stalled_steps": 0,
-            "frames_run": 0,
-            "repeat_index": 0,
-        }
-    )
-    normalized.pop("reward_breakdown", None)
-    return normalized
