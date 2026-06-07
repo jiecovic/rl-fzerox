@@ -22,6 +22,7 @@ from rl_fzerox.core.manager import ManagerStore
 class RunManagerLauncherDefaults:
     api_port: int = 8765
     web_port: int = 5174
+    web_host: str = "127.0.0.1"
     web_root: Path = Path(__file__).with_name("web")
 
 
@@ -71,18 +72,8 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     _ensure_frontend_dependencies(DEFAULTS.web_root)
-    web_binding = _resolve_web_port(args.web_port)
-    command = [
-        "npm",
-        "run",
-        "dev",
-        "--",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        str(web_binding.port),
-        "--strictPort",
-    ]
+    web_binding = _resolve_web_port(args.web_port, host=args.web_host)
+    command = _web_dev_command(host=args.web_host, port=web_binding.port)
     environment = os.environ.copy()
     environment["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{api_binding.port}"
 
@@ -91,7 +82,7 @@ def main(argv: list[str] | None = None) -> None:
             f"Run manager UI port {args.web_port} is busy; using {web_binding.port} instead.",
             file=sys.stderr,
         )
-    print(f"Run manager UI:  http://localhost:{web_binding.port}")
+    print(f"Run manager UI:  http://{_display_web_host(args.web_host)}:{web_binding.port}")
     print(f"Run manager API: http://127.0.0.1:{api_binding.port}")
     process = subprocess.Popen(command, cwd=DEFAULTS.web_root, env=environment)
     try:
@@ -106,6 +97,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Launch the local F-Zero X run manager")
     parser.add_argument("--api-port", type=int, default=DEFAULTS.api_port)
     parser.add_argument("--web-port", type=int, default=DEFAULTS.web_port)
+    parser.add_argument(
+        "--web-host",
+        default=DEFAULTS.web_host,
+        help="host interface for the Vite dev server; defaults to loopback only",
+    )
     parser.add_argument("--api-only", action="store_true")
     return parser.parse_args(argv)
 
@@ -151,22 +147,22 @@ def _open_api_socket(port: int) -> socket.socket:
     return bound_socket
 
 
-def _resolve_web_port(requested_port: int) -> ResolvedWebPort:
-    if _port_is_free(requested_port):
+def _resolve_web_port(requested_port: int, *, host: str) -> ResolvedWebPort:
+    if _port_is_free(requested_port, host=host):
         return ResolvedWebPort(port=requested_port, reassigned=False)
     for candidate_port in range(requested_port + 1, requested_port + 21):
-        if _port_is_free(candidate_port):
+        if _port_is_free(candidate_port, host=host):
             return ResolvedWebPort(port=candidate_port, reassigned=True)
     raise SystemExit(
         f"Run manager UI port {requested_port} is busy and no nearby free port was found."
     )
 
 
-def _port_is_free(port: int) -> bool:
+def _port_is_free(port: int, *, host: str) -> bool:
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        probe.bind(("0.0.0.0", port))
+        probe.bind((host, port))
     except OSError as exc:
         if exc.errno == errno.EADDRINUSE:
             return False
@@ -174,6 +170,24 @@ def _port_is_free(port: int) -> bool:
     finally:
         probe.close()
     return True
+
+
+def _web_dev_command(*, host: str, port: int) -> list[str]:
+    return [
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--strictPort",
+    ]
+
+
+def _display_web_host(host: str) -> str:
+    return "localhost" if host == DEFAULTS.web_host else host
 
 
 def _run_api_server(api_server: uvicorn.Server, bound_socket: socket.socket) -> None:

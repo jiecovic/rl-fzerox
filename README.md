@@ -57,6 +57,7 @@ just run-manager
 ```
 
 The UI runs at `http://localhost:5174`. The local API runs at
-`http://127.0.0.1:8765`.
+`http://127.0.0.1:8765`. The web server binds to loopback by default; pass
+`--web-host 0.0.0.0` only when you intentionally want LAN access.
 
 More project notes live in [docs](docs/index.md).
