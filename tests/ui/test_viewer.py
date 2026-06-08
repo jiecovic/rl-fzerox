@@ -496,6 +496,7 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         "R": (None, "same course"),
         "E": (None, "prev course"),
         "T": (None, "next course"),
+        "G": (None, "difficulty"),
         "F": (None, "toggle anchor"),
         "K": (None, "save"),
         "M": (None, "manual"),

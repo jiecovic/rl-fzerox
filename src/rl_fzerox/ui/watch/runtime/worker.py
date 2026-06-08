@@ -21,15 +21,13 @@ from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationSampler,
 )
-from rl_fzerox.ui.watch.runtime.course_commands import apply_course_navigation_commands
-from rl_fzerox.ui.watch.runtime.course_navigation import (
-    adjacent_watch_course_id as _adjacent_watch_course_id,
+from rl_fzerox.ui.watch.runtime.course_commands import (
+    apply_course_navigation_commands,
+    next_watch_reset_after_episode,
 )
 from rl_fzerox.ui.watch.runtime.course_navigation import (
-    current_watch_course_id,
-)
-from rl_fzerox.ui.watch.runtime.course_navigation import (
-    watch_sequential_course_ids as _watch_sequential_course_ids,
+    WatchCourseRotation,
+    sync_watch_rotation_info,
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
@@ -85,9 +83,7 @@ if TYPE_CHECKING:
     from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
 
 __all__ = (
-    "_adjacent_watch_course_id",
     "_refresh_paused_cnn_activations",
-    "_watch_sequential_course_ids",
     "run_simulation_worker",
 )
 
@@ -150,9 +146,10 @@ def _run_simulation_loop(
         live_visualization_enabled = False
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
-        persistent_locked_reset_course_id: str | None = None
-        sequential_course_ids = session.sequential_course_ids
         active_track_sampling = config.env.track_sampling
+        course_rotation = WatchCourseRotation.from_entries(active_track_sampling.entries)
+        selected_reset_target_key = course_rotation.normalized_key(None)
+        persistent_locked_reset_target_key: str | None = None
         track_sampling_refresh = ManagedTrackSamplingRefresh.from_config(config)
         watch_zeroed_state_features = session.watch_zeroed_state_features
         live_series = EpisodeLiveSeriesTracker()
@@ -213,8 +210,9 @@ def _run_simulation_loop(
 
         def refresh_track_sampling(*, force: bool = False) -> bool:
             nonlocal active_track_sampling
-            nonlocal persistent_locked_reset_course_id
-            nonlocal sequential_course_ids
+            nonlocal course_rotation
+            nonlocal persistent_locked_reset_target_key
+            nonlocal selected_reset_target_key
 
             if track_sampling_refresh is None:
                 return False
@@ -227,19 +225,18 @@ def _run_simulation_loop(
 
             env.set_track_sampling_config(refreshed_track_sampling)
             active_track_sampling = refreshed_track_sampling
-            sequential_course_ids = _watch_sequential_course_ids(active_track_sampling.entries)
-            if (
-                persistent_locked_reset_course_id is not None
-                and persistent_locked_reset_course_id not in sequential_course_ids
-            ):
-                persistent_locked_reset_course_id = None
+            course_rotation = WatchCourseRotation.from_entries(active_track_sampling.entries)
+            selected_reset_target_key = course_rotation.normalized_key(selected_reset_target_key)
+            if course_rotation.target_by_key(persistent_locked_reset_target_key) is None:
+                persistent_locked_reset_target_key = None
                 env.set_locked_reset_course(None)
             return True
 
         def track_sampling_ready_for_reset(*, force: bool = False) -> bool:
             nonlocal active_track_sampling
-            nonlocal persistent_locked_reset_course_id
-            nonlocal sequential_course_ids
+            nonlocal course_rotation
+            nonlocal persistent_locked_reset_target_key
+            nonlocal selected_reset_target_key
 
             if track_sampling_refresh is None:
                 return True
@@ -247,14 +244,12 @@ def _run_simulation_loop(
             if status.refreshed_config is not None:
                 env.set_track_sampling_config(status.refreshed_config)
                 active_track_sampling = status.refreshed_config
-                sequential_course_ids = _watch_sequential_course_ids(
-                    active_track_sampling.entries
+                course_rotation = WatchCourseRotation.from_entries(active_track_sampling.entries)
+                selected_reset_target_key = course_rotation.normalized_key(
+                    selected_reset_target_key
                 )
-                if (
-                    persistent_locked_reset_course_id is not None
-                    and persistent_locked_reset_course_id not in sequential_course_ids
-                ):
-                    persistent_locked_reset_course_id = None
+                if course_rotation.target_by_key(persistent_locked_reset_target_key) is None:
+                    persistent_locked_reset_target_key = None
                     env.set_locked_reset_course(None)
             return status.ready_for_reset and not missing_generated_x_cup_baseline_paths(
                 active_track_sampling,
@@ -265,7 +260,9 @@ def _run_simulation_loop(
             while not track_sampling_ready_for_reset(force=force_track_sampling_check):
                 force_track_sampling_check = False
                 time.sleep(0.25)
-            env.set_locked_reset_course(persistent_locked_reset_course_id)
+            env.set_locked_reset_course(persistent_locked_reset_target_key)
+            if persistent_locked_reset_target_key is None and selected_reset_target_key is not None:
+                env.set_next_sequential_reset_course(selected_reset_target_key)
             reset_seed = config.seed if episode == 0 else None
             raw_observation, raw_info = env.reset(seed=reset_seed)
             observation, info = apply_watch_state_feature_zeroing(
@@ -273,8 +270,18 @@ def _run_simulation_loop(
                 raw_info,
                 watch_zeroed_features=watch_zeroed_state_features,
             )
+            current_target = course_rotation.target_for_info(info)
+            if current_target is not None:
+                selected_reset_target_key = current_target.key
             _reset_policy_runner(policy_runner)
             reset_info = dict(info)
+            sync_watch_rotation_info(
+                info=info,
+                reset_info=reset_info,
+                rotation=course_rotation,
+                selected_reset_target_key=selected_reset_target_key,
+                locked_reset_target_key=persistent_locked_reset_target_key,
+            )
             current_control_state = env.last_requested_control_state
             current_gas_level = env.last_gas_level
             committed_action_mask_branches = env.action_mask_branches()
@@ -360,10 +367,12 @@ def _run_simulation_loop(
                     env=env,
                     info=info,
                     reset_info=reset_info,
-                    locked_reset_course_id=persistent_locked_reset_course_id,
-                    sequential_course_ids=sequential_course_ids,
+                    rotation=course_rotation,
+                    selected_reset_target_key=selected_reset_target_key,
+                    locked_reset_target_key=persistent_locked_reset_target_key,
                 )
-                persistent_locked_reset_course_id = course_command.locked_reset_course_id
+                selected_reset_target_key = course_command.selected_reset_target_key
+                persistent_locked_reset_target_key = course_command.locked_reset_target_key
                 if course_command.reset_requested:
                     break
                 if course_command.lock_state_changed:
@@ -638,11 +647,13 @@ def _run_simulation_loop(
                 if target_control_seconds is not None:
                     now = time.perf_counter()
                     next_step_time = max(next_step_time + target_control_seconds, now)
-            _sync_next_watch_reset_after_episode(
+            selected_reset_target_key = _sync_next_watch_reset_after_episode(
                 env=env,
+                rotation=course_rotation,
                 info=info,
                 episode_done=terminated or truncated,
-                locked_reset_course_id=persistent_locked_reset_course_id,
+                selected_reset_target_key=selected_reset_target_key,
+                locked_reset_target_key=persistent_locked_reset_target_key,
             )
             episode += 1
     finally:
@@ -652,37 +663,24 @@ def _run_simulation_loop(
 def _sync_next_watch_reset_after_episode(
     *,
     env: _SequentialResetEnv,
+    rotation: WatchCourseRotation,
     info: dict[str, object],
     episode_done: bool,
-    locked_reset_course_id: str | None,
-) -> None:
-    if not episode_done or locked_reset_course_id is not None:
-        return
-    if _watch_episode_completed_race(info):
-        return
-    current_course_id = current_watch_course_id(info)
-    if current_course_id is None:
-        return
-    env.set_next_sequential_reset_course(current_course_id)
-
-
-def _watch_episode_completed_race(info: dict[str, object]) -> bool:
-    if info.get("termination_reason") != "finished":
-        return False
-    laps_completed = _int_info_value(info, "race_laps_completed")
-    if laps_completed is None:
-        laps_completed = _int_info_value(info, "laps_completed")
-    total_laps = _int_info_value(info, "total_lap_count")
-    if laps_completed is None or total_laps is None:
-        return False
-    return total_laps > 0 and laps_completed >= total_laps
-
-
-def _int_info_value(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return None
-    return int(value)
+    selected_reset_target_key: str | None,
+    locked_reset_target_key: str | None,
+) -> str | None:
+    if not episode_done:
+        return selected_reset_target_key
+    next_target_key = next_watch_reset_after_episode(
+        rotation=rotation,
+        info=info,
+        episode_done=episode_done,
+        selected_reset_target_key=selected_reset_target_key,
+        locked_reset_target_key=locked_reset_target_key,
+    )
+    if locked_reset_target_key is None and next_target_key is not None:
+        env.set_next_sequential_reset_course(next_target_key)
+    return next_target_key
 
 
 def _watch_bootstrap_error_message(config: WatchAppConfig, error: Exception) -> str:

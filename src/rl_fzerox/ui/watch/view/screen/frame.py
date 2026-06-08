@@ -493,8 +493,10 @@ def _game_course_overlay_label(
     if course_name is None:
         return None
 
+    difficulty = _course_difficulty_name(info)
+    course_label = course_name if difficulty is None else f"{course_name} · {difficulty}"
     cup = _course_cup_name(info)
-    label = course_name if cup is None else f"{cup} : {course_name}"
+    label = course_label if cup is None else f"{cup} : {course_label}"
     if _course_anchor_active(info, reset_info=reset_info):
         return f"> {label} <"
     return label
@@ -507,17 +509,23 @@ def _course_anchor_active(
 ) -> bool:
     if reset_info is None:
         return False
-    locked_course_id = reset_info.get("track_sampling_locked_course_id")
-    if not isinstance(locked_course_id, str) or not locked_course_id:
+    locked_target_key = reset_info.get("track_sampling_locked_reset_target_key")
+    if not isinstance(locked_target_key, str) or not locked_target_key:
+        locked_target_key = reset_info.get("track_sampling_locked_course_id")
+    if not isinstance(locked_target_key, str) or not locked_target_key:
         return False
-    course_id = info.get("track_reset_course_key")
-    if not isinstance(course_id, str) or not course_id:
-        course_id = info.get("track_runtime_course_key")
-    if not isinstance(course_id, str) or not course_id:
-        course_id = info.get("track_course_id")
-    if course_id is None:
+    target_key = info.get("track_reset_target_key")
+    if not isinstance(target_key, str) or not target_key:
+        target_key = info.get("track_reset_course_key")
+    if not isinstance(target_key, str) or not target_key:
+        target_key = info.get("track_course_key")
+    if not isinstance(target_key, str) or not target_key:
+        target_key = info.get("track_runtime_course_key")
+    if not isinstance(target_key, str) or not target_key:
+        target_key = info.get("track_course_id")
+    if target_key is None:
         return True
-    return course_id == locked_course_id
+    return target_key == locked_target_key
 
 
 def _game_speed_overlay_label(info: dict[str, object], *, action_repeat: int) -> str | None:
@@ -575,6 +583,20 @@ def _course_cup_name(info: dict[str, object]) -> str | None:
     cup_index = course_index // 6
     if 0 <= cup_index < len(cups):
         return f"{cups[cup_index]} Cup"
+    return None
+
+
+def _course_difficulty_name(info: dict[str, object]) -> str | None:
+    for key in (
+        "track_gp_difficulty",
+        "track_source_gp_difficulty",
+        "watch_selected_gp_difficulty",
+        "gp_difficulty",
+        "source_gp_difficulty",
+    ):
+        value = info.get(key)
+        if isinstance(value, str) and value:
+            return _format_track_label(value)
     return None
 
 

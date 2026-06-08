@@ -355,7 +355,8 @@ def test_x_cup_rotation_preserves_duplicate_slot_id_difficulty_entries(
     assert update is not None
     replacement_entries = update.env_config.track_sampling.entries
     assert len(replacement_entries) == 2
-    assert len({entry.id for entry in replacement_entries}) == 1
+    assert len({entry.id for entry in replacement_entries}) == 2
+    assert all(entry.id.startswith("x_cup_") for entry in replacement_entries)
     assert [entry.runtime_course_key for entry in replacement_entries] == [slot_key, slot_key]
     assert [entry.gp_difficulty for entry in replacement_entries] == ["expert", "novice"]
     assert [entry.source_gp_difficulty for entry in replacement_entries] == [

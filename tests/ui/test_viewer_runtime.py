@@ -28,6 +28,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainConfig,
     WatchAppConfig,
 )
+from rl_fzerox.ui.watch.records import track_record_key
 from rl_fzerox.ui.watch.runtime.career_mode.menu import reset_race_progress_info
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
@@ -547,6 +548,57 @@ def test_best_finish_times_track_successful_finishes_per_track() -> None:
     assert best_times == {"mute": 95_000, "silence": 105_000}
 
 
+def test_best_finish_times_track_gp_difficulties_separately() -> None:
+    novice_info: dict[str, object] = {
+        "termination_reason": "finished",
+        "track_id": "mute",
+        "track_mode": "gp_race",
+        "track_gp_difficulty": "novice",
+    }
+    expert_info: dict[str, object] = {
+        "termination_reason": "finished",
+        "track_id": "mute",
+        "track_mode": "gp_race",
+        "track_gp_difficulty": "expert",
+    }
+    novice_key = track_record_key(novice_info)
+    expert_key = track_record_key(expert_info)
+    assert novice_key is not None
+    assert expert_key is not None
+
+    best_times = _update_best_finish_times(
+        {},
+        novice_info,
+        _sample_telemetry(race_time_ms=98_000),
+    )
+    best_times = _update_best_finish_times(
+        best_times,
+        expert_info,
+        _sample_telemetry(race_time_ms=101_000),
+    )
+    best_times = _update_best_finish_times(
+        best_times,
+        novice_info,
+        _sample_telemetry(race_time_ms=95_000),
+    )
+
+    assert best_times == {novice_key: 95_000, expert_key: 101_000}
+
+
+def test_x_cup_record_key_uses_generated_hash_and_difficulty() -> None:
+    assert (
+        track_record_key(
+            {
+                "track_course_id": "x_cup_slot_1",
+                "track_generated_course_kind": "x_cup",
+                "track_generated_course_hash": "abcd1234",
+                "track_gp_difficulty": "expert",
+            }
+        )
+        == "x_cup:abcd1234#difficulty=expert"
+    )
+
+
 def test_best_finish_ranks_track_successful_finishes_per_track() -> None:
     best_ranks = _update_best_finish_ranks(
         {},
@@ -716,7 +768,9 @@ def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -
 
     _add_config_track_info(info, config)
 
+    assert info["track_entry_id"] == "mute_city"
     assert info["track_id"] == "mute_city"
+    assert info["track_course_key"] == "course:0"
     assert info["track_display_name"] == "Mute City Time Attack - Blue Falcon Engine 50"
 
 
@@ -780,11 +834,17 @@ def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> 
 
     _add_config_track_info(info, config)
 
-    assert [record["track_id"] for record in _track_pool_records(config, info)] == [
+    assert [record["track_entry_id"] for record in _track_pool_records(config, info)] == [
         "port_town",
         "white_land",
     ]
+    assert [record["track_course_key"] for record in _track_pool_records(config, info)] == [
+        "course:7",
+        "course:8",
+    ]
+    assert info["track_entry_id"] == "port_town"
     assert info["track_id"] == "port_town"
+    assert info["track_course_key"] == "course:7"
     assert info["track_display_name"] == "Port Town Time Attack - Blue Falcon Engine 50"
     assert info["track_non_agg_best_time_ms"] == 73_000
 
@@ -835,7 +895,9 @@ def test_track_sampling_records_prefer_refreshed_watch_snapshot_state(tmp_path: 
 
     records = _track_pool_records(config, active_track_sampling=refreshed)
 
+    assert records[0]["track_entry_id"] == "new"
     assert records[0]["track_id"] == "new"
+    assert records[0]["track_course_key"] == "x_cup_slot_1"
     assert records[0]["track_course_id"] == "x_cup_new"
     assert records[0]["track_reset_course_key"] == "x_cup_slot_1"
     assert records[0]["track_generated_course_kind"] == "x_cup"

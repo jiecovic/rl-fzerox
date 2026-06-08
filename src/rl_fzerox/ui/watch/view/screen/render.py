@@ -13,7 +13,12 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
+from rl_fzerox.core.runtime_spec.track_sampling_identity import (
+    track_sampling_course_key,
+    track_sampling_reset_target_key,
+)
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
+from rl_fzerox.ui.watch.records import record_difficulty
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
@@ -280,8 +285,25 @@ def _curriculum_stage_name(info: dict[str, object] | None) -> str | None:
 
 
 def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]:
+    course_key = track_sampling_course_key(
+        entry_id=entry.id,
+        course_id=entry.course_id,
+        runtime_course_key=entry.runtime_course_key,
+        course_ref=entry.course_ref,
+        course_index=entry.course_index,
+    )
     info: dict[str, object] = {
+        "track_entry_id": entry.id,
         "track_id": entry.id,
+        "track_course_key": course_key,
+        "track_reset_target_key": track_sampling_reset_target_key(
+            entry_id=entry.id,
+            course_id=entry.course_id,
+            runtime_course_key=entry.runtime_course_key,
+            course_ref=entry.course_ref,
+            course_index=entry.course_index,
+            gp_difficulty=entry.gp_difficulty,
+        ),
         "track_baseline_state_path": str(entry.baseline_state_path),
         "track_sampling_weight": float(entry.weight),
     }
@@ -301,6 +323,10 @@ def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]
         info["track_course_index"] = int(entry.course_index)
     if entry.mode is not None:
         info["track_mode"] = entry.mode
+    if entry.gp_difficulty is not None:
+        info["track_gp_difficulty"] = entry.gp_difficulty
+    if entry.source_gp_difficulty is not None:
+        info["track_source_gp_difficulty"] = entry.source_gp_difficulty
     if entry.vehicle is not None:
         info["track_vehicle"] = entry.vehicle
     if entry.vehicle_name is not None:
@@ -337,6 +363,10 @@ def _track_config_record(track: TrackConfig) -> dict[str, object]:
         info["track_course_index"] = int(track.course_index)
     if track.mode is not None:
         info["track_mode"] = track.mode
+    if track.gp_difficulty is not None:
+        info["track_gp_difficulty"] = track.gp_difficulty
+    if track.source_gp_difficulty is not None:
+        info["track_source_gp_difficulty"] = track.source_gp_difficulty
     if track.vehicle is not None:
         info["track_vehicle"] = track.vehicle
     if track.vehicle_name is not None:
@@ -356,23 +386,67 @@ def _track_record_matching_info(
 ) -> dict[str, object]:
     track_id = info.get("track_id")
     if isinstance(track_id, str) and track_id:
-        for record in track_pool_records:
-            if record.get("track_id") == track_id:
-                return record
+        match = _matching_track_record(
+            info,
+            tuple(record for record in track_pool_records if record.get("track_id") == track_id),
+        )
+        if match is not None:
+            return match
 
     reset_course_key = info.get("track_reset_course_key")
     if isinstance(reset_course_key, str) and reset_course_key:
-        for record in track_pool_records:
-            if record.get("track_reset_course_key") == reset_course_key:
-                return record
+        match = _matching_track_record(
+            info,
+            tuple(
+                record
+                for record in track_pool_records
+                if record.get("track_reset_course_key") == reset_course_key
+            ),
+        )
+        if match is not None:
+            return match
+
+    course_id = info.get("track_course_id")
+    if isinstance(course_id, str) and course_id:
+        match = _matching_track_record(
+            info,
+            tuple(
+                record
+                for record in track_pool_records
+                if record.get("track_course_id") == course_id
+            ),
+        )
+        if match is not None:
+            return match
 
     course_index = info.get("track_course_index", info.get("course_index"))
     if isinstance(course_index, bool) or not isinstance(course_index, int):
         return {}
-    for record in track_pool_records:
-        if record.get("track_course_index") == course_index:
-            return record
+    match = _matching_track_record(
+        info,
+        tuple(
+            record
+            for record in track_pool_records
+            if record.get("track_course_index") == course_index
+        ),
+    )
+    if match is not None:
+        return match
     return {}
+
+
+def _matching_track_record(
+    info: dict[str, object],
+    candidates: tuple[dict[str, object], ...],
+) -> dict[str, object] | None:
+    if not candidates:
+        return None
+    difficulty = record_difficulty(info)
+    if difficulty is not None:
+        for record in candidates:
+            if record_difficulty(record) == difficulty:
+                return record
+    return candidates[0]
 
 
 def _observation_state_feature_names(

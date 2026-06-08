@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 
-from .model import BUILT_IN_COURSES_PER_CUP, BUILT_IN_CUP_ORDER, RecordGroup, RecordInfo
+from .model import (
+    BUILT_IN_COURSES_PER_CUP,
+    BUILT_IN_CUP_ORDER,
+    RecordGroup,
+    RecordInfo,
+)
 
 __all__ = (
     "record_groups",

@@ -13,6 +13,9 @@ from rl_fzerox.core.envs.engine.reset.track_sampling.models import (
     SelectedTrack,
 )
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
+from rl_fzerox.core.runtime_spec.track_sampling_identity import (
+    track_sampling_reset_target_key,
+)
 from rl_fzerox.core.runtime_spec.vehicle_catalog import EngineSetting, resolve_engine_setting
 
 _T = TypeVar("_T")
@@ -139,7 +142,7 @@ class TrackResetSelector:
             return None
         if not config.entries:
             raise ValueError("track sampling is enabled but has no entries")
-        course_buckets = _sequential_course_buckets(config.entries)
+        course_buckets = tuple(entries for _, entries in _group_entries_by_course(config.entries))
         position = self._env_index % len(course_buckets)
         entry = _pick_track_entry(course_buckets[position], seed=seed)
         return _selected_track_from_entry(
@@ -402,10 +405,10 @@ def _track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ..
 def _sequential_track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ...]:
     return tuple(
         (
-            course_key,
+            target_key,
             tuple(_entry_fingerprint(entry, include_weight=False) for entry in entries),
         )
-        for course_key, entries in _group_entries_by_course(config.entries)
+        for target_key, entries in _group_entries_by_sequential_target(config.entries)
     )
 
 
@@ -450,7 +453,23 @@ def _entry_fingerprint(
 def _sequential_course_buckets(
     entries: tuple[TrackSamplingEntryConfig, ...],
 ) -> tuple[tuple[TrackSamplingEntryConfig, ...], ...]:
-    return tuple(entries for _, entries in _group_entries_by_course(entries))
+    return tuple(entries for _, entries in _group_entries_by_sequential_target(entries))
+
+
+def _group_entries_by_sequential_target(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+) -> tuple[tuple[str, tuple[TrackSamplingEntryConfig, ...]], ...]:
+    grouped: dict[str, list[TrackSamplingEntryConfig]] = {}
+    order: list[str] = []
+    for entry in entries:
+        target_key = _entry_sequential_target_key(entry)
+        bucket = grouped.get(target_key)
+        if bucket is None:
+            bucket = []
+            grouped[target_key] = bucket
+            order.append(target_key)
+        bucket.append(entry)
+    return tuple((target_key, tuple(grouped[target_key])) for target_key in order)
 
 
 def _group_entries_by_course(
@@ -482,7 +501,23 @@ def _entry_course_key(entry: TrackSamplingEntryConfig) -> str:
 
 
 def _entry_matches_course_request(entry: TrackSamplingEntryConfig, course_id: str) -> bool:
-    return course_id in (entry.runtime_course_key, entry.course_id)
+    return course_id in (
+        entry.runtime_course_key,
+        entry.course_id,
+        entry.id,
+        _entry_sequential_target_key(entry),
+    )
+
+
+def _entry_sequential_target_key(entry: TrackSamplingEntryConfig) -> str:
+    return track_sampling_reset_target_key(
+        entry_id=entry.id,
+        course_id=entry.course_id,
+        runtime_course_key=entry.runtime_course_key,
+        course_ref=entry.course_ref,
+        course_index=entry.course_index,
+        gp_difficulty=entry.gp_difficulty,
+    )
 
 
 def _entries_weight(entries: tuple[TrackSamplingEntryConfig, ...]) -> float:

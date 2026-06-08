@@ -8,7 +8,6 @@ from fzerox_emulator import Emulator
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
-from rl_fzerox.ui.watch.runtime.course_navigation import watch_sequential_course_ids
 from rl_fzerox.ui.watch.runtime.observation import configured_watch_zeroed_features
 from rl_fzerox.ui.watch.runtime.policy import (
     _load_policy_runner,
@@ -31,7 +30,6 @@ class WatchRuntimeSession:
     native_control_fps: float
     target_control_fps: float | None
     target_control_seconds: float | None
-    sequential_course_ids: tuple[str, ...]
     watch_zeroed_state_features: frozenset[str]
     auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...]
 
@@ -82,7 +80,6 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
         native_control_fps=native_control_fps,
         target_control_fps=target_control_fps,
         target_control_seconds=_target_seconds(target_control_fps),
-        sequential_course_ids=watch_sequential_course_ids(config.env.track_sampling.entries),
         watch_zeroed_state_features=configured_watch_zeroed_features(config),
         auxiliary_target_names=auxiliary_target_names,
     )

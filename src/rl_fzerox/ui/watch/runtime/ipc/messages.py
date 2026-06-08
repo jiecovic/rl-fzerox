@@ -26,6 +26,7 @@ class ViewerCommand:
     save_state: bool = False
     reset_mode: str | None = None
     jump_course_id: str | None = None
+    difficulty_delta: int = 0
     toggle_deterministic_policy: bool = False
     toggle_manual_control: bool = False
     toggle_current_course_lock: bool = False
@@ -50,6 +51,7 @@ class WorkerCommandBatch:
     save_requests: int
     reset_mode: str | None
     jump_course_id: str | None
+    difficulty_delta: int
     toggle_deterministic_policy: bool
     manual_control_enabled: bool
     toggle_current_course_lock: bool

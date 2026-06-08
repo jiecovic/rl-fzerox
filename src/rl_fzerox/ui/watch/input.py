@@ -37,6 +37,7 @@ class ViewerInput:
     panel_tab_index: int | None = None
     cnn_layer_tab_index: int | None = None
     record_tab_index: int | None = None
+    difficulty_delta: int = 0
     toggle_current_course_lock: bool = False
     toggle_zeroed_state_feature_name: str | None = None
     spin_request: SpinRequest = "none"
@@ -99,6 +100,7 @@ def _poll_viewer_input(
     panel_tab_index = None
     cnn_layer_tab_index = None
     record_tab_index = None
+    difficulty_delta = 0
     jump_course_id = None
     toggle_current_course_lock = False
     toggle_zeroed_state_feature_name = None
@@ -169,6 +171,12 @@ def _poll_viewer_input(
                 reset_mode = "previous"
             elif event.key == pygame.K_t:
                 reset_mode = "next"
+            elif event.key == pygame.K_g:
+                difficulty_delta += _difficulty_key_delta(pygame, event)
+            elif event.key == pygame.K_LEFTBRACKET:
+                difficulty_delta -= 1
+            elif event.key == pygame.K_RIGHTBRACKET:
+                difficulty_delta += 1
             elif event.key == pygame.K_f:
                 toggle_current_course_lock = True
             elif event.key == pygame.K_d:
@@ -226,6 +234,7 @@ def _poll_viewer_input(
         panel_tab_index=panel_tab_index,
         cnn_layer_tab_index=cnn_layer_tab_index,
         record_tab_index=record_tab_index,
+        difficulty_delta=difficulty_delta,
         toggle_current_course_lock=toggle_current_course_lock,
         toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
         spin_request=spin_request,
@@ -249,6 +258,14 @@ def _held_speed_direction(pygame: PygameModule, keys: _PressedKeyState) -> int:
     if minus_held and not plus_held:
         return -1
     return 0
+
+
+def _difficulty_key_delta(pygame: PygameModule, event: object) -> int:
+    modifier = getattr(event, "mod", 0)
+    shift_mask = getattr(pygame, "KMOD_SHIFT", 0)
+    if isinstance(modifier, int) and isinstance(shift_mask, int) and modifier & shift_mask:
+        return -1
+    return 1
 
 
 def _held_spin_request(pygame: PygameModule, keys: _PressedKeyState) -> SpinRequest:

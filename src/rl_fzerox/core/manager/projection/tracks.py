@@ -9,6 +9,7 @@ from rl_fzerox.core.domain.x_cup import (
     generated_x_cup_slot_key,
 )
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.runtime_spec.track_sampling_identity import track_sampling_entry_id
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 
 
@@ -184,8 +185,15 @@ def _track_sampling_entry(
             raise ValueError("random engine range requires both min and max raw values")
         engine_raw = source_engine_setting_raw_value
 
+    entry_id = track_sampling_entry_id(
+        course_id=course_id,
+        runtime_course_key=runtime_course_key,
+        mode=race_mode,
+        gp_difficulty=resolved_gp_difficulty,
+        vehicle=target_vehicle_id,
+    )
     entry = {
-        "id": runtime_course_key or course_id,
+        "id": entry_id,
         "course_ref": course_ref,
         "course_id": course_id,
         "runtime_course_key": runtime_course_key,

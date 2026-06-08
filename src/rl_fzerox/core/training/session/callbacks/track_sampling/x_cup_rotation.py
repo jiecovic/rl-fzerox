@@ -20,6 +20,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainAppConfig,
     XCupRotationConfig,
 )
+from rl_fzerox.core.runtime_spec.track_sampling_identity import track_sampling_entry_id
 from rl_fzerox.core.training.runs import RunPaths, save_train_run_config
 from rl_fzerox.core.training.runs.baseline_materializer import (
     BASELINE_MATERIALIZER_SETTINGS,
@@ -296,7 +297,13 @@ def _replacement_entry(
     identity_course: GeneratedXCupCourseIdentity,
 ) -> TrackSamplingEntryConfig:
     update = {
-        "id": identity_course.course_id,
+        "id": track_sampling_entry_id(
+            course_id=identity_course.course_id,
+            runtime_course_key=entry.runtime_course_key,
+            mode=entry.mode,
+            gp_difficulty=entry.gp_difficulty,
+            vehicle=entry.vehicle,
+        ),
         "course_id": identity_course.course_id,
         "course_name": identity_course.display_name,
         "display_name": identity_course.display_name,

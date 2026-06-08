@@ -12,6 +12,8 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
+from rl_fzerox.ui.watch.runtime.course_commands import apply_course_navigation_commands
+from rl_fzerox.ui.watch.runtime.course_navigation import WatchCourseRotation
 from rl_fzerox.ui.watch.runtime.ipc import (
     ViewerCommand,
     WatchWorker,
@@ -20,9 +22,7 @@ from rl_fzerox.ui.watch.runtime.ipc import (
     drain_worker_commands,
 )
 from rl_fzerox.ui.watch.runtime.worker import (
-    _adjacent_watch_course_id,
     _sync_next_watch_reset_after_episode,
-    _watch_sequential_course_ids,
     run_simulation_worker,
 )
 
@@ -80,9 +80,40 @@ class _InterruptingProcess:
 class _SequentialResetEnv:
     def __init__(self) -> None:
         self.next_courses: list[str | None] = []
+        self.locked_courses: list[str | None] = []
+
+    def set_locked_reset_course(self, course_id: str | None) -> None:
+        self.locked_courses.append(course_id)
 
     def set_next_sequential_reset_course(self, course_id: str | None) -> None:
         self.next_courses.append(course_id)
+
+
+def _sample_rotation() -> WatchCourseRotation:
+    return WatchCourseRotation.from_entries(
+        (
+            TrackSamplingEntryConfig(
+                id="mute_novice",
+                course_id="mute_city",
+                gp_difficulty="novice",
+            ),
+            TrackSamplingEntryConfig(
+                id="silence_novice",
+                course_id="silence",
+                gp_difficulty="novice",
+            ),
+            TrackSamplingEntryConfig(
+                id="mute_expert",
+                course_id="mute_city",
+                gp_difficulty="expert",
+            ),
+            TrackSamplingEntryConfig(
+                id="silence_expert",
+                course_id="silence",
+                gp_difficulty="expert",
+            ),
+        )
+    )
 
 
 def test_drain_worker_commands_coalesces_reset_mode() -> None:
@@ -101,78 +132,105 @@ def test_drain_worker_commands_coalesces_reset_mode() -> None:
 
 def test_watch_course_rotation_retries_same_course_after_crash() -> None:
     env = _SequentialResetEnv()
+    rotation = _sample_rotation()
 
-    _sync_next_watch_reset_after_episode(
+    selected = _sync_next_watch_reset_after_episode(
         env=env,
+        rotation=rotation,
         info={
             "termination_reason": "crashed",
-            "track_reset_course_key": "mute_city",
+            "track_reset_target_key": "mute_city#difficulty=novice",
             "race_laps_completed": 1,
             "total_lap_count": 3,
         },
         episode_done=True,
-        locked_reset_course_id=None,
+        selected_reset_target_key="mute_city#difficulty=novice",
+        locked_reset_target_key=None,
     )
 
-    assert env.next_courses == ["mute_city"]
+    assert selected == "mute_city#difficulty=novice"
+    assert env.next_courses == ["mute_city#difficulty=novice"]
 
 
 def test_watch_course_rotation_retries_same_course_after_timeout() -> None:
     env = _SequentialResetEnv()
+    rotation = WatchCourseRotation.from_entries(
+        (
+            TrackSamplingEntryConfig(
+                id="x_cup_a",
+                course_id="x_cup_hash_a",
+                runtime_course_key="x_cup_slot_1",
+                gp_difficulty="novice",
+            ),
+        )
+    )
 
-    _sync_next_watch_reset_after_episode(
+    selected = _sync_next_watch_reset_after_episode(
         env=env,
+        rotation=rotation,
         info={
             "termination_reason": "timeout",
             "track_runtime_course_key": "x_cup_slot_1",
+            "track_gp_difficulty": "novice",
             "race_laps_completed": 2,
             "total_lap_count": 3,
         },
         episode_done=True,
-        locked_reset_course_id=None,
+        selected_reset_target_key="x_cup_slot_1#difficulty=novice",
+        locked_reset_target_key=None,
     )
 
-    assert env.next_courses == ["x_cup_slot_1"]
+    assert selected == "x_cup_slot_1#difficulty=novice"
+    assert env.next_courses == ["x_cup_slot_1#difficulty=novice"]
 
 
 def test_watch_course_rotation_advances_after_completed_finish() -> None:
     env = _SequentialResetEnv()
+    rotation = _sample_rotation()
 
-    _sync_next_watch_reset_after_episode(
+    selected = _sync_next_watch_reset_after_episode(
         env=env,
+        rotation=rotation,
         info={
             "termination_reason": "finished",
-            "track_reset_course_key": "mute_city",
+            "track_reset_target_key": "mute_city#difficulty=novice",
             "race_laps_completed": 3,
             "total_lap_count": 3,
         },
         episode_done=True,
-        locked_reset_course_id=None,
+        selected_reset_target_key="mute_city#difficulty=novice",
+        locked_reset_target_key=None,
     )
 
-    assert env.next_courses == []
+    assert selected == "silence#difficulty=novice"
+    assert env.next_courses == ["silence#difficulty=novice"]
 
 
 def test_watch_course_rotation_keeps_manual_and_locked_resets_unchanged() -> None:
     env = _SequentialResetEnv()
+    rotation = _sample_rotation()
     info = {
         "termination_reason": "crashed",
-        "track_reset_course_key": "mute_city",
+        "track_reset_target_key": "mute_city#difficulty=novice",
         "race_laps_completed": 1,
         "total_lap_count": 3,
     }
 
     _sync_next_watch_reset_after_episode(
         env=env,
+        rotation=rotation,
         info=info,
         episode_done=False,
-        locked_reset_course_id=None,
+        selected_reset_target_key="mute_city#difficulty=novice",
+        locked_reset_target_key=None,
     )
     _sync_next_watch_reset_after_episode(
         env=env,
+        rotation=rotation,
         info=info,
         episode_done=True,
-        locked_reset_course_id="mute_city",
+        selected_reset_target_key="mute_city#difficulty=novice",
+        locked_reset_target_key="mute_city#difficulty=novice",
     )
 
     assert env.next_courses == []
@@ -195,49 +253,62 @@ def test_drain_worker_commands_last_reset_mode_wins() -> None:
     assert commands.reset_mode == "next"
 
 
-def test_watch_sequential_course_ids_follow_unique_course_order() -> None:
+def test_watch_course_rotation_is_difficulty_major() -> None:
     entries = (
-        TrackSamplingEntryConfig(id="a1", course_id="mute_city"),
-        TrackSamplingEntryConfig(id="a2", course_id="mute_city"),
-        TrackSamplingEntryConfig(id="b1", course_id="silence"),
+        TrackSamplingEntryConfig(id="mute_novice", course_id="mute_city", gp_difficulty="novice"),
+        TrackSamplingEntryConfig(id="mute_expert", course_id="mute_city", gp_difficulty="expert"),
+        TrackSamplingEntryConfig(id="silence_novice", course_id="silence", gp_difficulty="novice"),
+        TrackSamplingEntryConfig(id="silence_expert", course_id="silence", gp_difficulty="expert"),
     )
 
-    assert _watch_sequential_course_ids(entries) == ("mute_city", "silence")
+    rotation = WatchCourseRotation.from_entries(entries)
+
+    assert tuple(target.key for target in rotation.targets) == (
+        "mute_city#difficulty=novice",
+        "silence#difficulty=novice",
+        "mute_city#difficulty=expert",
+        "silence#difficulty=expert",
+    )
 
 
-def test_watch_sequential_course_ids_use_stable_runtime_course_keys() -> None:
+def test_watch_course_rotation_uses_stable_runtime_course_keys() -> None:
     entries = (
         TrackSamplingEntryConfig(
             id="generated_old",
             course_id="x_cup_aaa111",
             runtime_course_key="x_cup_slot_1",
+            gp_difficulty="novice",
         ),
         TrackSamplingEntryConfig(
             id="generated_new",
             course_id="x_cup_bbb222",
             runtime_course_key="x_cup_slot_1",
+            gp_difficulty="expert",
         ),
         TrackSamplingEntryConfig(
             id="generated_other",
             course_id="x_cup_ccc333",
             runtime_course_key="x_cup_slot_2",
+            gp_difficulty="novice",
         ),
     )
 
-    assert _watch_sequential_course_ids(entries) == ("x_cup_slot_1", "x_cup_slot_2")
+    rotation = WatchCourseRotation.from_entries(entries)
 
-
-def test_adjacent_watch_course_id_wraps_to_previous_course() -> None:
-    ordered_course_ids = ("mute_city", "silence", "devils_forest")
-
-    assert (
-        _adjacent_watch_course_id(
-            current_course_id="mute_city",
-            ordered_course_ids=ordered_course_ids,
-            offset=-1,
-        )
-        == "devils_forest"
+    assert tuple(target.key for target in rotation.targets) == (
+        "x_cup_slot_1#difficulty=novice",
+        "x_cup_slot_2#difficulty=novice",
+        "x_cup_slot_1#difficulty=expert",
     )
+
+
+def test_watch_course_rotation_switches_difficulty_on_same_course() -> None:
+    rotation = _sample_rotation()
+
+    target = rotation.difficulty_target("silence#difficulty=novice", offset=1)
+
+    assert target is not None
+    assert target.key == "silence#difficulty=expert"
 
 
 def test_drain_worker_commands_coalesces_deterministic_toggle_parity() -> None:
@@ -329,6 +400,56 @@ def test_drain_worker_commands_coalesces_course_jump_selection() -> None:
     )
 
     assert commands.jump_course_id == "silence"
+
+
+def test_drain_worker_commands_accumulates_difficulty_delta() -> None:
+    command_queue = _CommandQueue(
+        [
+            ViewerCommand(difficulty_delta=1),
+            ViewerCommand(difficulty_delta=-1),
+            ViewerCommand(difficulty_delta=1),
+        ]
+    )
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=RaceControlState(),
+    )
+
+    assert commands.difficulty_delta == 1
+
+
+def test_difficulty_command_forces_reset_to_same_course_on_next_difficulty() -> None:
+    env = _SequentialResetEnv()
+    rotation = _sample_rotation()
+    command_queue = _CommandQueue([ViewerCommand(difficulty_delta=1)])
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=RaceControlState(),
+    )
+    info: dict[str, object] = {
+        "track_reset_target_key": "mute_city#difficulty=novice",
+        "track_reset_course_key": "mute_city",
+        "track_gp_difficulty": "novice",
+    }
+    reset_info = dict(info)
+
+    result = apply_course_navigation_commands(
+        commands,
+        env=env,
+        info=info,
+        reset_info=reset_info,
+        rotation=rotation,
+        selected_reset_target_key="mute_city#difficulty=novice",
+        locked_reset_target_key=None,
+    )
+
+    assert result.reset_requested is True
+    assert result.selected_reset_target_key == "mute_city#difficulty=expert"
+    assert env.next_courses == ["mute_city#difficulty=expert"]
+    assert reset_info["watch_selected_gp_difficulty"] == "expert"
 
 
 def test_drain_worker_commands_coalesces_current_course_lock_toggle() -> None:

@@ -164,6 +164,7 @@ def drain_worker_commands(
     save_requests = 0
     reset_mode: str | None = None
     jump_course_id: str | None = None
+    difficulty_delta = 0
     toggle_deterministic_policy = False
     toggle_current_course_lock = False
     toggle_zeroed_state_feature_name: str | None = None
@@ -185,6 +186,7 @@ def drain_worker_commands(
                     save_requests=save_requests,
                     reset_mode=reset_mode,
                     jump_course_id=jump_course_id,
+                    difficulty_delta=difficulty_delta,
                     toggle_deterministic_policy=toggle_deterministic_policy,
                     manual_control_enabled=next_manual_control_enabled,
                     toggle_current_course_lock=toggle_current_course_lock,
@@ -215,6 +217,7 @@ def drain_worker_commands(
             reset_mode = command.reset_mode
         if command.jump_course_id is not None:
             jump_course_id = command.jump_course_id
+        difficulty_delta += command.difficulty_delta
         if command.toggle_deterministic_policy:
             toggle_deterministic_policy = not toggle_deterministic_policy
         if command.toggle_manual_control:
@@ -254,6 +257,7 @@ def apply_viewer_input(
             save_state=viewer_input.save_state,
             reset_mode=viewer_input.reset_mode,
             jump_course_id=viewer_input.jump_course_id,
+            difficulty_delta=viewer_input.difficulty_delta,
             toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
             toggle_manual_control=viewer_input.toggle_manual_control,
             toggle_current_course_lock=viewer_input.toggle_current_course_lock,

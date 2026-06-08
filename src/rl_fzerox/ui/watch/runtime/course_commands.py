@@ -5,9 +5,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from rl_fzerox.ui.watch.runtime.course_navigation import (
-    adjacent_watch_course_id,
-    current_watch_course_id,
-    sync_locked_course_info,
+    WatchCourseRotation,
+    sync_watch_rotation_info,
 )
 from rl_fzerox.ui.watch.runtime.ipc import WorkerCommandBatch
 
@@ -20,7 +19,8 @@ class _CourseResetEnv(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class CourseCommandResult:
-    locked_reset_course_id: str | None
+    selected_reset_target_key: str | None
+    locked_reset_target_key: str | None
     reset_requested: bool
     lock_state_changed: bool
 
@@ -31,136 +31,222 @@ def apply_course_navigation_commands(
     env: _CourseResetEnv,
     info: dict[str, object],
     reset_info: dict[str, object],
-    locked_reset_course_id: str | None,
-    sequential_course_ids: tuple[str, ...],
+    rotation: WatchCourseRotation,
+    selected_reset_target_key: str | None,
+    locked_reset_target_key: str | None,
 ) -> CourseCommandResult:
-    """Apply reset/course-lock commands that take effect on the next reset."""
+    """Apply watch reset/navigation commands against the global course rotation."""
 
-    next_locked_course_id = locked_reset_course_id
+    next_selected_key = rotation.normalized_key(selected_reset_target_key)
+    next_locked_key = _valid_locked_key(rotation, locked_reset_target_key)
     lock_state_changed = False
 
     if commands.jump_course_id is not None:
-        next_locked_course_id = None
+        target_key = _jump_target_key(
+            rotation,
+            commands.jump_course_id,
+            selected_reset_target_key=next_selected_key,
+        )
+        if target_key is None:
+            return CourseCommandResult(
+                selected_reset_target_key=next_selected_key,
+                locked_reset_target_key=next_locked_key,
+                reset_requested=False,
+                lock_state_changed=False,
+            )
+        next_selected_key = target_key
+        next_locked_key = None
         env.set_locked_reset_course(None)
-        env.set_next_sequential_reset_course(commands.jump_course_id)
-        sync_locked_course_info(
+        env.set_next_sequential_reset_course(target_key)
+        _sync_info(
             info=info,
             reset_info=reset_info,
-            locked_reset_course_id=next_locked_course_id,
+            rotation=rotation,
+            selected_reset_target_key=next_selected_key,
+            locked_reset_target_key=next_locked_key,
         )
         return CourseCommandResult(
-            locked_reset_course_id=next_locked_course_id,
+            selected_reset_target_key=next_selected_key,
+            locked_reset_target_key=next_locked_key,
             reset_requested=True,
             lock_state_changed=False,
         )
 
     if commands.toggle_current_course_lock:
-        next_locked_course_id, lock_state_changed = _toggle_current_course_lock(
-            env=env,
+        current_key = _current_or_selected_key(
+            rotation,
+            info,
+            selected_reset_target_key=next_selected_key,
+        )
+        if current_key is not None:
+            next_locked_key = None if next_locked_key == current_key else current_key
+            env.set_locked_reset_course(next_locked_key)
+            lock_state_changed = True
+
+    target_key = _requested_target_key(
+        commands,
+        rotation=rotation,
+        info=info,
+        selected_reset_target_key=next_selected_key,
+        locked_reset_target_key=next_locked_key,
+    )
+    if target_key is not None:
+        next_selected_key = target_key
+        if next_locked_key is None:
+            env.set_next_sequential_reset_course(target_key)
+        else:
+            next_locked_key = target_key
+            env.set_locked_reset_course(target_key)
+        _sync_info(
             info=info,
             reset_info=reset_info,
-            locked_reset_course_id=next_locked_course_id,
-            sequential_course_ids=sequential_course_ids,
+            rotation=rotation,
+            selected_reset_target_key=next_selected_key,
+            locked_reset_target_key=next_locked_key,
         )
-
-    if commands.reset_mode == "current":
-        current_course_id = current_watch_course_id(info)
-        if current_course_id is not None and next_locked_course_id is None:
-            env.set_next_sequential_reset_course(current_course_id)
         return CourseCommandResult(
-            locked_reset_course_id=next_locked_course_id,
+            selected_reset_target_key=next_selected_key,
+            locked_reset_target_key=next_locked_key,
             reset_requested=True,
             lock_state_changed=lock_state_changed,
         )
 
-    if commands.reset_mode in {"previous", "next"}:
-        next_locked_course_id = _apply_adjacent_course_reset(
-            env=env,
+    if lock_state_changed:
+        _sync_info(
             info=info,
             reset_info=reset_info,
-            locked_reset_course_id=next_locked_course_id,
-            reset_mode=commands.reset_mode,
-            sequential_course_ids=sequential_course_ids,
-        )
-        return CourseCommandResult(
-            locked_reset_course_id=next_locked_course_id,
-            reset_requested=True,
-            lock_state_changed=lock_state_changed,
+            rotation=rotation,
+            selected_reset_target_key=next_selected_key,
+            locked_reset_target_key=next_locked_key,
         )
 
     return CourseCommandResult(
-        locked_reset_course_id=next_locked_course_id,
+        selected_reset_target_key=next_selected_key,
+        locked_reset_target_key=next_locked_key,
         reset_requested=False,
         lock_state_changed=lock_state_changed,
     )
 
 
-def _toggle_current_course_lock(
+def next_watch_reset_after_episode(
     *,
-    env: _CourseResetEnv,
+    rotation: WatchCourseRotation,
     info: dict[str, object],
-    reset_info: dict[str, object],
-    locked_reset_course_id: str | None,
-    sequential_course_ids: tuple[str, ...],
-) -> tuple[str | None, bool]:
-    current_course_id = current_watch_course_id(info)
-    if current_course_id is None:
-        return locked_reset_course_id, False
-
-    if locked_reset_course_id == current_course_id:
-        next_locked_course_id = None
-        env.set_locked_reset_course(None)
-    else:
-        next_locked_course_id = current_course_id
-        env.set_locked_reset_course(current_course_id)
-
-    next_course_id = adjacent_watch_course_id(
-        current_course_id=current_course_id,
-        ordered_course_ids=sequential_course_ids,
-        offset=1,
-    )
-    env.set_next_sequential_reset_course(next_course_id)
-    sync_locked_course_info(
-        info=info,
-        reset_info=reset_info,
-        locked_reset_course_id=next_locked_course_id,
-    )
-    return next_locked_course_id, True
-
-
-def _apply_adjacent_course_reset(
-    *,
-    env: _CourseResetEnv,
-    info: dict[str, object],
-    reset_info: dict[str, object],
-    locked_reset_course_id: str | None,
-    reset_mode: str,
-    sequential_course_ids: tuple[str, ...],
+    episode_done: bool,
+    selected_reset_target_key: str | None,
+    locked_reset_target_key: str | None,
 ) -> str | None:
-    base_course_id = locked_reset_course_id or current_watch_course_id(info)
-    offset = -1 if reset_mode == "previous" else 1
-    target_course_id = adjacent_watch_course_id(
-        current_course_id=base_course_id,
-        ordered_course_ids=sequential_course_ids,
-        offset=offset,
-    )
-    if target_course_id is None:
-        return locked_reset_course_id
+    """Return the selected target for the next episode after terminal handling."""
 
-    if locked_reset_course_id is None:
-        env.set_next_sequential_reset_course(target_course_id)
-        return locked_reset_course_id
-
-    env.set_locked_reset_course(target_course_id)
-    next_course_id = adjacent_watch_course_id(
-        current_course_id=target_course_id,
-        ordered_course_ids=sequential_course_ids,
-        offset=1,
+    if locked_reset_target_key is not None:
+        return rotation.normalized_key(locked_reset_target_key)
+    current_key = _current_or_selected_key(
+        rotation,
+        info,
+        selected_reset_target_key=selected_reset_target_key,
     )
-    env.set_next_sequential_reset_course(next_course_id)
-    sync_locked_course_info(
+    if current_key is None:
+        return rotation.normalized_key(selected_reset_target_key)
+    if not episode_done or not _watch_episode_completed_race(info):
+        return current_key
+    target = rotation.adjacent_target(current_key, offset=1)
+    return None if target is None else target.key
+
+
+def _requested_target_key(
+    commands: WorkerCommandBatch,
+    *,
+    rotation: WatchCourseRotation,
+    info: dict[str, object],
+    selected_reset_target_key: str | None,
+    locked_reset_target_key: str | None,
+) -> str | None:
+    current_key = locked_reset_target_key or _current_or_selected_key(
+        rotation,
+        info,
+        selected_reset_target_key=selected_reset_target_key,
+    )
+    if commands.reset_mode == "current":
+        return current_key
+    if commands.reset_mode in {"previous", "next"}:
+        offset = -1 if commands.reset_mode == "previous" else 1
+        target = rotation.adjacent_target(current_key, offset=offset)
+        return None if target is None else target.key
+    if commands.difficulty_delta != 0:
+        target = rotation.difficulty_target(current_key, offset=commands.difficulty_delta)
+        return None if target is None else target.key
+    return None
+
+
+def _jump_target_key(
+    rotation: WatchCourseRotation,
+    requested_key: str,
+    *,
+    selected_reset_target_key: str | None,
+) -> str | None:
+    target = rotation.target_by_key(requested_key)
+    if target is not None:
+        return target.key
+    selected = rotation.target_by_key(selected_reset_target_key)
+    if selected is not None:
+        target = rotation.target_for_course_difficulty(requested_key, selected.difficulty)
+        if target is not None:
+            return target.key
+    return None
+
+
+def _current_or_selected_key(
+    rotation: WatchCourseRotation,
+    info: dict[str, object],
+    *,
+    selected_reset_target_key: str | None,
+) -> str | None:
+    current = rotation.target_for_info(info)
+    if current is not None:
+        return current.key
+    return rotation.normalized_key(selected_reset_target_key)
+
+
+def _valid_locked_key(
+    rotation: WatchCourseRotation,
+    locked_reset_target_key: str | None,
+) -> str | None:
+    if rotation.target_by_key(locked_reset_target_key) is None:
+        return None
+    return locked_reset_target_key
+
+
+def _sync_info(
+    *,
+    info: dict[str, object],
+    reset_info: dict[str, object],
+    rotation: WatchCourseRotation,
+    selected_reset_target_key: str | None,
+    locked_reset_target_key: str | None,
+) -> None:
+    sync_watch_rotation_info(
         info=info,
         reset_info=reset_info,
-        locked_reset_course_id=target_course_id,
+        rotation=rotation,
+        selected_reset_target_key=selected_reset_target_key,
+        locked_reset_target_key=locked_reset_target_key,
     )
-    return target_course_id
+
+
+def _watch_episode_completed_race(info: dict[str, object]) -> bool:
+    if info.get("termination_reason") != "finished":
+        return False
+    laps_completed = _int_info_value(info, "race_laps_completed")
+    if laps_completed is None:
+        laps_completed = _int_info_value(info, "laps_completed")
+    total_laps = _int_info_value(info, "total_lap_count")
+    if laps_completed is None or total_laps is None:
+        return False
+    return total_laps > 0 and laps_completed >= total_laps
+
+
+def _int_info_value(info: dict[str, object], key: str) -> int | None:
+    value = info.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value)

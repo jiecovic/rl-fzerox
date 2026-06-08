@@ -57,6 +57,7 @@ VIEWER_HOTKEY_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("R", "same course"),
     MacroLegendHint("E", "prev course"),
     MacroLegendHint("T", "next course"),
+    MacroLegendHint("G", "difficulty"),
     MacroLegendHint("F", "toggle anchor"),
     MacroLegendHint("K", "save"),
     MacroLegendHint("M", "manual"),

@@ -23,6 +23,7 @@ class _FakePygame:
     QUIT = 1
     KEYDOWN = 2
     MOUSEBUTTONDOWN = 3
+    KMOD_SHIFT = 1
     K_ESCAPE = 9
     K_TAB = 28
     K_p = 10
@@ -38,6 +39,8 @@ class _FakePygame:
     K_r = 26
     K_e = 43
     K_t = 42
+    K_LEFTBRACKET = 49
+    K_RIGHTBRACKET = 50
     K_f = 44
     K_d = 27
     K_m = 35
@@ -63,15 +66,19 @@ class _FakePygame:
     K_8 = 46
     K_q = 47
     K_w = 48
+    K_g = 51
 
     def __init__(
         self,
         key_events: tuple[int, ...],
         *,
         pressed_keys: tuple[int, ...] = (),
+        key_mod: int = 0,
         mouse_click: tuple[int, int] | None = None,
     ) -> None:
-        events = [SimpleNamespace(type=self.KEYDOWN, key=key) for key in key_events]
+        events = [
+            SimpleNamespace(type=self.KEYDOWN, key=key, mod=key_mod) for key in key_events
+        ]
         if mouse_click is not None:
             events.append(
                 SimpleNamespace(
@@ -183,6 +190,30 @@ def test_poll_viewer_input_maps_t_to_next_course_reset() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_t,)))
 
     assert viewer_input.reset_mode == "next"
+
+
+def test_poll_viewer_input_maps_brackets_to_difficulty_delta() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((_FakePygame.K_LEFTBRACKET, _FakePygame.K_RIGHTBRACKET)),
+    )
+    next_input = _poll_viewer_input(_FakePygame((_FakePygame.K_RIGHTBRACKET,)))
+
+    assert viewer_input.difficulty_delta == 0
+    assert next_input.difficulty_delta == 1
+
+
+def test_poll_viewer_input_maps_g_to_difficulty_delta() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_g,)))
+
+    assert viewer_input.difficulty_delta == 1
+
+
+def test_poll_viewer_input_maps_shift_g_to_previous_difficulty() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((_FakePygame.K_g,), key_mod=_FakePygame.KMOD_SHIFT),
+    )
+
+    assert viewer_input.difficulty_delta == -1
 
 
 def test_poll_viewer_input_maps_f_to_current_course_anchor_toggle() -> None:

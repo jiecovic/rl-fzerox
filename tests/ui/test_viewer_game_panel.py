@@ -1,6 +1,7 @@
 # tests/ui/test_viewer_game_panel.py
 from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from rl_fzerox.ui.watch.records import track_record_key
 from rl_fzerox.ui.watch.view.panels.content.game import _format_telemetry_vehicle_setup
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.rendering.draw import _record_tab_sections
@@ -1051,6 +1052,61 @@ def test_records_section_dedupes_course_variants_to_one_course_row() -> None:
     headings = [line.label for line in records_section.lines if line.heading]
 
     assert headings == ["> Mute City"]
+
+
+def test_records_section_follows_selected_gp_difficulty() -> None:
+    novice_record: dict[str, object] = {
+        "track_id": "mute_city_novice",
+        "track_course_id": "mute_city",
+        "track_course_name": "Mute City",
+        "track_mode": "gp_race",
+        "track_gp_difficulty": "novice",
+    }
+    expert_record: dict[str, object] = {
+        "track_id": "mute_city_expert",
+        "track_course_id": "mute_city",
+        "track_course_name": "Mute City",
+        "track_mode": "gp_race",
+        "track_gp_difficulty": "expert",
+    }
+    novice_key = track_record_key(novice_record)
+    expert_key = track_record_key(expert_record)
+    assert novice_key is not None
+    assert expert_key is not None
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_course_id": "mute_city",
+            "track_mode": "gp_race",
+            "track_gp_difficulty": "expert",
+            "watch_selected_gp_difficulty": "expert",
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(difficulty_name="expert", difficulty_raw=2),
+        best_finish_ranks={novice_key: 3, expert_key: 1},
+        best_finish_times={novice_key: 92_000, expert_key: 98_000},
+        track_pool_records=(novice_record, expert_record),
+    )
+
+    assert [section.title for section in columns.records] == ["Records"]
+    headings = [line.label for line in columns.records[0].lines if line.heading]
+    expert_pb_line = next(line for line in columns.records[0].lines if line.label == "PB")
+
+    assert headings == ["> Mute City"]
+    assert expert_pb_line.value == "1:38.000 · P1"
 
 
 def test_records_section_highlights_current_track_heading() -> None:

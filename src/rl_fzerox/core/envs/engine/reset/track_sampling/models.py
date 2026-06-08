@@ -6,6 +6,10 @@ from pathlib import Path
 
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.runtime_spec.schema import TrackRecordsConfig
+from rl_fzerox.core.runtime_spec.track_sampling_identity import (
+    track_sampling_course_key,
+    track_sampling_reset_target_key,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,15 +69,32 @@ class SelectedTrack:
     cycle_position: int | None = None
 
     def info(self) -> dict[str, object]:
+        course_key = track_sampling_course_key(
+            entry_id=self.id,
+            course_id=self.course_id,
+            runtime_course_key=self.runtime_course_key,
+            course_ref=self.course_ref,
+            course_index=self.course_index,
+        )
         info = {
             "track_sampling_enabled": True,
             "track_sampling_mode": self.sampling_mode,
+            "track_entry_id": self.id,
             "track_id": self.id,
+            "track_course_key": course_key,
             "track_display_name": self.display_name,
             "track_course_ref": self.course_ref,
             "track_course_id": self.course_id,
             "track_runtime_course_key": self.runtime_course_key,
             "track_reset_course_key": self.runtime_course_key or self.course_id,
+            "track_reset_target_key": track_sampling_reset_target_key(
+                entry_id=self.id,
+                course_id=self.course_id,
+                runtime_course_key=self.runtime_course_key,
+                course_ref=self.course_ref,
+                course_index=self.course_index,
+                gp_difficulty=self.gp_difficulty,
+            ),
             "track_course_name": self.course_name,
             "track_baseline_state_path": str(self.baseline_state_path),
             "track_sampling_weight": self.weight,

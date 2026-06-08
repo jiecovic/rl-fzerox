@@ -1,6 +1,12 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/identity.py
 from __future__ import annotations
 
+from rl_fzerox.ui.watch.records import (
+    record_difficulty,
+    track_record_key,
+    track_record_lookup_keys,
+)
+
 from .model import RecordInfo
 
 
@@ -18,10 +24,13 @@ def has_failed_attempt(
     record: RecordInfo,
     failed_track_attempts: frozenset[str],
 ) -> bool:
-    return any(track_key in failed_track_attempts for track_key in _record_lookup_keys(record))
+    return any(track_key in failed_track_attempts for track_key in track_record_lookup_keys(record))
 
 
 def record_course_id(record: RecordInfo) -> str | None:
+    reset_target_key = record.get("track_reset_target_key")
+    if isinstance(reset_target_key, str) and reset_target_key:
+        return reset_target_key
     reset_course_key = record.get("track_reset_course_key")
     if isinstance(reset_course_key, str) and reset_course_key:
         return reset_course_key
@@ -38,10 +47,19 @@ def is_current_track_record(
     record: RecordInfo,
     current_info: RecordInfo,
 ) -> bool:
-    current_key = track_best_key(current_info)
-    record_key = track_best_key(record)
+    current_key = track_record_key(current_info)
+    record_key = track_record_key(record)
     if current_key is not None and record_key is not None:
         return current_key == record_key
+
+    current_difficulty = record_difficulty(current_info)
+    record_difficulty_value = record_difficulty(record)
+    if (
+        current_difficulty is not None
+        and record_difficulty_value is not None
+        and current_difficulty != record_difficulty_value
+    ):
+        return False
 
     current_course_id = current_info.get("track_course_id")
     record_course_id = record.get("track_course_id")
@@ -63,7 +81,7 @@ def watch_track_value(
     info: RecordInfo,
     values: dict[str, int],
 ) -> int | None:
-    for track_key in _record_lookup_keys(info):
+    for track_key in track_record_lookup_keys(info):
         value = values.get(track_key)
         if value is not None:
             return value
@@ -71,19 +89,7 @@ def watch_track_value(
 
 
 def track_best_key(info: RecordInfo) -> str | None:
-    course_id = info.get("track_course_id")
-    if isinstance(course_id, str) and course_id:
-        return course_id
-    value = info.get("track_course_index", info.get("course_index"))
-    if isinstance(value, int):
-        return f"course:{value}"
-    if isinstance(value, bool):
-        return None
-    for key in ("track_id", "track_display_name"):
-        value = info.get(key)
-        if isinstance(value, str) and value:
-            return value
-    return None
+    return track_record_key(info)
 
 
 def optional_int_info(info: RecordInfo, key: str) -> int | None:
@@ -93,22 +99,3 @@ def optional_int_info(info: RecordInfo, key: str) -> int | None:
     if isinstance(value, int):
         return value
     return None
-
-
-def _record_lookup_keys(info: RecordInfo) -> tuple[str, ...]:
-    keys: list[str] = []
-
-    course_id = info.get("track_course_id")
-    if isinstance(course_id, str) and course_id:
-        keys.append(course_id)
-
-    course_index = info.get("track_course_index", info.get("course_index"))
-    if isinstance(course_index, int):
-        keys.append(f"course:{course_index}")
-
-    for field_name in ("track_id", "track_display_name"):
-        value = info.get(field_name)
-        if isinstance(value, str) and value:
-            keys.append(value)
-
-    return tuple(dict.fromkeys(keys))
