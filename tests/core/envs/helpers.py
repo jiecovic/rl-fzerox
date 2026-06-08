@@ -32,6 +32,7 @@ class ScriptedStepBackend(SyntheticBackend):
         self._results = list(results)
         self._reset_telemetry = reset_telemetry
         self.last_lean_timer_assist: bool | None = None
+        self.last_spin_request: object = "none"
 
     def step_repeat_raw(
         self,
@@ -64,7 +65,6 @@ class ScriptedStepBackend(SyntheticBackend):
             progress_frontier_epsilon,
             terminate_on_energy_depleted,
             lean_timer_assist,
-            spin_request,
             spin_cooldown_frames,
             resize_filter,
             minimap_resize_filter,
@@ -73,6 +73,7 @@ class ScriptedStepBackend(SyntheticBackend):
         )
         self._last_race_control_state = control_state
         self.last_lean_timer_assist = lean_timer_assist
+        self.last_spin_request = spin_request
         result = self._results.pop(0)
         frames_run = result.summary.frames_run
         self._capture_video_flags.extend([False] * max(frames_run - 1, 0))

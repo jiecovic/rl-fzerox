@@ -183,7 +183,7 @@ class PolicyDriveRuntime:
             applied_control_state,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
-            spin_request=self._apply_spin_semantics(spin_request),
+            spin_request=spin_request,
         )
 
     def _step_decoded_action(

@@ -13,6 +13,8 @@ from fzerox_emulator import (
 )
 from rl_fzerox.core.envs.policy_drive import PolicyDriveRuntime
 from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, EnvConfig, TrainAppConfig
+from rl_fzerox.core.runtime_spec.schema.actions import ActionMaskConfig
+from tests.support.action_configs import configured_discrete_action
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import make_step_status, make_step_summary, make_telemetry
 
@@ -173,6 +175,41 @@ def test_policy_drive_manual_step_forwards_spin_request(tmp_path: Path) -> None:
 
     assert backend.last_spin_request == "left"
     assert step.info["spin_requested"] is True
+
+
+def test_policy_drive_manual_spin_bypasses_policy_spin_mask(tmp_path: Path) -> None:
+    backend = ScriptedPolicyDriveBackend(
+        [
+            _backend_step(
+                frames_run=3,
+                race_distance=1_500.0,
+                native_step_count=12_345,
+            )
+        ]
+    )
+    train_config = _train_config(tmp_path).model_copy(
+        update={
+            "env": EnvConfig(
+                action=configured_discrete_action(
+                    "steer",
+                    "gas",
+                    "boost",
+                    "lean",
+                    "spin",
+                    mask=ActionMaskConfig(spin=(0,)),
+                )
+            )
+        }
+    )
+    runtime = PolicyDriveRuntime(
+        emulator=backend,
+        train_config=train_config,
+    )
+
+    runtime.begin(seed=7, course_id="mute_city")
+    runtime.step_manual(RaceControlState(), spin_request="right")
+
+    assert backend.last_spin_request == "right"
 
 
 def _backend_step(

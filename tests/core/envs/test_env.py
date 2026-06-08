@@ -13,6 +13,7 @@ from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.observations import ObservationStackMode
 from rl_fzerox.core.envs.observations.state import state_feature_names
 from rl_fzerox.core.runtime_spec.schema import (
+    ActionMaskConfig,
     EnvConfig,
     ObservationConfig,
     ObservationStateComponentConfig,
@@ -755,6 +756,48 @@ def test_step_control_applies_manual_controller_state() -> None:
     env.step_control(control_state)
 
     assert backend.last_race_control_state == control_state
+
+
+def test_step_control_spin_bypasses_policy_spin_mask_for_manual_macro() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=5.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(
+                    max_race_distance=5.0,
+                    final_frame_index=1,
+                    spin_macro_started=True,
+                    spin_macro_active_frames=1,
+                ),
+                status=make_step_status(step_count=1, spin_macro_active=True),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "boost",
+                "lean",
+                "spin",
+                mask=ActionMaskConfig(spin=(0,)),
+            ),
+        ),
+    )
+
+    env.reset(seed=21)
+    _, _, _, _, info = env.step_control(RaceControlState(), spin_request="left")
+
+    assert backend.last_spin_request == "left"
+    assert info["spin_requested"] is True
+    assert info["spin_started"] is True
 
 
 def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> None:

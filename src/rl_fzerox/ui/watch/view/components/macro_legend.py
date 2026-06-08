@@ -73,8 +73,8 @@ MANUAL_CONTROL_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("Space", "boost", controller="B"),
     MacroLegendHint("A", "lean left", controller="Z"),
     MacroLegendHint("S", "lean right", controller="R"),
-    MacroLegendHint("Q", "spin left", controller="lean macro"),
-    MacroLegendHint("W", "spin right", controller="lean macro"),
+    MacroLegendHint("Q", "spin left"),
+    MacroLegendHint("W", "spin right"),
     MacroLegendHint("Enter", "start", controller="Start"),
 )
 _LEGEND_SEPARATOR = "›"

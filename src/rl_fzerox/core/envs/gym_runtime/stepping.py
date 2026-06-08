@@ -114,7 +114,7 @@ class GymStepRuntime:
             action_repeat=1,
             requested_control_state=requested_control_state,
             action_drive_axis=None,
-            spin_request=self._apply_spin_semantics(spin_request),
+            spin_request=spin_request,
         )
 
     def _step_control_state(
@@ -132,7 +132,7 @@ class GymStepRuntime:
             action_repeat=self._config.action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
-            spin_request=self._apply_spin_semantics(spin_request),
+            spin_request=spin_request,
         )
 
     def _step_decoded_action(
@@ -168,7 +168,7 @@ class GymStepRuntime:
             action_repeat=self._config.action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
-            spin_request=self._apply_spin_semantics(spin_request),
+            spin_request=spin_request,
             capture_display_frames=True,
         )
 
