@@ -52,6 +52,7 @@ def launch_watch_artifact(
         policy_artifact="best" if artifact == "best" else "latest",
         manager_db_path=store.db_path,
         managed_run_id=run.id,
+        session_name=lease_id,
         overrides=overrides,
     )
     log_path = manager_watch_log_path(run.id, artifact=artifact)

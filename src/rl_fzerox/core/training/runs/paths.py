@@ -181,8 +181,11 @@ def build_watch_session_paths(
 ) -> WatchSessionPaths:
     """Build one reusable runtime/baseline workspace for watch."""
 
-    del session_name
-    session_root = _watch_session_root(run_dir=run_dir, runtime_dir=runtime_dir)
+    session_root = _watch_session_root(
+        run_dir=run_dir,
+        runtime_dir=runtime_dir,
+        session_name=session_name,
+    )
     return WatchSessionPaths(
         session_dir=session_root,
         runtime_dir=session_root / RUN_LAYOUT.runtime_dirname,
@@ -211,12 +214,28 @@ def resolve_train_run_config_path(run_dir: Path) -> Path:
     return config_path
 
 
-def _watch_session_root(*, run_dir: Path | None, runtime_dir: Path | None) -> Path:
+def _watch_session_root(
+    *,
+    run_dir: Path | None,
+    runtime_dir: Path | None,
+    session_name: str | None,
+) -> Path:
     if run_dir is not None:
-        return run_dir.expanduser().resolve() / RUN_LAYOUT.watch_rootname
-    if runtime_dir is not None:
-        return runtime_dir.expanduser().resolve().parent / RUN_LAYOUT.watch_rootname
-    return Path("local/watch").expanduser().resolve()
+        root = run_dir.expanduser().resolve() / RUN_LAYOUT.watch_rootname
+    elif runtime_dir is not None:
+        root = runtime_dir.expanduser().resolve().parent / RUN_LAYOUT.watch_rootname
+    else:
+        root = Path("local/watch").expanduser().resolve()
+    if not session_name:
+        return root
+    return root / _safe_watch_session_name(session_name)
+
+
+def _safe_watch_session_name(session_name: str) -> str:
+    safe = "".join(
+        char if char.isalnum() or char in {"-", "_", "."} else "_" for char in session_name.strip()
+    ).strip("._-")
+    return safe or "session"
 
 
 def _next_run_dir(output_root: Path, run_name: str) -> Path:

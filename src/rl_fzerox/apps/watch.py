@@ -22,6 +22,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 policy_artifact=args.policy_artifact,
                 manager_db_path=args.manager_db_path,
                 managed_run_id=args.managed_run_id,
+                session_name=args.viewer_lease_id,
                 overrides=args.overrides,
             )
         except (RuntimeError, ValueError) as exc:

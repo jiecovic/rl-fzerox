@@ -35,6 +35,7 @@ def resolve_watch_app_config(
     policy_artifact: Literal["latest", "best", "final"] | None,
     manager_db_path: Path | None,
     managed_run_id: str | None,
+    session_name: str | None = None,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
     """Resolve watch config from the canonical managed or saved-run surfaces."""
@@ -118,6 +119,7 @@ def resolve_watch_app_config(
     return materialize_watch_session_config(
         config,
         run_dir=config.watch.policy_run_dir,
+        session_name=session_name,
     )
 
 

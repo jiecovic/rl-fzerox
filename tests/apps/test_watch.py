@@ -115,6 +115,7 @@ def test_watch_clears_owned_viewer_lease_on_exit(
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
+    captured_materialize_kwargs: dict[str, object] = {}
 
     monkeypatch.setattr(
         "rl_fzerox.apps.watch_cli.resolve.load_train_run_config_for_watch",
@@ -122,7 +123,7 @@ def test_watch_clears_owned_viewer_lease_on_exit(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch_cli.resolve.materialize_watch_session_config",
-        lambda config, *, run_dir: config,
+        lambda config, **kwargs: (captured_materialize_kwargs.update(kwargs) or config),
     )
     monkeypatch.setattr("rl_fzerox.apps.watch.run_viewer", lambda _config: None)
 
@@ -138,6 +139,7 @@ def test_watch_clears_owned_viewer_lease_on_exit(
     )
 
     assert store.get_viewer_lease(lease_id) is None
+    assert captured_materialize_kwargs["session_name"] == lease_id
 
 
 def test_watch_allows_run_dir_overrides_without_config(
@@ -169,7 +171,7 @@ def test_watch_allows_run_dir_overrides_without_config(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch_cli.resolve.materialize_watch_session_config",
-        lambda config, *, run_dir: config,
+        lambda config, **_kwargs: config,
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch.run_viewer",
@@ -275,7 +277,7 @@ def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch_cli.resolve.materialize_watch_session_config",
-        lambda config, *, run_dir: config,
+        lambda config, **_kwargs: config,
     )
 
     config = resolve_watch_app_config(
@@ -337,7 +339,7 @@ def test_watch_allows_run_dir_without_config(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch_cli.resolve.materialize_watch_session_config",
-        lambda config, *, run_dir: config,
+        lambda config, **_kwargs: config,
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch.run_viewer",
@@ -390,7 +392,7 @@ def test_watch_cli_overrides_apply_after_run_manifest(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch_cli.resolve.materialize_watch_session_config",
-        lambda config, *, run_dir: config,
+        lambda config, **_kwargs: config,
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch.run_viewer",

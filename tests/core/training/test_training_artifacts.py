@@ -1452,9 +1452,24 @@ def test_build_watch_session_paths_uses_run_local_watch_root(tmp_path: Path) -> 
         session_name="session-001",
     )
 
-    assert session_paths.session_dir == run_dir / "watch"
-    assert session_paths.runtime_dir == run_dir / "watch" / "runtime"
-    assert session_paths.baseline_state_path == run_dir / "watch" / "baseline.state"
+    assert session_paths.session_dir == run_dir / "watch" / "session-001"
+    assert session_paths.runtime_dir == run_dir / "watch" / "session-001" / "runtime"
+    assert session_paths.baseline_state_path == (
+        run_dir / "watch" / "session-001" / "baseline.state"
+    )
+
+
+def test_build_watch_session_paths_sanitizes_session_name(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+
+    session_paths = build_watch_session_paths(
+        run_dir=run_dir,
+        runtime_dir=None,
+        baseline_state_path=None,
+        session_name="run_watch:run/id:latest",
+    )
+
+    assert session_paths.session_dir == run_dir / "watch" / "run_watch_run_id_latest"
 
 
 def test_materialize_watch_session_config_isolates_runtime_and_baseline(
@@ -1485,10 +1500,10 @@ def test_materialize_watch_session_config_isolates_runtime_and_baseline(
     )
 
     assert materialized.emulator.runtime_dir == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "runtime"
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "runtime"
     )
     assert materialized.emulator.baseline_state_path == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "baseline.state"
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "baseline.state"
     )
     assert materialized.emulator.baseline_state_path is not None
     assert materialized.emulator.baseline_state_path.read_bytes() == b"baseline"
