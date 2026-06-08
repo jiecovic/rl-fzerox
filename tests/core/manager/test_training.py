@@ -800,34 +800,79 @@ def test_manager_training_bridge_adds_generated_x_cup_entries(
     assert {entry.generated_course_generation for entry in entries} == {1}
 
 
-def test_manager_config_omits_gp_difficulty_outside_gp_race() -> None:
+def test_manager_training_bridge_separates_generated_x_cup_difficulty_variants(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.tracks.race_mode = "gp_race"
+    config.tracks.gp_difficulties = ("novice", "expert")
+    config.tracks.include_x_cup = True
+    config.tracks.x_cup_course_count = 2
+    config.tracks.selected_course_ids = ()
+
+    train_config = build_managed_train_app_config(
+        ManagedRunConfig.model_validate(config.model_dump(mode="python")),
+        run_id="bridge-x-cup-difficulties",
+        run_dir=tmp_path / "runs" / "bridge-x-cup-difficulties_0001",
+    )
+
+    entries = train_config.env.track_sampling.entries
+    assert len(entries) == 4
+    assert {entry.gp_difficulty for entry in entries} == {"novice", "expert"}
+    assert {entry.runtime_course_key for entry in entries} == {
+        "x_cup_slot_1_novice",
+        "x_cup_slot_1_expert",
+        "x_cup_slot_2_novice",
+        "x_cup_slot_2_expert",
+    }
+    assert len({entry.course_id for entry in entries}) == 4
+
+
+def test_manager_config_omits_gp_difficulties_outside_gp_race() -> None:
     config = default_managed_run_config()
 
     dumped = config.model_dump(mode="json")
 
     assert dumped["tracks"]["race_mode"] == "time_attack"
-    assert "gp_difficulty" not in dumped["tracks"]
+    assert "gp_difficulties" not in dumped["tracks"]
 
 
-def test_manager_training_bridge_projects_configured_gp_difficulty(
+def test_manager_config_accepts_legacy_gp_difficulty() -> None:
+    config = ManagedRunConfig.model_validate(
+        {
+            **default_managed_run_config().model_dump(mode="json"),
+            "tracks": {
+                **default_managed_run_config().tracks.model_dump(mode="json"),
+                "race_mode": "gp_race",
+                "gp_difficulty": "expert",
+            },
+        }
+    )
+
+    assert config.tracks.gp_difficulties == ("expert",)
+    assert "gp_difficulty" not in config.model_dump(mode="json")["tracks"]
+
+
+def test_manager_training_bridge_projects_configured_gp_difficulties(
     tmp_path: Path,
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.tracks.race_mode = "gp_race"
-    config.tracks.gp_difficulty = "master"
+    config.tracks.gp_difficulties = ("standard", "master")
     config.tracks.selected_course_ids = ("mute_city",)
 
     train_config = build_managed_train_app_config(
-        config,
-        run_id="bridge-gp-master",
-        run_dir=tmp_path / "runs" / "bridge-gp-master_0001",
+        ManagedRunConfig.model_validate(config.model_dump(mode="python")),
+        run_id="bridge-gp-pool",
+        run_dir=tmp_path / "runs" / "bridge-gp-pool_0001",
     )
 
     entries = train_config.env.track_sampling.entries
-    assert len(entries) == 1
-    assert entries[0].mode == "gp_race"
-    assert entries[0].gp_difficulty == "master"
-    assert entries[0].source_gp_difficulty == "master"
+    assert len(entries) == 2
+    assert {entry.mode for entry in entries} == {"gp_race"}
+    assert {entry.gp_difficulty for entry in entries} == {"standard", "master"}
+    assert {entry.source_gp_difficulty for entry in entries} == {"standard", "master"}
+    assert {entry.course_id for entry in entries} == {"mute_city"}
 
 
 def test_manager_training_bridge_supports_weight_fork_from_parent_run(

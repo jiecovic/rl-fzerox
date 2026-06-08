@@ -8,9 +8,11 @@ export interface FixedEnvAssignmentSummary {
 }
 
 export function fixedEnvAssignmentSummary(config: ManagedRunConfig): FixedEnvAssignmentSummary {
+  const xCupDifficultyMultiplier =
+    config.tracks.race_mode === "gp_race" ? Math.max(1, config.tracks.gp_difficulties.length) : 1;
   const activeCourseCount =
     config.tracks.selected_course_ids.length +
-    (config.tracks.include_x_cup ? config.tracks.x_cup_course_count : 0);
+    (config.tracks.include_x_cup ? config.tracks.x_cup_course_count * xCupDifficultyMultiplier : 0);
   const numEnvs = config.train.num_envs;
   if (activeCourseCount <= 0) {
     return {

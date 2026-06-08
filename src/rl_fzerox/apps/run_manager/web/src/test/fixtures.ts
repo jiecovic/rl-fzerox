@@ -8,6 +8,11 @@ import type {
   ManagedSaveGame,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
+import {
+  configMetadataSchema,
+  managedRunConfigSchema,
+  policyArchitecturePreviewSchema,
+} from "@/shared/api/contract";
 import generatedFixtures from "@/test/generated/manager-fixtures.json";
 
 type GeneratedFixtures = {
@@ -16,7 +21,11 @@ type GeneratedFixtures = {
   policy_preview: PolicyArchitecturePreview;
 };
 
-const generated = generatedFixtures as GeneratedFixtures;
+const generated: GeneratedFixtures = {
+  config_metadata: configMetadataSchema.parse(generatedFixtures.config_metadata),
+  managed_run_config: managedRunConfigSchema.parse(generatedFixtures.managed_run_config),
+  policy_preview: policyArchitecturePreviewSchema.parse(generatedFixtures.policy_preview),
+};
 
 export const managedRunConfigFixture: ManagedRunConfig = generated.managed_run_config;
 export const configMetadataFixture: ConfigMetadata = generated.config_metadata;

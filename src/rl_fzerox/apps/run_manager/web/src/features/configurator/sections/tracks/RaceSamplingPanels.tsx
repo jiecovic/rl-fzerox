@@ -2,11 +2,13 @@
 import { ConfigGrid } from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import { IntegerField, NumberField } from "@/features/configurator/fields";
-import { ChoiceStrip } from "@/features/configurator/sections/tracks/ChoiceStrip";
+import {
+  ChoiceStrip,
+  ToggleChoiceStrip,
+} from "@/features/configurator/sections/tracks/ChoiceStrip";
 import { fixedEnvAssignmentSummary } from "@/features/configurator/sections/tracks/fixedEnvAssignment";
 import {
   formatTrackOptionLabel,
-  GP_DIFFICULTY_DESCRIPTIONS,
   RACE_MODE_DESCRIPTIONS,
   TRACK_SAMPLING_DESCRIPTIONS,
 } from "@/features/configurator/sections/tracks/options";
@@ -26,7 +28,7 @@ interface RaceModePanelProps {
 
 interface GpDifficultyPanelProps {
   config: ManagedRunConfig;
-  defaultGpDifficulty: GpDifficulty;
+  defaultGpDifficulties: readonly GpDifficulty[];
   metadata: ConfigMetadata;
   updateTracks: TrackUpdate;
 }
@@ -56,10 +58,10 @@ interface CourseSamplingPanelProps {
 export function RaceSetupPanels({
   config,
   defaultConfig,
-  defaultGpDifficulty,
+  defaultGpDifficulties,
   metadata,
   updateTracks,
-}: RaceModePanelProps & { defaultGpDifficulty: GpDifficulty }) {
+}: RaceModePanelProps & { defaultGpDifficulties: readonly GpDifficulty[] }) {
   return (
     <ConfigGrid columns="two" className="items-stretch">
       <RaceModePanel
@@ -70,7 +72,7 @@ export function RaceSetupPanels({
       />
       <GpDifficultyPanel
         config={config}
-        defaultGpDifficulty={defaultGpDifficulty}
+        defaultGpDifficulties={defaultGpDifficulties}
         metadata={metadata}
         updateTracks={updateTracks}
       />
@@ -109,24 +111,30 @@ export function RaceModePanel({
 
 export function GpDifficultyPanel({
   config,
-  defaultGpDifficulty,
+  defaultGpDifficulties,
   metadata,
   updateTracks,
 }: GpDifficultyPanelProps) {
+  const selectedDifficulties = selectedGpDifficulties(
+    config.tracks.gp_difficulties,
+    defaultGpDifficulties,
+  );
+  const selectedLabels = metadata.gp_difficulties
+    .filter((option) => selectedDifficulties.includes(option.value as GpDifficulty))
+    .map((option) => option.label);
   return (
     <ConfigPanel
-      onReset={() => updateTracks({ gp_difficulty: defaultGpDifficulty })}
-      title="GP difficulty"
+      onReset={() => updateTracks({ gp_difficulties: [...defaultGpDifficulties] })}
+      title="GP difficulties"
     >
-      <ChoiceStrip
+      <ToggleChoiceStrip
         description={
           config.tracks.race_mode === "gp_race"
-            ? (GP_DIFFICULTY_DESCRIPTIONS[config.tracks.gp_difficulty ?? defaultGpDifficulty] ??
-              GP_DIFFICULTY_DESCRIPTIONS.novice)
+            ? selectedLabels.join(", ")
             : "Only used when GP race mode is selected."
         }
         options={metadata.gp_difficulties.map((option) => ({
-          active: (config.tracks.gp_difficulty ?? defaultGpDifficulty) === option.value,
+          active: selectedDifficulties.includes(option.value as GpDifficulty),
           disabled: config.tracks.race_mode !== "gp_race",
           key: option.value,
           label: option.label,
@@ -134,14 +142,38 @@ export function GpDifficultyPanel({
             config.tracks.race_mode !== "gp_race"
               ? "GP difficulty is only applied to GP race baselines."
               : undefined,
-          onClick: () =>
-            updateTracks({
-              gp_difficulty: option.value as GpDifficulty,
-            }),
+          onClick: () => {
+            const difficulty = option.value as GpDifficulty;
+            const nextDifficulties = toggleGpDifficulty(selectedDifficulties, difficulty);
+            if (nextDifficulties === null) {
+              return;
+            }
+            updateTracks({ gp_difficulties: nextDifficulties });
+          },
         }))}
       />
     </ConfigPanel>
   );
+}
+
+function selectedGpDifficulties(
+  configured: readonly GpDifficulty[],
+  defaults: readonly GpDifficulty[],
+) {
+  return configured.length > 0 ? configured : defaults;
+}
+
+function toggleGpDifficulty(
+  currentDifficulties: readonly GpDifficulty[],
+  difficulty: GpDifficulty,
+) {
+  if (currentDifficulties.includes(difficulty)) {
+    if (currentDifficulties.length === 1) {
+      return null;
+    }
+    return currentDifficulties.filter((currentDifficulty) => currentDifficulty !== difficulty);
+  }
+  return [...currentDifficulties, difficulty];
 }
 
 export function CourseSamplingPanel({

@@ -59,61 +59,18 @@ def _runtime_track_sampling_mode(config: ManagedRunConfig) -> str:
 def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]:
     source_vehicle_id = config.vehicle.selected_vehicle_ids[0]
     source_engine = _source_engine_setting(config)
+    gp_difficulties = _gp_difficulties(config)
     entries: list[dict[str, object]] = []
     for course_id in config.tracks.selected_course_ids:
         course_ref = _course_ref(course_id)
-        for vehicle_id in config.vehicle.selected_vehicle_ids:
-            entries.append(
-                _track_sampling_entry(
-                    course_id=course_id,
-                    course_ref=course_ref,
-                    race_mode=config.tracks.race_mode,
-                    gp_difficulty=(
-                        config.tracks.gp_difficulty
-                        if config.tracks.race_mode == "gp_race"
-                        else None
-                    ),
-                    target_vehicle_id=vehicle_id,
-                    source_vehicle_id=source_vehicle_id,
-                    source_engine_setting_id=source_engine.id,
-                    source_engine_setting_raw_value=source_engine.raw_value,
-                    fixed_engine_setting_raw_value=(
-                        config.vehicle.engine_setting_raw_value
-                        if config.vehicle.engine_mode == "fixed"
-                        else None
-                    ),
-                    random_engine_min_raw_value=(
-                        config.vehicle.engine_setting_min_raw_value
-                        if config.vehicle.engine_mode == "random_range"
-                        else None
-                    ),
-                    random_engine_max_raw_value=(
-                        config.vehicle.engine_setting_max_raw_value
-                        if config.vehicle.engine_mode == "random_range"
-                        else None
-                    ),
-                )
-            )
-    if config.tracks.include_x_cup:
-        for x_cup_index in range(config.tracks.x_cup_course_count):
-            generated_course = generated_x_cup_course_identity(
-                master_seed=config.seed,
-                slot=x_cup_index,
-                generation=1,
-                gp_difficulty=(
-                    default_gp_difficulty()
-                    if config.tracks.gp_difficulty is None
-                    else config.tracks.gp_difficulty
-                ),
-            )
+        for gp_difficulty in gp_difficulties:
             for vehicle_id in config.vehicle.selected_vehicle_ids:
                 entries.append(
                     _track_sampling_entry(
-                        course_id=generated_course.course_id,
-                        runtime_course_key=generated_x_cup_slot_key(generated_course.slot),
-                        course_ref=None,
+                        course_id=course_id,
+                        course_ref=course_ref,
                         race_mode=config.tracks.race_mode,
-                        gp_difficulty=config.tracks.gp_difficulty,
+                        gp_difficulty=gp_difficulty,
                         target_vehicle_id=vehicle_id,
                         source_vehicle_id=source_vehicle_id,
                         source_engine_setting_id=source_engine.id,
@@ -133,19 +90,79 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                             if config.vehicle.engine_mode == "random_range"
                             else None
                         ),
-                        course_index=X_CUP_COURSE.course_index,
-                        course_name=generated_course.display_name,
-                        display_name=generated_course.display_name,
-                        source_course_index=X_CUP_COURSE.course_index,
-                        generated_course_kind=X_CUP_COURSE.generated_kind,
-                        generated_course_seed=generated_course.seed,
-                        generated_course_hash=generated_course.course_hash,
-                        generated_course_slot=generated_course.slot,
-                        generated_course_generation=generated_course.generation,
-                        log_per_course=False,
                     )
                 )
+    if config.tracks.include_x_cup:
+        for x_cup_index in range(config.tracks.x_cup_course_count):
+            for gp_difficulty in gp_difficulties:
+                generated_course = generated_x_cup_course_identity(
+                    master_seed=config.seed,
+                    slot=x_cup_index,
+                    generation=1,
+                    gp_difficulty=gp_difficulty or default_gp_difficulty(),
+                )
+                for vehicle_id in config.vehicle.selected_vehicle_ids:
+                    entries.append(
+                        _track_sampling_entry(
+                            course_id=generated_course.course_id,
+                            runtime_course_key=_x_cup_runtime_course_key(
+                                slot=generated_course.slot,
+                                gp_difficulty=gp_difficulty,
+                                gp_difficulty_count=len(gp_difficulties),
+                            ),
+                            course_ref=None,
+                            race_mode=config.tracks.race_mode,
+                            gp_difficulty=gp_difficulty,
+                            target_vehicle_id=vehicle_id,
+                            source_vehicle_id=source_vehicle_id,
+                            source_engine_setting_id=source_engine.id,
+                            source_engine_setting_raw_value=source_engine.raw_value,
+                            fixed_engine_setting_raw_value=(
+                                config.vehicle.engine_setting_raw_value
+                                if config.vehicle.engine_mode == "fixed"
+                                else None
+                            ),
+                            random_engine_min_raw_value=(
+                                config.vehicle.engine_setting_min_raw_value
+                                if config.vehicle.engine_mode == "random_range"
+                                else None
+                            ),
+                            random_engine_max_raw_value=(
+                                config.vehicle.engine_setting_max_raw_value
+                                if config.vehicle.engine_mode == "random_range"
+                                else None
+                            ),
+                            course_index=X_CUP_COURSE.course_index,
+                            course_name=generated_course.display_name,
+                            display_name=generated_course.display_name,
+                            source_course_index=X_CUP_COURSE.course_index,
+                            generated_course_kind=X_CUP_COURSE.generated_kind,
+                            generated_course_seed=generated_course.seed,
+                            generated_course_hash=generated_course.course_hash,
+                            generated_course_slot=generated_course.slot,
+                            generated_course_generation=generated_course.generation,
+                            log_per_course=False,
+                        )
+                    )
     return entries
+
+
+def _gp_difficulties(config: ManagedRunConfig) -> tuple[str | None, ...]:
+    if config.tracks.race_mode != "gp_race":
+        return (None,)
+    return tuple(config.tracks.gp_difficulties) or (default_gp_difficulty(),)
+
+
+def _x_cup_runtime_course_key(
+    *,
+    slot: int,
+    gp_difficulty: str | None,
+    gp_difficulty_count: int,
+) -> str:
+    slot_key = generated_x_cup_slot_key(slot)
+    if gp_difficulty_count <= 1 or gp_difficulty is None:
+        return slot_key
+    return f"{slot_key}_{gp_difficulty}"
 
 
 def _track_sampling_entry(

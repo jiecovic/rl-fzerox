@@ -22,7 +22,10 @@ import type {
 } from "@/features/configurator/sections/tracks/types";
 
 export function TracksSection({ config, defaultConfig, metadata, setConfig }: TracksSectionProps) {
-  const defaultGpDifficulty: GpDifficulty = defaultConfig.tracks.gp_difficulty ?? "novice";
+  const defaultGpDifficulties: GpDifficulty[] =
+    defaultConfig.tracks.gp_difficulties.length > 0
+      ? [...defaultConfig.tracks.gp_difficulties]
+      : ["novice"];
   const allCourseIds = useMemo(() => allBuiltInCourseIds(metadata), [metadata]);
   const defaultCourseIds = useMemo(
     () => defaultSelectedCourseIds(metadata, allCourseIds),
@@ -43,11 +46,11 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
       ...tracks,
       x_cup_auto_regeneration: { ...tracks.x_cup_auto_regeneration },
     };
-    if (nextTracks.race_mode === "gp_race" && nextTracks.gp_difficulty == null) {
-      nextTracks.gp_difficulty = defaultGpDifficulty;
+    if (nextTracks.race_mode === "gp_race" && nextTracks.gp_difficulties.length === 0) {
+      nextTracks.gp_difficulties = defaultGpDifficulties;
     }
     if (nextTracks.race_mode !== "gp_race") {
-      nextTracks.gp_difficulty = null;
+      nextTracks.gp_difficulties = [];
       nextTracks.include_x_cup = false;
       if (nextTracks.selected_course_ids.length === 0) {
         nextTracks.selected_course_ids = defaultCourseIds;
@@ -170,7 +173,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
       <RaceSetupPanels
         config={config}
         defaultConfig={defaultConfig}
-        defaultGpDifficulty={defaultGpDifficulty}
+        defaultGpDifficulties={defaultGpDifficulties}
         metadata={metadata}
         updateTracks={updateTracks}
       />

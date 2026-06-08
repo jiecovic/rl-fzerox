@@ -32,6 +32,12 @@ def built_in_course_id_set() -> frozenset[str]:
     return frozenset(course.id for course in BUILT_IN_COURSES)
 
 
+def default_gp_difficulties() -> tuple[GpDifficulty, ...]:
+    """Return the default GP difficulty pool."""
+
+    return (default_gp_difficulty(),)
+
+
 class ManagedXCupAutoRegenerationConfig(BaseModel):
     """Manager-owned policy for rotating solved generated X Cup slots."""
 
@@ -70,7 +76,7 @@ class ManagedTracksConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     race_mode: RaceMode = "time_attack"
-    gp_difficulty: GpDifficulty | None = None
+    gp_difficulties: tuple[GpDifficulty, ...] = Field(default_factory=default_gp_difficulties)
     include_x_cup: bool = False
     x_cup_course_count: int = Field(
         default=X_CUP_COURSE.default_generated_count,
@@ -95,21 +101,34 @@ class ManagedTracksConfig(BaseModel):
     deficit_budget_weight_update_rollouts: int = Field(default=20, ge=1)
     selected_course_ids: tuple[str, ...] = Field(default_factory=default_selected_course_ids)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_gp_difficulty(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        values: dict[str, object] = dict(data)
+        legacy_difficulty = values.pop("gp_difficulty", None)
+        if values.get("gp_difficulties") is None:
+            values.pop("gp_difficulties", None)
+        if legacy_difficulty is not None and "gp_difficulties" not in values:
+            values["gp_difficulties"] = (legacy_difficulty,)
+        return values
+
     def active_course_count(self) -> int:
         """Return distinct reset targets exposed to course sampling."""
 
-        return len(self.selected_course_ids) + (
-            self.x_cup_course_count if self.include_x_cup else 0
-        )
+        return len(self.selected_course_ids) + self._active_x_cup_course_count()
 
     @model_validator(mode="after")
     def _validate_selected_course_ids(self) -> ManagedTracksConfig:
         if self.race_mode != "gp_race":
-            self.gp_difficulty = None
+            self.gp_difficulties = ()
             self.include_x_cup = False
             self.x_cup_auto_regeneration.enabled = False
-        elif self.gp_difficulty is None:
-            self.gp_difficulty = default_gp_difficulty()
+        else:
+            self.gp_difficulties = _unique_gp_difficulties(
+                self.gp_difficulties or default_gp_difficulties()
+            )
         if self.include_x_cup and self.race_mode != "gp_race":
             raise ValueError("tracks.include_x_cup=true requires tracks.race_mode=gp_race")
         if self.x_cup_auto_regeneration.enabled and not self.include_x_cup:
@@ -137,5 +156,23 @@ class ManagedTracksConfig(BaseModel):
     ) -> dict[str, object]:
         data = handler(self)
         if self.race_mode != "gp_race":
-            data.pop("gp_difficulty", None)
+            data.pop("gp_difficulties", None)
         return data
+
+    def _active_x_cup_course_count(self) -> int:
+        if not self.include_x_cup:
+            return 0
+        return self.x_cup_course_count * max(1, len(self.gp_difficulties))
+
+
+def _unique_gp_difficulties(
+    difficulties: tuple[GpDifficulty, ...],
+) -> tuple[GpDifficulty, ...]:
+    seen: set[GpDifficulty] = set()
+    ordered: list[GpDifficulty] = []
+    for difficulty in difficulties:
+        if difficulty in seen:
+            continue
+        seen.add(difficulty)
+        ordered.append(difficulty)
+    return tuple(ordered)

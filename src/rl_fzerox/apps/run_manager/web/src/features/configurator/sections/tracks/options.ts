@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/tracks/options.ts
-import type { GpDifficulty, TracksConfig } from "@/features/configurator/sections/tracks/types";
+import type { TracksConfig } from "@/features/configurator/sections/tracks/types";
 
 export const X_CUP = {
   id: "x",
@@ -9,13 +9,6 @@ export const X_CUP = {
 export const RACE_MODE_DESCRIPTIONS: Record<TracksConfig["race_mode"], string> = {
   time_attack: "Single-course time-trial episodes.",
   gp_race: "Grand Prix race rules across the selected pool.",
-};
-
-export const GP_DIFFICULTY_DESCRIPTIONS: Record<GpDifficulty, string> = {
-  novice: "Lightest GP difficulty and the current default.",
-  standard: "Standard GP AI and race pressure.",
-  expert: "More aggressive GP field behavior.",
-  master: "Highest GP difficulty tier.",
 };
 
 export const TRACK_SAMPLING_DESCRIPTIONS: Record<TracksConfig["sampling_mode"], string> = {

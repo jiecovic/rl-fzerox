@@ -89,33 +89,67 @@ const trainConfigSchema = z.object({
   recent_checkpoint_limit: z.number().int().positive().nullable(),
 });
 
-const tracksConfigSchema = z.object({
-  race_mode: raceModeSchema,
-  gp_difficulty: gpDifficultySchema.nullable().optional(),
-  include_x_cup: z.boolean(),
-  x_cup_course_count: z.number().int().positive(),
-  x_cup_auto_regeneration: z.object({
-    enabled: z.boolean(),
-    completion_threshold: z.number().min(0).max(1),
-    min_episodes: z.number().int().positive(),
-    max_episodes: z.number().int().positive().nullable(),
-    ema_alpha: z.number().gt(0).max(1),
-  }),
-  sampling_mode: trackSamplingModeSchema,
-  step_balance_update_episodes: z.number().int().positive(),
-  step_balance_ema_alpha: z.number().gt(0).max(1),
-  step_balance_max_weight_scale: z.number().min(1),
-  adaptive_step_balance_completion_weight: z.number().nonnegative(),
-  adaptive_step_balance_target_completion: z.number().min(0).max(1),
-  adaptive_step_balance_min_confidence_episodes: z.number().int().positive(),
-  adaptive_step_balance_confidence_scale: z.number().min(1),
-  deficit_budget_uniform_fraction: z.number().min(0).max(1),
-  deficit_budget_min_weight: z.number().positive(),
-  deficit_budget_max_weight: z.number().positive(),
-  deficit_budget_ema_alpha: z.number().gt(0).max(1),
-  deficit_budget_weight_update_rollouts: z.number().int().positive(),
-  selected_course_ids: z.array(z.string()),
-});
+type GpDifficulty = z.infer<typeof gpDifficultySchema>;
+type RaceMode = z.infer<typeof raceModeSchema>;
+
+function normalizedGpDifficulties({
+  gpDifficulty,
+  gpDifficulties,
+  raceMode,
+}: {
+  gpDifficulty?: GpDifficulty | null;
+  gpDifficulties?: GpDifficulty[];
+  raceMode: RaceMode;
+}) {
+  if (raceMode !== "gp_race") {
+    return [];
+  }
+  const configured =
+    gpDifficulties !== undefined && gpDifficulties.length > 0
+      ? gpDifficulties
+      : gpDifficulty != null
+        ? [gpDifficulty]
+        : ["novice"];
+  return [...new Set(configured)];
+}
+
+const tracksConfigSchema = z
+  .object({
+    race_mode: raceModeSchema,
+    gp_difficulty: gpDifficultySchema.nullable().optional(),
+    gp_difficulties: z.array(gpDifficultySchema).optional(),
+    include_x_cup: z.boolean(),
+    x_cup_course_count: z.number().int().positive(),
+    x_cup_auto_regeneration: z.object({
+      enabled: z.boolean(),
+      completion_threshold: z.number().min(0).max(1),
+      min_episodes: z.number().int().positive(),
+      max_episodes: z.number().int().positive().nullable(),
+      ema_alpha: z.number().gt(0).max(1),
+    }),
+    sampling_mode: trackSamplingModeSchema,
+    step_balance_update_episodes: z.number().int().positive(),
+    step_balance_ema_alpha: z.number().gt(0).max(1),
+    step_balance_max_weight_scale: z.number().min(1),
+    adaptive_step_balance_completion_weight: z.number().nonnegative(),
+    adaptive_step_balance_target_completion: z.number().min(0).max(1),
+    adaptive_step_balance_min_confidence_episodes: z.number().int().positive(),
+    adaptive_step_balance_confidence_scale: z.number().min(1),
+    deficit_budget_uniform_fraction: z.number().min(0).max(1),
+    deficit_budget_min_weight: z.number().positive(),
+    deficit_budget_max_weight: z.number().positive(),
+    deficit_budget_ema_alpha: z.number().gt(0).max(1),
+    deficit_budget_weight_update_rollouts: z.number().int().positive(),
+    selected_course_ids: z.array(z.string()),
+  })
+  .transform(({ gp_difficulty, gp_difficulties, ...tracks }) => ({
+    ...tracks,
+    gp_difficulties: normalizedGpDifficulties({
+      gpDifficulty: gp_difficulty,
+      gpDifficulties: gp_difficulties,
+      raceMode: tracks.race_mode,
+    }),
+  }));
 
 const vehicleConfigSchema = z
   .object({

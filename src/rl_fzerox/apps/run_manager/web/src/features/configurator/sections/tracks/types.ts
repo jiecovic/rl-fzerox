@@ -10,7 +10,7 @@ export interface TracksSectionProps {
 }
 
 export type BuiltInCourse = ConfigMetadata["built_in_courses"][number];
-export type GpDifficulty = NonNullable<ManagedRunConfig["tracks"]["gp_difficulty"]>;
+export type GpDifficulty = ManagedRunConfig["tracks"]["gp_difficulties"][number];
 export type TracksConfig = ManagedRunConfig["tracks"];
 export type TrackUpdate = (patch: Partial<TracksConfig>) => void;
 

@@ -350,7 +350,7 @@ describe("RunTrackPoolPanel", () => {
             tracks: {
               ...managedRunConfigFixture.tracks,
               race_mode: "gp_race",
-              gp_difficulty: "novice",
+              gp_difficulties: ["novice"],
               include_x_cup: true,
               x_cup_course_count: 2,
               sampling_mode: "step_balanced",
