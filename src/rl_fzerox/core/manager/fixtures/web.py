@@ -1,5 +1,11 @@
 # src/rl_fzerox/core/manager/fixtures/web.py
-"""Export frontend test fixtures from the canonical manager backend surface."""
+"""Export frontend test fixtures from the canonical manager backend surface.
+
+Run-manager web tests and default UI state read these generated fixtures. When
+backend default values change, regenerate them with ``npm run sync-fixtures`` in
+``src/rl_fzerox/apps/run_manager/web`` so the frontend keeps the backend as the
+single source of truth.
+"""
 
 from __future__ import annotations
 
@@ -74,8 +80,8 @@ def main() -> None:
     if check_web_test_fixtures():
         return
     raise SystemExit(
-        "run-manager frontend fixtures are stale; run npm run sync-fixtures "
-        "--prefix src/rl_fzerox/apps/run_manager/web"
+        "run-manager frontend fixtures are stale; backend defaults changed, so "
+        "run npm run sync-fixtures --prefix src/rl_fzerox/apps/run_manager/web"
     )
 
 

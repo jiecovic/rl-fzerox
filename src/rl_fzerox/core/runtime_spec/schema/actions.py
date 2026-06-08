@@ -25,6 +25,7 @@ from pydantic import (
     model_validator,
 )
 
+from fzerox_emulator.control.spin import DEFAULT_SPIN_COOLDOWN_FRAMES
 from rl_fzerox.core.domain.action_adapters import ActionAdapterName
 from rl_fzerox.core.domain.action_values import (
     ActionMaskSpec,
@@ -272,7 +273,7 @@ class ActionConfig(BaseModel):
     mask_boost_when_airborne: bool = True
     boost_decision_interval_frames: PositiveInt = 1
     boost_request_lockout_frames: NonNegativeInt = 5
-    spin_cooldown_frames: NonNegativeInt = 8
+    spin_cooldown_frames: NonNegativeInt = DEFAULT_SPIN_COOLDOWN_FRAMES
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0

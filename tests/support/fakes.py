@@ -300,7 +300,7 @@ class SyntheticBackend:
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: object = "none",
-        spin_cooldown_frames: int = 8,
+        spin_cooldown_frames: int = 120,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -404,7 +404,7 @@ class SyntheticBackend:
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: object = "none",
-        spin_cooldown_frames: int = 8,
+        spin_cooldown_frames: int = 120,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -508,7 +508,7 @@ class SyntheticBackend:
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: object = "none",
-        spin_cooldown_frames: int = 8,
+        spin_cooldown_frames: int = 120,
     ) -> BackendMultiObservationStepResult:
         if len(observation_recipes) == 0:
             raise ValueError("At least one observation recipe is required")

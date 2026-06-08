@@ -21,7 +21,7 @@ from fzerox_emulator.base.results import (
     ResetState,
 )
 from fzerox_emulator.control import ControllerState, RaceControlState
-from fzerox_emulator.control.spin import SpinRequest
+from fzerox_emulator.control.spin import DEFAULT_SPIN_COOLDOWN_FRAMES, SpinRequest
 from fzerox_emulator.emulator.observations import ObservationRenderingMixin
 from fzerox_emulator.emulator.race_start import RaceStartMixin
 from fzerox_emulator.repeat import (
@@ -183,7 +183,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
-        spin_cooldown_frames: int = 8,
+        spin_cooldown_frames: int = DEFAULT_SPIN_COOLDOWN_FRAMES,
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
 
@@ -237,7 +237,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
-        spin_cooldown_frames: int = 8,
+        spin_cooldown_frames: int = DEFAULT_SPIN_COOLDOWN_FRAMES,
     ) -> BackendStepResult:
         """Execute one repeated watch step and return batched display images."""
 
@@ -284,7 +284,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
-        spin_cooldown_frames: int = 8,
+        spin_cooldown_frames: int = DEFAULT_SPIN_COOLDOWN_FRAMES,
     ) -> BackendMultiObservationStepResult:
         """Execute one repeated env step and return multiple observation views."""
 

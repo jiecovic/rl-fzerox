@@ -14,6 +14,7 @@ from pydantic import (
     model_validator,
 )
 
+from fzerox_emulator.control.spin import DEFAULT_SPIN_COOLDOWN_FRAMES
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
 from rl_fzerox.core.manager.run_spec.common import (
     ActionAxisMode,
@@ -58,7 +59,7 @@ class ManagedActionConfig(BaseModel):
     lean_initial_lockout_frames: NonNegativeInt = 0
     include_spin: bool = False
     enable_spin: bool = True
-    spin_cooldown_frames: NonNegativeInt = 8
+    spin_cooldown_frames: NonNegativeInt = DEFAULT_SPIN_COOLDOWN_FRAMES
     include_pitch: bool = True
     enable_pitch: bool = True
     pitch_mode: ActionAxisMode = "discrete"

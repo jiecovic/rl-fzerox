@@ -50,7 +50,7 @@ class ScriptedPolicyDriveBackend(SyntheticBackend):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: object = "none",
-        spin_cooldown_frames: int = 8,
+        spin_cooldown_frames: int = 120,
     ) -> BackendStepResult:
         _ = (
             action_repeat,

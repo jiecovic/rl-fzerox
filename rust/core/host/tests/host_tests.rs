@@ -278,7 +278,7 @@ fn repeated_step_config(
         terminate_on_energy_depleted: true,
         lean_timer_assist: false,
         spin_request: SpinRequest::None,
-        spin_cooldown_frames: 8,
+        spin_cooldown_frames: 120,
     }
 }
 

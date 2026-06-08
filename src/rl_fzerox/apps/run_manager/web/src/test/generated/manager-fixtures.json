@@ -1272,7 +1272,7 @@
       "pitch_buckets": 5,
       "pitch_deadzone": 0.1,
       "pitch_mode": "discrete",
-      "spin_cooldown_frames": 8,
+      "spin_cooldown_frames": 120,
       "steer_buckets": 7,
       "steering_mode": "continuous"
     },

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator.control.spin import SpinRequest
+from fzerox_emulator.control.spin import DEFAULT_SPIN_COOLDOWN_FRAMES, SpinRequest
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,4 +21,4 @@ class RepeatStepConfig:
     terminate_on_energy_depleted: bool
     lean_timer_assist: bool
     spin_request: SpinRequest = "none"
-    spin_cooldown_frames: int = 8
+    spin_cooldown_frames: int = DEFAULT_SPIN_COOLDOWN_FRAMES

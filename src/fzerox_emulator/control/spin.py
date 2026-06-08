@@ -7,6 +7,8 @@ from typing import Literal, TypeAlias
 
 SpinRequest: TypeAlias = Literal["none", "left", "right"]
 
+DEFAULT_SPIN_COOLDOWN_FRAMES = 120
+
 SPIN_REQUESTS: tuple[SpinRequest, ...] = ("none", "left", "right")
 
 
