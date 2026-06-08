@@ -244,8 +244,9 @@ class EngineStepAssembler:
             frames_run=step_result.summary.frames_run,
             gas_level=gas_level,
         )
+        spin_owns_lean = status.spin_macro_active or status.spin_macro_cooldown_frames > 0
         self.mask_controller.set_lean_allowed_values(
-            ((0,) if status.spin_macro_active else self.control_state.lean_action_mask_override()),
+            ((0,) if spin_owns_lean else self.control_state.lean_action_mask_override()),
         )
         self.mask_controller.set_spin_allowed_values(
             (0,) if status.spin_macro_active or status.spin_macro_cooldown_frames > 0 else None,
