@@ -43,12 +43,47 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     old_state_path = run_paths.baselines_dir / "old_x_cup.state"
     old_state_path.write_bytes(b"old")
     old_state_path.with_suffix(".json").write_text(
-        json.dumps({"materializer_mode": X_CUP_COURSE.materializer_mode}) + "\n",
+        json.dumps(
+            {
+                "materializer_mode": X_CUP_COURSE.materializer_mode,
+                "x_cup_course_hash": "old",
+                "x_cup_generation": 1,
+                "x_cup_seed": 1,
+                "x_cup_slot": 0,
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
-    stale_paths = tuple(
-        _write_x_cup_state(run_paths.baselines_dir / f"stale_{index}.state", timestamp=index)
-        for index in range(3)
+    oldest_stale_paths = _write_x_cup_state_group(
+        run_paths.baselines_dir,
+        "stale_oldest",
+        timestamp=1,
+        course_hash="stale-oldest",
+        seed=11,
+        slot=10,
+        generation=1,
+        count=2,
+    )
+    middle_stale_paths = _write_x_cup_state_group(
+        run_paths.baselines_dir,
+        "stale_middle",
+        timestamp=2,
+        course_hash="stale-middle",
+        seed=12,
+        slot=11,
+        generation=1,
+        count=2,
+    )
+    newest_stale_paths = _write_x_cup_state_group(
+        run_paths.baselines_dir,
+        "stale_newest",
+        timestamp=3,
+        course_hash="stale-newest",
+        seed=13,
+        slot=12,
+        generation=1,
+        count=2,
     )
     slot_key = generated_x_cup_slot_key(0)
     entry = TrackSamplingEntryConfig(
@@ -169,10 +204,11 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     saved = load_train_run_config(run_paths.run_dir)
     assert saved.env.track_sampling.entries[0].course_id == replacement.course_id
     assert saved.env.track_sampling.entries[0].runtime_course_key == slot_key
-    assert not stale_paths[0].exists()
-    assert not stale_paths[0].with_suffix(".json").exists()
-    assert not stale_paths[1].exists()
-    assert stale_paths[2].exists()
+    assert all(not path.exists() for path in oldest_stale_paths)
+    assert all(not path.with_suffix(".json").exists() for path in oldest_stale_paths)
+    assert all(not path.exists() for path in middle_stale_paths)
+    assert all(not path.with_suffix(".json").exists() for path in middle_stale_paths)
+    assert all(path.exists() for path in newest_stale_paths)
     assert old_state_path.exists()
     assert new_state_path.exists()
 
@@ -315,12 +351,33 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
     assert not (run_paths.run_dir / "train_config.yaml").exists()
 
 
-def _write_x_cup_state(path: Path, *, timestamp: int) -> Path:
-    path.write_bytes(b"stale")
-    path.with_suffix(".json").write_text(
-        json.dumps({"materializer_mode": X_CUP_COURSE.materializer_mode}) + "\n",
-        encoding="utf-8",
-    )
-    os.utime(path, (timestamp, timestamp))
-    os.utime(path.with_suffix(".json"), (timestamp, timestamp))
-    return path
+def _write_x_cup_state_group(
+    baselines_dir: Path,
+    prefix: str,
+    *,
+    timestamp: int,
+    course_hash: str,
+    seed: int,
+    slot: int,
+    generation: int,
+    count: int,
+) -> tuple[Path, ...]:
+    paths = tuple(baselines_dir / f"{prefix}_{index}.state" for index in range(count))
+    for path in paths:
+        path.write_bytes(b"stale")
+        path.with_suffix(".json").write_text(
+            json.dumps(
+                {
+                    "materializer_mode": X_CUP_COURSE.materializer_mode,
+                    "x_cup_course_hash": course_hash,
+                    "x_cup_generation": generation,
+                    "x_cup_seed": seed,
+                    "x_cup_slot": slot,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        os.utime(path, (timestamp, timestamp))
+        os.utime(path.with_suffix(".json"), (timestamp, timestamp))
+    return paths

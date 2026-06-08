@@ -182,15 +182,20 @@ class XCupRotationManager:
 
     def _prune_inactive_x_cup_baselines(self, track_sampling: TrackSamplingConfig) -> None:
         active_paths = _active_x_cup_state_paths(track_sampling.entries)
-        keep_count = len(active_paths) + X_CUP_COURSE.retention_policy.inactive_buffer_courses
-        inactive = _inactive_x_cup_baselines(
+        active_groups = _active_x_cup_baseline_groups(track_sampling.entries)
+        inactive_groups = _inactive_x_cup_baseline_groups(
             self._run_paths.baselines_dir,
+            active_groups=active_groups,
             active_paths=active_paths,
         )
-        delete_count = max(0, len(active_paths) + len(inactive) - keep_count)
-        for _, state_path, metadata_path in inactive[:delete_count]:
-            state_path.unlink(missing_ok=True)
-            metadata_path.unlink(missing_ok=True)
+        delete_count = max(
+            0,
+            len(inactive_groups) - X_CUP_COURSE.retention_policy.inactive_buffer_courses,
+        )
+        for _, artifacts in inactive_groups[:delete_count]:
+            for _, state_path, metadata_path in artifacts:
+                state_path.unlink(missing_ok=True)
+                metadata_path.unlink(missing_ok=True)
 
 
 def _generated_x_cup_entry_groups(
@@ -326,21 +331,70 @@ def _active_x_cup_state_paths(
     )
 
 
-def _inactive_x_cup_baselines(
+def _active_x_cup_baseline_groups(
+    entries: Sequence[TrackSamplingEntryConfig],
+) -> frozenset[tuple[object, ...]]:
+    return frozenset(
+        key
+        for entry in entries
+        if entry.generated_course_kind == X_CUP_COURSE.generated_kind
+        and (key := _x_cup_entry_group_key(entry)) is not None
+    )
+
+
+def _inactive_x_cup_baseline_groups(
     baselines_dir: Path,
     *,
+    active_groups: frozenset[tuple[object, ...]],
     active_paths: frozenset[Path],
-) -> list[tuple[float, Path, Path]]:
-    candidates: list[tuple[float, Path, Path]] = []
+) -> list[tuple[float, tuple[tuple[float, Path, Path], ...]]]:
+    groups: dict[tuple[object, ...], list[tuple[float, Path, Path]]] = {}
     for metadata_path in baselines_dir.glob("*.json"):
         metadata = _read_json_mapping(metadata_path)
         if metadata.get("materializer_mode") != X_CUP_COURSE.materializer_mode:
             continue
         state_path = metadata_path.with_suffix(".state").expanduser().resolve()
-        if state_path in active_paths or not state_path.is_file():
+        if not state_path.is_file():
             continue
-        candidates.append((state_path.stat().st_mtime, state_path, metadata_path))
+        group_key = _x_cup_metadata_group_key(metadata)
+        if group_key is None:
+            group_key = ("state_path", state_path)
+        if group_key in active_groups or state_path in active_paths:
+            continue
+        groups.setdefault(group_key, []).append(
+            (state_path.stat().st_mtime, state_path, metadata_path),
+        )
+    candidates = [
+        (min(item[0] for item in artifacts), tuple(sorted(artifacts, key=lambda item: item[0])))
+        for artifacts in groups.values()
+    ]
     return sorted(candidates, key=lambda candidate: candidate[0])
+
+
+def _x_cup_entry_group_key(entry: TrackSamplingEntryConfig) -> tuple[object, ...] | None:
+    if (
+        entry.generated_course_hash is None
+        or entry.generated_course_seed is None
+        or entry.generated_course_slot is None
+        or entry.generated_course_generation is None
+    ):
+        return None
+    return (
+        entry.generated_course_hash,
+        int(entry.generated_course_seed),
+        int(entry.generated_course_slot),
+        int(entry.generated_course_generation),
+    )
+
+
+def _x_cup_metadata_group_key(metadata: Mapping[str, object]) -> tuple[object, ...] | None:
+    course_hash = _optional_str(metadata.get("x_cup_course_hash"))
+    seed = _optional_int(metadata.get("x_cup_seed"))
+    slot = _optional_int(metadata.get("x_cup_slot"))
+    generation = _optional_int(metadata.get("x_cup_generation"))
+    if course_hash is None or seed is None or slot is None or generation is None:
+        return None
+    return (course_hash, seed, slot, generation)
 
 
 def _read_json_mapping(path: Path) -> Mapping[str, object]:
@@ -349,3 +403,13 @@ def _read_json_mapping(path: Path) -> Mapping[str, object]:
     except (OSError, json.JSONDecodeError):
         return {}
     return loaded if isinstance(loaded, dict) else {}
+
+
+def _optional_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value)
+
+
+def _optional_str(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None

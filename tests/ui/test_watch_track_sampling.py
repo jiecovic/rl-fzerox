@@ -124,20 +124,79 @@ def test_managed_watch_track_sampling_refresh_waits_for_run_local_baseline_artif
         managed_runs_root=tmp_path / "runs",
     )
     run.run_dir.mkdir(parents=True, exist_ok=True)
+    old_baseline_path = tmp_path / "old.state"
+    old_baseline_path.write_bytes(b"old")
     store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    config = _track_sampling_config(baseline_path=old_baseline_path)
     refresh = ManagedTrackSamplingRefresh.from_config(
         WatchAppConfig(
             emulator=EmulatorConfig(
                 core_path=_touched(tmp_path / "core.so"),
                 rom_path=_touched(tmp_path / "rom.n64"),
             ),
-            env=EnvConfig(track_sampling=_track_sampling_config()),
+            env=EnvConfig(track_sampling=config),
             watch=WatchConfig(manager_db_path=db_path, managed_run_id=run.id),
         )
     )
 
     assert refresh is not None
-    assert refresh.refreshed_config(_track_sampling_config(), force=True) is None
+    assert refresh.refreshed_config(config, force=True) is None
+    status = refresh.refresh_status(config, force=True)
+    assert status.refreshed_config is None
+    assert not status.ready_for_reset
+
+
+def test_managed_watch_track_sampling_refresh_repairs_missing_current_baseline(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="run",
+        name="Run",
+        config=_managed_x_cup_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    run.run_dir.mkdir(parents=True, exist_ok=True)
+    missing_baseline_path = tmp_path / "stale" / "x_cup_new.state"
+    baseline_path = run.run_dir / "baselines" / "x_cup_new.state"
+    baseline_path.parent.mkdir(parents=True)
+    baseline_path.write_bytes(b"state")
+    baseline_path.with_suffix(".json").write_text(
+        _x_cup_artifact_json(
+            course_hash="newhash",
+            course_seed=1234,
+            generation=3,
+            state_sha="new-state",
+        ),
+        encoding="utf-8",
+    )
+    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    config = _track_sampling_config(
+        entry_id="x_cup_new",
+        course_id="x_cup_new",
+        course_name="X Cup new",
+        course_hash="newhash",
+        course_seed=1234,
+        generation=3,
+        baseline_path=missing_baseline_path,
+    )
+    refresh = ManagedTrackSamplingRefresh.from_config(
+        WatchAppConfig(
+            emulator=EmulatorConfig(
+                core_path=_touched(tmp_path / "core.so"),
+                rom_path=_touched(tmp_path / "rom.n64"),
+            ),
+            env=EnvConfig(track_sampling=config),
+            watch=WatchConfig(manager_db_path=db_path, managed_run_id=run.id),
+        )
+    )
+
+    assert refresh is not None
+    refreshed = refresh.refreshed_config(config, force=True)
+
+    assert refreshed is not None
+    assert refreshed.entries[0].baseline_state_path == baseline_path.resolve()
 
 
 def _track_sampling_config(

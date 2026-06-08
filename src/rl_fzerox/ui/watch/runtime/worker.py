@@ -67,7 +67,10 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,
     _target_seconds,
 )
-from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
+from rl_fzerox.ui.watch.runtime.track_sampling import (
+    ManagedTrackSamplingRefresh,
+    missing_generated_x_cup_baseline_paths,
+)
 from rl_fzerox.ui.watch.runtime.visualization import (
     current_auxiliary_predictions as _current_auxiliary_predictions,
 )
@@ -233,8 +236,33 @@ def _run_simulation_loop(
                 env.set_locked_reset_course(None)
             return True
 
+        def track_sampling_ready_for_reset() -> bool:
+            nonlocal active_track_sampling
+            nonlocal persistent_locked_reset_course_id
+            nonlocal sequential_course_ids
+
+            if track_sampling_refresh is None:
+                return True
+            status = track_sampling_refresh.refresh_status(active_track_sampling, force=True)
+            if status.refreshed_config is not None:
+                env.set_track_sampling_config(status.refreshed_config)
+                active_track_sampling = status.refreshed_config
+                sequential_course_ids = _watch_sequential_course_ids(
+                    active_track_sampling.entries
+                )
+                if (
+                    persistent_locked_reset_course_id is not None
+                    and persistent_locked_reset_course_id not in sequential_course_ids
+                ):
+                    persistent_locked_reset_course_id = None
+                    env.set_locked_reset_course(None)
+            return status.ready_for_reset and not missing_generated_x_cup_baseline_paths(
+                active_track_sampling,
+            )
+
         while config.watch.episodes is None or episode < config.watch.episodes:
-            refresh_track_sampling(force=True)
+            while not track_sampling_ready_for_reset():
+                time.sleep(0.25)
             env.set_locked_reset_course(persistent_locked_reset_course_id)
             reset_seed = config.seed if episode == 0 else None
             raw_observation, raw_info = env.reset(seed=reset_seed)

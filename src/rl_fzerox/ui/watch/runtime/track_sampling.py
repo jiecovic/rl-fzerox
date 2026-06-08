@@ -22,6 +22,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
+class TrackSamplingRefreshStatus:
+    """Result of checking manager-owned track-sampling state."""
+
+    refreshed_config: TrackSamplingConfig | None
+    ready_for_reset: bool
+
+
+@dataclass(slots=True)
 class ManagedTrackSamplingRefresh:
     """Refresh mutable manager-owned X Cup slots for a running watch worker."""
 
@@ -29,6 +37,7 @@ class ManagedTrackSamplingRefresh:
     run_id: str
     interval_seconds: float = 10.0
     _last_check_monotonic: float = field(default=0.0, init=False)
+    _last_blocked_signature: TrackSamplingSignature | None = field(default=None, init=False)
 
     @classmethod
     def from_config(cls, config: WatchAppConfig) -> ManagedTrackSamplingRefresh | None:
@@ -47,8 +56,16 @@ class ManagedTrackSamplingRefresh:
         *,
         force: bool = False,
     ) -> TrackSamplingConfig | None:
+        return self.refresh_status(current_config, force=force).refreshed_config
+
+    def refresh_status(
+        self,
+        current_config: TrackSamplingConfig,
+        *,
+        force: bool = False,
+    ) -> TrackSamplingRefreshStatus:
         if not force and not self._refresh_due():
-            return None
+            return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)
         self._last_check_monotonic = time.monotonic()
         state = self.store.get_run_track_sampling_state(self.run_id)
         projected_config = restore_generated_x_cup_track_sampling_from_state(
@@ -56,18 +73,25 @@ class ManagedTrackSamplingRefresh:
             state=state,
         )
         projected_signature = _generated_x_cup_signature(projected_config)
-        if projected_signature == _generated_x_cup_signature(current_config):
-            return None
+        if (
+            projected_signature == _generated_x_cup_signature(current_config)
+            and not missing_generated_x_cup_baseline_paths(current_config)
+        ):
+            self._last_blocked_signature = None
+            return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)
         refreshed_config = self._with_materialized_x_cup_artifacts(projected_config)
         if refreshed_config is None:
-            LOGGER.warning(
-                "skipping managed watch track-sampling refresh for run_id=%s: "
-                "generated X Cup state changed but run-local baseline artifacts "
-                "are not ready",
-                self.run_id,
-            )
-            return None
-        return refreshed_config
+            if projected_signature != self._last_blocked_signature:
+                LOGGER.warning(
+                    "skipping managed watch track-sampling refresh for run_id=%s: "
+                    "generated X Cup state changed but run-local baseline artifacts "
+                    "are not ready",
+                    self.run_id,
+                )
+                self._last_blocked_signature = projected_signature
+            return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=False)
+        self._last_blocked_signature = None
+        return TrackSamplingRefreshStatus(refreshed_config=refreshed_config, ready_for_reset=True)
 
     def _refresh_due(self) -> bool:
         return time.monotonic() - self._last_check_monotonic >= self.interval_seconds
@@ -92,6 +116,18 @@ class ManagedTrackSamplingRefresh:
         return config.model_copy(update={"entries": tuple(next_entries)})
 
 
+def missing_generated_x_cup_baseline_paths(config: TrackSamplingConfig) -> tuple[Path, ...]:
+    """Return generated X Cup state paths that disappeared from disk."""
+
+    return tuple(
+        path
+        for entry in config.entries
+        if entry.generated_course_kind == X_CUP_COURSE.generated_kind
+        and (path := _resolved_baseline_state_path(entry)) is not None
+        and not path.is_file()
+    )
+
+
 def _generated_x_cup_signature(config: TrackSamplingConfig) -> TrackSamplingSignature:
     return tuple(
         (
@@ -106,6 +142,11 @@ def _generated_x_cup_signature(config: TrackSamplingConfig) -> TrackSamplingSign
         for entry in config.entries
         if entry.generated_course_kind == X_CUP_COURSE.generated_kind
     )
+
+
+def _resolved_baseline_state_path(entry: TrackSamplingEntryConfig) -> Path | None:
+    path = entry.baseline_state_path
+    return None if path is None else path.expanduser().resolve()
 
 
 def _x_cup_baseline_artifacts(
