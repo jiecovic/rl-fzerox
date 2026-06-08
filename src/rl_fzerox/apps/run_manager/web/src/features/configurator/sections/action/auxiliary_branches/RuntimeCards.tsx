@@ -374,15 +374,32 @@ export function RuntimeCards({
               value={action.lean_initial_lockout_frames}
               onChange={(value) => updateAction({ lean_initial_lockout_frames: value })}
             />
-            <fieldset className="dependent-fieldset contents" disabled={!action.include_spin}>
-              <IntegerField
-                help="After a completed native spin macro, keep spin requests masked for this many native frames."
-                label="Spin cooldown frames"
-                resetValue={defaultAction.spin_cooldown_frames}
-                value={action.spin_cooldown_frames}
-                onChange={(value) => updateAction({ spin_cooldown_frames: value })}
-              />
-            </fieldset>
+          </div>
+        </fieldset>
+      </section>
+
+      <section className="action-runtime-card">
+        <div className="action-runtime-header config-disclosure-copy">
+          <strong>Spin control</strong>
+          <small>Configure the native spin macro request guard.</small>
+        </div>
+        {action.include_spin ? null : (
+          <p className="action-note">
+            Spin is not in the action output right now, so this runtime guard is inactive.
+          </p>
+        )}
+        <fieldset
+          className="dependent-fieldset action-runtime-fields"
+          disabled={!action.include_spin}
+        >
+          <div className="action-runtime-two-col">
+            <IntegerField
+              help="After a completed native spin macro, keep spin requests masked for this many native frames."
+              label="Cooldown frames"
+              resetValue={defaultAction.spin_cooldown_frames}
+              value={action.spin_cooldown_frames}
+              onChange={(value) => updateAction({ spin_cooldown_frames: value })}
+            />
           </div>
         </fieldset>
       </section>

@@ -76,6 +76,23 @@ def _draw_control_viz(
     engine_x = pitch_x + pitch_width + aux_gap
     thrust_y = panel.y + (38 if wide else 28)
     led_clearance = 9 if wide else 6
+    spin_width = _spin_status_width(fonts.small, control_viz)
+    mode_switch_right = (
+        mode_switch_rect[0] + mode_switch_rect[2]
+        if mode_switch_rect is not None
+        else panel.x + 16 + header.get_width()
+    )
+    preferred_spin_x = mode_switch_right + (16 if wide else 10)
+    max_spin_x = thrust_x - spin_width - (18 if wide else 10)
+    spin_x = max(panel.x + 16, min(preferred_spin_x, max_spin_x))
+    _draw_spin_status(
+        pygame=pygame,
+        screen=screen,
+        font=fonts.small,
+        x=spin_x,
+        y=panel.y + (15 if wide else 9),
+        control_viz=control_viz,
+    )
 
     _draw_centered_label(
         screen=screen,
@@ -179,14 +196,6 @@ def _draw_control_viz(
         screen=screen,
         center=(right_lean_rect.centerx, lean_led_y),
         available=not control_viz.lean_right_masked,
-    )
-    _draw_spin_status(
-        pygame=pygame,
-        screen=screen,
-        font=fonts.small,
-        x=boost_center_x,
-        y=lean_led_y + led_radius + (10 if wide else 6),
-        control_viz=control_viz,
     )
     if wide:
         speed_x = right_lean_rect.right + 18
@@ -304,32 +313,59 @@ def _draw_spin_status(
 ) -> None:
     status = _spin_status_label(control_viz)
     status_surface = font.render(status, True, _spin_status_color(control_viz))
-    button_width = 29
+    button_width = 22
+    button_height = 18
     gap = 4
-    label_gap = 5
-    total_width = (2 * button_width) + gap
-    button_y = y + status_surface.get_height() + label_gap
-    status_x = x - (status_surface.get_width() // 2)
-    screen.blit(status_surface, (status_x, y))
-    left_x = x - (total_width // 2)
+    led_gap = 5
+    led_radius = AVAILABILITY_LED_STYLE.radius
+    led_diameter = (led_radius + 1) * 2
+    row_height = max(button_height, status_surface.get_height(), led_diameter)
+    button_y = y + (row_height // 2) - (button_height // 2)
+    left_x = x
     _draw_spin_macro_button(
         pygame=pygame,
         screen=screen,
         font=font,
-        rect=pygame.Rect(left_x, button_y, button_width, 18),
-        label="Q L",
+        rect=pygame.Rect(left_x, button_y, button_width, button_height),
+        label="Q",
         active=control_viz.spin_requested and control_viz.spin_direction < 0,
         masked=control_viz.spin_left_masked,
     )
+    led_x = left_x + button_width + gap + led_radius + 1
+    _draw_availability_led(
+        pygame=pygame,
+        screen=screen,
+        center=(led_x, y + (row_height // 2)),
+        available=not (control_viz.spin_left_masked and control_viz.spin_right_masked),
+    )
+    status_x = led_x + led_radius + 1 + led_gap
+    screen.blit(
+        status_surface,
+        (status_x, y + (row_height // 2) - (status_surface.get_height() // 2)),
+    )
+    right_x = status_x + status_surface.get_width() + gap
     _draw_spin_macro_button(
         pygame=pygame,
         screen=screen,
         font=font,
-        rect=pygame.Rect(left_x + button_width + gap, button_y, button_width, 18),
-        label="W R",
+        rect=pygame.Rect(right_x, button_y, button_width, button_height),
+        label="W",
         active=control_viz.spin_requested and control_viz.spin_direction > 0,
         masked=control_viz.spin_right_masked,
     )
+
+
+def _spin_status_width(font: RenderFont, control_viz: ControlViz) -> int:
+    button_width = 22
+    gap = 4
+    led_gap = 5
+    led_diameter = (AVAILABILITY_LED_STYLE.radius + 1) * 2
+    status_width = font.render(
+        _spin_status_label(control_viz),
+        True,
+        PALETTE.text_muted,
+    ).get_width()
+    return (2 * button_width) + (2 * gap) + led_diameter + led_gap + status_width
 
 
 def _spin_status_label(control_viz: ControlViz) -> str:
