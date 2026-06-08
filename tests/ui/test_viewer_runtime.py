@@ -822,6 +822,13 @@ def test_track_sampling_records_prefer_refreshed_watch_snapshot_state(tmp_path: 
                 course_id="x_cup_new",
                 runtime_course_key="x_cup_slot_1",
                 baseline_state_path=new_baseline_path,
+                mode="gp_race",
+                course_index=48,
+                generated_course_kind="x_cup",
+                generated_course_seed=123,
+                generated_course_hash="newhash",
+                generated_course_slot=0,
+                generated_course_generation=2,
             ),
         ),
     )
@@ -831,6 +838,8 @@ def test_track_sampling_records_prefer_refreshed_watch_snapshot_state(tmp_path: 
     assert records[0]["track_id"] == "new"
     assert records[0]["track_course_id"] == "x_cup_new"
     assert records[0]["track_reset_course_key"] == "x_cup_slot_1"
+    assert records[0]["track_generated_course_kind"] == "x_cup"
+    assert records[0]["track_generated_course_generation"] == 2
 
 
 def test_record_rows_click_stable_runtime_course_key() -> None:

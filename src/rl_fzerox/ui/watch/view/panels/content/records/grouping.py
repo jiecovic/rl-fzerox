@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/grouping.py
 from __future__ import annotations
 
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+
 from .model import BUILT_IN_COURSES_PER_CUP, BUILT_IN_CUP_ORDER, RecordGroup, RecordInfo
 
 __all__ = (
@@ -41,6 +43,9 @@ def _record_group_sort_key(group: RecordGroup) -> tuple[int, int]:
 
 
 def _record_cup(record: RecordInfo) -> str | None:
+    if _is_x_cup_record(record):
+        return "x_cup"
+
     course_ref = record.get("track_course_ref")
     if isinstance(course_ref, str) and "/" in course_ref:
         cup = course_ref.split("/", maxsplit=1)[0].strip().lower()
@@ -54,3 +59,16 @@ def _record_cup(record: RecordInfo) -> str | None:
     if 0 <= cup_index < len(BUILT_IN_CUP_ORDER):
         return BUILT_IN_CUP_ORDER[cup_index]
     return None
+
+
+def _is_x_cup_record(record: RecordInfo) -> bool:
+    if record.get("track_generated_course_kind") == X_CUP_COURSE.generated_kind:
+        return True
+
+    for key in ("track_runtime_course_key", "track_reset_course_key", "track_course_id"):
+        value = record.get(key)
+        if isinstance(value, str) and value.startswith(X_CUP_COURSE.id_prefix):
+            return True
+
+    course_index = record.get("track_course_index", record.get("course_index"))
+    return not isinstance(course_index, bool) and course_index == X_CUP_COURSE.course_index

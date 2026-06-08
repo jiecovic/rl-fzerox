@@ -975,6 +975,44 @@ def test_records_section_groups_track_pool_by_cup() -> None:
     assert [section.title for section in _record_tab_sections(columns.records, 1)] == ["Queen Cup"]
 
 
+def test_records_section_groups_generated_x_cup_records() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        track_pool_records=(
+            {
+                "track_id": "mute_city",
+                "track_course_ref": "jack/mute_city",
+                "track_course_name": "Mute City",
+            },
+            {
+                "track_id": "x_cup_d6a1a626",
+                "track_course_id": "x_cup_d6a1a626",
+                "track_runtime_course_key": "x_cup_slot_1",
+                "track_course_name": "Space Plant",
+                "track_course_index": 48,
+                "track_generated_course_kind": "x_cup",
+            },
+        ),
+    )
+
+    assert [section.title for section in columns.records] == ["Jack Cup", "X Cup"]
+    assert [line.label for line in columns.records[1].lines if line.heading] == ["Space Plant"]
+
+
 def test_records_section_dedupes_course_variants_to_one_course_row() -> None:
     columns = _build_panel_columns(
         episode=0,

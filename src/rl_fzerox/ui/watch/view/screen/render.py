@@ -307,6 +307,14 @@ def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]
         info["track_vehicle_name"] = entry.vehicle_name
     if entry.engine_setting_raw_value is not None:
         info["track_engine_setting_raw_value"] = int(entry.engine_setting_raw_value)
+    if entry.generated_course_kind is not None:
+        info["track_generated_course_kind"] = entry.generated_course_kind
+    if entry.generated_course_slot is not None:
+        info["track_generated_course_slot"] = int(entry.generated_course_slot)
+    if entry.generated_course_generation is not None:
+        info["track_generated_course_generation"] = int(entry.generated_course_generation)
+    if entry.generated_course_hash is not None:
+        info["track_generated_course_hash"] = entry.generated_course_hash
     if entry.records is not None:
         info.update(entry.records.info())
     return info
