@@ -35,6 +35,7 @@ class ActionMaskController:
     boost_unmask_max_speed_kph: float | None
     lean_unmask_min_speed_kph: float | None
     mask_air_brake_on_ground: bool
+    mask_pitch_on_ground: bool
     pitch_neutral_index: int = 2
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
@@ -53,6 +54,7 @@ class ActionMaskController:
         boost_unmask_max_speed_kph: float | None = None,
         lean_unmask_min_speed_kph: float | None = None,
         mask_air_brake_on_ground: bool = True,
+        mask_pitch_on_ground: bool = True,
         pitch_neutral_index: int = 2,
     ) -> ActionMaskController:
         stage_overrides = curriculum_stage_overrides(curriculum_config)
@@ -72,6 +74,7 @@ class ActionMaskController:
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             mask_air_brake_on_ground=bool(mask_air_brake_on_ground),
+            mask_pitch_on_ground=bool(mask_pitch_on_ground),
             pitch_neutral_index=int(pitch_neutral_index),
             _stage_index=0 if stage_overrides else None,
         )
@@ -98,6 +101,7 @@ class ActionMaskController:
                 speed_kph=self._speed_kph,
                 lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
                 mask_air_brake_on_ground=self.mask_air_brake_on_ground,
+                mask_pitch_on_ground=self.mask_pitch_on_ground,
                 pitch_neutral_index=self.pitch_neutral_index,
             ),
         )
@@ -204,6 +208,7 @@ def _dynamic_action_mask_overrides(
     speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
     mask_air_brake_on_ground: bool = True,
+    mask_pitch_on_ground: bool = True,
     pitch_neutral_index: int = 2,
 ) -> ActionMaskOverrides | None:
     overrides: ActionMaskOverrides = {}
@@ -228,7 +233,7 @@ def _dynamic_action_mask_overrides(
         overrides["spin"] = spin_allowed_values
     if airborne is False and mask_air_brake_on_ground:
         overrides["air_brake"] = (0,)
-    if airborne is False:
+    if airborne is False and mask_pitch_on_ground:
         overrides["pitch"] = (pitch_neutral_index,)
     if not overrides:
         return None

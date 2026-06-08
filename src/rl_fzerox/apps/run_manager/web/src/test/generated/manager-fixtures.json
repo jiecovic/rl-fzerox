@@ -1239,7 +1239,6 @@
       "enable_pitch": true,
       "enable_spin": false,
       "force_full_throttle": false,
-      "hard_zero_ground_pitch": false,
       "include_air_brake": true,
       "include_boost": true,
       "include_lean": true,
@@ -1252,6 +1251,7 @@
       "mask_air_brake_on_ground": false,
       "mask_boost_when_active": true,
       "mask_boost_when_airborne": true,
+      "mask_pitch_on_ground": true,
       "pitch_buckets": 5,
       "pitch_deadzone": 0.1,
       "pitch_mode": "discrete",
@@ -1497,8 +1497,9 @@
     },
     "train": {
       "actor_regularization": {
+        "airborne_pitch_std_cap": 0.8,
         "grounded_pitch_neutral_loss_weight": 0.0,
-        "pitch_std_cap": 0.5,
+        "grounded_pitch_std_cap": 0.35,
         "pitch_std_cap_loss_weight": 0.0
       },
       "batch_size": 1024,

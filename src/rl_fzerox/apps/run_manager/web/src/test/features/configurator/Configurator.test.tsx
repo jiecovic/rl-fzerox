@@ -415,14 +415,14 @@ describe("Configurator", () => {
 
     await user.click(screen.getByRole("button", { name: "Tracks" }));
 
-    expect(screen.getByRole("radio", { name: "Master" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Master" })).toBeDisabled();
 
     await user.click(screen.getByRole("radio", { name: "GP Race" }));
 
-    const masterDifficulty = screen.getByRole("radio", { name: "Master" });
+    const masterDifficulty = screen.getByRole("button", { name: "Master" });
     expect(masterDifficulty).toBeEnabled();
     await user.click(masterDifficulty);
-    expect(masterDifficulty).toHaveAttribute("aria-checked", "true");
+    expect(masterDifficulty).toHaveAttribute("aria-pressed", "true");
   });
 
   it("supports pooled vehicle selection and random engine ranges in the vehicle tab", async () => {
@@ -1175,7 +1175,7 @@ describe("Configurator", () => {
     expect(enableLoss).toBeEnabled();
     await user.click(enableLoss);
 
-    const lossWeight = within(pitchPanel).getByRole("textbox", { name: "Loss weight" });
+    const lossWeight = within(pitchPanel).getByRole("textbox", { name: "Mean loss weight" });
     expect(lossWeight).toBeEnabled();
     expect(lossWeight).toHaveValue("0.01");
 
@@ -1186,9 +1186,9 @@ describe("Configurator", () => {
         "pitch loss fork",
         expect.objectContaining({
           train: expect.objectContaining({
-            actor_regularization: {
+            actor_regularization: expect.objectContaining({
               grounded_pitch_neutral_loss_weight: 0.01,
-            },
+            }),
           }),
         }),
       ),

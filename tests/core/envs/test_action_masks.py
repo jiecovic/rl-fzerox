@@ -754,8 +754,40 @@ def test_env_action_masks_keep_air_brake_and_pitch_airborne_only() -> None:
     )
 
     assert not backend.last_race_control_state.air_brake
-    assert backend.last_race_control_state.pitch == 0.0
     assert env.action_masks().tolist() == [True] * 12
+
+
+def test_env_action_masks_can_leave_discrete_pitch_available_on_ground() -> None:
+    env = FZeroXEnv(
+        backend=ScriptedStepBackend(
+            [],
+            reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+        ),
+        config=EnvConfig(
+            action=configured_hybrid_action(
+                continuous_axes=("steer",),
+                discrete_axes=("gas", "air_brake", "lean", "pitch"),
+                mask_pitch_on_ground=False,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == [
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+    ]
 
 
 def test_env_action_masks_lock_boost_after_manual_request() -> None:

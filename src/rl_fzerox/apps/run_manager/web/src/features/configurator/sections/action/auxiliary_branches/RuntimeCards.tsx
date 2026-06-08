@@ -23,7 +23,7 @@ import {
 } from "@/features/configurator/sections/action/descriptions";
 import { normalizeOddBucketCount } from "@/features/configurator/sections/action/model";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
-import { FieldInput, FieldNote, FieldShell } from "@/shared/ui/Field";
+import { FieldInput, FieldNote, FieldShell, SwitchButton } from "@/shared/ui/Field";
 
 interface RuntimeCardsProps {
   action: AuxiliaryActionConfig;
@@ -454,204 +454,196 @@ export function RuntimeCards({
               />
             </div>
             {action.pitch_mode === "discrete" ? (
-              <RangeIntegerField
-                help="Odd bucket counts preserve one neutral center action while adding more upward and downward pitch resolution."
-                label="Pitch buckets"
-                max={31}
-                min={3}
-                rangeStep={2}
-                resetValue={defaultAction.pitch_buckets}
-                ticks={[
-                  { label: "3", value: 3 },
-                  { label: "5", value: 5 },
-                  { label: "9", value: 9 },
-                  { label: "15", value: 15 },
-                  { label: "31", value: 31 },
-                ]}
-                value={action.pitch_buckets}
-                onChange={(value) =>
-                  updateAction({ pitch_buckets: normalizeOddBucketCount(value) })
-                }
-              />
+              <>
+                <RangeIntegerField
+                  help="Odd bucket counts preserve one neutral center action while adding more upward and downward pitch resolution."
+                  label="Pitch buckets"
+                  max={31}
+                  min={3}
+                  rangeStep={2}
+                  resetValue={defaultAction.pitch_buckets}
+                  ticks={[
+                    { label: "3", value: 3 },
+                    { label: "5", value: 5 },
+                    { label: "9", value: 9 },
+                    { label: "15", value: 15 },
+                    { label: "31", value: 31 },
+                  ]}
+                  value={action.pitch_buckets}
+                  onChange={(value) =>
+                    updateAction({ pitch_buckets: normalizeOddBucketCount(value) })
+                  }
+                />
+                <div className="field-shell">
+                  <FieldLabel
+                    help="Mask discrete pitch to the neutral bucket while the vehicle is grounded. Continuous pitch uses the actor loss controls instead."
+                    label="Ground mask"
+                    onReset={() =>
+                      updateAction({ mask_pitch_on_ground: defaultAction.mask_pitch_on_ground })
+                    }
+                  />
+                  <SegmentedChoiceStrip
+                    ariaLabel="Discrete pitch ground mask"
+                    options={[
+                      {
+                        active: !action.mask_pitch_on_ground,
+                        key: "off",
+                        label: "Off",
+                        onClick: () => updateAction({ mask_pitch_on_ground: false }),
+                      },
+                      {
+                        active: action.mask_pitch_on_ground,
+                        key: "on",
+                        label: "On",
+                        onClick: () => updateAction({ mask_pitch_on_ground: true }),
+                      },
+                    ]}
+                  />
+                </div>
+              </>
             ) : null}
           </fieldset>
-          {action.pitch_mode === "continuous" ? (
-            <>
-              <p className="action-note">
-                Continuous pitch maps the vertical stick axis directly, matching continuous steering
-                semantics.
-              </p>
-              <div className="action-runtime-two-col">
-                <div className="field-shell">
-                  <FieldLabel
-                    help="Add a policy-side loss that pulls continuous pitch toward neutral while the vehicle is grounded."
-                    label="Grounded neutral loss"
-                    onReset={() =>
-                      updateTrain({
-                        actor_regularization: {
-                          ...defaultTrain.actor_regularization,
-                        },
-                      })
-                    }
-                  />
-                  <SegmentedChoiceStrip
-                    ariaLabel="Grounded pitch neutral loss"
-                    options={[
-                      {
-                        active: groundedPitchLossWeight <= 0,
-                        key: "off",
-                        label: "Off",
-                        onClick: () =>
-                          updateTrain({
-                            actor_regularization: {
-                              ...train.actor_regularization,
-                              grounded_pitch_neutral_loss_weight: 0,
-                            },
-                          }),
-                      },
-                      {
-                        active: groundedPitchLossWeight > 0,
-                        key: "on",
-                        label: "On",
-                        onClick: () =>
-                          updateTrain({
-                            actor_regularization: {
-                              ...train.actor_regularization,
-                              grounded_pitch_neutral_loss_weight:
-                                groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0.01,
-                            },
-                          }),
-                      },
-                    ]}
-                  />
-                </div>
-                <fieldset className="dependent-fieldset" disabled={groundedPitchLossWeight <= 0}>
-                  <NumberField
-                    help="Coefficient for squared continuous pitch mean while grounded. It affects the actor loss only and does not mask the action."
-                    label="Mean loss weight"
-                    resetValue={
-                      defaultTrain.actor_regularization.grounded_pitch_neutral_loss_weight
-                    }
-                    step="0.001"
-                    value={groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0}
-                    onChange={(value) =>
-                      updateTrain({
-                        actor_regularization: {
-                          ...train.actor_regularization,
-                          grounded_pitch_neutral_loss_weight: Math.max(0, value),
-                        },
-                      })
-                    }
-                  />
-                </fieldset>
-              </div>
-              <div className="action-runtime-two-col">
-                <div className="field-shell">
-                  <FieldLabel
-                    help="Add a pitch-only soft cap on the Gaussian std so stochastic pitch cannot stay excessively noisy."
-                    label="Pitch std cap"
-                    onReset={() =>
-                      updateTrain({
-                        actor_regularization: {
-                          ...defaultTrain.actor_regularization,
-                        },
-                      })
-                    }
-                  />
-                  <SegmentedChoiceStrip
-                    ariaLabel="Pitch std cap loss"
-                    options={[
-                      {
-                        active: pitchStdCapLossWeight <= 0,
-                        key: "off",
-                        label: "Off",
-                        onClick: () =>
-                          updateTrain({
-                            actor_regularization: {
-                              ...train.actor_regularization,
-                              pitch_std_cap_loss_weight: 0,
-                            },
-                          }),
-                      },
-                      {
-                        active: pitchStdCapLossWeight > 0,
-                        key: "on",
-                        label: "On",
-                        onClick: () =>
-                          updateTrain({
-                            actor_regularization: {
-                              ...train.actor_regularization,
-                              pitch_std_cap_loss_weight:
-                                pitchStdCapLossWeight > 0 ? pitchStdCapLossWeight : 0.05,
-                            },
-                          }),
-                      },
-                    ]}
-                  />
-                </div>
-                <fieldset className="dependent-fieldset" disabled={pitchStdCapLossWeight <= 0}>
-                  <NumberField
-                    help="Soft upper bound for the pitch Gaussian std. Steering std is not affected."
-                    label="Std cap"
-                    resetValue={defaultTrain.actor_regularization.pitch_std_cap}
-                    step="0.05"
-                    value={train.actor_regularization.pitch_std_cap}
-                    onChange={(value) =>
-                      updateTrain({
-                        actor_regularization: {
-                          ...train.actor_regularization,
-                          pitch_std_cap: Math.max(0.001, value),
-                        },
-                      })
-                    }
-                  />
-                  <NumberField
-                    help="Coefficient for relu(pitch_std - cap)^2. The loss is applied only to the pitch std dimension."
-                    label="Std cap loss weight"
-                    resetValue={defaultTrain.actor_regularization.pitch_std_cap_loss_weight}
-                    step="0.001"
-                    value={pitchStdCapLossWeight > 0 ? pitchStdCapLossWeight : 0}
-                    onChange={(value) =>
-                      updateTrain({
-                        actor_regularization: {
-                          ...train.actor_regularization,
-                          pitch_std_cap_loss_weight: Math.max(0, value),
-                        },
-                      })
-                    }
-                  />
-                </fieldset>
-              </div>
-              <div className="field-shell">
+          <p className="action-note">
+            {action.pitch_mode === "continuous"
+              ? "Continuous pitch maps the vertical stick axis directly."
+              : "Discrete pitch losses use the categorical distribution over pitch buckets."}
+          </p>
+          <div className="action-runtime-panel-grid">
+            <div className="action-runtime-control-panel">
+              <div className="action-runtime-control-header">
                 <FieldLabel
-                  help="Choose whether the controller forwards raw sampled pitch on the ground or forces the executed pitch value to neutral. This does not change the policy distribution."
-                  label="Grounded pitch output"
+                  help="Add a policy-side loss that pulls expected pitch toward neutral while the vehicle is grounded."
+                  label="Grounded neutral loss"
                   onReset={() =>
-                    updateAction({
-                      hard_zero_ground_pitch: defaultAction.hard_zero_ground_pitch,
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        grounded_pitch_neutral_loss_weight:
+                          defaultTrain.actor_regularization.grounded_pitch_neutral_loss_weight,
+                      },
                     })
                   }
                 />
-                <SegmentedChoiceStrip
-                  ariaLabel="Grounded pitch execution"
-                  options={[
-                    {
-                      active: !action.hard_zero_ground_pitch,
-                      key: "raw",
-                      label: "Raw sample",
-                      onClick: () => updateAction({ hard_zero_ground_pitch: false }),
-                    },
-                    {
-                      active: action.hard_zero_ground_pitch,
-                      key: "neutral",
-                      label: "Force neutral",
-                      onClick: () => updateAction({ hard_zero_ground_pitch: true }),
-                    },
-                  ]}
+                <SwitchButton
+                  active={groundedPitchLossWeight > 0}
+                  className="action-runtime-compact-switch"
+                  label="Grounded pitch neutral loss"
+                  onClick={() =>
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        grounded_pitch_neutral_loss_weight: groundedPitchLossWeight > 0 ? 0 : 0.01,
+                      },
+                    })
+                  }
                 />
               </div>
-            </>
-          ) : null}
+              <fieldset
+                className="dependent-fieldset action-runtime-field-grid action-runtime-field-grid-single"
+                disabled={groundedPitchLossWeight <= 0}
+              >
+                <NumberField
+                  help="Coefficient for squared expected pitch while grounded. It affects the actor loss only and does not mask the action."
+                  label="Mean loss weight"
+                  resetValue={defaultTrain.actor_regularization.grounded_pitch_neutral_loss_weight}
+                  step="0.001"
+                  value={groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0}
+                  onChange={(value) =>
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        grounded_pitch_neutral_loss_weight: Math.max(0, value),
+                      },
+                    })
+                  }
+                />
+              </fieldset>
+            </div>
+            <div className="action-runtime-control-panel action-runtime-control-panel-wide">
+              <div className="action-runtime-control-header">
+                <FieldLabel
+                  help="Add one policy-side loss that caps pitch distribution std. Grounded and airborne samples use separate caps but share this weight."
+                  label="Pitch std cap loss"
+                  onReset={() =>
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        pitch_std_cap_loss_weight:
+                          defaultTrain.actor_regularization.pitch_std_cap_loss_weight,
+                        grounded_pitch_std_cap:
+                          defaultTrain.actor_regularization.grounded_pitch_std_cap,
+                        airborne_pitch_std_cap:
+                          defaultTrain.actor_regularization.airborne_pitch_std_cap,
+                      },
+                    })
+                  }
+                />
+                <SwitchButton
+                  active={pitchStdCapLossWeight > 0}
+                  className="action-runtime-compact-switch"
+                  label="Pitch std cap loss"
+                  onClick={() =>
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        pitch_std_cap_loss_weight: pitchStdCapLossWeight > 0 ? 0 : 0.05,
+                      },
+                    })
+                  }
+                />
+              </div>
+              <fieldset
+                className="dependent-fieldset action-runtime-field-grid action-runtime-field-grid-three"
+                disabled={pitchStdCapLossWeight <= 0}
+              >
+                <NumberField
+                  help="Shared coefficient for relu(pitch_std - state_cap)^2. Grounded and airborne samples are disjoint, so this weight is shared."
+                  label="Loss weight"
+                  resetValue={defaultTrain.actor_regularization.pitch_std_cap_loss_weight}
+                  step="0.001"
+                  value={pitchStdCapLossWeight > 0 ? pitchStdCapLossWeight : 0}
+                  onChange={(value) =>
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        pitch_std_cap_loss_weight: Math.max(0, value),
+                      },
+                    })
+                  }
+                />
+                <NumberField
+                  help="Soft upper bound for the pitch distribution std while grounded."
+                  label="Grounded cap"
+                  resetValue={defaultTrain.actor_regularization.grounded_pitch_std_cap}
+                  step="0.05"
+                  value={train.actor_regularization.grounded_pitch_std_cap}
+                  onChange={(value) =>
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        grounded_pitch_std_cap: Math.max(0.001, value),
+                      },
+                    })
+                  }
+                />
+                <NumberField
+                  help="Soft upper bound for the pitch distribution std while airborne. No airborne mean-to-zero loss is added."
+                  label="Airborne cap"
+                  resetValue={defaultTrain.actor_regularization.airborne_pitch_std_cap}
+                  step="0.05"
+                  value={train.actor_regularization.airborne_pitch_std_cap}
+                  onChange={(value) =>
+                    updateTrain({
+                      actor_regularization: {
+                        ...train.actor_regularization,
+                        airborne_pitch_std_cap: Math.max(0.001, value),
+                      },
+                    })
+                  }
+                />
+              </fieldset>
+            </div>
+          </div>
         </fieldset>
       </section>
     </div>

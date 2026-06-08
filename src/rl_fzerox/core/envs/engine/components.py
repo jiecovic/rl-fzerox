@@ -61,6 +61,7 @@ def build_engine_runtime_components(
         boost_unmask_max_speed_kph=action_config.boost_unmask_max_speed_kph,
         lean_unmask_min_speed_kph=action_config.lean_unmask_min_speed_kph,
         mask_air_brake_on_ground=action_config.mask_air_brake_on_ground,
+        mask_pitch_on_ground=action_config.mask_pitch_on_ground,
         pitch_neutral_index=action_config.pitch_buckets // 2,
     )
     control_state = ControlStateTracker(

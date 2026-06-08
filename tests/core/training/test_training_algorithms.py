@@ -214,7 +214,7 @@ def test_hybrid_ppo_accepts_group_entropy_and_pitch_actor_loss() -> None:
         actor_regularization=TrainActorRegularizationConfig(
             grounded_pitch_neutral_loss_weight=0.01,
             pitch_std_cap_loss_weight=0.05,
-            pitch_std_cap=0.5,
+            grounded_pitch_std_cap=0.5,
         ),
     )
     env = DummyVecEnv(
@@ -245,6 +245,119 @@ def test_hybrid_ppo_accepts_group_entropy_and_pitch_actor_loss() -> None:
     assert isinstance(model, MaskableHybridActionPPO)
     assert model.entropy_group_weights == {"pitch": 1.0, "steer": 0.0}
     assert not any("auxiliary_state_heads" in key for key in model.policy.state_dict())
+
+
+def test_hybrid_ppo_accepts_state_scoped_pitch_std_actor_loss() -> None:
+    from sb3x import MaskableHybridActionPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env_config = EnvConfig(
+        action=configured_hybrid_action(
+            continuous_axes=("steer", "pitch"),
+            discrete_axes=("boost", "lean"),
+        ),
+        observation=ObservationConfig(
+            mode="image_state",
+            state_components=_VEHICLE_STATE_COMPONENT,
+        ),
+    )
+    policy_config = PolicyConfig()
+    train_config = TrainConfig(
+        algorithm="maskable_hybrid_action_ppo",
+        n_steps=4,
+        batch_size=4,
+        device="cpu",
+        actor_regularization=TrainActorRegularizationConfig(
+            grounded_pitch_neutral_loss_weight=0.01,
+            pitch_std_cap_loss_weight=0.05,
+            grounded_pitch_std_cap=0.35,
+            airborne_pitch_std_cap=0.8,
+        ),
+    )
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: maybe_wrap_training_auxiliary_state_observation(
+                FZeroXEnv(
+                    backend=SyntheticBackend(),
+                    config=env_config,
+                ),
+                policy_config=policy_config,
+                train_config=train_config,
+            )
+        )
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=train_config,
+            policy_config=policy_config,
+            env_config=env_config,
+            tensorboard_log=None,
+        )
+        model.learn(total_timesteps=4)
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridActionPPO)
+    assert model.policy.continuous_log_std_mode == "parameter"
+
+
+def test_hybrid_ppo_accepts_discrete_pitch_actor_loss() -> None:
+    from sb3x import MaskableHybridActionPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env_config = EnvConfig(
+        action=configured_hybrid_action(
+            continuous_axes=("steer",),
+            discrete_axes=("boost", "lean", "pitch"),
+            pitch_buckets=5,
+        ),
+        observation=ObservationConfig(
+            mode="image_state",
+            state_components=_VEHICLE_STATE_COMPONENT,
+        ),
+    )
+    policy_config = PolicyConfig()
+    train_config = TrainConfig(
+        algorithm="maskable_hybrid_action_ppo",
+        n_steps=4,
+        batch_size=4,
+        device="cpu",
+        actor_regularization=TrainActorRegularizationConfig(
+            grounded_pitch_neutral_loss_weight=0.01,
+            pitch_std_cap_loss_weight=0.05,
+            grounded_pitch_std_cap=0.35,
+            airborne_pitch_std_cap=0.8,
+        ),
+    )
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: maybe_wrap_training_auxiliary_state_observation(
+                FZeroXEnv(
+                    backend=SyntheticBackend(),
+                    config=env_config,
+                ),
+                policy_config=policy_config,
+                train_config=train_config,
+            )
+        )
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=train_config,
+            policy_config=policy_config,
+            env_config=env_config,
+            tensorboard_log=None,
+        )
+        model.learn(total_timesteps=4)
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridActionPPO)
+    assert model.policy.continuous_log_std_mode == "parameter"
 
 
 def test_build_ppo_model_rejects_unavailable_explicit_cuda(monkeypatch: pytest.MonkeyPatch) -> None:

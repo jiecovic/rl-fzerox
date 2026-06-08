@@ -40,7 +40,7 @@ export function resetAuxiliaryBranchesAction({
     include_pitch: checkpointLocked ? action.include_pitch : defaultAction.include_pitch,
     enable_pitch: defaultAction.enable_pitch,
     pitch_mode: checkpointLocked ? action.pitch_mode : defaultAction.pitch_mode,
-    hard_zero_ground_pitch: defaultAction.hard_zero_ground_pitch,
+    mask_pitch_on_ground: defaultAction.mask_pitch_on_ground,
     pitch_buckets: checkpointLocked ? action.pitch_buckets : defaultAction.pitch_buckets,
   } satisfies Partial<AuxiliaryActionConfig>;
 }

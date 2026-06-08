@@ -183,13 +183,15 @@ def _actor_regularization_data(config: ManagedRunConfig) -> dict[str, float]:
     actor_regularization = config.train.actor_regularization
     grounded_pitch_neutral_loss_weight = actor_regularization.grounded_pitch_neutral_loss_weight
     pitch_std_cap_loss_weight = actor_regularization.pitch_std_cap_loss_weight
-    if "pitch" not in continuous_action_axes(config):
+    action_groups = set(continuous_action_axes(config)) | set(discrete_action_axes(config))
+    if "pitch" not in action_groups:
         grounded_pitch_neutral_loss_weight = 0.0
         pitch_std_cap_loss_weight = 0.0
     return {
         "grounded_pitch_neutral_loss_weight": float(grounded_pitch_neutral_loss_weight),
         "pitch_std_cap_loss_weight": float(pitch_std_cap_loss_weight),
-        "pitch_std_cap": float(actor_regularization.pitch_std_cap),
+        "grounded_pitch_std_cap": float(actor_regularization.grounded_pitch_std_cap),
+        "airborne_pitch_std_cap": float(actor_regularization.airborne_pitch_std_cap),
     }
 
 

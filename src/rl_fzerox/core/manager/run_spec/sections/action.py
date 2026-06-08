@@ -63,7 +63,7 @@ class ManagedActionConfig(BaseModel):
     include_pitch: bool = True
     enable_pitch: bool = True
     pitch_mode: ActionAxisMode = "discrete"
-    hard_zero_ground_pitch: bool = False
+    mask_pitch_on_ground: bool = True
     pitch_deadzone: float = Field(default=0.1, ge=0.0, lt=1.0)
     pitch_buckets: int = Field(default=5, ge=3)
 

@@ -52,13 +52,14 @@ class TrainActorRegularizationConfig(BaseModel):
 
     grounded_pitch_neutral_loss_weight: NonNegativeFloat = 0.0
     pitch_std_cap_loss_weight: NonNegativeFloat = 0.0
-    pitch_std_cap: PositiveFloat = 0.5
+    grounded_pitch_std_cap: PositiveFloat = 0.35
+    airborne_pitch_std_cap: PositiveFloat = 0.8
 
     def enabled(self) -> bool:
         return self.grounded_pitch_neutral_loss_weight > 0.0 or self.pitch_std_cap_loss_weight > 0.0
 
     def requires_auxiliary_targets(self) -> bool:
-        return self.grounded_pitch_neutral_loss_weight > 0.0
+        return self.grounded_pitch_neutral_loss_weight > 0.0 or self.pitch_std_cap_loss_weight > 0.0
 
 
 class TrainConfig(BaseModel):

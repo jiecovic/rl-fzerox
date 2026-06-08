@@ -28,30 +28,8 @@ def load_config_json(data: str) -> ManagedRunConfig:
     loaded = json.loads(data)
     if not isinstance(loaded, Mapping):
         raise ValueError("managed run config JSON must decode to an object")
-    return ManagedRunConfig.model_validate(_with_current_defaults(loaded))
+    return ManagedRunConfig.model_validate(loaded)
 
 
 def _stable_json(data: object) -> str:
     return json.dumps(data, indent=None, separators=(",", ":"), sort_keys=True)
-
-
-def _with_current_defaults(data: Mapping[str, object]) -> dict[str, object]:
-    normalized = dict(data)
-    action = normalized.get("action")
-    if isinstance(action, Mapping):
-        normalized_action = dict(action)
-        normalized_action.setdefault("hard_zero_ground_pitch", False)
-        normalized["action"] = normalized_action
-    train = normalized.get("train")
-    if isinstance(train, Mapping):
-        normalized_train = dict(train)
-        actor_regularization = normalized_train.get("actor_regularization")
-        if isinstance(actor_regularization, Mapping):
-            normalized_actor_regularization = dict(actor_regularization)
-        else:
-            normalized_actor_regularization = {}
-        normalized_actor_regularization.setdefault("pitch_std_cap_loss_weight", 0.0)
-        normalized_actor_regularization.setdefault("pitch_std_cap", 0.5)
-        normalized_train["actor_regularization"] = normalized_actor_regularization
-        normalized["train"] = normalized_train
-    return normalized

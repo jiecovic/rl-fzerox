@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import gymnasium as gym
 import numpy as np
+import pytest
+import torch
 from gymnasium import spaces
 
 from rl_fzerox.core.policy.auxiliary_state.observations import (
     auxiliary_state_targets_field,
 )
+from rl_fzerox.core.policy.auxiliary_state.policies import _std_cap_loss
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_name_for_feature,
     auxiliary_state_target_spec,
@@ -44,6 +47,25 @@ def test_auxiliary_state_target_vector_matches_expected_slots() -> None:
     assert float(vector[8]) == 0.5
     assert float(vector[10]) == 0.5
     assert int(np.argmax(vector[15:39])) == 7
+
+
+def test_pitch_std_cap_loss_caps_existing_pitch_std_per_sample() -> None:
+    pitch_std = torch.tensor([0.6, 0.2])
+
+    loss = _std_cap_loss(pitch_std, cap=0.5, sample_mask=None)
+
+    assert loss is not None
+    assert float(loss) == pytest.approx(0.005)
+
+
+def test_pitch_std_cap_loss_ignores_inactive_samples() -> None:
+    values = torch.tensor([0.6, 0.2, 100.0])
+    mask = torch.tensor([True, True, False])
+
+    loss = _std_cap_loss(values, cap=0.5, sample_mask=mask)
+
+    assert loss is not None
+    assert float(loss) == pytest.approx(0.005)
 
 
 def test_auxiliary_state_target_vector_returns_zeros_without_telemetry() -> None:

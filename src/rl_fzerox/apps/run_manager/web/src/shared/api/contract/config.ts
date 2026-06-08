@@ -75,7 +75,8 @@ const trainConfigSchema = z.object({
   actor_regularization: z.object({
     grounded_pitch_neutral_loss_weight: z.number().nonnegative(),
     pitch_std_cap_loss_weight: z.number().nonnegative(),
-    pitch_std_cap: z.number().positive(),
+    grounded_pitch_std_cap: z.number().positive(),
+    airborne_pitch_std_cap: z.number().positive(),
   }),
   vf_coef: z.number().positive(),
   max_grad_norm: z.number().positive(),
@@ -205,7 +206,7 @@ const actionConfigSchema = z
     include_pitch: z.boolean(),
     enable_pitch: z.boolean(),
     pitch_mode: actionAxisModeSchema,
-    hard_zero_ground_pitch: z.boolean(),
+    mask_pitch_on_ground: z.boolean(),
     pitch_deadzone: z.number().min(0).lt(1),
     pitch_buckets: z.number().int().min(3),
   })

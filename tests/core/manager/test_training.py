@@ -201,8 +201,9 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
         "pitch": 0.25,
     }
     config.train.actor_regularization.grounded_pitch_neutral_loss_weight = 0.02
-    config.train.actor_regularization.pitch_std_cap_loss_weight = 0.05
-    config.train.actor_regularization.pitch_std_cap = 0.5
+    config.train.actor_regularization.pitch_std_cap_loss_weight = 0.07
+    config.train.actor_regularization.grounded_pitch_std_cap = 0.35
+    config.train.actor_regularization.airborne_pitch_std_cap = 0.8
 
     train_config = build_managed_train_app_config(
         config,
@@ -218,14 +219,28 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
         train_config.train.actor_regularization.grounded_pitch_neutral_loss_weight
         == pytest.approx(0.02)
     )
-    assert train_config.train.actor_regularization.pitch_std_cap_loss_weight == pytest.approx(0.05)
-    assert train_config.train.actor_regularization.pitch_std_cap == pytest.approx(0.5)
+    assert train_config.train.actor_regularization.pitch_std_cap_loss_weight == pytest.approx(0.07)
+    assert train_config.train.actor_regularization.grounded_pitch_std_cap == pytest.approx(0.35)
+    assert train_config.train.actor_regularization.airborne_pitch_std_cap == pytest.approx(0.8)
 
     config.action.pitch_mode = "discrete"
     train_config = build_managed_train_app_config(
         config,
         run_id="bridge-action-loss-controls-discrete",
         run_dir=tmp_path / "runs" / "bridge-action-loss-controls-discrete_0001",
+    )
+
+    assert (
+        train_config.train.actor_regularization.grounded_pitch_neutral_loss_weight
+        == pytest.approx(0.02)
+    )
+    assert train_config.train.actor_regularization.pitch_std_cap_loss_weight == pytest.approx(0.07)
+
+    config.action.include_pitch = False
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-action-loss-controls-no-pitch",
+        run_dir=tmp_path / "runs" / "bridge-action-loss-controls-no-pitch_0001",
     )
 
     assert train_config.train.actor_regularization.grounded_pitch_neutral_loss_weight == 0.0

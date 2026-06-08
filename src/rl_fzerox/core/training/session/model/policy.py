@@ -28,7 +28,7 @@ def resolve_policy_entry(
     actor_regularization_enabled = train_config.actor_regularization.enabled()
     if actor_regularization_enabled and effective_algorithm not in TRAINING_ALGORITHMS.hybrid:
         raise RuntimeError(
-            "train.actor_regularization requires a hybrid action algorithm with continuous pitch"
+            "train.actor_regularization requires a hybrid action algorithm with pitch"
         )
 
     auxiliary_state_enabled = _needs_auxiliary_policy(policy_config, train_config)
@@ -117,9 +117,10 @@ def build_policy_kwargs(
         policy_kwargs["actor_regularization"] = train_config.actor_regularization.model_dump(
             mode="python"
         )
-        policy_kwargs["continuous_action_group_names"] = tuple(
-            env_config.action.layout_continuous_axes
-        )
+        continuous_action_group_names = tuple(env_config.action.layout_continuous_axes)
+        policy_kwargs["continuous_action_group_names"] = continuous_action_group_names
+        policy_kwargs["discrete_action_group_names"] = tuple(env_config.action.layout_discrete_axes)
+        policy_kwargs["pitch_bucket_count"] = int(env_config.action.pitch_buckets)
     return policy_kwargs
 
 

@@ -20,7 +20,8 @@ class ManagedTrainActorRegularizationConfig(BaseModel):
 
     grounded_pitch_neutral_loss_weight: NonNegativeFloat = 0.0
     pitch_std_cap_loss_weight: NonNegativeFloat = 0.0
-    pitch_std_cap: PositiveFloat = 0.5
+    grounded_pitch_std_cap: PositiveFloat = 0.35
+    airborne_pitch_std_cap: PositiveFloat = 0.8
 
 
 class ManagedTrainConfig(BaseModel):

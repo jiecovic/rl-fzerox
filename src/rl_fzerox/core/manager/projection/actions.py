@@ -31,7 +31,7 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
         "boost_unmask_max_speed_kph": config.action.boost_unmask_max_speed_kph,
         "lean_unmask_min_speed_kph": config.action.lean_unmask_min_speed_kph,
         "lean_initial_lockout_frames": config.action.lean_initial_lockout_frames,
-        "hard_zero_ground_pitch": config.action.hard_zero_ground_pitch,
+        "mask_pitch_on_ground": _mask_pitch_on_ground(config),
         "pitch_deadzone": config.action.pitch_deadzone,
         "pitch_buckets": config.action.pitch_buckets,
         "layout_continuous_axes": list(continuous_axes),
@@ -114,3 +114,11 @@ def _continuous_air_brake_mode(config: ManagedRunConfig) -> str:
     if config.action.mask_air_brake_on_ground:
         return "disable_on_ground"
     return "always"
+
+
+def _mask_pitch_on_ground(config: ManagedRunConfig) -> bool:
+    return bool(
+        config.action.include_pitch
+        and config.action.pitch_mode == "discrete"
+        and config.action.mask_pitch_on_ground
+    )
