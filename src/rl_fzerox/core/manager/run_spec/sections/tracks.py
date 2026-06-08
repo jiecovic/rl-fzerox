@@ -162,7 +162,7 @@ class ManagedTracksConfig(BaseModel):
     def _active_x_cup_course_count(self) -> int:
         if not self.include_x_cup:
             return 0
-        return self.x_cup_course_count * max(1, len(self.gp_difficulties))
+        return self.x_cup_course_count
 
 
 def _unique_gp_difficulties(

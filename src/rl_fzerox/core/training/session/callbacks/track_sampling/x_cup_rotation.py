@@ -8,7 +8,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
 from rl_fzerox.core.domain.x_cup import (
     X_CUP_COURSE,
     GeneratedXCupCourseIdentity,
@@ -161,7 +160,6 @@ class XCupRotationManager:
             master_seed=self._config.seed,
             slot=slot,
             generation=generation,
-            gp_difficulty=_entry_gp_difficulty(old_entries[0]),
         )
         return tuple(
             self._materialize_entry(_replacement_entry(old_entry, identity_course=identity))
@@ -332,10 +330,6 @@ def _next_generation(entries: Sequence[TrackSamplingEntryConfig]) -> int:
         if entry.generated_course_generation is not None
     ]
     return (max(generations) if generations else 0) + 1
-
-
-def _entry_gp_difficulty(entry: TrackSamplingEntryConfig) -> str:
-    return default_gp_difficulty() if entry.gp_difficulty is None else entry.gp_difficulty
 
 
 def _active_x_cup_state_paths(

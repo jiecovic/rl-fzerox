@@ -99,17 +99,12 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                     master_seed=config.seed,
                     slot=x_cup_index,
                     generation=1,
-                    gp_difficulty=gp_difficulty or default_gp_difficulty(),
                 )
                 for vehicle_id in config.vehicle.selected_vehicle_ids:
                     entries.append(
                         _track_sampling_entry(
                             course_id=generated_course.course_id,
-                            runtime_course_key=_x_cup_runtime_course_key(
-                                slot=generated_course.slot,
-                                gp_difficulty=gp_difficulty,
-                                gp_difficulty_count=len(gp_difficulties),
-                            ),
+                            runtime_course_key=generated_x_cup_slot_key(generated_course.slot),
                             course_ref=None,
                             race_mode=config.tracks.race_mode,
                             gp_difficulty=gp_difficulty,
@@ -151,18 +146,6 @@ def _gp_difficulties(config: ManagedRunConfig) -> tuple[str | None, ...]:
     if config.tracks.race_mode != "gp_race":
         return (None,)
     return tuple(config.tracks.gp_difficulties) or (default_gp_difficulty(),)
-
-
-def _x_cup_runtime_course_key(
-    *,
-    slot: int,
-    gp_difficulty: str | None,
-    gp_difficulty_count: int,
-) -> str:
-    slot_key = generated_x_cup_slot_key(slot)
-    if gp_difficulty_count <= 1 or gp_difficulty is None:
-        return slot_key
-    return f"{slot_key}_{gp_difficulty}"
 
 
 def _track_sampling_entry(

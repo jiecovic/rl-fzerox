@@ -139,6 +139,7 @@ def test_fixed_env_sampling_counts_x_cup_slots() -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.train.num_envs = 24
     config.tracks.race_mode = "gp_race"
+    config.tracks.gp_difficulties = ("novice", "expert")
     config.tracks.include_x_cup = True
     config.tracks.x_cup_course_count = 2
     config.tracks.sampling_mode = "fixed_env"
@@ -819,7 +820,7 @@ def test_manager_training_bridge_adds_generated_x_cup_entries(
     assert {entry.generated_course_generation for entry in entries} == {1}
 
 
-def test_manager_training_bridge_separates_generated_x_cup_difficulty_variants(
+def test_manager_training_bridge_groups_generated_x_cup_difficulty_baselines(
     tmp_path: Path,
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
@@ -839,12 +840,16 @@ def test_manager_training_bridge_separates_generated_x_cup_difficulty_variants(
     assert len(entries) == 4
     assert {entry.gp_difficulty for entry in entries} == {"novice", "expert"}
     assert {entry.runtime_course_key for entry in entries} == {
-        "x_cup_slot_1_novice",
-        "x_cup_slot_1_expert",
-        "x_cup_slot_2_novice",
-        "x_cup_slot_2_expert",
+        "x_cup_slot_1",
+        "x_cup_slot_2",
     }
-    assert len({entry.course_id for entry in entries}) == 4
+    assert len({entry.course_id for entry in entries}) == 2
+    assert len({entry.generated_course_hash for entry in entries}) == 2
+    for slot in (0, 1):
+        slot_entries = tuple(entry for entry in entries if entry.generated_course_slot == slot)
+        assert {entry.gp_difficulty for entry in slot_entries} == {"novice", "expert"}
+        assert len({entry.course_id for entry in slot_entries}) == 1
+        assert len({entry.generated_course_hash for entry in slot_entries}) == 1
 
 
 def test_manager_config_omits_gp_difficulties_outside_gp_race() -> None:

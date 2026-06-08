@@ -87,12 +87,11 @@ def generated_x_cup_course_identity(
     master_seed: int | None,
     slot: int,
     generation: int,
-    gp_difficulty: str,
 ) -> GeneratedXCupCourseIdentity:
     """Derive the stable identity for one generated X Cup slot generation."""
 
     seed = _x_cup_seed(0 if master_seed is None else master_seed, slot=slot, generation=generation)
-    course_hash = _x_cup_course_hash(seed=seed, gp_difficulty=gp_difficulty)
+    course_hash = _x_cup_course_hash(seed=seed)
     short_hash = course_hash[: X_CUP_COURSE.display_hash_chars]
     return GeneratedXCupCourseIdentity(
         course_id=f"{X_CUP_COURSE.id_prefix}_{short_hash}",
@@ -123,11 +122,10 @@ def _x_cup_seed(master_seed: int, *, slot: int, generation: int) -> int:
     return seed
 
 
-def _x_cup_course_hash(*, seed: int, gp_difficulty: str) -> str:
+def _x_cup_course_hash(*, seed: int) -> str:
     return _sha256_json(
         {
             "generator_version": X_CUP_COURSE.generator_version,
-            "gp_difficulty": gp_difficulty,
             "race_mode": X_CUP_COURSE.race_mode,
             "rng_patch_timing": X_CUP_COURSE.rng_patch_timing,
             "seed": seed,
