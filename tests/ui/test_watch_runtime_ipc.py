@@ -15,6 +15,7 @@ from rl_fzerox.ui.watch.runtime.ipc import (
 )
 from rl_fzerox.ui.watch.runtime.worker import (
     _adjacent_watch_course_id,
+    _sync_next_watch_reset_after_episode,
     _watch_sequential_course_ids,
     run_simulation_worker,
 )
@@ -70,6 +71,14 @@ class _InterruptingProcess:
         self._alive = False
 
 
+class _SequentialResetEnv:
+    def __init__(self) -> None:
+        self.next_courses: list[str | None] = []
+
+    def set_next_sequential_reset_course(self, course_id: str | None) -> None:
+        self.next_courses.append(course_id)
+
+
 def test_drain_worker_commands_coalesces_reset_mode() -> None:
     command_queue = _CommandQueue([ViewerCommand(reset_mode="current")])
 
@@ -82,6 +91,85 @@ def test_drain_worker_commands_coalesces_reset_mode() -> None:
     assert commands.reset_mode == "current"
     assert paused is False
     assert control_state == RaceControlState()
+
+
+def test_watch_course_rotation_retries_same_course_after_crash() -> None:
+    env = _SequentialResetEnv()
+
+    _sync_next_watch_reset_after_episode(
+        env=env,
+        info={
+            "termination_reason": "crashed",
+            "track_reset_course_key": "mute_city",
+            "race_laps_completed": 1,
+            "total_lap_count": 3,
+        },
+        episode_done=True,
+        locked_reset_course_id=None,
+    )
+
+    assert env.next_courses == ["mute_city"]
+
+
+def test_watch_course_rotation_retries_same_course_after_timeout() -> None:
+    env = _SequentialResetEnv()
+
+    _sync_next_watch_reset_after_episode(
+        env=env,
+        info={
+            "termination_reason": "timeout",
+            "track_runtime_course_key": "x_cup_slot_1",
+            "race_laps_completed": 2,
+            "total_lap_count": 3,
+        },
+        episode_done=True,
+        locked_reset_course_id=None,
+    )
+
+    assert env.next_courses == ["x_cup_slot_1"]
+
+
+def test_watch_course_rotation_advances_after_completed_finish() -> None:
+    env = _SequentialResetEnv()
+
+    _sync_next_watch_reset_after_episode(
+        env=env,
+        info={
+            "termination_reason": "finished",
+            "track_reset_course_key": "mute_city",
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+        },
+        episode_done=True,
+        locked_reset_course_id=None,
+    )
+
+    assert env.next_courses == []
+
+
+def test_watch_course_rotation_keeps_manual_and_locked_resets_unchanged() -> None:
+    env = _SequentialResetEnv()
+    info = {
+        "termination_reason": "crashed",
+        "track_reset_course_key": "mute_city",
+        "race_laps_completed": 1,
+        "total_lap_count": 3,
+    }
+
+    _sync_next_watch_reset_after_episode(
+        env=env,
+        info=info,
+        episode_done=False,
+        locked_reset_course_id=None,
+    )
+    _sync_next_watch_reset_after_episode(
+        env=env,
+        info=info,
+        episode_done=True,
+        locked_reset_course_id="mute_city",
+    )
+
+    assert env.next_courses == []
 
 
 def test_drain_worker_commands_last_reset_mode_wins() -> None:

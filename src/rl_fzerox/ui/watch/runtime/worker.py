@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 from multiprocessing.queues import Queue as ProcessQueue
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.envs.actions import ActionValue
@@ -22,6 +22,9 @@ from rl_fzerox.ui.watch.runtime.cnn import (
 from rl_fzerox.ui.watch.runtime.course_commands import apply_course_navigation_commands
 from rl_fzerox.ui.watch.runtime.course_navigation import (
     adjacent_watch_course_id as _adjacent_watch_course_id,
+)
+from rl_fzerox.ui.watch.runtime.course_navigation import (
+    current_watch_course_id,
 )
 from rl_fzerox.ui.watch.runtime.course_navigation import (
     watch_sequential_course_ids as _watch_sequential_course_ids,
@@ -82,6 +85,10 @@ __all__ = (
     "_watch_sequential_course_ids",
     "run_simulation_worker",
 )
+
+
+class _SequentialResetEnv(Protocol):
+    def set_next_sequential_reset_course(self, course_id: str | None) -> None: ...
 
 
 def run_simulation_worker(
@@ -596,6 +603,48 @@ def _run_simulation_loop(
                 if target_control_seconds is not None:
                     now = time.perf_counter()
                     next_step_time = max(next_step_time + target_control_seconds, now)
+            _sync_next_watch_reset_after_episode(
+                env=env,
+                info=info,
+                episode_done=terminated or truncated,
+                locked_reset_course_id=persistent_locked_reset_course_id,
+            )
             episode += 1
     finally:
         session.close()
+
+
+def _sync_next_watch_reset_after_episode(
+    *,
+    env: _SequentialResetEnv,
+    info: dict[str, object],
+    episode_done: bool,
+    locked_reset_course_id: str | None,
+) -> None:
+    if not episode_done or locked_reset_course_id is not None:
+        return
+    if _watch_episode_completed_race(info):
+        return
+    current_course_id = current_watch_course_id(info)
+    if current_course_id is None:
+        return
+    env.set_next_sequential_reset_course(current_course_id)
+
+
+def _watch_episode_completed_race(info: dict[str, object]) -> bool:
+    if info.get("termination_reason") != "finished":
+        return False
+    laps_completed = _int_info_value(info, "race_laps_completed")
+    if laps_completed is None:
+        laps_completed = _int_info_value(info, "laps_completed")
+    total_laps = _int_info_value(info, "total_lap_count")
+    if laps_completed is None or total_laps is None:
+        return False
+    return total_laps > 0 and laps_completed >= total_laps
+
+
+def _int_info_value(info: dict[str, object], key: str) -> int | None:
+    value = info.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value)
