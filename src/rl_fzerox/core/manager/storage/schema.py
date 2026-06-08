@@ -167,9 +167,7 @@ def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
 
 
 def _assert_track_sampling_entry_columns(*, inspector: Inspector) -> None:
-    columns = {
-        column["name"] for column in inspector.get_columns("run_track_sampling_entries")
-    }
+    columns = {column["name"] for column in inspector.get_columns("run_track_sampling_entries")}
     legacy_columns = columns.intersection(TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS)
     if legacy_columns:
         joined_columns = ", ".join(sorted(legacy_columns))
@@ -177,15 +175,12 @@ def _assert_track_sampling_entry_columns(*, inspector: Inspector) -> None:
             "manager DB is not current: "
             f"run_track_sampling_entries has legacy columns {joined_columns}"
         )
-    required_columns = {
-        column.name for column in RunTrackSamplingEntryModel.__table__.columns
-    }
+    required_columns = {column.name for column in RunTrackSamplingEntryModel.__table__.columns}
     missing_columns = required_columns.difference(columns)
     if missing_columns:
         joined_columns = ", ".join(sorted(missing_columns))
         raise RuntimeError(
-            "manager DB is not current: "
-            f"run_track_sampling_entries is missing {joined_columns}"
+            f"manager DB is not current: run_track_sampling_entries is missing {joined_columns}"
         )
 
 

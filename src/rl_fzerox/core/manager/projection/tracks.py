@@ -216,8 +216,7 @@ def _source_engine_setting(config: ManagedRunConfig) -> int:
     if config.vehicle.engine_mode == "fixed":
         return config.vehicle.engine_setting_raw_value
     return (
-        config.vehicle.engine_setting_min_raw_value
-        + config.vehicle.engine_setting_max_raw_value
+        config.vehicle.engine_setting_min_raw_value + config.vehicle.engine_setting_max_raw_value
     ) // 2
 
 

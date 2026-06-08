@@ -126,9 +126,7 @@ def resolve_engine_setting(raw_engine_setting: object, *, context: str) -> Engin
     """Resolve one raw 0..100 engine-slider value."""
 
     if isinstance(raw_engine_setting, bool) or not isinstance(raw_engine_setting, int):
-        raise ValueError(
-            f"{context} engine_setting_raw_value must be a raw integer in [0, 100]"
-        )
+        raise ValueError(f"{context} engine_setting_raw_value must be a raw integer in [0, 100]")
     _validate_engine_setting_raw_value(raw_engine_setting, context=context)
     return EngineSetting(raw_value=raw_engine_setting)
 
