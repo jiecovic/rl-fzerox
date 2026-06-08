@@ -65,7 +65,10 @@ class ManagedTrackSamplingRefresh:
         force: bool = False,
     ) -> TrackSamplingRefreshStatus:
         if not force and not self._refresh_due():
-            return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)
+            return TrackSamplingRefreshStatus(
+                refreshed_config=None,
+                ready_for_reset=self._last_blocked_signature is None,
+            )
         self._last_check_monotonic = time.monotonic()
         state = self.store.get_run_track_sampling_state(self.run_id)
         projected_config = restore_generated_x_cup_track_sampling_from_state(

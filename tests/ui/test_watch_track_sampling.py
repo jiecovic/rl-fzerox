@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
@@ -142,6 +144,49 @@ def test_managed_watch_track_sampling_refresh_waits_for_run_local_baseline_artif
     assert refresh is not None
     assert refresh.refreshed_config(config, force=True) is None
     status = refresh.refresh_status(config, force=True)
+    assert status.refreshed_config is None
+    assert not status.ready_for_reset
+
+
+def test_managed_watch_track_sampling_refresh_remembers_blocked_state_between_checks(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="run",
+        name="Run",
+        config=_managed_x_cup_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    run.run_dir.mkdir(parents=True, exist_ok=True)
+    old_baseline_path = tmp_path / "old.state"
+    old_baseline_path.write_bytes(b"old")
+    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    config = _track_sampling_config(baseline_path=old_baseline_path)
+    refresh = ManagedTrackSamplingRefresh.from_config(
+        WatchAppConfig(
+            emulator=EmulatorConfig(
+                core_path=_touched(tmp_path / "core.so"),
+                rom_path=_touched(tmp_path / "rom.n64"),
+            ),
+            env=EnvConfig(track_sampling=config),
+            watch=WatchConfig(manager_db_path=db_path, managed_run_id=run.id),
+        )
+    )
+
+    assert refresh is not None
+    blocked_status = refresh.refresh_status(config, force=True)
+    assert not blocked_status.ready_for_reset
+
+    def fail_store_read(_run_id: str) -> None:
+        raise AssertionError("blocked watch refresh should wait for the next interval")
+
+    monkeypatch.setattr(refresh.store, "get_run_track_sampling_state", fail_store_read)
+
+    status = refresh.refresh_status(config, force=False)
+
     assert status.refreshed_config is None
     assert not status.ready_for_reset
 

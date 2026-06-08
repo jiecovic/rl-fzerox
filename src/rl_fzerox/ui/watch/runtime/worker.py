@@ -236,14 +236,14 @@ def _run_simulation_loop(
                 env.set_locked_reset_course(None)
             return True
 
-        def track_sampling_ready_for_reset() -> bool:
+        def track_sampling_ready_for_reset(*, force: bool = False) -> bool:
             nonlocal active_track_sampling
             nonlocal persistent_locked_reset_course_id
             nonlocal sequential_course_ids
 
             if track_sampling_refresh is None:
                 return True
-            status = track_sampling_refresh.refresh_status(active_track_sampling, force=True)
+            status = track_sampling_refresh.refresh_status(active_track_sampling, force=force)
             if status.refreshed_config is not None:
                 env.set_track_sampling_config(status.refreshed_config)
                 active_track_sampling = status.refreshed_config
@@ -261,7 +261,9 @@ def _run_simulation_loop(
             )
 
         while config.watch.episodes is None or episode < config.watch.episodes:
-            while not track_sampling_ready_for_reset():
+            force_track_sampling_check = True
+            while not track_sampling_ready_for_reset(force=force_track_sampling_check):
+                force_track_sampling_check = False
                 time.sleep(0.25)
             env.set_locked_reset_course(persistent_locked_reset_course_id)
             reset_seed = config.seed if episode == 0 else None
