@@ -319,6 +319,32 @@ def test_drain_worker_commands_last_non_idle_spin_request_wins() -> None:
     assert commands.spin_request == "right"
 
 
+def test_drain_worker_commands_preserves_held_spin_request_without_commands() -> None:
+    command_queue = _CommandQueue([])
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=RaceControlState(),
+        spin_request="left",
+    )
+
+    assert commands.spin_request == "left"
+
+
+def test_drain_worker_commands_clears_released_spin_request() -> None:
+    command_queue = _CommandQueue([ViewerCommand(spin_request="none")])
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=RaceControlState(),
+        spin_request="left",
+    )
+
+    assert commands.spin_request == "none"
+
+
 def test_watch_worker_shutdown_swallows_keyboard_interrupt_during_join() -> None:
     command_queue = _ShutdownQueue()
     snapshot_queue = _ShutdownQueue()

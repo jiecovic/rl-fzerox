@@ -206,6 +206,9 @@ def _poll_viewer_input(
             _held_speed_direction(pygame, keys),
             now_seconds=time.perf_counter() if now_seconds is None else now_seconds,
         )
+    held_spin_request = _held_spin_request(pygame, keys)
+    if spin_request == "none":
+        spin_request = held_spin_request
 
     return ViewerInput(
         quit_requested=quit_requested,
@@ -246,6 +249,16 @@ def _held_speed_direction(pygame: PygameModule, keys: _PressedKeyState) -> int:
     if minus_held and not plus_held:
         return -1
     return 0
+
+
+def _held_spin_request(pygame: PygameModule, keys: _PressedKeyState) -> SpinRequest:
+    left_held = keys[pygame.K_q]
+    right_held = keys[pygame.K_w]
+    if left_held and not right_held:
+        return "left"
+    if right_held and not left_held:
+        return "right"
+    return "none"
 
 
 def _sign(value: int) -> int:

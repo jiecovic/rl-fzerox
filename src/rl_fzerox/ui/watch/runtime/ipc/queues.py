@@ -148,6 +148,7 @@ def drain_worker_commands(
     *,
     paused: bool,
     control_state: RaceControlState,
+    spin_request: SpinRequest = "none",
     manual_control_enabled: bool = False,
     cnn_visualization_enabled: bool = False,
     auxiliary_visualization_enabled: bool = False,
@@ -156,6 +157,7 @@ def drain_worker_commands(
 ) -> tuple[WorkerCommandBatch, bool, RaceControlState]:
     next_paused = paused
     next_control_state = control_state
+    next_spin_request = spin_request
     next_manual_control_enabled = manual_control_enabled
     quit_requested = False
     step_requests = 0
@@ -171,7 +173,6 @@ def drain_worker_commands(
     next_auxiliary_visualization_enabled = auxiliary_visualization_enabled
     next_live_visualization_enabled = live_visualization_enabled
     next_cnn_normalization = cnn_normalization
-    spin_request: SpinRequest = "none"
     while True:
         try:
             command = command_queue.get_nowait()
@@ -194,7 +195,7 @@ def drain_worker_commands(
                     auxiliary_visualization_enabled=next_auxiliary_visualization_enabled,
                     live_visualization_enabled=next_live_visualization_enabled,
                     cnn_normalization=next_cnn_normalization,
-                    spin_request=spin_request,
+                    spin_request=next_spin_request,
                     control_state=next_control_state,
                 ),
                 next_paused,
@@ -228,8 +229,7 @@ def drain_worker_commands(
         next_auxiliary_visualization_enabled = command.auxiliary_visualization_enabled
         next_live_visualization_enabled = command.live_visualization_enabled
         next_cnn_normalization = command.cnn_normalization
-        if command.spin_request != "none":
-            spin_request = command.spin_request
+        next_spin_request = command.spin_request
         if command.control_state is not None:
             next_control_state = command.control_state
 

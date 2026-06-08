@@ -334,6 +334,8 @@ def _run_career_mode_loop_body(
     cnn_activations: CnnActivationSnapshot | None,
     last_menu_step: RawMenuStep | None,
 ) -> None:
+    manual_spin_request: SpinRequest = "none"
+
     def publish_snapshot(*, policy_visible: bool) -> None:
         policy_active = policy_visible and observation is not None
         snapshot_target_fps = _snapshot_target_control_fps(
@@ -419,6 +421,7 @@ def _run_career_mode_loop_body(
                 command_queue,
                 paused=paused,
                 control_state=manual_control_state,
+                spin_request=manual_spin_request,
                 manual_control_enabled=manual_control_enabled,
                 cnn_visualization_enabled=cnn_visualization_enabled,
                 auxiliary_visualization_enabled=auxiliary_visualization_enabled,
@@ -489,6 +492,15 @@ def _run_career_mode_loop_body(
             cnn_normalization = commands.cnn_normalization
             if commands.toggle_deterministic_policy:
                 deterministic_policy = not deterministic_policy
+            next_manual_control_enabled = (
+                commands.manual_control_enabled
+                if controller.policy_owns_control() and active_policy_started
+                else False
+            )
+            if next_manual_control_enabled:
+                manual_spin_request = commands.spin_request
+            else:
+                manual_spin_request = "none"
             if (
                 auxiliary_visualization_enabled != previous_auxiliary_visualization_enabled
                 and controller.policy_owns_control()
@@ -695,7 +707,7 @@ def _run_career_mode_loop_body(
                     target_control_fps=target_control_fps,
                 )
                 current_step_seconds = policy_timing.target_seconds
-                manual_control_enabled = commands.manual_control_enabled
+                manual_control_enabled = next_manual_control_enabled
                 if manual_control_enabled:
                     current_control_state = commands.control_state
                 (
@@ -731,7 +743,7 @@ def _run_career_mode_loop_body(
                     deterministic_policy=deterministic_policy,
                     manual_control_enabled=manual_control_enabled,
                     current_control_state=current_control_state,
-                    spin_request=commands.spin_request,
+                    spin_request=manual_spin_request if manual_control_enabled else "none",
                     boost_lamp_level=boost_lamp_level,
                     cnn_visualization_enabled=cnn_visualization_enabled,
                     cnn_normalization=cnn_normalization,

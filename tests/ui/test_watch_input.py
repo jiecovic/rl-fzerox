@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from rl_fzerox.ui.watch.input import SpeedKeyRepeat, _poll_viewer_input, mouse_over_clickable
+from rl_fzerox.ui.watch.input import (
+    SpeedKeyRepeat,
+    _poll_viewer_input,
+    mouse_over_clickable,
+)
 from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox, StateFeatureHitbox
 
 
@@ -205,10 +209,34 @@ def test_poll_viewer_input_maps_q_to_left_spin_request() -> None:
     assert viewer_input.spin_request == "left"
 
 
+def test_poll_viewer_input_maps_held_q_to_left_spin_request() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_q,)),
+    )
+
+    assert viewer_input.spin_request == "left"
+
+
 def test_poll_viewer_input_maps_w_to_right_spin_request() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_w,)))
 
     assert viewer_input.spin_request == "right"
+
+
+def test_poll_viewer_input_maps_held_w_to_right_spin_request() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_w,)),
+    )
+
+    assert viewer_input.spin_request == "right"
+
+
+def test_poll_viewer_input_ignores_conflicting_held_spin_keys() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_q, _FakePygame.K_w)),
+    )
+
+    assert viewer_input.spin_request == "none"
 
 
 def test_poll_viewer_input_maps_c_to_cnn_normalization_toggle() -> None:

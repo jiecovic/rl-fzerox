@@ -5,7 +5,7 @@ import time
 from multiprocessing.queues import Queue as ProcessQueue
 from typing import TYPE_CHECKING
 
-from fzerox_emulator import RaceControlState
+from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
@@ -127,6 +127,7 @@ def _run_simulation_loop(
         deterministic_policy = bool(config.watch.deterministic_policy)
         manual_control_enabled = policy_runner is None
         manual_control_state = RaceControlState()
+        manual_spin_request: SpinRequest = "none"
         committed_policy_action: ActionValue | None = None
         committed_action_mask_branches = env.action_mask_branches()
         cnn_visualization_enabled = False
@@ -274,6 +275,7 @@ def _run_simulation_loop(
                     command_queue,
                     paused=paused,
                     control_state=manual_control_state,
+                    spin_request=manual_spin_request,
                     manual_control_enabled=manual_control_enabled,
                     cnn_visualization_enabled=cnn_visualization_enabled,
                     auxiliary_visualization_enabled=auxiliary_visualization_enabled,
@@ -283,6 +285,10 @@ def _run_simulation_loop(
                 manual_control_enabled = (
                     True if policy_runner is None else commands.manual_control_enabled
                 )
+                if manual_control_enabled:
+                    manual_spin_request = commands.spin_request
+                else:
+                    manual_spin_request = "none"
                 cnn_visualization_enabled = commands.cnn_visualization_enabled
                 auxiliary_visualization_enabled = (
                     bool(auxiliary_target_names) and commands.auxiliary_visualization_enabled
@@ -407,14 +413,14 @@ def _run_simulation_loop(
                     if single_frame_manual:
                         observation, reward, terminated, truncated, info = env.step_frame(
                             current_control_state,
-                            spin_request=commands.spin_request,
+                            spin_request=manual_spin_request,
                         )
                         display_frames = (env.render(),)
                         display_controller_masks = (current_control_state.control_mask,)
                     else:
                         watch_step = env.step_control_watch(
                             current_control_state,
-                            spin_request=commands.spin_request,
+                            spin_request=manual_spin_request,
                         )
                         observation, reward, terminated, truncated, info = watch_step.gym_result()
                         display_frames = watch_step.display_frames
