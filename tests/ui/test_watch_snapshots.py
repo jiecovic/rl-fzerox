@@ -120,7 +120,11 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         active_track_sampling=None,
         best_finish_position=None,
         best_finish_ranks={"mute": 1},
+        best_finish_rank_times={"mute": 99_000},
+        best_finish_rank_setups={"mute": {"vehicle_name": "Blue Falcon"}},
         best_finish_times={"mute": 98_000},
+        best_finish_time_ranks={"mute": 2},
+        best_finish_time_setups={"mute": {"engine_setting_raw_value": 60}},
         latest_finish_times={"mute": 101_000},
         latest_finish_deltas_ms={"mute": 3_000},
         failed_track_attempts=frozenset({"silence"}),
@@ -166,7 +170,11 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert np.array_equal(snapshot.policy_action, policy_action)
         assert snapshot.manual_control_enabled is True
         assert snapshot.action_mask_branches == {"lean": (True, False, True)}
+        assert snapshot.best_finish_rank_times == {"mute": 99_000}
+        assert snapshot.best_finish_rank_setups == {"mute": {"vehicle_name": "Blue Falcon"}}
         assert snapshot.best_finish_times == {"mute": 98_000}
+        assert snapshot.best_finish_time_ranks == {"mute": 2}
+        assert snapshot.best_finish_time_setups == {"mute": {"engine_setting_raw_value": 60}}
         assert snapshot.latest_finish_times == {"mute": 101_000}
         assert snapshot.latest_finish_deltas_ms == {"mute": 3_000}
         assert snapshot.failed_track_attempts == frozenset({"silence"})
@@ -221,7 +229,11 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
         active_track_sampling=None,
         best_finish_position=None,
         best_finish_ranks={},
+        best_finish_rank_times={},
+        best_finish_rank_setups={},
         best_finish_times={},
+        best_finish_time_ranks={},
+        best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
         failed_track_attempts=frozenset(),
@@ -277,7 +289,11 @@ def test_menu_snapshot_has_layout_shape_without_policy_observation(tmp_path: Pat
         active_track_sampling=None,
         best_finish_position=None,
         best_finish_ranks={},
+        best_finish_rank_times={},
+        best_finish_rank_setups={},
         best_finish_times={},
+        best_finish_time_ranks={},
+        best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
         failed_track_attempts=frozenset(),
@@ -328,7 +344,11 @@ def test_career_menu_snapshot_has_no_policy_observation_shape(tmp_path: Path) ->
         active_track_sampling=None,
         best_finish_position=None,
         best_finish_ranks={},
+        best_finish_rank_times={},
+        best_finish_rank_setups={},
         best_finish_times={},
+        best_finish_time_ranks={},
+        best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
         failed_track_attempts=frozenset(),

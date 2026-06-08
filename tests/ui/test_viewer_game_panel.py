@@ -839,7 +839,7 @@ def test_records_section_shows_non_agg_reference_records() -> None:
 
     records_section = next(section for section in columns.records if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "Big Blue")
-    pb_line = next(line for line in records_section.lines if line.label == "PB")
+    pb_line = next(line for line in records_section.lines if line.label == "Best time")
     wr_line = next(line for line in records_section.lines if line.label == "WR")
     assert header_line.value == ""
     assert header_line.status_icon == "none"
@@ -883,7 +883,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
 
     records_section = next(section for section in columns.records if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "> Silence")
-    pb_line = next(line for line in records_section.lines if line.label == "PB")
+    pb_line = next(line for line in records_section.lines if line.label == "Best time")
     latest_line = next(line for line in records_section.lines if line.label == "Latest")
     assert header_line.value == ""
     assert header_line.status_icon == "outside"
@@ -915,7 +915,15 @@ def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
         best_finish_ranks={"silence": 1},
+        best_finish_rank_times={"silence": 101_000},
+        best_finish_rank_setups={
+            "silence": {"vehicle_name": "Deep Claw", "engine_setting_raw_value": 60}
+        },
         best_finish_times={"silence": 98765},
+        best_finish_time_ranks={"silence": 2},
+        best_finish_time_setups={
+            "silence": {"vehicle_name": "Blue Falcon", "engine_setting_raw_value": 50}
+        },
         track_pool_records=(
             {
                 "track_id": "silence",
@@ -926,9 +934,11 @@ def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
     )
 
     records_section = next(section for section in columns.records if section.title == "Records")
-    pb_line = next(line for line in records_section.lines if line.label == "PB")
+    best_time_line = next(line for line in records_section.lines if line.label == "Best time")
+    best_position_line = next(line for line in records_section.lines if line.label == "Best pos")
 
-    assert pb_line.value == "1:38.765 · P1"
+    assert best_time_line.value == "1:38.765 · P2 · Blue Falcon / Engine 50"
+    assert best_position_line.value == "P1 · 1:41.000 · Deep Claw / Engine 60"
 
 
 def test_records_section_groups_track_pool_by_cup() -> None:
@@ -1097,16 +1107,22 @@ def test_records_section_follows_selected_gp_difficulty() -> None:
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(difficulty_name="expert", difficulty_raw=2),
         best_finish_ranks={novice_key: 3, expert_key: 1},
+        best_finish_rank_times={novice_key: 92_000, expert_key: 102_000},
         best_finish_times={novice_key: 92_000, expert_key: 98_000},
+        best_finish_time_ranks={novice_key: 3, expert_key: 1},
         track_pool_records=(novice_record, expert_record),
     )
 
     assert [section.title for section in columns.records] == ["Records"]
     headings = [line.label for line in columns.records[0].lines if line.heading]
-    expert_pb_line = next(line for line in columns.records[0].lines if line.label == "PB")
+    expert_pb_line = next(
+        line for line in columns.records[0].lines if line.label == "Best time"
+    )
+    expert_pos_line = next(line for line in columns.records[0].lines if line.label == "Best pos")
 
     assert headings == ["> Mute City"]
     assert expert_pb_line.value == "1:38.000 · P1"
+    assert expert_pos_line.value == "P1 · 1:42.000"
 
 
 def test_records_section_highlights_current_track_heading() -> None:
@@ -1224,7 +1240,7 @@ def test_records_section_marks_watch_best_inside_reference_range() -> None:
 
     records_section = next(section for section in columns.records if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "> Silence")
-    pb_line = next(line for line in records_section.lines if line.label == "PB")
+    pb_line = next(line for line in records_section.lines if line.label == "Best time")
     assert header_line.value == ""
     assert header_line.status_icon == "in_range"
     assert header_line.status_text == "+1.4s"

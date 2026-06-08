@@ -6,8 +6,9 @@ from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelLine
 
 from .formatting import (
+    format_best_position,
+    format_best_time,
     format_latest_compact_time,
-    format_personal_best,
     format_record_range,
     format_track_record_heading,
     latest_time_color,
@@ -19,6 +20,7 @@ from .identity import (
     is_current_track_record,
     optional_int_info,
     record_course_id,
+    watch_track_payload,
     watch_track_value,
 )
 from .model import RecordInfo
@@ -29,7 +31,11 @@ def record_group_lines(
     *,
     current_info: RecordInfo,
     best_finish_ranks: dict[str, int],
+    best_finish_rank_times: dict[str, int],
+    best_finish_rank_setups: dict[str, dict[str, str | int]],
     best_finish_times: dict[str, int],
+    best_finish_time_ranks: dict[str, int],
+    best_finish_time_setups: dict[str, dict[str, str | int]],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
@@ -43,7 +49,11 @@ def record_group_lines(
                 record,
                 current_info=current_info,
                 best_finish_ranks=best_finish_ranks,
+                best_finish_rank_times=best_finish_rank_times,
+                best_finish_rank_setups=best_finish_rank_setups,
                 best_finish_times=best_finish_times,
+                best_finish_time_ranks=best_finish_time_ranks,
+                best_finish_time_setups=best_finish_time_setups,
                 latest_finish_times=latest_finish_times,
                 latest_finish_deltas_ms=latest_finish_deltas_ms,
                 failed_track_attempts=failed_track_attempts,
@@ -57,14 +67,22 @@ def track_record_pool_lines(
     *,
     current_info: RecordInfo,
     best_finish_ranks: dict[str, int],
+    best_finish_rank_times: dict[str, int],
+    best_finish_rank_setups: dict[str, dict[str, str | int]],
     best_finish_times: dict[str, int],
+    best_finish_time_ranks: dict[str, int],
+    best_finish_time_setups: dict[str, dict[str, str | int]],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
 ) -> tuple[PanelLine, ...]:
     is_current_track = is_current_track_record(record, current_info)
     watch_best_rank = watch_track_value(record, best_finish_ranks)
+    watch_best_rank_time = watch_track_value(record, best_finish_rank_times)
+    watch_best_rank_setup = watch_track_payload(record, best_finish_rank_setups)
     watch_best = watch_track_value(record, best_finish_times)
+    watch_best_time_rank = watch_track_value(record, best_finish_time_ranks)
+    watch_best_time_setup = watch_track_payload(record, best_finish_time_setups)
     watch_latest = watch_track_value(record, latest_finish_times)
     watch_latest_delta = watch_track_value(record, latest_finish_deltas_ms)
     failed_attempt = has_failed_attempt(record, failed_track_attempts) and watch_best is None
@@ -82,7 +100,7 @@ def track_record_pool_lines(
         worst_time_ms=worst_time,
         failed_attempt=failed_attempt,
     )
-    return (
+    lines = [
         panel_line(
             format_track_record_heading(record, is_current_track=is_current_track),
             "",
@@ -94,36 +112,54 @@ def track_record_pool_lines(
             click_course_id=record_course_id(record),
         ),
         panel_line(
-            "PB",
-            format_personal_best(
+            "Best time",
+            format_best_time(
                 watch_best,
-                watch_best_rank if _shows_finish_rank(record, current_info) else None,
+                rank=watch_best_time_rank if _shows_finish_rank(record, current_info) else None,
+                setup=watch_best_time_setup,
             ),
             status_color if watch_best is not None else PALETTE.text_muted,
         ),
-        panel_line(
-            "Latest",
-            format_latest_compact_time(
-                watch_latest,
-                watch_best,
-                latest_delta_ms=watch_latest_delta,
-                failed_attempt=failed_attempt,
+    ]
+    if _shows_finish_rank(record, current_info):
+        lines.append(
+            panel_line(
+                "Best pos",
+                format_best_position(
+                    watch_best_rank,
+                    time_ms=watch_best_rank_time,
+                    setup=watch_best_rank_setup,
+                ),
+                PALETTE.text_accent if watch_best_rank is not None else PALETTE.text_muted,
+            )
+        )
+    lines.extend(
+        (
+            panel_line(
+                "Latest",
+                format_latest_compact_time(
+                    watch_latest,
+                    watch_best,
+                    latest_delta_ms=watch_latest_delta,
+                    failed_attempt=failed_attempt,
+                ),
+                latest_time_color(
+                    latest_time_ms=watch_latest,
+                    best_time_ms=watch_best,
+                    latest_delta_ms=watch_latest_delta,
+                    failed_attempt=failed_attempt,
+                ),
             ),
-            latest_time_color(
-                latest_time_ms=watch_latest,
-                best_time_ms=watch_best,
-                latest_delta_ms=watch_latest_delta,
-                failed_attempt=failed_attempt,
+            panel_line(
+                "WR",
+                format_record_range(best_time, worst_time),
+                PALETTE.text_primary
+                if best_time is not None or worst_time is not None
+                else PALETTE.text_muted,
             ),
-        ),
-        panel_line(
-            "WR",
-            format_record_range(best_time, worst_time),
-            PALETTE.text_primary
-            if best_time is not None or worst_time is not None
-            else PALETTE.text_muted,
-        ),
+        )
     )
+    return tuple(lines)
 
 
 def _shows_finish_rank(record: RecordInfo, current_info: RecordInfo) -> bool:

@@ -87,11 +87,48 @@ def format_optional_compact_time(time_ms: int | None) -> str:
     return format_compact_race_time_ms(time_ms)
 
 
-def format_personal_best(time_ms: int | None, rank: int | None) -> str:
+def format_best_time(
+    time_ms: int | None,
+    *,
+    rank: int | None,
+    setup: dict[str, str | int] | None,
+) -> str:
     time_text = format_optional_compact_time(time_ms)
+    parts = [time_text]
+    if rank is not None:
+        parts.append(f"P{rank}")
+    if setup_text := format_finish_setup(setup):
+        parts.append(setup_text)
+    return " · ".join(parts)
+
+
+def format_best_position(
+    rank: int | None,
+    *,
+    time_ms: int | None,
+    setup: dict[str, str | int] | None,
+) -> str:
     if rank is None:
-        return time_text
-    return f"{time_text} · P{rank}"
+        return "--"
+    parts = [f"P{rank}"]
+    if time_ms is not None:
+        parts.append(format_compact_race_time_ms(time_ms))
+    if setup_text := format_finish_setup(setup):
+        parts.append(setup_text)
+    return " · ".join(parts)
+
+
+def format_finish_setup(setup: dict[str, str | int] | None) -> str | None:
+    if setup is None:
+        return None
+    parts: list[str] = []
+    vehicle_name = setup.get("vehicle_name", setup.get("vehicle"))
+    if isinstance(vehicle_name, str) and vehicle_name:
+        parts.append(format_mode_name(vehicle_name))
+    engine_raw = setup.get("engine_setting_raw_value")
+    if isinstance(engine_raw, int) and not isinstance(engine_raw, bool):
+        parts.append(f"Engine {engine_raw}")
+    return " / ".join(parts) if parts else None
 
 
 def format_latest_compact_time(

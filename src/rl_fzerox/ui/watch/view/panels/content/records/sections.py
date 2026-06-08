@@ -16,7 +16,11 @@ def track_record_sections(
     current_info: RecordInfo,
     track_pool_records: tuple[RecordInfo, ...],
     best_finish_ranks: dict[str, int],
+    best_finish_rank_times: dict[str, int],
+    best_finish_rank_setups: dict[str, dict[str, str | int]],
     best_finish_times: dict[str, int],
+    best_finish_time_ranks: dict[str, int],
+    best_finish_time_setups: dict[str, dict[str, str | int]],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str] = frozenset(),
@@ -30,7 +34,11 @@ def track_record_sections(
     if (
         not records
         and not best_finish_ranks
+        and not best_finish_rank_times
+        and not best_finish_rank_setups
         and not best_finish_times
+        and not best_finish_time_ranks
+        and not best_finish_time_setups
         and not latest_finish_times
         and not failed_track_attempts
     ):
@@ -44,7 +52,11 @@ def track_record_sections(
                     group.records,
                     current_info=current_info,
                     best_finish_ranks=best_finish_ranks,
+                    best_finish_rank_times=best_finish_rank_times,
+                    best_finish_rank_setups=best_finish_rank_setups,
                     best_finish_times=best_finish_times,
+                    best_finish_time_ranks=best_finish_time_ranks,
+                    best_finish_time_setups=best_finish_time_setups,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
                     failed_track_attempts=failed_track_attempts,
@@ -57,7 +69,11 @@ def track_record_sections(
         records,
         current_info=current_info,
         best_finish_ranks=best_finish_ranks,
+        best_finish_rank_times=best_finish_rank_times,
+        best_finish_rank_setups=best_finish_rank_setups,
         best_finish_times=best_finish_times,
+        best_finish_time_ranks=best_finish_time_ranks,
+        best_finish_time_setups=best_finish_time_setups,
         latest_finish_times=latest_finish_times,
         latest_finish_deltas_ms=latest_finish_deltas_ms,
         failed_track_attempts=failed_track_attempts,

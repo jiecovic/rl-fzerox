@@ -43,7 +43,11 @@ from rl_fzerox.ui.watch.runtime.career_mode.timing import (
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
+    _update_best_finish_rank_setups,
+    _update_best_finish_rank_times,
     _update_best_finish_ranks,
+    _update_best_finish_time_ranks,
+    _update_best_finish_time_setups,
     _update_best_finish_times,
     _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
@@ -74,7 +78,7 @@ def test_watch_state_feature_zeroing_masks_selected_features_without_mutating_so
         "image": _sample_image(),
         "state": _sample_state([0.0, 2.0, 3.0]),
     }
-    info = {
+    info: dict[str, object] = {
         "observation_state_features": (
             "vehicle_state.speed_kph_norm",
             "machine_context.energy_norm",
@@ -548,6 +552,61 @@ def test_best_finish_times_track_successful_finishes_per_track() -> None:
     assert best_times == {"mute": 95_000, "silence": 105_000}
 
 
+def test_best_finish_time_metadata_tracks_the_finish_that_set_the_time() -> None:
+    best_times: dict[str, int] = {}
+    time_ranks: dict[str, int] = {}
+    time_setups: dict[str, dict[str, str | int]] = {}
+    info = {
+        "termination_reason": "finished",
+        "track_id": "mute",
+        "race_time_ms": 98_000,
+        "position": 3,
+        "track_vehicle_name": "Deep Claw",
+        "track_engine_setting_raw_value": 60,
+    }
+
+    time_ranks = _update_best_finish_time_ranks(
+        time_ranks,
+        best_times,
+        info,
+        _sample_telemetry(race_time_ms=98_000, position=3),
+    )
+    time_setups = _update_best_finish_time_setups(
+        time_setups,
+        best_times,
+        info,
+        None,
+    )
+    best_times = _update_best_finish_times(
+        best_times,
+        info,
+        _sample_telemetry(race_time_ms=98_000),
+    )
+    slower_info: dict[str, object] = dict(
+        info,
+        race_time_ms=101_000,
+        position=1,
+        track_vehicle_name="Blue Falcon",
+        track_engine_setting_raw_value=40,
+    )
+    time_ranks = _update_best_finish_time_ranks(
+        time_ranks,
+        best_times,
+        slower_info,
+        _sample_telemetry(race_time_ms=101_000, position=1),
+    )
+    time_setups = _update_best_finish_time_setups(time_setups, best_times, slower_info, None)
+
+    assert best_times == {"mute": 98_000}
+    assert time_ranks == {"mute": 3}
+    assert time_setups == {
+        "mute": {
+            "vehicle_name": "Deep Claw",
+            "engine_setting_raw_value": 60,
+        }
+    }
+
+
 def test_best_finish_times_track_gp_difficulties_separately() -> None:
     novice_info: dict[str, object] = {
         "termination_reason": "finished",
@@ -629,6 +688,67 @@ def test_best_finish_ranks_track_successful_finishes_per_track() -> None:
     )
 
     assert best_ranks == {"mute": 3, "silence": 5}
+
+
+def test_best_finish_rank_metadata_tracks_time_for_best_position() -> None:
+    best_ranks: dict[str, int] = {}
+    rank_times: dict[str, int] = {}
+    rank_setups: dict[str, dict[str, str | int]] = {}
+    info: dict[str, object] = {
+        "termination_reason": "finished",
+        "track_id": "mute",
+        "race_time_ms": 101_000,
+        "position": 1,
+        "track_vehicle_name": "Blue Falcon",
+        "track_engine_setting_raw_value": 50,
+    }
+
+    rank_setups = _update_best_finish_rank_setups(
+        rank_setups,
+        rank_times,
+        best_ranks,
+        info,
+        None,
+    )
+    rank_times = _update_best_finish_rank_times(
+        rank_times,
+        best_ranks,
+        info,
+        _sample_telemetry(race_time_ms=101_000, position=1),
+    )
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        info,
+        _sample_telemetry(position=1),
+    )
+    faster_same_rank_info: dict[str, object] = dict(
+        info,
+        race_time_ms=98_000,
+        track_vehicle_name="Deep Claw",
+        track_engine_setting_raw_value=60,
+    )
+    rank_setups = _update_best_finish_rank_setups(
+        rank_setups,
+        rank_times,
+        best_ranks,
+        faster_same_rank_info,
+        None,
+    )
+    rank_times = _update_best_finish_rank_times(
+        rank_times,
+        best_ranks,
+        faster_same_rank_info,
+        _sample_telemetry(race_time_ms=98_000, position=1),
+    )
+
+    assert best_ranks == {"mute": 1}
+    assert rank_times == {"mute": 98_000}
+    assert rank_setups == {
+        "mute": {
+            "vehicle_name": "Deep Claw",
+            "engine_setting_raw_value": 60,
+        }
+    }
 
 
 def test_latest_finish_times_track_most_recent_successful_finish_per_track() -> None:
@@ -720,7 +840,11 @@ def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
         current_info={},
         track_pool_records=records,
         best_finish_ranks={},
+        best_finish_rank_times={},
+        best_finish_rank_setups={},
         best_finish_times={},
+        best_finish_time_ranks={},
+        best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
         failed_track_attempts=frozenset({"mute"}),
@@ -729,7 +853,11 @@ def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
         current_info={},
         track_pool_records=records,
         best_finish_ranks={},
+        best_finish_rank_times={},
+        best_finish_rank_setups={},
         best_finish_times={"mute": 95_000},
+        best_finish_time_ranks={},
+        best_finish_time_setups={},
         latest_finish_times={"mute": 95_000},
         latest_finish_deltas_ms={},
         failed_track_attempts=frozenset({"mute"}),
@@ -915,7 +1043,11 @@ def test_record_rows_click_stable_runtime_course_key() -> None:
             },
         ),
         best_finish_ranks={},
+        best_finish_rank_times={},
+        best_finish_rank_setups={},
         best_finish_times={},
+        best_finish_time_ranks={},
+        best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
         failed_track_attempts=frozenset(),

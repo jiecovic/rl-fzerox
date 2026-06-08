@@ -1,6 +1,9 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/identity.py
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import TypeVar
+
 from rl_fzerox.ui.watch.records import (
     record_difficulty,
     track_record_key,
@@ -8,6 +11,8 @@ from rl_fzerox.ui.watch.records import (
 )
 
 from .model import RecordInfo
+
+_T = TypeVar("_T")
 
 
 def current_track_record_pool(info: RecordInfo) -> tuple[RecordInfo, ...]:
@@ -81,6 +86,13 @@ def watch_track_value(
     info: RecordInfo,
     values: dict[str, int],
 ) -> int | None:
+    return watch_track_payload(info, values)
+
+
+def watch_track_payload(
+    info: RecordInfo,
+    values: Mapping[str, _T],
+) -> _T | None:
     for track_key in track_record_lookup_keys(info):
         value = values.get(track_key)
         if value is not None:

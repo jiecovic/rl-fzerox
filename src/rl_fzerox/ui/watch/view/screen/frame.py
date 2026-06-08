@@ -87,7 +87,11 @@ class FrameRenderData:
     cnn_activations: CnnActivationSnapshot | None
     best_finish_position: int | None
     best_finish_ranks: dict[str, int]
+    best_finish_rank_times: dict[str, int]
+    best_finish_rank_setups: dict[str, dict[str, str | int]]
     best_finish_times: dict[str, int]
+    best_finish_time_ranks: dict[str, int]
+    best_finish_time_setups: dict[str, dict[str, str | int]]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
     failed_track_attempts: frozenset[str]
@@ -396,7 +400,11 @@ def _draw_frame(
             cnn_activations=data.cnn_activations,
             best_finish_position=data.best_finish_position,
             best_finish_ranks=data.best_finish_ranks,
+            best_finish_rank_times=data.best_finish_rank_times,
+            best_finish_rank_setups=data.best_finish_rank_setups,
             best_finish_times=data.best_finish_times,
+            best_finish_time_ranks=data.best_finish_time_ranks,
+            best_finish_time_setups=data.best_finish_time_setups,
             latest_finish_times=data.latest_finish_times,
             latest_finish_deltas_ms=data.latest_finish_deltas_ms,
             failed_track_attempts=data.failed_track_attempts,

@@ -116,7 +116,11 @@ class WatchSnapshot:
     cnn_activations: CnnActivationSnapshot | None
     best_finish_position: int | None
     best_finish_ranks: dict[str, int]
+    best_finish_rank_times: dict[str, int]
+    best_finish_rank_setups: dict[str, dict[str, str | int]]
     best_finish_times: dict[str, int]
+    best_finish_time_ranks: dict[str, int]
+    best_finish_time_setups: dict[str, dict[str, str | int]]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
     failed_track_attempts: frozenset[str]

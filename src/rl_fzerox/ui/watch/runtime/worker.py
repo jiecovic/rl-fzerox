@@ -31,7 +31,11 @@ from rl_fzerox.ui.watch.runtime.course_navigation import (
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
+    _update_best_finish_rank_setups,
+    _update_best_finish_rank_times,
     _update_best_finish_ranks,
+    _update_best_finish_time_ranks,
+    _update_best_finish_time_setups,
     _update_best_finish_times,
     _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
@@ -130,7 +134,11 @@ def _run_simulation_loop(
         episode = 0
         best_finish_position: int | None = None
         best_finish_ranks: dict[str, int] = {}
+        best_finish_rank_times: dict[str, int] = {}
+        best_finish_rank_setups: dict[str, dict[str, str | int]] = {}
         best_finish_times: dict[str, int] = {}
+        best_finish_time_ranks: dict[str, int] = {}
+        best_finish_time_setups: dict[str, dict[str, str | int]] = {}
         latest_finish_times: dict[str, int] = {}
         latest_finish_deltas_ms: dict[str, int] = {}
         failed_track_attempts: frozenset[str] = frozenset()
@@ -200,7 +208,11 @@ def _run_simulation_loop(
                     active_track_sampling=active_track_sampling,
                     best_finish_position=best_finish_position,
                     best_finish_ranks=best_finish_ranks,
+                    best_finish_rank_times=best_finish_rank_times,
+                    best_finish_rank_setups=best_finish_rank_setups,
                     best_finish_times=best_finish_times,
+                    best_finish_time_ranks=best_finish_time_ranks,
+                    best_finish_time_setups=best_finish_time_setups,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
                     failed_track_attempts=failed_track_attempts,
@@ -557,8 +569,33 @@ def _run_simulation_loop(
                     info,
                     None,
                 )
+                best_finish_rank_setups = _update_best_finish_rank_setups(
+                    best_finish_rank_setups,
+                    best_finish_rank_times,
+                    best_finish_ranks,
+                    info,
+                    live_telemetry,
+                )
+                best_finish_rank_times = _update_best_finish_rank_times(
+                    best_finish_rank_times,
+                    best_finish_ranks,
+                    info,
+                    live_telemetry,
+                )
                 best_finish_ranks = _update_best_finish_ranks(
                     best_finish_ranks,
+                    info,
+                    live_telemetry,
+                )
+                best_finish_time_ranks = _update_best_finish_time_ranks(
+                    best_finish_time_ranks,
+                    best_finish_times,
+                    info,
+                    live_telemetry,
+                )
+                best_finish_time_setups = _update_best_finish_time_setups(
+                    best_finish_time_setups,
+                    best_finish_times,
                     info,
                     live_telemetry,
                 )
@@ -632,7 +669,11 @@ def _run_simulation_loop(
                     active_track_sampling=active_track_sampling,
                     best_finish_position=best_finish_position,
                     best_finish_ranks=best_finish_ranks,
+                    best_finish_rank_times=best_finish_rank_times,
+                    best_finish_rank_setups=best_finish_rank_setups,
                     best_finish_times=best_finish_times,
+                    best_finish_time_ranks=best_finish_time_ranks,
+                    best_finish_time_setups=best_finish_time_setups,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
                     failed_track_attempts=failed_track_attempts,
