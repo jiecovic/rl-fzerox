@@ -10,6 +10,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
+    XCupRotationConfig,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     StepBalancedTrackSamplingController,
@@ -297,6 +298,65 @@ def test_step_balance_runtime_state_exposes_generated_x_cup_generation() -> None
     assert x_cup_runtime.track_id == slot_key
     assert x_cup_runtime.generated_course_slot == 2
     assert x_cup_runtime.generated_course_generation == 3
+
+
+def test_deficit_budget_runtime_state_tracks_generated_x_cup_generation_stats() -> None:
+    slot_key = generated_x_cup_slot_key(0)
+    controller = DeficitBudgetTrackSamplingController.from_configs(
+        env_config=EnvConfig(
+            action_repeat=2,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="deficit_budget",
+                deficit_budget_ema_alpha=1.0,
+                x_cup_rotation=XCupRotationConfig(enabled=True, ema_alpha=1.0),
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="x_cup_slot_master",
+                        course_id="x_cup_abcd1234",
+                        runtime_course_key=slot_key,
+                        course_name="X Cup abcd1234",
+                        mode=X_CUP_COURSE.race_mode,
+                        course_index=X_CUP_COURSE.course_index,
+                        generated_course_kind=X_CUP_COURSE.generated_kind,
+                        generated_course_seed=123,
+                        generated_course_hash="abcd1234",
+                        generated_course_slot=0,
+                        generated_course_generation=1,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="mute_city_master",
+                        course_id="mute_city",
+                        course_name="Mute City",
+                    ),
+                ),
+            ),
+        ),
+        curriculum_config=CurriculumConfig(),
+    )
+
+    assert controller is not None
+    controller.record_episodes(
+        (
+            {
+                "track_id": "x_cup_slot_master",
+                "episode_step": 100,
+                "episode_completion_fraction": 0.75,
+                "termination_reason": "finished",
+            },
+        )
+    )
+    x_cup_runtime = next(
+        entry for entry in controller.runtime_state().entries if entry.course_key == slot_key
+    )
+
+    assert x_cup_runtime.episode_count == 1
+    assert x_cup_runtime.generation_episode_count == 1
+    assert x_cup_runtime.generation_finished_episode_count == 1
+    assert x_cup_runtime.generation_success_sample_count == 1
+    assert x_cup_runtime.generation_ema_completion_fraction == pytest.approx(0.75)
+    assert x_cup_runtime.generated_course_slot == 0
+    assert x_cup_runtime.generated_course_generation == 1
 
 
 def test_track_sampling_payload_uses_runtime_generated_x_cup_metadata() -> None:
@@ -1223,3 +1283,77 @@ def test_deficit_budget_controller_restores_runtime_stats() -> None:
         values["track_sampling/silence/target_step_share"]
         > values["track_sampling/mute/target_step_share"]
     )
+
+
+def test_deficit_budget_controller_backfills_first_x_cup_generation_stats() -> None:
+    slot_key = generated_x_cup_slot_key(0)
+    restored = TrackSamplingRuntimeState(
+        sampling_mode="deficit_budget",
+        action_repeat=2,
+        update_episodes=20,
+        ema_alpha=0.02,
+        max_weight_scale=3.0,
+        adaptive_completion_weight=0.3,
+        adaptive_target_completion=1.0,
+        adaptive_min_confidence_episodes=1,
+        adaptive_confidence_scale=3.0,
+        update_count=2,
+        episodes_since_update=3,
+        entries=(
+            TrackSamplingRuntimeEntry(
+                track_id=slot_key,
+                course_key=slot_key,
+                label="X Cup abcd1234",
+                base_weight=1.0,
+                current_weight=1.0,
+                completed_frames=171660,
+                episode_count=40,
+                finished_episode_count=10,
+                success_sample_count=40,
+                ema_episode_frames=4000.0,
+                ema_completion_fraction=0.686,
+                generated_course_slot=0,
+                generated_course_generation=1,
+            ),
+            TrackSamplingRuntimeEntry(
+                track_id="mute",
+                course_key="mute",
+                label="Mute City",
+                base_weight=1.0,
+                current_weight=1.0,
+                completed_frames=200,
+                episode_count=1,
+                finished_episode_count=0,
+                success_sample_count=1,
+                ema_episode_frames=200.0,
+                ema_completion_fraction=0.25,
+            ),
+        ),
+    )
+    controller = DeficitBudgetTrackSamplingController(
+        track_base_weights={"x_cup_entry": 1.0, "mute": 1.0},
+        action_repeat=2,
+        settings=DeficitBudgetSettings(
+            uniform_fraction=0.7,
+            min_weight=1.0,
+            max_weight=3.0,
+            ema_alpha=0.02,
+            weight_update_rollouts=20,
+            x_cup_generation_ema_alpha=0.1,
+        ),
+        track_course_keys={"x_cup_entry": slot_key, "mute": "mute"},
+        track_log_keys={"x_cup_entry": slot_key, "mute": "mute"},
+        track_labels={slot_key: "X Cup abcd1234", "mute": "Mute City"},
+        track_log_enabled={slot_key: True, "mute": True},
+        restored_state=restored,
+        seed=7,
+    )
+
+    entry = next(
+        entry for entry in controller.runtime_state().entries if entry.course_key == slot_key
+    )
+
+    assert entry.generation_episode_count == 40
+    assert entry.generation_finished_episode_count == 10
+    assert entry.generation_success_sample_count == 40
+    assert entry.generation_ema_completion_fraction == pytest.approx(0.686)

@@ -29,6 +29,7 @@ class DeficitBudgetSettings:
     max_weight: float
     ema_alpha: float
     weight_update_rollouts: int
+    x_cup_generation_ema_alpha: float = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +202,7 @@ class DeficitBudgetTrackSamplingController:
                 max_weight=settings_source.deficit_budget_max_weight,
                 ema_alpha=settings_source.deficit_budget_ema_alpha,
                 weight_update_rollouts=settings_source.deficit_budget_weight_update_rollouts,
+                x_cup_generation_ema_alpha=settings_source.x_cup_rotation.ema_alpha,
             ),
             track_course_keys=course_keys,
             track_log_keys=log_keys,
@@ -254,6 +256,11 @@ class DeficitBudgetTrackSamplingController:
             stats.record_episode(
                 frame_count,
                 ema_alpha=self._settings.ema_alpha,
+                generation_ema_alpha=(
+                    self._settings.x_cup_generation_ema_alpha
+                    if course_key in self._course_generated_slots
+                    else None
+                ),
                 completion_fraction=episode_completion_fraction(episode),
                 finished=finished,
             )
@@ -364,6 +371,10 @@ class DeficitBudgetTrackSamplingController:
                     success_sample_count=stats.success_sample_count,
                     ema_episode_frames=stats.ema_episode_frames,
                     ema_completion_fraction=stats.ema_completion_fraction,
+                    generation_episode_count=stats.generation_episode_count,
+                    generation_finished_episode_count=stats.generation_finished_episode_count,
+                    generation_success_sample_count=stats.generation_success_sample_count,
+                    generation_ema_completion_fraction=(stats.generation_ema_completion_fraction),
                     generated_course_slot=self._course_generated_slots.get(course_key),
                     generated_course_generation=self._course_generated_generations.get(course_key),
                     generated_course_id=self._course_generated_course_ids.get(course_key),
@@ -398,7 +409,22 @@ class DeficitBudgetTrackSamplingController:
             stats.success_sample_count = max(0, int(entry.success_sample_count))
             stats.ema_episode_frames = entry.ema_episode_frames
             stats.ema_completion_fraction = entry.ema_completion_fraction
+            stats.generation_episode_count = max(0, int(entry.generation_episode_count))
+            stats.generation_finished_episode_count = max(
+                0,
+                int(entry.generation_finished_episode_count),
+            )
+            stats.generation_success_sample_count = max(
+                0,
+                int(entry.generation_success_sample_count),
+            )
+            stats.generation_ema_completion_fraction = entry.generation_ema_completion_fraction
             stats.current_weight = max(0.0, float(entry.current_weight))
+            if _needs_first_generation_backfill(entry):
+                stats.generation_episode_count = stats.episode_count
+                stats.generation_finished_episode_count = stats.finished_episode_count
+                stats.generation_success_sample_count = stats.success_sample_count
+                stats.generation_ema_completion_fraction = stats.ema_completion_fraction
             if entry.ema_completion_fraction is not None:
                 self._best_completion[course_key] = max(0.0, float(entry.ema_completion_fraction))
             if entry.generated_course_slot is not None:
@@ -514,3 +540,14 @@ def _episode_crashed(episode: Mapping[str, object]) -> bool:
     if not isinstance(reason, str):
         return False
     return reason in _CRASH_TERMINATION_REASONS
+
+
+def _needs_first_generation_backfill(entry: TrackSamplingRuntimeEntry) -> bool:
+    return (
+        entry.generated_course_slot is not None
+        and entry.generated_course_generation == 1
+        and entry.episode_count > 0
+        and entry.generation_episode_count == 0
+        and entry.generation_success_sample_count == 0
+        and entry.generation_ema_completion_fraction is None
+    )
