@@ -20,6 +20,7 @@ from rl_fzerox.core.envs.rewards.reward_main.controls import (
     lean_request_penalty,
     manual_boost_reward,
     outside_track_recovery_reward,
+    spin_request_penalty,
 )
 from rl_fzerox.core.envs.rewards.reward_main.energy import EnergyRefillRewardTracker
 from rl_fzerox.core.envs.rewards.reward_main.events import (
@@ -275,6 +276,14 @@ class RewardMainTracker:
         if air_brake_penalty:
             reward += air_brake_penalty
             breakdown["air_brake"] = air_brake_penalty
+
+        spin_penalty = spin_request_penalty(
+            action_context,
+            weights=self._weights,
+        )
+        if spin_penalty:
+            reward += spin_penalty
+            breakdown["spin"] = spin_penalty
 
         lean_penalty = lean_request_penalty(
             summary,

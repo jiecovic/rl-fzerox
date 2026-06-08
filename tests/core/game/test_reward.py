@@ -81,6 +81,7 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "ice_entry_penalty": -0.25,
         "energy_refill_collision_cooldown_frames": 17,
         "air_brake_request_penalty": -0.005,
+        "spin_request_penalty": -0.006,
         "lean_request_penalty": -0.002,
         "lean_activation_penalty": -0.01,
         "grounded_pitch_penalty": -0.004,

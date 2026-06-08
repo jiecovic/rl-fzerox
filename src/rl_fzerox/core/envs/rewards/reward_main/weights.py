@@ -47,6 +47,7 @@ class RewardMainWeights:
     ice_entry_penalty: float = 0.0
     energy_refill_collision_cooldown_frames: int = 120
     air_brake_request_penalty: float = 0.0
+    spin_request_penalty: float = 0.0
     lean_request_penalty: float = -0.003
     lean_activation_penalty: float = 0.0
     grounded_pitch_penalty: float = 0.0

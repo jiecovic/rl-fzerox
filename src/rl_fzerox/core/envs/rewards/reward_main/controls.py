@@ -67,6 +67,17 @@ def air_brake_request_penalty(
     return max(int(summary.frames_run), 0) * penalty
 
 
+def spin_request_penalty(
+    action_context: RewardActionContext | None,
+    *,
+    weights: RewardMainWeights,
+) -> float:
+    penalty = weights.spin_request_penalty
+    if penalty >= 0.0 or action_context is None or not action_context.spin_requested:
+        return 0.0
+    return penalty
+
+
 def grounded_pitch_penalty(
     summary: StepSummary,
     telemetry: FZeroXTelemetry,

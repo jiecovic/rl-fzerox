@@ -59,6 +59,7 @@ def test_default_manager_training_bridge_uses_configured_hybrid_defaults(
     assert train_config.reward.suspend_progress_while_outside_track_bounds is True
     assert train_config.reward.position_progress_min_multiplier == pytest.approx(1.0)
     assert train_config.reward.position_progress_max_multiplier == pytest.approx(1.0)
+    assert train_config.reward.spin_request_penalty == pytest.approx(0.0)
     assert train_config.train.explicit_run_dir == tmp_path / "runs" / "bridge-default_0001"
     assert train_config.emulator.renderer == "gliden64"
     assert train_config.env.camera_setting == "close_behind"

@@ -306,6 +306,7 @@ const rewardConfigSchema = z
     ice_entry_penalty: z.number().max(0),
     energy_refill_collision_cooldown_frames: z.number().int().nonnegative(),
     air_brake_request_penalty: z.number().max(0),
+    spin_request_penalty: z.number().max(0),
     manual_boost_reward: z.number().nonnegative(),
     manual_boost_reward_energy_shaping: z.boolean(),
     manual_boost_reward_min_energy_fraction: z.number().min(0).lt(1),

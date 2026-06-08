@@ -255,6 +255,14 @@ export function TrackActionPanels({
                 onChange={(value) => updateReward({ air_brake_request_penalty: value })}
               />
               <NumberField
+                help="One-time penalty when a spin macro is requested."
+                label="Spin request penalty"
+                resetValue={defaultConfig.reward.spin_request_penalty}
+                step="0.001"
+                value={config.reward.spin_request_penalty}
+                onChange={(value) => updateReward({ spin_request_penalty: value })}
+              />
+              <NumberField
                 help="Per-frame penalty while lean is held."
                 label="Lean hold penalty"
                 resetValue={defaultConfig.reward.lean_request_penalty}

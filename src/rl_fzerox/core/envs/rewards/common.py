@@ -32,6 +32,7 @@ class RewardActionContext:
     boost_requested: bool = False
     lean_requested: bool = False
     air_brake_requested: bool = False
+    spin_requested: bool = False
     gas_level: float | None = None
     steer_level: float | None = None
     pitch_level: float | None = None

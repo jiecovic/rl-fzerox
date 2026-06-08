@@ -155,6 +155,7 @@ class EngineStepAssembler:
                 air_brake_requested=air_brake_used,
                 boost_requested=boost_used,
                 lean_requested=lean_used,
+                spin_requested=spin_requested,
                 gas_level=gas_level,
                 steer_level=max(
                     -1.0,

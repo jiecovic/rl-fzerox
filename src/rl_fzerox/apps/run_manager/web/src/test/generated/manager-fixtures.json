@@ -1451,6 +1451,7 @@
       "progress_speed_min_multiplier": 1.0,
       "progress_speed_reference_kph": 760.0,
       "progress_track_distance_tolerance": 1000.0,
+      "spin_request_penalty": 0.0,
       "step_reward_clip_max": 100.0,
       "step_reward_clip_min": -100.0,
       "suspend_progress_while_outside_track_bounds": true,

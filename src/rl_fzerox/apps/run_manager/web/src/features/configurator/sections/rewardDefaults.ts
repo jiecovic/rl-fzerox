@@ -73,6 +73,7 @@ export function actionDefaults(reward: RewardConfig): RewardPatch {
     manual_boost_reward_full_energy_fraction: reward.manual_boost_reward_full_energy_fraction,
     manual_boost_reward_min_energy_fraction: reward.manual_boost_reward_min_energy_fraction,
     manual_boost_reward_min_energy_value: reward.manual_boost_reward_min_energy_value,
+    spin_request_penalty: reward.spin_request_penalty,
   };
 }
 

@@ -94,6 +94,7 @@ class RewardCourseOverrideConfig(BaseModel):
     ice_entry_penalty: float | None = Field(default=None, le=0.0)
     energy_refill_collision_cooldown_frames: NonNegativeInt | None = None
     air_brake_request_penalty: float | None = Field(default=None, le=0.0)
+    spin_request_penalty: float | None = Field(default=None, le=0.0)
     lean_request_penalty: float | None = Field(default=None, le=0.0)
     lean_activation_penalty: float | None = Field(default=None, le=0.0)
     grounded_pitch_penalty: float | None = Field(default=None, le=0.0)
@@ -172,6 +173,7 @@ class RewardConfig(BaseModel):
     ice_entry_penalty: float = Field(default=0.0, le=0.0)
     energy_refill_collision_cooldown_frames: NonNegativeInt = 0
     air_brake_request_penalty: float = Field(default=0.0, le=0.0)
+    spin_request_penalty: float = Field(default=0.0, le=0.0)
     lean_request_penalty: float = Field(default=0.0, le=0.0)
     lean_activation_penalty: float = Field(default=0.0, le=0.0)
     grounded_pitch_penalty: float = Field(default=0.0, le=0.0)

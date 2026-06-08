@@ -275,6 +275,36 @@ def test_reward_main_penalizes_air_brake_request() -> None:
     assert step.breakdown == {"air_brake": -0.03}
 
 
+def test_reward_main_penalizes_spin_request_once_per_env_step() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            spin_request_penalty=-0.02,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    requested = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(spin_requested=True),
+    )
+    idle = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=6),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(spin_requested=False),
+    )
+
+    assert requested.reward == pytest.approx(-0.02)
+    assert requested.breakdown == {"spin": -0.02}
+    assert idle.reward == 0.0
+    assert idle.breakdown == {}
+
+
 def test_reward_main_rewards_manual_boost_request_once_per_env_step() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
