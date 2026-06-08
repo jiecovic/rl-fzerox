@@ -6,7 +6,10 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.apps.run_manager.launching.processes import reap_child_when_done
+from rl_fzerox.apps.run_manager.launching.processes import (
+    fresh_process_log,
+    reap_child_when_done,
+)
 from rl_fzerox.apps.run_manager.launching.watch import (
     WatchLaunchStatus,
     raise_if_watch_exited_early,
@@ -57,7 +60,6 @@ def launch_career_mode_runner(
     )
     overrides = watch_config_overrides(device=device, renderer=renderer)
     log_path = manager_career_mode_log_path(save_game_id)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
     command = [
         sys.executable,
         "-m",
@@ -77,10 +79,11 @@ def launch_career_mode_runner(
         *overrides,
     ]
     try:
-        with log_path.open("ab") as log_handle:
+        cwd = project_root_dir()
+        with fresh_process_log(log_path, command=command, cwd=cwd) as log_handle:
             process = subprocess.Popen(
                 command,
-                cwd=project_root_dir(),
+                cwd=cwd,
                 stdin=subprocess.DEVNULL,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,

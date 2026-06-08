@@ -1,6 +1,7 @@
 # src/rl_fzerox/ui/watch/runtime/track_sampling.py
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,7 @@ from rl_fzerox.core.training.runs import continue_run_paths, materialize_train_r
 from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingRuntimeState
 
 TrackSamplingSignature = tuple[tuple[object, ...], ...]
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -52,13 +54,24 @@ class ManagedTrackSamplingRefresh:
             current_config,
             state=state,
         )
-        if _generated_x_cup_signature(projected_config) == _generated_x_cup_signature(
-            current_config
-        ):
+        projected_signature = _generated_x_cup_signature(projected_config)
+        if projected_signature == _generated_x_cup_signature(current_config):
             return None
         refreshed_config = self._materialized_track_sampling(state=state)
-        if refreshed_config is None:
-            return projected_config
+        if refreshed_config is None or not _track_sampling_baselines_ready(refreshed_config):
+            LOGGER.warning(
+                "skipping managed watch track-sampling refresh for run_id=%s: "
+                "generated X Cup state changed but materialized baselines are not ready",
+                self.run_id,
+            )
+            return None
+        if _generated_x_cup_signature(refreshed_config) != projected_signature:
+            LOGGER.warning(
+                "skipping managed watch track-sampling refresh for run_id=%s: "
+                "materialized config does not match current runtime generation",
+                self.run_id,
+            )
+            return None
         return refreshed_config
 
     def _refresh_due(self) -> bool:
@@ -89,10 +102,17 @@ class ManagedTrackSamplingRefresh:
                 )
             }
         )
-        materialized = materialize_train_run_config(
-            train_config,
-            run_paths=continue_run_paths(run.run_dir),
-        )
+        try:
+            materialized = materialize_train_run_config(
+                train_config,
+                run_paths=continue_run_paths(run.run_dir),
+            )
+        except Exception:
+            LOGGER.exception(
+                "managed watch track-sampling refresh failed for run_id=%s",
+                self.run_id,
+            )
+            return None
         return materialized.env.track_sampling
 
 
@@ -109,4 +129,14 @@ def _generated_x_cup_signature(config: TrackSamplingConfig) -> TrackSamplingSign
         )
         for entry in config.entries
         if entry.generated_course_kind == X_CUP_COURSE.generated_kind
+    )
+
+
+def _track_sampling_baselines_ready(config: TrackSamplingConfig) -> bool:
+    if not config.enabled:
+        return True
+    return all(
+        entry.baseline_state_path is not None
+        and entry.baseline_state_path.expanduser().resolve().is_file()
+        for entry in config.entries
     )

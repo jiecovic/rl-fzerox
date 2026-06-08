@@ -4,10 +4,12 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
 
 from rl_fzerox.apps.run_manager.launch import ManagerRunLauncher
+from rl_fzerox.apps.run_manager.launching.watch import watch_failure_detail
 from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_managed_run_config
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 
@@ -368,6 +370,9 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
         explicit_run_dir=tmp_path / "runs" / "watch-run",
     )
     launcher = ManagerRunLauncher(store)
+    log_path = tmp_path / "logs" / "watch-latest.log"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text("stale traceback\n", encoding="utf-8")
     captured: dict[str, object] = {}
 
     class _FakeProcess:
@@ -378,8 +383,18 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
                 return 0
             raise subprocess.TimeoutExpired(cmd="watch", timeout=timeout or 0.0)
 
-    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+    def _fake_popen(
+        command: list[str],
+        *,
+        cwd: Path,
+        stdin: object,
+        stdout: BinaryIO,
+        stderr: object,
+        start_new_session: bool,
+    ) -> _FakeProcess:
+        del cwd, stdin, stderr, start_new_session
         captured["command"] = command
+        stdout.write(b"watch started\n")
         return _FakeProcess()
 
     monkeypatch.setattr(
@@ -389,6 +404,10 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
     monkeypatch.setattr(
         "rl_fzerox.apps.run_manager.launching.watch.resolve_watch_app_config",
         lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.watch.manager_watch_log_path",
+        lambda run_id, *, artifact: log_path,
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.run_manager.launching.watch.subprocess.Popen",
@@ -430,6 +449,28 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
     assert lease.owner_id == run.id
     assert lease.qualifier == "latest"
     assert lease.pid == 4321
+    log_text = log_path.read_text(encoding="utf-8")
+    assert "stale traceback" not in log_text
+    assert "# launched_at=" in log_text
+    assert "# command=" in log_text
+    assert "watch started" in log_text
+
+
+def test_watch_failure_detail_ignores_launch_log_headers(tmp_path: Path) -> None:
+    log_path = tmp_path / "watch.log"
+    log_path.write_text(
+        "# launched_at=2026-06-08T12:00:00+00:00\n# command=python -m rl_fzerox.apps.watch\n\n",
+        encoding="utf-8",
+    )
+
+    assert watch_failure_detail(log_path) is None
+
+    log_path.write_text(
+        "# launched_at=2026-06-08T12:00:00+00:00\nRuntimeError: failed for real\n",
+        encoding="utf-8",
+    )
+
+    assert watch_failure_detail(log_path) == "RuntimeError: failed for real"
 
 
 def test_start_career_mode_passes_viewer_lease_and_runtime_options(
@@ -453,6 +494,9 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         policy_artifact="best",
     )
     launcher = ManagerRunLauncher(store)
+    log_path = tmp_path / "logs" / f"{save_game.id}.log"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text("stale career failure\n", encoding="utf-8")
     captured: dict[str, object] = {}
 
     class _FakeProcess:
@@ -463,13 +507,23 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
                 return 0
             raise subprocess.TimeoutExpired(cmd="career-mode", timeout=timeout or 0.0)
 
-    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+    def _fake_popen(
+        command: list[str],
+        *,
+        cwd: Path,
+        stdin: object,
+        stdout: BinaryIO,
+        stderr: object,
+        start_new_session: bool,
+    ) -> _FakeProcess:
+        del cwd, stdin, stderr, start_new_session
         captured["command"] = command
+        stdout.write(b"career mode started\n")
         return _FakeProcess()
 
     monkeypatch.setattr(
         "rl_fzerox.apps.run_manager.launching.save_games.manager_career_mode_log_path",
-        lambda save_game_id: tmp_path / "logs" / f"{save_game_id}.log",
+        lambda save_game_id: log_path,
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.run_manager.launching.save_games.subprocess.Popen",
@@ -515,3 +569,8 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
     assert lease.owner_id == save_game.id
     assert lease.qualifier is None
     assert lease.pid == 8765
+    log_text = log_path.read_text(encoding="utf-8")
+    assert "stale career failure" not in log_text
+    assert "# launched_at=" in log_text
+    assert "# command=" in log_text
+    assert "career mode started" in log_text

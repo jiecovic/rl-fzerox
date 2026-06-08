@@ -130,6 +130,98 @@ def test_managed_watch_track_sampling_refresh_ignores_unchanged_slots(tmp_path: 
     assert refresh.refreshed_config(config, force=True) is None
 
 
+def test_managed_watch_track_sampling_refresh_keeps_current_slot_when_materialization_fails(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="run",
+        name="Run",
+        config=_managed_x_cup_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    run.run_dir.mkdir(parents=True, exist_ok=True)
+    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+
+    def fake_materialize_train_run_config(
+        config: TrainAppConfig,
+        *,
+        run_paths: RunPaths,
+    ) -> TrainAppConfig:
+        del config, run_paths
+        raise RuntimeError("baseline materialization failed")
+
+    monkeypatch.setattr(
+        watch_track_sampling,
+        "materialize_train_run_config",
+        fake_materialize_train_run_config,
+    )
+    refresh = ManagedTrackSamplingRefresh.from_config(
+        WatchAppConfig(
+            emulator=EmulatorConfig(
+                core_path=_touched(tmp_path / "core.so"),
+                rom_path=_touched(tmp_path / "rom.n64"),
+            ),
+            env=EnvConfig(track_sampling=_track_sampling_config()),
+            watch=WatchConfig(manager_db_path=db_path, managed_run_id=run.id),
+        )
+    )
+
+    assert refresh is not None
+    assert refresh.refreshed_config(_track_sampling_config(), force=True) is None
+
+
+def test_managed_watch_track_sampling_refresh_waits_for_materialized_baselines(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="run",
+        name="Run",
+        config=_managed_x_cup_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    run.run_dir.mkdir(parents=True, exist_ok=True)
+    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+
+    def fake_materialize_train_run_config(
+        config: TrainAppConfig,
+        *,
+        run_paths: RunPaths,
+    ) -> TrainAppConfig:
+        del run_paths
+        entry = config.env.track_sampling.entries[0]
+        track_sampling = config.env.track_sampling.model_copy(
+            update={"entries": (entry.model_copy(update={"baseline_state_path": None}),)}
+        )
+        return config.model_copy(
+            update={"env": config.env.model_copy(update={"track_sampling": track_sampling})}
+        )
+
+    monkeypatch.setattr(
+        watch_track_sampling,
+        "materialize_train_run_config",
+        fake_materialize_train_run_config,
+    )
+    refresh = ManagedTrackSamplingRefresh.from_config(
+        WatchAppConfig(
+            emulator=EmulatorConfig(
+                core_path=_touched(tmp_path / "core.so"),
+                rom_path=_touched(tmp_path / "rom.n64"),
+            ),
+            env=EnvConfig(track_sampling=_track_sampling_config()),
+            watch=WatchConfig(manager_db_path=db_path, managed_run_id=run.id),
+        )
+    )
+
+    assert refresh is not None
+    assert refresh.refreshed_config(_track_sampling_config(), force=True) is None
+
+
 def _track_sampling_config(
     *,
     entry_id: str = "x_cup_old",

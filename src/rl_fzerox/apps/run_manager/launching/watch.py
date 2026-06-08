@@ -6,7 +6,10 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.apps.run_manager.launching.processes import reap_child_when_done
+from rl_fzerox.apps.run_manager.launching.processes import (
+    fresh_process_log,
+    reap_child_when_done,
+)
 from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
@@ -56,7 +59,6 @@ def launch_watch_artifact(
         overrides=overrides,
     )
     log_path = manager_watch_log_path(run.id, artifact=artifact)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
     command = [
         sys.executable,
         "-m",
@@ -72,10 +74,11 @@ def launch_watch_artifact(
         "--",
         *overrides,
     ]
-    with log_path.open("ab") as log_handle:
+    cwd = project_root_dir()
+    with fresh_process_log(log_path, command=command, cwd=cwd) as log_handle:
         process = subprocess.Popen(
             command,
-            cwd=project_root_dir(),
+            cwd=cwd,
             stdin=subprocess.DEVNULL,
             stdout=log_handle,
             stderr=subprocess.STDOUT,
@@ -137,7 +140,7 @@ def watch_failure_detail(log_path: Path) -> str | None:
         return None
     for line in reversed(lines):
         detail = line.strip()
-        if detail:
+        if detail and not detail.startswith("#"):
             return detail
     return None
 
