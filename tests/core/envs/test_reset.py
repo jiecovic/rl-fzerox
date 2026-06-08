@@ -180,7 +180,7 @@ def test_step_info_keeps_sampled_track_metadata(tmp_path: Path) -> None:
                 entries=(
                     TrackSamplingEntryConfig(
                         id="silence",
-                        display_name="Silence Time Attack - Blue Falcon Balanced",
+                        display_name="Silence Time Attack - Blue Falcon Engine 50",
                         baseline_state_path=baseline_path,
                         weight=1.0,
                         course_index=1,
@@ -198,7 +198,7 @@ def test_step_info_keeps_sampled_track_metadata(tmp_path: Path) -> None:
     _, _, _, _, step_info = env.step(env.action_space.sample())
 
     assert step_info["track_id"] == "silence"
-    assert step_info["track_display_name"] == "Silence Time Attack - Blue Falcon Balanced"
+    assert step_info["track_display_name"] == "Silence Time Attack - Blue Falcon Engine 50"
     assert step_info["track_course_index"] == 1
     assert step_info["track_non_agg_worst_time_ms"] == 63279
 

@@ -11,14 +11,18 @@ from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.orm import Session
 
 from rl_fzerox.core.manager.db import manager_session
-from rl_fzerox.core.manager.db.models import ManagerBase, SchemaVersionModel
+from rl_fzerox.core.manager.db.models import (
+    ManagerBase,
+    RunTrackSamplingEntryModel,
+    SchemaVersionModel,
+)
 from rl_fzerox.core.manager.db.repositories.configs import create_config_snapshot
 from rl_fzerox.core.manager.db.repositories.runs import upsert_template
 from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -34,6 +38,12 @@ RUN_CHILD_TABLES = (
     "run_workers",
 )
 MANAGER_RUNTIME_TABLES = ("viewer_leases",)
+TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS = frozenset(
+    {
+        "generated_entry_id",
+        "generated_baseline_state_path",
+    }
+)
 
 
 def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
@@ -130,6 +140,7 @@ def _assert_current_schema(
             raise RuntimeError(f"manager DB is not current: missing {table_name}")
     _assert_save_game_child_columns(inspector=inspector)
     _assert_run_foreign_keys(inspector=inspector, table_names=table_names)
+    _assert_track_sampling_entry_columns(inspector=inspector)
 
 
 def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
@@ -153,6 +164,29 @@ def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
             raise RuntimeError(
                 f"manager DB is not current: save_game_course_setups is missing {column_name}"
             )
+
+
+def _assert_track_sampling_entry_columns(*, inspector: Inspector) -> None:
+    columns = {
+        column["name"] for column in inspector.get_columns("run_track_sampling_entries")
+    }
+    legacy_columns = columns.intersection(TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS)
+    if legacy_columns:
+        joined_columns = ", ".join(sorted(legacy_columns))
+        raise RuntimeError(
+            "manager DB is not current: "
+            f"run_track_sampling_entries has legacy columns {joined_columns}"
+        )
+    required_columns = {
+        column.name for column in RunTrackSamplingEntryModel.__table__.columns
+    }
+    missing_columns = required_columns.difference(columns)
+    if missing_columns:
+        joined_columns = ", ".join(sorted(missing_columns))
+        raise RuntimeError(
+            "manager DB is not current: "
+            f"run_track_sampling_entries is missing {joined_columns}"
+        )
 
 
 def _assert_run_foreign_keys(

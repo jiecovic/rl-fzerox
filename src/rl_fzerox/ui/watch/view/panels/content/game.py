@@ -240,11 +240,11 @@ def _short_track_name(value: str) -> str:
     suffixes = tuple(
         f" {mode} - Blue Falcon {engine}"
         for mode in ("Time Attack", "GP Race")
-        for engine in ("Balanced", "Engine 50")
+        for engine in ("Engine 50",)
     ) + tuple(
         f" {mode} - Blue Falcon {engine}".lower()
         for mode in ("Time Attack", "GP Race")
-        for engine in ("Balanced", "Engine 50")
+        for engine in ("Engine 50",)
     )
     for suffix in suffixes:
         if value.endswith(suffix):

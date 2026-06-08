@@ -2,25 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
-
-EngineSettingAlias = Literal["max_acceleration", "balanced", "max_speed"]
 
 
 @dataclass(frozen=True, slots=True)
 class EngineSetting:
-    """Resolved engine-slider setting used for ids and RAM writes."""
+    """Resolved 0..100 engine-slider setting used for RAM writes."""
 
-    id: str
-    raw_value: int
-
-
-@dataclass(frozen=True, slots=True)
-class EngineSettingPreset:
-    """Human-readable alias for the 0..100 engine slider."""
-
-    id: EngineSettingAlias
-    display_name: str
     raw_value: int
 
 
@@ -53,15 +40,9 @@ class VehicleMenuGrid:
 
 @dataclass(frozen=True, slots=True)
 class VehicleCatalog:
-    """ROM/decomp-backed stable ids for stock machines and engine aliases."""
+    """ROM/decomp-backed stable ids for stock machines."""
 
-    generated_engine_prefix: str = "engine_"
     menu_grid: VehicleMenuGrid = field(default_factory=VehicleMenuGrid)
-    engine_presets: tuple[EngineSettingPreset, ...] = (
-        EngineSettingPreset("max_acceleration", "Max Acceleration", 0),
-        EngineSettingPreset("balanced", "Balanced", 50),
-        EngineSettingPreset("max_speed", "Max Speed", 100),
-    )
     vehicles: tuple[VehicleInfo, ...] = field(
         default_factory=lambda: (
             VehicleInfo("blue_falcon", "Blue Falcon", 0, 0),
@@ -142,75 +123,20 @@ def vehicle_menu_row_and_column(machine_select_slot: int) -> tuple[int, int]:
 
 
 def resolve_engine_setting(raw_engine_setting: object, *, context: str) -> EngineSetting:
-    """Resolve a named alias, generated id, or raw 0..100 slider value."""
-
-    if isinstance(raw_engine_setting, str) and raw_engine_setting:
-        resolved = try_resolve_engine_setting_id(raw_engine_setting, context=context)
-        if resolved is not None:
-            return resolved
-        known = ", ".join(preset.id for preset in CATALOG.engine_presets)
-        raise ValueError(
-            f"{context} unknown engine_setting {raw_engine_setting!r}; "
-            f"known aliases: {known}, or raw integers 0..100"
-        )
+    """Resolve one raw 0..100 engine-slider value."""
 
     if isinstance(raw_engine_setting, bool) or not isinstance(raw_engine_setting, int):
         raise ValueError(
-            "track_sampling.baseline.engine_setting must be a string id or raw integer"
+            f"{context} engine_setting_raw_value must be a raw integer in [0, 100]"
         )
     _validate_engine_setting_raw_value(raw_engine_setting, context=context)
-    for preset in CATALOG.engine_presets:
-        if preset.raw_value == raw_engine_setting:
-            return EngineSetting(id=preset.id, raw_value=raw_engine_setting)
-    return EngineSetting(
-        id=f"{CATALOG.generated_engine_prefix}{raw_engine_setting}",
-        raw_value=raw_engine_setting,
-    )
-
-
-def try_resolve_engine_setting_id(
-    engine_setting: str,
-    *,
-    context: str,
-) -> EngineSetting | None:
-    """Resolve a named preset or generated raw engine id, if valid."""
-
-    for preset in CATALOG.engine_presets:
-        if preset.id == engine_setting:
-            return EngineSetting(id=preset.id, raw_value=preset.raw_value)
-
-    raw_value = _raw_value_from_generated_engine_setting_id(engine_setting)
-    if raw_value is None:
-        return None
-    _validate_engine_setting_raw_value(raw_value, context=context)
-    return EngineSetting(id=engine_setting, raw_value=raw_value)
-
-
-def engine_setting_display_name(engine_setting: str) -> str:
-    """Return a short display label for named or generated engine settings."""
-
-    for preset in CATALOG.engine_presets:
-        if preset.id == engine_setting:
-            return preset.display_name
-    raw_value = _raw_value_from_generated_engine_setting_id(engine_setting)
-    if raw_value is not None:
-        return f"Engine {raw_value}"
-    return engine_setting.replace("_", " ").title()
+    return EngineSetting(raw_value=raw_engine_setting)
 
 
 def engine_setting_display_name_for_raw(raw_value: int) -> str:
     """Return a short display label for a native 0..100 engine-slider value."""
 
     return f"Engine {raw_value}"
-
-
-def _raw_value_from_generated_engine_setting_id(engine_setting: str) -> int | None:
-    if not engine_setting.startswith(CATALOG.generated_engine_prefix):
-        return None
-    raw_value = engine_setting.removeprefix(CATALOG.generated_engine_prefix)
-    if not raw_value.isdigit():
-        return None
-    return int(raw_value)
 
 
 def _validate_engine_setting_raw_value(raw_value: int, *, context: str) -> None:

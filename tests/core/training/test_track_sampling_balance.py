@@ -385,12 +385,10 @@ def test_replace_runtime_generation_keeps_slot_history_and_resets_current_genera
         replacement_label="X Cup new",
         generated_course_slot=0,
         generated_course_generation=2,
-        generated_entry_id="x_cup_new_gp_race",
         generated_course_id="x_cup_new",
         generated_course_name="X Cup new",
         generated_course_hash="new",
         generated_course_seed=123,
-        generated_baseline_state_path="/tmp/x_cup_new.state",
         generated_course_segment_count=256,
         generated_course_length=12345.0,
     )
@@ -619,12 +617,12 @@ def test_step_balance_controller_logs_unique_courses_by_course_id() -> None:
                 sampling_mode="step_balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="big_blue_time_attack_blue_falcon_balanced",
+                        id="big_blue",
                         course_id="big_blue",
                         weight=1.0,
                     ),
                     TrackSamplingEntryConfig(
-                        id="silence_time_attack_blue_falcon_balanced",
+                        id="silence",
                         course_id="silence",
                         weight=1.0,
                     ),
@@ -651,7 +649,7 @@ def test_step_balance_controller_can_suppress_generated_course_logs() -> None:
                 sampling_mode="step_balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="x_cup_a_blue_falcon_balanced",
+                        id="x_cup_a",
                         course_id="x_cup_a",
                         course_index=X_CUP_COURSE.course_index,
                         mode=X_CUP_COURSE.race_mode,
@@ -662,7 +660,7 @@ def test_step_balance_controller_can_suppress_generated_course_logs() -> None:
                         weight=1.0,
                     ),
                     TrackSamplingEntryConfig(
-                        id="x_cup_b_blue_falcon_balanced",
+                        id="x_cup_b",
                         course_id="x_cup_b",
                         course_index=X_CUP_COURSE.course_index,
                         mode=X_CUP_COURSE.race_mode,
@@ -683,13 +681,13 @@ def test_step_balance_controller_can_suppress_generated_course_logs() -> None:
     assert controller is not None
     weights = controller.record_episodes(
         (
-            {"track_id": "x_cup_a_blue_falcon_balanced", "episode_step": 100},
-            {"track_id": "x_cup_b_blue_falcon_balanced", "episode_step": 300},
+            {"track_id": "x_cup_a", "episode_step": 100},
+            {"track_id": "x_cup_b", "episode_step": 300},
         )
     )
 
     assert weights is not None
-    assert set(weights) == {"x_cup_a_blue_falcon_balanced", "x_cup_b_blue_falcon_balanced"}
+    assert set(weights) == {"x_cup_a", "x_cup_b"}
     assert controller.log_values() == {}
 
 
@@ -701,12 +699,12 @@ def test_step_balance_controller_aggregates_duplicate_courses() -> None:
                 sampling_mode="step_balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="big_blue_time_attack_blue_falcon_balanced",
+                        id="big_blue",
                         course_id="big_blue",
                         weight=1.0,
                     ),
                     TrackSamplingEntryConfig(
-                        id="big_blue_gp_blue_falcon_balanced",
+                        id="big_blue",
                         course_id="big_blue",
                         weight=1.0,
                     ),

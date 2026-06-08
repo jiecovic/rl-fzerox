@@ -36,7 +36,6 @@ class CareerModeRaceSetupConfig(BaseModel):
     machine_select_slot: NonNegativeInt
     machine_select_row: NonNegativeInt
     machine_select_column: NonNegativeInt
-    engine_setting_id: str
     engine_setting_raw_value: int
 
 

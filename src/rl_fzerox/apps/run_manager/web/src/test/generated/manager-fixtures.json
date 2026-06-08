@@ -304,23 +304,6 @@
         "value": "on_off"
       }
     ],
-    "engine_setting_presets": [
-      {
-        "display_name": "Max Acceleration",
-        "id": "max_acceleration",
-        "raw_value": 0
-      },
-      {
-        "display_name": "Balanced",
-        "id": "balanced",
-        "raw_value": 50
-      },
-      {
-        "display_name": "Max Speed",
-        "id": "max_speed",
-        "raw_value": 100
-      }
-    ],
     "gp_difficulties": [
       {
         "label": "Novice",

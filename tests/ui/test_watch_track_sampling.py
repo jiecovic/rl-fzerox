@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
@@ -10,33 +12,59 @@ from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
+    TrainAppConfig,
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
+from rl_fzerox.ui.watch.runtime import track_sampling as watch_track_sampling
 from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
 
 
 def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     db_path = tmp_path / "manager" / "runs.db"
     store = ManagerStore(db_path)
     run = store.create_run(
         run_id="run",
         name="Run",
-        config=default_managed_run_config(),
+        config=_managed_x_cup_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
+    run.run_dir.mkdir(parents=True, exist_ok=True)
     baseline_path = tmp_path / "baselines" / "x_cup_new.state"
     baseline_path.parent.mkdir(parents=True)
     baseline_path.touch()
-    store.upsert_run_track_sampling_state(
-        run_id=run.id,
-        state=_runtime_state(baseline_path),
+    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+
+    def fake_materialize_train_run_config(
+        config: TrainAppConfig,
+        *,
+        run_paths: RunPaths,
+    ) -> TrainAppConfig:
+        del run_paths
+        entry = config.env.track_sampling.entries[0]
+        track_sampling = config.env.track_sampling.model_copy(
+            update={
+                "entries": (
+                    entry.model_copy(update={"baseline_state_path": baseline_path.resolve()}),
+                )
+            }
+        )
+        return config.model_copy(
+            update={"env": config.env.model_copy(update={"track_sampling": track_sampling})}
+        )
+
+    monkeypatch.setattr(
+        watch_track_sampling,
+        "materialize_train_run_config",
+        fake_materialize_train_run_config,
     )
     refresh = ManagedTrackSamplingRefresh.from_config(
         WatchAppConfig(
@@ -70,16 +98,14 @@ def test_managed_watch_track_sampling_refresh_ignores_unchanged_slots(tmp_path: 
     run = store.create_run(
         run_id="run",
         name="Run",
-        config=default_managed_run_config(),
+        config=_managed_x_cup_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
+    run.run_dir.mkdir(parents=True, exist_ok=True)
     baseline_path = tmp_path / "baselines" / "x_cup_old.state"
     baseline_path.parent.mkdir(parents=True)
     baseline_path.touch()
-    store.upsert_run_track_sampling_state(
-        run_id=run.id,
-        state=_runtime_state(baseline_path),
-    )
+    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
     config = _track_sampling_config(
         entry_id="x_cup_new",
         course_id="x_cup_new",
@@ -136,7 +162,16 @@ def _track_sampling_config(
     )
 
 
-def _runtime_state(baseline_path: Path) -> TrackSamplingRuntimeState:
+def _managed_x_cup_run_config():
+    config = default_managed_run_config().model_copy(deep=True)
+    config.tracks.race_mode = "gp_race"
+    config.tracks.selected_course_ids = ()
+    config.tracks.include_x_cup = True
+    config.tracks.x_cup_course_count = 1
+    return config
+
+
+def _runtime_state() -> TrackSamplingRuntimeState:
     return TrackSamplingRuntimeState(
         sampling_mode="adaptive_step_balanced",
         action_repeat=1,
@@ -164,12 +199,10 @@ def _runtime_state(baseline_path: Path) -> TrackSamplingRuntimeState:
                 ema_completion_fraction=None,
                 generated_course_slot=0,
                 generated_course_generation=3,
-                generated_entry_id="x_cup_new",
                 generated_course_id="x_cup_new",
                 generated_course_name="X Cup new",
                 generated_course_hash="newhash",
                 generated_course_seed=1234,
-                generated_baseline_state_path=str(baseline_path),
             ),
         ),
     )

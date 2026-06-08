@@ -330,7 +330,6 @@ def test_race_setup_does_not_fallback_to_configured_track_vehicle() -> None:
             "frame_index": 0,
             "native_fps": 60.0,
             "track_vehicle_name": "Blue Falcon",
-            "track_engine_setting": "Balanced",
         },
         reset_info={},
         episode_reward=0.0,
@@ -670,7 +669,6 @@ def test_game_section_prefers_live_vehicle_setup_over_track_metadata() -> None:
             "frame_index": 0,
             "native_fps": 60.0,
             "track_vehicle_name": "Blue Falcon",
-            "track_engine_setting": "Balanced",
             "racer_character_index_ram": 3,
             "engine_setting_percent_ram": 100.0,
         },
@@ -701,7 +699,6 @@ def test_game_section_falls_back_to_menu_vehicle_when_live_racer_is_uninitialize
             "frame_index": 0,
             "native_fps": 60.0,
             "track_vehicle_name": "Blue Falcon",
-            "track_engine_setting": "Balanced",
             "racer_character_index_ram": -1,
             "player_character_index_ram": 7,
             "engine_setting_percent_ram": 75.0,
@@ -733,7 +730,6 @@ def test_game_section_ignores_invalid_live_engine_value() -> None:
             "frame_index": 0,
             "native_fps": 60.0,
             "track_vehicle_name": "Blue Falcon",
-            "track_engine_setting": "Balanced",
             "racer_character_index_ram": -1,
             "player_character_index_ram": 0,
             "engine_setting_percent_ram": 5000.0,
@@ -832,7 +828,7 @@ def test_records_section_shows_non_agg_reference_records() -> None:
         telemetry=_sample_telemetry(),
         track_pool_records=(
             {
-                "track_display_name": "Big Blue Time Attack - Blue Falcon Balanced",
+                "track_display_name": "Big Blue Time Attack - Blue Falcon Engine 50",
                 "track_id": "big_blue",
                 "track_non_agg_best_time_ms": 48035,
                 "track_non_agg_worst_time_ms": 75846,
@@ -877,7 +873,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
         track_pool_records=(
             {
                 "track_id": "silence",
-                "track_display_name": "Silence Time Attack - Blue Falcon Balanced",
+                "track_display_name": "Silence Time Attack - Blue Falcon Engine 50",
                 "track_non_agg_best_time_ms": 60638,
                 "track_non_agg_worst_time_ms": 63279,
             },
@@ -922,7 +918,7 @@ def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
         track_pool_records=(
             {
                 "track_id": "silence",
-                "track_display_name": "Silence GP Race - Blue Falcon Balanced",
+                "track_display_name": "Silence GP Race - Blue Falcon Engine 50",
                 "track_mode": "gp_race",
             },
         ),
@@ -1088,7 +1084,7 @@ def test_records_section_shows_latest_improvement_against_previous_pb() -> None:
         track_pool_records=(
             {
                 "track_id": "silence",
-                "track_display_name": "Silence Time Attack - Blue Falcon Balanced",
+                "track_display_name": "Silence Time Attack - Blue Falcon Engine 50",
                 "track_non_agg_best_time_ms": 60638,
                 "track_non_agg_worst_time_ms": 63279,
             },
@@ -1125,7 +1121,7 @@ def test_records_section_marks_watch_best_inside_reference_range() -> None:
         track_pool_records=(
             {
                 "track_id": "silence",
-                "track_display_name": "Silence Time Attack - Blue Falcon Balanced",
+                "track_display_name": "Silence Time Attack - Blue Falcon Engine 50",
                 "track_non_agg_best_time_ms": 60638,
                 "track_non_agg_worst_time_ms": 63279,
             },
@@ -1166,7 +1162,7 @@ def test_records_section_formats_minute_scale_reference_gap() -> None:
         track_pool_records=(
             {
                 "track_id": "silence",
-                "track_display_name": "Silence Time Attack - Blue Falcon Balanced",
+                "track_display_name": "Silence Time Attack - Blue Falcon Engine 50",
                 "track_non_agg_best_time_ms": 60638,
                 "track_non_agg_worst_time_ms": 63279,
             },

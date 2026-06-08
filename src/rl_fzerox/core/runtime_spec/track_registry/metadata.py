@@ -5,7 +5,7 @@ from pathlib import Path
 
 from rl_fzerox.core.runtime_spec.track_registry_types import BaselineVariant
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
-    engine_setting_display_name,
+    engine_setting_display_name_for_raw,
     resolve_engine_setting,
     vehicle_by_id,
 )
@@ -33,18 +33,11 @@ def entry_from_course_variant(
     course = load_course_config(course_ref, config_root=config_root)
     vehicle = vehicle_by_id(variant.vehicle)
     vehicle_name = vehicle.display_name
-    engine_display_name = engine_setting_display_name(variant.engine_setting)
+    engine_display_name = engine_setting_display_name_for_raw(variant.engine_setting_raw_value)
     course_id = optional_str(course.get("id")) or safe_id(course_ref)
-    mode_id = safe_id(variant.mode)
-    difficulty_suffix = (
-        "" if variant.gp_difficulty is None else f"_{safe_id(variant.gp_difficulty)}"
-    )
 
-    entry_id = (
-        f"{course_id}_{mode_id}{difficulty_suffix}_{variant.vehicle}_{variant.engine_setting}"
-    )
     entry: dict[str, object] = {
-        "id": entry_id,
+        "id": course_id,
         "display_name": (
             f"{course.get('display_name', course_id)} "
             f"{variant.mode.replace('_', ' ').title()} - "
@@ -58,7 +51,6 @@ def entry_from_course_variant(
         "gp_difficulty": variant.gp_difficulty,
         "vehicle": variant.vehicle,
         "vehicle_name": vehicle_name,
-        "engine_setting": variant.engine_setting,
         "engine_setting_raw_value": variant.engine_setting_raw_value,
     }
     if "records" in course:
@@ -95,11 +87,9 @@ def enrich_entry_with_registry_metadata(
                 "vehicle",
                 "vehicle_name",
                 "source_vehicle",
-                "engine_setting",
                 "engine_setting_raw_value",
                 "source_course_index",
                 "source_gp_difficulty",
-                "source_engine_setting",
                 "source_engine_setting_raw_value",
                 "records",
             }:
@@ -132,22 +122,17 @@ def enrich_track_with_registry_metadata(
     vehicle = enriched.get("vehicle")
     if isinstance(vehicle, str) and vehicle:
         vehicle_info = vehicle_by_id(vehicle)
-        engine_setting = enriched.get("engine_setting")
-        if (isinstance(engine_setting, str) and engine_setting) or (
-            isinstance(engine_setting, int) and not isinstance(engine_setting, bool)
-        ):
+        engine_setting = enriched.get("engine_setting_raw_value")
+        if isinstance(engine_setting, int) and not isinstance(engine_setting, bool):
             resolved_engine_setting = resolve_engine_setting(
                 engine_setting,
                 context=f"track vehicle={vehicle!r}",
             )
-            enriched["engine_setting"] = resolved_engine_setting.id
-            if resolved_engine_setting.raw_value is not None:
-                enriched.setdefault("engine_setting_raw_value", resolved_engine_setting.raw_value)
-                enriched.setdefault("source_engine_setting", resolved_engine_setting.id)
-                enriched.setdefault(
-                    "source_engine_setting_raw_value",
-                    resolved_engine_setting.raw_value,
-                )
+            enriched["engine_setting_raw_value"] = resolved_engine_setting.raw_value
+            enriched.setdefault(
+                "source_engine_setting_raw_value",
+                resolved_engine_setting.raw_value,
+            )
         enriched.setdefault("vehicle_name", vehicle_info.display_name)
         enriched.setdefault("source_vehicle", vehicle)
     return enriched

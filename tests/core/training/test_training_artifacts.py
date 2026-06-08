@@ -492,11 +492,10 @@ def test_materialize_train_run_config_does_not_copy_init_run_baseline(
         ),
         env=EnvConfig(),
         track=TrackConfig(
-            id="mute_city_time_attack_blue_falcon_balanced",
+            id="mute_city",
             course_index=0,
             mode="time_attack",
             vehicle="blue_falcon",
-            engine_setting="balanced",
             engine_setting_raw_value=50,
         ),
         policy=PolicyConfig(),
@@ -678,11 +677,10 @@ def test_materialize_train_run_config_reuses_baseline_materializer_cache(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
         env=EnvConfig(camera_setting="close_behind"),
         track=TrackConfig(
-            id="mute_city_time_attack_blue_falcon_balanced",
+            id="mute_city",
             course_index=0,
             mode="time_attack",
             vehicle="blue_falcon",
-            engine_setting="balanced",
             engine_setting_raw_value=50,
         ),
         policy=PolicyConfig(),
@@ -761,12 +759,11 @@ def test_materialize_train_run_config_regenerates_stale_run_local_baseline_for_i
         ),
         env=EnvConfig(camera_setting="close_behind"),
         track=TrackConfig(
-            id="mute_city_time_attack_blue_falcon_balanced",
+            id="mute_city",
             baseline_state_path=baseline_path,
             course_index=0,
             mode="time_attack",
             vehicle="blue_falcon",
-            engine_setting="balanced",
             engine_setting_raw_value=50,
         ),
         policy=PolicyConfig(),
@@ -812,21 +809,19 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
                 sampling_mode="balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="mute_city_time_attack_blue_falcon_balanced",
+                        id="mute_city",
                         course_id="mute_city",
                         course_index=0,
                         mode="time_attack",
                         vehicle="blue_falcon",
-                        engine_setting="balanced",
                         engine_setting_raw_value=50,
                     ),
                     TrackSamplingEntryConfig(
-                        id="silence_time_attack_blue_falcon_balanced",
+                        id="silence",
                         course_id="silence",
                         course_index=1,
                         mode="time_attack",
                         vehicle="blue_falcon",
-                        engine_setting="balanced",
                         engine_setting_raw_value=50,
                     ),
                 ),
@@ -909,14 +904,13 @@ def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
                 sampling_mode="balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="x_cup_abcd1234_gp_race_novice_blue_falcon_balanced",
+                        id="x_cup_abcd1234",
                         course_id="x_cup_abcd1234",
                         course_name="X Cup abcd1234",
                         course_index=X_CUP_COURSE.course_index,
                         mode=X_CUP_COURSE.race_mode,
                         gp_difficulty="novice",
                         vehicle="blue_falcon",
-                        engine_setting="balanced",
                         engine_setting_raw_value=50,
                         generated_course_kind=X_CUP_COURSE.generated_kind,
                         generated_course_seed=1234,
@@ -961,6 +955,7 @@ def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
 
 def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -977,9 +972,10 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
         json.dumps(
             {
                 "schema_version": BASELINE_MATERIALIZER_SETTINGS.schema_version,
-                "cache_kind": "exact_run_baseline",
+                "cache_kind": X_CUP_COURSE.baseline_cache_kind,
                 "cache_key": "rotated-cache",
                 "materializer_mode": X_CUP_COURSE.materializer_mode,
+                "materialized_state_sha256": "rotated-sha",
             },
             indent=2,
         )
@@ -987,7 +983,7 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
         encoding="utf-8",
     )
     saved_entry = TrackSamplingEntryConfig(
-        id="x_cup_rotated_gp_race_novice_blue_falcon_balanced",
+        id="x_cup_rotated",
         course_id="x_cup_rotated",
         runtime_course_key=generated_x_cup_slot_key(0),
         course_name="X Cup rotated",
@@ -995,7 +991,6 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
         mode=X_CUP_COURSE.race_mode,
         gp_difficulty="novice",
         vehicle="blue_falcon",
-        engine_setting="balanced",
         engine_setting_raw_value=50,
         baseline_state_path=saved_state_path,
         generated_course_kind=X_CUP_COURSE.generated_kind,
@@ -1005,6 +1000,33 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
         generated_course_generation=3,
         log_per_course=False,
     )
+
+    def fake_ensure_x_cup_baseline(
+        *,
+        label: str,
+        seed: int,
+        course_hash: str,
+        gp_difficulty: object,
+        vehicle_id: str,
+        camera_setting: str | None,
+        cache_root: Path,
+        context: object,
+        emulator_type: object,
+    ) -> tuple[Path, XCupMaterializedCourse]:
+        del label, gp_difficulty, vehicle_id, camera_setting, cache_root, context, emulator_type
+        assert seed == 99
+        assert course_hash == "rotated"
+        return saved_state_path, XCupMaterializedCourse(
+            segment_count=212,
+            course_length=91_234.5,
+        )
+
+    monkeypatch.setattr(
+        baseline_materialization,
+        "ensure_x_cup_baseline",
+        fake_ensure_x_cup_baseline,
+    )
+
     config = TrainAppConfig(
         seed=123,
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
@@ -1050,18 +1072,16 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
                 generation_ema_completion_fraction=1.0,
                 generated_course_slot=0,
                 generated_course_generation=3,
-                generated_entry_id=saved_entry.id,
                 generated_course_id="x_cup_rotated",
                 generated_course_name="X Cup rotated",
                 generated_course_hash="rotated",
                 generated_course_seed=99,
-                generated_baseline_state_path=str(saved_state_path),
             ),
         ),
     )
 
     projected_entry = TrackSamplingEntryConfig(
-        id="x_cup_initial_gp_race_novice_blue_falcon_balanced",
+        id="x_cup_initial",
         course_id="x_cup_initial",
         runtime_course_key=generated_x_cup_slot_key(0),
         course_name="X Cup initial",
@@ -1069,7 +1089,6 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
         mode=X_CUP_COURSE.race_mode,
         gp_difficulty="novice",
         vehicle="blue_falcon",
-        engine_setting="balanced",
         engine_setting_raw_value=50,
         generated_course_kind=X_CUP_COURSE.generated_kind,
         generated_course_seed=11,
@@ -1104,7 +1123,6 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
     assert entry.course_id == "x_cup_rotated"
     assert entry.generated_course_generation == 3
     baseline_state_path = _required_baseline_path(entry)
-    assert baseline_state_path == saved_state_path.resolve()
     assert baseline_state_path.read_bytes() == b"rotated"
 
 
@@ -1128,23 +1146,21 @@ def test_materialize_train_run_config_reports_track_sampling_progress(
                 sampling_mode="balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="mute_city_time_attack_blue_falcon_balanced",
+                        id="mute_city",
                         course_id="mute_city",
                         course_name="Mute City",
                         course_index=0,
                         mode="time_attack",
                         vehicle="blue_falcon",
-                        engine_setting="balanced",
                         engine_setting_raw_value=50,
                     ),
                     TrackSamplingEntryConfig(
-                        id="silence_time_attack_blue_falcon_balanced",
+                        id="silence",
                         course_id="silence",
                         course_name="Silence",
                         course_index=1,
                         mode="time_attack",
                         vehicle="blue_falcon",
-                        engine_setting="balanced",
                         engine_setting_raw_value=50,
                     ),
                 ),
@@ -1199,11 +1215,10 @@ def test_materialize_train_run_config_generates_race_start_engine_variant(
                 sampling_mode="balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="silence_time_attack_blue_falcon_max_speed",
+                        id="silence",
                         course_index=1,
                         mode="time_attack",
                         vehicle="blue_falcon",
-                        engine_setting="max_speed",
                         engine_setting_raw_value=100,
                     ),
                 ),
@@ -1266,12 +1281,11 @@ def test_materialize_train_run_config_reuses_target_variant_cache_without_source
                     sampling_mode="balanced",
                     entries=(
                         TrackSamplingEntryConfig(
-                            id="silence_time_attack_blue_falcon_max_speed",
+                            id="silence",
                             course_id="silence",
                             course_index=1,
                             mode="time_attack",
                             vehicle="blue_falcon",
-                            engine_setting="max_speed",
                             engine_setting_raw_value=100,
                         ),
                     ),
@@ -1336,11 +1350,10 @@ def test_materialize_train_run_config_generates_vehicle_variant(
                 sampling_mode="balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="silence_time_attack_white_cat_engine_70",
+                        id="silence",
                         course_index=1,
                         mode="time_attack",
                         vehicle="white_cat",
-                        engine_setting="engine_70",
                         engine_setting_raw_value=70,
                     ),
                 ),
@@ -1398,7 +1411,6 @@ def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
                                 course_index=0,
                                 mode="time_attack",
                                 vehicle="blue_falcon",
-                                engine_setting="balanced",
                                 engine_setting_raw_value=50,
                             ),
                         ),
@@ -1537,14 +1549,13 @@ def test_cleanup_failed_run_preserves_explicit_run_dir_when_requested(tmp_path: 
 
 def test_track_sampling_baseline_label_omits_engine_range_metadata() -> None:
     entry = TrackSamplingEntryConfig(
-        id="silence_time_attack_fire_stingray_engine_range_20_80",
+        id="silence",
         course_id="silence",
         course_name="Silence",
         course_index=0,
         mode="time_attack",
         vehicle="fire_stingray",
         vehicle_name="Fire Stingray",
-        engine_setting="random",
     )
 
     request = request_from_track_entry(entry, camera_setting="close_behind")

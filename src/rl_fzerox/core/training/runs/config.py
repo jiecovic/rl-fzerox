@@ -91,6 +91,8 @@ def save_train_run_config(*, config: TrainAppConfig, run_dir: Path) -> Path:
     """Persist one resolved train config snapshot next to a training run."""
 
     config_path = run_dir / RUN_LAYOUT.config_filename
+    # Managed run-manager flows must rebuild from SQLite; this file is a
+    # run-local manifest for reproducibility and non-managed run-dir tools.
     data = _train_config_snapshot_data(config)
     OmegaConf.save(config=OmegaConf.create(data), f=str(config_path))
     return config_path

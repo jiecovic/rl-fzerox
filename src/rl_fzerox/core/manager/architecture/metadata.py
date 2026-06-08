@@ -17,7 +17,6 @@ from rl_fzerox.core.envs.observations.state.components import state_component_de
 from rl_fzerox.core.envs.observations.state.types import StateFeature
 from rl_fzerox.core.manager.architecture.models import (
     BuiltInCourseInfo,
-    EngineSettingPresetInfo,
     ObservationPresetInfo,
     ObservationResolutionBounds,
     ObservationSourceGeometryInfo,
@@ -85,7 +84,6 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
         track_cups=tuple(cup_infos()),
         built_in_courses=tuple(course_infos()),
         vehicles=tuple(vehicle_infos()),
-        engine_setting_presets=tuple(engine_setting_preset_infos()),
         steering_modes=(
             SelectOption(value="continuous", label="Continuous"),
             SelectOption(value="discrete", label="Discrete"),
@@ -230,15 +228,4 @@ def vehicle_infos() -> tuple[VehicleInfo, ...]:
             menu_column=vehicle_menu_row_and_column(vehicle.machine_select_slot)[1],
         )
         for vehicle in sorted(CATALOG.vehicles, key=lambda item: item.machine_select_slot)
-    )
-
-
-def engine_setting_preset_infos() -> tuple[EngineSettingPresetInfo, ...]:
-    return tuple(
-        EngineSettingPresetInfo(
-            id=preset.id,
-            display_name=preset.display_name,
-            raw_value=preset.raw_value,
-        )
-        for preset in CATALOG.engine_presets
     )

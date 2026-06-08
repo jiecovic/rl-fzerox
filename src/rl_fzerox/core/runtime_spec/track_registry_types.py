@@ -50,8 +50,7 @@ class BaselineVariant:
     mode: str
     gp_difficulty: RaceDifficultyName | None
     vehicle: str
-    engine_setting: str
-    engine_setting_raw_value: int | None
+    engine_setting_raw_value: int
 
 
 REGISTRY = RegistrySchema()

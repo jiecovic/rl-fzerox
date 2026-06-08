@@ -120,14 +120,13 @@ def baseline_variant(raw_baseline_spec: object, *, config_root: Path) -> Baselin
             "track_sampling.baseline.ghost is not configurable; use no-ghost baselines"
         )
     engine_setting = resolve_engine_setting(
-        raw_baseline_spec.get("engine_setting"),
+        raw_baseline_spec.get("engine_setting_raw_value"),
         context=f"track_sampling.baseline.vehicle={vehicle!r}",
     )
     return BaselineVariant(
         mode=mode,
         gp_difficulty=_baseline_gp_difficulty(raw_baseline_spec, mode=mode),
         vehicle=vehicle,
-        engine_setting=engine_setting.id,
         engine_setting_raw_value=engine_setting.raw_value,
     )
 

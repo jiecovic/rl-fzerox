@@ -9,7 +9,7 @@ from rl_fzerox.core.domain.x_cup import (
     generated_x_cup_slot_key,
 )
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
-from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting, vehicle_by_id
+from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 
 
 def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
@@ -68,13 +68,13 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                 entries.append(
                     _track_sampling_entry(
                         course_id=course_id,
+                        runtime_course_key=course_id,
                         course_ref=course_ref,
                         race_mode=config.tracks.race_mode,
                         gp_difficulty=gp_difficulty,
                         target_vehicle_id=vehicle_id,
                         source_vehicle_id=source_vehicle_id,
-                        source_engine_setting_id=source_engine.id,
-                        source_engine_setting_raw_value=source_engine.raw_value,
+                        source_engine_setting_raw_value=source_engine,
                         fixed_engine_setting_raw_value=(
                             config.vehicle.engine_setting_raw_value
                             if config.vehicle.engine_mode == "fixed"
@@ -110,8 +110,7 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                             gp_difficulty=gp_difficulty,
                             target_vehicle_id=vehicle_id,
                             source_vehicle_id=source_vehicle_id,
-                            source_engine_setting_id=source_engine.id,
-                            source_engine_setting_raw_value=source_engine.raw_value,
+                            source_engine_setting_raw_value=source_engine,
                             fixed_engine_setting_raw_value=(
                                 config.vehicle.engine_setting_raw_value
                                 if config.vehicle.engine_mode == "fixed"
@@ -157,7 +156,6 @@ def _track_sampling_entry(
     gp_difficulty: str | None,
     target_vehicle_id: str,
     source_vehicle_id: str,
-    source_engine_setting_id: str,
     source_engine_setting_raw_value: int,
     fixed_engine_setting_raw_value: int | None,
     random_engine_min_raw_value: int | None,
@@ -180,28 +178,14 @@ def _track_sampling_entry(
         else gp_difficulty
     )
     if fixed_engine_setting_raw_value is not None:
-        target_engine = resolve_engine_setting(
-            fixed_engine_setting_raw_value,
-            context=f"manager track_sampling {course_id}/{target_vehicle_id}",
-        )
-        engine_id = target_engine.id
-        engine_raw = target_engine.raw_value
-        engine_suffix = engine_id
+        engine_raw = fixed_engine_setting_raw_value
     else:
         if random_engine_min_raw_value is None or random_engine_max_raw_value is None:
             raise ValueError("random engine range requires both min and max raw values")
-        engine_id = source_engine_setting_id
         engine_raw = source_engine_setting_raw_value
-        engine_suffix = f"engine_range_{random_engine_min_raw_value}_{random_engine_max_raw_value}"
 
     entry = {
-        "id": _track_sampling_entry_id(
-            course_id=course_id,
-            race_mode=race_mode,
-            gp_difficulty=resolved_gp_difficulty,
-            target_vehicle_id=target_vehicle_id,
-            engine_suffix=engine_suffix,
-        ),
+        "id": runtime_course_key or course_id,
         "course_ref": course_ref,
         "course_id": course_id,
         "runtime_course_key": runtime_course_key,
@@ -213,9 +197,7 @@ def _track_sampling_entry(
         "vehicle": target_vehicle_id,
         "vehicle_name": vehicle.display_name,
         "source_vehicle": source_vehicle_id,
-        "engine_setting": engine_id,
         "engine_setting_raw_value": engine_raw,
-        "source_engine_setting": source_engine_setting_id,
         "source_engine_setting_raw_value": source_engine_setting_raw_value,
         "source_course_index": source_course_index,
         "engine_setting_min_raw_value": random_engine_min_raw_value,
@@ -230,18 +212,13 @@ def _track_sampling_entry(
     return {key: value for key, value in entry.items() if value is not None}
 
 
-def _source_engine_setting(config: ManagedRunConfig):
+def _source_engine_setting(config: ManagedRunConfig) -> int:
     if config.vehicle.engine_mode == "fixed":
-        raw_value = config.vehicle.engine_setting_raw_value
-    else:
-        raw_value = (
-            config.vehicle.engine_setting_min_raw_value
-            + config.vehicle.engine_setting_max_raw_value
-        ) // 2
-    return resolve_engine_setting(
-        raw_value,
-        context="manager source engine setting",
-    )
+        return config.vehicle.engine_setting_raw_value
+    return (
+        config.vehicle.engine_setting_min_raw_value
+        + config.vehicle.engine_setting_max_raw_value
+    ) // 2
 
 
 def _course_ref(course_id: str) -> str:
@@ -249,16 +226,3 @@ def _course_ref(course_id: str) -> str:
     if len(matches) != 1:
         raise ValueError(f"Expected exactly one built-in course ref for {course_id!r}")
     return matches[0]
-
-
-def _track_sampling_entry_id(
-    *,
-    course_id: str,
-    race_mode: str,
-    gp_difficulty: str | None,
-    target_vehicle_id: str,
-    engine_suffix: str,
-) -> str:
-    if race_mode == "gp_race" and gp_difficulty is not None:
-        return f"{course_id}_{race_mode}_{gp_difficulty}_{target_vehicle_id}_{engine_suffix}"
-    return f"{course_id}_{race_mode}_{target_vehicle_id}_{engine_suffix}"

@@ -163,8 +163,10 @@ def format_mode_name(value: object) -> str:
 
 def _short_track_name(value: str) -> str:
     suffixes = (
-        " Time Attack - Blue Falcon Balanced",
-        " time attack blue falcon balanced",
+        " Time Attack - Blue Falcon Engine 50",
+        " GP Race - Blue Falcon Engine 50",
+        " time attack - blue falcon engine 50",
+        " gp race - blue falcon engine 50",
     )
     for suffix in suffixes:
         if value.endswith(suffix):

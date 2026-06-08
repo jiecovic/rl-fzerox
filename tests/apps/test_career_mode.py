@@ -35,7 +35,6 @@ def test_career_mode_base_config_uses_save_runtime_without_policy_template(
             machine_select_slot=1,
             machine_select_row=0,
             machine_select_column=1,
-            engine_setting_id="engine_50",
             engine_setting_raw_value=50,
         ),
         label="Clear Novice Jack Cup",

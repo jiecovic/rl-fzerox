@@ -10,9 +10,6 @@ from typing import Literal
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
-    resolve_engine_setting as resolve_catalog_engine_setting,
-)
-from rl_fzerox.core.runtime_spec.vehicle_catalog import (
     vehicle_by_id,
 )
 from rl_fzerox.core.training.runs.race_start.menu_route import machine_select_route_for_slot
@@ -31,7 +28,6 @@ class SaveRaceSetup:
     machine_select_slot: int
     machine_select_row: int
     machine_select_column: int
-    engine_setting_id: str
     engine_setting_raw_value: int
 
 
@@ -61,10 +57,6 @@ def build_save_race_execution_plan(
     vehicle_id = context.course_setup.vehicle_id
     vehicle = vehicle_by_id(vehicle_id)
     route = machine_select_route_for_slot(vehicle.machine_select_slot)
-    engine_setting = resolve_catalog_engine_setting(
-        context.course_setup.engine_setting_raw_value,
-        context="career course setup",
-    )
     return SaveRaceExecutionPlan(
         attempt_id=context.attempt.id,
         policy_run_id=context.policy_run.id,
@@ -82,7 +74,6 @@ def build_save_race_execution_plan(
             machine_select_slot=vehicle.machine_select_slot,
             machine_select_row=route.down_count,
             machine_select_column=route.right_count,
-            engine_setting_id=engine_setting.id,
-            engine_setting_raw_value=engine_setting.raw_value,
+            engine_setting_raw_value=context.course_setup.engine_setting_raw_value,
         ),
     )

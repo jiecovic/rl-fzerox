@@ -52,7 +52,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     )
     slot_key = generated_x_cup_slot_key(0)
     entry = TrackSamplingEntryConfig(
-        id="x_cup_old_gp_race_novice_blue_falcon_balanced",
+        id="x_cup_old",
         course_id="x_cup_old",
         runtime_course_key=slot_key,
         course_name="X Cup old",
@@ -60,7 +60,6 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
         mode=X_CUP_COURSE.race_mode,
         gp_difficulty="novice",
         vehicle="blue_falcon",
-        engine_setting="balanced",
         engine_setting_raw_value=50,
         baseline_state_path=old_state_path,
         generated_course_kind=X_CUP_COURSE.generated_kind,
@@ -104,7 +103,6 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
             source_course_index=X_CUP_COURSE.course_index,
             source_vehicle="blue_falcon",
             source_gp_difficulty="novice",
-            source_engine_setting="balanced",
             source_engine_setting_raw_value=50,
             generated_course_segment_count=123,
             generated_course_length=45_678.0,
@@ -146,12 +144,10 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
                 generation_ema_completion_fraction=0.95,
                 generated_course_slot=0,
                 generated_course_generation=1,
-                generated_entry_id="x_cup_old_gp_race_novice_blue_falcon_balanced",
                 generated_course_id="x_cup_old",
                 generated_course_name="X Cup old",
                 generated_course_hash="old",
                 generated_course_seed=1,
-                generated_baseline_state_path=str(old_state_path),
             ),
         ),
     )
@@ -200,7 +196,7 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
     )
     slot_key = generated_x_cup_slot_key(0)
     entry = TrackSamplingEntryConfig(
-        id="x_cup_old_gp_race_novice_blue_falcon_balanced",
+        id="x_cup_old",
         course_id="x_cup_old",
         runtime_course_key=slot_key,
         course_name="X Cup old",
@@ -208,7 +204,6 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
         mode=X_CUP_COURSE.race_mode,
         gp_difficulty="novice",
         vehicle="blue_falcon",
-        engine_setting="balanced",
         engine_setting_raw_value=50,
         baseline_state_path=old_state_path,
         generated_course_kind=X_CUP_COURSE.generated_kind,
@@ -253,7 +248,6 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
             source_course_index=X_CUP_COURSE.course_index,
             source_vehicle="blue_falcon",
             source_gp_difficulty="novice",
-            source_engine_setting="balanced",
             source_engine_setting_raw_value=50,
         )
 
@@ -292,12 +286,10 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
                 generation_ema_completion_fraction=0.2,
                 generated_course_slot=0,
                 generated_course_generation=1,
-                generated_entry_id="x_cup_old_gp_race_novice_blue_falcon_balanced",
                 generated_course_id="x_cup_old",
                 generated_course_name="X Cup old",
                 generated_course_hash="old",
                 generated_course_seed=1,
-                generated_baseline_state_path=str(old_state_path),
             ),
         ),
     )

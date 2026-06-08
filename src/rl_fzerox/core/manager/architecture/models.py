@@ -91,14 +91,6 @@ class VehicleInfo(BaseModel):
     menu_column: int
 
 
-class EngineSettingPresetInfo(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    display_name: str
-    raw_value: int
-
-
 class RunManagerConfigMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -112,7 +104,6 @@ class RunManagerConfigMetadata(BaseModel):
     track_cups: tuple[TrackCupInfo, ...]
     built_in_courses: tuple[BuiltInCourseInfo, ...]
     vehicles: tuple[VehicleInfo, ...]
-    engine_setting_presets: tuple[EngineSettingPresetInfo, ...]
     steering_modes: tuple[SelectOption, ...]
     drive_modes: tuple[SelectOption, ...]
     lean_output_modes: tuple[SelectOption, ...]

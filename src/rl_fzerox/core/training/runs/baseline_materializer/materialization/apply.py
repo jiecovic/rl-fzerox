@@ -310,10 +310,6 @@ def _materialized_request_update(
         update["source_gp_difficulty"] = artifact.source_gp_difficulty
     elif request.gp_difficulty is not None:
         update["source_gp_difficulty"] = request.gp_difficulty
-    if artifact.source_engine_setting is not None:
-        update["source_engine_setting"] = artifact.source_engine_setting
-    elif request.engine_setting is not None:
-        update["source_engine_setting"] = request.engine_setting
     if artifact.source_engine_setting_raw_value is not None:
         update["source_engine_setting_raw_value"] = artifact.source_engine_setting_raw_value
     elif request.engine_setting_raw_value is not None:

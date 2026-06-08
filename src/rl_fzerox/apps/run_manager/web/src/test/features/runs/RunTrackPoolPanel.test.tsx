@@ -549,7 +549,7 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
     update_count: 1,
     episodes_since_update: 0,
     entries: ["abcd1234", "ef567890"].map((hash, index) => ({
-      track_id: `x_cup_${hash}_gp_race_novice_blue_falcon_balanced`,
+      track_id: `x_cup_${hash}`,
       course_key: `x_cup_${hash}`,
       label: `X Cup ${hash}`,
       current_weight: 1,

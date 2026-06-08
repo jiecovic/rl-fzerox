@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
 
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.schema import (
@@ -21,10 +20,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
 class GeneratedXCupRuntimeEntry:
     course_key: str
     slot: int
-    entry_id: str
     course_id: str
     course_name: str
-    baseline_state_path: Path
     generation: int | None
     course_hash: str | None
     course_seed: int | None
@@ -96,25 +93,19 @@ def _generated_entry_from_runtime_entry(
     entry: TrackSamplingRuntimeEntry,
 ) -> GeneratedXCupRuntimeEntry | None:
     generated_course_slot = entry.generated_course_slot
-    generated_entry_id = entry.generated_entry_id
     generated_course_id = entry.generated_course_id
     generated_course_name = entry.generated_course_name
-    generated_baseline_state_path = entry.generated_baseline_state_path
     if (
         not isinstance(generated_course_slot, int)
-        or not isinstance(generated_entry_id, str)
         or not isinstance(generated_course_id, str)
         or not isinstance(generated_course_name, str)
-        or not isinstance(generated_baseline_state_path, str)
     ):
         return None
     return GeneratedXCupRuntimeEntry(
         course_key=entry.course_key,
         slot=max(0, generated_course_slot),
-        entry_id=generated_entry_id,
         course_id=generated_course_id,
         course_name=generated_course_name,
-        baseline_state_path=Path(generated_baseline_state_path).expanduser().resolve(),
         generation=entry.generated_course_generation,
         course_hash=entry.generated_course_hash,
         course_seed=entry.generated_course_seed,
@@ -153,12 +144,12 @@ def _restore_entry(
 ) -> TrackSamplingEntryConfig:
     return entry.model_copy(
         update={
-            "id": runtime_entry.entry_id,
+            "id": runtime_entry.course_id,
             "runtime_course_key": runtime_entry.course_key,
             "course_id": runtime_entry.course_id,
             "course_name": runtime_entry.course_name,
             "display_name": runtime_entry.course_name,
-            "baseline_state_path": runtime_entry.baseline_state_path,
+            "baseline_state_path": None,
             "generated_course_hash": runtime_entry.course_hash,
             "generated_course_seed": runtime_entry.course_seed,
             "generated_course_generation": runtime_entry.generation,

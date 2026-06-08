@@ -58,12 +58,6 @@ const vehicleInfoSchema = z.object({
   menu_column: z.number().int().nonnegative(),
 });
 
-const engineSettingPresetInfoSchema = z.object({
-  id: z.string(),
-  display_name: z.string(),
-  raw_value: z.number().int().min(0).max(100),
-});
-
 const stateComponentInfoSchema = z.object({
   name: z.string(),
   low: z.number(),
@@ -90,7 +84,6 @@ export const configMetadataSchema = z.object({
   track_cups: z.array(trackCupInfoSchema),
   built_in_courses: z.array(builtInCourseInfoSchema),
   vehicles: z.array(vehicleInfoSchema),
-  engine_setting_presets: z.array(engineSettingPresetInfoSchema),
   steering_modes: z.array(selectOptionSchema),
   drive_modes: z.array(selectOptionSchema),
   lean_output_modes: z.array(selectOptionSchema),

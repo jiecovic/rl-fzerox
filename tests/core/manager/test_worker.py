@@ -65,9 +65,6 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
         config=config,
         managed_runs_root=tmp_path / "runs",
     )
-    baseline_path = run.run_dir / "baselines" / "x_cup_rotated.state"
-    baseline_path.parent.mkdir(parents=True, exist_ok=True)
-    baseline_path.touch()
     slot_key = generated_x_cup_slot_key(0)
     store.upsert_run_track_sampling_state(
         run_id=run.id,
@@ -98,12 +95,10 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
                     ema_completion_fraction=1.0,
                     generated_course_slot=0,
                     generated_course_generation=3,
-                    generated_entry_id="x_cup_rotated_gp_race_novice_blue_falcon_balanced",
                     generated_course_id="x_cup_rotated",
                     generated_course_name="X Cup rotated",
                     generated_course_hash="rotated",
                     generated_course_seed=99,
-                    generated_baseline_state_path=str(baseline_path),
                 ),
             ),
         ),
@@ -116,4 +111,4 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
     assert entry.runtime_course_key == slot_key
     assert entry.course_id == "x_cup_rotated"
     assert entry.course_name == "X Cup rotated"
-    assert entry.baseline_state_path == baseline_path.resolve()
+    assert entry.baseline_state_path is None

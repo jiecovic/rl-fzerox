@@ -40,7 +40,6 @@ def retarget_gp_race_baseline(
     )
     info["track_gp_race_retargeted"] = True
     info["track_source_vehicle"] = selected_track.source_vehicle
-    info["track_source_engine_setting"] = selected_track.source_engine_setting
     info["track_source_engine_setting_raw_value"] = selected_track.source_engine_setting_raw_value
     return read_live_telemetry(backend) or telemetry
 

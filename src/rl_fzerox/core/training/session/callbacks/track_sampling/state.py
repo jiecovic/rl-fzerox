@@ -24,12 +24,10 @@ class TrackSamplingRuntimeEntry:
     generation_ema_completion_fraction: float | None = None
     generated_course_slot: int | None = None
     generated_course_generation: int | None = None
-    generated_entry_id: str | None = None
     generated_course_id: str | None = None
     generated_course_name: str | None = None
     generated_course_hash: str | None = None
     generated_course_seed: int | None = None
-    generated_baseline_state_path: str | None = None
     generated_course_segment_count: int | None = None
     generated_course_length: float | None = None
 
@@ -154,12 +152,10 @@ def aggregate_runtime_entries(
                 generation_ema_completion_fraction=entry.generation_ema_completion_fraction,
                 generated_course_slot=entry.generated_course_slot,
                 generated_course_generation=entry.generated_course_generation,
-                generated_entry_id=entry.generated_entry_id,
                 generated_course_id=entry.generated_course_id,
                 generated_course_name=entry.generated_course_name,
                 generated_course_hash=entry.generated_course_hash,
                 generated_course_seed=entry.generated_course_seed,
-                generated_baseline_state_path=entry.generated_baseline_state_path,
                 generated_course_segment_count=entry.generated_course_segment_count,
                 generated_course_length=entry.generated_course_length,
             )
@@ -197,10 +193,6 @@ def aggregate_runtime_entries(
                 existing.generated_course_generation,
                 entry.generated_course_generation,
             ),
-            generated_entry_id=_merged_optional_str(
-                existing.generated_entry_id,
-                entry.generated_entry_id,
-            ),
             generated_course_id=_merged_optional_str(
                 existing.generated_course_id,
                 entry.generated_course_id,
@@ -216,10 +208,6 @@ def aggregate_runtime_entries(
             generated_course_seed=_merged_optional_int(
                 existing.generated_course_seed,
                 entry.generated_course_seed,
-            ),
-            generated_baseline_state_path=_merged_optional_str(
-                existing.generated_baseline_state_path,
-                entry.generated_baseline_state_path,
             ),
             generated_course_segment_count=_merged_optional_int(
                 existing.generated_course_segment_count,
@@ -240,12 +228,10 @@ def replace_runtime_generation(
     replacement_label: str,
     generated_course_slot: int | None,
     generated_course_generation: int | None,
-    generated_entry_id: str | None,
     generated_course_id: str | None,
     generated_course_name: str | None,
     generated_course_hash: str | None,
     generated_course_seed: int | None,
-    generated_baseline_state_path: str | None,
     generated_course_segment_count: int | None,
     generated_course_length: float | None,
 ) -> TrackSamplingRuntimeState:
@@ -257,12 +243,10 @@ def replace_runtime_generation(
             replacement_label=replacement_label,
             generated_course_slot=generated_course_slot,
             generated_course_generation=generated_course_generation,
-            generated_entry_id=generated_entry_id,
             generated_course_id=generated_course_id,
             generated_course_name=generated_course_name,
             generated_course_hash=generated_course_hash,
             generated_course_seed=generated_course_seed,
-            generated_baseline_state_path=generated_baseline_state_path,
             generated_course_segment_count=generated_course_segment_count,
             generated_course_length=generated_course_length,
         )
@@ -279,12 +263,10 @@ def _replacement_runtime_entry(
     replacement_label: str,
     generated_course_slot: int | None,
     generated_course_generation: int | None,
-    generated_entry_id: str | None,
     generated_course_id: str | None,
     generated_course_name: str | None,
     generated_course_hash: str | None,
     generated_course_seed: int | None,
-    generated_baseline_state_path: str | None,
     generated_course_segment_count: int | None,
     generated_course_length: float | None,
 ) -> TrackSamplingRuntimeEntry:
@@ -297,12 +279,10 @@ def _replacement_runtime_entry(
         generation_ema_completion_fraction=None,
         generated_course_slot=generated_course_slot,
         generated_course_generation=generated_course_generation,
-        generated_entry_id=generated_entry_id,
         generated_course_id=generated_course_id,
         generated_course_name=generated_course_name,
         generated_course_hash=generated_course_hash,
         generated_course_seed=generated_course_seed,
-        generated_baseline_state_path=generated_baseline_state_path,
         generated_course_segment_count=generated_course_segment_count,
         generated_course_length=generated_course_length,
     )

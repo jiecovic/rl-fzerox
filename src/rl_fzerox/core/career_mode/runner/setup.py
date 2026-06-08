@@ -23,6 +23,5 @@ def career_mode_race_setup_config(
         machine_select_slot=race_setup.machine_select_slot,
         machine_select_row=race_setup.machine_select_row,
         machine_select_column=race_setup.machine_select_column,
-        engine_setting_id=race_setup.engine_setting_id,
         engine_setting_raw_value=race_setup.engine_setting_raw_value,
     )

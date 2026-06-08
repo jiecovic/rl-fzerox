@@ -25,11 +25,9 @@ class BaselineRequest:
     vehicle: str | None = None
     vehicle_name: str | None = None
     source_vehicle: str | None = None
-    engine_setting: str | None = None
     engine_setting_raw_value: int | None = None
     source_course_index: int | None = None
     source_gp_difficulty: RaceDifficultyName | None = None
-    source_engine_setting: str | None = None
     source_engine_setting_raw_value: int | None = None
     camera_setting: str | None = None
     generated_course_kind: XCupGeneratedCourseKind | None = None
@@ -49,7 +47,6 @@ class BaselineArtifact:
     source_course_index: int | None = None
     source_vehicle: str | None = None
     source_gp_difficulty: RaceDifficultyName | None = None
-    source_engine_setting: str | None = None
     source_engine_setting_raw_value: int | None = None
     generated_course_segment_count: int | None = None
     generated_course_length: float | None = None

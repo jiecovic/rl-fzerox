@@ -305,8 +305,6 @@ def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]
         info["track_vehicle"] = entry.vehicle
     if entry.vehicle_name is not None:
         info["track_vehicle_name"] = entry.vehicle_name
-    if entry.engine_setting is not None:
-        info["track_engine_setting"] = entry.engine_setting
     if entry.engine_setting_raw_value is not None:
         info["track_engine_setting_raw_value"] = int(entry.engine_setting_raw_value)
     if entry.records is not None:
@@ -335,8 +333,6 @@ def _track_config_record(track: TrackConfig) -> dict[str, object]:
         info["track_vehicle"] = track.vehicle
     if track.vehicle_name is not None:
         info["track_vehicle_name"] = track.vehicle_name
-    if track.engine_setting is not None:
-        info["track_engine_setting"] = track.engine_setting
     if track.engine_setting_raw_value is not None:
         info["track_engine_setting_raw_value"] = int(track.engine_setting_raw_value)
     if track.baseline_state_path is not None:

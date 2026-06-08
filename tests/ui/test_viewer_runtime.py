@@ -704,7 +704,7 @@ def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute_city",
-                        display_name="Mute City Time Attack - Blue Falcon Balanced",
+                        display_name="Mute City Time Attack - Blue Falcon Engine 50",
                         baseline_state_path=baseline_path,
                         course_index=0,
                     ),
@@ -717,7 +717,7 @@ def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -
     _add_config_track_info(info, config)
 
     assert info["track_id"] == "mute_city"
-    assert info["track_display_name"] == "Mute City Time Attack - Blue Falcon Balanced"
+    assert info["track_display_name"] == "Mute City Time Attack - Blue Falcon Engine 50"
 
 
 def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> None:
@@ -739,7 +739,7 @@ def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> 
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute_city",
-                        display_name="Mute City Time Attack - Blue Falcon Balanced",
+                        display_name="Mute City Time Attack - Blue Falcon Engine 50",
                         baseline_state_path=mute_baseline_path,
                         course_index=0,
                     ),
@@ -757,7 +757,7 @@ def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> 
                         entries=(
                             TrackSamplingEntryConfig(
                                 id="port_town",
-                                display_name="Port Town Time Attack - Blue Falcon Balanced",
+                                display_name="Port Town Time Attack - Blue Falcon Engine 50",
                                 baseline_state_path=port_baseline_path,
                                 course_index=7,
                                 records=TrackRecordsConfig(
@@ -766,7 +766,7 @@ def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> 
                             ),
                             TrackSamplingEntryConfig(
                                 id="white_land",
-                                display_name="White Land Time Attack - Blue Falcon Balanced",
+                                display_name="White Land Time Attack - Blue Falcon Engine 50",
                                 baseline_state_path=white_land_baseline_path,
                                 course_index=8,
                             ),
@@ -785,7 +785,7 @@ def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> 
         "white_land",
     ]
     assert info["track_id"] == "port_town"
-    assert info["track_display_name"] == "Port Town Time Attack - Blue Falcon Balanced"
+    assert info["track_display_name"] == "Port Town Time Attack - Blue Falcon Engine 50"
     assert info["track_non_agg_best_time_ms"] == 73_000
 
 

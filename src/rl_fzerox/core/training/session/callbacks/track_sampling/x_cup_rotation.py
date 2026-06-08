@@ -47,12 +47,10 @@ class XCupRotationUpdate:
     replacement_label: str
     generated_course_slot: int | None
     generated_course_generation: int | None
-    generated_entry_id: str | None
     generated_course_id: str | None
     generated_course_name: str | None
     generated_course_hash: str | None
     generated_course_seed: int | None
-    generated_baseline_state_path: str | None
     generated_course_segment_count: int | None
     generated_course_length: float | None
 
@@ -126,18 +124,12 @@ class XCupRotationManager:
             replacement_label=replacement_label,
             generated_course_slot=replacement_entries[0].generated_course_slot,
             generated_course_generation=replacement_entries[0].generated_course_generation,
-            generated_entry_id=replacement_entries[0].id,
             generated_course_id=replacement_entries[0].course_id,
             generated_course_name=(
                 replacement_entries[0].course_name or replacement_entries[0].display_name
             ),
             generated_course_hash=replacement_entries[0].generated_course_hash,
             generated_course_seed=replacement_entries[0].generated_course_seed,
-            generated_baseline_state_path=(
-                None
-                if replacement_entries[0].baseline_state_path is None
-                else str(replacement_entries[0].baseline_state_path)
-            ),
             generated_course_segment_count=replacement_entries[0].generated_course_segment_count,
             generated_course_length=replacement_entries[0].generated_course_length,
         )
@@ -264,7 +256,7 @@ def _replacement_entry(
     identity_course: GeneratedXCupCourseIdentity,
 ) -> TrackSamplingEntryConfig:
     update = {
-        "id": _replacement_entry_id(entry, new_course_id=identity_course.course_id),
+        "id": identity_course.course_id,
         "course_id": identity_course.course_id,
         "course_name": identity_course.display_name,
         "display_name": identity_course.display_name,
@@ -282,13 +274,6 @@ def _replacement_entry(
     return entry.model_copy(update=update)
 
 
-def _replacement_entry_id(entry: TrackSamplingEntryConfig, *, new_course_id: str) -> str:
-    old_course_id = entry.course_id
-    if old_course_id is not None and entry.id.startswith(f"{old_course_id}_"):
-        return f"{new_course_id}{entry.id[len(old_course_id) :]}"
-    return f"{new_course_id}_{entry.id}"
-
-
 def _materialized_entry_update(artifact: BaselineArtifact) -> dict[str, object]:
     update: dict[str, object] = {"baseline_state_path": artifact.state_path}
     if artifact.source_course_index is not None:
@@ -297,8 +282,6 @@ def _materialized_entry_update(artifact: BaselineArtifact) -> dict[str, object]:
         update["source_vehicle"] = artifact.source_vehicle
     if artifact.source_gp_difficulty is not None:
         update["source_gp_difficulty"] = artifact.source_gp_difficulty
-    if artifact.source_engine_setting is not None:
-        update["source_engine_setting"] = artifact.source_engine_setting
     if artifact.source_engine_setting_raw_value is not None:
         update["source_engine_setting_raw_value"] = artifact.source_engine_setting_raw_value
     if artifact.generated_course_segment_count is not None:

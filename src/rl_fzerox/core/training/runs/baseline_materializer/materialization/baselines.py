@@ -6,7 +6,6 @@ from pathlib import Path
 
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, is_race_difficulty_name
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
-from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting
 from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     atomic_write_json,
     course_vehicle_cache_payload,
@@ -58,7 +57,7 @@ def materialize_baseline_impl(
     source_course_index = _required_request_course_index(request)
     source_vehicle_id = _request_vehicle_id(request)
     source_gp_difficulty = _request_gp_difficulty(request)
-    source_engine = _source_engine_setting()
+    source_engine_raw_value = _source_engine_setting_raw_value()
     cache_state_path = ensure_course_vehicle_baseline(
         mode=_validated_request_mode(_required_request_mode(request)),
         label=request.label,
@@ -100,8 +99,7 @@ def materialize_baseline_impl(
                 "source_course_index": source_course_index,
                 "source_vehicle": source_vehicle_id,
                 "source_gp_difficulty": source_gp_difficulty,
-                "source_engine_setting": source_engine.id,
-                "source_engine_setting_raw_value": source_engine.raw_value,
+                "source_engine_setting_raw_value": source_engine_raw_value,
             },
         )
     return BaselineArtifact(
@@ -111,8 +109,7 @@ def materialize_baseline_impl(
         source_course_index=source_course_index,
         source_vehicle=source_vehicle_id,
         source_gp_difficulty=source_gp_difficulty,
-        source_engine_setting=source_engine.id,
-        source_engine_setting_raw_value=source_engine.raw_value,
+        source_engine_setting_raw_value=source_engine_raw_value,
     )
 
 
@@ -130,7 +127,7 @@ def _materialize_x_cup_baseline(
     course_hash = _required_request_generated_hash(request)
     source_vehicle_id = _request_vehicle_id(request)
     source_gp_difficulty = _request_gp_difficulty(request)
-    source_engine = _source_engine_setting()
+    source_engine_raw_value = _source_engine_setting_raw_value()
     cache_state_path, course = ensure_x_cup_baseline(
         label=request.label,
         seed=seed,
@@ -154,8 +151,7 @@ def _materialize_x_cup_baseline(
         "source_course_index": X_CUP_COURSE.course_index,
         "source_vehicle": source_vehicle_id,
         "source_gp_difficulty": source_gp_difficulty,
-        "source_engine_setting": source_engine.id,
-        "source_engine_setting_raw_value": source_engine.raw_value,
+        "source_engine_setting_raw_value": source_engine_raw_value,
         "generated_course_segment_count": course.segment_count,
         "generated_course_length": course.course_length,
     }
@@ -183,8 +179,7 @@ def _materialize_x_cup_baseline(
         source_course_index=X_CUP_COURSE.course_index,
         source_vehicle=source_vehicle_id,
         source_gp_difficulty=source_gp_difficulty,
-        source_engine_setting=source_engine.id,
-        source_engine_setting_raw_value=source_engine.raw_value,
+        source_engine_setting_raw_value=source_engine_raw_value,
         generated_course_segment_count=course.segment_count,
         generated_course_length=course.course_length,
     )
@@ -233,7 +228,6 @@ def _reuse_existing_run_baseline(
         source_course_index=_optional_metadata_int(metadata, "source_course_index"),
         source_vehicle=_optional_metadata_str(metadata, "source_vehicle"),
         source_gp_difficulty=_optional_metadata_race_difficulty(metadata, "source_gp_difficulty"),
-        source_engine_setting=_optional_metadata_str(metadata, "source_engine_setting"),
         source_engine_setting_raw_value=_optional_metadata_int(
             metadata,
             "source_engine_setting_raw_value",
@@ -286,11 +280,8 @@ def _request_gp_difficulty(request: BaselineRequest) -> RaceDifficultyName | Non
     return request.gp_difficulty if request.mode == "gp_race" else None
 
 
-def _source_engine_setting():
-    return resolve_engine_setting(
-        BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline.engine_setting_raw_value,
-        context="baseline materializer source engine",
-    )
+def _source_engine_setting_raw_value() -> int:
+    return BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline.engine_setting_raw_value
 
 
 def _validated_request_mode(mode: str) -> RaceStartMode:

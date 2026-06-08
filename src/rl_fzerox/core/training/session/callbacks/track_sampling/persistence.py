@@ -88,12 +88,10 @@ def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
                 "generation_ema_completion_fraction": entry.generation_ema_completion_fraction,
                 "generated_course_slot": entry.generated_course_slot,
                 "generated_course_generation": entry.generated_course_generation,
-                "generated_entry_id": entry.generated_entry_id,
                 "generated_course_id": entry.generated_course_id,
                 "generated_course_name": entry.generated_course_name,
                 "generated_course_hash": entry.generated_course_hash,
                 "generated_course_seed": entry.generated_course_seed,
-                "generated_baseline_state_path": entry.generated_baseline_state_path,
                 "generated_course_segment_count": entry.generated_course_segment_count,
                 "generated_course_length": entry.generated_course_length,
             }
@@ -208,15 +206,10 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
             raw_entry,
             "generated_course_generation",
         )
-        generated_entry_id = _mapping_optional_str(raw_entry, "generated_entry_id")
         generated_course_id = _mapping_optional_str(raw_entry, "generated_course_id")
         generated_course_name = _mapping_optional_str(raw_entry, "generated_course_name")
         generated_course_hash = _mapping_optional_str(raw_entry, "generated_course_hash")
         generated_course_seed = _mapping_optional_int(raw_entry, "generated_course_seed")
-        generated_baseline_state_path = _mapping_optional_str(
-            raw_entry,
-            "generated_baseline_state_path",
-        )
         generated_course_segment_count = _mapping_optional_int(
             raw_entry,
             "generated_course_segment_count",
@@ -298,14 +291,12 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
                     if generated_course_generation is None
                     else max(1, generated_course_generation)
                 ),
-                generated_entry_id=generated_entry_id,
                 generated_course_id=generated_course_id,
                 generated_course_name=generated_course_name,
                 generated_course_hash=generated_course_hash,
                 generated_course_seed=(
                     None if generated_course_seed is None else max(0, generated_course_seed)
                 ),
-                generated_baseline_state_path=generated_baseline_state_path,
                 generated_course_segment_count=(
                     None
                     if generated_course_segment_count is None

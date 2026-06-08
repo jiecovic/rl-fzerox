@@ -34,7 +34,6 @@ def retarget_time_attack_baseline(
     )
     info["track_time_attack_retargeted"] = True
     info["track_source_vehicle"] = selected_track.source_vehicle
-    info["track_source_engine_setting"] = selected_track.source_engine_setting
     info["track_source_engine_setting_raw_value"] = selected_track.source_engine_setting_raw_value
     return read_live_telemetry(backend) or telemetry
 

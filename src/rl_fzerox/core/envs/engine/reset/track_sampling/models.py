@@ -45,14 +45,12 @@ class SelectedTrack:
     gp_difficulty: RaceDifficultyName | None
     vehicle: str | None
     vehicle_name: str | None
-    engine_setting: str | None
     engine_setting_raw_value: int | None
     engine_setting_min_raw_value: int | None
     engine_setting_max_raw_value: int | None
     source_vehicle: str | None
     source_course_index: int | None
     source_gp_difficulty: RaceDifficultyName | None
-    source_engine_setting: str | None
     source_engine_setting_raw_value: int | None
     generated_course_kind: str | None
     generated_course_seed: int | None
@@ -84,7 +82,6 @@ class SelectedTrack:
             "track_gp_difficulty": self.gp_difficulty,
             "track_vehicle": self.vehicle,
             "track_vehicle_name": self.vehicle_name,
-            "track_engine_setting": self.engine_setting,
             "track_engine_setting_raw_value": self.engine_setting_raw_value,
             "track_sampling_cycle_position": self.cycle_position,
             "track_generated_course_kind": self.generated_course_kind,

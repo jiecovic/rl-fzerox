@@ -84,13 +84,11 @@ class TrackSamplingEntryConfig(BaseModel):
     vehicle: str | None = None
     vehicle_name: str | None = None
     source_vehicle: str | None = None
-    engine_setting: str | None = None
     engine_setting_raw_value: NonNegativeInt | None = None
     engine_setting_min_raw_value: NonNegativeInt | None = None
     engine_setting_max_raw_value: NonNegativeInt | None = None
     source_course_index: NonNegativeInt | None = None
     source_gp_difficulty: RaceDifficultyName | None = None
-    source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
     generated_course_kind: XCupGeneratedCourseKind | None = None
     generated_course_seed: NonNegativeInt | None = None
@@ -204,13 +202,11 @@ class TrackConfig(BaseModel):
     vehicle: str | None = None
     vehicle_name: str | None = None
     source_vehicle: str | None = None
-    engine_setting: str | None = None
     engine_setting_raw_value: NonNegativeInt | None = None
     engine_setting_min_raw_value: NonNegativeInt | None = None
     engine_setting_max_raw_value: NonNegativeInt | None = None
     source_course_index: NonNegativeInt | None = None
     source_gp_difficulty: RaceDifficultyName | None = None
-    source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
     baseline_state_path: Path | None = None
     records: TrackRecordsConfig | None = None

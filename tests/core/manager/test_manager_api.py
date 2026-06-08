@@ -1424,7 +1424,7 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     red_gazelle = next(vehicle for vehicle in payload["vehicles"] if vehicle["id"] == "red_gazelle")
     assert red_gazelle["menu_row"] == 0
     assert red_gazelle["menu_column"] == 5
-    assert "balanced" in {preset["id"] for preset in payload["engine_setting_presets"]}
+    assert "engine_setting_presets" not in payload
     assert "continuous" in {mode["value"] for mode in payload["steering_modes"]}
     assert "on_off" in {mode["value"] for mode in payload["drive_modes"]}
     lean_output_modes = {mode["value"] for mode in payload["lean_output_modes"]}

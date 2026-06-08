@@ -38,6 +38,9 @@ from rl_fzerox.core.manager.db.models import (
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json, load_config_json
+from rl_fzerox.core.manager.storage.track_sampling_identity_migration import (
+    migrate_manager_track_sampling_identity,
+)
 from rl_fzerox.core.save_game.unlocks import FZEROX_SAVE_LAYOUT
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
@@ -1003,12 +1006,10 @@ def test_manager_store_persists_track_sampling_runtime_state(tmp_path: Path) -> 
                 generation_ema_completion_fraction=0.8,
                 generated_course_slot=1,
                 generated_course_generation=3,
-                generated_entry_id="x_cup_1234abcd_gp_race_novice_blue_falcon_balanced",
                 generated_course_id="x_cup_1234abcd",
                 generated_course_name="X Cup 1234abcd",
                 generated_course_hash="1234abcd",
                 generated_course_seed=12_647_406_722_013_964_192,
-                generated_baseline_state_path=str(run.run_dir / "baselines" / "x.state"),
                 generated_course_segment_count=128,
                 generated_course_length=12345.0,
             ),
@@ -1025,6 +1026,98 @@ def test_manager_store_persists_track_sampling_runtime_state(tmp_path: Path) -> 
     store.clear_run_track_sampling_state(run.id)
 
     assert store.get_run_track_sampling_state(run.id) is None
+
+
+def test_manager_store_requires_explicit_track_sampling_identity_migration(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Legacy Track Pool State Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    state = TrackSamplingRuntimeState(
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=5,
+        ema_alpha=0.1,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.8,
+        adaptive_target_completion=0.5,
+        adaptive_min_confidence_episodes=12,
+        adaptive_confidence_scale=3.0,
+        update_count=7,
+        episodes_since_update=2,
+        entries=(
+            TrackSamplingRuntimeEntry(
+                track_id="x_cup_slot_1",
+                course_key="x_cup_slot_1",
+                label="X Cup 1234abcd",
+                base_weight=1.0,
+                current_weight=2.0,
+                completed_frames=1000,
+                episode_count=4,
+                finished_episode_count=1,
+                success_sample_count=4,
+                ema_episode_frames=250.0,
+                ema_completion_fraction=0.75,
+                generation_episode_count=2,
+                generation_finished_episode_count=1,
+                generation_success_sample_count=2,
+                generation_ema_completion_fraction=0.8,
+                generated_course_slot=1,
+                generated_course_generation=3,
+                generated_course_id="x_cup_1234abcd",
+                generated_course_name="X Cup 1234abcd",
+                generated_course_hash="1234abcd",
+                generated_course_seed=12_647_406_722_013_964_192,
+                generated_course_segment_count=128,
+                generated_course_length=12345.0,
+            ),
+        ),
+    )
+    store.upsert_run_track_sampling_state(run_id=run.id, state=state)
+    legacy_engine = manager_engine(store.db_path)
+    try:
+        with legacy_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "ALTER TABLE run_track_sampling_entries ADD COLUMN generated_entry_id TEXT"
+            )
+            connection.exec_driver_sql(
+                "ALTER TABLE run_track_sampling_entries "
+                "ADD COLUMN generated_baseline_state_path TEXT"
+            )
+            connection.exec_driver_sql(
+                "UPDATE run_track_sampling_entries "
+                "SET generated_entry_id = 'x_cup_1234abcd_gp_race_novice', "
+                "generated_baseline_state_path = '/tmp/stale.state'"
+            )
+    finally:
+        legacy_engine.dispose()
+
+    with pytest.raises(RuntimeError, match="legacy columns"):
+        ManagerStore(store.db_path).get_run_track_sampling_state(run.id)
+
+    migrate_manager_track_sampling_identity(
+        store.db_path,
+        applied_at="2026-06-08T00:00:00+00:00",
+    )
+
+    migrated_store = ManagerStore(store.db_path)
+    recovered = migrated_store.get_run_track_sampling_state(run.id)
+    inspected_engine = manager_engine(store.db_path)
+    try:
+        columns = {
+            column["name"]
+            for column in inspect(inspected_engine).get_columns("run_track_sampling_entries")
+        }
+    finally:
+        inspected_engine.dispose()
+
+    assert recovered == state
+    assert "generated_entry_id" not in columns
+    assert "generated_baseline_state_path" not in columns
 
 
 def test_manager_store_updates_track_sampling_rows_incrementally(tmp_path: Path) -> None:
