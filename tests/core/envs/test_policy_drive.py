@@ -175,6 +175,7 @@ def test_policy_drive_manual_step_forwards_spin_request(tmp_path: Path) -> None:
 
     assert backend.last_spin_request == "left"
     assert step.info["spin_requested"] is True
+    assert step.info["spin_request"] == "left"
 
 
 def test_policy_drive_manual_spin_bypasses_policy_spin_mask(tmp_path: Path) -> None:

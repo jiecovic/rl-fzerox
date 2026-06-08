@@ -302,36 +302,84 @@ def _draw_spin_status(
     y: int,
     control_viz: ControlViz,
 ) -> None:
-    if not (
-        control_viz.spin_requested
-        or control_viz.spin_macro_active
-        or control_viz.spin_macro_cooldown_frames > 0
-    ):
-        return
-    direction = (
-        "L" if control_viz.spin_direction < 0 else "R" if control_viz.spin_direction > 0 else "-"
+    status = _spin_status_label(control_viz)
+    status_surface = font.render(status, True, _spin_status_color(control_viz))
+    button_width = 29
+    gap = 4
+    label_gap = 5
+    total_width = (2 * button_width) + gap
+    button_y = y + status_surface.get_height() + label_gap
+    status_x = x - (status_surface.get_width() // 2)
+    screen.blit(status_surface, (status_x, y))
+    left_x = x - (total_width // 2)
+    _draw_spin_macro_button(
+        pygame=pygame,
+        screen=screen,
+        font=font,
+        rect=pygame.Rect(left_x, button_y, button_width, 18),
+        label="Q L",
+        active=control_viz.spin_requested and control_viz.spin_direction < 0,
+        masked=control_viz.spin_left_masked,
     )
+    _draw_spin_macro_button(
+        pygame=pygame,
+        screen=screen,
+        font=font,
+        rect=pygame.Rect(left_x + button_width + gap, button_y, button_width, 18),
+        label="W R",
+        active=control_viz.spin_requested and control_viz.spin_direction > 0,
+        masked=control_viz.spin_right_masked,
+    )
+
+
+def _spin_status_label(control_viz: ControlViz) -> str:
     if control_viz.spin_macro_active:
-        label = f"SPIN {direction}"
-        color = PALETTE.text_accent
-    elif control_viz.spin_macro_cooldown_frames > 0:
-        label = f"SPIN CD {control_viz.spin_macro_cooldown_frames}"
-        color = PALETTE.text_muted
+        return "SPIN"
+    if control_viz.spin_macro_cooldown_frames > 0:
+        return f"CD {control_viz.spin_macro_cooldown_frames}"
+    return "SPIN"
+
+
+def _spin_status_color(control_viz: ControlViz) -> tuple[int, int, int]:
+    if control_viz.spin_macro_active or control_viz.spin_requested:
+        return PALETTE.text_accent
+    if control_viz.spin_macro_cooldown_frames > 0:
+        return PALETTE.text_muted
+    return PALETTE.text_muted
+
+
+def _draw_spin_macro_button(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    font: RenderFont,
+    rect: PygameRect,
+    label: str,
+    active: bool,
+    masked: bool,
+) -> None:
+    if masked:
+        fill = (17, 21, 25)
+        border = (58, 64, 70)
+        text_color = (90, 98, 106)
+    elif active:
+        fill = (28, 78, 64)
+        border = PALETTE.text_accent
+        text_color = PALETTE.text_primary
     else:
-        label = f"SPIN {direction}"
-        color = PALETTE.text_accent
-    text = font.render(label, True, color)
-    pad_x = 5
-    pad_y = 2
-    rect = pygame.Rect(
-        x - (text.get_width() // 2) - pad_x,
-        y,
-        text.get_width() + (2 * pad_x),
-        text.get_height() + (2 * pad_y),
+        fill = (20, 27, 34)
+        border = PALETTE.panel_border
+        text_color = PALETTE.text_muted
+    pygame.draw.rect(screen, fill, rect, border_radius=4)
+    pygame.draw.rect(screen, border, rect, width=1, border_radius=4)
+    text = font.render(label, True, text_color)
+    screen.blit(
+        text,
+        (
+            rect.centerx - (text.get_width() // 2),
+            rect.centery - (text.get_height() // 2),
+        ),
     )
-    pygame.draw.rect(screen, COCKPIT_PANEL_STYLE.fill, rect, border_radius=4)
-    pygame.draw.rect(screen, color, rect, width=1, border_radius=4)
-    screen.blit(text, (rect.x + pad_x, rect.y + pad_y))
 
 
 def _control_viz_panel_height(width: int) -> int:

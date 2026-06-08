@@ -225,6 +225,31 @@ def test_control_viz_maps_action_mask_branches_to_cockpit_locks() -> None:
     assert control_viz.pitch_masked
 
 
+def test_control_viz_visualizes_manual_spin_request_direction() -> None:
+    control_viz = _control_viz(
+        race_control_state(),
+        gas_level=0.0,
+        spin_requested=True,
+        spin_request="left",
+    )
+
+    assert control_viz.spin_requested
+    assert control_viz.spin_direction == -1
+    assert not control_viz.spin_left_masked
+    assert not control_viz.spin_right_masked
+
+
+def test_control_viz_masks_spin_buttons_during_macro_cooldown() -> None:
+    control_viz = _control_viz(
+        race_control_state(),
+        gas_level=0.0,
+        spin_macro_cooldown_frames=4,
+    )
+
+    assert control_viz.spin_left_masked
+    assert control_viz.spin_right_masked
+
+
 def test_control_viz_uses_policy_branch_selection_for_hybrid_buttons() -> None:
     control_viz = _control_viz(
         race_control_state(control_mask=RACE_CONTROL_MASKS.lean_left),

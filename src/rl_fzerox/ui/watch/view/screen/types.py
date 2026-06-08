@@ -90,6 +90,8 @@ class ControlViz:
     spin_requested: bool = False
     spin_macro_active: bool = False
     spin_macro_cooldown_frames: int = 0
+    spin_left_masked: bool = False
+    spin_right_masked: bool = False
     lean_left_pressed: bool = False
     lean_right_pressed: bool = False
     deterministic_policy: bool | None = None

@@ -797,6 +797,7 @@ def test_step_control_spin_bypasses_policy_spin_mask_for_manual_macro() -> None:
 
     assert backend.last_spin_request == "left"
     assert info["spin_requested"] is True
+    assert info["spin_request"] == "left"
     assert info["spin_started"] is True
 
 

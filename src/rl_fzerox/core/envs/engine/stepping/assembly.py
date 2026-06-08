@@ -210,6 +210,7 @@ class EngineStepAssembler:
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used
         info["spin_requested"] = spin_requested
+        info["spin_request"] = request.spin_request
         info["spin_started"] = spin_started
         info["spin_macro_active_frames"] = spin_active_frames
         info["lean_macro_owned_frames"] = int(step_result.summary.lean_macro_owned_frames)

@@ -52,6 +52,7 @@ def _control_viz(
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
     spin_requested: bool = False,
+    spin_request: str = "none",
     spin_macro_active: bool = False,
     spin_macro_cooldown_frames: int = 0,
 ) -> ControlViz:
@@ -76,6 +77,10 @@ def _control_viz(
         policy_action=policy_action,
     )
     spin_direction = _spin_direction(selected_branches)
+    if spin_direction == 0:
+        spin_direction = _spin_request_direction(spin_request)
+    normalized_spin_cooldown_frames = max(0, int(spin_macro_cooldown_frames))
+    spin_runtime_masked = spin_macro_active or normalized_spin_cooldown_frames > 0
     boost_pressed = _branch_pressed(
         selected_branches,
         "boost",
@@ -125,7 +130,9 @@ def _control_viz(
         spin_direction=spin_direction,
         spin_requested=spin_requested or spin_direction != 0,
         spin_macro_active=spin_macro_active,
-        spin_macro_cooldown_frames=max(0, int(spin_macro_cooldown_frames)),
+        spin_macro_cooldown_frames=normalized_spin_cooldown_frames,
+        spin_left_masked=spin_runtime_masked,
+        spin_right_masked=spin_runtime_masked,
         lean_left_pressed=lean_left_pressed,
         lean_right_pressed=lean_right_pressed,
         deterministic_policy=policy_deterministic,
@@ -239,6 +246,14 @@ def _spin_direction(selected_branches: dict[str, int]) -> int:
     if spin == 1:
         return -1
     if spin == 2:
+        return 1
+    return 0
+
+
+def _spin_request_direction(spin_request: str) -> int:
+    if spin_request == "left":
+        return -1
+    if spin_request == "right":
         return 1
     return 0
 

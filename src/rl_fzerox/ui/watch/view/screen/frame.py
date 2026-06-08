@@ -318,6 +318,7 @@ def _draw_frame(
         continuous_air_brake_mode=data.continuous_air_brake_mode,
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
         spin_requested=_bool_info(data.info, "spin_requested"),
+        spin_request=_spin_request_info(data.info),
         spin_macro_active=_bool_info(data.info, "spin_macro_active"),
         spin_macro_cooldown_frames=_int_info(data.info, "spin_macro_cooldown_frames"),
     )
@@ -552,6 +553,11 @@ def _int_info(info: dict[str, object], key: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         return 0
     return max(0, value)
+
+
+def _spin_request_info(info: dict[str, object]) -> str:
+    value = info.get("spin_request")
+    return value if isinstance(value, str) and value in {"left", "right"} else "none"
 
 
 def _course_cup_name(info: dict[str, object]) -> str | None:
