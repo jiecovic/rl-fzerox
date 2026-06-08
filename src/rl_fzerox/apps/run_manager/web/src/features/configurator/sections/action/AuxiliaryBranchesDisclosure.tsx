@@ -13,6 +13,7 @@ export function AuxiliaryBranchesDisclosure({
   open,
   setOpen,
   updateAction,
+  updatePolicy,
   updateTrain,
 }: AuxiliaryBranchesDisclosureProps) {
   const action = config.action;
@@ -30,6 +31,9 @@ export function AuxiliaryBranchesDisclosure({
         updateTrain({
           actor_regularization: defaultConfig.train.actor_regularization,
         });
+        updatePolicy({
+          spin_idle_logit: defaultConfig.policy.spin_idle_logit,
+        });
       }}
       onToggle={setOpen}
       open={open}
@@ -45,10 +49,13 @@ export function AuxiliaryBranchesDisclosure({
           action={action}
           checkpointLocked={checkpointLocked}
           defaultAction={defaultConfig.action}
+          defaultPolicy={defaultConfig.policy}
           defaultTrain={defaultConfig.train}
           metadata={metadata}
+          policy={config.policy}
           train={config.train}
           updateAction={updateAction}
+          updatePolicy={updatePolicy}
           updateTrain={updateTrain}
         />
       </div>

@@ -32,7 +32,10 @@ def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
         "action_bias": {
             "gas_on_logit": (
                 config.policy.gas_on_logit if config.action.drive_mode == "on_off" else 0.0
-            )
+            ),
+            "spin_idle_logit": (
+                config.policy.spin_idle_logit if config.action.include_spin else 0.0
+            ),
         },
         "auxiliary_state": {
             "enabled": config.policy.auxiliary_state_enabled,

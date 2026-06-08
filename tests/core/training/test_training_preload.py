@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 from torch import nn
 
-from rl_fzerox.core.runtime_spec.schema import TrainConfig
+from rl_fzerox.core.runtime_spec.schema import PolicyActionBiasConfig, PolicyConfig, TrainConfig
 from rl_fzerox.core.training.session.model.preload import maybe_resume_training_model
 
 
@@ -107,6 +107,52 @@ def test_weights_only_resume_keeps_exact_match_when_aux_bank_signature_matches(
     )
 
     assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
+
+
+def test_weights_only_resume_applies_action_bias_after_parameter_load(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = _DummyModel(auxiliary_state_head_arch=None)
+    model_path = tmp_path / "model.zip"
+    train_config = _resume_train_config(tmp_path)
+    policy_config = PolicyConfig(
+        action_bias=PolicyActionBiasConfig(spin_idle_logit=0.5),
+    )
+    train_env = SimpleNamespace(get_attr=lambda _attr_name: [])
+    calls: list[PolicyConfig] = []
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
+        lambda run_dir: _source_run_config(auxiliary_state_head_arch=None),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
+        lambda run_dir, artifact: model_path,
+    )
+
+    def fake_apply_initial_action_biases(
+        model: _DummyModel,
+        *,
+        train_env: object,
+        policy_config: PolicyConfig,
+    ) -> None:
+        assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
+        calls.append(policy_config)
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.apply_initial_action_biases",
+        fake_apply_initial_action_biases,
+    )
+
+    maybe_resume_training_model(
+        model=model,
+        train_env=train_env,
+        train_config=train_config,
+        policy_config=policy_config,
+    )
+
+    assert calls == [policy_config]
 
 
 def test_weights_only_resume_relaxes_exact_match_when_aux_bank_arch_differs(

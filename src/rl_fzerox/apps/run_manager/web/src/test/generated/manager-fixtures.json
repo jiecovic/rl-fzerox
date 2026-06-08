@@ -1402,6 +1402,7 @@
       "recurrent_hidden_size": 256,
       "recurrent_n_lstm_layers": 1,
       "recurrent_shared_lstm": false,
+      "spin_idle_logit": 0.0,
       "state_activation": "relu",
       "state_net_arch": [64],
       "vf_net_arch": [256, 128]

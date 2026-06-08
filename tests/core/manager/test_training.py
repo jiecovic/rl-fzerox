@@ -260,6 +260,7 @@ def test_manager_training_bridge_supports_optional_spin_macro(
     config = default_managed_run_config().model_copy(deep=True)
     config.action.include_spin = True
     config.action.spin_cooldown_frames = 13
+    config.policy.spin_idle_logit = 1.0
 
     train_config = build_managed_train_app_config(
         config,
@@ -276,6 +277,24 @@ def test_manager_training_bridge_supports_optional_spin_macro(
         "pitch",
     )
     assert train_config.env.action.spin_cooldown_frames == 13
+    assert train_config.policy.action_bias.spin_idle_logit == pytest.approx(1.0)
+
+
+def test_manager_training_bridge_ignores_spin_idle_bias_without_spin_branch(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.include_spin = False
+    config.policy.spin_idle_logit = 1.0
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-no-spin",
+        run_dir=tmp_path / "runs" / "bridge-no-spin_0001",
+    )
+
+    assert "spin" not in train_config.env.action.layout_discrete_axes
+    assert train_config.policy.action_bias.spin_idle_logit == pytest.approx(0.0)
 
 
 def test_manager_action_config_disables_spin_outside_three_way_lean() -> None:

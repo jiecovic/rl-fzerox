@@ -105,6 +105,7 @@ class ManagedPolicyConfig(BaseModel):
     pi_net_arch: tuple[PositiveInt, ...] = (256, 128)
     vf_net_arch: tuple[PositiveInt, ...] = (256, 128)
     gas_on_logit: float = 0.0
+    spin_idle_logit: float = 0.0
     auxiliary_state_enabled: bool = False
     auxiliary_state_head_arch: tuple[PositiveInt, ...] = (128,)
     auxiliary_state_losses: tuple[ManagedPolicyAuxiliaryStateLossConfig, ...] = ()

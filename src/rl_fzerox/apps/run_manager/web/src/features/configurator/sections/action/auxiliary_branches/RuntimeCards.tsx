@@ -8,9 +8,13 @@ import {
   RangeNumberField,
   SegmentedChoiceStrip,
 } from "@/features/configurator/fields";
+import { formatEditableDecimal } from "@/features/configurator/fields/format";
+import { useEditableNumberInput } from "@/features/configurator/fields/numberInput";
+import { resetHandler } from "@/features/configurator/fields/reset";
 import type {
   AuxiliaryActionConfig,
   UpdateAction,
+  UpdatePolicy,
   UpdateTrain,
 } from "@/features/configurator/sections/action/auxiliary_branches/types";
 import {
@@ -19,15 +23,19 @@ import {
 } from "@/features/configurator/sections/action/descriptions";
 import { normalizeOddBucketCount } from "@/features/configurator/sections/action/model";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
+import { FieldInput, FieldNote, FieldShell } from "@/shared/ui/Field";
 
 interface RuntimeCardsProps {
   action: AuxiliaryActionConfig;
   checkpointLocked: boolean;
   defaultAction: AuxiliaryActionConfig;
+  defaultPolicy: ManagedRunConfig["policy"];
   defaultTrain: ManagedRunConfig["train"];
   metadata: ConfigMetadata;
+  policy: ManagedRunConfig["policy"];
   train: ManagedRunConfig["train"];
   updateAction: UpdateAction;
+  updatePolicy: UpdatePolicy;
   updateTrain: UpdateTrain;
 }
 
@@ -35,10 +43,13 @@ export function RuntimeCards({
   action,
   checkpointLocked,
   defaultAction,
+  defaultPolicy,
   defaultTrain,
   metadata,
+  policy,
   train,
   updateAction,
+  updatePolicy,
   updateTrain,
 }: RuntimeCardsProps) {
   const groundedPitchLossWeight = train.actor_regularization.grounded_pitch_neutral_loss_weight;
@@ -400,6 +411,11 @@ export function RuntimeCards({
               value={action.spin_cooldown_frames}
               onChange={(value) => updateAction({ spin_cooldown_frames: value })}
             />
+            <SpinIdleLogitField
+              resetValue={defaultPolicy.spin_idle_logit}
+              value={policy.spin_idle_logit}
+              onChange={(value) => updatePolicy({ spin_idle_logit: value })}
+            />
           </div>
         </fieldset>
       </section>
@@ -659,4 +675,77 @@ function formatCadence(value: number): string {
     maximumFractionDigits: value >= 10 ? 1 : 2,
     minimumFractionDigits: 0,
   });
+}
+
+function SpinIdleLogitField({
+  resetValue,
+  value,
+  onChange,
+}: {
+  resetValue: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const input = useEditableNumberInput({
+    format: formatEditableDecimal,
+    formattedValue: formatEditableDecimal(value),
+    normalize: (nextValue) => nextValue,
+    onCommit: onChange,
+    onValidInput: onChange,
+    parse: parseFiniteDecimal,
+  });
+  const noteValue = parseFiniteDecimal(input.rawValue) ?? value;
+  const idleProbability = spinIdleProbability(noteValue);
+  const sideProbability = (1 - idleProbability) / 2;
+
+  return (
+    <FieldShell>
+      <FieldLabel
+        help="Initial logit bias toward the idle spin action. Positive values reduce random spin requests when the spin branch is first enabled."
+        label="No-spin logit"
+        onReset={resetHandler(value, resetValue, onChange)}
+      />
+      <FieldInput
+        aria-label="No-spin logit"
+        className="min-w-[9ch] max-w-[14ch] justify-self-start"
+        inputMode="decimal"
+        spellCheck={false}
+        value={input.rawValue}
+        onBlur={input.commitRawValue}
+        onChange={(event) => input.changeRawValue(event.target.value)}
+      />
+      <FieldNote>
+        {`logit ${formatSignedDecimal(noteValue)} -> idle ${formatPercent(idleProbability)}, left/right ${formatPercent(sideProbability)} each`}
+      </FieldNote>
+    </FieldShell>
+  );
+}
+
+function parseFiniteDecimal(rawValue: string): number | null {
+  const normalized = rawValue.trim();
+  if (normalized === "" || normalized === "-" || normalized === "." || normalized === "-.") {
+    return null;
+  }
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function spinIdleProbability(value: number): number {
+  const idleWeight = Math.exp(value);
+  return idleWeight / (idleWeight + 2);
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })}%`;
+}
+
+function formatSignedDecimal(value: number): string {
+  const formatted = value.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  });
+  return value > 0 ? `+${formatted}` : formatted;
 }

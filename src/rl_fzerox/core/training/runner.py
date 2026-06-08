@@ -108,6 +108,7 @@ def run_training(
             model=model,
             train_env=train_env,
             train_config=run_config.train,
+            policy_config=run_config.policy,
         )
         initial_curriculum_stage_index = _resume_curriculum_stage_index(run_config)
         if initial_curriculum_stage_index is not None:

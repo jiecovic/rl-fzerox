@@ -146,11 +146,12 @@ def _build_ppo_family_model(
         model_kwargs["entropy_group_weights"] = dict(train_config.entropy_group_weights)
 
     model = algorithm_class(**model_kwargs)
-    apply_initial_action_biases(
-        model,
-        train_env=train_env,
-        policy_config=policy_config,
-    )
+    if train_config.resume_run_dir is None:
+        apply_initial_action_biases(
+            model,
+            train_env=train_env,
+            policy_config=policy_config,
+        )
     return model
 
 

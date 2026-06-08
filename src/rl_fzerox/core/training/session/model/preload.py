@@ -8,11 +8,16 @@ from stable_baselines3.common.utils import FloatSchedule
 from torch import nn
 
 from rl_fzerox.core.domain.training_algorithms import TrainAlgorithmName
-from rl_fzerox.core.runtime_spec.schema import TrainConfig
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.training.runs import (
     load_train_run_config,
     load_train_run_train_config,
     resolve_model_artifact_path,
+)
+from rl_fzerox.core.training.session.model.action_bias import (
+    TrainingEnvActionDimensions,
+    apply_initial_action_biases,
+    apply_resume_action_bias_delta,
 )
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
@@ -33,6 +38,7 @@ def maybe_resume_training_model(
     model: _ModelT,
     train_env: object,
     train_config: TrainConfig,
+    policy_config: PolicyConfig | None = None,
 ) -> _ModelT:
     """Resume or warm-start a training model from a saved run artifact.
 
@@ -87,6 +93,12 @@ def maybe_resume_training_model(
             loaded_model,
             train_config=train_config,
         )
+        if policy_config is not None:
+            apply_resume_action_bias_delta(
+                loaded_model,
+                train_env=_action_dimensions_env(train_env),
+                policy_config=policy_config,
+            )
         return loaded_model
 
     _set_model_parameters(
@@ -97,6 +109,12 @@ def maybe_resume_training_model(
             source_auxiliary_state_signature=source_auxiliary_state_signature,
         ),
     )
+    if policy_config is not None:
+        apply_initial_action_biases(
+            model,
+            train_env=_action_dimensions_env(train_env),
+            policy_config=policy_config,
+        )
     return model
 
 
@@ -137,6 +155,16 @@ def _raise_if_managed_source_metadata_missing(train_config: TrainConfig) -> None
 
 def _is_full_model_loader(value: object) -> TypeGuard[_FullModelLoader]:
     return callable(getattr(value, "load", None))
+
+
+def _is_action_dimensions_env(value: object) -> TypeGuard[TrainingEnvActionDimensions]:
+    return callable(getattr(value, "get_attr", None))
+
+
+def _action_dimensions_env(value: object) -> TrainingEnvActionDimensions:
+    if not _is_action_dimensions_env(value):
+        raise TypeError("Training env does not expose get_attr(...)")
+    return value
 
 
 def _is_training_model_instance(value: object, model: _ModelT) -> TypeGuard[_ModelT]:

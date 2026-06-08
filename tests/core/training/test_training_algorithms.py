@@ -31,6 +31,10 @@ from rl_fzerox.core.training.session.model import (
     training_requires_action_masks,
     validate_training_algorithm_config,
 )
+from rl_fzerox.core.training.session.model.action_bias import (
+    MODEL_ACTION_BIAS_OFFSETS_ATTR,
+    apply_resume_action_bias_delta,
+)
 from tests.support.action_configs import (
     configured_discrete_action,
     configured_hybrid_action,
@@ -621,6 +625,194 @@ def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
 
     bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
     assert float(bias[1] - bias[0]) == pytest.approx(0.5)
+
+
+def test_build_ppo_model_applies_hybrid_spin_idle_logit_bias() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=configured_hybrid_action(
+                        continuous_axes=("steer",),
+                        discrete_axes=("gas", "air_brake", "boost", "lean", "spin", "pitch"),
+                    ),
+                    observation=ObservationConfig(
+                        mode="image_state",
+                        state_components=_VEHICLE_STATE_COMPONENT,
+                    ),
+                ),
+            )
+        )
+    )
+
+    try:
+        dimensions = env.get_attr("action_dimensions")[0]
+        spin_offset = 0
+        for dimension in dimensions:
+            if dimension.label == "spin":
+                break
+            spin_offset += dimension.size
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+                action_bias=PolicyActionBiasConfig(spin_idle_logit=1.0),
+            ),
+            tensorboard_log=None,
+        )
+    finally:
+        env.close()
+
+    bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
+    assert float(bias[spin_offset]) == pytest.approx(1.0)
+    assert float(bias[spin_offset + 1]) == pytest.approx(0.0)
+    assert float(bias[spin_offset + 2]) == pytest.approx(0.0)
+    assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["spin_idle_logit"] == pytest.approx(1.0)
+
+
+def test_resume_action_bias_delta_does_not_stack_spin_idle_bias() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=configured_hybrid_action(
+                        continuous_axes=("steer",),
+                        discrete_axes=("gas", "air_brake", "boost", "lean", "spin", "pitch"),
+                    ),
+                    observation=ObservationConfig(
+                        mode="image_state",
+                        state_components=_VEHICLE_STATE_COMPONENT,
+                    ),
+                ),
+            )
+        )
+    )
+
+    try:
+        dimensions = env.get_attr("action_dimensions")[0]
+        spin_offset = 0
+        for dimension in dimensions:
+            if dimension.label == "spin":
+                break
+            spin_offset += dimension.size
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+            ),
+            tensorboard_log=None,
+        )
+        policy_config = PolicyConfig(
+            recurrent=PolicyRecurrentConfig(
+                enabled=True,
+                hidden_size=512,
+                n_lstm_layers=1,
+            ),
+            action_bias=PolicyActionBiasConfig(spin_idle_logit=1.0),
+        )
+        apply_resume_action_bias_delta(model, train_env=env, policy_config=policy_config)
+        apply_resume_action_bias_delta(model, train_env=env, policy_config=policy_config)
+    finally:
+        env.close()
+
+    bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
+    assert float(bias[spin_offset]) == pytest.approx(1.0)
+    assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["spin_idle_logit"] == pytest.approx(1.0)
+
+
+def test_markerless_resume_action_bias_delta_skips_legacy_gas_bias() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=configured_hybrid_action(
+                        continuous_axes=("steer",),
+                        discrete_axes=("gas", "air_brake", "boost", "lean", "spin", "pitch"),
+                    ),
+                    observation=ObservationConfig(
+                        mode="image_state",
+                        state_components=_VEHICLE_STATE_COMPONENT,
+                    ),
+                ),
+            )
+        )
+    )
+
+    try:
+        dimensions = env.get_attr("action_dimensions")[0]
+        spin_offset = 0
+        for dimension in dimensions:
+            if dimension.label == "spin":
+                break
+            spin_offset += dimension.size
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+            ),
+            tensorboard_log=None,
+        )
+        delattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)
+        apply_resume_action_bias_delta(
+            model,
+            train_env=env,
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+                action_bias=PolicyActionBiasConfig(
+                    gas_on_logit=1.0,
+                    spin_idle_logit=0.5,
+                ),
+            ),
+        )
+    finally:
+        env.close()
+
+    bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
+    assert float(bias[1]) == pytest.approx(0.0)
+    assert float(bias[spin_offset]) == pytest.approx(0.5)
 
 
 def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:

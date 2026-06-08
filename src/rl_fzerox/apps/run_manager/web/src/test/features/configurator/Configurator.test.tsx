@@ -1270,6 +1270,34 @@ describe("Configurator", () => {
     });
   });
 
+  it("updates the no-spin logit probability note while typing", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Action" }));
+    await user.click(screen.getByText("Auxiliary branches"));
+    await user.click(screen.getByRole("checkbox", { name: "Spin in output" }));
+
+    expect(screen.getByText("logit 0 -> idle 33.3%, left/right 33.3% each")).toBeVisible();
+
+    const noSpinLogit = screen.getByRole("textbox", { name: "No-spin logit" });
+    await user.clear(noSpinLogit);
+    await user.type(noSpinLogit, "0.5");
+
+    expect(screen.getByText("logit +0.5 -> idle 45.2%, left/right 27.4% each")).toBeVisible();
+  });
+
   it("lets you switch image features from auto to a custom width", async () => {
     const user = userEvent.setup();
 

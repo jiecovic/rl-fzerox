@@ -90,6 +90,7 @@ export function ActionSection({
         open={openSections.auxiliary}
         setOpen={(open) => setSectionOpen("auxiliary", open)}
         updateAction={updateAction}
+        updatePolicy={updatePolicy}
         updateTrain={updateTrain}
       />
 
