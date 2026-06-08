@@ -100,11 +100,11 @@ class XCupRotationManager:
 
         old_entries = groups[eligible.course_key]
         replacement_entries = self._materialized_replacement_entries(old_entries)
-        replacement_by_id = {
-            old_entry.id: replacement_entry
-            for old_entry, replacement_entry in zip(old_entries, replacement_entries, strict=True)
-        }
-        entries = tuple(replacement_by_id.get(entry.id, entry) for entry in track_sampling.entries)
+        entries = _replace_generated_x_cup_group_entries(
+            track_sampling.entries,
+            course_key=eligible.course_key,
+            replacement_entries=replacement_entries,
+        )
         replacement_course_key = replacement_entries[0].course_id
         if replacement_course_key is None:
             return None
@@ -253,6 +253,41 @@ def _rotation_eligible(
 
 def _entry_runtime_course_key(entry: TrackSamplingEntryConfig) -> str:
     return entry.runtime_course_key or entry.course_id or entry.id
+
+
+def _replace_generated_x_cup_group_entries(
+    entries: Sequence[TrackSamplingEntryConfig],
+    *,
+    course_key: str,
+    replacement_entries: Sequence[TrackSamplingEntryConfig],
+) -> tuple[TrackSamplingEntryConfig, ...]:
+    replacements = iter(replacement_entries)
+    replaced_count = 0
+    next_entries: list[TrackSamplingEntryConfig] = []
+    for entry in entries:
+        if _entry_belongs_to_generated_x_cup_group(entry, course_key=course_key):
+            next_entries.append(next(replacements))
+            replaced_count += 1
+        else:
+            next_entries.append(entry)
+    if replaced_count != len(replacement_entries):
+        raise ValueError(
+            "generated X Cup replacement count does not match grouped entries: "
+            f"{replaced_count} replaced, {len(replacement_entries)} materialized",
+        )
+    return tuple(next_entries)
+
+
+def _entry_belongs_to_generated_x_cup_group(
+    entry: TrackSamplingEntryConfig,
+    *,
+    course_key: str,
+) -> bool:
+    return (
+        entry.generated_course_kind == X_CUP_COURSE.generated_kind
+        and entry.generated_course_slot is not None
+        and _entry_runtime_course_key(entry) == course_key
+    )
 
 
 def _replacement_entry(

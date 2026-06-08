@@ -18,7 +18,10 @@ from rl_fzerox.core.runtime_spec.schema import (
     XCupRotationConfig,
 )
 from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs
-from rl_fzerox.core.training.runs.baseline_materializer.models import BaselineArtifact
+from rl_fzerox.core.training.runs.baseline_materializer.models import (
+    BaselineArtifact,
+    BaselineRequest,
+)
 from rl_fzerox.core.training.runs.config import load_train_run_config
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
@@ -211,6 +214,156 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     assert all(path.exists() for path in newest_stale_paths)
     assert old_state_path.exists()
     assert new_state_path.exists()
+
+
+def test_x_cup_rotation_preserves_duplicate_slot_id_difficulty_entries(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="x-cup-variants")
+    ensure_run_dirs(run_paths)
+    slot_key = generated_x_cup_slot_key(0)
+    old_state_path = run_paths.baselines_dir / "old_x_cup.state"
+    old_state_path.write_bytes(b"old")
+    old_entries = tuple(
+        TrackSamplingEntryConfig(
+            id=slot_key,
+            course_id="x_cup_old",
+            runtime_course_key=slot_key,
+            course_name="X Cup old",
+            course_index=X_CUP_COURSE.course_index,
+            mode=X_CUP_COURSE.race_mode,
+            gp_difficulty=difficulty,
+            vehicle="blue_falcon",
+            engine_setting_raw_value=50,
+            baseline_state_path=old_state_path,
+            generated_course_kind=X_CUP_COURSE.generated_kind,
+            generated_course_seed=1,
+            generated_course_hash="old",
+            generated_course_slot=0,
+            generated_course_generation=1,
+            log_per_course=False,
+        )
+        for difficulty in ("expert", "novice")
+    )
+    env_config = EnvConfig(
+        track_sampling=TrackSamplingConfig(
+            enabled=True,
+            sampling_mode="adaptive_step_balanced",
+            entries=old_entries,
+            x_cup_rotation=XCupRotationConfig(
+                enabled=True,
+                completion_threshold=0.9,
+                min_episodes=1,
+            ),
+        ),
+    )
+    train_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=env_config,
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="x-cup-variants"),
+    )
+    materialized_difficulties: list[str] = []
+
+    def fake_materialize_baseline(
+        request: BaselineRequest,
+        *args: object,
+        **kwargs: object,
+    ) -> BaselineArtifact:
+        del args, kwargs
+        difficulty = request.gp_difficulty
+        assert difficulty is not None
+        materialized_difficulties.append(difficulty)
+        state_path = run_paths.baselines_dir / f"new_{difficulty}.state"
+        state_path.write_bytes(f"new-{difficulty}".encode())
+        state_path.with_suffix(".json").write_text(
+            json.dumps(
+                {
+                    "materializer_mode": X_CUP_COURSE.materializer_mode,
+                    "source_gp_difficulty": difficulty,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return BaselineArtifact(
+            state_path=state_path,
+            metadata_path=state_path.with_suffix(".json"),
+            cache_key=f"new-cache-{difficulty}",
+            source_course_index=X_CUP_COURSE.course_index,
+            source_vehicle="blue_falcon",
+            source_gp_difficulty=difficulty,
+            source_engine_setting_raw_value=50,
+        )
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.callbacks.track_sampling.x_cup_rotation.materialize_baseline",
+        fake_materialize_baseline,
+    )
+    state = TrackSamplingRuntimeState(
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=1,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.35,
+        adaptive_target_completion=0.9,
+        adaptive_min_confidence_episodes=1,
+        adaptive_confidence_scale=1.0,
+        update_count=1,
+        episodes_since_update=0,
+        entries=(
+            TrackSamplingRuntimeEntry(
+                track_id=slot_key,
+                course_key=slot_key,
+                label="X Cup old",
+                base_weight=1.0,
+                current_weight=1.0,
+                completed_frames=100,
+                episode_count=3,
+                finished_episode_count=3,
+                success_sample_count=3,
+                ema_episode_frames=100.0,
+                ema_completion_fraction=0.95,
+                generation_episode_count=3,
+                generation_finished_episode_count=3,
+                generation_success_sample_count=3,
+                generation_ema_completion_fraction=0.95,
+                generated_course_slot=0,
+                generated_course_generation=1,
+                generated_course_id="x_cup_old",
+                generated_course_name="X Cup old",
+                generated_course_hash="old",
+                generated_course_seed=1,
+            ),
+        ),
+    )
+
+    manager = XCupRotationManager(
+        config=train_config,
+        run_paths=run_paths,
+        cache_root=tmp_path,
+        persist_manifest_on_commit=False,
+    )
+    update = manager.rotate_once(env_config=env_config, state=state)
+
+    assert update is not None
+    replacement_entries = update.env_config.track_sampling.entries
+    assert len(replacement_entries) == 2
+    assert len({entry.id for entry in replacement_entries}) == 1
+    assert [entry.runtime_course_key for entry in replacement_entries] == [slot_key, slot_key]
+    assert [entry.gp_difficulty for entry in replacement_entries] == ["expert", "novice"]
+    assert [entry.source_gp_difficulty for entry in replacement_entries] == [
+        "expert",
+        "novice",
+    ]
+    assert len({entry.baseline_state_path for entry in replacement_entries}) == 2
+    assert materialized_difficulties == ["expert", "novice"]
 
 
 def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
