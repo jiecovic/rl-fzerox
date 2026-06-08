@@ -1,8 +1,10 @@
 # src/rl_fzerox/ui/watch/runtime/track_sampling.py
 from __future__ import annotations
 
+import json
 import logging
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -11,10 +13,9 @@ from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
     restore_generated_x_cup_track_sampling_from_state,
 )
-from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
-from rl_fzerox.core.training.runs import continue_run_paths, materialize_train_run_config
-from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingRuntimeState
+from rl_fzerox.core.runtime_spec.schema.tracks import TrackSamplingEntryConfig
+from rl_fzerox.core.training.runs import continue_run_paths
 
 TrackSamplingSignature = tuple[tuple[object, ...], ...]
 LOGGER = logging.getLogger(__name__)
@@ -57,18 +58,12 @@ class ManagedTrackSamplingRefresh:
         projected_signature = _generated_x_cup_signature(projected_config)
         if projected_signature == _generated_x_cup_signature(current_config):
             return None
-        refreshed_config = self._materialized_track_sampling(state=state)
-        if refreshed_config is None or not _track_sampling_baselines_ready(refreshed_config):
+        refreshed_config = self._with_materialized_x_cup_artifacts(projected_config)
+        if refreshed_config is None:
             LOGGER.warning(
                 "skipping managed watch track-sampling refresh for run_id=%s: "
-                "generated X Cup state changed but materialized baselines are not ready",
-                self.run_id,
-            )
-            return None
-        if _generated_x_cup_signature(refreshed_config) != projected_signature:
-            LOGGER.warning(
-                "skipping managed watch track-sampling refresh for run_id=%s: "
-                "materialized config does not match current runtime generation",
+                "generated X Cup state changed but run-local baseline artifacts "
+                "are not ready",
                 self.run_id,
             )
             return None
@@ -77,43 +72,24 @@ class ManagedTrackSamplingRefresh:
     def _refresh_due(self) -> bool:
         return time.monotonic() - self._last_check_monotonic >= self.interval_seconds
 
-    def _materialized_track_sampling(
+    def _with_materialized_x_cup_artifacts(
         self,
-        *,
-        state: TrackSamplingRuntimeState | None,
+        config: TrackSamplingConfig,
     ) -> TrackSamplingConfig | None:
         run = self.store.get_run(self.run_id)
         if run is None:
             return None
-        train_config = build_managed_train_app_config(
-            run.config,
-            run_id=run.id,
-            run_dir=run.run_dir,
-        )
-        train_config = train_config.model_copy(
-            update={
-                "env": train_config.env.model_copy(
-                    update={
-                        "track_sampling": restore_generated_x_cup_track_sampling_from_state(
-                            train_config.env.track_sampling,
-                            state=state,
-                        )
-                    }
-                )
-            }
-        )
-        try:
-            materialized = materialize_train_run_config(
-                train_config,
-                run_paths=continue_run_paths(run.run_dir),
-            )
-        except Exception:
-            LOGGER.exception(
-                "managed watch track-sampling refresh failed for run_id=%s",
-                self.run_id,
-            )
-            return None
-        return materialized.env.track_sampling
+        artifact_index = _x_cup_baseline_artifacts(continue_run_paths(run.run_dir).baselines_dir)
+        next_entries: list[TrackSamplingEntryConfig] = []
+        for entry in config.entries:
+            if entry.generated_course_kind != X_CUP_COURSE.generated_kind:
+                next_entries.append(entry)
+                continue
+            artifact = _artifact_for_entry(entry, artifact_index)
+            if artifact is None:
+                return None
+            next_entries.append(_entry_with_artifact(entry, artifact))
+        return config.model_copy(update={"entries": tuple(next_entries)})
 
 
 def _generated_x_cup_signature(config: TrackSamplingConfig) -> TrackSamplingSignature:
@@ -132,11 +108,98 @@ def _generated_x_cup_signature(config: TrackSamplingConfig) -> TrackSamplingSign
     )
 
 
-def _track_sampling_baselines_ready(config: TrackSamplingConfig) -> bool:
-    if not config.enabled:
-        return True
-    return all(
-        entry.baseline_state_path is not None
-        and entry.baseline_state_path.expanduser().resolve().is_file()
-        for entry in config.entries
+def _x_cup_baseline_artifacts(
+    baselines_dir: Path,
+) -> dict[tuple[object, ...], Mapping[str, object]]:
+    artifacts: dict[tuple[object, ...], Mapping[str, object]] = {}
+    for metadata_path in baselines_dir.glob("*.json"):
+        metadata = _read_json_mapping(metadata_path)
+        if metadata.get("materializer_mode") != X_CUP_COURSE.materializer_mode:
+            continue
+        state_path = metadata_path.with_suffix(".state").expanduser().resolve()
+        if not state_path.is_file():
+            continue
+        key = _artifact_key(metadata)
+        if key is None:
+            continue
+        artifacts[key] = {**metadata, "state_path": state_path}
+    return artifacts
+
+
+def _artifact_for_entry(
+    entry: TrackSamplingEntryConfig,
+    artifacts: Mapping[tuple[object, ...], Mapping[str, object]],
+) -> Mapping[str, object] | None:
+    return artifacts.get(
+        (
+            entry.generated_course_hash,
+            entry.generated_course_seed,
+            entry.generated_course_slot,
+            entry.generated_course_generation,
+            entry.gp_difficulty or entry.source_gp_difficulty,
+            entry.vehicle or entry.source_vehicle,
+        )
     )
+
+
+def _entry_with_artifact(
+    entry: TrackSamplingEntryConfig,
+    artifact: Mapping[str, object],
+) -> TrackSamplingEntryConfig:
+    update: dict[str, object] = {"baseline_state_path": artifact["state_path"]}
+    if (value := _optional_int(artifact.get("source_course_index"))) is not None:
+        update["source_course_index"] = value
+    if (value := _optional_str(artifact.get("source_vehicle"))) is not None:
+        update["source_vehicle"] = value
+    if (value := _optional_str(artifact.get("source_gp_difficulty"))) is not None:
+        update["source_gp_difficulty"] = value
+    if (value := _optional_int(artifact.get("source_engine_setting_raw_value"))) is not None:
+        update["source_engine_setting_raw_value"] = value
+    if (value := _optional_int(artifact.get("generated_course_segment_count"))) is not None:
+        update["generated_course_segment_count"] = value
+    if (value := _optional_float(artifact.get("generated_course_length"))) is not None:
+        update["generated_course_length"] = value
+    return entry.model_copy(update=update)
+
+
+def _artifact_key(metadata: Mapping[str, object]) -> tuple[object, ...] | None:
+    course_hash = _optional_str(metadata.get("x_cup_course_hash"))
+    seed = _optional_int(metadata.get("x_cup_seed"))
+    slot = _optional_int(metadata.get("x_cup_slot"))
+    generation = _optional_int(metadata.get("x_cup_generation"))
+    difficulty = _optional_str(metadata.get("source_gp_difficulty"))
+    vehicle = _optional_str(metadata.get("source_vehicle"))
+    if (
+        course_hash is None
+        or seed is None
+        or slot is None
+        or generation is None
+        or difficulty is None
+        or vehicle is None
+    ):
+        return None
+    return (course_hash, seed, slot, generation, difficulty, vehicle)
+
+
+def _read_json_mapping(path: Path) -> Mapping[str, object]:
+    try:
+        raw_data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw_data if isinstance(raw_data, dict) else {}
+
+
+def _optional_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value)
+
+
+def _optional_float(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)
+
+
+def _optional_str(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None

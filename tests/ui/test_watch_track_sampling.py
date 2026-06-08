@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pytest import MonkeyPatch
-
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
@@ -12,22 +10,18 @@ from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
-    TrainAppConfig,
     WatchAppConfig,
     WatchConfig,
 )
-from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
-from rl_fzerox.ui.watch.runtime import track_sampling as watch_track_sampling
 from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
 
 
 def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
     tmp_path: Path,
-    monkeypatch: MonkeyPatch,
 ) -> None:
     db_path = tmp_path / "manager" / "runs.db"
     store = ManagerStore(db_path)
@@ -38,34 +32,20 @@ def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
         managed_runs_root=tmp_path / "runs",
     )
     run.run_dir.mkdir(parents=True, exist_ok=True)
-    baseline_path = tmp_path / "baselines" / "x_cup_new.state"
+    baseline_path = run.run_dir / "baselines" / "x_cup_new.state"
     baseline_path.parent.mkdir(parents=True)
-    baseline_path.touch()
+    baseline_path.write_bytes(b"state")
+    baseline_path.with_suffix(".json").write_text(
+        _x_cup_artifact_json(
+            course_hash="newhash",
+            course_seed=1234,
+            generation=3,
+            state_sha="new-state",
+        ),
+        encoding="utf-8",
+    )
     store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
 
-    def fake_materialize_train_run_config(
-        config: TrainAppConfig,
-        *,
-        run_paths: RunPaths,
-    ) -> TrainAppConfig:
-        del run_paths
-        entry = config.env.track_sampling.entries[0]
-        track_sampling = config.env.track_sampling.model_copy(
-            update={
-                "entries": (
-                    entry.model_copy(update={"baseline_state_path": baseline_path.resolve()}),
-                )
-            }
-        )
-        return config.model_copy(
-            update={"env": config.env.model_copy(update={"track_sampling": track_sampling})}
-        )
-
-    monkeypatch.setattr(
-        watch_track_sampling,
-        "materialize_train_run_config",
-        fake_materialize_train_run_config,
-    )
     refresh = ManagedTrackSamplingRefresh.from_config(
         WatchAppConfig(
             emulator=EmulatorConfig(
@@ -90,6 +70,8 @@ def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
     assert entry.generated_course_hash == "newhash"
     assert entry.generated_course_seed == 1234
     assert entry.generated_course_generation == 3
+    assert entry.generated_course_segment_count == 38
+    assert entry.generated_course_length == 61_743.98046875
 
 
 def test_managed_watch_track_sampling_refresh_ignores_unchanged_slots(tmp_path: Path) -> None:
@@ -130,9 +112,8 @@ def test_managed_watch_track_sampling_refresh_ignores_unchanged_slots(tmp_path: 
     assert refresh.refreshed_config(config, force=True) is None
 
 
-def test_managed_watch_track_sampling_refresh_keeps_current_slot_when_materialization_fails(
+def test_managed_watch_track_sampling_refresh_waits_for_run_local_baseline_artifact(
     tmp_path: Path,
-    monkeypatch: MonkeyPatch,
 ) -> None:
     db_path = tmp_path / "manager" / "runs.db"
     store = ManagerStore(db_path)
@@ -144,69 +125,6 @@ def test_managed_watch_track_sampling_refresh_keeps_current_slot_when_materializ
     )
     run.run_dir.mkdir(parents=True, exist_ok=True)
     store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
-
-    def fake_materialize_train_run_config(
-        config: TrainAppConfig,
-        *,
-        run_paths: RunPaths,
-    ) -> TrainAppConfig:
-        del config, run_paths
-        raise RuntimeError("baseline materialization failed")
-
-    monkeypatch.setattr(
-        watch_track_sampling,
-        "materialize_train_run_config",
-        fake_materialize_train_run_config,
-    )
-    refresh = ManagedTrackSamplingRefresh.from_config(
-        WatchAppConfig(
-            emulator=EmulatorConfig(
-                core_path=_touched(tmp_path / "core.so"),
-                rom_path=_touched(tmp_path / "rom.n64"),
-            ),
-            env=EnvConfig(track_sampling=_track_sampling_config()),
-            watch=WatchConfig(manager_db_path=db_path, managed_run_id=run.id),
-        )
-    )
-
-    assert refresh is not None
-    assert refresh.refreshed_config(_track_sampling_config(), force=True) is None
-
-
-def test_managed_watch_track_sampling_refresh_waits_for_materialized_baselines(
-    tmp_path: Path,
-    monkeypatch: MonkeyPatch,
-) -> None:
-    db_path = tmp_path / "manager" / "runs.db"
-    store = ManagerStore(db_path)
-    run = store.create_run(
-        run_id="run",
-        name="Run",
-        config=_managed_x_cup_run_config(),
-        managed_runs_root=tmp_path / "runs",
-    )
-    run.run_dir.mkdir(parents=True, exist_ok=True)
-    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
-
-    def fake_materialize_train_run_config(
-        config: TrainAppConfig,
-        *,
-        run_paths: RunPaths,
-    ) -> TrainAppConfig:
-        del run_paths
-        entry = config.env.track_sampling.entries[0]
-        track_sampling = config.env.track_sampling.model_copy(
-            update={"entries": (entry.model_copy(update={"baseline_state_path": None}),)}
-        )
-        return config.model_copy(
-            update={"env": config.env.model_copy(update={"track_sampling": track_sampling})}
-        )
-
-    monkeypatch.setattr(
-        watch_track_sampling,
-        "materialize_train_run_config",
-        fake_materialize_train_run_config,
-    )
     refresh = ManagedTrackSamplingRefresh.from_config(
         WatchAppConfig(
             emulator=EmulatorConfig(
@@ -244,6 +162,8 @@ def _track_sampling_config(
                 baseline_state_path=baseline_path,
                 mode="gp_race",
                 course_index=X_CUP_COURSE.course_index,
+                gp_difficulty="novice",
+                vehicle="blue_falcon",
                 generated_course_kind=X_CUP_COURSE.generated_kind,
                 generated_course_seed=course_seed,
                 generated_course_hash=course_hash,
@@ -297,6 +217,33 @@ def _runtime_state() -> TrackSamplingRuntimeState:
                 generated_course_seed=1234,
             ),
         ),
+    )
+
+
+def _x_cup_artifact_json(
+    *,
+    course_hash: str,
+    course_seed: int,
+    generation: int,
+    state_sha: str,
+) -> str:
+    return (
+        "{"
+        '"cache_kind":"exact_run_baseline",'
+        '"generated_course_length":61743.98046875,'
+        '"generated_course_segment_count":38,'
+        f'"materialized_state_sha256":"{state_sha}",'
+        '"materializer_mode":"x_cup_generated_course",'
+        '"schema_version":16,'
+        f'"x_cup_course_hash":"{course_hash}",'
+        f'"x_cup_generation":{generation},'
+        f'"x_cup_seed":{course_seed},'
+        '"x_cup_slot":0,'
+        '"source_course_index":48,'
+        '"source_engine_setting_raw_value":50,'
+        '"source_gp_difficulty":"novice",'
+        '"source_vehicle":"blue_falcon"'
+        "}"
     )
 
 
