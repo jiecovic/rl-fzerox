@@ -289,6 +289,36 @@ def test_drain_worker_commands_coalesces_control_fps_reset() -> None:
     assert commands.reset_control_fps is True
 
 
+def test_drain_worker_commands_coalesces_spin_request() -> None:
+    command_queue = _CommandQueue([ViewerCommand(spin_request="left")])
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=RaceControlState(),
+    )
+
+    assert commands.spin_request == "left"
+
+
+def test_drain_worker_commands_last_non_idle_spin_request_wins() -> None:
+    command_queue = _CommandQueue(
+        [
+            ViewerCommand(spin_request="left"),
+            ViewerCommand(spin_request="none"),
+            ViewerCommand(spin_request="right"),
+        ]
+    )
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=RaceControlState(),
+    )
+
+    assert commands.spin_request == "right"
+
+
 def test_watch_worker_shutdown_swallows_keyboard_interrupt_during_join() -> None:
     command_queue = _ShutdownQueue()
     snapshot_queue = _ShutdownQueue()

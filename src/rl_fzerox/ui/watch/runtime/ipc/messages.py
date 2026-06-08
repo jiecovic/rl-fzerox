@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator import RaceControlState
+from fzerox_emulator import RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -36,6 +36,7 @@ class ViewerCommand:
     auxiliary_visualization_enabled: bool = False
     live_visualization_enabled: bool = False
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION
+    spin_request: SpinRequest = "none"
     control_state: RaceControlState | None = None
 
 
@@ -59,6 +60,7 @@ class WorkerCommandBatch:
     auxiliary_visualization_enabled: bool
     live_visualization_enabled: bool
     cnn_normalization: CnnActivationNormalizationMode
+    spin_request: SpinRequest
     control_state: RaceControlState
 
 

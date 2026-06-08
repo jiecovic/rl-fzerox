@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from fzerox_emulator import RaceControlState
+from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.observations import ObservationValue
@@ -79,8 +79,13 @@ class CareerPolicyRaceDriver:
     def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
         return self._runtime.step_policy(action)
 
-    def step_manual(self, control_state: RaceControlState) -> PolicyDriveFrame:
-        return self._runtime.step_manual(control_state)
+    def step_manual(
+        self,
+        control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
+    ) -> PolicyDriveFrame:
+        return self._runtime.step_manual(control_state, spin_request=spin_request)
 
     def action_mask_branches(self) -> ActionMaskBranches:
         return self._runtime.action_mask_branches()

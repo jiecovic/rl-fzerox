@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 import gymnasium as gym
 
-from fzerox_emulator import EmulatorBackend, RaceControlState
+from fzerox_emulator import EmulatorBackend, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
@@ -159,16 +159,31 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         return self._runtime.auxiliary_state_targets()
 
-    def step_control(self, control_state: RaceControlState):
-        return self._runtime.step_control(control_state)
+    def step_control(
+        self,
+        control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
+    ):
+        return self._runtime.step_control(control_state, spin_request=spin_request)
 
-    def step_control_watch(self, control_state: RaceControlState):
+    def step_control_watch(
+        self,
+        control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
+    ):
         """Step manual controls and include watch-only intermediate display frames."""
 
-        return self._runtime.step_control_watch(control_state)
+        return self._runtime.step_control_watch(control_state, spin_request=spin_request)
 
-    def step_frame(self, control_state: RaceControlState | None = None):
-        return self._runtime.step_frame(control_state)
+    def step_frame(
+        self,
+        control_state: RaceControlState | None = None,
+        *,
+        spin_request: SpinRequest = "none",
+    ):
+        return self._runtime.step_frame(control_state, spin_request=spin_request)
 
     def render(self) -> RgbFrame:
         return self._runtime.render()

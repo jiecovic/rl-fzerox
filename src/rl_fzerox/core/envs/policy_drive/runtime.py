@@ -146,8 +146,19 @@ class PolicyDriveRuntime:
             )
         )
 
-    def step_manual(self, control_state: RaceControlState) -> PolicyDriveFrame:
-        return _policy_drive_frame(self._step_control_state(control_state, action_drive_axis=None))
+    def step_manual(
+        self,
+        control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
+    ) -> PolicyDriveFrame:
+        return _policy_drive_frame(
+            self._step_control_state(
+                control_state,
+                action_drive_axis=None,
+                spin_request=spin_request,
+            )
+        )
 
     def action_mask_branches(self) -> ActionMaskBranches:
         return self._mask_controller.action_mask_branches()
@@ -163,6 +174,7 @@ class PolicyDriveRuntime:
         control_state: RaceControlState,
         *,
         action_drive_axis: float | None,
+        spin_request: SpinRequest = "none",
     ) -> PolicyDriveStep:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
@@ -171,7 +183,7 @@ class PolicyDriveRuntime:
             applied_control_state,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
-            spin_request="none",
+            spin_request=self._apply_spin_semantics(spin_request),
         )
 
     def _step_decoded_action(

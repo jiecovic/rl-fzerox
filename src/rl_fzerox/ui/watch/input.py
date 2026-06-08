@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
-from fzerox_emulator import RaceControlState
+from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.ui.watch.view.screen.types import (
     MouseRect,
     PygameModule,
@@ -39,6 +39,7 @@ class ViewerInput:
     record_tab_index: int | None = None
     toggle_current_course_lock: bool = False
     toggle_zeroed_state_feature_name: str | None = None
+    spin_request: SpinRequest = "none"
     control_state: RaceControlState = RaceControlState()
 
 
@@ -101,6 +102,7 @@ def _poll_viewer_input(
     jump_course_id = None
     toggle_current_course_lock = False
     toggle_zeroed_state_feature_name = None
+    spin_request: SpinRequest = "none"
 
     mouse_button_down = getattr(pygame, "MOUSEBUTTONDOWN", None)
     for event in pygame.event.get():
@@ -175,6 +177,10 @@ def _poll_viewer_input(
                 toggle_manual_control = True
             elif event.key == pygame.K_c:
                 toggle_cnn_normalization = True
+            elif event.key == pygame.K_q:
+                spin_request = "left"
+            elif event.key == pygame.K_w:
+                spin_request = "right"
             elif event.key in (pygame.K_0, pygame.K_KP0):
                 reset_control_fps = True
             elif event.key in (pygame.K_PLUS, pygame.K_KP_PLUS):
@@ -219,6 +225,7 @@ def _poll_viewer_input(
         record_tab_index=record_tab_index,
         toggle_current_course_lock=toggle_current_course_lock,
         toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
+        spin_request=spin_request,
         control_state=RaceControlState(
             gas=keys[pygame.K_z],
             air_brake=keys[pygame.K_x],

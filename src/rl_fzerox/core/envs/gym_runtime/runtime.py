@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 from gymnasium import spaces
 
-from fzerox_emulator import EmulatorBackend, RaceControlState
+from fzerox_emulator import EmulatorBackend, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine.components import build_engine_runtime_components
@@ -197,21 +197,30 @@ class FZeroXEnvRuntime:
     def step_control(
         self,
         control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self._step_runtime.step_control(control_state)
+        return self._step_runtime.step_control(control_state, spin_request=spin_request)
 
-    def step_control_watch(self, control_state: RaceControlState) -> WatchEnvStep:
+    def step_control_watch(
+        self,
+        control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
+    ) -> WatchEnvStep:
         """Step manual controls while collecting watch-only intermediate frames."""
 
-        return self._step_runtime.step_control_watch(control_state)
+        return self._step_runtime.step_control_watch(control_state, spin_request=spin_request)
 
     def step_frame(
         self,
         control_state: RaceControlState | None = None,
+        *,
+        spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         """Advance one frame through the same reward path used by step()."""
 
-        return self._step_runtime.step_frame(control_state)
+        return self._step_runtime.step_frame(control_state, spin_request=spin_request)
 
     def render(self) -> RgbFrame:
         return self.backend.render_display(

@@ -1,5 +1,4 @@
 # tests/core/envs/test_policy_drive.py
-# tests/core/envs/test_policy_drive.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,6 +22,7 @@ class ScriptedPolicyDriveBackend(SyntheticBackend):
         super().__init__()
         self._results = list(results)
         self._telemetry = make_telemetry(race_distance=0.0)
+        self.last_spin_request: object = "none"
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         return self._telemetry
@@ -59,10 +59,10 @@ class ScriptedPolicyDriveBackend(SyntheticBackend):
             progress_frontier_epsilon,
             terminate_on_energy_depleted,
             lean_timer_assist,
-            spin_request,
             spin_cooldown_frames,
         )
         self._last_race_control_state = control_state
+        self.last_spin_request = spin_request
         result = self._results.pop(0)
         if result.telemetry is None:
             raise AssertionError("scripted policy-drive steps must include telemetry")
@@ -151,6 +151,28 @@ def test_policy_drive_episode_return_comes_from_shared_engine_state(tmp_path: Pa
     assert first.info["episode_return"] == first.reward
     assert second.info["episode_return"] == first.reward + second.reward
     assert first.reward > -1.0
+
+
+def test_policy_drive_manual_step_forwards_spin_request(tmp_path: Path) -> None:
+    backend = ScriptedPolicyDriveBackend(
+        [
+            _backend_step(
+                frames_run=3,
+                race_distance=1_500.0,
+                native_step_count=12_345,
+            )
+        ]
+    )
+    runtime = PolicyDriveRuntime(
+        emulator=backend,
+        train_config=_train_config(tmp_path),
+    )
+
+    runtime.begin(seed=7, course_id="mute_city")
+    step = runtime.step_manual(RaceControlState(), spin_request="left")
+
+    assert backend.last_spin_request == "left"
+    assert step.info["spin_requested"] is True
 
 
 def _backend_step(

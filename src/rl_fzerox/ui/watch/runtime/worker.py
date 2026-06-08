@@ -406,12 +406,16 @@ def _run_simulation_loop(
                 if manual_control_enabled:
                     if single_frame_manual:
                         observation, reward, terminated, truncated, info = env.step_frame(
-                            current_control_state
+                            current_control_state,
+                            spin_request=commands.spin_request,
                         )
                         display_frames = (env.render(),)
                         display_controller_masks = (current_control_state.control_mask,)
                     else:
-                        watch_step = env.step_control_watch(current_control_state)
+                        watch_step = env.step_control_watch(
+                            current_control_state,
+                            spin_request=commands.spin_request,
+                        )
                         observation, reward, terminated, truncated, info = watch_step.gym_result()
                         display_frames = watch_step.display_frames
                         display_controller_masks = watch_step.display_controller_masks

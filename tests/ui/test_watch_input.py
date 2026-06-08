@@ -57,6 +57,8 @@ class _FakePygame:
     K_6 = 34
     K_7 = 45
     K_8 = 46
+    K_q = 47
+    K_w = 48
 
     def __init__(
         self,
@@ -195,6 +197,18 @@ def test_poll_viewer_input_maps_m_to_manual_control_toggle() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_m,)))
 
     assert viewer_input.toggle_manual_control is True
+
+
+def test_poll_viewer_input_maps_q_to_left_spin_request() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_q,)))
+
+    assert viewer_input.spin_request == "left"
+
+
+def test_poll_viewer_input_maps_w_to_right_spin_request() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_w,)))
+
+    assert viewer_input.spin_request == "right"
 
 
 def test_poll_viewer_input_maps_c_to_cnn_normalization_toggle() -> None:

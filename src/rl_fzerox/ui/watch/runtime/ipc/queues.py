@@ -8,7 +8,7 @@ from multiprocessing.queues import Queue as ProcessQueue
 from queue import Empty, Full
 from typing import Protocol
 
-from fzerox_emulator import RaceControlState
+from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import ViewerInput
 from rl_fzerox.ui.watch.runtime.cnn import (
@@ -171,6 +171,7 @@ def drain_worker_commands(
     next_auxiliary_visualization_enabled = auxiliary_visualization_enabled
     next_live_visualization_enabled = live_visualization_enabled
     next_cnn_normalization = cnn_normalization
+    spin_request: SpinRequest = "none"
     while True:
         try:
             command = command_queue.get_nowait()
@@ -193,6 +194,7 @@ def drain_worker_commands(
                     auxiliary_visualization_enabled=next_auxiliary_visualization_enabled,
                     live_visualization_enabled=next_live_visualization_enabled,
                     cnn_normalization=next_cnn_normalization,
+                    spin_request=spin_request,
                     control_state=next_control_state,
                 ),
                 next_paused,
@@ -226,6 +228,8 @@ def drain_worker_commands(
         next_auxiliary_visualization_enabled = command.auxiliary_visualization_enabled
         next_live_visualization_enabled = command.live_visualization_enabled
         next_cnn_normalization = command.cnn_normalization
+        if command.spin_request != "none":
+            spin_request = command.spin_request
         if command.control_state is not None:
             next_control_state = command.control_state
 
@@ -260,6 +264,7 @@ def apply_viewer_input(
             auxiliary_visualization_enabled=auxiliary_visualization_enabled,
             live_visualization_enabled=live_visualization_enabled,
             cnn_normalization=cnn_normalization,
+            spin_request=viewer_input.spin_request,
             control_state=viewer_input.control_state,
         ),
     )

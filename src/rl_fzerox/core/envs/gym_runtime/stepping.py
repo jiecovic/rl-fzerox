@@ -73,17 +73,34 @@ class GymStepRuntime:
     def step_control(
         self,
         control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self._step_control_state(control_state, action_drive_axis=None)
+        return self._step_control_state(
+            control_state,
+            action_drive_axis=None,
+            spin_request=spin_request,
+        )
 
-    def step_control_watch(self, control_state: RaceControlState) -> WatchEnvStep:
+    def step_control_watch(
+        self,
+        control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
+    ) -> WatchEnvStep:
         """Step manual controls while collecting watch-only intermediate frames."""
 
-        return self._step_control_state_watch(control_state, action_drive_axis=None)
+        return self._step_control_state_watch(
+            control_state,
+            action_drive_axis=None,
+            spin_request=spin_request,
+        )
 
     def step_frame(
         self,
         control_state: RaceControlState | None = None,
+        *,
+        spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         """Advance one frame through the same reward path used by step()."""
 
@@ -97,7 +114,7 @@ class GymStepRuntime:
             action_repeat=1,
             requested_control_state=requested_control_state,
             action_drive_axis=None,
-            spin_request="none",
+            spin_request=self._apply_spin_semantics(spin_request),
         )
 
     def _step_control_state(
@@ -105,6 +122,7 @@ class GymStepRuntime:
         control_state: RaceControlState,
         *,
         action_drive_axis: float | None,
+        spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
@@ -114,7 +132,7 @@ class GymStepRuntime:
             action_repeat=self._config.action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
-            spin_request="none",
+            spin_request=self._apply_spin_semantics(spin_request),
         )
 
     def _step_decoded_action(
@@ -140,6 +158,7 @@ class GymStepRuntime:
         control_state: RaceControlState,
         *,
         action_drive_axis: float | None,
+        spin_request: SpinRequest = "none",
     ) -> WatchEnvStep:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
@@ -149,7 +168,7 @@ class GymStepRuntime:
             action_repeat=self._config.action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
-            spin_request="none",
+            spin_request=self._apply_spin_semantics(spin_request),
             capture_display_frames=True,
         )
 

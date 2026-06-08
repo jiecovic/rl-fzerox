@@ -510,6 +510,8 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         "Space": ("B", "boost"),
         "A": ("Z", "lean left"),
         "S": ("R", "lean right"),
+        "Q": ("lean macro", "spin left"),
+        "W": ("lean macro", "spin right"),
         "Enter": ("Start", "start"),
     }
 

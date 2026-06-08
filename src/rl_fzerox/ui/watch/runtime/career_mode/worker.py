@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from multiprocessing.queues import Queue as ProcessQueue
 from typing import TypeAlias
 
-from fzerox_emulator import FZeroXTelemetry, RaceControlState
+from fzerox_emulator import FZeroXTelemetry, RaceControlState, SpinRequest
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.menu import (
     MenuInput,
@@ -731,6 +731,7 @@ def _run_career_mode_loop_body(
                     deterministic_policy=deterministic_policy,
                     manual_control_enabled=manual_control_enabled,
                     current_control_state=current_control_state,
+                    spin_request=commands.spin_request,
                     boost_lamp_level=boost_lamp_level,
                     cnn_visualization_enabled=cnn_visualization_enabled,
                     cnn_normalization=cnn_normalization,
@@ -851,6 +852,7 @@ def _step_policy_or_manual(
     deterministic_policy: bool,
     manual_control_enabled: bool,
     current_control_state: RaceControlState,
+    spin_request: SpinRequest,
     boost_lamp_level: float,
     cnn_visualization_enabled: bool,
     cnn_normalization: CnnActivationNormalizationMode,
@@ -884,7 +886,10 @@ def _step_policy_or_manual(
         target_names=auxiliary_target_names,
     )
     if manual_control_enabled:
-        race_step = session.step_manual_race(current_control_state)
+        race_step = session.step_manual_race(
+            current_control_state,
+            spin_request=spin_request,
+        )
         raw_observation = race_step.observation
         raw_info = race_step.info
         current_policy_action = None

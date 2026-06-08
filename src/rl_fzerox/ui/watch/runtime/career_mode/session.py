@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from fzerox_emulator import Emulator, RaceControlState
+from fzerox_emulator import Emulator, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.career_mode.runner.policy import (
     CareerModePolicyControl,
@@ -91,8 +91,16 @@ class CareerModeRuntimeSession:
     def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
         return self._require_policy_race().step_policy(action)
 
-    def step_manual_race(self, control_state: RaceControlState) -> PolicyDriveFrame:
-        return self._require_policy_race().step_manual(control_state)
+    def step_manual_race(
+        self,
+        control_state: RaceControlState,
+        *,
+        spin_request: SpinRequest = "none",
+    ) -> PolicyDriveFrame:
+        return self._require_policy_race().step_manual(
+            control_state,
+            spin_request=spin_request,
+        )
 
     def sync_policy_curriculum_stage(self, stage_index: int | None) -> None:
         self._require_policy_race().sync_curriculum_stage(stage_index)
