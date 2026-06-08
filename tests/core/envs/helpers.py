@@ -54,6 +54,7 @@ class ScriptedStepBackend(SyntheticBackend):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: object = "none",
+        spin_cooldown_frames: int = 8,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -64,6 +65,7 @@ class ScriptedStepBackend(SyntheticBackend):
             terminate_on_energy_depleted,
             lean_timer_assist,
             spin_request,
+            spin_cooldown_frames,
             resize_filter,
             minimap_resize_filter,
             height,

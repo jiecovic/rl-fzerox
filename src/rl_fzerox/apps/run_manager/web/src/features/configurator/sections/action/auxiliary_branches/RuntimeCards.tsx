@@ -374,6 +374,15 @@ export function RuntimeCards({
               value={action.lean_initial_lockout_frames}
               onChange={(value) => updateAction({ lean_initial_lockout_frames: value })}
             />
+            <fieldset className="dependent-fieldset contents" disabled={!action.include_spin}>
+              <IntegerField
+                help="After a completed native spin macro, keep spin requests masked for this many native frames."
+                label="Spin cooldown frames"
+                resetValue={defaultAction.spin_cooldown_frames}
+                value={action.spin_cooldown_frames}
+                onChange={(value) => updateAction({ spin_cooldown_frames: value })}
+              />
+            </fieldset>
           </div>
         </fieldset>
       </section>

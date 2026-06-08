@@ -374,4 +374,6 @@ pub struct RepeatedStepConfig {
     pub lean_timer_assist: bool,
     /// Optional high-level spin macro request for this outer env step.
     pub spin_request: SpinRequest,
+    /// Internal frames to wait after a completed spin macro before starting another one.
+    pub spin_cooldown_frames: usize,
 }

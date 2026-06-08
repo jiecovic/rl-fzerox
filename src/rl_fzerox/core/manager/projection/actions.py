@@ -27,6 +27,7 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
             config.action.boost_decision_interval_steps * config.action.action_repeat
         ),
         "boost_request_lockout_frames": config.action.boost_request_lockout_frames,
+        "spin_cooldown_frames": config.action.spin_cooldown_frames,
         "boost_unmask_max_speed_kph": config.action.boost_unmask_max_speed_kph,
         "lean_unmask_min_speed_kph": config.action.lean_unmask_min_speed_kph,
         "lean_initial_lockout_frames": config.action.lean_initial_lockout_frames,

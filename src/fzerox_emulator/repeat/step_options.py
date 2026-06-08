@@ -21,3 +21,4 @@ class RepeatStepConfig:
     terminate_on_energy_depleted: bool
     lean_timer_assist: bool
     spin_request: SpinRequest = "none"
+    spin_cooldown_frames: int = 8

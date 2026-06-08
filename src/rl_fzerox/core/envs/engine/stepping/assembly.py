@@ -320,6 +320,7 @@ class EngineStepAssembler:
                 terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
                 lean_timer_assist=lean_timer_assist,
                 spin_request=request.spin_request,
+                spin_cooldown_frames=self.action_config.spin_cooldown_frames,
                 **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
             )
         return self.backend.step_repeat_raw(
@@ -338,6 +339,7 @@ class EngineStepAssembler:
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
             spin_request=request.spin_request,
+            spin_cooldown_frames=self.action_config.spin_cooldown_frames,
             **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
         )
 

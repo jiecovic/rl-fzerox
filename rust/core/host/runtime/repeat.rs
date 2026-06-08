@@ -95,6 +95,7 @@ impl Host {
                     base_controller_state,
                     spin_controls_active,
                     &mut spin_stats,
+                    config.spin_cooldown_frames,
                 );
                 display_controller_masks.push(controller_state.race_control_mask());
                 if config.lean_timer_assist {
@@ -166,6 +167,7 @@ impl Host {
                     base_controller_state,
                     spin_controls_active,
                     &mut spin_stats,
+                    config.spin_cooldown_frames,
                 );
                 if config.lean_timer_assist {
                     self.patch_lean_timers_for_slide_assist(controller_state)?;
@@ -204,11 +206,14 @@ impl Host {
         base_controller_state: crate::core::input::ControllerState,
         spin_controls_active: bool,
         spin_stats: &mut super::spin::SpinStepStats,
+        spin_cooldown_frames: usize,
     ) -> crate::core::input::ControllerState {
         if !spin_controls_active {
             return base_controller_state;
         }
-        let frame_controller = self.spin_macro.next_controller(base_controller_state);
+        let frame_controller = self
+            .spin_macro
+            .next_controller(base_controller_state, spin_cooldown_frames);
         if frame_controller.macro_owns_lean {
             spin_stats.active_frames += 1;
             spin_stats.lean_owned_frames += 1;

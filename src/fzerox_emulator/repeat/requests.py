@@ -53,6 +53,7 @@ def native_repeat_step_request(
         "terminate_on_energy_depleted": config.terminate_on_energy_depleted,
         "lean_timer_assist": config.lean_timer_assist,
         "spin_request": config.spin_request,
+        "spin_cooldown_frames": config.spin_cooldown_frames,
         "gas": control_state.gas,
         "air_brake": control_state.air_brake,
         "boost": control_state.boost,

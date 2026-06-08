@@ -80,6 +80,7 @@ class EmulatorBackend(Protocol):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
+        spin_cooldown_frames: int = 8,
     ) -> BackendStepResult: ...
 
     def step_repeat_watch_raw(
@@ -103,6 +104,7 @@ class EmulatorBackend(Protocol):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
+        spin_cooldown_frames: int = 8,
     ) -> BackendStepResult: ...
 
     def step_repeat_multi_observation_raw(
@@ -119,6 +121,7 @@ class EmulatorBackend(Protocol):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
+        spin_cooldown_frames: int = 8,
     ) -> BackendMultiObservationStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...

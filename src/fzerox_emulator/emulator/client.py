@@ -183,6 +183,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
+        spin_cooldown_frames: int = 8,
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
 
@@ -196,6 +197,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
             spin_request=spin_request,
+            spin_cooldown_frames=spin_cooldown_frames,
         )
         recipe = ObservationImageRecipe(
             preset=preset,
@@ -235,6 +237,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
+        spin_cooldown_frames: int = 8,
     ) -> BackendStepResult:
         """Execute one repeated watch step and return batched display images."""
 
@@ -248,6 +251,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
             spin_request=spin_request,
+            spin_cooldown_frames=spin_cooldown_frames,
         )
         recipe = ObservationImageRecipe(
             preset=preset,
@@ -280,6 +284,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
+        spin_cooldown_frames: int = 8,
     ) -> BackendMultiObservationStepResult:
         """Execute one repeated env step and return multiple observation views."""
 
@@ -293,6 +298,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
             spin_request=spin_request,
+            spin_cooldown_frames=spin_cooldown_frames,
         )
         return run_repeat_multi_observation_step(
             self._native,

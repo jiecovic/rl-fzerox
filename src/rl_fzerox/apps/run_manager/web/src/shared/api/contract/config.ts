@@ -167,6 +167,7 @@ const actionConfigSchema = z
     lean_initial_lockout_frames: z.number().int().nonnegative(),
     include_spin: z.boolean().default(false),
     enable_spin: z.boolean().default(false),
+    spin_cooldown_frames: z.number().int().nonnegative(),
     include_pitch: z.boolean(),
     enable_pitch: z.boolean(),
     pitch_mode: actionAxisModeSchema,

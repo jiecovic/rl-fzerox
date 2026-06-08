@@ -11,7 +11,7 @@ fn none_request_leaves_controller_unchanged() {
     let mut stats = spin.begin_step(SpinRequest::None);
     let controller = ControllerState::from_normalized(1 << DEVICE_ID_JOYPAD_A, 0.0, 0.0, 0.0, 0.0);
 
-    let frame = spin.next_controller(controller);
+    let frame = spin.next_controller(controller, 8);
     if frame.macro_owns_lean {
         stats.active_frames += 1;
     }
@@ -34,17 +34,17 @@ fn left_spin_holds_right_lean_and_double_taps_left() {
         0.0,
     );
 
-    let first = spin.next_controller(controller);
+    let first = spin.next_controller(controller, 8);
     if first.macro_owns_lean {
         stats.active_frames += 1;
         stats.lean_owned_frames += 1;
     }
-    let second_tap = spin.next_controller(controller);
+    let second_tap = spin.next_controller(controller, 8);
     if second_tap.macro_owns_lean {
         stats.active_frames += 1;
         stats.lean_owned_frames += 1;
     }
-    let gap = spin.next_controller(controller);
+    let gap = spin.next_controller(controller, 8);
     if gap.macro_owns_lean {
         stats.active_frames += 1;
         stats.lean_owned_frames += 1;
@@ -73,11 +73,24 @@ fn completed_spin_enters_cooldown_and_blocks_restart() {
     assert!(spin.begin_step(SpinRequest::Right).started);
 
     while spin.status().active {
-        spin.next_controller(controller);
+        spin.next_controller(controller, 8);
     }
 
     let cooldown = spin.status().cooldown_frames;
     assert!(cooldown > 0);
     assert!(!spin.begin_step(SpinRequest::Left).started);
     assert_eq!(spin.status().cooldown_frames, cooldown);
+}
+
+#[test]
+fn completed_spin_uses_configured_cooldown_frames() {
+    let mut spin = SpinMacroState::default();
+    let controller = ControllerState::default();
+    assert!(spin.begin_step(SpinRequest::Right).started);
+
+    while spin.status().active {
+        spin.next_controller(controller, 3);
+    }
+
+    assert_eq!(spin.status().cooldown_frames, 3);
 }

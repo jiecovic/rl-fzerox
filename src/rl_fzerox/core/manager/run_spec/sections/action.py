@@ -58,6 +58,7 @@ class ManagedActionConfig(BaseModel):
     lean_initial_lockout_frames: NonNegativeInt = 0
     include_spin: bool = False
     enable_spin: bool = True
+    spin_cooldown_frames: NonNegativeInt = 8
     include_pitch: bool = True
     enable_pitch: bool = True
     pitch_mode: ActionAxisMode = "discrete"

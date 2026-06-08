@@ -154,6 +154,7 @@ class ActionRuntimeConfig:
     boost_unmask_max_speed_kph: float | None
     boost_decision_interval_frames: int
     boost_request_lockout_frames: int
+    spin_cooldown_frames: int
     lean_unmask_min_speed_kph: float | None
     lean_initial_lockout_frames: int
     hard_zero_ground_pitch: bool
@@ -232,6 +233,7 @@ class ActionRuntimeConfig:
             ),
             boost_decision_interval_frames=int(config.boost_decision_interval_frames),
             boost_request_lockout_frames=int(config.boost_request_lockout_frames),
+            spin_cooldown_frames=int(config.spin_cooldown_frames),
             lean_unmask_min_speed_kph=(
                 None
                 if config.lean_unmask_min_speed_kph is None
@@ -270,6 +272,7 @@ class ActionConfig(BaseModel):
     mask_boost_when_airborne: bool = True
     boost_decision_interval_frames: PositiveInt = 1
     boost_request_lockout_frames: NonNegativeInt = 5
+    spin_cooldown_frames: NonNegativeInt = 8
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0

@@ -259,6 +259,7 @@ def test_manager_training_bridge_supports_optional_spin_macro(
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.action.include_spin = True
+    config.action.spin_cooldown_frames = 13
 
     train_config = build_managed_train_app_config(
         config,
@@ -274,6 +275,7 @@ def test_manager_training_bridge_supports_optional_spin_macro(
         "spin",
         "pitch",
     )
+    assert train_config.env.action.spin_cooldown_frames == 13
 
 
 def test_manager_action_config_disables_spin_outside_three_way_lean() -> None:

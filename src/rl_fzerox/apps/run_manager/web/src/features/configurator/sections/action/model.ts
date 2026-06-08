@@ -157,7 +157,7 @@ function auxiliaryOutputSummary(action: ManagedActionConfig): string {
     labels.push(leanOutputSummary(action));
   }
   if (action.include_spin) {
-    labels.push(action.enable_spin ? "spin macro" : "spin macro masked");
+    labels.push(spinOutputSummary(action));
   }
   if (action.include_pitch) {
     labels.push(pitchOutputSummary(action));
@@ -194,6 +194,13 @@ function boostOutputSummary(action: ManagedActionConfig): string {
     guards.push(`${action.boost_request_lockout_frames}f cooldown`);
   }
   return guards.length > 0 ? `boost, ${guards.join(", ")}` : "boost";
+}
+
+function spinOutputSummary(action: ManagedActionConfig): string {
+  const base = action.enable_spin ? "spin macro" : "spin macro masked";
+  return action.spin_cooldown_frames > 0
+    ? `${base}, ${action.spin_cooldown_frames}f cooldown`
+    : base;
 }
 
 function leanOutputSummary(action: ManagedActionConfig): string {

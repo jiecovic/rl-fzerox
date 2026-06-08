@@ -158,7 +158,12 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
     }
   }
   if (config.action.include_spin) {
-    labels.push(config.action.enable_spin ? "spin macro" : "spin macro masked");
+    const spinSummary = config.action.enable_spin ? "spin macro" : "spin macro masked";
+    labels.push(
+      config.action.spin_cooldown_frames > 0
+        ? `${spinSummary}, ${config.action.spin_cooldown_frames}f cooldown`
+        : spinSummary,
+    );
   }
   if (config.action.include_pitch) {
     if (config.action.pitch_mode === "continuous") {

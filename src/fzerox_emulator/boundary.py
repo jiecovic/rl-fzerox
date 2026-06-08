@@ -93,6 +93,7 @@ class RepeatStepRequestDict(TypedDict, total=False):
     terminate_on_energy_depleted: bool
     lean_timer_assist: bool
     spin_request: SpinRequest
+    spin_cooldown_frames: int
     gas: bool
     air_brake: bool
     boost: bool

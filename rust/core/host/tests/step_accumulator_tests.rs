@@ -283,6 +283,7 @@ fn repeated_step_config(max_episode_steps: usize, _legacy_limit: usize) -> Repea
         terminate_on_energy_depleted: true,
         lean_timer_assist: false,
         spin_request: SpinRequest::None,
+        spin_cooldown_frames: 8,
     }
 }
 

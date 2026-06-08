@@ -110,6 +110,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
             assert isinstance(observation_request, dict)
             assert step["action_repeat"] == 2
             assert step["lean_timer_assist"] is False
+            assert step["spin_cooldown_frames"] == 11
             assert observation_request["preset"] == "crop_84x84"
             observation = np.zeros((84, 84, 6), dtype=np.uint8)
             summary = make_step_summary(
@@ -144,6 +145,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
         progress_frontier_stall_limit_frames=900,
         progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=True,
+        spin_cooldown_frames=11,
     )
 
     assert result.observation.shape == (84, 84, 6)

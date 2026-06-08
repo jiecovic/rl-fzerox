@@ -231,6 +231,7 @@ fn repeated_step_config(request: &Bound<'_, PyDict>) -> PyResult<RepeatedStepCon
             "spin_request",
             String::from("none"),
         )?)?,
+        spin_cooldown_frames: optional_item(request, "spin_cooldown_frames", 8)?,
     })
 }
 

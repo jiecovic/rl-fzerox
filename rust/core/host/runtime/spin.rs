@@ -54,7 +54,6 @@ struct SpinMacroTiming {
     tap_frames: usize,
     gap_frames: usize,
     settle_frames: usize,
-    cooldown_frames: usize,
 }
 
 impl SpinMacroTiming {
@@ -82,7 +81,6 @@ const SPIN_TIMING: SpinMacroTiming = SpinMacroTiming {
     tap_frames: 2,
     gap_frames: 2,
     settle_frames: 2,
-    cooldown_frames: 8,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -160,7 +158,11 @@ impl SpinMacroState {
         stats
     }
 
-    pub(super) fn next_controller(&mut self, base: ControllerState) -> SpinFrameController {
+    pub(super) fn next_controller(
+        &mut self,
+        base: ControllerState,
+        cooldown_frames: usize,
+    ) -> SpinFrameController {
         let Some(active) = self.active else {
             self.cooldown_frames = self.cooldown_frames.saturating_sub(1);
             return SpinFrameController {
@@ -179,7 +181,7 @@ impl SpinMacroState {
         let next_frame_index = active.frame_index + 1;
         if next_frame_index >= SPIN_TIMING.total_frames() {
             self.active = None;
-            self.cooldown_frames = SPIN_TIMING.cooldown_frames;
+            self.cooldown_frames = cooldown_frames;
         } else {
             self.active = Some(ActiveSpinMacro {
                 direction: active.direction,
