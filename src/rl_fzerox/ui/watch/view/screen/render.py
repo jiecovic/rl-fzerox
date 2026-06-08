@@ -133,6 +133,7 @@ def draw_watch_frame(
             best_finish_time_setups=snapshot.best_finish_time_setups,
             latest_finish_times=snapshot.latest_finish_times,
             latest_finish_deltas_ms=snapshot.latest_finish_deltas_ms,
+            track_attempt_stats=snapshot.track_attempt_stats,
             failed_track_attempts=snapshot.failed_track_attempts,
             track_pool_records=track_pool_records,
             panel_tab_index=panel_tab_index,

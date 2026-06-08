@@ -13,6 +13,8 @@ TrackFinishRanks = dict[str, int]
 TrackBestFinishRanks = TrackFinishRanks
 TrackFinishSetup = dict[str, str | int]
 TrackBestFinishSetups = dict[str, TrackFinishSetup]
+TrackAttemptStats = dict[str, int | float]
+TrackAttemptStatsByRecord = dict[str, TrackAttemptStats]
 TrackLatestFinishDeltas = dict[str, int]
 FailedTrackAttempts = frozenset[str]
 
@@ -215,6 +217,46 @@ def _update_latest_finish_deltas_ms(
     return updated
 
 
+def _update_track_attempt_stats(
+    track_attempt_stats: TrackAttemptStatsByRecord,
+    info: dict[str, object],
+    telemetry: FZeroXTelemetry | None,
+    *,
+    episode_done: bool,
+) -> TrackAttemptStatsByRecord:
+    """Return updated per-track watch-session attempt statistics."""
+
+    if not episode_done:
+        return track_attempt_stats
+    track_key = _track_key(info)
+    if track_key is None:
+        return track_attempt_stats
+
+    current = track_attempt_stats.get(track_key, {})
+    completion = _episode_completion_fraction(info, telemetry)
+    attempts = _stats_int(current, "attempts") + 1
+    finishes = _stats_int(current, "finishes")
+    if info.get("termination_reason") == "finished":
+        finishes += 1
+    completion_samples = _stats_int(current, "completion_samples")
+    completion_sum = _stats_float(current, "completion_sum")
+    best_completion = _stats_float(current, "best_completion")
+    if completion is not None:
+        completion_samples += 1
+        completion_sum += completion
+        best_completion = max(best_completion, completion)
+
+    updated = dict(track_attempt_stats)
+    updated[track_key] = {
+        "attempts": attempts,
+        "finishes": finishes,
+        "completion_samples": completion_samples,
+        "completion_sum": completion_sum,
+        "best_completion": best_completion,
+    }
+    return updated
+
+
 def _update_failed_track_attempts(
     failed_track_attempts: FailedTrackAttempts,
     info: dict[str, object],
@@ -277,6 +319,26 @@ def _successful_finish_time_ms(
 
 def _track_key(info: dict[str, object]) -> str | None:
     return track_record_key(info)
+
+
+def _episode_completion_fraction(
+    info: dict[str, object],
+    telemetry: FZeroXTelemetry | None,
+) -> float | None:
+    value = info.get("episode_completion_fraction")
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return _clamped_fraction(float(value))
+    if info.get("termination_reason") == "finished":
+        return 1.0
+    if telemetry is None:
+        return None
+
+    course_length = float(telemetry.course_length)
+    total_lap_count = int(telemetry.total_lap_count)
+    total_race_distance = course_length * total_lap_count
+    if total_race_distance <= 0.0:
+        return None
+    return _clamped_fraction(float(telemetry.player.race_distance) / total_race_distance)
 
 
 def _is_new_best_time(
@@ -377,3 +439,27 @@ def _int_setup_value(value: object) -> int | None:
             return None
         return int(round(value))
     return None
+
+
+def _stats_int(stats: TrackAttemptStats, key: str) -> int:
+    value = stats.get(key)
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int | float):
+        return max(0, int(value))
+    return 0
+
+
+def _stats_float(stats: TrackAttemptStats, key: str) -> float:
+    value = stats.get(key)
+    if isinstance(value, bool):
+        return 0.0
+    if isinstance(value, int | float) and math.isfinite(float(value)):
+        return max(0.0, float(value))
+    return 0.0
+
+
+def _clamped_fraction(value: float) -> float:
+    if not math.isfinite(value):
+        return 0.0
+    return max(0.0, min(1.0, value))

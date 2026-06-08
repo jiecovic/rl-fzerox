@@ -40,6 +40,7 @@ from rl_fzerox.ui.watch.runtime.episode import (
     _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
+    _update_track_attempt_stats,
 )
 from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerClosed,
@@ -141,6 +142,7 @@ def _run_simulation_loop(
         best_finish_time_setups: dict[str, dict[str, str | int]] = {}
         latest_finish_times: dict[str, int] = {}
         latest_finish_deltas_ms: dict[str, int] = {}
+        track_attempt_stats: dict[str, dict[str, int | float]] = {}
         failed_track_attempts: frozenset[str] = frozenset()
         paused = False
         deterministic_policy = bool(config.watch.deterministic_policy)
@@ -215,6 +217,7 @@ def _run_simulation_loop(
                     best_finish_time_setups=best_finish_time_setups,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    track_attempt_stats=track_attempt_stats,
                     failed_track_attempts=failed_track_attempts,
                     live_episode_series=live_episode_series,
                 ),
@@ -615,6 +618,12 @@ def _run_simulation_loop(
                     info,
                     live_telemetry,
                 )
+                track_attempt_stats = _update_track_attempt_stats(
+                    track_attempt_stats,
+                    info,
+                    live_telemetry,
+                    episode_done=terminated or truncated,
+                )
                 failed_track_attempts = _update_failed_track_attempts(
                     failed_track_attempts,
                     info,
@@ -676,6 +685,7 @@ def _run_simulation_loop(
                     best_finish_time_setups=best_finish_time_setups,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    track_attempt_stats=track_attempt_stats,
                     failed_track_attempts=failed_track_attempts,
                     manual_control_enabled=manual_control_enabled,
                     live_episode_series=live_episode_series,

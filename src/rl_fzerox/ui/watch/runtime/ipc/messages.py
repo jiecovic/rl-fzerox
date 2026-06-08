@@ -123,6 +123,7 @@ class WatchSnapshot:
     best_finish_time_setups: dict[str, dict[str, str | int]]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
+    track_attempt_stats: dict[str, dict[str, int | float]]
     failed_track_attempts: frozenset[str]
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None

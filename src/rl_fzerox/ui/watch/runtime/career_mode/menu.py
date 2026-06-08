@@ -193,6 +193,7 @@ def step_menu(
                 best_finish_time_setups={},
                 latest_finish_times={},
                 latest_finish_deltas_ms={},
+                track_attempt_stats={},
                 failed_track_attempts=frozenset(),
                 action_hold_frame=frame_index + 1,
                 action_hold_frames=controller_step.frames,

@@ -23,8 +23,10 @@ def track_record_sections(
     best_finish_time_setups: dict[str, dict[str, str | int]],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    track_attempt_stats: dict[str, dict[str, int | float]] | None = None,
     failed_track_attempts: frozenset[str] = frozenset(),
 ) -> tuple[PanelSection, ...]:
+    resolved_track_attempt_stats = track_attempt_stats or {}
     records = _unique_course_records(
         _records_for_selected_difficulty(
             track_pool_records or current_track_record_pool(current_info),
@@ -40,6 +42,7 @@ def track_record_sections(
         and not best_finish_time_ranks
         and not best_finish_time_setups
         and not latest_finish_times
+        and not resolved_track_attempt_stats
         and not failed_track_attempts
     ):
         return ()
@@ -59,6 +62,7 @@ def track_record_sections(
                     best_finish_time_setups=best_finish_time_setups,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    track_attempt_stats=resolved_track_attempt_stats,
                     failed_track_attempts=failed_track_attempts,
                 ),
             )
@@ -76,6 +80,7 @@ def track_record_sections(
         best_finish_time_setups=best_finish_time_setups,
         latest_finish_times=latest_finish_times,
         latest_finish_deltas_ms=latest_finish_deltas_ms,
+        track_attempt_stats=resolved_track_attempt_stats,
         failed_track_attempts=failed_track_attempts,
     )
     if not lines:

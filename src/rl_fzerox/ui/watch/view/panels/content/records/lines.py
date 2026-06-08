@@ -6,6 +6,7 @@ from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelLine
 
 from .formatting import (
+    format_attempt_stats,
     format_best_position,
     format_best_time,
     format_latest_compact_time,
@@ -38,6 +39,7 @@ def record_group_lines(
     best_finish_time_setups: dict[str, dict[str, str | int]],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    track_attempt_stats: dict[str, dict[str, int | float]],
     failed_track_attempts: frozenset[str],
 ) -> list[PanelLine]:
     lines: list[PanelLine] = []
@@ -56,6 +58,7 @@ def record_group_lines(
                 best_finish_time_setups=best_finish_time_setups,
                 latest_finish_times=latest_finish_times,
                 latest_finish_deltas_ms=latest_finish_deltas_ms,
+                track_attempt_stats=track_attempt_stats,
                 failed_track_attempts=failed_track_attempts,
             )
         )
@@ -74,6 +77,7 @@ def track_record_pool_lines(
     best_finish_time_setups: dict[str, dict[str, str | int]],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    track_attempt_stats: dict[str, dict[str, int | float]],
     failed_track_attempts: frozenset[str],
 ) -> tuple[PanelLine, ...]:
     is_current_track = is_current_track_record(record, current_info)
@@ -85,6 +89,7 @@ def track_record_pool_lines(
     watch_best_time_setup = watch_track_payload(record, best_finish_time_setups)
     watch_latest = watch_track_value(record, latest_finish_times)
     watch_latest_delta = watch_track_value(record, latest_finish_deltas_ms)
+    watch_attempt_stats = watch_track_payload(record, track_attempt_stats)
     failed_attempt = has_failed_attempt(record, failed_track_attempts) and watch_best is None
     best_time = optional_int_info(record, "track_non_agg_best_time_ms")
     worst_time = optional_int_info(record, "track_non_agg_worst_time_ms")
@@ -149,6 +154,11 @@ def track_record_pool_lines(
                     latest_delta_ms=watch_latest_delta,
                     failed_attempt=failed_attempt,
                 ),
+            ),
+            panel_line(
+                "Attempts",
+                format_attempt_stats(watch_attempt_stats),
+                PALETTE.text_primary if watch_attempt_stats is not None else PALETTE.text_muted,
             ),
             panel_line(
                 "WR",

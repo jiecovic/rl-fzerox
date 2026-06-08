@@ -52,6 +52,7 @@ from rl_fzerox.ui.watch.runtime.episode import (
     _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
+    _update_track_attempt_stats,
 )
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
@@ -825,6 +826,49 @@ def test_failed_track_attempts_track_until_success() -> None:
         episode_done=True,
     )
     assert failed_attempts == frozenset()
+
+
+def test_track_attempt_stats_track_finish_rate_and_average_completion() -> None:
+    stats = _update_track_attempt_stats(
+        {},
+        {
+            "termination_reason": "crashed",
+            "track_id": "mute",
+            "episode_completion_fraction": 0.25,
+        },
+        None,
+        episode_done=True,
+    )
+    stats = _update_track_attempt_stats(
+        stats,
+        {
+            "termination_reason": "finished",
+            "track_id": "mute",
+            "episode_completion_fraction": 1.0,
+        },
+        None,
+        episode_done=True,
+    )
+    stats = _update_track_attempt_stats(
+        stats,
+        {
+            "termination_reason": "crashed",
+            "track_id": "mute",
+            "episode_completion_fraction": 0.5,
+        },
+        None,
+        episode_done=False,
+    )
+
+    assert stats == {
+        "mute": {
+            "attempts": 2,
+            "finishes": 1,
+            "completion_samples": 2,
+            "completion_sum": 1.25,
+            "best_completion": 1.0,
+        }
+    }
 
 
 def test_record_panel_marks_failed_watch_attempts_until_success() -> None:

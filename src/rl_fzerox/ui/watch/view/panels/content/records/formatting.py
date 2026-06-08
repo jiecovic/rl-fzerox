@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/formatting.py
 from __future__ import annotations
 
+import math
+
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import StatusIcon
 
@@ -131,6 +133,23 @@ def format_finish_setup(setup: dict[str, str | int] | None) -> str | None:
     return " / ".join(parts) if parts else None
 
 
+def format_attempt_stats(stats: dict[str, int | float] | None) -> str:
+    attempts = _attempt_stat_int(stats, "attempts")
+    if attempts <= 0:
+        return "0 · finish -- · comp --"
+    finishes = min(_attempt_stat_int(stats, "finishes"), attempts)
+    completion_samples = _attempt_stat_int(stats, "completion_samples")
+    completion_sum = _attempt_stat_float(stats, "completion_sum")
+    finish_rate = finishes / attempts
+    completion_rate = None
+    if completion_samples > 0:
+        completion_rate = completion_sum / completion_samples
+    return (
+        f"{attempts} · finish {format_percent(finish_rate)} · "
+        f"comp {format_optional_percent(completion_rate)}"
+    )
+
+
 def format_latest_compact_time(
     latest_time_ms: int | None,
     best_time_ms: int | None,
@@ -176,6 +195,16 @@ def format_record_range(best_time_ms: int | None, worst_time_ms: int | None) -> 
     return f"{best} - {worst}"
 
 
+def format_percent(value: float) -> str:
+    return f"{max(0.0, min(1.0, value)) * 100.0:.1f}%"
+
+
+def format_optional_percent(value: float | None) -> str:
+    if value is None:
+        return "--"
+    return format_percent(value)
+
+
 def format_compact_duration_ms(duration_ms: int) -> str:
     tenths = round(max(0, duration_ms) / 100)
     if tenths < 600:
@@ -196,6 +225,28 @@ def format_mode_name(value: object) -> str:
     if not isinstance(value, str):
         return str(value)
     return value.replace("_", " ").title()
+
+
+def _attempt_stat_int(stats: dict[str, int | float] | None, key: str) -> int:
+    if stats is None:
+        return 0
+    value = stats.get(key)
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int | float):
+        return max(0, int(value))
+    return 0
+
+
+def _attempt_stat_float(stats: dict[str, int | float] | None, key: str) -> float:
+    if stats is None:
+        return 0.0
+    value = stats.get(key)
+    if isinstance(value, bool):
+        return 0.0
+    if isinstance(value, int | float) and math.isfinite(float(value)):
+        return max(0.0, float(value))
+    return 0.0
 
 
 def _short_track_name(value: str) -> str:

@@ -127,6 +127,15 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         best_finish_time_setups={"mute": {"engine_setting_raw_value": 60}},
         latest_finish_times={"mute": 101_000},
         latest_finish_deltas_ms={"mute": 3_000},
+        track_attempt_stats={
+            "mute": {
+                "attempts": 2,
+                "finishes": 1,
+                "completion_samples": 2,
+                "completion_sum": 1.5,
+                "best_completion": 1.0,
+            }
+        },
         failed_track_attempts=frozenset({"silence"}),
         live_episode_series=live_series,
     )
@@ -177,6 +186,15 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert snapshot.best_finish_time_setups == {"mute": {"engine_setting_raw_value": 60}}
         assert snapshot.latest_finish_times == {"mute": 101_000}
         assert snapshot.latest_finish_deltas_ms == {"mute": 3_000}
+        assert snapshot.track_attempt_stats == {
+            "mute": {
+                "attempts": 2,
+                "finishes": 1,
+                "completion_samples": 2,
+                "completion_sum": 1.5,
+                "best_completion": 1.0,
+            }
+        }
         assert snapshot.failed_track_attempts == frozenset({"silence"})
 
 
@@ -236,6 +254,7 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
         best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
+        track_attempt_stats={},
         failed_track_attempts=frozenset(),
     )
 
@@ -296,6 +315,7 @@ def test_menu_snapshot_has_layout_shape_without_policy_observation(tmp_path: Pat
         best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
+        track_attempt_stats={},
         failed_track_attempts=frozenset(),
     )
 
@@ -351,6 +371,7 @@ def test_career_menu_snapshot_has_no_policy_observation_shape(tmp_path: Path) ->
         best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
+        track_attempt_stats={},
         failed_track_attempts=frozenset(),
     )
 

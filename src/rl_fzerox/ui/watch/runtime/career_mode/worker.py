@@ -235,6 +235,7 @@ def _run_loaded_career_mode_loop(
             best_finish_time_setups={},
             latest_finish_times={},
             latest_finish_deltas_ms={},
+            track_attempt_stats={},
             failed_track_attempts=frozenset(),
         ),
     )
@@ -415,6 +416,7 @@ def _run_career_mode_loop_body(
                 best_finish_time_setups={},
                 latest_finish_times={},
                 latest_finish_deltas_ms={},
+                track_attempt_stats={},
                 failed_track_attempts=frozenset(),
             ),
         )
@@ -1057,6 +1059,7 @@ def _step_policy_or_manual(
         best_finish_time_setups={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
+        track_attempt_stats={},
         failed_track_attempts=frozenset(),
         manual_control_enabled=manual_control_enabled,
         live_episode_series=live_episode_series,

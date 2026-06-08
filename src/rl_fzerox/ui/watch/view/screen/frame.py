@@ -94,6 +94,7 @@ class FrameRenderData:
     best_finish_time_setups: dict[str, dict[str, str | int]]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
+    track_attempt_stats: dict[str, dict[str, int | float]]
     failed_track_attempts: frozenset[str]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
@@ -407,6 +408,7 @@ def _draw_frame(
             best_finish_time_setups=data.best_finish_time_setups,
             latest_finish_times=data.latest_finish_times,
             latest_finish_deltas_ms=data.latest_finish_deltas_ms,
+            track_attempt_stats=data.track_attempt_stats,
             failed_track_attempts=data.failed_track_attempts,
             track_pool_records=data.track_pool_records,
             panel_tab_index=data.panel_tab_index,

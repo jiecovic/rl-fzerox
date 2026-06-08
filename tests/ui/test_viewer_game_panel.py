@@ -871,6 +871,15 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
         telemetry=_sample_telemetry(),
         best_finish_times={"silence": 98765},
         latest_finish_times={"silence": 101234},
+        track_attempt_stats={
+            "silence": {
+                "attempts": 3,
+                "finishes": 1,
+                "completion_samples": 3,
+                "completion_sum": 2.25,
+                "best_completion": 1.0,
+            }
+        },
         track_pool_records=(
             {
                 "track_id": "silence",
@@ -885,11 +894,13 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
     header_line = next(line for line in records_section.lines if line.label == "> Silence")
     pb_line = next(line for line in records_section.lines if line.label == "Best time")
     latest_line = next(line for line in records_section.lines if line.label == "Latest")
+    attempts_line = next(line for line in records_section.lines if line.label == "Attempts")
     assert header_line.value == ""
     assert header_line.status_icon == "outside"
     assert header_line.status_text == "+35.5s"
     assert pb_line.value == "1:38.765"
     assert latest_line.value == "1:41.234 (+2.5s)"
+    assert attempts_line.value == "3 · finish 33.3% · comp 75.0%"
 
 
 def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
