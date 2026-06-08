@@ -139,7 +139,7 @@ def test_watch_clears_owned_viewer_lease_on_exit(
     )
 
     assert store.get_viewer_lease(lease_id) is None
-    assert captured_materialize_kwargs["session_name"] == lease_id
+    assert captured_materialize_kwargs["session_name"] == f"{lease_id}:{os.getpid()}"
 
 
 def test_watch_allows_run_dir_overrides_without_config(
