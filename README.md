@@ -47,6 +47,9 @@ the run manager. The run manager also stores its SQLite DB, generated baselines,
 TensorBoard views, and training runs under `local/`. None of those local files
 are included in git.
 
+Tracked runtime binary policy is documented in
+[docs/runtime_assets.md](docs/runtime_assets.md).
+
 ## Run Manager
 
 The run manager is the local UI/API for editing experiment specs, launching

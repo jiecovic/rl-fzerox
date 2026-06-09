@@ -4,6 +4,7 @@ This directory contains project notes that are useful while `rl-fzerox` moves
 toward a first stable version.
 
 - [Observation pipeline](observation_pipeline.md)
+- [Runtime assets](runtime_assets.md)
 - [Reward main](reward_shaping/reward_main.md)
 - [Architecture](architecture.md)
 - [Contributing](contributing.md)
