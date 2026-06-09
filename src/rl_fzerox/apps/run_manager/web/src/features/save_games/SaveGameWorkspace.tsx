@@ -667,6 +667,8 @@ function resolveSavedCourseSetupForCourse(
         optionalMatch(setup.cup_id, target.cup_id) &&
         optionalMatch(setup.difficulty, target.difficulty),
     ) ??
+    // Cup-scoped setup rows remain valid persisted data for cup unlock targets.
+    // Course rows win; the course setup editor writes course rows for bulk edits.
     setups.find(
       (setup) =>
         setup.scope === "cup" &&

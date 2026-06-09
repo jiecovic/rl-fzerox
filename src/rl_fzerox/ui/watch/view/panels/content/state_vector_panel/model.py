@@ -52,7 +52,7 @@ CONTROL_HISTORY_GROUP = StateVectorGroup(
     "control_history.",
     "control_history",
 )
-LEGACY_STATE_GROUP = StateVectorGroup("State", None, None)
+UNCATEGORIZED_STATE_GROUP = StateVectorGroup("Other", None, None)
 
 
 def flattened_state_vector(observation_state: StateVector | None) -> StateVector | None:
@@ -110,13 +110,13 @@ def state_vector_groups(
     )
     if any(is_control_history_feature(name) for name in names):
         groups = (*groups, CONTROL_HISTORY_GROUP)
-    legacy_names = tuple(
+    uncategorized_names = tuple(
         name
         for name in names
         if name not in used_component_names and not is_control_history_feature(name)
     )
-    if legacy_names:
-        return (*groups, LEGACY_STATE_GROUP)
+    if uncategorized_names:
+        return (*groups, UNCATEGORIZED_STATE_GROUP)
     return groups
 
 

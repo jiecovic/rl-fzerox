@@ -228,12 +228,14 @@ function CupSetupBlock({
   unlockedVehicleIds: readonly string[];
 }) {
   const cupScopeValues = cupSetupScopeValues(cup);
-  const legacyCupDraft = exactCourseSetupDraft(courseSetupDrafts, cupScopeValues);
+  const cupFallbackDraft = exactCourseSetupDraft(courseSetupDrafts, cupScopeValues);
   const courseScopeValues = cup.courses.map((course) => courseSetupScopeValues(cup, course.id));
   const courseDrafts = courseScopeValues
     .map((scopeValues) => exactCourseSetupDraft(courseSetupDrafts, scopeValues))
     .filter((draft): draft is CourseSetupDraft => draft !== null);
-  const fallbackDraft = legacyCupDraft ?? EMPTY_COURSE_SETUP_DRAFT;
+  // New bulk edits fan out to course rows, but existing save games can still
+  // have cup-scoped rows. Use them only to seed empty course rows.
+  const fallbackDraft = cupFallbackDraft ?? EMPTY_COURSE_SETUP_DRAFT;
   const bulkDraft = sharedCourseDraft(courseDrafts, courseScopeValues.length) ?? fallbackDraft;
 
   function applyBulkCourseDraft(
