@@ -1,6 +1,8 @@
 # tests/core/policy/test_auxiliary_state.py
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import gymnasium as gym
 import numpy as np
 import pytest
@@ -10,6 +12,9 @@ from sb3x.common.auxiliary_losses import PolicyAuxiliaryLoss
 
 from rl_fzerox.core.policy.auxiliary_state.actor_regularization import (
     _AxisDistributionStats,
+    _categorical_lean_expected_signed_values,
+    _signed_balance_loss,
+    _split_lean_expected_signed_values,
     _std_cap_loss,
 )
 from rl_fzerox.core.policy.auxiliary_state.mixin import _AuxiliaryStatePolicyMixin
@@ -42,6 +47,16 @@ class _PitchStdCapHarness(_AuxiliaryStatePolicyMixin):
         obs: dict[str, torch.Tensor],
     ) -> PolicyAuxiliaryLoss | None:
         return self._pitch_std_cap_loss(stats, obs=obs, sample_mask=None)
+
+
+def _hybrid_discrete_distribution(*probabilities: torch.Tensor) -> SimpleNamespace:
+    return SimpleNamespace(
+        discrete_dist=SimpleNamespace(
+            distributions=tuple(
+                torch.distributions.Categorical(probs=probs) for probs in probabilities
+            )
+        )
+    )
 
 
 def _auxiliary_target_observation(
@@ -135,6 +150,56 @@ def test_continuous_pitch_std_cap_loss_keeps_airborne_scope() -> None:
     assert float(loss.total_loss) == pytest.approx(0.5)
     assert "pitch/grounded_std_cap_loss" in loss.metrics
     assert "pitch/airborne_std_cap_loss" in loss.metrics
+
+
+def test_categorical_lean_signed_balance_treats_both_as_neutral() -> None:
+    distribution = _hybrid_discrete_distribution(torch.tensor([[0.0, 0.7, 0.2, 0.1]]))
+
+    expected = _categorical_lean_expected_signed_values(distribution, branch_index=0)
+
+    assert expected.tolist() == pytest.approx([-0.5])
+
+
+def test_split_lean_signed_balance_uses_right_minus_left_probability() -> None:
+    distribution = _hybrid_discrete_distribution(
+        torch.tensor([[0.2, 0.8]]),
+        torch.tensor([[0.9, 0.1]]),
+    )
+
+    expected = _split_lean_expected_signed_values(
+        distribution,
+        left_branch_index=0,
+        right_branch_index=1,
+    )
+
+    assert expected.tolist() == pytest.approx([-0.7])
+
+
+def test_signed_balance_loss_penalizes_batch_bias_outside_deadzone() -> None:
+    loss = _signed_balance_loss(
+        torch.tensor([0.25, 0.35]),
+        deadzone=0.1,
+        loss_weight=2.0,
+        sample_mask=None,
+    )
+
+    assert loss is not None
+    assert float(loss.bias) == pytest.approx(0.3)
+    assert float(loss.loss_value) == pytest.approx(0.04)
+    assert float(loss.total_loss) == pytest.approx(0.08)
+
+
+def test_signed_balance_loss_respects_sample_mask() -> None:
+    loss = _signed_balance_loss(
+        torch.tensor([0.25, 0.9]),
+        deadzone=0.1,
+        loss_weight=2.0,
+        sample_mask=torch.tensor([True, False]),
+    )
+
+    assert loss is not None
+    assert float(loss.bias) == pytest.approx(0.25)
+    assert float(loss.loss_value) == pytest.approx(0.0225)
 
 
 def test_auxiliary_state_target_vector_returns_zeros_without_telemetry() -> None:

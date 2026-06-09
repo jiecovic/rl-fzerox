@@ -123,6 +123,50 @@ def _steer_std_cap(
     )
 
 
+def _steer_signed_balance_loss_weight(
+    config: Mapping[str, object] | None,
+) -> float:
+    return _non_negative_config_float(
+        config,
+        key="steer_signed_balance_loss_weight",
+        label="steer signed balance loss weight",
+        default=0.0,
+    )
+
+
+def _steer_signed_balance_deadzone(
+    config: Mapping[str, object] | None,
+) -> float:
+    return _non_negative_config_float(
+        config,
+        key="steer_signed_balance_deadzone",
+        label="steer signed balance deadzone",
+        default=0.2,
+    )
+
+
+def _lean_signed_balance_loss_weight(
+    config: Mapping[str, object] | None,
+) -> float:
+    return _non_negative_config_float(
+        config,
+        key="lean_signed_balance_loss_weight",
+        label="lean signed balance loss weight",
+        default=0.0,
+    )
+
+
+def _lean_signed_balance_deadzone(
+    config: Mapping[str, object] | None,
+) -> float:
+    return _non_negative_config_float(
+        config,
+        key="lean_signed_balance_deadzone",
+        label="lean signed balance deadzone",
+        default=0.1,
+    )
+
+
 def _non_negative_config_float(
     config: Mapping[str, object] | None,
     *,

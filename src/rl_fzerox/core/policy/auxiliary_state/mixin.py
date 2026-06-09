@@ -21,8 +21,12 @@ from rl_fzerox.core.policy.auxiliary_state.config import (
     _axis_index,
     _grounded_pitch_neutral_loss_weight,
     _grounded_pitch_std_cap,
+    _lean_signed_balance_deadzone,
+    _lean_signed_balance_loss_weight,
     _pitch_bucket_values,
     _pitch_std_cap_loss_weight,
+    _steer_signed_balance_deadzone,
+    _steer_signed_balance_loss_weight,
     _steer_std_cap,
     _steer_std_cap_loss_weight,
 )
@@ -47,9 +51,16 @@ class _AuxiliaryStatePolicyMixin(_ActorRegularizationMixin):
     _airborne_pitch_std_cap: float
     _steer_std_cap_loss_weight: float
     _steer_std_cap: float
+    _steer_signed_balance_loss_weight: float
+    _steer_signed_balance_deadzone: float
+    _lean_signed_balance_loss_weight: float
+    _lean_signed_balance_deadzone: float
     _continuous_steer_index: int | None
     _continuous_pitch_index: int | None
     _discrete_pitch_index: int | None
+    _discrete_lean_index: int | None
+    _discrete_lean_left_index: int | None
+    _discrete_lean_right_index: int | None
     _continuous_action_group_count: int
     _pitch_bucket_values: tuple[float, ...]
 
@@ -82,11 +93,22 @@ class _AuxiliaryStatePolicyMixin(_ActorRegularizationMixin):
         self._airborne_pitch_std_cap = _airborne_pitch_std_cap(actor_regularization)
         self._steer_std_cap_loss_weight = _steer_std_cap_loss_weight(actor_regularization)
         self._steer_std_cap = _steer_std_cap(actor_regularization)
+        self._steer_signed_balance_loss_weight = _steer_signed_balance_loss_weight(
+            actor_regularization
+        )
+        self._steer_signed_balance_deadzone = _steer_signed_balance_deadzone(actor_regularization)
+        self._lean_signed_balance_loss_weight = _lean_signed_balance_loss_weight(
+            actor_regularization
+        )
+        self._lean_signed_balance_deadzone = _lean_signed_balance_deadzone(actor_regularization)
         continuous_names = tuple(continuous_action_group_names)
         discrete_names = tuple(discrete_action_group_names)
         self._continuous_steer_index = _axis_index(continuous_names, "steer")
         self._continuous_pitch_index = _axis_index(continuous_names, "pitch")
         self._discrete_pitch_index = _axis_index(discrete_names, "pitch")
+        self._discrete_lean_index = _axis_index(discrete_names, "lean")
+        self._discrete_lean_left_index = _axis_index(discrete_names, "lean_left")
+        self._discrete_lean_right_index = _axis_index(discrete_names, "lean_right")
         self._continuous_action_group_count = len(continuous_names)
         self._pitch_bucket_values = _pitch_bucket_values(pitch_bucket_count)
         if (
@@ -97,6 +119,14 @@ class _AuxiliaryStatePolicyMixin(_ActorRegularizationMixin):
             raise ValueError("pitch actor regularization requires a pitch action group")
         if self._steer_actor_regularization_enabled() and self._continuous_steer_index is None:
             raise ValueError("steer actor regularization requires a continuous steer action group")
+        if self._lean_actor_regularization_enabled() and not (
+            self._discrete_lean_index is not None
+            or (
+                self._discrete_lean_left_index is not None
+                and self._discrete_lean_right_index is not None
+            )
+        ):
+            raise ValueError("lean actor regularization requires a lean action group")
 
     def _auxiliary_state_loss(
         self,

@@ -184,13 +184,22 @@ def _actor_regularization_data(config: ManagedRunConfig) -> dict[str, float]:
     grounded_pitch_neutral_loss_weight = actor_regularization.grounded_pitch_neutral_loss_weight
     pitch_std_cap_loss_weight = actor_regularization.pitch_std_cap_loss_weight
     steer_std_cap_loss_weight = actor_regularization.steer_std_cap_loss_weight
+    steer_signed_balance_loss_weight = actor_regularization.steer_signed_balance_loss_weight
+    lean_signed_balance_loss_weight = actor_regularization.lean_signed_balance_loss_weight
     continuous_action_groups = set(continuous_action_axes(config))
-    action_groups = continuous_action_groups | set(discrete_action_axes(config))
+    discrete_action_groups = set(discrete_action_axes(config))
+    action_groups = continuous_action_groups | discrete_action_groups
     if "pitch" not in action_groups:
         grounded_pitch_neutral_loss_weight = 0.0
         pitch_std_cap_loss_weight = 0.0
     if "steer" not in continuous_action_groups:
         steer_std_cap_loss_weight = 0.0
+        steer_signed_balance_loss_weight = 0.0
+    if not (
+        "lean" in discrete_action_groups
+        or {"lean_left", "lean_right"}.issubset(discrete_action_groups)
+    ):
+        lean_signed_balance_loss_weight = 0.0
     return {
         "grounded_pitch_neutral_loss_weight": float(grounded_pitch_neutral_loss_weight),
         "pitch_std_cap_loss_weight": float(pitch_std_cap_loss_weight),
@@ -198,6 +207,10 @@ def _actor_regularization_data(config: ManagedRunConfig) -> dict[str, float]:
         "airborne_pitch_std_cap": float(actor_regularization.airborne_pitch_std_cap),
         "steer_std_cap_loss_weight": float(steer_std_cap_loss_weight),
         "steer_std_cap": float(actor_regularization.steer_std_cap),
+        "steer_signed_balance_loss_weight": float(steer_signed_balance_loss_weight),
+        "steer_signed_balance_deadzone": float(actor_regularization.steer_signed_balance_deadzone),
+        "lean_signed_balance_loss_weight": float(lean_signed_balance_loss_weight),
+        "lean_signed_balance_deadzone": float(actor_regularization.lean_signed_balance_deadzone),
     }
 
 

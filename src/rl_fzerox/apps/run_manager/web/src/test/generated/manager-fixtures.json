@@ -1500,7 +1500,11 @@
         "airborne_pitch_std_cap": 0.8,
         "grounded_pitch_neutral_loss_weight": 0.0,
         "grounded_pitch_std_cap": 0.35,
+        "lean_signed_balance_deadzone": 0.1,
+        "lean_signed_balance_loss_weight": 0.0,
         "pitch_std_cap_loss_weight": 0.0,
+        "steer_signed_balance_deadzone": 0.2,
+        "steer_signed_balance_loss_weight": 0.0,
         "steer_std_cap": 1.0,
         "steer_std_cap_loss_weight": 0.0
       },

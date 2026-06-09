@@ -178,6 +178,10 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
     config.train.actor_regularization.airborne_pitch_std_cap = 0.8
     config.train.actor_regularization.steer_std_cap_loss_weight = 0.03
     config.train.actor_regularization.steer_std_cap = 0.9
+    config.train.actor_regularization.steer_signed_balance_loss_weight = 0.04
+    config.train.actor_regularization.steer_signed_balance_deadzone = 0.2
+    config.train.actor_regularization.lean_signed_balance_loss_weight = 0.05
+    config.train.actor_regularization.lean_signed_balance_deadzone = 0.1
 
     train_config = build_managed_train_app_config(
         config,
@@ -198,8 +202,17 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
     assert train_config.train.actor_regularization.airborne_pitch_std_cap == pytest.approx(0.8)
     assert train_config.train.actor_regularization.steer_std_cap_loss_weight == 0.0
     assert train_config.train.actor_regularization.steer_std_cap == pytest.approx(0.9)
+    assert train_config.train.actor_regularization.steer_signed_balance_loss_weight == 0.0
+    assert train_config.train.actor_regularization.steer_signed_balance_deadzone == pytest.approx(
+        0.2
+    )
+    assert train_config.train.actor_regularization.lean_signed_balance_loss_weight == 0.0
+    assert train_config.train.actor_regularization.lean_signed_balance_deadzone == pytest.approx(
+        0.1
+    )
 
     config.action.steering_mode = "continuous"
+    config.action.include_lean = True
     train_config = build_managed_train_app_config(
         config,
         run_id="bridge-action-loss-controls-continuous-steer",
@@ -207,6 +220,13 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
     )
 
     assert train_config.train.actor_regularization.steer_std_cap_loss_weight == pytest.approx(0.03)
+    assert (
+        train_config.train.actor_regularization.steer_signed_balance_loss_weight
+        == pytest.approx(0.04)
+    )
+    assert train_config.train.actor_regularization.lean_signed_balance_loss_weight == pytest.approx(
+        0.05
+    )
 
     config.action.steering_mode = "discrete"
     config.action.pitch_mode = "discrete"

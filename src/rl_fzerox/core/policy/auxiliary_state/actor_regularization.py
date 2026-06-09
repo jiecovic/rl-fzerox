@@ -28,6 +28,13 @@ class _AxisDistributionStats:
     log_std: torch.Tensor | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _SignedBalanceLoss:
+    bias: torch.Tensor
+    loss_value: torch.Tensor
+    total_loss: torch.Tensor
+
+
 class _ActorRegularizationMixin:
     _grounded_pitch_neutral_loss_weight: float
     _pitch_std_cap_loss_weight: float
@@ -35,9 +42,16 @@ class _ActorRegularizationMixin:
     _airborne_pitch_std_cap: float
     _steer_std_cap_loss_weight: float
     _steer_std_cap: float
+    _steer_signed_balance_loss_weight: float
+    _steer_signed_balance_deadzone: float
+    _lean_signed_balance_loss_weight: float
+    _lean_signed_balance_deadzone: float
     _continuous_steer_index: int | None
     _continuous_pitch_index: int | None
     _discrete_pitch_index: int | None
+    _discrete_lean_index: int | None
+    _discrete_lean_left_index: int | None
+    _discrete_lean_right_index: int | None
     _continuous_action_group_count: int
     _pitch_bucket_values: tuple[float, ...]
 
@@ -121,6 +135,29 @@ class _ActorRegularizationMixin:
             if steer_loss is not None:
                 add_loss(steer_loss.total_loss)
                 metrics.update(steer_loss.metrics)
+
+            steer_balance_loss = _signed_balance_loss(
+                steer_stats.mean,
+                deadzone=self._steer_signed_balance_deadzone,
+                loss_weight=self._steer_signed_balance_loss_weight,
+                sample_mask=sample_mask,
+            )
+            if steer_balance_loss is not None:
+                add_loss(steer_balance_loss.total_loss)
+                metrics.update(_signed_balance_metrics("steer", steer_balance_loss))
+
+        if self._lean_actor_regularization_enabled():
+            lean_expected = self._lean_expected_signed_values(distribution)
+            loss_anchor = lean_expected
+            lean_balance_loss = _signed_balance_loss(
+                lean_expected,
+                deadzone=self._lean_signed_balance_deadzone,
+                loss_weight=self._lean_signed_balance_loss_weight,
+                sample_mask=sample_mask,
+            )
+            if lean_balance_loss is not None:
+                add_loss(lean_balance_loss.total_loss)
+                metrics.update(_signed_balance_metrics("lean", lean_balance_loss))
 
         if not metrics:
             return None
@@ -283,6 +320,24 @@ class _ActorRegularizationMixin:
 
         return PolicyAuxiliaryLoss(total_loss=total_loss, metrics=metrics)
 
+    def _lean_expected_signed_values(self, distribution: object) -> torch.Tensor:
+        lean_index = self._discrete_lean_index
+        if lean_index is not None:
+            return _categorical_lean_expected_signed_values(
+                distribution,
+                branch_index=lean_index,
+            )
+
+        lean_left_index = self._discrete_lean_left_index
+        lean_right_index = self._discrete_lean_right_index
+        if lean_left_index is None or lean_right_index is None:
+            raise RuntimeError("lean actor regularization was not initialized")
+        return _split_lean_expected_signed_values(
+            distribution,
+            left_branch_index=lean_left_index,
+            right_branch_index=lean_right_index,
+        )
+
     def _continuous_axis_distribution_stats(
         self,
         distribution: object,
@@ -305,7 +360,9 @@ class _ActorRegularizationMixin:
 
     def _actor_regularization_enabled(self) -> bool:
         return (
-            self._pitch_actor_regularization_enabled() or self._steer_actor_regularization_enabled()
+            self._pitch_actor_regularization_enabled()
+            or self._steer_actor_regularization_enabled()
+            or self._lean_actor_regularization_enabled()
         )
 
     def _pitch_actor_regularization_enabled(self) -> bool:
@@ -314,7 +371,10 @@ class _ActorRegularizationMixin:
         )
 
     def _steer_actor_regularization_enabled(self) -> bool:
-        return self._steer_std_cap_loss_weight > 0.0
+        return self._steer_std_cap_loss_weight > 0.0 or self._steer_signed_balance_loss_weight > 0.0
+
+    def _lean_actor_regularization_enabled(self) -> bool:
+        return self._lean_signed_balance_loss_weight > 0.0
 
 
 def _continuous_action_mode(distribution: object) -> torch.Tensor:
@@ -374,6 +434,64 @@ def _discrete_pitch_distribution_stats(
     return _AxisDistributionStats(mean=mean, std=std, entropy=entropy, source="discrete")
 
 
+def _categorical_lean_expected_signed_values(
+    distribution: object,
+    *,
+    branch_index: int,
+) -> torch.Tensor:
+    probs = _discrete_branch_probabilities(
+        distribution,
+        branch_index=branch_index,
+        label="categorical lean",
+    )
+    if probs.shape[1] not in {3, 4}:
+        raise ValueError("Categorical lean probabilities must have three or four values")
+    signed_values = probs.new_zeros((probs.shape[1],))
+    signed_values[1] = -1.0
+    signed_values[2] = 1.0
+    return (probs * signed_values.unsqueeze(0)).sum(dim=1)
+
+
+def _split_lean_expected_signed_values(
+    distribution: object,
+    *,
+    left_branch_index: int,
+    right_branch_index: int,
+) -> torch.Tensor:
+    left_probs = _discrete_branch_probabilities(
+        distribution,
+        branch_index=left_branch_index,
+        label="lean_left",
+    )
+    right_probs = _discrete_branch_probabilities(
+        distribution,
+        branch_index=right_branch_index,
+        label="lean_right",
+    )
+    if left_probs.shape[1] != 2 or right_probs.shape[1] != 2:
+        raise ValueError("Split lean probabilities must be binary")
+    return right_probs[:, 1] - left_probs[:, 1]
+
+
+def _discrete_branch_probabilities(
+    distribution: object,
+    *,
+    branch_index: int,
+    label: str,
+) -> torch.Tensor:
+    branch_distribution = _discrete_branch_distribution(
+        distribution,
+        branch_index=branch_index,
+    )
+    raw_probs = getattr(branch_distribution, "probs", None)
+    if not isinstance(raw_probs, torch.Tensor):
+        raise TypeError(f"Discrete {label} distribution must expose categorical probabilities")
+    probs: torch.Tensor = raw_probs
+    if probs.ndim != 2:
+        raise TypeError(f"Discrete {label} probabilities must be batched")
+    return probs
+
+
 def _discrete_branch_distribution(
     distribution: object,
     *,
@@ -386,7 +504,35 @@ def _discrete_branch_distribution(
     try:
         return branches[branch_index]
     except IndexError as exc:
-        raise ValueError("Discrete pitch branch index is outside the distribution") from exc
+        raise ValueError("Discrete branch index is outside the distribution") from exc
+
+
+def _signed_balance_loss(
+    values: torch.Tensor,
+    *,
+    deadzone: float,
+    loss_weight: float,
+    sample_mask: torch.Tensor | None,
+) -> _SignedBalanceLoss | None:
+    if loss_weight <= 0.0:
+        return None
+    bias, has_active_samples = _masked_mean(values, sample_mask)
+    if not has_active_samples:
+        return None
+    loss_value = torch.relu(bias.abs() - values.new_tensor(deadzone)).square()
+    return _SignedBalanceLoss(
+        bias=bias,
+        loss_value=loss_value,
+        total_loss=loss_weight * loss_value,
+    )
+
+
+def _signed_balance_metrics(prefix: str, loss: _SignedBalanceLoss) -> dict[str, float]:
+    return {
+        f"{prefix}/signed_bias": float(loss.bias.detach().cpu().item()),
+        f"{prefix}/signed_balance_loss": float(loss.loss_value.detach().cpu().item()),
+        f"{prefix}/signed_balance_loss_weighted": float(loss.total_loss.detach().cpu().item()),
+    }
 
 
 def _pitch_sample_metrics(

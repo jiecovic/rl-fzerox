@@ -24,6 +24,10 @@ class ManagedTrainActorRegularizationConfig(BaseModel):
     airborne_pitch_std_cap: PositiveFloat = 0.8
     steer_std_cap_loss_weight: NonNegativeFloat = 0.0
     steer_std_cap: PositiveFloat = 1.0
+    steer_signed_balance_loss_weight: NonNegativeFloat = 0.0
+    steer_signed_balance_deadzone: float = Field(default=0.2, ge=0.0, le=1.0)
+    lean_signed_balance_loss_weight: NonNegativeFloat = 0.0
+    lean_signed_balance_deadzone: float = Field(default=0.1, ge=0.0, le=1.0)
 
 
 class ManagedTrainConfig(BaseModel):

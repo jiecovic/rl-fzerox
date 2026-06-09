@@ -2,6 +2,7 @@
 import { ActionRuntimeStack } from "@/features/configurator/sections/action/ActionLayout";
 import {
   PitchControlCard,
+  SignedBiasBalanceCard,
   SteeringGuardCard,
 } from "@/features/configurator/sections/action/auxiliary_branches/ActorRegularizationCards";
 import {
@@ -71,6 +72,12 @@ export function RuntimeCards({
         updatePolicy={updatePolicy}
       />
       <SteeringGuardCard
+        action={action}
+        defaultTrain={defaultTrain}
+        train={train}
+        updateTrain={updateTrain}
+      />
+      <SignedBiasBalanceCard
         action={action}
         defaultTrain={defaultTrain}
         train={train}
