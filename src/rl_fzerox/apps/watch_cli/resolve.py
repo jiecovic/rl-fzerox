@@ -16,6 +16,7 @@ from rl_fzerox.core.manager import (
     default_manager_db_path,
 )
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
+    restore_generated_x_cup_artifacts_from_state,
     restore_generated_x_cup_entries_from_state,
 )
 from rl_fzerox.core.manager.training import build_managed_train_app_config
@@ -167,6 +168,10 @@ def _managed_watch_train_config(
     train_config = restore_generated_x_cup_entries_from_state(
         train_config,
         state=store.get_run_track_sampling_state(run.id),
+    )
+    train_config = restore_generated_x_cup_artifacts_from_state(
+        train_config,
+        artifacts=store.get_run_track_sampling_artifacts(run.id),
     )
     return (
         run.run_dir,

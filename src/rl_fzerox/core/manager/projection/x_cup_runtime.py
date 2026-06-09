@@ -14,6 +14,12 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
+    TrackSamplingMaterializedArtifact,
+    track_sampling_artifact_course_key,
+    track_sampling_artifact_index,
+    track_sampling_artifact_reset_variant_key,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +78,59 @@ def restore_generated_x_cup_track_sampling_from_state(
             continue
         next_entries.append(_restore_entry(entry, runtime_entry))
         changed = True
+    if not changed:
+        return config
+    return config.model_copy(update={"entries": tuple(next_entries)})
+
+
+def restore_generated_x_cup_artifacts_from_state(
+    config: TrainAppConfig,
+    *,
+    artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
+) -> TrainAppConfig:
+    """Apply manager-owned generated X Cup reset artifacts to one train config."""
+
+    track_sampling = restore_generated_x_cup_track_sampling_artifacts(
+        config.env.track_sampling,
+        artifacts=artifacts,
+    )
+    if track_sampling is config.env.track_sampling:
+        return config
+    return config.model_copy(
+        update={
+            "env": config.env.model_copy(update={"track_sampling": track_sampling}),
+        }
+    )
+
+
+def restore_generated_x_cup_track_sampling_artifacts(
+    config: TrackSamplingConfig,
+    *,
+    artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
+) -> TrackSamplingConfig:
+    """Apply materialized artifact paths to generated X Cup entries."""
+
+    artifact_index = track_sampling_artifact_index(artifacts)
+    if not artifact_index:
+        return config
+    next_entries: list[TrackSamplingEntryConfig] = []
+    changed = False
+    for entry in config.entries:
+        if entry.generated_course_kind != X_CUP_COURSE.generated_kind:
+            next_entries.append(entry)
+            continue
+        artifact = artifact_index.get(
+            (
+                track_sampling_artifact_course_key(entry),
+                track_sampling_artifact_reset_variant_key(entry),
+            )
+        )
+        if artifact is None:
+            next_entries.append(entry)
+            continue
+        next_entry = _restore_entry_artifact(entry, artifact)
+        next_entries.append(next_entry)
+        changed = changed or next_entry != entry
     if not changed:
         return config
     return config.model_copy(update={"entries": tuple(next_entries)})
@@ -158,3 +217,26 @@ def _restore_entry(
             "log_per_course": False,
         }
     )
+
+
+def _restore_entry_artifact(
+    entry: TrackSamplingEntryConfig,
+    artifact: TrackSamplingMaterializedArtifact,
+) -> TrackSamplingEntryConfig:
+    update: dict[str, object] = {
+        "id": artifact.entry_id,
+        "baseline_state_path": artifact.baseline_state_path,
+    }
+    if artifact.source_course_index is not None:
+        update["source_course_index"] = artifact.source_course_index
+    if artifact.source_vehicle is not None:
+        update["source_vehicle"] = artifact.source_vehicle
+    if artifact.source_gp_difficulty is not None:
+        update["source_gp_difficulty"] = artifact.source_gp_difficulty
+    if artifact.source_engine_setting_raw_value is not None:
+        update["source_engine_setting_raw_value"] = artifact.source_engine_setting_raw_value
+    if artifact.generated_course_segment_count is not None:
+        update["generated_course_segment_count"] = artifact.generated_course_segment_count
+    if artifact.generated_course_length is not None:
+        update["generated_course_length"] = artifact.generated_course_length
+    return entry.model_copy(update=update)

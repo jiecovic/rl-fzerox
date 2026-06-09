@@ -58,3 +58,28 @@ class RunTrackSamplingEntryModel(ManagerBase):
     generated_course_seed: Mapped[str | None]
     generated_course_segment_count: Mapped[int | None]
     generated_course_length: Mapped[float | None]
+
+
+class RunTrackSamplingArtifactModel(ManagerBase):
+    """Active materialized reset artifact for one sampled course variant."""
+
+    __tablename__ = "run_track_sampling_artifacts"
+
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), primary_key=True)
+    course_key: Mapped[str] = mapped_column(primary_key=True)
+    reset_variant_key: Mapped[str] = mapped_column(primary_key=True)
+    entry_id: Mapped[str]
+    baseline_state_path: Mapped[str]
+    metadata_path: Mapped[str]
+    source_course_index: Mapped[int | None]
+    source_gp_difficulty: Mapped[str | None]
+    source_vehicle: Mapped[str | None]
+    source_engine_setting_raw_value: Mapped[int | None]
+    generated_course_slot: Mapped[int | None]
+    generated_course_generation: Mapped[int | None]
+    generated_course_id: Mapped[str | None]
+    generated_course_name: Mapped[str | None]
+    generated_course_hash: Mapped[str | None]
+    generated_course_seed: Mapped[str | None]
+    generated_course_segment_count: Mapped[int | None]
+    generated_course_length: Mapped[float | None]

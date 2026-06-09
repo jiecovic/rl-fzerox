@@ -55,6 +55,7 @@ from rl_fzerox.core.manager.storage.schema import (
 
 if TYPE_CHECKING:
     from rl_fzerox.core.training.session.callbacks.track_sampling import (
+        TrackSamplingMaterializedArtifact,
         TrackSamplingRuntimeState,
     )
 
@@ -257,6 +258,24 @@ class ManagerStore:
             run_id=run_id,
             state=state,
             updated_at=updated_at,
+        )
+
+    def get_run_track_sampling_artifacts(
+        self,
+        run_id: str,
+    ) -> tuple[TrackSamplingMaterializedArtifact, ...]:
+        return run_registry.get_run_track_sampling_artifacts(self, run_id)
+
+    def replace_run_track_sampling_artifacts(
+        self,
+        *,
+        run_id: str,
+        artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
+    ) -> None:
+        run_registry.replace_run_track_sampling_artifacts(
+            self,
+            run_id=run_id,
+            artifacts=artifacts,
         )
 
     def register_run_worker(

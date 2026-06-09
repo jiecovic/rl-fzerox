@@ -72,6 +72,10 @@ extending, and reviewing.
   and mutable runtime state. Treat `train_config.yaml`, checkpoints, baselines,
   TensorBoard logs, and exported bundles as manifests or derived artifacts unless
   a non-managed CLI path explicitly uses a run directory as input.
+- Do not commit one-off DB or data migration scripts to repo source. Keep
+  throwaway migration tooling under ignored `local/` paths, run it explicitly
+  during the maintenance window, and remove temporary compatibility guards before
+  committing the durable schema/code change.
 - Avoid loose “constant soup” for related literal values when a proper data
   structure would be clearer. Group RAM offsets, protocol ids, wire values, and
   enum constants in small immutable data structures when reasonable.

@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
+    TrackSamplingMaterializedArtifact,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     uses_track_sampling_runtime_mode,
 )
@@ -23,6 +26,9 @@ class TrackSamplingRuntimePersistence:
 
     load: Callable[[], TrackSamplingRuntimeState | None]
     save: Callable[[TrackSamplingRuntimeState], None]
+    replace_materialized_artifacts: (
+        Callable[[tuple[TrackSamplingMaterializedArtifact, ...]], None] | None
+    ) = None
 
 
 def file_track_sampling_runtime_persistence(path: Path) -> TrackSamplingRuntimePersistence:

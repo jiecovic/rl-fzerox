@@ -33,6 +33,7 @@ from rl_fzerox.core.training.session import (
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimePersistence,
+    materialized_track_sampling_artifacts,
 )
 
 
@@ -79,6 +80,12 @@ def run_training(
             run_paths=run_paths,
             startup_reporter=startup_reporter,
         )
+        if track_sampling_runtime_persistence is not None:
+            publish_artifacts = track_sampling_runtime_persistence.replace_materialized_artifacts
+            if publish_artifacts is not None:
+                publish_artifacts(
+                    materialized_track_sampling_artifacts(run_config.env.track_sampling)
+                )
         validate_training_baseline_state(run_config)
         _report_startup(
             startup_reporter,

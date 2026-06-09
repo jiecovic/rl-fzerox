@@ -201,6 +201,10 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     assert replacement.generated_course_generation == 2
     assert replacement.baseline_state_path == new_state_path
     assert replacement.generated_course_segment_count == 123
+    assert len(update.materialized_artifacts) == 1
+    assert update.materialized_artifacts[0].baseline_state_path == new_state_path.resolve()
+    assert update.materialized_artifacts[0].source_gp_difficulty == "novice"
+    assert update.materialized_artifacts[0].source_vehicle == "blue_falcon"
 
     manager.commit(update)
 

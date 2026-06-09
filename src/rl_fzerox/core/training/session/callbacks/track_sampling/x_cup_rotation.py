@@ -31,6 +31,10 @@ from rl_fzerox.core.training.runs.baseline_materializer import (
 from rl_fzerox.core.training.runs.baseline_materializer.requests import (
     request_from_track_entry,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
+    TrackSamplingMaterializedArtifact,
+    materialized_track_sampling_artifacts,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
@@ -54,6 +58,7 @@ class XCupRotationUpdate:
     generated_course_seed: int | None
     generated_course_segment_count: int | None
     generated_course_length: float | None
+    materialized_artifacts: tuple[TrackSamplingMaterializedArtifact, ...]
 
 
 class XCupRotationManager:
@@ -133,6 +138,7 @@ class XCupRotationManager:
             generated_course_seed=replacement_entries[0].generated_course_seed,
             generated_course_segment_count=replacement_entries[0].generated_course_segment_count,
             generated_course_length=replacement_entries[0].generated_course_length,
+            materialized_artifacts=materialized_track_sampling_artifacts(next_track_sampling),
         )
 
     def commit(self, update: XCupRotationUpdate) -> None:

@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
+    TrackSamplingMaterializedArtifact,
+    materialized_track_sampling_artifacts,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.controller import (
     StepBalancedTrackSamplingController,
 )
@@ -38,6 +42,7 @@ __all__ = (
     "DEFICIT_QUEUE_SETTINGS",
     "DeficitBudgetTrackSamplingController",
     "TrackSamplingRuntimeEntry",
+    "TrackSamplingMaterializedArtifact",
     "TrackSamplingRuntimePersistence",
     "TrackSamplingRuntimeState",
     "XCupRotationManager",
@@ -48,6 +53,7 @@ __all__ = (
     "file_track_sampling_runtime_persistence",
     "load_track_sampling_runtime_state",
     "load_track_sampling_runtime_state_json",
+    "materialized_track_sampling_artifacts",
     "replace_runtime_generation",
     "save_track_sampling_runtime_state",
     "track_sampling_runtime_state_json",

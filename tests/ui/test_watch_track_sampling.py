@@ -16,9 +16,11 @@ from rl_fzerox.core.runtime_spec.schema import (
     WatchConfig,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingMaterializedArtifact,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import reset_variant_key
 from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
 
 
@@ -37,14 +39,9 @@ def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
     baseline_path = run.run_dir / "baselines" / "x_cup_new.state"
     baseline_path.parent.mkdir(parents=True)
     baseline_path.write_bytes(b"state")
-    baseline_path.with_suffix(".json").write_text(
-        _x_cup_artifact_json(
-            course_hash="newhash",
-            course_seed=1234,
-            generation=3,
-            state_sha="new-state",
-        ),
-        encoding="utf-8",
+    store.replace_run_track_sampling_artifacts(
+        run_id=run.id,
+        artifacts=(_x_cup_artifact(baseline_path),),
     )
     store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
 
@@ -64,7 +61,7 @@ def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
 
     assert refreshed is not None
     entry = refreshed.entries[0]
-    assert entry.id == "x_cup_new"
+    assert entry.id == "x_cup_new_gp_race_novice_blue_falcon"
     assert entry.runtime_course_key == "x_cup_slot_1"
     assert entry.course_id == "x_cup_new"
     assert entry.course_name == "X Cup new"
@@ -207,14 +204,9 @@ def test_managed_watch_track_sampling_refresh_repairs_missing_current_baseline(
     baseline_path = run.run_dir / "baselines" / "x_cup_new.state"
     baseline_path.parent.mkdir(parents=True)
     baseline_path.write_bytes(b"state")
-    baseline_path.with_suffix(".json").write_text(
-        _x_cup_artifact_json(
-            course_hash="newhash",
-            course_seed=1234,
-            generation=3,
-            state_sha="new-state",
-        ),
-        encoding="utf-8",
+    store.replace_run_track_sampling_artifacts(
+        run_id=run.id,
+        artifacts=(_x_cup_artifact(baseline_path),),
     )
     store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
     config = _track_sampling_config(
@@ -324,30 +316,29 @@ def _runtime_state() -> TrackSamplingRuntimeState:
     )
 
 
-def _x_cup_artifact_json(
-    *,
-    course_hash: str,
-    course_seed: int,
-    generation: int,
-    state_sha: str,
-) -> str:
-    return (
-        "{"
-        '"cache_kind":"exact_run_baseline",'
-        '"generated_course_length":61743.98046875,'
-        '"generated_course_segment_count":38,'
-        f'"materialized_state_sha256":"{state_sha}",'
-        '"materializer_mode":"x_cup_generated_course",'
-        '"schema_version":16,'
-        f'"x_cup_course_hash":"{course_hash}",'
-        f'"x_cup_generation":{generation},'
-        f'"x_cup_seed":{course_seed},'
-        '"x_cup_slot":0,'
-        '"source_course_index":48,'
-        '"source_engine_setting_raw_value":50,'
-        '"source_gp_difficulty":"novice",'
-        '"source_vehicle":"blue_falcon"'
-        "}"
+def _x_cup_artifact(baseline_path: Path) -> TrackSamplingMaterializedArtifact:
+    return TrackSamplingMaterializedArtifact(
+        course_key="x_cup_slot_1",
+        reset_variant_key=reset_variant_key(
+            mode="gp_race",
+            gp_difficulty="novice",
+            vehicle="blue_falcon",
+        ),
+        entry_id="x_cup_new_gp_race_novice_blue_falcon",
+        baseline_state_path=baseline_path.resolve(),
+        metadata_path=baseline_path.with_suffix(".json").resolve(),
+        source_course_index=48,
+        source_gp_difficulty="novice",
+        source_vehicle="blue_falcon",
+        source_engine_setting_raw_value=50,
+        generated_course_slot=0,
+        generated_course_generation=3,
+        generated_course_id="x_cup_new",
+        generated_course_name="X Cup new",
+        generated_course_hash="newhash",
+        generated_course_seed=1234,
+        generated_course_segment_count=38,
+        generated_course_length=61_743.98046875,
     )
 
 

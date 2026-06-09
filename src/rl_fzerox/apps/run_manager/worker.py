@@ -168,6 +168,12 @@ def _track_sampling_runtime_persistence(
             state=state,
             updated_at=_now(),
         ),
+        replace_materialized_artifacts=lambda artifacts: (
+            store.replace_run_track_sampling_artifacts(
+                run_id=run_id,
+                artifacts=artifacts,
+            )
+        ),
     )
 
 

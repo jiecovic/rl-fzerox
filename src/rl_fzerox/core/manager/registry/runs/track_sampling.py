@@ -1,16 +1,21 @@
 # src/rl_fzerox/core/manager/registry/runs/track_sampling.py
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from rl_fzerox.core.manager.db.models import (
+    RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
     RunTrackSamplingRuntimeModel,
 )
 from rl_fzerox.core.manager.registry.common import utc_now
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
+    TrackSamplingMaterializedArtifact,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
@@ -23,6 +28,12 @@ if TYPE_CHECKING:
 def clear_run_track_sampling_state(store: ManagerStore, run_id: str) -> None:
     store._ensure_schema_initialized()
     with store._orm_session() as session:
+        for artifact in session.scalars(
+            select(RunTrackSamplingArtifactModel).where(
+                RunTrackSamplingArtifactModel.run_id == run_id
+            )
+        ):
+            session.delete(artifact)
         for entry in session.scalars(
             select(RunTrackSamplingEntryModel).where(RunTrackSamplingEntryModel.run_id == run_id)
         ):
@@ -112,6 +123,47 @@ def upsert_run_track_sampling_state(
         session.execute(stale_entries)
 
 
+def get_run_track_sampling_artifacts(
+    store: ManagerStore,
+    run_id: str,
+) -> tuple[TrackSamplingMaterializedArtifact, ...]:
+    store._ensure_schema_initialized()
+    with store._orm_session() as session:
+        artifacts = tuple(
+            session.scalars(
+                select(RunTrackSamplingArtifactModel)
+                .where(RunTrackSamplingArtifactModel.run_id == run_id)
+                .order_by(
+                    RunTrackSamplingArtifactModel.course_key,
+                    RunTrackSamplingArtifactModel.reset_variant_key,
+                )
+            )
+        )
+    return tuple(_track_sampling_artifact_from_model(artifact) for artifact in artifacts)
+
+
+def replace_run_track_sampling_artifacts(
+    store: ManagerStore,
+    *,
+    run_id: str,
+    artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
+) -> None:
+    store._ensure_schema_initialized()
+    with store._orm_session() as session:
+        session.execute(
+            delete(RunTrackSamplingArtifactModel).where(
+                RunTrackSamplingArtifactModel.run_id == run_id
+            )
+        )
+        artifact_values = tuple(
+            _track_sampling_artifact_values(run_id=run_id, artifact=artifact)
+            for artifact in artifacts
+        )
+        if not artifact_values:
+            return
+        session.execute(sqlite_insert(RunTrackSamplingArtifactModel).values(artifact_values))
+
+
 def _runtime_values(
     *,
     run_id: str,
@@ -196,6 +248,61 @@ def _track_sampling_entry_values(
         "generated_course_segment_count": entry.generated_course_segment_count,
         "generated_course_length": entry.generated_course_length,
     }
+
+
+def _track_sampling_artifact_from_model(
+    artifact: RunTrackSamplingArtifactModel,
+) -> TrackSamplingMaterializedArtifact:
+    return TrackSamplingMaterializedArtifact(
+        course_key=artifact.course_key,
+        reset_variant_key=artifact.reset_variant_key,
+        entry_id=artifact.entry_id,
+        baseline_state_path=_stored_path(artifact.baseline_state_path),
+        metadata_path=_stored_path(artifact.metadata_path),
+        source_course_index=artifact.source_course_index,
+        source_gp_difficulty=artifact.source_gp_difficulty,
+        source_vehicle=artifact.source_vehicle,
+        source_engine_setting_raw_value=artifact.source_engine_setting_raw_value,
+        generated_course_slot=artifact.generated_course_slot,
+        generated_course_generation=artifact.generated_course_generation,
+        generated_course_id=artifact.generated_course_id,
+        generated_course_name=artifact.generated_course_name,
+        generated_course_hash=artifact.generated_course_hash,
+        generated_course_seed=_optional_int(artifact.generated_course_seed),
+        generated_course_segment_count=artifact.generated_course_segment_count,
+        generated_course_length=artifact.generated_course_length,
+    )
+
+
+def _track_sampling_artifact_values(
+    *,
+    run_id: str,
+    artifact: TrackSamplingMaterializedArtifact,
+) -> dict[str, object]:
+    return {
+        "run_id": run_id,
+        "course_key": artifact.course_key,
+        "reset_variant_key": artifact.reset_variant_key,
+        "entry_id": artifact.entry_id,
+        "baseline_state_path": str(artifact.baseline_state_path),
+        "metadata_path": str(artifact.metadata_path),
+        "source_course_index": artifact.source_course_index,
+        "source_gp_difficulty": artifact.source_gp_difficulty,
+        "source_vehicle": artifact.source_vehicle,
+        "source_engine_setting_raw_value": artifact.source_engine_setting_raw_value,
+        "generated_course_slot": artifact.generated_course_slot,
+        "generated_course_generation": artifact.generated_course_generation,
+        "generated_course_id": artifact.generated_course_id,
+        "generated_course_name": artifact.generated_course_name,
+        "generated_course_hash": artifact.generated_course_hash,
+        "generated_course_seed": _optional_seed_text(artifact.generated_course_seed),
+        "generated_course_segment_count": artifact.generated_course_segment_count,
+        "generated_course_length": artifact.generated_course_length,
+    }
+
+
+def _stored_path(value: str) -> Path:
+    return Path(value).expanduser().resolve()
 
 
 def _optional_int(value: object) -> int | None:

@@ -38,14 +38,13 @@ from rl_fzerox.core.manager.db.models import (
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json, load_config_json
-from rl_fzerox.core.manager.storage.track_sampling_identity_migration import (
-    migrate_manager_track_sampling_identity,
-)
 from rl_fzerox.core.save_game.unlocks import FZEROX_SAVE_LAYOUT
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingMaterializedArtifact,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import reset_variant_key
 
 SnapshotKind = Literal["run", "draft", "template", "import"]
 
@@ -1028,7 +1027,41 @@ def test_manager_store_persists_track_sampling_runtime_state(tmp_path: Path) -> 
     assert store.get_run_track_sampling_state(run.id) is None
 
 
-def test_manager_store_requires_explicit_track_sampling_identity_migration(
+def test_manager_store_replaces_track_sampling_artifact_rows(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Artifact State Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    first_path = run.run_dir / "baselines" / "x_cup_first.state"
+    second_path = run.run_dir / "baselines" / "x_cup_second.state"
+    first_artifact = _track_sampling_artifact(first_path, difficulty="novice")
+    second_artifact = _track_sampling_artifact(second_path, difficulty="expert")
+
+    store.replace_run_track_sampling_artifacts(
+        run_id=run.id,
+        artifacts=(first_artifact, second_artifact),
+    )
+
+    assert ManagerStore(store.db_path).get_run_track_sampling_artifacts(run.id) == (
+        second_artifact,
+        first_artifact,
+    )
+
+    store.replace_run_track_sampling_artifacts(
+        run_id=run.id,
+        artifacts=(first_artifact,),
+    )
+
+    assert store.get_run_track_sampling_artifacts(run.id) == (first_artifact,)
+
+    store.clear_run_track_sampling_state(run.id)
+
+    assert store.get_run_track_sampling_artifacts(run.id) == ()
+
+
+def test_manager_store_rejects_legacy_track_sampling_identity_columns(
     tmp_path: Path,
 ) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
@@ -1098,26 +1131,6 @@ def test_manager_store_requires_explicit_track_sampling_identity_migration(
 
     with pytest.raises(RuntimeError, match="legacy columns"):
         ManagerStore(store.db_path).get_run_track_sampling_state(run.id)
-
-    migrate_manager_track_sampling_identity(
-        store.db_path,
-        applied_at="2026-06-08T00:00:00+00:00",
-    )
-
-    migrated_store = ManagerStore(store.db_path)
-    recovered = migrated_store.get_run_track_sampling_state(run.id)
-    inspected_engine = manager_engine(store.db_path)
-    try:
-        columns = {
-            column["name"]
-            for column in inspect(inspected_engine).get_columns("run_track_sampling_entries")
-        }
-    finally:
-        inspected_engine.dispose()
-
-    assert recovered == state
-    assert "generated_entry_id" not in columns
-    assert "generated_baseline_state_path" not in columns
 
 
 def test_manager_store_updates_track_sampling_rows_incrementally(tmp_path: Path) -> None:
@@ -1656,6 +1669,38 @@ def test_manager_store_rejects_deleting_running_run(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="stop or pause the run before deleting it"):
         store.delete_run(run.id)
+
+
+def _track_sampling_artifact(
+    baseline_path: Path,
+    *,
+    difficulty: str,
+    course_slot: int = 1,
+    course_generation: int = 3,
+) -> TrackSamplingMaterializedArtifact:
+    return TrackSamplingMaterializedArtifact(
+        course_key="x_cup_slot_1",
+        reset_variant_key=reset_variant_key(
+            mode="gp_race",
+            gp_difficulty=difficulty,
+            vehicle="blue_falcon",
+        ),
+        entry_id=f"x_cup_1234abcd_gp_race_{difficulty}_blue_falcon",
+        baseline_state_path=baseline_path.expanduser().resolve(),
+        metadata_path=baseline_path.with_suffix(".json").expanduser().resolve(),
+        source_course_index=48,
+        source_gp_difficulty=difficulty,
+        source_vehicle="blue_falcon",
+        source_engine_setting_raw_value=50,
+        generated_course_slot=course_slot,
+        generated_course_generation=course_generation,
+        generated_course_id="x_cup_1234abcd",
+        generated_course_name="X Cup 1234abcd",
+        generated_course_hash="1234abcd",
+        generated_course_seed=1234,
+        generated_course_segment_count=38,
+        generated_course_length=61_743.98046875,
+    )
 
 
 def _logical_sra(cup_progress: dict[str, int]) -> bytes:

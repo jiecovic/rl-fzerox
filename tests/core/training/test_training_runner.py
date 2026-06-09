@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.runtime_spec.schema import (
@@ -40,6 +41,10 @@ from rl_fzerox.core.training.session.callbacks import (
     RolloutInfoAccumulator,
     build_callbacks,
     info_sequence,
+)
+from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingMaterializedArtifact,
+    TrackSamplingRuntimePersistence,
 )
 from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 from rl_fzerox.core.training.session.model import (
@@ -594,6 +599,63 @@ def test_run_training_full_model_resume_skips_completed_target(
 
     assert not learn_called
     assert env.closed
+
+
+def test_run_training_publishes_initial_track_sampling_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _full_model_resume_config(tmp_path, total_timesteps=1_000)
+    run_dir = config.train.continue_run_dir
+    assert run_dir is not None
+    baseline_path = run_dir / "baselines" / "x_cup.state"
+    baseline_path.parent.mkdir(parents=True)
+    baseline_path.write_bytes(b"state")
+    config = config.model_copy(
+        update={
+            "env": config.env.model_copy(
+                update={
+                    "track_sampling": TrackSamplingConfig(
+                        enabled=True,
+                        entries=(
+                            TrackSamplingEntryConfig(
+                                id="x_cup_abcd1234",
+                                runtime_course_key="x_cup_slot_1",
+                                course_id="x_cup_abcd1234",
+                                course_name="X Cup abcd1234",
+                                baseline_state_path=baseline_path,
+                                course_index=X_CUP_COURSE.course_index,
+                                mode=X_CUP_COURSE.race_mode,
+                                gp_difficulty="novice",
+                                vehicle="blue_falcon",
+                                generated_course_kind=X_CUP_COURSE.generated_kind,
+                                generated_course_seed=1234,
+                                generated_course_hash="abcd1234",
+                                generated_course_slot=1,
+                                generated_course_generation=2,
+                            ),
+                        ),
+                    )
+                }
+            )
+        }
+    )
+    env = _RunTrainingEnv()
+    model = _RunTrainingModel(num_timesteps=900)
+    captured_artifacts: list[tuple[TrackSamplingMaterializedArtifact, ...]] = []
+    persistence = TrackSamplingRuntimePersistence(
+        load=lambda: None,
+        save=lambda _: None,
+        replace_materialized_artifacts=captured_artifacts.append,
+    )
+    _stub_run_training_dependencies(monkeypatch, config=config, env=env, model=model)
+    monkeypatch.setattr(runner, "_learn_model", lambda **_: None)
+
+    runner.run_training(config, track_sampling_runtime_persistence=persistence)
+
+    assert captured_artifacts
+    assert captured_artifacts[0][0].course_key == "x_cup_slot_1"
+    assert captured_artifacts[0][0].baseline_state_path == baseline_path.resolve()
 
 
 def _full_model_resume_config(tmp_path: Path, *, total_timesteps: int) -> TrainAppConfig:

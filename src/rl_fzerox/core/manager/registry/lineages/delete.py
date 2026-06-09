@@ -61,6 +61,7 @@ def delete_run(store: ManagerStore, run_id: str) -> bool:
         if run_dir.exists():
             queue_delete_tree(connection, path=run_dir, created_at=deleted_at)
 
+        connection.execute("DELETE FROM run_track_sampling_artifacts WHERE run_id = ?", (run_id,))
         connection.execute("DELETE FROM run_track_sampling_entries WHERE run_id = ?", (run_id,))
         connection.execute("DELETE FROM run_track_sampling_runtime WHERE run_id = ?", (run_id,))
         connection.execute("DELETE FROM run_runtime WHERE run_id = ?", (run_id,))
@@ -140,6 +141,10 @@ def delete_lineage(store: ManagerStore, lineage_id: str) -> bool:
             )
         connection.execute("DELETE FROM lineage_groups WHERE lineage_id = ?", (lineage_id,))
         for current_run_id in run_delete_order:
+            connection.execute(
+                "DELETE FROM run_track_sampling_artifacts WHERE run_id = ?",
+                (current_run_id,),
+            )
             connection.execute(
                 "DELETE FROM run_track_sampling_entries WHERE run_id = ?",
                 (current_run_id,),
