@@ -71,6 +71,9 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "airborne_frames": 1,
             "boost_pad_entered": True,
             "gas_level": 1.0,
+            "steer_level": -0.25,
+            "lean_level": -1.0,
+            "lean_request_level": -1.0,
             "gas_used": True,
             "air_brake_used": False,
             "boost_used": True,
@@ -108,6 +111,9 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "airborne_frames": 3,
             "boost_pad_entered": False,
             "gas_level": 0.0,
+            "steer_level": 0.75,
+            "lean_level": 1.0,
+            "lean_request_level": 0.0,
             "gas_used": False,
             "air_brake_used": True,
             "boost_used": False,
@@ -138,6 +144,9 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.state_metrics["step_reward_raw"].mean() == 25.0
     assert accumulator.state_metrics["step_reward_clip_abs_excess"].mean() == 12.5
     assert accumulator.state_metrics["gas_level"].mean() == 0.5
+    assert accumulator.state_metrics["steer_level"].mean() == 0.25
+    assert accumulator.state_metrics["lean_level"].mean() == 0.0
+    assert accumulator.state_metrics["lean_request_level"].mean() == -0.5
     assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
     assert accumulator.step_rates["boost_pad_entered"].rate() == 0.5
     assert accumulator.step_rates["gas_used"].rate() == 0.5
@@ -175,6 +184,9 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["state/airborne_frame_ratio"] == 0.8
     assert logger.records["state/ko_star_count_mean"] == 3.0
     assert logger.records["action/gas_level_mean"] == 0.5
+    assert logger.records["action/steer_level_mean"] == 0.25
+    assert logger.records["action/lean_level_mean"] == 0.0
+    assert logger.records["action/lean_request_level_mean"] == -0.5
     assert logger.records["action/gas_used_step_rate"] == 0.5
     assert logger.records["action/air_brake_used_step_rate"] == 0.5
     assert logger.records["action/boost_used_step_rate"] == 0.5

@@ -20,6 +20,7 @@ from rl_fzerox.core.runtime_spec.schema import EnvConfig
 from rl_fzerox.core.runtime_spec.schema.actions import ActionRuntimeConfig
 
 from ..controls import ActionMaskController, ControlStateTracker, sync_dynamic_action_masks
+from ..controls.lean import lean_index_from_control, signed_lean
 from ..info import backend_step_info, set_curriculum_info, telemetry_info
 from ..observation import EngineObservationBuilder
 from ..reset import SelectedTrack
@@ -140,6 +141,10 @@ class EngineStepAssembler:
             ),
             continuous_drive_min_thrust=float(self.action_config.continuous_drive_min_thrust),
         )
+        steer_level = _clamped_axis(requested_control_state.stick_x)
+        pitch_level = _clamped_axis(requested_control_state.pitch)
+        lean_level = signed_lean(lean_index_from_control(applied_control_state))
+        requested_lean_level = signed_lean(lean_index_from_control(requested_control_state))
 
         boost_used = applied_control_state.boost
         lean_used = applied_control_state.lean_left or applied_control_state.lean_right
@@ -157,14 +162,8 @@ class EngineStepAssembler:
                 lean_requested=lean_used,
                 spin_requested=spin_requested,
                 gas_level=gas_level,
-                steer_level=max(
-                    -1.0,
-                    min(1.0, float(requested_control_state.stick_x)),
-                ),
-                pitch_level=max(
-                    -1.0,
-                    min(1.0, float(requested_control_state.pitch)),
-                ),
+                steer_level=steer_level,
+                pitch_level=pitch_level,
                 pitch_deadzone=float(self.action_config.pitch_deadzone),
                 drive_axis=request.action_drive_axis,
             ),
@@ -205,6 +204,9 @@ class EngineStepAssembler:
         info["episode_airborne_frames"] = episode_airborne_frames
         info["boost_pad_entered"] = boost_pad_entered
         info["gas_level"] = gas_level
+        info["steer_level"] = steer_level
+        info["lean_level"] = lean_level
+        info["lean_request_level"] = requested_lean_level
         info["gas_used"] = gas_level > 0.0
         info["air_brake_used"] = air_brake_used
         info["boost_used"] = boost_used
@@ -359,6 +361,10 @@ def set_episode_boost_pad_info(
         info["boost_pad_entries_per_lap"] = None
         return
     info["boost_pad_entries_per_lap"] = episode_boost_pad_entries / float(laps_completed)
+
+
+def _clamped_axis(value: float) -> float:
+    return max(-1.0, min(1.0, float(value)))
 
 
 def _native_episode_status(

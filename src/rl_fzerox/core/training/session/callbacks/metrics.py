@@ -48,6 +48,9 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("step_reward_raw", "reward/step_raw_mean"),
         _MetricLogSpec("step_reward_clip_abs_excess", "reward_clip/abs_excess_mean"),
         _MetricLogSpec("gas_level", "action/gas_level_mean"),
+        _MetricLogSpec("steer_level", "action/steer_level_mean"),
+        _MetricLogSpec("lean_level", "action/lean_level_mean"),
+        _MetricLogSpec("lean_request_level", "action/lean_request_level_mean"),
     ),
     step_rates=(
         _MetricLogSpec("impact_frames", "state/impact_step_rate"),
