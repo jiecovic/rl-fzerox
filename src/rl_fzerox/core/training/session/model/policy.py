@@ -8,7 +8,6 @@ from rl_fzerox.core.policy.activations import resolve_policy_activation_fn
 from rl_fzerox.core.policy.auxiliary_state.policies import (
     AuxiliaryStateMaskableHybridActionMultiInputPolicy,
     AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy,
-    AuxiliaryStateMaskableRecurrentMultiInputPolicy,
 )
 from rl_fzerox.core.runtime_spec.schema import EnvConfig, PolicyConfig, TrainConfig
 
@@ -35,8 +34,6 @@ def resolve_policy_entry(
             raise RuntimeError(
                 "policy auxiliary state or actor regularization requires a dict observation space"
             )
-        if effective_algorithm == TRAINING_ALGORITHMS.maskable_recurrent_ppo:
-            return AuxiliaryStateMaskableRecurrentMultiInputPolicy
         if effective_algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
             return AuxiliaryStateMaskableHybridActionMultiInputPolicy
         if effective_algorithm == TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo:
@@ -56,7 +53,7 @@ def build_policy_kwargs(
     train_env: VecEnv,
     policy_config: PolicyConfig,
     train_config: TrainConfig,
-    env_config: EnvConfig,
+    env_config: EnvConfig | None,
     value_head_key: str,
 ) -> dict[str, object]:
     from gymnasium import spaces
@@ -106,19 +103,25 @@ def build_policy_kwargs(
     }
     if policy_config.auxiliary_state.enabled:
         policy_kwargs["auxiliary_state"] = policy_config.auxiliary_state.model_dump(mode="python")
-    if env_config.action.layout_continuous_axes:
+    action_config = env_config.action.runtime() if env_config is not None else None
+    if action_config is not None and action_config.name == "configured_hybrid":
         policy_kwargs["hybrid_action_group_names"] = {
-            "continuous": tuple(env_config.action.layout_continuous_axes),
-            "discrete": tuple(env_config.action.layout_discrete_axes),
+            "continuous": tuple(action_config.layout_continuous_axes),
+            "discrete": tuple(action_config.layout_discrete_axes),
         }
     if train_config.actor_regularization.enabled():
+        if action_config is None:
+            raise RuntimeError(
+                "train.actor_regularization requires env_config so action group names "
+                "can be matched to the policy outputs"
+            )
         policy_kwargs["actor_regularization"] = train_config.actor_regularization.model_dump(
             mode="python"
         )
-        continuous_action_group_names = tuple(env_config.action.layout_continuous_axes)
+        continuous_action_group_names = tuple(action_config.layout_continuous_axes)
         policy_kwargs["continuous_action_group_names"] = continuous_action_group_names
-        policy_kwargs["discrete_action_group_names"] = tuple(env_config.action.layout_discrete_axes)
-        policy_kwargs["pitch_bucket_count"] = int(env_config.action.pitch_buckets)
+        policy_kwargs["discrete_action_group_names"] = tuple(action_config.layout_discrete_axes)
+        policy_kwargs["pitch_bucket_count"] = int(action_config.pitch_buckets)
     return policy_kwargs
 
 

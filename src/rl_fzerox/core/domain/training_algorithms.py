@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
 TrainAlgorithmName: TypeAlias = Literal[
-    "maskable_ppo",
-    "maskable_recurrent_ppo",
     "maskable_hybrid_action_ppo",
     "maskable_hybrid_recurrent_ppo",
 ]
@@ -18,21 +16,17 @@ TrainAlgorithmName: TypeAlias = Literal[
 class TrainingAlgorithmRegistry:
     """Stable runtime-spec names plus capability groups for supported trainers."""
 
-    maskable_ppo: TrainAlgorithmName = "maskable_ppo"
-    maskable_recurrent_ppo: TrainAlgorithmName = "maskable_recurrent_ppo"
     maskable_hybrid_action_ppo: TrainAlgorithmName = "maskable_hybrid_action_ppo"
     maskable_hybrid_recurrent_ppo: TrainAlgorithmName = "maskable_hybrid_recurrent_ppo"
 
     @property
     def default(self) -> TrainAlgorithmName:
-        return self.maskable_ppo
+        return self.maskable_hybrid_action_ppo
 
     @property
     def maskable(self) -> frozenset[TrainAlgorithmName]:
         return frozenset(
             (
-                self.maskable_ppo,
-                self.maskable_recurrent_ppo,
                 self.maskable_hybrid_action_ppo,
                 self.maskable_hybrid_recurrent_ppo,
             )
@@ -40,12 +34,7 @@ class TrainingAlgorithmRegistry:
 
     @property
     def recurrent(self) -> frozenset[TrainAlgorithmName]:
-        return frozenset(
-            (
-                self.maskable_recurrent_ppo,
-                self.maskable_hybrid_recurrent_ppo,
-            )
-        )
+        return frozenset((self.maskable_hybrid_recurrent_ppo,))
 
     @property
     def hybrid(self) -> frozenset[TrainAlgorithmName]:
@@ -60,7 +49,6 @@ class TrainingAlgorithmRegistry:
     def sb3x(self) -> frozenset[TrainAlgorithmName]:
         return frozenset(
             (
-                self.maskable_recurrent_ppo,
                 self.maskable_hybrid_action_ppo,
                 self.maskable_hybrid_recurrent_ppo,
             )
@@ -70,7 +58,6 @@ class TrainingAlgorithmRegistry:
     def full_model_policy(self) -> frozenset[TrainAlgorithmName]:
         return frozenset(
             (
-                self.maskable_recurrent_ppo,
                 self.maskable_hybrid_action_ppo,
                 self.maskable_hybrid_recurrent_ppo,
             )

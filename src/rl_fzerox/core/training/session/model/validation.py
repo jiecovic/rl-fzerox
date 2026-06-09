@@ -54,11 +54,8 @@ def validate_auxiliary_state_configuration(
             "policy.auxiliary_state requires observation.mode=image_state "
             "so hidden aux targets can ride alongside dict observations"
         )
-    if effective_algorithm == TRAINING_ALGORITHMS.maskable_ppo:
-        raise RuntimeError(
-            "policy.auxiliary_state is not wired for maskable_ppo yet; "
-            "use a recurrent or hybrid sb3x PPO variant"
-        )
+    if effective_algorithm not in TRAINING_ALGORITHMS.hybrid:
+        raise RuntimeError("policy.auxiliary_state requires a hybrid sb3x PPO variant")
 
 
 def _validate_maskable_hybrid_ppo_config(config: TrainAppConfig) -> None:

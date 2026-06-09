@@ -280,6 +280,7 @@ class ActionConfig(BaseModel):
     mask_pitch_on_ground: bool = True
     pitch_deadzone: float = Field(default=0.1, ge=0.0, lt=1.0)
     pitch_buckets: int = Field(default=5, ge=3)
+    adapter_name: ActionAdapterName = "configured_hybrid"
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...] = ()
     layout_discrete_axes: tuple[ConfiguredDiscreteAxis, ...] = (
         CONFIGURED_ACTION_LAYOUTS.default_discrete_axes
@@ -294,7 +295,7 @@ class ActionConfig(BaseModel):
     def resolved_adapter_name(self) -> ActionAdapterName:
         """Return the adapter family implied by the configured action layout."""
 
-        return "configured_hybrid" if self.layout_continuous_axes else "configured_discrete"
+        return self.adapter_name
 
     def resolved_mask_overrides(self) -> ActionMaskOverrides | None:
         """Return one canonical set of branch overrides for runtime consumers."""
@@ -346,8 +347,10 @@ class ActionConfig(BaseModel):
         if set(self.layout_continuous_axes) & set(self.layout_discrete_axes):
             raise ValueError("configured action axes cannot be both continuous and discrete")
         resolved_name = self.resolved_adapter_name()
-        if resolved_name == "configured_hybrid" and not self.layout_continuous_axes:
-            raise ValueError("configured_hybrid requires at least one continuous axis")
+        if resolved_name == "configured_hybrid" and not (
+            self.layout_continuous_axes or self.layout_discrete_axes
+        ):
+            raise ValueError("configured_hybrid requires at least one action axis")
         if resolved_name == "configured_discrete":
             if self.layout_continuous_axes:
                 raise ValueError("configured_discrete cannot define continuous axes")

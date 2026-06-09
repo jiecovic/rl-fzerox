@@ -47,18 +47,13 @@ def _latest_model_path(run_dir: Path) -> Path:
     return path
 
 
-def _configured_discrete_action_config(*axes: str) -> dict[str, object]:
-    return {
-        "layout_discrete_axes": list(axes),
-    }
-
-
 def _configured_hybrid_action_config(
     *,
     continuous_axes: tuple[str, ...],
     discrete_axes: tuple[str, ...] = (),
 ) -> dict[str, object]:
     return {
+        "adapter_name": "configured_hybrid",
         "layout_continuous_axes": list(continuous_axes),
         "layout_discrete_axes": list(discrete_axes),
     }
@@ -542,11 +537,9 @@ def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path
                     "rom_path": str(rom_path),
                 },
                 "env": {
-                    "action": _configured_discrete_action_config(
-                        "steer",
-                        "gas",
-                        "boost",
-                        "lean",
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=(),
+                        discrete_axes=("steer", "gas", "boost", "lean"),
                     )
                 },
                 "policy": {
@@ -555,7 +548,7 @@ def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path
                     }
                 },
                 "train": {
-                    "algorithm": "maskable_ppo",
+                    "algorithm": "maskable_hybrid_action_ppo",
                     "total_timesteps": 1000,
                 },
             }
@@ -567,7 +560,9 @@ def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path
         _load_saved_policy_algorithm(tmp_path)
 
 
-def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path: Path) -> None:
+def test_load_saved_policy_algorithm_recognizes_discrete_only_hybrid_recurrent_ppo(
+    tmp_path: Path,
+) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
@@ -582,11 +577,9 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
                     "rom_path": str(rom_path),
                 },
                 "env": {
-                    "action": _configured_discrete_action_config(
-                        "steer",
-                        "gas",
-                        "boost",
-                        "lean",
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=(),
+                        discrete_axes=("steer", "gas", "boost", "lean"),
                     )
                 },
                 "policy": {
@@ -595,7 +588,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
                     }
                 },
                 "train": {
-                    "algorithm": "maskable_recurrent_ppo",
+                    "algorithm": "maskable_hybrid_recurrent_ppo",
                     "total_timesteps": 1000,
                 },
             }
@@ -603,7 +596,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
         f=str(config_path),
     )
 
-    assert _load_saved_policy_algorithm(tmp_path) == "maskable_recurrent_ppo"
+    assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_recurrent_ppo"
 
 
 def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
@@ -680,7 +673,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
     assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_recurrent_ppo"
 
 
-def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
+def test_load_saved_policy_uses_full_model_artifact_for_discrete_only_recurrent_runs(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -698,11 +691,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
                     "rom_path": str(rom_path),
                 },
                 "env": {
-                    "action": _configured_discrete_action_config(
-                        "steer",
-                        "gas",
-                        "boost",
-                        "lean",
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=(),
+                        discrete_axes=("steer", "gas", "boost", "lean"),
                     )
                 },
                 "policy": {
@@ -711,7 +702,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
                     }
                 },
                 "train": {
-                    "algorithm": "maskable_recurrent_ppo",
+                    "algorithm": "maskable_hybrid_recurrent_ppo",
                     "total_timesteps": 1000,
                 },
             }
@@ -733,16 +724,19 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
             episode_start: BoolArray | None = None,
             deterministic: bool = True,
             action_masks: ActionMask | None = None,
-        ) -> tuple[DiscreteAction, PolicyState]:
+        ) -> tuple[dict[str, NumpyArray], PolicyState]:
             _ = (observation, state, episode_start, deterministic, action_masks)
-            return np.array([0], dtype=np.int64), None
+            return {
+                "continuous": np.empty((0,), dtype=np.float32),
+                "discrete": np.array([0, 0, 0, 0], dtype=np.int64),
+            }, None
 
     def _fake_load(path: str, *, device: str) -> _FakeLoadedRecurrentModel:
         captured["path"] = path
         captured["device"] = device
         return _FakeLoadedRecurrentModel()
 
-    monkeypatch.setattr("sb3x.MaskableRecurrentPPO.load", _fake_load)
+    monkeypatch.setattr("sb3x.MaskableHybridRecurrentPPO.load", _fake_load)
 
     loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
 

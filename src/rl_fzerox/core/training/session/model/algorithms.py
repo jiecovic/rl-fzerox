@@ -7,18 +7,13 @@ from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, Train
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, TrainConfig
 
 if TYPE_CHECKING:
-    from sb3_contrib import MaskablePPO
     from sb3x import (
         MaskableHybridActionPPO,
         MaskableHybridRecurrentPPO,
-        MaskableRecurrentPPO,
     )
 
     PpoTrainingAlgorithmClass: TypeAlias = (
-        type[MaskablePPO]
-        | type[MaskableRecurrentPPO]
-        | type[MaskableHybridActionPPO]
-        | type[MaskableHybridRecurrentPPO]
+        type[MaskableHybridActionPPO] | type[MaskableHybridRecurrentPPO]
     )
     TrainingAlgorithmClass: TypeAlias = PpoTrainingAlgorithmClass
 else:
@@ -59,14 +54,6 @@ def resolve_training_algorithm_class(algorithm: str) -> TrainingAlgorithmClass:
 
 def resolve_ppo_training_algorithm_class(algorithm: str) -> PpoTrainingAlgorithmClass:
     try:
-        if algorithm == TRAINING_ALGORITHMS.maskable_recurrent_ppo:
-            from sb3x import MaskableRecurrentPPO
-
-            return MaskableRecurrentPPO
-        if algorithm == TRAINING_ALGORITHMS.maskable_ppo:
-            from sb3_contrib import MaskablePPO
-
-            return MaskablePPO
         if algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
             from sb3x import MaskableHybridActionPPO
 

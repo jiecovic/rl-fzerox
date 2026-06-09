@@ -46,7 +46,7 @@ def test_rollout_checkpoint_callback_saves_and_trims_recent_snapshots(tmp_path: 
     ensure_run_dirs(run_paths)
     callbacks = build_callbacks(
         train_config=TrainConfig(
-            algorithm="maskable_ppo",
+            algorithm="maskable_hybrid_action_ppo",
             num_envs=1,
             n_steps=4,
             batch_size=4,
@@ -72,7 +72,7 @@ def test_rollout_checkpoint_callback_saves_and_trims_recent_snapshots(tmp_path: 
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
-                algorithm="maskable_ppo",
+                algorithm="maskable_hybrid_action_ppo",
                 num_envs=1,
                 n_steps=4,
                 batch_size=4,

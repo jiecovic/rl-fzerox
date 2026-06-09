@@ -429,7 +429,7 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
-                algorithm="maskable_ppo",
+                algorithm="maskable_hybrid_action_ppo",
                 n_steps=4,
                 batch_size=4,
                 device="cpu",
@@ -699,7 +699,7 @@ def test_train_app_config_rejects_recurrent_policy_without_recurrent_algorithm(
                 recurrent=PolicyRecurrentConfig(enabled=True),
             ),
             curriculum=CurriculumConfig(),
-            train=TrainConfig(algorithm="maskable_ppo"),
+            train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
         )
 
 
@@ -713,14 +713,16 @@ def test_train_app_config_rejects_recurrent_algorithm_without_recurrent_policy(
 
     with pytest.raises(
         ValidationError,
-        match="train.algorithm=maskable_recurrent_ppo requires policy.recurrent.enabled=true",
+        match=(
+            "train.algorithm=maskable_hybrid_recurrent_ppo requires policy.recurrent.enabled=true"
+        ),
     ):
         TrainAppConfig(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
             env=EnvConfig(),
             policy=PolicyConfig(),
             curriculum=CurriculumConfig(),
-            train=TrainConfig(algorithm="maskable_recurrent_ppo"),
+            train=TrainConfig(algorithm="maskable_hybrid_recurrent_ppo"),
         )
 
 
@@ -957,7 +959,7 @@ def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> No
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
-                algorithm="maskable_ppo",
+                algorithm="maskable_hybrid_action_ppo",
                 n_steps=4,
                 batch_size=4,
                 device="cpu",
@@ -1053,7 +1055,7 @@ def test_curriculum_callback_starts_from_resume_stage(tmp_path: Path) -> None:
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
-                algorithm="maskable_ppo",
+                algorithm="maskable_hybrid_action_ppo",
                 n_steps=4,
                 batch_size=4,
                 device="cpu",

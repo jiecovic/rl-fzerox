@@ -741,7 +741,7 @@ def test_manager_training_bridge_supports_multilayer_state_mlp(
     assert train_config.policy.extractor.resolved_state_net_arch() == (128, 64)
 
 
-def test_manager_training_bridge_switches_to_discrete_ppo_when_no_continuous_axes(
+def test_manager_training_bridge_uses_discrete_only_hybrid_ppo_when_no_continuous_axes(
     tmp_path: Path,
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
@@ -755,8 +755,8 @@ def test_manager_training_bridge_switches_to_discrete_ppo_when_no_continuous_axe
         run_dir=tmp_path / "runs" / "bridge-discrete_0001",
     )
 
-    assert train_config.train.algorithm == "maskable_ppo"
-    assert train_config.env.action.runtime().name == "configured_discrete"
+    assert train_config.train.algorithm == "maskable_hybrid_action_ppo"
+    assert train_config.env.action.runtime().name == "configured_hybrid"
     assert train_config.env.action.layout_continuous_axes == ()
     assert train_config.env.action.layout_discrete_axes == (
         "steer",

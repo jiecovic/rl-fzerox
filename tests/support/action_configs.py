@@ -14,6 +14,7 @@ def configured_discrete_action(
 ) -> ActionConfig:
     return ActionConfig.model_validate(
         {
+            "adapter_name": "configured_discrete",
             "layout_discrete_axes": layout_discrete_axes,
             **overrides,
         }
@@ -28,6 +29,7 @@ def configured_hybrid_action(
 ) -> ActionConfig:
     return ActionConfig.model_validate(
         {
+            "adapter_name": "configured_hybrid",
             "layout_continuous_axes": continuous_axes,
             "layout_discrete_axes": discrete_axes,
             **overrides,

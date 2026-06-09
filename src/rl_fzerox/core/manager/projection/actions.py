@@ -8,6 +8,7 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
     continuous_axes = continuous_action_axes(config)
     discrete_axes = discrete_action_axes(config)
     return {
+        "adapter_name": "configured_hybrid",
         "steer_buckets": config.action.steer_buckets,
         "steer_response_power": 1.0,
         "continuous_drive_deadzone": config.action.continuous_drive_deadzone,

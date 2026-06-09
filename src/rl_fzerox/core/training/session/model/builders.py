@@ -39,7 +39,7 @@ def build_training_model(
         train_env=train_env,
         train_config=train_config,
         policy_config=policy_config,
-        env_config=env_config or EnvConfig(),
+        env_config=env_config,
         tensorboard_log=tensorboard_log,
         effective_algorithm=effective_algorithm,
     )
@@ -62,7 +62,7 @@ def build_ppo_model(
         train_env=train_env,
         train_config=train_config,
         policy_config=policy_config,
-        env_config=env_config or EnvConfig(),
+        env_config=env_config,
         tensorboard_log=tensorboard_log,
         effective_algorithm=effective_algorithm,
     )
@@ -73,7 +73,7 @@ def _build_ppo_family_model(
     train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
-    env_config: EnvConfig,
+    env_config: EnvConfig | None,
     tensorboard_log: str | None,
     effective_algorithm: str,
 ):

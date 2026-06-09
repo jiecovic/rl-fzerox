@@ -202,16 +202,10 @@ def _actor_regularization_data(config: ManagedRunConfig) -> dict[str, float]:
 
 
 def effective_train_algorithm(config: ManagedRunConfig) -> str:
-    if continuous_action_axes(config):
-        return (
-            TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo
-            if config.policy.recurrent_enabled
-            else TRAINING_ALGORITHMS.maskable_hybrid_action_ppo
-        )
     return (
-        TRAINING_ALGORITHMS.maskable_recurrent_ppo
+        TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo
         if config.policy.recurrent_enabled
-        else TRAINING_ALGORITHMS.maskable_ppo
+        else TRAINING_ALGORITHMS.maskable_hybrid_action_ppo
     )
 
 

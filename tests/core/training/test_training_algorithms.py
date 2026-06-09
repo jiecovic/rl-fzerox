@@ -8,7 +8,6 @@ from gymnasium import spaces
 
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import (
-    ActionMaskConfig,
     CurriculumConfig,
     EmulatorConfig,
     EnvConfig,
@@ -63,7 +62,12 @@ def test_training_requires_action_masks_for_current_supported_algorithms(
             discrete_axes=("boost", "lean"),
         )
     )
-    discrete_env = EnvConfig(action=configured_discrete_action("steer", "gas", "boost", "lean"))
+    discrete_only_hybrid_env = EnvConfig(
+        action=configured_hybrid_action(
+            continuous_axes=(),
+            discrete_axes=("steer", "gas", "boost", "lean"),
+        )
+    )
 
     assert (
         training_requires_action_masks(
@@ -105,10 +109,10 @@ def test_training_requires_action_masks_for_current_supported_algorithms(
         training_requires_action_masks(
             TrainAppConfig(
                 emulator=emulator,
-                env=discrete_env,
+                env=discrete_only_hybrid_env,
                 policy=PolicyConfig(),
                 curriculum=CurriculumConfig(),
-                train=TrainConfig(algorithm="maskable_ppo"),
+                train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
             )
         )
         is True
@@ -503,48 +507,6 @@ def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
 
     assert isinstance(model, MaskableHybridRecurrentPPO)
     assert model.policy.state_dict()["lstm_actor.weight_ih_l0"].shape[0] == 4 * 512
-
-
-def test_build_ppo_model_rejects_auxiliary_state_for_maskable_ppo() -> None:
-    from stable_baselines3.common.vec_env import DummyVecEnv
-
-    env = DummyVecEnv(
-        vec_env_fns(
-            lambda: maybe_wrap_training_auxiliary_state_observation(
-                FZeroXEnv(
-                    backend=SyntheticBackend(),
-                    config=EnvConfig(
-                        action=configured_discrete_action("steer", "gas", "boost", "lean"),
-                        observation=ObservationConfig(
-                            mode="image_state",
-                            state_components=_VEHICLE_STATE_COMPONENT,
-                        ),
-                    ),
-                ),
-                policy_config=PolicyConfig(
-                    auxiliary_state=PolicyAuxiliaryStateConfig(enabled=True)
-                ),
-            )
-        )
-    )
-
-    try:
-        with pytest.raises(RuntimeError, match="maskable_ppo"):
-            build_ppo_model(
-                train_env=env,
-                train_config=TrainConfig(
-                    algorithm="maskable_ppo",
-                    n_steps=4,
-                    batch_size=4,
-                    device="cpu",
-                ),
-                policy_config=PolicyConfig(
-                    auxiliary_state=PolicyAuxiliaryStateConfig(enabled=True)
-                ),
-                tensorboard_log=None,
-            )
-    finally:
-        env.close()
 
 
 def test_maskable_hybrid_action_ppo_learns_with_auxiliary_state_loss() -> None:
@@ -984,8 +946,8 @@ def test_markerless_resume_action_bias_delta_skips_legacy_gas_bias() -> None:
     assert float(bias[spin_offset]) == pytest.approx(0.5)
 
 
-def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
-    from sb3x import MaskableRecurrentPPO
+def test_build_ppo_model_can_construct_recurrent_discrete_only_hybrid_ppo() -> None:
+    from sb3x import MaskableHybridRecurrentPPO
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
@@ -993,12 +955,9 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=configured_discrete_action(
-                        "steer",
-                        "gas",
-                        "boost",
-                        "lean",
-                        mask=ActionMaskConfig(lean=(0,)),
+                    action=configured_hybrid_action(
+                        continuous_axes=(),
+                        discrete_axes=("steer", "gas", "boost", "lean"),
                     ),
                     observation=ObservationConfig(
                         mode="image_state",
@@ -1013,7 +972,7 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
-                algorithm="maskable_recurrent_ppo",
+                algorithm="maskable_hybrid_recurrent_ppo",
                 n_steps=4,
                 batch_size=4,
                 device="cpu",
@@ -1024,4 +983,5 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
     finally:
         env.close()
 
-    assert isinstance(model, MaskableRecurrentPPO)
+    assert isinstance(model, MaskableHybridRecurrentPPO)
+    assert model.policy.hybrid_action_spec.continuous_dim == 0

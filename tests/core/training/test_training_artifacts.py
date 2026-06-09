@@ -471,7 +471,7 @@ def test_materialize_train_run_config_does_not_copy_init_run_baseline(
                 "policy: {}",
                 "curriculum: {}",
                 "train:",
-                "  algorithm: maskable_ppo",
+                "  algorithm: maskable_hybrid_action_ppo",
             ]
         ),
         encoding="utf-8",

@@ -44,9 +44,6 @@ def _load_saved_policy(
 ) -> _HasPredict:
     """Load one saved policy-only SB3 artifact."""
 
-    import torch
-    from gymnasium import spaces
-
     _ensure_policy_dependencies_loaded()
 
     algorithm = _load_saved_policy_algorithm(run_dir, explicit_algorithm=algorithm)
@@ -63,16 +60,7 @@ def _load_saved_policy(
             raise TypeError("Loaded model does not expose a compatible predict(...)")
         return loaded_model
 
-    saved_policy = torch.load(policy_path, map_location="cpu", weights_only=False)
-    saved_data = saved_policy.get("data", {})
-    observation_space = saved_data.get("observation_space")
-    policy_classes = _policy_classes_for_algorithm(algorithm=algorithm)
-    CnnPolicy, MultiInputPolicy = policy_classes
-    policy_class = MultiInputPolicy if isinstance(observation_space, spaces.Dict) else CnnPolicy
-    loaded_policy = policy_class.load(str(policy_path), device=device)
-    if not _has_predict(loaded_policy):
-        raise TypeError("Loaded policy does not expose a compatible predict(...) method")
-    return loaded_policy
+    raise ValueError(f"Unsupported saved policy algorithm: {algorithm!r}")
 
 
 def _policy_mtime_ns(policy_path: Path) -> int:
@@ -134,21 +122,8 @@ def _has_maskable_predict(policy: object) -> TypeGuard[_HasMaskablePredict]:
     return "action_masks" in inspect.signature(policy.predict).parameters
 
 
-def _policy_classes_for_algorithm(*, algorithm: str):
-    if algorithm == TRAINING_ALGORITHMS.maskable_ppo:
-        from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
-
-        return CnnPolicy, MultiInputPolicy
-
-    raise ValueError(f"Unsupported saved policy algorithm: {algorithm!r}")
-
-
 def _full_model_class_for_algorithm(algorithm: str):
     try:
-        if algorithm == TRAINING_ALGORITHMS.maskable_recurrent_ppo:
-            from sb3x import MaskableRecurrentPPO
-
-            return MaskableRecurrentPPO
         if algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
             from sb3x import MaskableHybridActionPPO
 

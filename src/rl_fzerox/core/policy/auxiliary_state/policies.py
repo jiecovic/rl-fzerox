@@ -8,7 +8,6 @@ from gymnasium import spaces
 from sb3_contrib.common.recurrent.type_aliases import RNNStates
 from sb3x.common.auxiliary_losses import (
     PolicyActionEvaluation,
-    PolicyAuxiliaryLoss,
 )
 from sb3x.common.maskable import MaybeMasks
 from sb3x.common.recurrent import (
@@ -22,7 +21,6 @@ from sb3x.ppo_mask_hybrid_action.policies import (
 from sb3x.ppo_mask_hybrid_recurrent.policies import (
     MaskableHybridRecurrentMultiInputActorCriticPolicy,
 )
-from sb3x.ppo_mask_recurrent.policies import MaskableRecurrentMultiInputActorCriticPolicy
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 
 from fzerox_emulator.arrays import BoolArray, PolicyState
@@ -34,7 +32,6 @@ from rl_fzerox.core.policy.auxiliary_state.targets import AuxiliaryStateTargetNa
 __all__ = [
     "AuxiliaryStateMaskableHybridActionMultiInputPolicy",
     "AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy",
-    "AuxiliaryStateMaskableRecurrentMultiInputPolicy",
 ]
 
 
@@ -136,120 +133,6 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
                     raise TypeError("Expected separate actor and critic feature tensors")
                 source_latent = features[0]
         return self._auxiliary_state_predictions(source_latent, names=target_names)
-
-
-class AuxiliaryStateMaskableRecurrentMultiInputPolicy(
-    _AuxiliaryStatePolicyMixin,
-    MaskableRecurrentMultiInputActorCriticPolicy,
-):
-    def __init__(
-        self,
-        observation_space: spaces.Dict,
-        action_space: spaces.Space,
-        lr_schedule: Schedule,
-        *,
-        auxiliary_state: Mapping[str, object] | None = None,
-        actor_regularization: Mapping[str, object] | None = None,
-        continuous_action_group_names: Sequence[str] = (),
-        discrete_action_group_names: Sequence[str] = (),
-        pitch_bucket_count: int = 5,
-        **kwargs: object,
-    ) -> None:
-        MaskableRecurrentMultiInputActorCriticPolicy.__init__(
-            self,
-            observation_space,
-            action_space,
-            lr_schedule,
-            **kwargs,
-        )
-        self._init_auxiliary_state(
-            input_dim=int(self.lstm_output_dim),
-            auxiliary_state=auxiliary_state,
-            actor_regularization=actor_regularization,
-            continuous_action_group_names=continuous_action_group_names,
-            discrete_action_group_names=discrete_action_group_names,
-            pitch_bucket_count=pitch_bucket_count,
-            activation_fn=self.activation_fn,
-        )
-
-    def evaluate_actions_with_aux(
-        self,
-        obs: PyTorchObs,
-        actions: torch.Tensor,
-        lstm_states: RNNStates,
-        episode_starts: torch.Tensor,
-        *,
-        action_masks: MaybeMasks = None,
-        auxiliary_mask: torch.Tensor | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, PolicyAuxiliaryLoss | None]:
-        features = self.extract_features(obs)
-        pi_features, vf_features = split_actor_critic_features(
-            features,
-            share_features_extractor=self.share_features_extractor,
-        )
-
-        latent_pi_source, _ = self._process_sequence(
-            pi_features,
-            require_lstm_state(lstm_states.pi),
-            episode_starts,
-            self.lstm_actor,
-        )
-        if self.lstm_critic is not None:
-            latent_vf_source, _ = self._process_sequence(
-                vf_features,
-                require_lstm_state(lstm_states.vf),
-                episode_starts,
-                self.lstm_critic,
-            )
-        elif self.shared_lstm:
-            latent_vf_source = latent_pi_source.detach()
-        else:
-            latent_vf_source = require_linear(self.critic)(vf_features)
-
-        latent_pi = self.mlp_extractor.forward_actor(latent_pi_source)
-        latent_vf = self.mlp_extractor.forward_critic(latent_vf_source)
-        distribution = self._get_action_dist_from_latent(latent_pi)
-        if action_masks is not None:
-            distribution.apply_masking(action_masks)
-        log_prob = distribution.log_prob(actions)
-        values = self.value_net(latent_vf)
-        entropy = distribution.entropy()
-        aux_loss = self._auxiliary_state_loss(
-            latent_pi_source,
-            obs=obs,
-            sample_mask=auxiliary_mask,
-        )
-        return values, log_prob, entropy, aux_loss
-
-    def predict_auxiliary_state(
-        self,
-        observation: ObservationValue,
-        *,
-        state: PolicyState = None,
-        episode_start: BoolArray | None = None,
-        target_names: Sequence[AuxiliaryStateTargetName] | None = None,
-    ) -> dict[str, object]:
-        self.set_training_mode(False)
-        obs_tensor, _ = self.obs_to_tensor(observation)
-        tensor_states, tensor_episode_starts = _recurrent_tensor_state(
-            policy=self,
-            state=state,
-            obs=obs_tensor,
-            episode_start=episode_start,
-        )
-        with torch.no_grad():
-            features = self.extract_features(obs_tensor)
-            pi_features, _ = split_actor_critic_features(
-                features,
-                share_features_extractor=self.share_features_extractor,
-            )
-            latent_pi_source, _ = self._process_sequence(
-                pi_features,
-                tensor_states,
-                tensor_episode_starts,
-                self.lstm_actor,
-            )
-        return self._auxiliary_state_predictions(latent_pi_source, names=target_names)
 
 
 class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(

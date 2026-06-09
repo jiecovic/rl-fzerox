@@ -7,7 +7,6 @@ from sb3x.common.recurrent import count_vectorized_envs
 from sb3x.ppo_mask_hybrid_recurrent.policies import (
     MaskableHybridRecurrentMultiInputActorCriticPolicy,
 )
-from sb3x.ppo_mask_recurrent.policies import MaskableRecurrentMultiInputActorCriticPolicy
 from stable_baselines3.common.type_aliases import PyTorchObs
 
 from fzerox_emulator.arrays import BoolArray, PolicyState
@@ -15,8 +14,7 @@ from fzerox_emulator.arrays import BoolArray, PolicyState
 
 def _recurrent_tensor_state(
     *,
-    policy: MaskableRecurrentMultiInputActorCriticPolicy
-    | MaskableHybridRecurrentMultiInputActorCriticPolicy,
+    policy: MaskableHybridRecurrentMultiInputActorCriticPolicy,
     state: PolicyState,
     obs: PyTorchObs,
     episode_start: BoolArray | None,
