@@ -3,15 +3,10 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.career_mode.course_setup import (
-    CourseSetupTarget,
-    resolve_course_setup,
-)
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.career_mode.runner.menu import (
     GP_MENU_ORDER,
@@ -22,7 +17,6 @@ from rl_fzerox.core.career_mode.runner.menu import (
     MenuInput,
     ObservedMenuScreen,
     RawMenuStep,
-    camera_setting,
     continue_after_race_step,
     continue_next_course_step,
     course_id_from_info,
@@ -33,6 +27,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     raw_step,
 )
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
+from rl_fzerox.core.career_mode.runner.policy_resolver import CareerPolicyResolver
 from rl_fzerox.core.career_mode.runner.race import (
     SaveRaceExecutionPlan,
     build_save_race_execution_plan,
@@ -44,6 +39,11 @@ from rl_fzerox.core.career_mode.runner.save_file import (
 from rl_fzerox.core.career_mode.runner.setup import (
     career_mode_race_setup_config,
     save_race_setup_from_config,
+)
+from rl_fzerox.core.career_mode.runner.view import (
+    CareerControllerViewState,
+    career_debug_context,
+    career_viewer_info,
 )
 from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.domain.race_difficulty import (
@@ -66,9 +66,7 @@ from rl_fzerox.core.manager.models import (
     SaveAttemptStatus,
     SaveGameStatus,
 )
-from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchAppConfig
-from rl_fzerox.core.training.inference import PolicyRunner, load_policy_runner
 
 
 class CareerRuntimeEmulator(CameraSyncBackend, SaveRamSession, Protocol):
@@ -124,12 +122,6 @@ class CareerModeStore(Protocol):
     ) -> SaveAttemptExecutionContext | None: ...
 
 
-@dataclass(frozen=True, slots=True)
-class _LoadedPolicy:
-    run: ManagedRun
-    runner: PolicyRunner
-
-
 class CareerModeController:
     """Drive the menu path until the configured policy can control a race."""
 
@@ -146,7 +138,6 @@ class CareerModeController:
         self._store: CareerModeStore = ManagerStore(db_path)
         self._save_game_id = save_game_id
         self._attempt_id: str | None = attempt_id
-        self._device = device
         self._camera_setting: CameraSettingName | None = None
         self._pending_steps: deque[RawMenuStep] = deque()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
@@ -165,8 +156,12 @@ class CareerModeController:
         self._fresh_race_ready_frames = 0
         self._course_setups = self._store.list_save_course_setups(save_game_id)
         self._unlock_progress = self._store.save_game_unlock_progress(save_game_id)
-        self._policy_cache: dict[tuple[str, str], _LoadedPolicy] = {}
-        self._active_policy_key: tuple[str, str] | None = None
+        self._policy_resolver = CareerPolicyResolver(
+            store=self._store,
+            setup=self._setup,
+            course_setups=self._course_setups,
+            device=device,
+        )
 
     @classmethod
     def from_config(cls, config: WatchAppConfig) -> CareerModeController:
@@ -438,43 +433,31 @@ class CareerModeController:
         info: dict[str, object],
         active_policy_control: CareerModePolicyControl | None,
     ) -> dict[str, object]:
-        """Add Career Mode control/progress context to viewer telemetry."""
-
-        progress = self._unlock_progress
-        current_target_label = _current_target_label(progress, self._setup)
-        next_target = progress.next_target
-        viewer_info = dict(info)
-        viewer_info.update(
-            {
-                "career_mode_attempt_id": self._attempt_id,
-                "career_mode_completed_targets": progress.completed_count,
-                "career_mode_controller_context": self.debug_context(info),
-                "career_mode_total_targets": progress.total_count,
-                "career_mode_inspection_status": progress.inspection_status,
-                "career_mode_next_target_label": (
-                    next_target.label if next_target is not None else None
-                ),
-                "career_mode_phase": self._phase.value,
-                "career_mode_policy_active": active_policy_control is not None,
-                "career_mode_target_label": current_target_label,
-            }
+        facts = MenuFacts.from_info(info)
+        return career_viewer_info(
+            info=info,
+            state=self._view_state(),
+            observed_screen=self._observed_menu_screen(facts),
+            active_policy_control=active_policy_control,
         )
-        viewer_info.update(self._viewer_fsm_facts(info))
-        if active_policy_control is not None:
-            viewer_info.update(
-                {
-                    "career_mode_policy_artifact": (
-                        active_policy_control.course_setup.policy_artifact
-                    ),
-                    "career_mode_policy_run_id": active_policy_control.policy_run.id,
-                    "career_mode_policy_run_name": active_policy_control.policy_run.name,
-                    "career_mode_policy_scope": active_policy_control.course_setup.scope,
-                    "career_mode_policy_course_id": (
-                        active_policy_control.course_setup.course_id or course_id_from_info(info)
-                    ),
-                }
-            )
-        return viewer_info
+
+    def debug_context(self, info: dict[str, object]) -> str:
+        return career_debug_context(info=info, state=self._view_state())
+
+    def _view_state(self) -> CareerControllerViewState:
+        return CareerControllerViewState(
+            attempt_id=self._attempt_id,
+            setup=self._setup,
+            progress=self._unlock_progress,
+            phase=self._phase,
+            pending_step_count=len(self._pending_steps),
+            difficulty_popup_state=self._difficulty_popup_state,
+            camera_synced=self._camera_synced,
+            camera_setting=self._camera_setting,
+            awaiting_new_race_after_terminal=self._awaiting_new_race_after_terminal,
+            continuing_race_result=self._continuing_race_result,
+            fresh_race_ready_frames=self._fresh_race_ready_frames,
+        )
 
     def _observed_menu_screen(self, facts: MenuFacts) -> ObservedMenuScreen:
         return observed_menu_screen(
@@ -482,115 +465,17 @@ class CareerModeController:
             difficulty_popup_state=self._difficulty_popup_state,
         )
 
-    def _viewer_fsm_facts(self, info: dict[str, object]) -> dict[str, object]:
-        facts = MenuFacts.from_info(info)
-        screen = self._observed_menu_screen(facts)
-        return {
-            "career_mode_fsm_awaiting_fresh_race": (self._awaiting_new_race_after_terminal),
-            "career_mode_fsm_camera_synced": self._camera_synced,
-            "career_mode_fsm_camera_target": self._camera_setting,
-            "career_mode_fsm_completed_laps": facts.completed_laps,
-            "career_mode_fsm_completion_fraction": facts.completion_fraction,
-            "career_mode_fsm_continuing_result": self._continuing_race_result,
-            "career_mode_fsm_course_index": facts.course_index,
-            "career_mode_fsm_difficulty_cursor_raw": facts.difficulty_cursor_raw,
-            "career_mode_fsm_difficulty_state_raw": facts.difficulty_state_raw,
-            "career_mode_fsm_fresh_race_ready": facts.fresh_race_ready_for_policy,
-            "career_mode_fsm_fresh_race_ready_frames": (self._fresh_race_ready_frames),
-            "career_mode_fsm_game_mode": facts.game_mode,
-            "career_mode_fsm_intro_timer": facts.race_intro_timer,
-            "career_mode_fsm_observed_screen": screen.value,
-            "career_mode_fsm_pending_steps": len(self._pending_steps),
-            "career_mode_fsm_popup_state": self._difficulty_popup_state.value,
-            "career_mode_fsm_race_time_ms": facts.race_time_ms,
-            "career_mode_fsm_selected_mode_raw": facts.selected_mode_raw,
-            "career_mode_fsm_terminal_reason": facts.terminal_reason,
-            "career_mode_fsm_terminal_result": facts.terminal_race_result,
-            "career_mode_fsm_total_laps": facts.total_laps,
-            "career_mode_fsm_transition_raw": facts.transition_state_raw,
-        }
-
-    def debug_context(self, info: dict[str, object]) -> str:
-        fields = (
-            ("phase", self._phase.value),
-            ("pending_steps", len(self._pending_steps)),
-            ("game_mode", info.get("game_mode")),
-            ("game_mode_raw", info.get("game_mode_raw")),
-            ("queued_game_mode", info.get("queued_game_mode")),
-            ("queued_game_mode_raw", info.get("queued_game_mode_raw")),
-            ("menu_selected_mode_raw", info.get("menu_selected_mode_raw")),
-            ("menu_difficulty_state_raw", info.get("menu_difficulty_state_raw")),
-            ("menu_difficulty_cursor_raw", info.get("menu_difficulty_cursor_raw")),
-            ("menu_transition_state_raw", info.get("menu_transition_state_raw")),
-            ("difficulty", info.get("difficulty")),
-            ("difficulty_raw", info.get("difficulty_raw")),
-            ("course_index", info.get("course_index")),
-            ("camera_setting", camera_setting(info)),
-            ("race_intro_timer", info.get("race_intro_timer")),
-            ("race_time_ms", info.get("race_time_ms")),
-            ("laps", _lap_summary(info)),
-            ("position", info.get("position")),
-            ("termination_reason", info.get("termination_reason")),
-        )
-        parts = [f"{name}={value!r}" for name, value in fields if value is not None]
-        return ", ".join(parts)
-
     def _resolve_policy_control(
         self,
         info: dict[str, object],
     ) -> CareerModePolicyControl | None:
-        course_setup = self._resolve_current_course_setup(info)
-        if course_setup is None:
+        resolution = self._policy_resolver.resolve(info)
+        if resolution is None:
             return None
-
-        key = (course_setup.policy_run_id, course_setup.policy_artifact)
-        loaded_policy = self._policy_cache.get(key)
-        if loaded_policy is None:
-            policy_run = self._store.get_run(course_setup.policy_run_id)
-            if policy_run is None:
-                raise RuntimeError(
-                    f"Career Mode policy run not found: {course_setup.policy_run_id}"
-                )
-            runner = load_policy_runner(
-                policy_run.run_dir,
-                artifact=course_setup.policy_artifact,
-                device=self._device,
-                algorithm=effective_train_algorithm(policy_run.config),
-            )
-            loaded_policy = _LoadedPolicy(run=policy_run, runner=runner)
-            self._policy_cache[key] = loaded_policy
-        else:
-            policy_run = loaded_policy.run
-        if key != self._active_policy_key:
-            self._active_policy_key = key
-            self._camera_setting = _validated_camera_setting(
-                policy_run.config.environment.camera_setting
-            )
+        if resolution.activated_new_policy:
+            self._camera_setting = resolution.camera_setting
             self._reset_camera_sync()
-        return CareerModePolicyControl(
-            course_setup=course_setup,
-            policy_run=loaded_policy.run,
-            runner=loaded_policy.runner,
-        )
-
-    def _resolve_current_course_setup(
-        self,
-        info: dict[str, object],
-    ) -> ManagedSaveCourseSetup | None:
-        course_id = course_id_from_info(info)
-        if course_id is None:
-            return None
-        course_setup = resolve_course_setup(
-            self._course_setups,
-            CourseSetupTarget(
-                difficulty=self._setup.difficulty,
-                cup_id=self._setup.cup_id,
-                course_id=course_id,
-            ),
-        )
-        if course_setup is None:
-            raise RuntimeError(f"no Career Mode course setup matches {course_id!r}")
-        return course_setup
+        return resolution.control
 
     def _enter_policy_race(self) -> RawMenuStep:
         self._phase = CareerPhase.POLICY_RACE
@@ -758,7 +643,7 @@ class CareerModeController:
         course_id = course_id_from_info(info)
         if course_id is None:
             return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_course")
-        course_setup = self._resolve_current_course_setup(info)
+        course_setup = self._policy_resolver.resolve_course_setup(info)
         if course_setup is None:
             return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_setup")
         current = facts.engine_setting_raw_value
@@ -938,7 +823,10 @@ class CareerModeController:
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
-        self._active_policy_key = None
+        self._policy_resolver.update_context(
+            setup=self._setup,
+            course_setups=self._course_setups,
+        )
         self._awaiting_new_race_after_terminal = True
         self._continuing_race_result = True
         self._observed_terminal_race_result = True
@@ -1157,25 +1045,6 @@ def _target_succeeded(
     )
 
 
-def _current_target_label(
-    progress: ManagedSaveUnlockProgress,
-    setup: CareerModeRaceSetupConfig,
-) -> str:
-    target = next(
-        (
-            target
-            for target in progress.targets
-            if target.kind == "clear_gp_cup"
-            and target.difficulty == setup.difficulty
-            and target.cup_id == setup.cup_id
-        ),
-        None,
-    )
-    if target is not None:
-        return target.label
-    return f"Clear {setup.difficulty.title()} {setup.cup_id.title()} Cup"
-
-
 def _failure_reason(info: dict[str, object]) -> str:
     reason = info.get("termination_reason")
     return reason if isinstance(reason, str) and reason else "race ended before cup clear"
@@ -1266,19 +1135,6 @@ def _positive_int_info(info: dict[str, object], key: str) -> int | None:
     return value if value > 0 else None
 
 
-def _lap_summary(info: dict[str, object]) -> str | None:
-    completed = info.get("race_laps_completed")
-    total = info.get("total_lap_count")
-    if (
-        isinstance(completed, bool)
-        or isinstance(total, bool)
-        or not isinstance(completed, int | float)
-        or not isinstance(total, int | float)
-    ):
-        return None
-    return f"{int(completed)}/{int(total)}"
-
-
 def _race_intro_ready_for_camera(info: dict[str, object]) -> bool:
     transition_state = info.get("menu_transition_state_raw")
     if isinstance(transition_state, int) and not isinstance(transition_state, bool):
@@ -1288,13 +1144,3 @@ def _race_intro_ready_for_camera(info: dict[str, object]) -> bool:
     if isinstance(timer, bool) or not isinstance(timer, int):
         return False
     return 0 < timer < CAMERA_SYNC_CONTROLS.ready_intro_timer
-
-
-def _validated_camera_setting(value: str | None) -> CameraSettingName | None:
-    match value:
-        case None:
-            return None
-        case "overhead" | "close_behind" | "regular" | "wide":
-            return value
-        case _:
-            raise ValueError(f"Unsupported camera setting {value!r}")

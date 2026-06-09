@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
-from typing import TypeAlias
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState, SpinRequest
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
@@ -156,48 +156,132 @@ def _run_loaded_career_mode_loop(
     command_queue: ProcessQueue,
     snapshot_queue: ProcessQueue,
 ) -> None:
-    native_control_fps = session.native_control_fps
-    target_control_fps = session.target_control_fps
+    state = _initial_career_mode_loop_state(
+        config=config,
+        session=session,
+        controller=controller,
+    )
+    _publish_initial_career_snapshot(
+        config=config,
+        session=session,
+        snapshot_queue=snapshot_queue,
+        state=state,
+    )
+
+    try:
+        _run_career_mode_loop_body(
+            config=config,
+            session=session,
+            controller=controller,
+            command_queue=command_queue,
+            snapshot_queue=snapshot_queue,
+            state=state,
+        )
+    except _CareerModeWorkerQuit:
+        return
+
+
+@dataclass(slots=True)
+class _CareerModeLoopState:
+    control_rate: RateMeter
+    native_control_fps: float
+    target_control_fps: float | None
+    target_control_seconds: float | None
+    native_frame_seconds: float | None
+    next_step_time: float
+    paused: bool
+    deterministic_policy: bool
+    manual_control_enabled: bool
+    manual_control_state: RaceControlState
+    current_control_state: RaceControlState
+    current_gas_level: float
+    boost_lamp_level: float
+    episode: int
+    episode_reward: float
+    cnn_visualization_enabled: bool
+    auxiliary_visualization_enabled: bool
+    live_visualization_enabled: bool
+    live_series: EpisodeLiveSeriesTracker
+    last_live_series_publish_time: float
+    cnn_normalization: CnnActivationNormalizationMode
+    cnn_sampler: CnnActivationSampler
+    watch_zeroed_state_features: frozenset[str]
+    auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...]
+    active_policy_control: CareerModePolicyControl | None
+    active_policy_started: bool
+    current_policy_action: ActionValue | None
+    raw_observation: ObservationValue | None
+    observation: ObservationValue | None
+    raw_info: dict[str, object]
+    info: dict[str, object]
+    reset_info: dict[str, object]
+    current_telemetry: FZeroXTelemetry | None
+    current_auxiliary_predictions: dict[str, object] | None
+    current_auxiliary_targets: dict[str, object] | None
+    cnn_activations: CnnActivationSnapshot | None
+    last_menu_step: RawMenuStep | None
+
+
+def _initial_career_mode_loop_state(
+    *,
+    config: WatchAppConfig,
+    session: CareerModeRuntimeSession,
+    controller: CareerModeController,
+) -> _CareerModeLoopState:
     target_control_seconds = session.target_control_seconds
-    native_frame_seconds = _native_frame_seconds(target_control_seconds)
-    control_rate = RateMeter(window=60)
-    watch_zeroed_state_features = session.watch_zeroed_state_features
-    auxiliary_target_names = session.auxiliary_target_names
-
-    paused = False
-    deterministic_policy = bool(config.watch.deterministic_policy)
-    manual_control_enabled = False
-    manual_control_state = RaceControlState()
-    current_control_state = RaceControlState()
-    current_gas_level = 0.0
-    boost_lamp_level = 0.0
-    episode = 0
-    episode_reward = 0.0
-    cnn_visualization_enabled = False
-    auxiliary_visualization_enabled = False
-    live_visualization_enabled = False
-    live_series = EpisodeLiveSeriesTracker()
-    last_live_series_publish_time = 0.0
-    cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
-    cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
-    cnn_activations = None
-    active_policy_control: CareerModePolicyControl | None = None
-    active_policy_started = False
-    current_policy_action: ActionValue | None = None
-
-    raw_observation: ObservationValue | None = None
-    observation: ObservationValue | None = None
     raw_info = menu_viewer_info(session)
     info = controller.viewer_info(
         info=dict(raw_info),
         active_policy_control=None,
     )
-    reset_info = dict(info)
-    last_menu_step: RawMenuStep | None = None
-    current_telemetry = _read_live_telemetry(session.emulator)
-    current_auxiliary_predictions = None
-    current_auxiliary_targets = None
+    return _CareerModeLoopState(
+        control_rate=RateMeter(window=60),
+        native_control_fps=session.native_control_fps,
+        target_control_fps=session.target_control_fps,
+        target_control_seconds=target_control_seconds,
+        native_frame_seconds=_native_frame_seconds(target_control_seconds),
+        next_step_time=time.perf_counter(),
+        paused=False,
+        deterministic_policy=bool(config.watch.deterministic_policy),
+        manual_control_enabled=False,
+        manual_control_state=RaceControlState(),
+        current_control_state=RaceControlState(),
+        current_gas_level=0.0,
+        boost_lamp_level=0.0,
+        episode=0,
+        episode_reward=0.0,
+        cnn_visualization_enabled=False,
+        auxiliary_visualization_enabled=False,
+        live_visualization_enabled=False,
+        live_series=EpisodeLiveSeriesTracker(),
+        last_live_series_publish_time=0.0,
+        cnn_normalization=DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+        cnn_sampler=CnnActivationSampler(refresh_interval_steps=1),
+        watch_zeroed_state_features=session.watch_zeroed_state_features,
+        auxiliary_target_names=session.auxiliary_target_names,
+        active_policy_control=None,
+        active_policy_started=False,
+        current_policy_action=None,
+        raw_observation=None,
+        observation=None,
+        raw_info=raw_info,
+        info=info,
+        reset_info=dict(info),
+        current_telemetry=_read_live_telemetry(session.emulator),
+        current_auxiliary_predictions=None,
+        current_auxiliary_targets=None,
+        cnn_activations=None,
+        last_menu_step=None,
+    )
 
+
+def _publish_initial_career_snapshot(
+    *,
+    config: WatchAppConfig,
+    session: CareerModeRuntimeSession,
+    snapshot_queue: ProcessQueue,
+    state: _CareerModeLoopState,
+) -> None:
     publish_worker_message(
         snapshot_queue,
         _build_snapshot(
@@ -205,24 +289,24 @@ def _run_loaded_career_mode_loop(
             env=session,
             emulator=session.emulator,
             observation=None,
-            info=info,
-            reset_info=reset_info,
-            episode=episode,
-            episode_reward=episode_reward,
-            control_fps=control_rate.rate_hz(),
-            target_control_fps=target_control_fps,
+            info=state.info,
+            reset_info=state.reset_info,
+            episode=state.episode,
+            episode_reward=state.episode_reward,
+            control_fps=state.control_rate.rate_hz(),
+            target_control_fps=state.target_control_fps,
             action_repeat=1,
-            control_state=current_control_state,
-            gas_level=current_gas_level,
-            boost_lamp_level=boost_lamp_level,
+            control_state=state.current_control_state,
+            gas_level=state.current_gas_level,
+            boost_lamp_level=state.boost_lamp_level,
             action_mask_branches=session.action_mask_branches(),
             policy_action=None,
             policy_runner=None,
             policy_auxiliary_state_predictions=None,
             policy_auxiliary_state_targets=None,
             include_auxiliary_state=False,
-            auxiliary_target_names=auxiliary_target_names,
-            deterministic_policy=deterministic_policy,
+            auxiliary_target_names=state.auxiliary_target_names,
+            deterministic_policy=state.deterministic_policy,
             manual_control_enabled=False,
             policy_reload_error=None,
             cnn_activations=None,
@@ -239,55 +323,6 @@ def _run_loaded_career_mode_loop(
             failed_track_attempts=frozenset(),
         ),
     )
-    next_step_time = time.perf_counter()
-
-    try:
-        _run_career_mode_loop_body(
-            config=config,
-            session=session,
-            controller=controller,
-            command_queue=command_queue,
-            snapshot_queue=snapshot_queue,
-            control_rate=control_rate,
-            native_control_fps=native_control_fps,
-            target_control_fps=target_control_fps,
-            target_control_seconds=target_control_seconds,
-            native_frame_seconds=native_frame_seconds,
-            next_step_time=next_step_time,
-            paused=paused,
-            deterministic_policy=deterministic_policy,
-            manual_control_enabled=manual_control_enabled,
-            manual_control_state=manual_control_state,
-            current_control_state=current_control_state,
-            current_gas_level=current_gas_level,
-            boost_lamp_level=boost_lamp_level,
-            episode=episode,
-            episode_reward=episode_reward,
-            cnn_visualization_enabled=cnn_visualization_enabled,
-            auxiliary_visualization_enabled=auxiliary_visualization_enabled,
-            live_visualization_enabled=live_visualization_enabled,
-            live_series=live_series,
-            last_live_series_publish_time=last_live_series_publish_time,
-            cnn_normalization=cnn_normalization,
-            cnn_sampler=cnn_sampler,
-            watch_zeroed_state_features=watch_zeroed_state_features,
-            auxiliary_target_names=auxiliary_target_names,
-            active_policy_control=active_policy_control,
-            active_policy_started=active_policy_started,
-            current_policy_action=current_policy_action,
-            raw_observation=raw_observation,
-            observation=observation,
-            raw_info=raw_info,
-            info=info,
-            reset_info=reset_info,
-            current_telemetry=current_telemetry,
-            current_auxiliary_predictions=current_auxiliary_predictions,
-            current_auxiliary_targets=current_auxiliary_targets,
-            cnn_activations=cnn_activations,
-            last_menu_step=last_menu_step,
-        )
-    except _CareerModeWorkerQuit:
-        return
 
 
 class _CareerModeWorkerQuit(Exception):
@@ -301,44 +336,45 @@ def _run_career_mode_loop_body(
     controller: CareerModeController,
     command_queue: ProcessQueue,
     snapshot_queue: ProcessQueue,
-    control_rate: RateMeter,
-    native_control_fps: float,
-    target_control_fps: float | None,
-    target_control_seconds: float | None,
-    native_frame_seconds: float | None,
-    next_step_time: float,
-    paused: bool,
-    deterministic_policy: bool,
-    manual_control_enabled: bool,
-    manual_control_state: RaceControlState,
-    current_control_state: RaceControlState,
-    current_gas_level: float,
-    boost_lamp_level: float,
-    episode: int,
-    episode_reward: float,
-    cnn_visualization_enabled: bool,
-    auxiliary_visualization_enabled: bool,
-    live_visualization_enabled: bool,
-    live_series: EpisodeLiveSeriesTracker,
-    last_live_series_publish_time: float,
-    cnn_normalization: CnnActivationNormalizationMode,
-    cnn_sampler: CnnActivationSampler,
-    watch_zeroed_state_features: frozenset[str],
-    auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...],
-    active_policy_control: CareerModePolicyControl | None,
-    active_policy_started: bool,
-    current_policy_action: ActionValue | None,
-    raw_observation: ObservationValue | None,
-    observation: ObservationValue | None,
-    raw_info: dict[str, object],
-    info: dict[str, object],
-    reset_info: dict[str, object],
-    current_telemetry: FZeroXTelemetry | None,
-    current_auxiliary_predictions: dict[str, object] | None,
-    current_auxiliary_targets: dict[str, object] | None,
-    cnn_activations: CnnActivationSnapshot | None,
-    last_menu_step: RawMenuStep | None,
+    state: _CareerModeLoopState,
 ) -> None:
+    control_rate = state.control_rate
+    native_control_fps = state.native_control_fps
+    target_control_fps = state.target_control_fps
+    target_control_seconds = state.target_control_seconds
+    native_frame_seconds = state.native_frame_seconds
+    next_step_time = state.next_step_time
+    paused = state.paused
+    deterministic_policy = state.deterministic_policy
+    manual_control_enabled = state.manual_control_enabled
+    manual_control_state = state.manual_control_state
+    current_control_state = state.current_control_state
+    current_gas_level = state.current_gas_level
+    boost_lamp_level = state.boost_lamp_level
+    episode = state.episode
+    episode_reward = state.episode_reward
+    cnn_visualization_enabled = state.cnn_visualization_enabled
+    auxiliary_visualization_enabled = state.auxiliary_visualization_enabled
+    live_visualization_enabled = state.live_visualization_enabled
+    live_series = state.live_series
+    last_live_series_publish_time = state.last_live_series_publish_time
+    cnn_normalization = state.cnn_normalization
+    cnn_sampler = state.cnn_sampler
+    watch_zeroed_state_features = state.watch_zeroed_state_features
+    auxiliary_target_names = state.auxiliary_target_names
+    active_policy_control = state.active_policy_control
+    active_policy_started = state.active_policy_started
+    current_policy_action = state.current_policy_action
+    raw_observation = state.raw_observation
+    observation = state.observation
+    raw_info = state.raw_info
+    info = state.info
+    reset_info = state.reset_info
+    current_telemetry = state.current_telemetry
+    current_auxiliary_predictions = state.current_auxiliary_predictions
+    current_auxiliary_targets = state.current_auxiliary_targets
+    cnn_activations = state.cnn_activations
+    last_menu_step = state.last_menu_step
     manual_spin_request: SpinRequest = "none"
 
     def publish_snapshot(*, policy_visible: bool) -> None:
@@ -720,22 +756,7 @@ def _run_career_mode_loop_body(
                 manual_control_enabled = next_manual_control_enabled
                 if manual_control_enabled:
                     current_control_state = commands.control_state
-                (
-                    raw_observation,
-                    raw_info,
-                    observation,
-                    info,
-                    episode_reward,
-                    current_control_state,
-                    current_gas_level,
-                    boost_lamp_level,
-                    current_policy_action,
-                    cnn_activations,
-                    current_telemetry,
-                    current_auxiliary_predictions,
-                    current_auxiliary_targets,
-                    last_live_series_publish_time,
-                ) = _step_policy_or_manual(
+                policy_step = _step_policy_or_manual(
                     config=config,
                     session=session,
                     controller=controller,
@@ -765,6 +786,20 @@ def _run_career_mode_loop_body(
                     live_series=live_series,
                     last_live_series_publish_time=last_live_series_publish_time,
                 )
+                raw_observation = policy_step.raw_observation
+                raw_info = policy_step.raw_info
+                observation = policy_step.observation
+                info = policy_step.info
+                episode_reward = policy_step.episode_reward
+                current_control_state = policy_step.control_state
+                current_gas_level = policy_step.gas_level
+                boost_lamp_level = policy_step.boost_lamp_level
+                current_policy_action = policy_step.policy_action
+                cnn_activations = policy_step.cnn_activations
+                current_telemetry = policy_step.telemetry
+                current_auxiliary_predictions = policy_step.auxiliary_predictions
+                current_auxiliary_targets = policy_step.auxiliary_targets
+                last_live_series_publish_time = policy_step.last_live_series_publish_time
                 terminal_handled = controller.observe_step(
                     session=session,
                     info=info,
@@ -837,22 +872,22 @@ def _fresh_menu_runtime_state(
     return raw_info, info, telemetry
 
 
-_PolicyStepResult: TypeAlias = tuple[
-    ObservationValue,
-    dict[str, object],
-    ObservationValue,
-    dict[str, object],
-    float,
-    RaceControlState,
-    float,
-    float,
-    ActionValue | None,
-    CnnActivationSnapshot | None,
-    FZeroXTelemetry | None,
-    dict[str, object] | None,
-    dict[str, object] | None,
-    float,
-]
+@dataclass(frozen=True, slots=True)
+class _PolicyStepResult:
+    raw_observation: ObservationValue
+    raw_info: dict[str, object]
+    observation: ObservationValue
+    info: dict[str, object]
+    episode_reward: float
+    control_state: RaceControlState
+    gas_level: float
+    boost_lamp_level: float
+    policy_action: ActionValue | None
+    cnn_activations: CnnActivationSnapshot | None
+    telemetry: FZeroXTelemetry | None
+    auxiliary_predictions: dict[str, object] | None
+    auxiliary_targets: dict[str, object] | None
+    last_live_series_publish_time: float
 
 
 def _step_policy_or_manual(
@@ -1064,21 +1099,21 @@ def _step_policy_or_manual(
         manual_control_enabled=manual_control_enabled,
         live_episode_series=live_episode_series,
     )
-    return (
-        raw_observation,
-        raw_info,
-        observation,
-        info,
-        episode_reward,
-        current_control_state,
-        current_gas_level,
-        boost_lamp_level,
-        current_policy_action,
-        cnn_activations,
-        live_telemetry,
-        final_auxiliary_predictions,
-        final_auxiliary_targets,
-        last_live_series_publish_time,
+    return _PolicyStepResult(
+        raw_observation=raw_observation,
+        raw_info=raw_info,
+        observation=observation,
+        info=info,
+        episode_reward=episode_reward,
+        control_state=current_control_state,
+        gas_level=current_gas_level,
+        boost_lamp_level=boost_lamp_level,
+        policy_action=current_policy_action,
+        cnn_activations=cnn_activations,
+        telemetry=live_telemetry,
+        auxiliary_predictions=final_auxiliary_predictions,
+        auxiliary_targets=final_auxiliary_targets,
+        last_live_series_publish_time=last_live_series_publish_time,
     )
 
 
