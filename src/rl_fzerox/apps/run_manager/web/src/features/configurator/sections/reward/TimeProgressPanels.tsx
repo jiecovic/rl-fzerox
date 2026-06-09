@@ -168,6 +168,7 @@ export function TimeProgressPanels({
           }))}
           title="Speed multiplier preview"
           xAxisLabel="speed (kph)"
+          yDomain="tight"
         />
         <table className="derived-table">
           <tbody>

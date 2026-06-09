@@ -9,6 +9,7 @@ interface RewardCurvePreviewProps {
   points: readonly RewardCurvePreviewPoint[];
   title: string;
   xAxisLabel: string;
+  yDomain?: "zero" | "tight";
   ySuffix?: string;
 }
 
@@ -16,6 +17,7 @@ export function RewardCurvePreview({
   points,
   title,
   xAxisLabel,
+  yDomain = "zero",
   ySuffix = "x",
 }: RewardCurvePreviewProps) {
   if (points.length === 0) {
@@ -26,8 +28,9 @@ export function RewardCurvePreview({
   const yValues = points.map((point) => point.yValue);
   const yMin = Math.min(...yValues);
   const yMax = Math.max(...yValues);
-  const axisMinY = Math.min(yMin, 0);
-  const axisMaxY = Math.max(yMax, 1);
+  const yRange = previewYRange({ max: yMax, min: yMin, mode: yDomain });
+  const axisMinY = yRange.min;
+  const axisMaxY = yRange.max;
   const xSpan = Math.max(xMax - xMin, 1e-9);
   const ySpan = Math.max(axisMaxY - axisMinY, 1e-9);
   const viewBox = {
@@ -187,6 +190,22 @@ function axisTickAnchor(index: number, count: number) {
     return "end";
   }
   return "middle";
+}
+
+function previewYRange({ max, min, mode }: { max: number; min: number; mode: "zero" | "tight" }) {
+  if (mode === "zero") {
+    return {
+      max: Math.max(max, 1),
+      min: Math.min(min, 0),
+    };
+  }
+
+  const span = max - min;
+  const padding = span > 1e-9 ? span * 0.08 : Math.max(Math.abs(max) * 0.02, 0.05);
+  return {
+    max: max + padding,
+    min: min - padding,
+  };
 }
 
 function formatPreviewNumber(value: number) {
