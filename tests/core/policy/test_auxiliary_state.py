@@ -6,11 +6,16 @@ import numpy as np
 import pytest
 import torch
 from gymnasium import spaces
+from sb3x.common.auxiliary_losses import PolicyAuxiliaryLoss
 
 from rl_fzerox.core.policy.auxiliary_state.observations import (
     auxiliary_state_targets_field,
 )
-from rl_fzerox.core.policy.auxiliary_state.policies import _std_cap_loss
+from rl_fzerox.core.policy.auxiliary_state.policies import (
+    _AuxiliaryStatePolicyMixin,
+    _AxisDistributionStats,
+    _std_cap_loss,
+)
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_name_for_feature,
     auxiliary_state_target_spec,
@@ -22,6 +27,31 @@ from rl_fzerox.core.training.session.auxiliary_state import (
     AuxiliaryStateObservationWrapper,
 )
 from tests.support.native_objects import make_telemetry
+
+
+class _PitchStdCapHarness(_AuxiliaryStatePolicyMixin):
+    def __init__(self) -> None:
+        self._pitch_std_cap_loss_weight = 1.0
+        self._grounded_pitch_std_cap = 0.3
+        self._airborne_pitch_std_cap = 0.3
+
+    def pitch_std_cap_loss(
+        self,
+        stats: _AxisDistributionStats,
+        *,
+        obs: dict[str, torch.Tensor],
+    ) -> PolicyAuxiliaryLoss | None:
+        return self._pitch_std_cap_loss(stats, obs=obs, sample_mask=None)
+
+
+def _auxiliary_target_observation(
+    *,
+    airborne_flags: tuple[float, ...],
+) -> dict[str, torch.Tensor]:
+    targets = torch.zeros((len(airborne_flags), auxiliary_state_target_spec().count))
+    airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
+    targets[:, airborne_index] = torch.tensor(airborne_flags)
+    return {auxiliary_state_targets_field(): targets}
 
 
 def test_auxiliary_state_target_vector_matches_expected_slots() -> None:
@@ -66,6 +96,45 @@ def test_pitch_std_cap_loss_ignores_inactive_samples() -> None:
 
     assert loss is not None
     assert float(loss) == pytest.approx(0.005)
+
+
+def test_discrete_pitch_std_cap_loss_skips_airborne_scope() -> None:
+    stats = _AxisDistributionStats(
+        mean=torch.zeros(2),
+        std=torch.tensor([0.8, 0.8]),
+        entropy=torch.zeros(2),
+        source="discrete",
+    )
+
+    loss = _PitchStdCapHarness().pitch_std_cap_loss(
+        stats,
+        obs=_auxiliary_target_observation(airborne_flags=(0.0, 1.0)),
+    )
+
+    assert loss is not None
+    assert float(loss.total_loss) == pytest.approx(0.25)
+    assert "pitch/grounded_std_cap_loss" in loss.metrics
+    assert "pitch/airborne_std_cap_loss" not in loss.metrics
+
+
+def test_continuous_pitch_std_cap_loss_keeps_airborne_scope() -> None:
+    stats = _AxisDistributionStats(
+        mean=torch.zeros(2),
+        std=torch.tensor([0.8, 0.8]),
+        entropy=torch.zeros(2),
+        source="continuous",
+        log_std=torch.zeros(2),
+    )
+
+    loss = _PitchStdCapHarness().pitch_std_cap_loss(
+        stats,
+        obs=_auxiliary_target_observation(airborne_flags=(0.0, 1.0)),
+    )
+
+    assert loss is not None
+    assert float(loss.total_loss) == pytest.approx(0.5)
+    assert "pitch/grounded_std_cap_loss" in loss.metrics
+    assert "pitch/airborne_std_cap_loss" in loss.metrics
 
 
 def test_auxiliary_state_target_vector_returns_zeros_without_telemetry() -> None:

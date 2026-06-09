@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import torch
@@ -52,6 +53,7 @@ class _AxisDistributionStats:
     mean: torch.Tensor
     std: torch.Tensor
     entropy: torch.Tensor
+    source: Literal["continuous", "discrete"]
     log_std: torch.Tensor | None = None
 
 
@@ -375,6 +377,8 @@ class _AuxiliaryStatePolicyMixin:
                 pitch_std,
                 _combined_mask(scope_mask, sample_mask),
             )
+            if pitch_stats.source == "discrete" and scope == "airborne":
+                continue
             loss_value = _std_cap_loss(
                 pitch_std,
                 cap=cap,
@@ -445,6 +449,7 @@ class _AuxiliaryStatePolicyMixin:
             mean=axis_mean,
             std=axis_std,
             entropy=entropy,
+            source="continuous",
             log_std=axis_log_std,
         )
 
@@ -670,7 +675,7 @@ def _discrete_pitch_distribution_stats(
     entropy = entropy_fn()
     if not isinstance(entropy, torch.Tensor):
         raise TypeError("Discrete pitch entropy must be a tensor")
-    return _AxisDistributionStats(mean=mean, std=std, entropy=entropy)
+    return _AxisDistributionStats(mean=mean, std=std, entropy=entropy, source="discrete")
 
 
 def _discrete_branch_distribution(

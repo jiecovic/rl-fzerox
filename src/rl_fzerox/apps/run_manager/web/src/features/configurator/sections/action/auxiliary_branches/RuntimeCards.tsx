@@ -646,7 +646,7 @@ export function RuntimeCards({
             <div className="action-runtime-control-panel action-runtime-control-panel-wide">
               <div className="action-runtime-control-header">
                 <FieldLabel
-                  help="Add one policy-side loss that caps pitch distribution std. Grounded and airborne samples use separate caps but share this weight."
+                  help="Add one policy-side loss that caps pitch distribution std. Discrete pitch only uses the grounded cap; continuous pitch also uses the airborne cap."
                   label="Pitch std cap loss"
                   onReset={() =>
                     updateTrain({
@@ -677,7 +677,11 @@ export function RuntimeCards({
                 />
               </div>
               <fieldset
-                className="dependent-fieldset action-runtime-field-grid action-runtime-field-grid-three"
+                className={
+                  action.pitch_mode === "discrete"
+                    ? "dependent-fieldset action-runtime-two-col"
+                    : "dependent-fieldset action-runtime-field-grid action-runtime-field-grid-three"
+                }
                 disabled={pitchStdCapLossWeight <= 0}
               >
                 <NumberField
@@ -710,21 +714,23 @@ export function RuntimeCards({
                     })
                   }
                 />
-                <NumberField
-                  help="Soft upper bound for the pitch distribution std while airborne. No airborne mean-to-zero loss is added."
-                  label="Airborne cap"
-                  resetValue={defaultTrain.actor_regularization.airborne_pitch_std_cap}
-                  step="0.05"
-                  value={train.actor_regularization.airborne_pitch_std_cap}
-                  onChange={(value) =>
-                    updateTrain({
-                      actor_regularization: {
-                        ...train.actor_regularization,
-                        airborne_pitch_std_cap: Math.max(0.001, value),
-                      },
-                    })
-                  }
-                />
+                {action.pitch_mode === "continuous" ? (
+                  <NumberField
+                    help="Soft upper bound for the continuous pitch distribution std while airborne."
+                    label="Airborne cap"
+                    resetValue={defaultTrain.actor_regularization.airborne_pitch_std_cap}
+                    step="0.05"
+                    value={train.actor_regularization.airborne_pitch_std_cap}
+                    onChange={(value) =>
+                      updateTrain({
+                        actor_regularization: {
+                          ...train.actor_regularization,
+                          airborne_pitch_std_cap: Math.max(0.001, value),
+                        },
+                      })
+                    }
+                  />
+                ) : null}
               </fieldset>
             </div>
           </div>
