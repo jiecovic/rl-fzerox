@@ -24,6 +24,7 @@ from rl_fzerox.core.manager.architecture.preview.state import (
     state_feature_previews,
 )
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.policy.auxiliary_state.targets import auxiliary_state_target_spec
 
 
 def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitecturePreview:
@@ -73,6 +74,14 @@ def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitectureP
     )
     pi_head_params = mlp_params(policy_input_dim, config.policy.pi_net_arch)
     vf_head_params = mlp_params(policy_input_dim, config.policy.vf_net_arch)
+    auxiliary_head_arch = tuple(int(width) for width in config.policy.auxiliary_state_head_arch)
+    auxiliary_head_output_dim = auxiliary_head_arch[-1] if auxiliary_head_arch else policy_input_dim
+    auxiliary_head_params = (
+        mlp_params(policy_input_dim, auxiliary_head_arch)
+        + linear_params(auxiliary_head_output_dim, auxiliary_state_target_spec().count)
+        if config.policy.auxiliary_state_enabled
+        else 0
+    )
     pi_output_dim = config.policy.pi_net_arch[-1] if config.policy.pi_net_arch else policy_input_dim
     vf_output_dim = config.policy.vf_net_arch[-1] if config.policy.vf_net_arch else policy_input_dim
     action_branches = action_branch_previews(config)
@@ -93,6 +102,7 @@ def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitectureP
         ParameterGroupPreview(name="Fusion", params=fusion_params),
         ParameterGroupPreview(name="LayerNorm", params=layer_norm_params),
         ParameterGroupPreview(name="LSTM", params=recurrent_params),
+        ParameterGroupPreview(name="Aux head", params=auxiliary_head_params),
         ParameterGroupPreview(name="Policy head", params=pi_head_params + action_head_params),
         ParameterGroupPreview(name="Value head", params=vf_head_params + value_output_params),
     )
@@ -106,6 +116,7 @@ def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitectureP
         recurrent_params=recurrent_params,
         pi_head_params=pi_head_params,
         action_head_params=action_head_params,
+        auxiliary_head_params=auxiliary_head_params,
         vf_head_params=vf_head_params,
         value_output_params=value_output_params,
     )
@@ -135,6 +146,7 @@ def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitectureP
             policy_input_dim,
             int(pi_output_dim),
             int(vf_output_dim),
+            auxiliary_state_target_spec().count,
             action_branches,
             continuous_action_dims,
             discrete_action_logits,

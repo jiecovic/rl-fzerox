@@ -38,8 +38,24 @@ describe("policy architecture graph model", () => {
     );
     const edgeIds = graph.elkGraph.edges?.map((edge) => edge.id) ?? [];
 
-    expect(edgeIds).toContain("concat:out-policy_head");
-    expect(edgeIds).toContain("concat:out-value_head");
+    expect(edgeIds).toContain("concat:out-heads");
+    expect(edgeIds).toContain("heads-policy_head");
+    expect(edgeIds).toContain("heads-value_head");
+    expect(edgeIds).not.toContain("concat:out-policy_head");
+    expect(edgeIds).not.toContain("concat:out-value_head");
+  });
+
+  it("connects policy, auxiliary, and value heads through one fork", () => {
+    const graph = buildArchitectureGraph(previewWithAuxiliaryHead());
+    const edgeIds = graph.elkGraph.edges?.map((edge) => edge.id) ?? [];
+
+    expect(edgeIds).toContain("lstm-heads");
+    expect(edgeIds).toContain("heads-policy_head");
+    expect(edgeIds).toContain("heads-aux_head");
+    expect(edgeIds).toContain("heads-value_head");
+    expect(edgeIds).not.toContain("lstm-policy_head");
+    expect(edgeIds).not.toContain("lstm-aux_head");
+    expect(edgeIds).not.toContain("lstm-value_head");
   });
 });
 
@@ -59,6 +75,29 @@ function previewWithMutedNodes(
               tone: "muted",
             }
           : node,
+      ),
+    })),
+  };
+}
+
+function previewWithAuxiliaryHead(): PolicyArchitecturePreview {
+  return {
+    ...policyPreviewFixture,
+    architecture_lanes: policyPreviewFixture.architecture_lanes.map((lane) => ({
+      ...lane,
+      nodes: lane.nodes.flatMap((node) =>
+        node.id === "policy_head"
+          ? [
+              node,
+              {
+                detail: "256 → [128], relu",
+                id: "aux_head",
+                label: "Aux head",
+                params: 37900,
+                tone: "normal",
+              },
+            ]
+          : [node],
       ),
     })),
   };

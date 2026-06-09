@@ -20,6 +20,7 @@ def architecture_lanes(
     policy_input_dim: int,
     pi_output_dim: int,
     vf_output_dim: int,
+    auxiliary_output_dim: int,
     action_branches: tuple[ActionBranchPreview, ...],
     continuous_action_dims: int,
     discrete_action_logits: int,
@@ -48,6 +49,12 @@ def architecture_lanes(
         else "off"
     )
     recurrent_tone = "normal" if config.policy.recurrent_enabled else "muted"
+    auxiliary_detail = (
+        f"{policy_input_dim} → {list(config.policy.auxiliary_state_head_arch)}, "
+        f"{config.policy.activation}"
+        if config.policy.auxiliary_state_enabled
+        else "off"
+    )
     fusion_detail = (
         f"identity {fusion_input_dim}"
         if config.policy.fusion_features_dim is None
@@ -143,6 +150,13 @@ def architecture_lanes(
                     params=node_params.get("action_net"),
                 ),
                 ArchitectureNodePreview(
+                    id="aux_head",
+                    label="Aux head",
+                    detail=f"{auxiliary_detail}, {auxiliary_output_dim} targets",
+                    params=node_params.get("aux_head"),
+                    tone="normal" if config.policy.auxiliary_state_enabled else "muted",
+                ),
+                ArchitectureNodePreview(
                     id="value_head",
                     label="Value head",
                     detail=(
@@ -172,6 +186,7 @@ def architecture_node_params(
     recurrent_params: int,
     pi_head_params: int,
     action_head_params: int,
+    auxiliary_head_params: int,
     vf_head_params: int,
     value_output_params: int,
 ) -> dict[str, int]:
@@ -184,6 +199,7 @@ def architecture_node_params(
         "lstm": recurrent_params,
         "policy_head": pi_head_params,
         "action_net": action_head_params,
+        "aux_head": auxiliary_head_params,
         "value_head": vf_head_params,
         "value_net": value_output_params,
     }

@@ -29,12 +29,17 @@ export function toRenderedGraph(
       },
     ];
   });
+  shiftNodesY(nodes, diagramMetrics.summaryBox.reservedHeight);
+  alignInputFusionJunction(nodes);
+  alignPostConcatPipeline(nodes);
+  alignOutputHeadCluster(nodes);
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const edges = (elkGraph.edges ?? []).flatMap((edge) => edgePaths(edge, nodeById));
+  const rawPathYOffset = diagramMetrics.summaryBox.reservedHeight;
+  const edges = (elkGraph.edges ?? []).flatMap((edge) => edgePaths(edge, nodeById, rawPathYOffset));
   const width = Math.max(
     diagramMetrics.canvasMinWidth,
     numberOrZero(elkGraph.width),
-    maxNodeExtent(nodes, "x"),
+    maxNodeExtent(nodes, "x") + diagramMetrics.contentRightPadding,
   );
   const height = Math.max(
     diagramMetrics.canvasMinHeight,
@@ -50,6 +55,87 @@ export function toRenderedGraph(
     viewBox: `${-margin} ${-margin} ${width + margin * 2} ${height + margin * 2}`,
     width,
   };
+}
+
+function shiftNodesY(nodes: readonly RenderedNode[], offset: number) {
+  for (const node of nodes) {
+    node.y += offset;
+  }
+}
+
+function alignInputFusionJunction(nodes: RenderedNode[]) {
+  const junction = nodes.find((node) => node.id === "concat");
+  const imageSource = firstExistingNode(nodes, ["image_projection", "cnn", "image"]);
+  const stateSource = firstExistingNode(nodes, ["state_mlp", "state"]);
+  if (junction === undefined || imageSource === undefined || stateSource === undefined) {
+    return;
+  }
+
+  const centerY = (nodeCenterY(imageSource) + nodeCenterY(stateSource)) / 2;
+  junction.y = centerY - junction.height / 2;
+}
+
+function alignPostConcatPipeline(nodes: readonly RenderedNode[]) {
+  const junction = nodes.find((node) => node.id === "concat");
+  if (junction === undefined) {
+    return;
+  }
+
+  const centerY = nodeCenterY(junction);
+  for (const id of ["fusion", "layer_norm", "lstm"]) {
+    alignNodeCenterY(nodes, id, centerY);
+  }
+}
+
+function alignOutputHeadCluster(nodes: RenderedNode[]) {
+  const junction = nodes.find((node) => node.id === "heads");
+  const auxiliaryHead = nodes.find((node) => node.id === "aux_head");
+  const source = outputHeadSource(nodes);
+  if (junction === undefined || auxiliaryHead === undefined || source === undefined) {
+    return;
+  }
+
+  const centerY = source.y + source.height / 2;
+  auxiliaryHead.y = centerY - auxiliaryHead.height / 2;
+  junction.y = centerY - junction.height / 2;
+
+  const verticalGap = 28;
+  const policyHead = nodes.find((node) => node.id === "policy_head");
+  if (policyHead !== undefined) {
+    policyHead.y = auxiliaryHead.y - verticalGap - policyHead.height;
+    alignNodeCenterY(nodes, "action_net", policyHead.y + policyHead.height / 2);
+  }
+
+  const valueHead = nodes.find((node) => node.id === "value_head");
+  if (valueHead !== undefined) {
+    valueHead.y = auxiliaryHead.y + auxiliaryHead.height + verticalGap;
+    alignNodeCenterY(nodes, "value_net", valueHead.y + valueHead.height / 2);
+  }
+}
+
+function outputHeadSource(nodes: readonly RenderedNode[]) {
+  return firstExistingNode(nodes, ["lstm", "layer_norm", "fusion", "concat"]);
+}
+
+function alignNodeCenterY(nodes: readonly RenderedNode[], nodeId: string, centerY: number) {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+  if (node !== undefined) {
+    node.y = centerY - node.height / 2;
+  }
+}
+
+function firstExistingNode(nodes: readonly RenderedNode[], ids: readonly string[]) {
+  for (const id of ids) {
+    const node = nodes.find((candidate) => candidate.id === id);
+    if (node !== undefined) {
+      return node;
+    }
+  }
+  return undefined;
+}
+
+function nodeCenterY(node: RenderedNode) {
+  return node.y + node.height / 2;
 }
 
 export function fallbackGraph(visuals: Map<string, NodeVisual>): RenderedGraph {
@@ -73,34 +159,101 @@ export function fallbackGraph(visuals: Map<string, NodeVisual>): RenderedGraph {
 function edgePaths(
   edge: ElkExtendedEdge,
   nodeById: ReadonlyMap<string, RenderedNode>,
+  rawPathYOffset: number,
 ): RenderedEdge[] {
   return (edge.sections ?? []).map((section) => ({
     hasArrow: hasEdgeArrow(edge.id),
     id: `${edge.id}-${section.id}`,
-    path: pathForSection(edge.id, section, nodeById),
+    path: pathForSection(edge.id, section, nodeById, rawPathYOffset),
   }));
 }
 
 function hasEdgeArrow(edgeId: string) {
-  return !(edgeId.endsWith("-concat:image") || edgeId.endsWith("-concat:state"));
+  return !(
+    edgeId.endsWith("-concat:image") ||
+    edgeId.endsWith("-concat:state") ||
+    edgeId.endsWith("-heads")
+  );
 }
 
 function pathForSection(
   edgeId: string,
   section: ElkEdgeSection,
   nodeById: ReadonlyMap<string, RenderedNode>,
+  rawPathYOffset: number,
 ) {
   if (edgeId.endsWith("-concat:image") || edgeId.endsWith("-concat:state")) {
     return concatBranchPath(edgeId, section, nodeById);
   }
-  if (edgeId.endsWith("-policy_head") || edgeId.endsWith("-value_head")) {
+  if (edgeId.startsWith("concat:out-")) {
+    return concatOutPath(edgeId, section, nodeById);
+  }
+  if (edgeId.endsWith("-heads")) {
+    return trunkToHeadJunctionPath(edgeId, section, nodeById);
+  }
+  if (
+    edgeId.endsWith("-policy_head") ||
+    edgeId.endsWith("-aux_head") ||
+    edgeId.endsWith("-value_head")
+  ) {
     return headBranchPath(edgeId, section, nodeById);
   }
   if (edgeId.endsWith("-action_net") || edgeId.endsWith("-value_net")) {
     return terminalHeadPath(edgeId, section, nodeById);
   }
 
-  return pathForRawSection(section);
+  return pathForRawSection(section, rawPathYOffset);
+}
+
+function concatOutPath(
+  edgeId: string,
+  section: ElkEdgeSection,
+  nodeById: ReadonlyMap<string, RenderedNode>,
+) {
+  const [, targetId] = splitEdgeId(edgeId);
+  const source = nodeById.get("concat");
+  const target = targetId === undefined ? undefined : nodeById.get(targetId);
+  if (source === undefined || target === undefined) {
+    return pathForRawSection(section, diagramMetrics.summaryBox.reservedHeight);
+  }
+
+  const start = {
+    x: source.x + source.width,
+    y: source.y + source.height / 2,
+  };
+  const end = {
+    x: target.x,
+    y: target.y + target.height / 2,
+  };
+  return orthogonalPath(start, end);
+}
+
+function trunkToHeadJunctionPath(
+  edgeId: string,
+  section: ElkEdgeSection,
+  nodeById: ReadonlyMap<string, RenderedNode>,
+) {
+  const [sourceId, targetId] = splitEdgeId(edgeId);
+  const source =
+    sourceId === "concat:out" ? nodeById.get("concat") : endpointNode(sourceId, nodeById);
+  const junction = targetId === undefined ? undefined : nodeById.get(targetId);
+  if (source === undefined || junction === undefined) {
+    return pathForRawSection(section, diagramMetrics.summaryBox.reservedHeight);
+  }
+
+  const start = {
+    x: source.x + source.width,
+    y: source.y + source.height / 2,
+  };
+  const end = {
+    x: junction.x + junction.width / 2,
+    y: junction.y + junction.height / 2,
+  };
+  const segments = [`M ${round(start.x)} ${round(start.y)}`, `H ${round(end.x)}`];
+  if (Math.abs(start.y - end.y) >= 0.5) {
+    segments.push(`V ${round(end.y)}`);
+  }
+  return segments.join(" ");
 }
 
 function terminalHeadPath(
@@ -112,7 +265,7 @@ function terminalHeadPath(
   const source = sourceId === undefined ? undefined : nodeById.get(sourceId);
   const target = targetId === undefined ? undefined : nodeById.get(targetId);
   if (source === undefined || target === undefined) {
-    return pathForRawSection(section);
+    return pathForRawSection(section, diagramMetrics.summaryBox.reservedHeight);
   }
 
   const start = {
@@ -123,12 +276,7 @@ function terminalHeadPath(
     x: target.x,
     y: target.y + target.height / 2,
   };
-  return [
-    `M ${round(start.x)} ${round(start.y)}`,
-    `H ${round((start.x + end.x) / 2)}`,
-    `V ${round(end.y)}`,
-    `H ${round(end.x)}`,
-  ].join(" ");
+  return orthogonalPath(start, end);
 }
 
 function concatBranchPath(
@@ -140,7 +288,7 @@ function concatBranchPath(
   const source = sourceId === undefined ? undefined : nodeById.get(sourceId);
   const concat = nodeById.get("concat");
   if (source === undefined || concat === undefined) {
-    return pathForRawSection(section);
+    return pathForRawSection(section, diagramMetrics.summaryBox.reservedHeight);
   }
 
   const start = {
@@ -153,12 +301,10 @@ function concatBranchPath(
         y: concat.y,
       }
     : {
-        x: concat.x,
-        y: concat.y + concat.height / 2,
+        x: concat.x + concat.width / 2,
+        y: concat.y + concat.height,
       };
-  const mergeX = edgeId.endsWith("-concat:image")
-    ? Math.max(start.x + 22, end.x)
-    : Math.max(start.x + 24, end.x - 24);
+  const mergeX = Math.max(start.x + 22, end.x);
   return [
     `M ${round(start.x)} ${round(start.y)}`,
     `H ${round(mergeX)}`,
@@ -176,7 +322,24 @@ function headBranchPath(
   const source = sourceId === undefined ? undefined : nodeById.get(sourceId);
   const target = targetId === undefined ? undefined : nodeById.get(targetId);
   if (source === undefined || target === undefined) {
-    return pathForRawSection(section);
+    return pathForRawSection(section, diagramMetrics.summaryBox.reservedHeight);
+  }
+
+  if (source.visual.kind === "junction") {
+    const start = {
+      x: source.x + source.width / 2,
+      y: source.y + source.height / 2,
+    };
+    const end = {
+      x: target.x,
+      y: target.y + target.height / 2,
+    };
+    if (targetId === "aux_head" && Math.abs(start.y - end.y) < 0.5) {
+      return [`M ${round(start.x)} ${round(start.y)}`, `H ${round(end.x)}`].join(" ");
+    }
+    return [`M ${round(start.x)} ${round(start.y)}`, `V ${round(end.y)}`, `H ${round(end.x)}`].join(
+      " ",
+    );
   }
 
   const start = {
@@ -188,12 +351,25 @@ function headBranchPath(
     y: target.y + target.height / 2,
   };
   const midX = Math.max(start.x + 16, (start.x + end.x) / 2 - 4);
-  return [
-    `M ${round(start.x)} ${round(start.y)}`,
-    `H ${round(midX)}`,
-    `V ${round(end.y)}`,
-    `H ${round(end.x)}`,
-  ].join(" ");
+  return orthogonalPath(start, end, midX);
+}
+
+function orthogonalPath(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  midX = (start.x + end.x) / 2,
+) {
+  const segments = [`M ${round(start.x)} ${round(start.y)}`];
+  if (Math.abs(start.y - end.y) < 0.5) {
+    segments.push(`H ${round(end.x)}`);
+    return segments.join(" ");
+  }
+  segments.push(`H ${round(midX)}`, `V ${round(end.y)}`, `H ${round(end.x)}`);
+  return segments.join(" ");
+}
+
+function endpointNode(nodeId: string | undefined, nodeById: ReadonlyMap<string, RenderedNode>) {
+  return nodeId === undefined ? undefined : nodeById.get(nodeId);
 }
 
 function splitEdgeId(edgeId: string): [string | undefined, string | undefined] {
@@ -204,10 +380,12 @@ function splitEdgeId(edgeId: string): [string | undefined, string | undefined] {
   return [edgeId.slice(0, separatorIndex), edgeId.slice(separatorIndex + 1)];
 }
 
-function pathForRawSection(section: ElkEdgeSection) {
+function pathForRawSection(section: ElkEdgeSection, yOffset = 0) {
   const points = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint];
   return points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${round(point.x)} ${round(point.y)}`)
+    .map(
+      (point, index) => `${index === 0 ? "M" : "L"} ${round(point.x)} ${round(point.y + yOffset)}`,
+    )
     .join(" ");
 }
 
@@ -219,10 +397,15 @@ function maxNodeExtent(nodes: readonly RenderedNode[], axis: "x" | "y") {
 }
 
 function nodeYOffset(nodeId: string) {
-  if (["image", "cnn", "image_projection", "state", "state_mlp"].includes(nodeId)) {
-    return diagramMetrics.inputBranchYOffset;
+  if (["image", "cnn", "image_projection"].includes(nodeId)) {
+    return diagramMetrics.inputImageBranchYOffset;
   }
-  return ["policy_head", "value_head", "action_net", "value_net"].includes(nodeId)
+  if (["state", "state_mlp"].includes(nodeId)) {
+    return diagramMetrics.inputStateBranchYOffset;
+  }
+  return ["heads", "policy_head", "aux_head", "value_head", "action_net", "value_net"].includes(
+    nodeId,
+  )
     ? diagramMetrics.headBranchYOffset
     : 0;
 }

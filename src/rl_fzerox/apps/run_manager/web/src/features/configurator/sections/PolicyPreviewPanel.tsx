@@ -1,6 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicyPreviewPanel.tsx
 import { PolicyArchitectureDiagram } from "@/features/configurator/sections/PolicyArchitectureDiagram";
-import { formatParamCount } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import { CustomConvTableRows } from "@/features/configurator/sections/policy/LayerEditors";
 import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
@@ -39,16 +38,7 @@ export function PolicyPreviewPanel({
   return (
     <div className="grid gap-3">
       <section className={previewPanelClass}>
-        <h3 className={previewHeadingClass}>Architecture</h3>
-        <div className="relative">
-          <div className="absolute left-3 top-3 z-[3] grid min-w-[132px] gap-1 border border-app-border-strong bg-app-surface px-2.5 py-2">
-            <span className="text-[9px] tabular-nums text-app-muted">total params</span>
-            <strong className="text-[13px] font-bold tabular-nums text-app-text">
-              {formatParamCount(preview.total_params)}
-            </strong>
-          </div>
-          <PolicyArchitectureDiagram preview={preview} />
-        </div>
+        <PolicyArchitectureDiagram preview={preview} />
       </section>
 
       <section className={previewPanelClass} id="policy-cnn-configurator">

@@ -63,6 +63,26 @@
   font-weight: 600;
 }
 
+.architecture-summary rect {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.architecture-summary-label {
+  fill: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.architecture-summary-value {
+  fill: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .architecture-junction {
   fill: var(--accent);
   stroke: var(--surface-muted);

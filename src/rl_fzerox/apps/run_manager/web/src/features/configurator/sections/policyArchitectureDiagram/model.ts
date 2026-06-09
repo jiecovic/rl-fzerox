@@ -23,7 +23,7 @@ export function buildArchitectureGraph(preview: PolicyArchitecturePreview): Arch
   }
 
   if (!visuals.has("concat")) {
-    addJunctionNode("concat", visuals, children);
+    addJunctionNode("concat", visuals, children, concatPorts());
   } else {
     const concatVisual = visuals.get("concat");
     if (concatVisual !== undefined) {
@@ -50,9 +50,18 @@ export function buildArchitectureGraph(preview: PolicyArchitecturePreview): Arch
   connectIds(postConcatPath, edges);
 
   const headSource = lastId(postConcatPath) ?? "concat:out";
-  for (const headId of ["policy_head", "value_head", "heads"]) {
-    if (headSource !== undefined && visuals.has(headId)) {
-      addEdge(headSource, headId, edges);
+  const headIds = ["policy_head", "aux_head", "value_head"].filter((id) => visuals.has(id));
+  if (headSource !== undefined && headIds.length > 1) {
+    addJunctionNode("heads", visuals, children);
+    addEdge(headSource, "heads", edges);
+    for (const headId of headIds) {
+      addEdge("heads", headId, edges);
+    }
+  } else {
+    for (const headId of headIds) {
+      if (headSource !== undefined) {
+        addEdge(headSource, headId, edges);
+      }
     }
   }
   if (visuals.has("policy_head") && visuals.has("action_net")) {
@@ -90,7 +99,12 @@ function addVisualNode(
   });
 }
 
-function addJunctionNode(id: string, visuals: Map<string, NodeVisual>, children: ElkNode[]) {
+function addJunctionNode(
+  id: string,
+  visuals: Map<string, NodeVisual>,
+  children: ElkNode[],
+  ports?: ElkNode["ports"],
+) {
   visuals.set(id, {
     detailLines: [],
     height: diagramMetrics.junctionSize,
@@ -99,15 +113,18 @@ function addJunctionNode(id: string, visuals: Map<string, NodeVisual>, children:
     tone: "normal",
     width: diagramMetrics.junctionSize,
   });
-  children.push({
+  const node: ElkNode = {
     id,
     height: diagramMetrics.junctionSize,
-    layoutOptions: {
-      "elk.portConstraints": "FIXED_POS",
-    },
-    ports: concatPorts(),
     width: diagramMetrics.junctionSize,
-  });
+  };
+  if (ports !== undefined) {
+    node.layoutOptions = {
+      "elk.portConstraints": "FIXED_POS",
+    };
+    node.ports = ports;
+  }
+  children.push(node);
 }
 
 function updateElkNodeSize(children: ElkNode[], id: string, width: number, height: number) {
@@ -128,7 +145,7 @@ function concatPorts() {
   const center = diagramMetrics.junctionSize / 2 - 1;
   return [
     concatPort("concat:image", center, 0, "NORTH"),
-    concatPort("concat:state", 0, center, "WEST"),
+    concatPort("concat:state", center, diagramMetrics.junctionSize - 2, "SOUTH"),
     concatPort("concat:out", diagramMetrics.junctionSize - 2, center, "EAST"),
   ];
 }
@@ -200,6 +217,7 @@ const activationDetailNodeIds = new Set([
   "state_mlp",
   "fusion",
   "policy_head",
+  "aux_head",
   "value_head",
 ]);
 

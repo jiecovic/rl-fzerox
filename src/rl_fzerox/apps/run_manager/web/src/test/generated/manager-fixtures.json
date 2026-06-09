@@ -1681,6 +1681,13 @@
             "tone": "normal"
           },
           {
+            "detail": "off, 39 targets",
+            "id": "aux_head",
+            "label": "Aux head",
+            "params": 0,
+            "tone": "muted"
+          },
+          {
             "detail": "256 \u2192 [256, 128], relu",
             "id": "value_head",
             "label": "Value head",
@@ -1788,6 +1795,10 @@
       {
         "name": "LSTM",
         "params": 2101248
+      },
+      {
+        "name": "Aux head",
+        "params": 0
       },
       {
         "name": "Policy head",

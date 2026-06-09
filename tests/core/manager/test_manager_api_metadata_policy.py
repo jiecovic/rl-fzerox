@@ -92,6 +92,7 @@ async def test_manager_api_previews_policy_architecture(tmp_path: Path) -> None:
     fusion_nodes = payload["architecture_lanes"][2]["nodes"]
     assert {node["id"] for node in fusion_nodes} >= {
         "action_net",
+        "aux_head",
         "policy_head",
         "value_head",
         "value_net",

@@ -87,6 +87,22 @@ def test_policy_architecture_preview_labels_extractor_activations() -> None:
     assert node_by_id["policy_head"].detail.endswith(", relu")
 
 
+def test_policy_architecture_preview_shows_auxiliary_head_when_enabled() -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.policy.auxiliary_state_enabled = True
+
+    preview = policy_architecture_preview(config)
+    aux_group = next(group for group in preview.parameter_groups if group.name == "Aux head")
+    aux_node = next(
+        node for lane in preview.architecture_lanes for node in lane.nodes if node.id == "aux_head"
+    )
+
+    assert aux_group.params > 0
+    assert aux_node.tone == "normal"
+    assert aux_node.params == aux_group.params
+    assert aux_node.detail.endswith(", relu, 39 targets")
+
+
 def test_manager_training_bridge_projects_extractor_activations(tmp_path: Path) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.policy.features_dim = 512

@@ -2,16 +2,19 @@
 export const diagramMetrics = {
   canvasMinHeight: 230,
   canvasMinWidth: 1456,
+  contentRightPadding: 84,
   graphMargin: 18,
   summaryBox: {
     height: 44,
     paddingX: 12,
+    reservedHeight: 92,
     width: 156,
     xInset: 12,
     yInset: 10,
   },
   headBranchYOffset: 14,
-  inputBranchYOffset: 10,
+  inputImageBranchYOffset: -24,
+  inputStateBranchYOffset: 10,
   junctionSize: 20,
   node: {
     characterWidth: 6.9,

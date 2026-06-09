@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicyArchitectureDiagram.tsx
 import { useEffect, useState } from "react";
+import { formatParamCount } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import { diagramMetrics } from "@/features/configurator/sections/policyArchitectureDiagram/constants";
 import { layoutGraph } from "@/features/configurator/sections/policyArchitectureDiagram/layout";
 import { buildArchitectureGraph } from "@/features/configurator/sections/policyArchitectureDiagram/model";
@@ -76,6 +77,8 @@ export function PolicyArchitectureDiagram({ preview }: { preview: PolicyArchitec
           ))}
         </g>
 
+        <ArchitectureSummaryBox totalParams={preview.total_params} />
+
         <g className="architecture-nodes">
           {layout.nodes.map((node) =>
             node.visual.kind === "junction" ? (
@@ -93,6 +96,23 @@ export function PolicyArchitectureDiagram({ preview }: { preview: PolicyArchitec
         </g>
       </svg>
     </div>
+  );
+}
+
+function ArchitectureSummaryBox({ totalParams }: { totalParams: number }) {
+  const box = diagramMetrics.summaryBox;
+  const x = box.xInset;
+  const y = box.yInset;
+  return (
+    <g className="architecture-summary">
+      <rect height={box.height} width={box.width} x={x} y={y} />
+      <text className="architecture-summary-label" x={x + box.paddingX} y={y + 17}>
+        total params
+      </text>
+      <text className="architecture-summary-value" x={x + box.paddingX} y={y + 36}>
+        {formatParamCount(totalParams)}
+      </text>
+    </g>
   );
 }
 
