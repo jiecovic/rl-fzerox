@@ -52,13 +52,14 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
           <RangeIntegerField
             help="Training step target for this run."
             label="Target steps"
-            max={100_000_000}
+            max={500_000_000}
             min={1_000_000}
             rangeStep={1_000_000}
             ticks={[
               { value: 1_000_000, label: "1M" },
-              { value: 50_000_000, label: "50M" },
               { value: 100_000_000, label: "100M" },
+              { value: 250_000_000, label: "250M" },
+              { value: 500_000_000, label: "500M" },
             ]}
             resetValue={defaultConfig.train.total_timesteps}
             value={config.train.total_timesteps}
