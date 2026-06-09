@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/sections.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.records import record_difficulty
+from rl_fzerox.ui.watch.records import TrackRecordBook, record_difficulty
 from rl_fzerox.ui.watch.view.screen.types import PanelSection
 
 from .formatting import format_cup_label
@@ -15,36 +15,15 @@ def track_record_sections(
     *,
     current_info: RecordInfo,
     track_pool_records: tuple[RecordInfo, ...],
-    best_finish_ranks: dict[str, int],
-    best_finish_rank_times: dict[str, int],
-    best_finish_rank_setups: dict[str, dict[str, str | int]],
-    best_finish_times: dict[str, int],
-    best_finish_time_ranks: dict[str, int],
-    best_finish_time_setups: dict[str, dict[str, str | int]],
-    latest_finish_times: dict[str, int],
-    latest_finish_deltas_ms: dict[str, int],
-    track_attempt_stats: dict[str, dict[str, int | float]] | None = None,
-    failed_track_attempts: frozenset[str] = frozenset(),
+    track_record_book: TrackRecordBook,
 ) -> tuple[PanelSection, ...]:
-    resolved_track_attempt_stats = track_attempt_stats or {}
     records = _unique_course_records(
         _records_for_selected_difficulty(
             track_pool_records or current_track_record_pool(current_info),
             current_info=current_info,
         )
     )
-    if (
-        not records
-        and not best_finish_ranks
-        and not best_finish_rank_times
-        and not best_finish_rank_setups
-        and not best_finish_times
-        and not best_finish_time_ranks
-        and not best_finish_time_setups
-        and not latest_finish_times
-        and not resolved_track_attempt_stats
-        and not failed_track_attempts
-    ):
+    if not records and track_record_book.is_empty:
         return ()
     groups = record_groups(records)
     if should_split_cup_sections(groups):
@@ -54,16 +33,7 @@ def track_record_sections(
                 lines=record_group_lines(
                     group.records,
                     current_info=current_info,
-                    best_finish_ranks=best_finish_ranks,
-                    best_finish_rank_times=best_finish_rank_times,
-                    best_finish_rank_setups=best_finish_rank_setups,
-                    best_finish_times=best_finish_times,
-                    best_finish_time_ranks=best_finish_time_ranks,
-                    best_finish_time_setups=best_finish_time_setups,
-                    latest_finish_times=latest_finish_times,
-                    latest_finish_deltas_ms=latest_finish_deltas_ms,
-                    track_attempt_stats=resolved_track_attempt_stats,
-                    failed_track_attempts=failed_track_attempts,
+                    track_record_book=track_record_book,
                 ),
             )
             for group in groups
@@ -72,16 +42,7 @@ def track_record_sections(
     lines = record_group_lines(
         records,
         current_info=current_info,
-        best_finish_ranks=best_finish_ranks,
-        best_finish_rank_times=best_finish_rank_times,
-        best_finish_rank_setups=best_finish_rank_setups,
-        best_finish_times=best_finish_times,
-        best_finish_time_ranks=best_finish_time_ranks,
-        best_finish_time_setups=best_finish_time_setups,
-        latest_finish_times=latest_finish_times,
-        latest_finish_deltas_ms=latest_finish_deltas_ms,
-        track_attempt_stats=resolved_track_attempt_stats,
-        failed_track_attempts=failed_track_attempts,
+        track_record_book=track_record_book,
     )
     if not lines:
         return ()

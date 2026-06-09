@@ -6,6 +6,7 @@ from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.panels.content.auxiliary import (
     auxiliary_episode_sections,
@@ -60,17 +61,7 @@ def _build_panel_columns(
     boost_active: bool = False,
     boost_lamp_level: float = 0.0,
     action_mask_branches: ActionMaskBranches | None = None,
-    best_finish_position: int | None = None,
-    best_finish_ranks: dict[str, int] | None = None,
-    best_finish_rank_times: dict[str, int] | None = None,
-    best_finish_rank_setups: dict[str, dict[str, str | int]] | None = None,
-    best_finish_times: dict[str, int] | None = None,
-    best_finish_time_ranks: dict[str, int] | None = None,
-    best_finish_time_setups: dict[str, dict[str, str | int]] | None = None,
-    latest_finish_times: dict[str, int] | None = None,
-    latest_finish_deltas_ms: dict[str, int] | None = None,
-    track_attempt_stats: dict[str, dict[str, int | float]] | None = None,
-    failed_track_attempts: frozenset[str] = frozenset(),
+    track_record_book: TrackRecordBook | None = None,
     track_pool_records: tuple[dict[str, object], ...] = (),
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_axis_index: int | None = 2,
@@ -273,16 +264,7 @@ def _build_panel_columns(
             *track_record_sections(
                 current_info=info,
                 track_pool_records=track_pool_records,
-                best_finish_ranks=best_finish_ranks or {},
-                best_finish_rank_times=best_finish_rank_times or {},
-                best_finish_rank_setups=best_finish_rank_setups or {},
-                best_finish_times=best_finish_times or {},
-                best_finish_time_ranks=best_finish_time_ranks or {},
-                best_finish_time_setups=best_finish_time_setups or {},
-                latest_finish_times=latest_finish_times or {},
-                latest_finish_deltas_ms=latest_finish_deltas_ms or {},
-                track_attempt_stats=track_attempt_stats or {},
-                failed_track_attempts=failed_track_attempts,
+                track_record_book=track_record_book or TrackRecordBook(),
             ),
         ],
         career=_career_mode_sections(info),

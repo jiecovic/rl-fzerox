@@ -12,6 +12,7 @@ from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.core.envs.engine.reset.camera import CAMERA_SYNC_CONTROLS
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
 from rl_fzerox.ui.watch.runtime.career_mode.timing import (
     measured_game_fps,
@@ -184,17 +185,7 @@ def step_menu(
                 policy_reload_error=None,
                 cnn_activations=None,
                 active_track_sampling=None,
-                best_finish_position=None,
-                best_finish_ranks={},
-                best_finish_rank_times={},
-                best_finish_rank_setups={},
-                best_finish_times={},
-                best_finish_time_ranks={},
-                best_finish_time_setups={},
-                latest_finish_times={},
-                latest_finish_deltas_ms={},
-                track_attempt_stats={},
-                failed_track_attempts=frozenset(),
+                track_record_book=TrackRecordBook(),
                 action_hold_frame=frame_index + 1,
                 action_hold_frames=controller_step.frames,
                 policy_decision_frame=False,

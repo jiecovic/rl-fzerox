@@ -25,6 +25,7 @@ from rl_fzerox.ui.watch.view.screen.frame import (
 from rl_fzerox.ui.watch.view.screen.render import _with_viewer_rates
 from tests.ui.viewer_support import (
     fake_viewer_fonts,
+    record_book,
 )
 from tests.ui.viewer_support import (
     panel_group_labels as _panel_group_labels,
@@ -946,7 +947,7 @@ def test_session_section_omits_global_best_finish_position() -> None:
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
-        best_finish_position=8,
+        track_record_book=record_book(best_finish_position=8),
         action_repeat=1,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),

@@ -11,6 +11,7 @@ from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.snapshots import _build_snapshot, _publish_step_snapshots
+from tests.ui.viewer_support import record_book, record_entry
 
 
 class _SnapshotQueue:
@@ -118,25 +119,28 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         policy_reload_error=None,
         cnn_activations=None,
         active_track_sampling=None,
-        best_finish_position=None,
-        best_finish_ranks={"mute": 1},
-        best_finish_rank_times={"mute": 99_000},
-        best_finish_rank_setups={"mute": {"vehicle_name": "Blue Falcon"}},
-        best_finish_times={"mute": 98_000},
-        best_finish_time_ranks={"mute": 2},
-        best_finish_time_setups={"mute": {"engine_setting_raw_value": 60}},
-        latest_finish_times={"mute": 101_000},
-        latest_finish_deltas_ms={"mute": 3_000},
-        track_attempt_stats={
-            "mute": {
-                "attempts": 2,
-                "finishes": 1,
-                "completion_samples": 2,
-                "completion_sum": 1.5,
-                "best_completion": 1.0,
+        track_record_book=record_book(
+            {
+                "mute": record_entry(
+                    best_finish_rank=1,
+                    best_finish_rank_time_ms=99_000,
+                    best_finish_rank_setup={"vehicle_name": "Blue Falcon"},
+                    best_finish_time_ms=98_000,
+                    best_finish_time_rank=2,
+                    best_finish_time_setup={"engine_setting_raw_value": 60},
+                    latest_finish_time_ms=101_000,
+                    latest_finish_delta_ms=3_000,
+                    attempt_stats={
+                        "attempts": 2,
+                        "finishes": 1,
+                        "completion_samples": 2,
+                        "completion_sum": 1.5,
+                        "best_completion": 1.0,
+                    },
+                ),
+                "silence": record_entry(failed_attempt=True),
             }
-        },
-        failed_track_attempts=frozenset({"silence"}),
+        ),
         live_episode_series=live_series,
     )
 
@@ -164,11 +168,9 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         "final",
     ]
     assert [snapshot.episode_reward for snapshot in snapshots] == [12.0, 12.0, 15.0]
-    assert [snapshot.best_finish_ranks for snapshot in snapshots] == [
-        {"mute": 1},
-        {"mute": 1},
-        {"mute": 1},
-    ]
+    assert [
+        snapshot.track_record_book.entries["mute"].best_finish_rank for snapshot in snapshots
+    ] == [1, 1, 1]
     assert [snapshot.live_episode_series for snapshot in snapshots] == [
         None,
         None,
@@ -179,23 +181,22 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert np.array_equal(snapshot.policy_action, policy_action)
         assert snapshot.manual_control_enabled is True
         assert snapshot.action_mask_branches == {"lean": (True, False, True)}
-        assert snapshot.best_finish_rank_times == {"mute": 99_000}
-        assert snapshot.best_finish_rank_setups == {"mute": {"vehicle_name": "Blue Falcon"}}
-        assert snapshot.best_finish_times == {"mute": 98_000}
-        assert snapshot.best_finish_time_ranks == {"mute": 2}
-        assert snapshot.best_finish_time_setups == {"mute": {"engine_setting_raw_value": 60}}
-        assert snapshot.latest_finish_times == {"mute": 101_000}
-        assert snapshot.latest_finish_deltas_ms == {"mute": 3_000}
-        assert snapshot.track_attempt_stats == {
-            "mute": {
-                "attempts": 2,
-                "finishes": 1,
-                "completion_samples": 2,
-                "completion_sum": 1.5,
-                "best_completion": 1.0,
-            }
+        entry = snapshot.track_record_book.entries["mute"]
+        assert entry.best_finish_rank_time_ms == 99_000
+        assert entry.best_finish_rank_setup == {"vehicle_name": "Blue Falcon"}
+        assert entry.best_finish_time_ms == 98_000
+        assert entry.best_finish_time_rank == 2
+        assert entry.best_finish_time_setup == {"engine_setting_raw_value": 60}
+        assert entry.latest_finish_time_ms == 101_000
+        assert entry.latest_finish_delta_ms == 3_000
+        assert entry.attempt_stats.as_mapping() == {
+            "attempts": 2,
+            "finishes": 1,
+            "completion_samples": 2,
+            "completion_sum": 1.5,
+            "best_completion": 1.0,
         }
-        assert snapshot.failed_track_attempts == frozenset({"silence"})
+        assert snapshot.track_record_book.entries["silence"].failed_attempt is True
 
 
 def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Path) -> None:
@@ -245,17 +246,7 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
         policy_reload_error=None,
         cnn_activations=None,
         active_track_sampling=None,
-        best_finish_position=None,
-        best_finish_ranks={},
-        best_finish_rank_times={},
-        best_finish_rank_setups={},
-        best_finish_times={},
-        best_finish_time_ranks={},
-        best_finish_time_setups={},
-        latest_finish_times={},
-        latest_finish_deltas_ms={},
-        track_attempt_stats={},
-        failed_track_attempts=frozenset(),
+        track_record_book=record_book(),
     )
 
     snapshots: list[WatchSnapshot] = []
@@ -306,17 +297,7 @@ def test_menu_snapshot_has_layout_shape_without_policy_observation(tmp_path: Pat
         policy_reload_error=None,
         cnn_activations=None,
         active_track_sampling=None,
-        best_finish_position=None,
-        best_finish_ranks={},
-        best_finish_rank_times={},
-        best_finish_rank_setups={},
-        best_finish_times={},
-        best_finish_time_ranks={},
-        best_finish_time_setups={},
-        latest_finish_times={},
-        latest_finish_deltas_ms={},
-        track_attempt_stats={},
-        failed_track_attempts=frozenset(),
+        track_record_book=record_book(),
     )
 
     assert snapshot.policy_observation is None
@@ -362,17 +343,7 @@ def test_career_menu_snapshot_has_no_policy_observation_shape(tmp_path: Path) ->
         policy_reload_error=None,
         cnn_activations=None,
         active_track_sampling=None,
-        best_finish_position=None,
-        best_finish_ranks={},
-        best_finish_rank_times={},
-        best_finish_rank_setups={},
-        best_finish_times={},
-        best_finish_time_ranks={},
-        best_finish_time_setups={},
-        latest_finish_times={},
-        latest_finish_deltas_ms={},
-        track_attempt_stats={},
-        failed_track_attempts=frozenset(),
+        track_record_book=record_book(),
     )
 
     assert snapshot.policy_observation is None

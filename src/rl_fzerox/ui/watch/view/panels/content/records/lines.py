@@ -1,6 +1,7 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/lines.py
 from __future__ import annotations
 
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.view.panels.core.lines import panel_divider, panel_line
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelLine
@@ -17,12 +18,9 @@ from .formatting import (
     track_record_status,
 )
 from .identity import (
-    has_failed_attempt,
     is_current_track_record,
     optional_int_info,
     record_course_id,
-    watch_track_payload,
-    watch_track_value,
 )
 from .model import RecordInfo
 
@@ -31,16 +29,7 @@ def record_group_lines(
     records: tuple[RecordInfo, ...],
     *,
     current_info: RecordInfo,
-    best_finish_ranks: dict[str, int],
-    best_finish_rank_times: dict[str, int],
-    best_finish_rank_setups: dict[str, dict[str, str | int]],
-    best_finish_times: dict[str, int],
-    best_finish_time_ranks: dict[str, int],
-    best_finish_time_setups: dict[str, dict[str, str | int]],
-    latest_finish_times: dict[str, int],
-    latest_finish_deltas_ms: dict[str, int],
-    track_attempt_stats: dict[str, dict[str, int | float]],
-    failed_track_attempts: frozenset[str],
+    track_record_book: TrackRecordBook,
 ) -> list[PanelLine]:
     lines: list[PanelLine] = []
     for record_index, record in enumerate(records):
@@ -50,16 +39,7 @@ def record_group_lines(
             track_record_pool_lines(
                 record,
                 current_info=current_info,
-                best_finish_ranks=best_finish_ranks,
-                best_finish_rank_times=best_finish_rank_times,
-                best_finish_rank_setups=best_finish_rank_setups,
-                best_finish_times=best_finish_times,
-                best_finish_time_ranks=best_finish_time_ranks,
-                best_finish_time_setups=best_finish_time_setups,
-                latest_finish_times=latest_finish_times,
-                latest_finish_deltas_ms=latest_finish_deltas_ms,
-                track_attempt_stats=track_attempt_stats,
-                failed_track_attempts=failed_track_attempts,
+                track_record_book=track_record_book,
             )
         )
     return lines
@@ -69,28 +49,20 @@ def track_record_pool_lines(
     record: RecordInfo,
     *,
     current_info: RecordInfo,
-    best_finish_ranks: dict[str, int],
-    best_finish_rank_times: dict[str, int],
-    best_finish_rank_setups: dict[str, dict[str, str | int]],
-    best_finish_times: dict[str, int],
-    best_finish_time_ranks: dict[str, int],
-    best_finish_time_setups: dict[str, dict[str, str | int]],
-    latest_finish_times: dict[str, int],
-    latest_finish_deltas_ms: dict[str, int],
-    track_attempt_stats: dict[str, dict[str, int | float]],
-    failed_track_attempts: frozenset[str],
+    track_record_book: TrackRecordBook,
 ) -> tuple[PanelLine, ...]:
     is_current_track = is_current_track_record(record, current_info)
-    watch_best_rank = watch_track_value(record, best_finish_ranks)
-    watch_best_rank_time = watch_track_value(record, best_finish_rank_times)
-    watch_best_rank_setup = watch_track_payload(record, best_finish_rank_setups)
-    watch_best = watch_track_value(record, best_finish_times)
-    watch_best_time_rank = watch_track_value(record, best_finish_time_ranks)
-    watch_best_time_setup = watch_track_payload(record, best_finish_time_setups)
-    watch_latest = watch_track_value(record, latest_finish_times)
-    watch_latest_delta = watch_track_value(record, latest_finish_deltas_ms)
-    watch_attempt_stats = watch_track_payload(record, track_attempt_stats)
-    failed_attempt = has_failed_attempt(record, failed_track_attempts) and watch_best is None
+    entry = track_record_book.entry_for(record)
+    watch_best_rank = None if entry is None else entry.best_finish_rank
+    watch_best_rank_time = None if entry is None else entry.best_finish_rank_time_ms
+    watch_best_rank_setup = None if entry is None else entry.best_finish_rank_setup
+    watch_best = None if entry is None else entry.best_finish_time_ms
+    watch_best_time_rank = None if entry is None else entry.best_finish_time_rank
+    watch_best_time_setup = None if entry is None else entry.best_finish_time_setup
+    watch_latest = None if entry is None else entry.latest_finish_time_ms
+    watch_latest_delta = None if entry is None else entry.latest_finish_delta_ms
+    watch_attempt_stats = None if entry is None else entry.attempt_stats.as_mapping()
+    failed_attempt = bool(entry is not None and entry.failed_attempt and watch_best is None)
     best_time = optional_int_info(record, "track_non_agg_best_time_ms")
     worst_time = optional_int_info(record, "track_non_agg_worst_time_ms")
     status_icon, status_color = track_record_status(

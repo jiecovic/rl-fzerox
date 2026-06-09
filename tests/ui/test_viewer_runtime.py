@@ -28,7 +28,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainConfig,
     WatchAppConfig,
 )
-from rl_fzerox.ui.watch.records import track_record_key
+from rl_fzerox.ui.watch.records import TrackRecordBook, track_record_key
 from rl_fzerox.ui.watch.runtime.career_mode.menu import reset_race_progress_info
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
@@ -40,19 +40,6 @@ from rl_fzerox.ui.watch.runtime.career_mode.timing import (
     snapshot_action_repeat,
     snapshot_target_control_fps,
     target_game_fps,
-)
-from rl_fzerox.ui.watch.runtime.episode import (
-    _update_best_finish_position,
-    _update_best_finish_rank_setups,
-    _update_best_finish_rank_times,
-    _update_best_finish_ranks,
-    _update_best_finish_time_ranks,
-    _update_best_finish_time_setups,
-    _update_best_finish_times,
-    _update_failed_track_attempts,
-    _update_latest_finish_deltas_ms,
-    _update_latest_finish_times,
-    _update_track_attempt_stats,
 )
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
@@ -71,6 +58,7 @@ from rl_fzerox.ui.watch.view.screen.render import (
     _observation_state_feature_names,
     _track_pool_records,
 )
+from tests.ui.viewer_support import record_book, record_entry
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
 
@@ -491,72 +479,50 @@ def test_career_mode_session_timing_updates_with_viewer_commands() -> None:
     assert session.target_control_seconds == pytest.approx(1.0 / 60.0)
 
 
-def test_best_finish_position_tracks_only_finished_episodes() -> None:
-    best_position = _update_best_finish_position(
-        None,
-        {"termination_reason": "crashed", "position": 4},
-        _sample_telemetry(position=4),
-    )
-    assert best_position is None
-
-    best_position = _update_best_finish_position(
-        best_position,
-        {"termination_reason": "finished"},
-        _sample_telemetry(position=8),
-    )
-    assert best_position == 8
-
-    best_position = _update_best_finish_position(
-        best_position,
-        {"termination_reason": "finished"},
-        _sample_telemetry(position=12),
-    )
-    assert best_position == 8
-
-    best_position = _update_best_finish_position(
-        best_position,
-        {"termination_reason": "finished"},
-        _sample_telemetry(position=3),
-    )
-    assert best_position == 3
-
-
-def test_best_finish_times_track_successful_finishes_per_track() -> None:
-    best_times = _update_best_finish_times(
-        {},
+def test_track_record_book_tracks_successful_finishes_per_track() -> None:
+    book = TrackRecordBook()
+    book = book.update(
         {"termination_reason": "crashed", "race_time_ms": 98_000, "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
+        _sample_telemetry(race_time_ms=98_000, position=4),
+        episode_done=True,
     )
-    assert best_times == {}
+    assert book.best_finish_position is None
+    assert book.entries["mute"].failed_attempt is True
 
-    best_times = _update_best_finish_times(
-        best_times,
+    book = book.update(
         {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
+        _sample_telemetry(race_time_ms=98_000, position=8),
+        episode_done=True,
     )
-    best_times = _update_best_finish_times(
-        best_times,
+    book = book.update(
         {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=101_000),
+        _sample_telemetry(race_time_ms=101_000, position=12),
+        episode_done=True,
     )
-    best_times = _update_best_finish_times(
-        best_times,
+    book = book.update(
         {"termination_reason": "finished", "track_id": "silence"},
-        _sample_telemetry(race_time_ms=105_000),
+        _sample_telemetry(race_time_ms=105_000, position=5),
+        episode_done=True,
     )
-    best_times = _update_best_finish_times(
-        best_times,
+    book = book.update(
         {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=95_000),
+        _sample_telemetry(race_time_ms=95_000, position=3),
+        episode_done=True,
     )
 
-    assert best_times == {"mute": 95_000, "silence": 105_000}
+    assert book.best_finish_position == 3
+    assert book.entries["mute"].best_finish_time_ms == 95_000
+    assert book.entries["mute"].best_finish_time_rank == 3
+    assert book.entries["mute"].best_finish_rank == 3
+    assert book.entries["mute"].best_finish_rank_time_ms == 95_000
+    assert book.entries["mute"].latest_finish_time_ms == 95_000
+    assert book.entries["mute"].latest_finish_delta_ms == -3_000
+    assert book.entries["mute"].failed_attempt is False
+    assert book.entries["silence"].best_finish_time_ms == 105_000
 
 
-def test_best_finish_time_metadata_tracks_the_finish_that_set_the_time() -> None:
-    best_times: dict[str, int] = {}
-    time_ranks: dict[str, int] = {}
-    time_setups: dict[str, dict[str, str | int]] = {}
+def test_track_record_book_metadata_tracks_the_finish_that_set_the_record() -> None:
+    book = TrackRecordBook()
     info = {
         "termination_reason": "finished",
         "track_id": "mute",
@@ -566,23 +532,7 @@ def test_best_finish_time_metadata_tracks_the_finish_that_set_the_time() -> None
         "track_engine_setting_raw_value": 60,
     }
 
-    time_ranks = _update_best_finish_time_ranks(
-        time_ranks,
-        best_times,
-        info,
-        _sample_telemetry(race_time_ms=98_000, position=3),
-    )
-    time_setups = _update_best_finish_time_setups(
-        time_setups,
-        best_times,
-        info,
-        None,
-    )
-    best_times = _update_best_finish_times(
-        best_times,
-        info,
-        _sample_telemetry(race_time_ms=98_000),
-    )
+    book = book.update(info, None, episode_done=True)
     slower_info: dict[str, object] = dict(
         info,
         race_time_ms=101_000,
@@ -590,25 +540,41 @@ def test_best_finish_time_metadata_tracks_the_finish_that_set_the_time() -> None
         track_vehicle_name="Blue Falcon",
         track_engine_setting_raw_value=40,
     )
-    time_ranks = _update_best_finish_time_ranks(
-        time_ranks,
-        best_times,
+    book = book.update(
         slower_info,
-        _sample_telemetry(race_time_ms=101_000, position=1),
+        None,
+        episode_done=True,
     )
-    time_setups = _update_best_finish_time_setups(time_setups, best_times, slower_info, None)
+    faster_same_rank_info: dict[str, object] = dict(
+        info,
+        race_time_ms=97_000,
+        position=1,
+        track_vehicle_name="Twin Noritta",
+        track_engine_setting_raw_value=70,
+    )
+    book = book.update(
+        faster_same_rank_info,
+        None,
+        episode_done=True,
+    )
 
-    assert best_times == {"mute": 98_000}
-    assert time_ranks == {"mute": 3}
-    assert time_setups == {
-        "mute": {
-            "vehicle_name": "Deep Claw",
-            "engine_setting_raw_value": 60,
-        }
+    entry = book.entries["mute"]
+    assert entry.best_finish_time_ms == 97_000
+    assert entry.best_finish_time_rank == 1
+    assert entry.best_finish_time_setup == {
+        "vehicle_name": "Twin Noritta",
+        "engine_setting_raw_value": 70,
     }
+    assert entry.best_finish_rank == 1
+    assert entry.best_finish_rank_time_ms == 97_000
+    assert entry.best_finish_rank_setup == {
+        "vehicle_name": "Twin Noritta",
+        "engine_setting_raw_value": 70,
+    }
+    assert entry.latest_finish_delta_ms == -1_000
 
 
-def test_best_finish_times_track_gp_difficulties_separately() -> None:
+def test_track_record_book_tracks_gp_difficulties_separately() -> None:
     novice_info: dict[str, object] = {
         "termination_reason": "finished",
         "track_id": "mute",
@@ -626,23 +592,13 @@ def test_best_finish_times_track_gp_difficulties_separately() -> None:
     assert novice_key is not None
     assert expert_key is not None
 
-    best_times = _update_best_finish_times(
-        {},
-        novice_info,
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    best_times = _update_best_finish_times(
-        best_times,
-        expert_info,
-        _sample_telemetry(race_time_ms=101_000),
-    )
-    best_times = _update_best_finish_times(
-        best_times,
-        novice_info,
-        _sample_telemetry(race_time_ms=95_000),
-    )
+    book = TrackRecordBook()
+    book = book.update(novice_info, _sample_telemetry(race_time_ms=98_000), episode_done=True)
+    book = book.update(expert_info, _sample_telemetry(race_time_ms=101_000), episode_done=True)
+    book = book.update(novice_info, _sample_telemetry(race_time_ms=95_000), episode_done=True)
 
-    assert best_times == {novice_key: 95_000, expert_key: 101_000}
+    assert book.entries[novice_key].best_finish_time_ms == 95_000
+    assert book.entries[expert_key].best_finish_time_ms == 101_000
 
 
 def test_x_cup_record_key_uses_generated_hash_and_difficulty() -> None:
@@ -659,178 +615,9 @@ def test_x_cup_record_key_uses_generated_hash_and_difficulty() -> None:
     )
 
 
-def test_best_finish_ranks_track_successful_finishes_per_track() -> None:
-    best_ranks = _update_best_finish_ranks(
-        {},
-        {"termination_reason": "crashed", "position": 1, "track_id": "mute"},
-        _sample_telemetry(position=1),
-    )
-    assert best_ranks == {}
-
-    best_ranks = _update_best_finish_ranks(
-        best_ranks,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(position=8),
-    )
-    best_ranks = _update_best_finish_ranks(
-        best_ranks,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(position=12),
-    )
-    best_ranks = _update_best_finish_ranks(
-        best_ranks,
-        {"termination_reason": "finished", "track_id": "silence"},
-        _sample_telemetry(position=5),
-    )
-    best_ranks = _update_best_finish_ranks(
-        best_ranks,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(position=3),
-    )
-
-    assert best_ranks == {"mute": 3, "silence": 5}
-
-
-def test_best_finish_rank_metadata_tracks_time_for_best_position() -> None:
-    best_ranks: dict[str, int] = {}
-    rank_times: dict[str, int] = {}
-    rank_setups: dict[str, dict[str, str | int]] = {}
-    info: dict[str, object] = {
-        "termination_reason": "finished",
-        "track_id": "mute",
-        "race_time_ms": 101_000,
-        "position": 1,
-        "track_vehicle_name": "Blue Falcon",
-        "track_engine_setting_raw_value": 50,
-    }
-
-    rank_setups = _update_best_finish_rank_setups(
-        rank_setups,
-        rank_times,
-        best_ranks,
-        info,
-        None,
-    )
-    rank_times = _update_best_finish_rank_times(
-        rank_times,
-        best_ranks,
-        info,
-        _sample_telemetry(race_time_ms=101_000, position=1),
-    )
-    best_ranks = _update_best_finish_ranks(
-        best_ranks,
-        info,
-        _sample_telemetry(position=1),
-    )
-    faster_same_rank_info: dict[str, object] = dict(
-        info,
-        race_time_ms=98_000,
-        track_vehicle_name="Deep Claw",
-        track_engine_setting_raw_value=60,
-    )
-    rank_setups = _update_best_finish_rank_setups(
-        rank_setups,
-        rank_times,
-        best_ranks,
-        faster_same_rank_info,
-        None,
-    )
-    rank_times = _update_best_finish_rank_times(
-        rank_times,
-        best_ranks,
-        faster_same_rank_info,
-        _sample_telemetry(race_time_ms=98_000, position=1),
-    )
-
-    assert best_ranks == {"mute": 1}
-    assert rank_times == {"mute": 98_000}
-    assert rank_setups == {
-        "mute": {
-            "vehicle_name": "Deep Claw",
-            "engine_setting_raw_value": 60,
-        }
-    }
-
-
-def test_latest_finish_times_track_most_recent_successful_finish_per_track() -> None:
-    latest_times = _update_latest_finish_times(
-        {},
-        {"termination_reason": "crashed", "race_time_ms": 98_000, "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    assert latest_times == {}
-
-    latest_times = _update_latest_finish_times(
-        latest_times,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    latest_times = _update_latest_finish_times(
-        latest_times,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=101_000),
-    )
-    latest_times = _update_latest_finish_times(
-        latest_times,
-        {"termination_reason": "finished", "track_id": "silence"},
-        _sample_telemetry(race_time_ms=105_000),
-    )
-
-    assert latest_times == {"mute": 101_000, "silence": 105_000}
-
-
-def test_latest_finish_delta_tracks_previous_pb_gap() -> None:
-    latest_deltas = _update_latest_finish_deltas_ms(
-        {},
-        {},
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    assert latest_deltas == {}
-
-    latest_deltas = _update_latest_finish_deltas_ms(
-        latest_deltas,
-        {"mute": 98_000},
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=101_000),
-    )
-    assert latest_deltas == {"mute": 3_000}
-
-    latest_deltas = _update_latest_finish_deltas_ms(
-        latest_deltas,
-        {"mute": 98_000},
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=95_000),
-    )
-    assert latest_deltas == {"mute": -3_000}
-
-
-def test_failed_track_attempts_track_until_success() -> None:
-    failed_attempts = _update_failed_track_attempts(
-        frozenset(),
-        {"truncation_reason": "progress_stalled", "track_id": "mute"},
-        episode_done=True,
-    )
-    assert failed_attempts == frozenset({"mute"})
-
-    failed_attempts = _update_failed_track_attempts(
-        failed_attempts,
-        {"termination_reason": "crashed", "track_id": "silence"},
-        episode_done=False,
-    )
-    assert failed_attempts == frozenset({"mute"})
-
-    failed_attempts = _update_failed_track_attempts(
-        failed_attempts,
-        {"termination_reason": "finished", "track_id": "mute"},
-        episode_done=True,
-    )
-    assert failed_attempts == frozenset()
-
-
-def test_track_attempt_stats_track_finish_rate_and_average_completion() -> None:
-    stats = _update_track_attempt_stats(
-        {},
+def test_track_record_book_tracks_failed_attempts_and_attempt_stats() -> None:
+    book = TrackRecordBook()
+    book = book.update(
         {
             "termination_reason": "crashed",
             "track_id": "mute",
@@ -839,8 +626,7 @@ def test_track_attempt_stats_track_finish_rate_and_average_completion() -> None:
         None,
         episode_done=True,
     )
-    stats = _update_track_attempt_stats(
-        stats,
+    book = book.update(
         {
             "termination_reason": "finished",
             "track_id": "mute",
@@ -849,8 +635,7 @@ def test_track_attempt_stats_track_finish_rate_and_average_completion() -> None:
         None,
         episode_done=True,
     )
-    stats = _update_track_attempt_stats(
-        stats,
+    book = book.update(
         {
             "termination_reason": "crashed",
             "track_id": "mute",
@@ -860,14 +645,14 @@ def test_track_attempt_stats_track_finish_rate_and_average_completion() -> None:
         episode_done=False,
     )
 
-    assert stats == {
-        "mute": {
-            "attempts": 2,
-            "finishes": 1,
-            "completion_samples": 2,
-            "completion_sum": 1.25,
-            "best_completion": 1.0,
-        }
+    entry = book.entries["mute"]
+    assert entry.failed_attempt is False
+    assert entry.attempt_stats.as_mapping() == {
+        "attempts": 2,
+        "finishes": 1,
+        "completion_samples": 2,
+        "completion_sum": 1.25,
+        "best_completion": 1.0,
     }
 
 
@@ -883,28 +668,20 @@ def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
     failed_section = track_record_sections(
         current_info={},
         track_pool_records=records,
-        best_finish_ranks={},
-        best_finish_rank_times={},
-        best_finish_rank_setups={},
-        best_finish_times={},
-        best_finish_time_ranks={},
-        best_finish_time_setups={},
-        latest_finish_times={},
-        latest_finish_deltas_ms={},
-        failed_track_attempts=frozenset({"mute"}),
+        track_record_book=record_book({"mute": record_entry(failed_attempt=True)}),
     )[0]
     success_section = track_record_sections(
         current_info={},
         track_pool_records=records,
-        best_finish_ranks={},
-        best_finish_rank_times={},
-        best_finish_rank_setups={},
-        best_finish_times={"mute": 95_000},
-        best_finish_time_ranks={},
-        best_finish_time_setups={},
-        latest_finish_times={"mute": 95_000},
-        latest_finish_deltas_ms={},
-        failed_track_attempts=frozenset({"mute"}),
+        track_record_book=record_book(
+            {
+                "mute": record_entry(
+                    best_finish_time_ms=95_000,
+                    latest_finish_time_ms=95_000,
+                    failed_attempt=True,
+                )
+            }
+        ),
     )[0]
 
     assert failed_section.lines[0].status_text == "FAILED"
@@ -1086,15 +863,7 @@ def test_record_rows_click_stable_runtime_course_key() -> None:
                 "track_reset_course_key": "x_cup_slot_1",
             },
         ),
-        best_finish_ranks={},
-        best_finish_rank_times={},
-        best_finish_rank_setups={},
-        best_finish_times={},
-        best_finish_time_ranks={},
-        best_finish_time_setups={},
-        latest_finish_times={},
-        latest_finish_deltas_ms={},
-        failed_track_attempts=frozenset(),
+        track_record_book=record_book(),
     )[0]
 
     assert section.lines[0].click_course_id == "x_cup_slot_1"

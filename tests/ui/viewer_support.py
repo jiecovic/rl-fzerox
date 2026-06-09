@@ -1,5 +1,6 @@
 # tests/ui/viewer_support.py
 from fzerox_emulator import FZeroXTelemetry
+from rl_fzerox.ui.watch.records import TrackAttemptStats, TrackRecordBook, TrackRecordEntry
 from rl_fzerox.ui.watch.view.screen.theme import Color
 from rl_fzerox.ui.watch.view.screen.types import PanelSection, ViewerFonts
 from tests.support.native_objects import make_telemetry
@@ -76,6 +77,44 @@ def panel_group_values(section: PanelSection, heading: str) -> dict[str, str]:
         if in_group and line.label:
             values[line.label] = line.value
     return values
+
+
+def record_book(
+    entries: dict[str, TrackRecordEntry] | None = None,
+    *,
+    best_finish_position: int | None = None,
+) -> TrackRecordBook:
+    return TrackRecordBook(
+        entries={} if entries is None else entries,
+        best_finish_position=best_finish_position,
+    )
+
+
+def record_entry(
+    *,
+    best_finish_rank: int | None = None,
+    best_finish_rank_time_ms: int | None = None,
+    best_finish_rank_setup: dict[str, str | int] | None = None,
+    best_finish_time_ms: int | None = None,
+    best_finish_time_rank: int | None = None,
+    best_finish_time_setup: dict[str, str | int] | None = None,
+    latest_finish_time_ms: int | None = None,
+    latest_finish_delta_ms: int | None = None,
+    attempt_stats: dict[str, int | float] | None = None,
+    failed_attempt: bool = False,
+) -> TrackRecordEntry:
+    return TrackRecordEntry(
+        best_finish_rank=best_finish_rank,
+        best_finish_rank_time_ms=best_finish_rank_time_ms,
+        best_finish_rank_setup=best_finish_rank_setup,
+        best_finish_time_ms=best_finish_time_ms,
+        best_finish_time_rank=best_finish_time_rank,
+        best_finish_time_setup=best_finish_time_setup,
+        latest_finish_time_ms=latest_finish_time_ms,
+        latest_finish_delta_ms=latest_finish_delta_ms,
+        attempt_stats=TrackAttemptStats.from_mapping(attempt_stats),
+        failed_attempt=failed_attempt,
+    )
 
 
 def sample_telemetry(

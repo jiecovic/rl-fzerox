@@ -17,8 +17,8 @@ from rl_fzerox.core.policy.auxiliary_state import (
 )
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
-from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (
     PolicyObservationSnapshot,
     WatchSnapshot,
@@ -95,17 +95,7 @@ def _publish_step_snapshots(
     policy_reload_error: str | None,
     cnn_activations: CnnActivationSnapshot | None,
     active_track_sampling: TrackSamplingConfig | None,
-    best_finish_position: int | None,
-    best_finish_ranks: dict[str, int],
-    best_finish_rank_times: dict[str, int],
-    best_finish_rank_setups: dict[str, dict[str, str | int]],
-    best_finish_times: dict[str, int],
-    best_finish_time_ranks: dict[str, int],
-    best_finish_time_setups: dict[str, dict[str, str | int]],
-    latest_finish_times: dict[str, int],
-    latest_finish_deltas_ms: dict[str, int],
-    track_attempt_stats: dict[str, dict[str, int | float]],
-    failed_track_attempts: frozenset[str],
+    track_record_book: TrackRecordBook,
     previous_control_state: RaceControlState | None = None,
     previous_gas_level: float | None = None,
     previous_action_mask_branches: ActionMaskBranches | None = None,
@@ -215,17 +205,7 @@ def _publish_step_snapshots(
                 policy_reload_error=policy_reload_error,
                 cnn_activations=cnn_activations,
                 active_track_sampling=active_track_sampling,
-                best_finish_position=best_finish_position,
-                best_finish_ranks=best_finish_ranks,
-                best_finish_rank_times=best_finish_rank_times,
-                best_finish_rank_setups=best_finish_rank_setups,
-                best_finish_times=best_finish_times,
-                best_finish_time_ranks=best_finish_time_ranks,
-                best_finish_time_setups=best_finish_time_setups,
-                latest_finish_times=latest_finish_times,
-                latest_finish_deltas_ms=latest_finish_deltas_ms,
-                track_attempt_stats=track_attempt_stats,
-                failed_track_attempts=failed_track_attempts,
+                track_record_book=track_record_book,
                 action_hold_frame=index + 1,
                 action_hold_frames=len(frames),
                 policy_decision_frame=is_final_frame,
@@ -299,17 +279,7 @@ def _build_snapshot(
     manual_control_enabled: bool,
     policy_reload_error: str | None,
     cnn_activations: CnnActivationSnapshot | None,
-    best_finish_position: int | None,
-    best_finish_ranks: dict[str, int],
-    best_finish_rank_times: dict[str, int],
-    best_finish_rank_setups: dict[str, dict[str, str | int]],
-    best_finish_times: dict[str, int],
-    best_finish_time_ranks: dict[str, int],
-    best_finish_time_setups: dict[str, dict[str, str | int]],
-    latest_finish_times: dict[str, int],
-    latest_finish_deltas_ms: dict[str, int],
-    track_attempt_stats: dict[str, dict[str, int | float]],
-    failed_track_attempts: frozenset[str],
+    track_record_book: TrackRecordBook,
     action_repeat: int | None = None,
     active_track_sampling: TrackSamplingConfig | None = None,
     telemetry: FZeroXTelemetry | None = None,
@@ -324,7 +294,6 @@ def _build_snapshot(
 ) -> WatchSnapshot:
     if telemetry is None:
         telemetry = _read_live_telemetry(emulator)
-    best_finish_position = _update_best_finish_position(best_finish_position, info, telemetry)
     policy_observation = _policy_observation_snapshot(
         config=config,
         observation=observation,
@@ -369,21 +338,7 @@ def _build_snapshot(
         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
         policy_reload_error=policy_reload_error,
         cnn_activations=cnn_activations,
-        best_finish_position=best_finish_position,
-        best_finish_ranks=dict(best_finish_ranks),
-        best_finish_rank_times=dict(best_finish_rank_times),
-        best_finish_rank_setups={
-            key: dict(value) for key, value in best_finish_rank_setups.items()
-        },
-        best_finish_times=dict(best_finish_times),
-        best_finish_time_ranks=dict(best_finish_time_ranks),
-        best_finish_time_setups={
-            key: dict(value) for key, value in best_finish_time_setups.items()
-        },
-        latest_finish_times=dict(latest_finish_times),
-        latest_finish_deltas_ms=dict(latest_finish_deltas_ms),
-        track_attempt_stats={key: dict(value) for key, value in track_attempt_stats.items()},
-        failed_track_attempts=failed_track_attempts,
+        track_record_book=track_record_book.snapshot(),
         continuous_air_brake_disabled=_continuous_air_brake_disabled(config, telemetry),
         telemetry_data=_telemetry_to_data(telemetry),
         active_track_sampling=active_track_sampling,

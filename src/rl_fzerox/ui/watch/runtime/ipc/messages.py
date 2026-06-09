@@ -9,6 +9,7 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationNormalizationMode,
@@ -114,17 +115,7 @@ class WatchSnapshot:
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
     cnn_activations: CnnActivationSnapshot | None
-    best_finish_position: int | None
-    best_finish_ranks: dict[str, int]
-    best_finish_rank_times: dict[str, int]
-    best_finish_rank_setups: dict[str, dict[str, str | int]]
-    best_finish_times: dict[str, int]
-    best_finish_time_ranks: dict[str, int]
-    best_finish_time_setups: dict[str, dict[str, str | int]]
-    latest_finish_times: dict[str, int]
-    latest_finish_deltas_ms: dict[str, int]
-    track_attempt_stats: dict[str, dict[str, int | float]]
-    failed_track_attempts: frozenset[str]
+    track_record_book: TrackRecordBook
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None
     active_track_sampling: TrackSamplingConfig | None = None

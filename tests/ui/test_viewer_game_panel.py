@@ -9,6 +9,7 @@ from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelColumns, PanelSection
 from tests.support.native_objects import encode_state_flags
+from tests.ui.viewer_support import record_book, record_entry
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
 
@@ -869,17 +870,21 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
-        best_finish_times={"silence": 98765},
-        latest_finish_times={"silence": 101234},
-        track_attempt_stats={
-            "silence": {
-                "attempts": 3,
-                "finishes": 1,
-                "completion_samples": 3,
-                "completion_sum": 2.25,
-                "best_completion": 1.0,
+        track_record_book=record_book(
+            {
+                "silence": record_entry(
+                    best_finish_time_ms=98765,
+                    latest_finish_time_ms=101234,
+                    attempt_stats={
+                        "attempts": 3,
+                        "finishes": 1,
+                        "completion_samples": 3,
+                        "completion_sum": 2.25,
+                        "best_completion": 1.0,
+                    },
+                )
             }
-        },
+        ),
         track_pool_records=(
             {
                 "track_id": "silence",
@@ -925,16 +930,24 @@ def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
-        best_finish_ranks={"silence": 1},
-        best_finish_rank_times={"silence": 101_000},
-        best_finish_rank_setups={
-            "silence": {"vehicle_name": "Deep Claw", "engine_setting_raw_value": 60}
-        },
-        best_finish_times={"silence": 98765},
-        best_finish_time_ranks={"silence": 2},
-        best_finish_time_setups={
-            "silence": {"vehicle_name": "Blue Falcon", "engine_setting_raw_value": 50}
-        },
+        track_record_book=record_book(
+            {
+                "silence": record_entry(
+                    best_finish_rank=1,
+                    best_finish_rank_time_ms=101_000,
+                    best_finish_rank_setup={
+                        "vehicle_name": "Deep Claw",
+                        "engine_setting_raw_value": 60,
+                    },
+                    best_finish_time_ms=98765,
+                    best_finish_time_rank=2,
+                    best_finish_time_setup={
+                        "vehicle_name": "Blue Falcon",
+                        "engine_setting_raw_value": 50,
+                    },
+                )
+            }
+        ),
         track_pool_records=(
             {
                 "track_id": "silence",
@@ -1052,7 +1065,7 @@ def test_records_section_dedupes_course_variants_to_one_course_row() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
-        best_finish_times={"mute_city": 88_000},
+        track_record_book=record_book({"mute_city": record_entry(best_finish_time_ms=88_000)}),
         track_pool_records=(
             {
                 "track_id": "mute_city_blue_falcon",
@@ -1117,18 +1130,28 @@ def test_records_section_follows_selected_gp_difficulty() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(difficulty_name="expert", difficulty_raw=2),
-        best_finish_ranks={novice_key: 3, expert_key: 1},
-        best_finish_rank_times={novice_key: 92_000, expert_key: 102_000},
-        best_finish_times={novice_key: 92_000, expert_key: 98_000},
-        best_finish_time_ranks={novice_key: 3, expert_key: 1},
+        track_record_book=record_book(
+            {
+                novice_key: record_entry(
+                    best_finish_rank=3,
+                    best_finish_rank_time_ms=92_000,
+                    best_finish_time_ms=92_000,
+                    best_finish_time_rank=3,
+                ),
+                expert_key: record_entry(
+                    best_finish_rank=1,
+                    best_finish_rank_time_ms=102_000,
+                    best_finish_time_ms=98_000,
+                    best_finish_time_rank=1,
+                ),
+            }
+        ),
         track_pool_records=(novice_record, expert_record),
     )
 
     assert [section.title for section in columns.records] == ["Records"]
     headings = [line.label for line in columns.records[0].lines if line.heading]
-    expert_pb_line = next(
-        line for line in columns.records[0].lines if line.label == "Best time"
-    )
+    expert_pb_line = next(line for line in columns.records[0].lines if line.label == "Best time")
     expert_pos_line = next(line for line in columns.records[0].lines if line.label == "Best pos")
 
     assert headings == ["> Mute City"]
@@ -1199,9 +1222,15 @@ def test_records_section_shows_latest_improvement_against_previous_pb() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
-        best_finish_times={"silence": 97_530},
-        latest_finish_times={"silence": 97_530},
-        latest_finish_deltas_ms={"silence": -1_235},
+        track_record_book=record_book(
+            {
+                "silence": record_entry(
+                    best_finish_time_ms=97_530,
+                    latest_finish_time_ms=97_530,
+                    latest_finish_delta_ms=-1_235,
+                )
+            }
+        ),
         track_pool_records=(
             {
                 "track_id": "silence",
@@ -1238,7 +1267,7 @@ def test_records_section_marks_watch_best_inside_reference_range() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
-        best_finish_times={"silence": 62_000},
+        track_record_book=record_book({"silence": record_entry(best_finish_time_ms=62_000)}),
         track_pool_records=(
             {
                 "track_id": "silence",
@@ -1279,7 +1308,7 @@ def test_records_section_formats_minute_scale_reference_gap() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
-        best_finish_times={"silence": 138_379},
+        track_record_book=record_book({"silence": record_entry(best_finish_time_ms=138_379)}),
         track_pool_records=(
             {
                 "track_id": "silence",

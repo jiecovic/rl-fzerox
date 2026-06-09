@@ -13,6 +13,7 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
@@ -85,17 +86,7 @@ class FrameRenderData:
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
     cnn_activations: CnnActivationSnapshot | None
-    best_finish_position: int | None
-    best_finish_ranks: dict[str, int]
-    best_finish_rank_times: dict[str, int]
-    best_finish_rank_setups: dict[str, dict[str, str | int]]
-    best_finish_times: dict[str, int]
-    best_finish_time_ranks: dict[str, int]
-    best_finish_time_setups: dict[str, dict[str, str | int]]
-    latest_finish_times: dict[str, int]
-    latest_finish_deltas_ms: dict[str, int]
-    track_attempt_stats: dict[str, dict[str, int | float]]
-    failed_track_attempts: frozenset[str]
+    track_record_book: TrackRecordBook
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
     cnn_layer_tab_index: int
@@ -399,17 +390,7 @@ def _draw_frame(
             policy_reload_age_seconds=data.policy_reload_age_seconds,
             policy_reload_error=data.policy_reload_error,
             cnn_activations=data.cnn_activations,
-            best_finish_position=data.best_finish_position,
-            best_finish_ranks=data.best_finish_ranks,
-            best_finish_rank_times=data.best_finish_rank_times,
-            best_finish_rank_setups=data.best_finish_rank_setups,
-            best_finish_times=data.best_finish_times,
-            best_finish_time_ranks=data.best_finish_time_ranks,
-            best_finish_time_setups=data.best_finish_time_setups,
-            latest_finish_times=data.latest_finish_times,
-            latest_finish_deltas_ms=data.latest_finish_deltas_ms,
-            track_attempt_stats=data.track_attempt_stats,
-            failed_track_attempts=data.failed_track_attempts,
+            track_record_book=data.track_record_book,
             track_pool_records=data.track_pool_records,
             panel_tab_index=data.panel_tab_index,
             cnn_layer_tab_index=data.cnn_layer_tab_index,

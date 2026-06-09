@@ -1,18 +1,12 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/identity.py
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import TypeVar
-
 from rl_fzerox.ui.watch.records import (
     record_difficulty,
     track_record_key,
-    track_record_lookup_keys,
 )
 
 from .model import RecordInfo
-
-_T = TypeVar("_T")
 
 
 def current_track_record_pool(info: RecordInfo) -> tuple[RecordInfo, ...]:
@@ -23,13 +17,6 @@ def current_track_record_pool(info: RecordInfo) -> tuple[RecordInfo, ...]:
     if not has_best_time:
         return ()
     return (dict(info),)
-
-
-def has_failed_attempt(
-    record: RecordInfo,
-    failed_track_attempts: frozenset[str],
-) -> bool:
-    return any(track_key in failed_track_attempts for track_key in track_record_lookup_keys(record))
 
 
 def record_course_id(record: RecordInfo) -> str | None:
@@ -80,24 +67,6 @@ def is_current_track_record(
     if isinstance(current_index, bool) or isinstance(record_index, bool):
         return False
     return isinstance(current_index, int) and current_index == record_index
-
-
-def watch_track_value(
-    info: RecordInfo,
-    values: dict[str, int],
-) -> int | None:
-    return watch_track_payload(info, values)
-
-
-def watch_track_payload(
-    info: RecordInfo,
-    values: Mapping[str, _T],
-) -> _T | None:
-    for track_key in track_record_lookup_keys(info):
-        value = values.get(track_key)
-        if value is not None:
-            return value
-    return None
 
 
 def track_best_key(info: RecordInfo) -> str | None:

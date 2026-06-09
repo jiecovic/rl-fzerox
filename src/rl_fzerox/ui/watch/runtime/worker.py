@@ -16,6 +16,7 @@ from rl_fzerox.ui.watch.live_series import (
     LIVE_SERIES_PUBLISH_POLICY,
     EpisodeLiveSeriesTracker,
 )
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
@@ -28,19 +29,6 @@ from rl_fzerox.ui.watch.runtime.course_commands import (
 from rl_fzerox.ui.watch.runtime.course_navigation import (
     WatchCourseRotation,
     sync_watch_rotation_info,
-)
-from rl_fzerox.ui.watch.runtime.episode import (
-    _update_best_finish_position,
-    _update_best_finish_rank_setups,
-    _update_best_finish_rank_times,
-    _update_best_finish_ranks,
-    _update_best_finish_time_ranks,
-    _update_best_finish_time_setups,
-    _update_best_finish_times,
-    _update_failed_track_attempts,
-    _update_latest_finish_deltas_ms,
-    _update_latest_finish_times,
-    _update_track_attempt_stats,
 )
 from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerClosed,
@@ -133,17 +121,7 @@ def _run_simulation_loop(
         control_rate = RateMeter(window=60)
         last_logged_reload_error: str | None = None
         episode = 0
-        best_finish_position: int | None = None
-        best_finish_ranks: dict[str, int] = {}
-        best_finish_rank_times: dict[str, int] = {}
-        best_finish_rank_setups: dict[str, dict[str, str | int]] = {}
-        best_finish_times: dict[str, int] = {}
-        best_finish_time_ranks: dict[str, int] = {}
-        best_finish_time_setups: dict[str, dict[str, str | int]] = {}
-        latest_finish_times: dict[str, int] = {}
-        latest_finish_deltas_ms: dict[str, int] = {}
-        track_attempt_stats: dict[str, dict[str, int | float]] = {}
-        failed_track_attempts: frozenset[str] = frozenset()
+        track_record_book = TrackRecordBook()
         paused = False
         deterministic_policy = bool(config.watch.deterministic_policy)
         manual_control_enabled = policy_runner is None
@@ -208,17 +186,7 @@ def _run_simulation_loop(
                     policy_reload_error=policy_reload_error,
                     cnn_activations=cnn_activations,
                     active_track_sampling=active_track_sampling,
-                    best_finish_position=best_finish_position,
-                    best_finish_ranks=best_finish_ranks,
-                    best_finish_rank_times=best_finish_rank_times,
-                    best_finish_rank_setups=best_finish_rank_setups,
-                    best_finish_times=best_finish_times,
-                    best_finish_time_ranks=best_finish_time_ranks,
-                    best_finish_time_setups=best_finish_time_setups,
-                    latest_finish_times=latest_finish_times,
-                    latest_finish_deltas_ms=latest_finish_deltas_ms,
-                    track_attempt_stats=track_attempt_stats,
-                    failed_track_attempts=failed_track_attempts,
+                    track_record_book=track_record_book,
                     live_episode_series=live_episode_series,
                 ),
             )
@@ -567,66 +535,9 @@ def _run_simulation_loop(
                     telemetry_data=_telemetry_to_data(live_telemetry),
                     action_repeat=config.env.action_repeat,
                 )
-                best_finish_position = _update_best_finish_position(
-                    best_finish_position,
-                    info,
-                    None,
-                )
-                best_finish_rank_setups = _update_best_finish_rank_setups(
-                    best_finish_rank_setups,
-                    best_finish_rank_times,
-                    best_finish_ranks,
+                track_record_book = track_record_book.update(
                     info,
                     live_telemetry,
-                )
-                best_finish_rank_times = _update_best_finish_rank_times(
-                    best_finish_rank_times,
-                    best_finish_ranks,
-                    info,
-                    live_telemetry,
-                )
-                best_finish_ranks = _update_best_finish_ranks(
-                    best_finish_ranks,
-                    info,
-                    live_telemetry,
-                )
-                best_finish_time_ranks = _update_best_finish_time_ranks(
-                    best_finish_time_ranks,
-                    best_finish_times,
-                    info,
-                    live_telemetry,
-                )
-                best_finish_time_setups = _update_best_finish_time_setups(
-                    best_finish_time_setups,
-                    best_finish_times,
-                    info,
-                    live_telemetry,
-                )
-                latest_finish_deltas_ms = _update_latest_finish_deltas_ms(
-                    latest_finish_deltas_ms,
-                    best_finish_times,
-                    info,
-                    live_telemetry,
-                )
-                best_finish_times = _update_best_finish_times(
-                    best_finish_times,
-                    info,
-                    live_telemetry,
-                )
-                latest_finish_times = _update_latest_finish_times(
-                    latest_finish_times,
-                    info,
-                    live_telemetry,
-                )
-                track_attempt_stats = _update_track_attempt_stats(
-                    track_attempt_stats,
-                    info,
-                    live_telemetry,
-                    episode_done=terminated or truncated,
-                )
-                failed_track_attempts = _update_failed_track_attempts(
-                    failed_track_attempts,
-                    info,
                     episode_done=terminated or truncated,
                 )
                 live_episode_series = None
@@ -676,17 +587,7 @@ def _run_simulation_loop(
                     policy_reload_error=policy_reload_error,
                     cnn_activations=cnn_activations,
                     active_track_sampling=active_track_sampling,
-                    best_finish_position=best_finish_position,
-                    best_finish_ranks=best_finish_ranks,
-                    best_finish_rank_times=best_finish_rank_times,
-                    best_finish_rank_setups=best_finish_rank_setups,
-                    best_finish_times=best_finish_times,
-                    best_finish_time_ranks=best_finish_time_ranks,
-                    best_finish_time_setups=best_finish_time_setups,
-                    latest_finish_times=latest_finish_times,
-                    latest_finish_deltas_ms=latest_finish_deltas_ms,
-                    track_attempt_stats=track_attempt_stats,
-                    failed_track_attempts=failed_track_attempts,
+                    track_record_book=track_record_book,
                     manual_control_enabled=manual_control_enabled,
                     live_episode_series=live_episode_series,
                 )
