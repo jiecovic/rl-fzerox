@@ -6,13 +6,17 @@ from dataclasses import dataclass
 from random import Random
 
 from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
+from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
+    ResolvedTrackSamplingCourses,
+    resolve_track_sampling_courses_from_configs,
+    resolve_track_sampling_courses_from_parts,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     episode_completion_fraction,
     episode_finished,
     episode_frame_count,
     episode_track_id,
     runtime_track_sampling_configs,
-    sanitize_log_key,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
@@ -64,10 +68,10 @@ class DeficitBudgetTrackSamplingController:
         track_base_weights: dict[str, float],
         action_repeat: int,
         settings: DeficitBudgetSettings,
-        track_course_keys: dict[str, str],
-        track_log_keys: dict[str, str],
-        track_labels: dict[str, str],
-        track_log_enabled: dict[str, bool],
+        track_course_keys: dict[str, str] | None = None,
+        track_log_keys: dict[str, str] | None = None,
+        track_labels: dict[str, str] | None = None,
+        track_log_enabled: dict[str, bool] | None = None,
         track_generated_course_slots: dict[str, int] | None = None,
         track_generated_course_generations: dict[str, int] | None = None,
         track_generated_course_ids: dict[str, str] | None = None,
@@ -76,34 +80,35 @@ class DeficitBudgetTrackSamplingController:
         track_generated_course_seeds: dict[str, int] | None = None,
         track_generated_course_segment_counts: dict[str, int] | None = None,
         track_generated_course_lengths: dict[str, float] | None = None,
+        resolved_courses: ResolvedTrackSamplingCourses | None = None,
         restored_state: TrackSamplingRuntimeState | None = None,
         seed: int = 0,
     ) -> None:
-        self._entry_course_keys = dict(track_course_keys)
-        self._course_entry_ids = _course_entry_ids(track_course_keys)
-        self._course_keys = tuple(sorted(self._course_entry_ids))
-        self._course_log_keys = dict(track_log_keys)
-        self._course_log_enabled = dict(track_log_enabled)
-        self._course_labels = dict(track_labels)
-        self._course_generated_slots = dict(track_generated_course_slots or {})
-        self._course_generated_generations = dict(track_generated_course_generations or {})
-        self._course_generated_course_ids = dict(track_generated_course_ids or {})
-        self._course_generated_course_names = dict(track_generated_course_names or {})
-        self._course_generated_course_hashes = dict(track_generated_course_hashes or {})
-        self._course_generated_course_seeds = dict(track_generated_course_seeds or {})
-        self._course_generated_course_segment_counts = dict(
-            track_generated_course_segment_counts or {}
+        resolved = resolved_courses or resolve_track_sampling_courses_from_parts(
+            track_base_weights=track_base_weights,
+            track_course_keys=track_course_keys,
+            track_log_keys=track_log_keys,
+            track_labels=track_labels,
+            track_log_enabled=track_log_enabled,
+            track_generated_course_slots=track_generated_course_slots,
+            track_generated_course_generations=track_generated_course_generations,
+            track_generated_course_ids=track_generated_course_ids,
+            track_generated_course_names=track_generated_course_names,
+            track_generated_course_hashes=track_generated_course_hashes,
+            track_generated_course_seeds=track_generated_course_seeds,
+            track_generated_course_segment_counts=track_generated_course_segment_counts,
+            track_generated_course_lengths=track_generated_course_lengths,
         )
-        self._course_generated_course_lengths = dict(track_generated_course_lengths or {})
+        self._entry_course_keys = dict(resolved.entry_course_keys)
+        self._courses = dict(resolved.courses)
+        self._course_entry_ids = resolved.course_entry_ids
+        self._course_keys = tuple(sorted(self._course_entry_ids))
         self._settings = settings
         self._action_repeat = max(1, int(action_repeat))
         self._rng = Random(seed)
         self._stats = {
             course_key: TrackStepStats(
-                base_weight=_mean_entry_weight(
-                    self._course_entry_ids[course_key],
-                    track_base_weights,
-                ),
+                base_weight=self._courses[course_key].base_weight_mean,
                 current_weight=1.0,
             )
             for course_key in self._course_keys
@@ -137,64 +142,13 @@ class DeficitBudgetTrackSamplingController:
         if not configs:
             return None
 
-        base_weights: dict[str, float] = {}
-        course_keys: dict[str, str] = {}
-        log_keys: dict[str, str] = {}
-        labels: dict[str, str] = {}
-        log_enabled: dict[str, bool] = {}
-        generated_slots: dict[str, int] = {}
-        generated_generations: dict[str, int] = {}
-        generated_course_ids: dict[str, str] = {}
-        generated_course_names: dict[str, str] = {}
-        generated_course_hashes: dict[str, str] = {}
-        generated_course_seeds: dict[str, int] = {}
-        generated_course_segment_counts: dict[str, int] = {}
-        generated_course_lengths: dict[str, float] = {}
-        for config in configs:
-            for entry in config.entries:
-                course_key = entry.runtime_course_key or entry.course_id or entry.id
-                base_weights.setdefault(entry.id, float(entry.weight))
-                course_keys.setdefault(entry.id, course_key)
-                log_keys.setdefault(entry.id, sanitize_log_key(course_key))
-                labels.setdefault(
-                    course_key,
-                    entry.course_name or entry.course_id or entry.display_name or entry.id,
-                )
-                log_enabled.setdefault(course_key, entry.log_per_course)
-                if entry.generated_course_slot is not None:
-                    generated_slots.setdefault(course_key, int(entry.generated_course_slot))
-                if entry.generated_course_generation is not None:
-                    generated_generations.setdefault(
-                        course_key,
-                        int(entry.generated_course_generation),
-                    )
-                if entry.course_id is not None and entry.generated_course_slot is not None:
-                    generated_course_ids.setdefault(course_key, entry.course_id)
-                if entry.generated_course_slot is not None:
-                    generated_course_names.setdefault(
-                        course_key,
-                        entry.course_name or entry.display_name or entry.course_id or entry.id,
-                    )
-                if entry.generated_course_hash is not None:
-                    generated_course_hashes.setdefault(course_key, entry.generated_course_hash)
-                if entry.generated_course_seed is not None:
-                    generated_course_seeds.setdefault(course_key, int(entry.generated_course_seed))
-                if entry.generated_course_segment_count is not None:
-                    generated_course_segment_counts.setdefault(
-                        course_key,
-                        int(entry.generated_course_segment_count),
-                    )
-                if entry.generated_course_length is not None:
-                    generated_course_lengths.setdefault(
-                        course_key,
-                        float(entry.generated_course_length),
-                    )
-        if len(set(course_keys.values())) <= 1:
+        resolved_courses = resolve_track_sampling_courses_from_configs(configs)
+        if len(resolved_courses.courses) <= 1:
             return None
 
         settings_source = configs[0]
         return cls(
-            track_base_weights=base_weights,
+            track_base_weights=resolved_courses.entry_base_weights,
             action_repeat=env_config.action_repeat,
             settings=DeficitBudgetSettings(
                 uniform_fraction=settings_source.deficit_budget_uniform_fraction,
@@ -204,18 +158,7 @@ class DeficitBudgetTrackSamplingController:
                 weight_update_rollouts=settings_source.deficit_budget_weight_update_rollouts,
                 x_cup_generation_ema_alpha=settings_source.x_cup_rotation.ema_alpha,
             ),
-            track_course_keys=course_keys,
-            track_log_keys=log_keys,
-            track_labels=labels,
-            track_log_enabled=log_enabled,
-            track_generated_course_slots=generated_slots,
-            track_generated_course_generations=generated_generations,
-            track_generated_course_ids=generated_course_ids,
-            track_generated_course_names=generated_course_names,
-            track_generated_course_hashes=generated_course_hashes,
-            track_generated_course_seeds=generated_course_seeds,
-            track_generated_course_segment_counts=generated_course_segment_counts,
-            track_generated_course_lengths=generated_course_lengths,
+            resolved_courses=resolved_courses,
             restored_state=restored_state,
         )
 
@@ -258,7 +201,7 @@ class DeficitBudgetTrackSamplingController:
                 ema_alpha=self._settings.ema_alpha,
                 generation_ema_alpha=(
                     self._settings.x_cup_generation_ema_alpha
-                    if course_key in self._course_generated_slots
+                    if self._courses[course_key].generated.slot is not None
                     else None
                 ),
                 completion_fraction=episode_completion_fraction(episode),
@@ -322,9 +265,10 @@ class DeficitBudgetTrackSamplingController:
         target_fractions = self._target_fractions()
         rollout_total = sum(self._rollout_steps.values())
         for course_key, stats in self._stats.items():
-            if not self._course_log_enabled[course_key]:
+            course = self._courses[course_key]
+            if not course.log_enabled:
                 continue
-            key = self._course_log_keys.get(course_key, sanitize_log_key(course_key))
+            key = course.log_key
             success_count = max(stats.success_sample_count, 1)
             values[f"track_sampling/{key}/target_step_share"] = target_fractions[course_key]
             values[f"track_sampling/{key}/actual_step_share"] = (
@@ -359,32 +303,9 @@ class DeficitBudgetTrackSamplingController:
             update_count=self.update_count,
             episodes_since_update=self._rollouts_since_weight_update,
             entries=tuple(
-                TrackSamplingRuntimeEntry(
-                    track_id=course_key,
-                    course_key=course_key,
-                    label=self._course_labels.get(course_key, course_key),
-                    base_weight=stats.base_weight,
-                    current_weight=stats.current_weight,
+                self._courses[course_key].runtime_entry(
+                    stats=stats,
                     completed_frames=self._accounted_env_steps[course_key] * self._action_repeat,
-                    episode_count=stats.episode_count,
-                    finished_episode_count=stats.finished_episode_count,
-                    success_sample_count=stats.success_sample_count,
-                    ema_episode_frames=stats.ema_episode_frames,
-                    ema_completion_fraction=stats.ema_completion_fraction,
-                    generation_episode_count=stats.generation_episode_count,
-                    generation_finished_episode_count=stats.generation_finished_episode_count,
-                    generation_success_sample_count=stats.generation_success_sample_count,
-                    generation_ema_completion_fraction=(stats.generation_ema_completion_fraction),
-                    generated_course_slot=self._course_generated_slots.get(course_key),
-                    generated_course_generation=self._course_generated_generations.get(course_key),
-                    generated_course_id=self._course_generated_course_ids.get(course_key),
-                    generated_course_name=self._course_generated_course_names.get(course_key),
-                    generated_course_hash=self._course_generated_course_hashes.get(course_key),
-                    generated_course_seed=self._course_generated_course_seeds.get(course_key),
-                    generated_course_segment_count=(
-                        self._course_generated_course_segment_counts.get(course_key)
-                    ),
-                    generated_course_length=self._course_generated_course_lengths.get(course_key),
                 )
                 for course_key, stats in sorted(self._stats.items())
             ),
@@ -427,24 +348,7 @@ class DeficitBudgetTrackSamplingController:
                 stats.generation_ema_completion_fraction = stats.ema_completion_fraction
             if entry.ema_completion_fraction is not None:
                 self._best_completion[course_key] = max(0.0, float(entry.ema_completion_fraction))
-            if entry.generated_course_slot is not None:
-                self._course_generated_slots[course_key] = entry.generated_course_slot
-            if entry.generated_course_generation is not None:
-                self._course_generated_generations[course_key] = entry.generated_course_generation
-            if entry.generated_course_id is not None:
-                self._course_generated_course_ids[course_key] = entry.generated_course_id
-            if entry.generated_course_name is not None:
-                self._course_generated_course_names[course_key] = entry.generated_course_name
-            if entry.generated_course_hash is not None:
-                self._course_generated_course_hashes[course_key] = entry.generated_course_hash
-            if entry.generated_course_seed is not None:
-                self._course_generated_course_seeds[course_key] = entry.generated_course_seed
-            if entry.generated_course_segment_count is not None:
-                self._course_generated_course_segment_counts[course_key] = (
-                    entry.generated_course_segment_count
-                )
-            if entry.generated_course_length is not None:
-                self._course_generated_course_lengths[course_key] = entry.generated_course_length
+            self._courses[course_key] = self._courses[course_key].with_runtime_generation(entry)
         self.update_count = max(0, int(restored_state.update_count))
         self._rollouts_since_weight_update = max(0, int(restored_state.episodes_since_update))
 
@@ -520,19 +424,6 @@ class DeficitBudgetTrackSamplingController:
 
     def _reserve_course_assignment(self, course_key: str, *, assignment_cost: float) -> None:
         self._reserved_reset_steps[course_key] += max(1.0, float(assignment_cost))
-
-
-def _course_entry_ids(track_course_keys: Mapping[str, str]) -> dict[str, tuple[str, ...]]:
-    grouped: dict[str, list[str]] = {}
-    for entry_id, course_key in track_course_keys.items():
-        grouped.setdefault(course_key, []).append(entry_id)
-    return {course_key: tuple(entry_ids) for course_key, entry_ids in grouped.items()}
-
-
-def _mean_entry_weight(entry_ids: Sequence[str], base_weights: Mapping[str, float]) -> float:
-    if not entry_ids:
-        return 1.0
-    return sum(base_weights[entry_id] for entry_id in entry_ids) / len(entry_ids)
 
 
 def _episode_crashed(episode: Mapping[str, object]) -> bool:

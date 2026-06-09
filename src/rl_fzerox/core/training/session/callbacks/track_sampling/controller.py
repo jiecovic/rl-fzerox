@@ -4,18 +4,21 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
+from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
+    ResolvedTrackSamplingCourses,
+    resolve_track_sampling_courses_from_configs,
+    resolve_track_sampling_courses_from_parts,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     episode_completion_fraction,
     episode_finished,
     episode_frame_count,
     episode_track_id,
     runtime_track_sampling_configs,
-    sanitize_log_key,
     uses_step_balance_scheduler,
     uses_track_sampling_runtime_mode,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
-    TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
     TrackStepStats,
     aggregate_runtime_entries,
@@ -61,109 +64,35 @@ class StepBalancedTrackSamplingController:
         track_generated_course_seeds: dict[str, int] | None = None,
         track_generated_course_segment_counts: dict[str, int] | None = None,
         track_generated_course_lengths: dict[str, float] | None = None,
+        resolved_courses: ResolvedTrackSamplingCourses | None = None,
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> None:
-        self._entry_base_weights = {
-            track_id: float(weight) for track_id, weight in track_base_weights.items()
-        }
-        course_keys = {
-            track_id: (
-                (track_course_keys or {}).get(track_id)
-                or (track_log_keys or {}).get(track_id)
-                or track_id
-            )
-            for track_id in self._entry_base_weights
-        }
-        self._entry_course_keys = course_keys
-        course_entry_ids: dict[str, list[str]] = {}
-        course_labels: dict[str, str] = {}
-        course_log_keys: dict[str, str] = {}
-        course_log_enabled: dict[str, bool] = {}
-        course_generated_slots: dict[str, int] = {}
-        course_generated_generations: dict[str, int] = {}
-        course_generated_course_ids: dict[str, str] = {}
-        course_generated_course_names: dict[str, str] = {}
-        course_generated_course_hashes: dict[str, str] = {}
-        course_generated_course_seeds: dict[str, int] = {}
-        course_generated_course_segment_counts: dict[str, int] = {}
-        course_generated_course_lengths: dict[str, float] = {}
-        course_base_weight_sums: dict[str, float] = {}
-        course_base_weight_counts: dict[str, int] = {}
-
-        for track_id, base_weight in self._entry_base_weights.items():
-            course_key = course_keys[track_id]
-            generated_slot = (track_generated_course_slots or {}).get(track_id)
-            generated_generation = (track_generated_course_generations or {}).get(track_id)
-            generated_course_id = (track_generated_course_ids or {}).get(track_id)
-            generated_course_name = (track_generated_course_names or {}).get(track_id)
-            generated_course_hash = (track_generated_course_hashes or {}).get(track_id)
-            generated_course_seed = (track_generated_course_seeds or {}).get(track_id)
-            generated_course_segment_count = (track_generated_course_segment_counts or {}).get(
-                track_id
-            )
-            generated_course_length = (track_generated_course_lengths or {}).get(track_id)
-            course_entry_ids.setdefault(course_key, []).append(track_id)
-            course_labels.setdefault(
-                course_key,
-                (track_labels or {}).get(track_id, course_key),
-            )
-            course_log_keys.setdefault(
-                course_key,
-                sanitize_log_key((track_log_keys or {}).get(track_id, course_key)),
-            )
-            course_log_enabled[course_key] = course_log_enabled.get(course_key, False) or (
-                (track_log_enabled or {}).get(track_id, True)
-            )
-            if generated_slot is not None:
-                course_generated_slots.setdefault(course_key, generated_slot)
-            if generated_generation is not None:
-                course_generated_generations.setdefault(course_key, generated_generation)
-            if generated_course_id is not None:
-                course_generated_course_ids.setdefault(course_key, generated_course_id)
-            if generated_course_name is not None:
-                course_generated_course_names.setdefault(course_key, generated_course_name)
-            if generated_course_hash is not None:
-                course_generated_course_hashes.setdefault(course_key, generated_course_hash)
-            if generated_course_seed is not None:
-                course_generated_course_seeds.setdefault(course_key, generated_course_seed)
-            if generated_course_segment_count is not None:
-                course_generated_course_segment_counts.setdefault(
-                    course_key,
-                    generated_course_segment_count,
-                )
-            if generated_course_length is not None:
-                course_generated_course_lengths.setdefault(course_key, generated_course_length)
-            course_base_weight_sums[course_key] = (
-                course_base_weight_sums.get(course_key, 0.0) + base_weight
-            )
-            course_base_weight_counts[course_key] = course_base_weight_counts.get(course_key, 0) + 1
-
-        self._course_entry_ids = {
-            course_key: tuple(entry_ids) for course_key, entry_ids in course_entry_ids.items()
-        }
-        self._course_entry_base_totals = {
-            course_key: sum(self._entry_base_weights[entry_id] for entry_id in entry_ids)
-            for course_key, entry_ids in self._course_entry_ids.items()
-        }
-        self._course_log_keys = course_log_keys
-        self._course_log_enabled = course_log_enabled
-        self._course_generated_slots = course_generated_slots
-        self._course_generated_generations = course_generated_generations
-        self._course_generated_course_ids = course_generated_course_ids
-        self._course_generated_course_names = course_generated_course_names
-        self._course_generated_course_hashes = course_generated_course_hashes
-        self._course_generated_course_seeds = course_generated_course_seeds
-        self._course_generated_course_segment_counts = course_generated_course_segment_counts
-        self._course_generated_course_lengths = course_generated_course_lengths
-        self._course_labels = course_labels
+        resolved = resolved_courses or resolve_track_sampling_courses_from_parts(
+            track_base_weights=track_base_weights,
+            track_course_keys=track_course_keys,
+            track_log_keys=track_log_keys,
+            track_labels=track_labels,
+            track_log_enabled=track_log_enabled,
+            track_generated_course_slots=track_generated_course_slots,
+            track_generated_course_generations=track_generated_course_generations,
+            track_generated_course_ids=track_generated_course_ids,
+            track_generated_course_names=track_generated_course_names,
+            track_generated_course_hashes=track_generated_course_hashes,
+            track_generated_course_seeds=track_generated_course_seeds,
+            track_generated_course_segment_counts=track_generated_course_segment_counts,
+            track_generated_course_lengths=track_generated_course_lengths,
+        )
+        self._entry_base_weights = dict(resolved.entry_base_weights)
+        self._entry_course_keys = dict(resolved.entry_course_keys)
+        self._courses = dict(resolved.courses)
+        self._course_entry_ids = resolved.course_entry_ids
+        self._course_entry_base_totals = resolved.course_entry_base_totals
         self._stats = {
             course_key: TrackStepStats(
-                base_weight=course_base_weight_sums[course_key]
-                / max(course_base_weight_counts[course_key], 1),
-                current_weight=course_base_weight_sums[course_key]
-                / max(course_base_weight_counts[course_key], 1),
+                base_weight=course.base_weight_mean,
+                current_weight=course.base_weight_mean,
             )
-            for course_key in self._course_entry_ids
+            for course_key, course in self._courses.items()
         }
         if not uses_track_sampling_runtime_mode(sampling_mode):
             raise ValueError(f"Unsupported track sampling runtime mode: {sampling_mode!r}")
@@ -197,70 +126,13 @@ class StepBalancedTrackSamplingController:
         if not configs:
             return None
 
-        base_weights: dict[str, float] = {}
-        requested_course_keys: dict[str, str] = {}
-        requested_log_keys: dict[str, str] = {}
-        requested_log_enabled: dict[str, bool] = {}
-        requested_labels: dict[str, str] = {}
-        requested_generated_slots: dict[str, int] = {}
-        requested_generated_generations: dict[str, int] = {}
-        requested_generated_course_ids: dict[str, str] = {}
-        requested_generated_course_names: dict[str, str] = {}
-        requested_generated_course_hashes: dict[str, str] = {}
-        requested_generated_course_seeds: dict[str, int] = {}
-        requested_generated_course_segment_counts: dict[str, int] = {}
-        requested_generated_course_lengths: dict[str, float] = {}
-        for config in configs:
-            for entry in config.entries:
-                base_weights.setdefault(entry.id, float(entry.weight))
-                course_key = entry.runtime_course_key or entry.course_id or entry.id
-                requested_course_keys.setdefault(entry.id, course_key)
-                requested_log_keys.setdefault(entry.id, course_key)
-                requested_log_enabled.setdefault(entry.id, entry.log_per_course)
-                requested_labels.setdefault(
-                    entry.id,
-                    entry.course_name or entry.course_id or entry.display_name or entry.id,
-                )
-                if entry.generated_course_slot is not None:
-                    requested_generated_slots.setdefault(entry.id, int(entry.generated_course_slot))
-                if entry.generated_course_generation is not None:
-                    requested_generated_generations.setdefault(
-                        entry.id,
-                        int(entry.generated_course_generation),
-                    )
-                if entry.generated_course_slot is not None:
-                    if entry.course_id is not None:
-                        requested_generated_course_ids.setdefault(entry.id, entry.course_id)
-                    requested_generated_course_names.setdefault(
-                        entry.id,
-                        entry.course_name or entry.display_name or entry.course_id or entry.id,
-                    )
-                    if entry.generated_course_hash is not None:
-                        requested_generated_course_hashes.setdefault(
-                            entry.id,
-                            entry.generated_course_hash,
-                        )
-                    if entry.generated_course_seed is not None:
-                        requested_generated_course_seeds.setdefault(
-                            entry.id,
-                            int(entry.generated_course_seed),
-                        )
-                    if entry.generated_course_segment_count is not None:
-                        requested_generated_course_segment_counts.setdefault(
-                            entry.id,
-                            int(entry.generated_course_segment_count),
-                        )
-                    if entry.generated_course_length is not None:
-                        requested_generated_course_lengths.setdefault(
-                            entry.id,
-                            float(entry.generated_course_length),
-                        )
-        if len(set(requested_course_keys.values())) <= 1:
+        resolved_courses = resolve_track_sampling_courses_from_configs(configs)
+        if len(resolved_courses.courses) <= 1:
             return None
 
         settings = configs[0]
         return cls(
-            track_base_weights=base_weights,
+            track_base_weights=resolved_courses.entry_base_weights,
             sampling_mode=settings.sampling_mode,
             action_repeat=env_config.action_repeat,
             update_episodes=settings.step_balance_update_episodes,
@@ -274,18 +146,7 @@ class StepBalancedTrackSamplingController:
             adaptive_confidence_scale=settings.adaptive_step_balance_confidence_scale,
             x_cup_generation_ema_alpha=settings.x_cup_rotation.ema_alpha,
             log_details=settings.step_balance_log_details,
-            track_course_keys=requested_course_keys,
-            track_log_keys=requested_log_keys,
-            track_labels=requested_labels,
-            track_log_enabled=requested_log_enabled,
-            track_generated_course_slots=requested_generated_slots,
-            track_generated_course_generations=requested_generated_generations,
-            track_generated_course_ids=requested_generated_course_ids,
-            track_generated_course_names=requested_generated_course_names,
-            track_generated_course_hashes=requested_generated_course_hashes,
-            track_generated_course_seeds=requested_generated_course_seeds,
-            track_generated_course_segment_counts=requested_generated_course_segment_counts,
-            track_generated_course_lengths=requested_generated_course_lengths,
+            resolved_courses=resolved_courses,
             restored_state=restored_state,
         )
 
@@ -306,7 +167,7 @@ class StepBalancedTrackSamplingController:
                 ema_alpha=self._ema_alpha,
                 generation_ema_alpha=(
                     self._x_cup_generation_ema_alpha
-                    if course_key in self._course_generated_slots
+                    if self._courses[course_key].generated.slot is not None
                     else None
                 ),
                 completion_fraction=episode_completion_fraction(episode),
@@ -345,9 +206,10 @@ class StepBalancedTrackSamplingController:
         total_expected_frame_weight = sum(expected_frame_weights.values())
         values: dict[str, float] = {}
         for course_key, stats in self._stats.items():
-            if not self._course_log_enabled[course_key]:
+            course = self._courses[course_key]
+            if not course.log_enabled:
                 continue
-            key = self._course_log_keys[course_key]
+            key = course.log_key
             values[f"track_sampling/{key}/prob"] = (
                 stats.current_weight / total_weight if total_weight > 0.0 else 0.0
             )
@@ -391,33 +253,7 @@ class StepBalancedTrackSamplingController:
             update_count=self.update_count,
             episodes_since_update=self._episodes_since_update,
             entries=tuple(
-                TrackSamplingRuntimeEntry(
-                    track_id=course_key,
-                    course_key=course_key,
-                    label=self._course_labels[course_key],
-                    base_weight=stats.base_weight,
-                    current_weight=stats.current_weight,
-                    completed_frames=stats.completed_frames,
-                    episode_count=stats.episode_count,
-                    finished_episode_count=stats.finished_episode_count,
-                    success_sample_count=stats.success_sample_count,
-                    ema_episode_frames=stats.ema_episode_frames,
-                    ema_completion_fraction=stats.ema_completion_fraction,
-                    generation_episode_count=stats.generation_episode_count,
-                    generation_finished_episode_count=stats.generation_finished_episode_count,
-                    generation_success_sample_count=stats.generation_success_sample_count,
-                    generation_ema_completion_fraction=(stats.generation_ema_completion_fraction),
-                    generated_course_slot=self._course_generated_slots.get(course_key),
-                    generated_course_generation=self._course_generated_generations.get(course_key),
-                    generated_course_id=self._course_generated_course_ids.get(course_key),
-                    generated_course_name=self._course_generated_course_names.get(course_key),
-                    generated_course_hash=self._course_generated_course_hashes.get(course_key),
-                    generated_course_seed=self._course_generated_course_seeds.get(course_key),
-                    generated_course_segment_count=(
-                        self._course_generated_course_segment_counts.get(course_key)
-                    ),
-                    generated_course_length=self._course_generated_course_lengths.get(course_key),
-                )
+                self._courses[course_key].runtime_entry(stats=stats)
                 for course_key, stats in sorted(self._stats.items())
             ),
         )
@@ -579,24 +415,7 @@ class StepBalancedTrackSamplingController:
                 else max(0.0, min(1.0, float(entry.generation_ema_completion_fraction)))
             )
             stats.current_weight = max(0.0, float(entry.current_weight))
-            if entry.generated_course_slot is not None:
-                self._course_generated_slots[course_key] = entry.generated_course_slot
-            if entry.generated_course_generation is not None:
-                self._course_generated_generations[course_key] = entry.generated_course_generation
-            if entry.generated_course_id is not None:
-                self._course_generated_course_ids[course_key] = entry.generated_course_id
-            if entry.generated_course_name is not None:
-                self._course_generated_course_names[course_key] = entry.generated_course_name
-            if entry.generated_course_hash is not None:
-                self._course_generated_course_hashes[course_key] = entry.generated_course_hash
-            if entry.generated_course_seed is not None:
-                self._course_generated_course_seeds[course_key] = entry.generated_course_seed
-            if entry.generated_course_segment_count is not None:
-                self._course_generated_course_segment_counts[course_key] = (
-                    entry.generated_course_segment_count
-                )
-            if entry.generated_course_length is not None:
-                self._course_generated_course_lengths[course_key] = entry.generated_course_length
+            self._courses[course_key] = self._courses[course_key].with_runtime_generation(entry)
             restored_any = True
         self._episodes_since_update = max(0, int(restored_state.episodes_since_update))
         self.update_count = max(0, int(restored_state.update_count))
