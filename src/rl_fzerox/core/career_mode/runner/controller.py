@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
+from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
 from rl_fzerox.core.career_mode.runner.menu import (
     GP_MENU_ORDER,
     MENU_TIMING,
@@ -28,14 +27,11 @@ from rl_fzerox.core.career_mode.runner.menu import (
 )
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.career_mode.runner.policy_resolver import CareerPolicyResolver
-from rl_fzerox.core.career_mode.runner.race import (
-    SaveRaceExecutionPlan,
-    build_save_race_execution_plan,
+from rl_fzerox.core.career_mode.runner.progress import (
+    CareerAttemptProgress,
 )
-from rl_fzerox.core.career_mode.runner.save_file import (
-    SaveRamSession,
-    persist_save_ram_for_store,
-)
+from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan
+from rl_fzerox.core.career_mode.runner.save_file import SaveRamSession
 from rl_fzerox.core.career_mode.runner.setup import (
     career_mode_race_setup_config,
     save_race_setup_from_config,
@@ -45,27 +41,14 @@ from rl_fzerox.core.career_mode.runner.view import (
     career_debug_context,
     career_viewer_info,
 )
-from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.domain.race_difficulty import (
     is_race_difficulty_name,
     race_difficulty_raw_value,
 )
-from rl_fzerox.core.envs.engine.info import telemetry_info
 from rl_fzerox.core.envs.engine.reset.camera import (
-    CAMERA_SYNC_CONTROLS,
     CameraSyncBackend,
-    sync_camera_setting,
 )
 from rl_fzerox.core.manager import ManagerStore
-from rl_fzerox.core.manager.models import (
-    ManagedRun,
-    ManagedSaveAttempt,
-    ManagedSaveCourseSetup,
-    ManagedSaveGame,
-    ManagedSaveUnlockProgress,
-    SaveAttemptStatus,
-    SaveGameStatus,
-)
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchAppConfig
 
 
@@ -78,48 +61,6 @@ class CareerRuntimeSession(Protocol):
 
     @property
     def emulator(self) -> CareerRuntimeEmulator: ...
-
-
-class CareerModeStore(Protocol):
-    """Manager operations the Career controller mutates while running."""
-
-    def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None: ...
-
-    def get_run(self, run_id: str) -> ManagedRun | None: ...
-
-    def list_save_course_setups(
-        self,
-        save_game_id: str,
-    ) -> tuple[ManagedSaveCourseSetup, ...]: ...
-
-    def save_game_unlock_progress(
-        self,
-        save_game_id: str,
-    ) -> ManagedSaveUnlockProgress: ...
-
-    def finish_save_attempt(
-        self,
-        *,
-        attempt_id: str,
-        status: SaveAttemptStatus,
-        finish_position: int | None = None,
-        finish_time_s: float | None = None,
-        failure_reason: str | None = None,
-    ) -> ManagedSaveAttempt | None: ...
-
-    def update_save_game_status(
-        self,
-        *,
-        save_game_id: str,
-        status: SaveGameStatus,
-    ) -> object | None: ...
-
-    def start_next_save_attempt(self, save_game_id: str) -> ManagedSaveAttempt: ...
-
-    def get_save_attempt_execution_context(
-        self,
-        attempt_id: str,
-    ) -> SaveAttemptExecutionContext | None: ...
 
 
 class CareerModeController:
@@ -135,10 +76,13 @@ class CareerModeController:
         device: str,
     ) -> None:
         self._setup = setup
-        self._store: CareerModeStore = ManagerStore(db_path)
-        self._save_game_id = save_game_id
-        self._attempt_id: str | None = attempt_id
-        self._camera_setting: CameraSettingName | None = None
+        store = ManagerStore(db_path)
+        self._progress = CareerAttemptProgress(
+            store=store,
+            save_game_id=save_game_id,
+            attempt_id=attempt_id,
+        )
+        self._camera = CareerCameraSync()
         self._pending_steps: deque[RawMenuStep] = deque()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
         self._engine_applied_course_id: str | None = None
@@ -146,20 +90,16 @@ class CareerModeController:
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
-        self._camera_synced = self._camera_setting is None
-        self._camera_sync_taps = 0
         self._awaiting_new_race_after_terminal = False
         self._continuing_race_result = False
         self._observed_terminal_race_result = False
         self._continue_after_race_pulses = 0
         self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
-        self._course_setups = self._store.list_save_course_setups(save_game_id)
-        self._unlock_progress = self._store.save_game_unlock_progress(save_game_id)
         self._policy_resolver = CareerPolicyResolver(
-            store=self._store,
+            store=store,
             setup=self._setup,
-            course_setups=self._course_setups,
+            course_setups=self._progress.course_setups,
             device=device,
         )
 
@@ -446,14 +386,14 @@ class CareerModeController:
 
     def _view_state(self) -> CareerControllerViewState:
         return CareerControllerViewState(
-            attempt_id=self._attempt_id,
+            attempt_id=self._progress.attempt_id,
             setup=self._setup,
-            progress=self._unlock_progress,
+            progress=self._progress.unlock_progress,
             phase=self._phase,
             pending_step_count=len(self._pending_steps),
             difficulty_popup_state=self._difficulty_popup_state,
-            camera_synced=self._camera_synced,
-            camera_setting=self._camera_setting,
+            camera_synced=self._camera.synced,
+            camera_setting=self._camera.target,
             awaiting_new_race_after_terminal=self._awaiting_new_race_after_terminal,
             continuing_race_result=self._continuing_race_result,
             fresh_race_ready_frames=self._fresh_race_ready_frames,
@@ -473,8 +413,7 @@ class CareerModeController:
         if resolution is None:
             return None
         if resolution.activated_new_policy:
-            self._camera_setting = resolution.camera_setting
-            self._reset_camera_sync()
+            self._camera.set_target(resolution.camera_setting)
         return resolution.control
 
     def _enter_policy_race(self) -> RawMenuStep:
@@ -739,83 +678,23 @@ class CareerModeController:
             terminal_reason=terminal_reason,
         )
         info.update(terminal_info)
-        self._handle_terminal_race_step(
+        transition = self._progress.handle_terminal_race(
             session=session,
+            setup=self._setup,
             info=terminal_info,
         )
-        if self._attempt_id is None:
+        if transition.next_plan is not None:
+            self._apply_execution_plan(transition.next_plan)
+        if self._progress.attempt_id is None:
             self._phase = CareerPhase.WAIT_FOR_GP_RACE
             self._pending_steps.clear()
             return True
         self._enter_continue_after_race()
         return True
 
-    def _handle_terminal_race_step(
-        self,
-        *,
-        session: CareerRuntimeSession,
-        info: dict[str, object],
-    ) -> None:
-        if self._attempt_id is None:
-            return
-
-        persist_save_ram_for_store(self._store, self._save_game_id, session)
-        progress = self._store.save_game_unlock_progress(self._save_game_id)
-        self._unlock_progress = progress
-        if _target_succeeded(progress.targets, self._setup):
-            self._finish_attempt(info=info, status="succeeded", failure_reason=None)
-            self._advance_after_finished_attempt()
-            return
-
-        if info.get("termination_reason") == "finished":
-            return
-
-        reason = _failure_reason(info)
-        self._finish_attempt(info=info, status="failed", failure_reason=reason)
-        self._advance_after_finished_attempt()
-
-    def _finish_attempt(
-        self,
-        *,
-        info: dict[str, object],
-        status: SaveAttemptStatus,
-        failure_reason: str | None,
-    ) -> None:
-        if self._attempt_id is None:
-            return
-        finish_time_ms = _positive_int_info(info, "race_time_ms")
-        self._store.finish_save_attempt(
-            attempt_id=self._attempt_id,
-            status=status,
-            finish_position=_positive_int_info(info, "position"),
-            finish_time_s=(finish_time_ms / 1000.0 if finish_time_ms is not None else None),
-            failure_reason=failure_reason,
-        )
-
-    def _advance_after_finished_attempt(self) -> None:
-        progress = self._store.save_game_unlock_progress(self._save_game_id)
-        self._unlock_progress = progress
-        if progress.next_target is None:
-            self._store.update_save_game_status(
-                save_game_id=self._save_game_id,
-                status="finished",
-            )
-            self._attempt_id = None
-            return
-
-        next_attempt = self._store.start_next_save_attempt(self._save_game_id)
-        context = self._store.get_save_attempt_execution_context(next_attempt.id)
-        if context is None:
-            raise RuntimeError(
-                f"save attempt disappeared before Career Mode could continue: {next_attempt.id}"
-            )
-        self._apply_execution_plan(build_save_race_execution_plan(context))
-
     def _apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:
-        self._attempt_id = plan.attempt_id
+        self._progress.apply_execution_plan(plan)
         self._setup = career_mode_race_setup_config(plan.race_setup)
-        self._course_setups = self._store.list_save_course_setups(self._save_game_id)
-        self._unlock_progress = self._store.save_game_unlock_progress(self._save_game_id)
         self._pending_steps.clear()
         self._phase = CareerPhase.CONTINUE_AFTER_RACE
         self._engine_applied_course_id = None
@@ -825,7 +704,7 @@ class CareerModeController:
         self._advance_presses_in_phase = 0
         self._policy_resolver.update_context(
             setup=self._setup,
-            course_setups=self._course_setups,
+            course_setups=self._progress.course_setups,
         )
         self._awaiting_new_race_after_terminal = True
         self._continuing_race_result = True
@@ -851,31 +730,13 @@ class CareerModeController:
         self._reset_camera_sync()
 
     def _camera_ready(self, info: dict[str, object]) -> bool:
-        facts = MenuFacts.from_info(info)
-        if self._camera_setting is None:
-            return True
-        if facts.camera_setting == self._camera_setting:
-            self._camera_synced = True
-            return True
-        return self._camera_synced
+        return self._camera.ready(info)
 
     def _next_camera_sync_step(
         self,
         info: dict[str, object],
     ) -> RawMenuStep | None:
-        facts = MenuFacts.from_info(info)
-        if self._camera_setting is None or self._camera_synced:
-            return None
-        if facts.camera_setting == self._camera_setting:
-            self._camera_synced = True
-            return None
-        if not _race_intro_ready_for_camera(info):
-            return raw_step(
-                MenuInput.NEUTRAL,
-                1,
-                phase="camera_sync:wait_intro",
-            )
-        return raw_step(MenuInput.NEUTRAL, 1, phase="camera_sync:apply")
+        return self._camera.next_menu_step(info)
 
     def _sync_camera_before_policy_handoff(
         self,
@@ -883,35 +744,11 @@ class CareerModeController:
         session: CareerRuntimeSession,
         info: dict[str, object],
     ) -> bool:
-        if (
-            self._camera_setting is None
-            or self._camera_synced
-            or self._phase not in {CareerPhase.ENTER_RACE, CareerPhase.CONTINUE_AFTER_RACE}
-            or not in_gp_race(info)
-            or not _race_intro_ready_for_camera(info)
-        ):
-            return False
-
-        telemetry = session.emulator.try_read_telemetry()
-        try:
-            telemetry = sync_camera_setting(
-                session.emulator,
-                target_name=self._camera_setting,
-                telemetry=telemetry,
-                info=info,
-            )
-        except RuntimeError as exc:
-            info["camera_setting_sync"] = "retry"
-            info["camera_setting_sync_reason"] = str(exc)
-            return False
-        if telemetry is None:
-            return False
-        info.update(telemetry_info(telemetry))
-        if telemetry.camera_setting_name == self._camera_setting:
-            self._camera_synced = True
-            tap_count = info.get("camera_setting_taps")
-            self._camera_sync_taps = tap_count if isinstance(tap_count, int) else 0
-        return True
+        return self._camera.sync_before_policy_handoff(
+            session=session,
+            info=info,
+            phase=self._phase,
+        )
 
     def _sync_post_terminal_save_progress(
         self,
@@ -921,7 +758,7 @@ class CareerModeController:
     ) -> bool:
         if (
             self._phase != CareerPhase.CONTINUE_AFTER_RACE
-            or self._attempt_id is None
+            or self._progress.attempt_id is None
             or not self._observed_terminal_race_result
         ):
             return False
@@ -932,19 +769,17 @@ class CareerModeController:
             return False
 
         self._last_progress_sync_continue_pulse = self._continue_after_race_pulses
-        persist_save_ram_for_store(self._store, self._save_game_id, session)
-        progress = self._store.save_game_unlock_progress(self._save_game_id)
-        self._unlock_progress = progress
-        if not _target_succeeded(progress.targets, self._setup):
-            return False
-
-        self._finish_attempt(info=info, status="succeeded", failure_reason=None)
-        self._advance_after_finished_attempt()
-        return True
+        transition = self._progress.sync_post_terminal_success(
+            session=session,
+            setup=self._setup,
+            info=info,
+        )
+        if transition.next_plan is not None:
+            self._apply_execution_plan(transition.next_plan)
+        return transition.attempt_finished
 
     def _reset_camera_sync(self) -> None:
-        self._camera_synced = self._camera_setting is None
-        self._camera_sync_taps = 0
+        self._camera.reset()
 
     def _new_race_ready_for_policy(self, info: dict[str, object]) -> bool:
         facts = MenuFacts.from_info(info)
@@ -1032,24 +867,6 @@ def _post_terminal_progress_screen(facts: MenuFacts) -> bool:
     )
 
 
-def _target_succeeded(
-    targets: Iterable[object],
-    setup: CareerModeRaceSetupConfig,
-) -> bool:
-    return any(
-        getattr(target, "status", None) == "succeeded"
-        and getattr(target, "kind", None) == "clear_gp_cup"
-        and getattr(target, "difficulty", None) == setup.difficulty
-        and getattr(target, "cup_id", None) == setup.cup_id
-        for target in targets
-    )
-
-
-def _failure_reason(info: dict[str, object]) -> str:
-    reason = info.get("termination_reason")
-    return reason if isinstance(reason, str) and reason else "race ended before cup clear"
-
-
 def _race_terminal_reason(
     *,
     session: CareerRuntimeSession,
@@ -1126,21 +943,3 @@ def _number_info(info: dict[str, object], key: str) -> float | None:
 
 def _non_empty_str(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
-
-
-def _positive_int_info(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value if value > 0 else None
-
-
-def _race_intro_ready_for_camera(info: dict[str, object]) -> bool:
-    transition_state = info.get("menu_transition_state_raw")
-    if isinstance(transition_state, int) and not isinstance(transition_state, bool):
-        if transition_state != 0:
-            return False
-    timer = info.get("race_intro_timer")
-    if isinstance(timer, bool) or not isinstance(timer, int):
-        return False
-    return 0 < timer < CAMERA_SYNC_CONTROLS.ready_intro_timer
