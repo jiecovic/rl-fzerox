@@ -1,5 +1,9 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/ActionToggleRow.tsx
 import { ToggleSwitch } from "@/features/configurator/fields";
+import {
+  ActionToggleCopy,
+  ActionToggleRowLayout,
+} from "@/features/configurator/sections/action/ActionLayout";
 
 export function ActionToggleRow({
   description,
@@ -25,11 +29,8 @@ export function ActionToggleRow({
   outputLabel: string;
 }) {
   return (
-    <div className="action-toggle-row">
-      <div className="action-toggle-copy">
-        <strong>{label}</strong>
-        <small>{description}</small>
-      </div>
+    <ActionToggleRowLayout>
+      <ActionToggleCopy description={description} title={label} />
       <ToggleSwitch
         checked={output}
         disabled={outputDisabledReason !== undefined}
@@ -51,6 +52,6 @@ export function ActionToggleRow({
         }
         onChange={onEnabledChange}
       />
-    </div>
+    </ActionToggleRowLayout>
   );
 }

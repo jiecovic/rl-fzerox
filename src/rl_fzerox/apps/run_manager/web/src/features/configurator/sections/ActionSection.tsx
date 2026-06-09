@@ -8,6 +8,11 @@ import {
 } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
+import {
+  ActionNote,
+  ActionSummaryGrid,
+  ActionSummaryItem,
+} from "@/features/configurator/sections/action/ActionLayout";
 import { AuxiliaryBranchesDisclosure } from "@/features/configurator/sections/action/AuxiliaryBranchesDisclosure";
 import { ControlFamilyDisclosure } from "@/features/configurator/sections/action/ControlFamilyDisclosure";
 import { EntropyGroupWeightsPanel } from "@/features/configurator/sections/action/EntropyGroupWeightsPanel";
@@ -62,7 +67,7 @@ export function ActionSection({
   };
 
   return (
-    <ConfigStack className="action-disclosure-stack">
+    <ConfigStack className="gap-2.5 [&_.config-disclosure-body]:gap-[18px]">
       <DisclosureToolbar
         collapseLabel="Collapse all action sections"
         expandLabel="Expand all action sections"
@@ -102,15 +107,15 @@ export function ActionSection({
       />
 
       <ConfigPanel title="Action surface" wide>
-        <div className="action-summary-grid">
+        <ActionSummaryGrid>
           {actionSummaryRows(action).map((row) => (
-            <div className="action-summary-item" key={row.label}>
+            <ActionSummaryItem key={row.label}>
               <span>{row.label}</span>
               <strong>{row.value}</strong>
-            </div>
+            </ActionSummaryItem>
           ))}
-        </div>
-        {compatibilityNote !== null ? <p className="action-note">{compatibilityNote}</p> : null}
+        </ActionSummaryGrid>
+        {compatibilityNote !== null ? <ActionNote>{compatibilityNote}</ActionNote> : null}
       </ConfigPanel>
     </ConfigStack>
   );

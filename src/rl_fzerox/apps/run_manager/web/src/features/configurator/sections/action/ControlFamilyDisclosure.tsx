@@ -8,6 +8,13 @@ import {
   SegmentedChoiceStrip,
   ToggleSwitch,
 } from "@/features/configurator/fields";
+import {
+  ActionCard,
+  ActionFields,
+  ActionInlineToggle,
+  ActionStack,
+  ActionTripleFields,
+} from "@/features/configurator/sections/action/ActionLayout";
 import { throttleModeDescription } from "@/features/configurator/sections/action/descriptions";
 import {
   displayActionRepeat,
@@ -18,6 +25,7 @@ import {
 } from "@/features/configurator/sections/action/model";
 import type { ActionUpdateContext } from "@/features/configurator/sections/action/types";
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { FieldShell } from "@/shared/ui/Field";
 
 export function ControlFamilyDisclosure({
   checkpointLocked = false,
@@ -67,14 +75,13 @@ export function ControlFamilyDisclosure({
         }))
       }
     >
-      <div className="action-family-stack">
-        <section className="action-axis-card">
-          <div className="action-axis-header">
-            <strong>Steering</strong>
-            <span>Choose between one analog lane and a discrete bucket head.</span>
-          </div>
+      <ActionStack>
+        <ActionCard
+          description="Choose between one analog lane and a discrete bucket head."
+          title="Steering"
+        >
           <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
-            <div className="field-shell">
+            <FieldShell>
               <FieldLabel
                 help="Choose whether steering is one analog lane or a discrete bucket head."
                 label="Steering mode"
@@ -91,9 +98,9 @@ export function ControlFamilyDisclosure({
                     }),
                 }))}
               />
-            </div>
+            </FieldShell>
             {action.steering_mode === "discrete" ? (
-              <div className="action-axis-fields">
+              <ActionFields>
                 <RangeIntegerField
                   help="Odd bucket counts preserve one neutral center action while adding more left and right resolution."
                   label="Steer buckets"
@@ -112,20 +119,17 @@ export function ControlFamilyDisclosure({
                     updateAction({ steer_buckets: normalizeOddBucketCount(value) })
                   }
                 />
-              </div>
+              </ActionFields>
             ) : null}
           </fieldset>
-        </section>
+        </ActionCard>
 
-        <section className="action-axis-card">
-          <div className="action-axis-header">
-            <strong>Throttle</strong>
-            <span>
-              Choose between a continuous PWM throttle lane and a stock-style digital button press.
-            </span>
-          </div>
+        <ActionCard
+          description="Choose between a continuous PWM throttle lane and a stock-style digital button press."
+          title="Throttle"
+        >
           <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
-            <div className="field-shell">
+            <FieldShell>
               <FieldLabel
                 help="Choose between a continuous PWM throttle lane and a stock-style digital gas button. PWM is a workaround that approximates fractional throttle by pulsing the real N64 button across frames."
                 label="Throttle mode"
@@ -145,105 +149,96 @@ export function ControlFamilyDisclosure({
                     }),
                 }))}
               />
-            </div>
+            </FieldShell>
           </fieldset>
-          <div
-            className={
-              action.drive_mode === "pwm"
-                ? "action-axis-fields action-axis-fields-triple"
-                : "action-axis-fields"
-            }
-          >
-            {action.drive_mode === "pwm" ? (
-              <>
-                <RangeNumberField
-                  help="Ignore small positive throttle values below this threshold."
-                  label="Deadzone"
-                  max={0.5}
-                  min={0}
-                  rangeStep={0.01}
-                  resetValue={defaultConfig.action.continuous_drive_deadzone}
-                  ticks={[
-                    { value: 0, label: "0" },
-                    { value: 0.1, label: "0.1" },
-                    { value: 0.25, label: "0.25" },
-                    { value: 0.5, label: "0.5" },
-                  ]}
-                  value={action.continuous_drive_deadzone}
-                  onChange={(value) => updateAction({ continuous_drive_deadzone: value })}
+          {action.drive_mode === "pwm" ? (
+            <ActionTripleFields>
+              <RangeNumberField
+                help="Ignore small positive throttle values below this threshold."
+                label="Deadzone"
+                max={0.5}
+                min={0}
+                rangeStep={0.01}
+                resetValue={defaultConfig.action.continuous_drive_deadzone}
+                ticks={[
+                  { value: 0, label: "0" },
+                  { value: 0.1, label: "0.1" },
+                  { value: 0.25, label: "0.25" },
+                  { value: 0.5, label: "0.5" },
+                ]}
+                value={action.continuous_drive_deadzone}
+                onChange={(value) => updateAction({ continuous_drive_deadzone: value })}
+              />
+              <RangeNumberField
+                help="Clamp throttle to full once the continuous lane reaches this value."
+                label="Full threshold"
+                max={1}
+                min={0.1}
+                rangeStep={0.01}
+                resetValue={defaultConfig.action.continuous_drive_full_threshold}
+                ticks={[
+                  { value: 0.1, label: "0.1" },
+                  { value: 0.5, label: "0.5" },
+                  { value: 0.85, label: "0.85" },
+                  { value: 1, label: "1" },
+                ]}
+                value={action.continuous_drive_full_threshold}
+                onChange={(value) => updateAction({ continuous_drive_full_threshold: value })}
+              />
+              <RangeNumberField
+                help="Throttle duty used at and below the deadzone, and the lower endpoint of the ramp up to full throttle."
+                label="Minimum thrust"
+                max={1}
+                min={0}
+                rangeStep={0.01}
+                resetValue={defaultConfig.action.continuous_drive_min_thrust}
+                ticks={[
+                  { value: 0, label: "0" },
+                  { value: 0.25, label: "0.25" },
+                  { value: 0.5, label: "0.5" },
+                  { value: 1, label: "1" },
+                ]}
+                value={action.continuous_drive_min_thrust}
+                onChange={(value) => updateAction({ continuous_drive_min_thrust: value })}
+              />
+            </ActionTripleFields>
+          ) : (
+            <ActionFields>
+              <div className="field-with-note">
+                <NumberField
+                  help="Initial logit bias toward the engaged gas button when throttle uses the discrete N64-style button branch."
+                  label="Gas-on logit"
+                  resetValue={defaultConfig.policy.gas_on_logit}
+                  step="0.1"
+                  value={config.policy.gas_on_logit}
+                  onChange={(value) => updatePolicy({ gas_on_logit: value })}
                 />
-                <RangeNumberField
-                  help="Clamp throttle to full once the continuous lane reaches this value."
-                  label="Full threshold"
-                  max={1}
-                  min={0.1}
-                  rangeStep={0.01}
-                  resetValue={defaultConfig.action.continuous_drive_full_threshold}
-                  ticks={[
-                    { value: 0.1, label: "0.1" },
-                    { value: 0.5, label: "0.5" },
-                    { value: 0.85, label: "0.85" },
-                    { value: 1, label: "1" },
-                  ]}
-                  value={action.continuous_drive_full_threshold}
-                  onChange={(value) => updateAction({ continuous_drive_full_threshold: value })}
-                />
-                <RangeNumberField
-                  help="Throttle duty used at and below the deadzone, and the lower endpoint of the ramp up to full throttle."
-                  label="Minimum thrust"
-                  max={1}
-                  min={0}
-                  rangeStep={0.01}
-                  resetValue={defaultConfig.action.continuous_drive_min_thrust}
-                  ticks={[
-                    { value: 0, label: "0" },
-                    { value: 0.25, label: "0.25" },
-                    { value: 0.5, label: "0.5" },
-                    { value: 1, label: "1" },
-                  ]}
-                  value={action.continuous_drive_min_thrust}
-                  onChange={(value) => updateAction({ continuous_drive_min_thrust: value })}
-                />
-              </>
-            ) : (
-              <div className="action-axis-fields">
-                <div className="field-with-note">
-                  <NumberField
-                    help="Initial logit bias toward the engaged gas button when throttle uses the discrete N64-style button branch."
-                    label="Gas-on logit"
-                    resetValue={defaultConfig.policy.gas_on_logit}
-                    step="0.1"
-                    value={config.policy.gas_on_logit}
-                    onChange={(value) => updatePolicy({ gas_on_logit: value })}
-                  />
-                  <div className="field-note">
-                    {`sigmoid(${formatSignedDecimal(config.policy.gas_on_logit)}) ≈ ${formatPercent(gasOnProbability(config.policy.gas_on_logit))} initial engage probability`}
-                  </div>
+                <div className="field-note">
+                  {`sigmoid(${formatSignedDecimal(config.policy.gas_on_logit)}) ≈ ${formatPercent(gasOnProbability(config.policy.gas_on_logit))} initial engage probability`}
                 </div>
               </div>
-            )}
-          </div>
-          <div className="field-shell action-inline-toggle-field">
+            </ActionFields>
+          )}
+          <FieldShell className="min-h-full">
             <FieldLabel
               help="Force discrete throttle fully engaged at runtime. This is useful when you want to remove throttle variation without changing the action head shape."
               label="Force full throttle"
             />
-            <div className="action-inline-toggle">
+            <ActionInlineToggle className="grid-cols-1 justify-items-start">
               <ToggleSwitch
                 checked={action.force_full_throttle}
                 hideLabel
                 label="Force full throttle"
                 onChange={(checked) => updateAction({ force_full_throttle: checked })}
               />
-            </div>
-          </div>
-        </section>
+            </ActionInlineToggle>
+          </FieldShell>
+        </ActionCard>
 
-        <section className="action-axis-card">
-          <div className="action-axis-header">
-            <strong>Control cadence</strong>
-            <span>Set how many native frames each sampled action stays active.</span>
-          </div>
+        <ActionCard
+          description="Set how many native frames each sampled action stays active."
+          title="Control cadence"
+        >
           <div className="field-with-note">
             <RangeIntegerField
               help="Hold each policy decision for N native emulator frames before sampling the next action."
@@ -267,8 +262,8 @@ export function ControlFamilyDisclosure({
               {`${displayActionRepeat(action.action_repeat)} keeps one decision active for ${action.action_repeat} native frames, giving an effective control rate of ${formatControlFps(effectiveControlFps(action.action_repeat))}.`}
             </div>
           </div>
-        </section>
-      </div>
+        </ActionCard>
+      </ActionStack>
     </ConfigDisclosure>
   );
 }

@@ -9,6 +9,13 @@ import {
 import { formatEditableDecimal } from "@/features/configurator/fields/format";
 import { useEditableNumberInput } from "@/features/configurator/fields/numberInput";
 import { resetHandler } from "@/features/configurator/fields/reset";
+import {
+  ActionCard,
+  ActionFieldset,
+  ActionNote,
+  ActionTripleFields,
+  ActionTwoColumn,
+} from "@/features/configurator/sections/action/ActionLayout";
 import type {
   AuxiliaryActionConfig,
   UpdateAction,
@@ -37,22 +44,18 @@ export function AirBrakeCard({
   updateAction,
 }: AirBrakeCardProps) {
   return (
-    <section className="action-runtime-card">
-      <div className="action-runtime-header config-disclosure-copy">
-        <strong>Air brake</strong>
-        <small>Choose the output family, optional PWM shaping, and grounded-use guard.</small>
-      </div>
+    <ActionCard
+      description="Choose the output family, optional PWM shaping, and grounded-use guard."
+      title="Air brake"
+    >
       {action.include_air_brake ? null : (
-        <p className="action-note">
+        <ActionNote>
           Air brake is not in the action output right now, so these runtime rules are inactive.
-        </p>
+        </ActionNote>
       )}
-      <fieldset
-        className="dependent-fieldset action-runtime-fields"
-        disabled={!action.include_air_brake}
-      >
+      <ActionFieldset disabled={!action.include_air_brake}>
         <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
-          <div className="field-shell">
+          <FieldShell>
             <FieldLabel
               help="Choose between a continuous PWM air-brake lane and a stock-style digital air-brake button."
               label="Air brake mode"
@@ -72,9 +75,9 @@ export function AirBrakeCard({
                   }),
               }))}
             />
-          </div>
+          </FieldShell>
           {action.air_brake_mode === "pwm" ? (
-            <div className="action-axis-fields action-axis-fields-triple">
+            <ActionTripleFields>
               <RangeNumberField
                 help="Ignore small positive air-brake values below this threshold."
                 label="Deadzone"
@@ -123,10 +126,10 @@ export function AirBrakeCard({
                 value={action.continuous_air_brake_min_duty}
                 onChange={(value) => updateAction({ continuous_air_brake_min_duty: value })}
               />
-            </div>
+            </ActionTripleFields>
           ) : null}
         </fieldset>
-        <div className="field-shell">
+        <FieldShell>
           <FieldLabel
             help="When enabled, the air-brake branch is masked back to neutral while grounded. Turn this off to let the policy use air brake freely on ground too."
             label="Mask on ground"
@@ -148,9 +151,9 @@ export function AirBrakeCard({
               },
             ]}
           />
-        </div>
-      </fieldset>
-    </section>
+        </FieldShell>
+      </ActionFieldset>
+    </ActionCard>
   );
 }
 
@@ -162,21 +165,17 @@ interface BoostGuardsCardProps {
 
 export function BoostGuardsCard({ action, defaultAction, updateAction }: BoostGuardsCardProps) {
   return (
-    <section className="action-runtime-card">
-      <div className="action-runtime-header config-disclosure-copy">
-        <strong>Boost guards</strong>
-        <small>Only allow manual boost when these runtime conditions are satisfied.</small>
-      </div>
+    <ActionCard
+      description="Only allow manual boost when these runtime conditions are satisfied."
+      title="Boost guards"
+    >
       {action.include_boost ? null : (
-        <p className="action-note">
+        <ActionNote>
           Boost is not in the action output right now, so these runtime rules are inactive.
-        </p>
+        </ActionNote>
       )}
-      <fieldset
-        className="dependent-fieldset action-runtime-fields"
-        disabled={!action.include_boost}
-      >
-        <div className="action-runtime-two-col">
+      <ActionFieldset disabled={!action.include_boost}>
+        <ActionTwoColumn>
           <OptionalNumberField
             defaultValue={900}
             help="Optionally block manual boost once the vehicle is above this speed. Leave this empty to ignore speed and rely on the normal unlock plus the energy guard."
@@ -205,9 +204,9 @@ export function BoostGuardsCard({ action, defaultAction, updateAction }: BoostGu
             value={action.boost_min_energy_fraction * 100}
             onChange={(value) => updateAction({ boost_min_energy_fraction: value / 100 })}
           />
-        </div>
-        <div className="action-runtime-two-col">
-          <div className="field-shell">
+        </ActionTwoColumn>
+        <ActionTwoColumn>
+          <FieldShell>
             <FieldLabel
               help="When enabled, manual boost is masked while a manual boost or dash-pad boost effect is already active."
               label="Mask while boosted"
@@ -232,8 +231,8 @@ export function BoostGuardsCard({ action, defaultAction, updateAction }: BoostGu
                 },
               ]}
             />
-          </div>
-          <div className="field-shell">
+          </FieldShell>
+          <FieldShell>
             <FieldLabel
               help="When enabled, manual boost is masked while the vehicle is airborne."
               label="Mask while airborne"
@@ -260,9 +259,9 @@ export function BoostGuardsCard({ action, defaultAction, updateAction }: BoostGu
                 },
               ]}
             />
-          </div>
-        </div>
-        <div className="action-runtime-two-col">
+          </FieldShell>
+        </ActionTwoColumn>
+        <ActionTwoColumn>
           <IntegerField
             help="Allow a manual boost decision only once per this many env steps. The native-frame spacing is derived from action repeat."
             label="Decision interval env steps"
@@ -275,8 +274,8 @@ export function BoostGuardsCard({ action, defaultAction, updateAction }: BoostGu
             value={action.boost_decision_interval_steps}
             onChange={(value) => updateAction({ boost_decision_interval_steps: value })}
           />
-        </div>
-        <div className="action-runtime-two-col">
+        </ActionTwoColumn>
+        <ActionTwoColumn>
           <IntegerField
             help="After a manual boost request, keep the boost branch masked for this many native frames. Useful as the spam guard when the active-boost mask is off."
             label="Request cooldown frames"
@@ -284,9 +283,9 @@ export function BoostGuardsCard({ action, defaultAction, updateAction }: BoostGu
             value={action.boost_request_lockout_frames}
             onChange={(value) => updateAction({ boost_request_lockout_frames: value })}
           />
-        </div>
-      </fieldset>
-    </section>
+        </ActionTwoColumn>
+      </ActionFieldset>
+    </ActionCard>
   );
 }
 
@@ -306,22 +305,18 @@ export function LeanControlCard({
   updateAction,
 }: LeanControlCardProps) {
   return (
-    <section className="action-runtime-card">
-      <div className="action-runtime-header config-disclosure-copy">
-        <strong>Lean control</strong>
-        <small>Define the lean output shape, optional guards, and any post-processing.</small>
-      </div>
+    <ActionCard
+      description="Define the lean output shape, optional guards, and any post-processing."
+      title="Lean control"
+    >
       {action.include_lean ? null : (
-        <p className="action-note">
+        <ActionNote>
           Lean is not in the action output right now, so these runtime rules are inactive.
-        </p>
+        </ActionNote>
       )}
-      <fieldset
-        className="dependent-fieldset action-runtime-fields"
-        disabled={!action.include_lean}
-      >
+      <ActionFieldset disabled={!action.include_lean}>
         <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
-          <div className="field-shell">
+          <FieldShell>
             <FieldLabel
               help="Choose whether lean is one categorical branch or two independent left and right button branches."
               label="Lean output"
@@ -344,12 +339,12 @@ export function LeanControlCard({
                 },
               }))}
             />
-          </div>
+          </FieldShell>
         </fieldset>
         {action.lean_output_mode === "three_way" ||
         action.lean_output_mode === "four_way_categorical" ? (
           <>
-            <div className="field-shell">
+            <FieldShell>
               <FieldLabel
                 help="Choose how the categorical lean branch is post-processed before it reaches the emulator."
                 label="Lean mode"
@@ -366,16 +361,16 @@ export function LeanControlCard({
                     }),
                 }))}
               />
-            </div>
-            <p className="action-note">{leanModeDescription(action.lean_mode)}</p>
+            </FieldShell>
+            <ActionNote>{leanModeDescription(action.lean_mode)}</ActionNote>
           </>
         ) : (
-          <p className="action-note">
+          <ActionNote>
             Independent buttons expose separate left and right lean outputs. They can co-activate
             and always bypass lean hold or cooldown assistance.
-          </p>
+          </ActionNote>
         )}
-        <div className="action-runtime-two-col">
+        <ActionTwoColumn>
           <OptionalNumberField
             defaultValue={700}
             help="Optionally block lean below this vehicle speed."
@@ -393,9 +388,9 @@ export function LeanControlCard({
             value={action.lean_initial_lockout_frames}
             onChange={(value) => updateAction({ lean_initial_lockout_frames: value })}
           />
-        </div>
-      </fieldset>
-    </section>
+        </ActionTwoColumn>
+      </ActionFieldset>
+    </ActionCard>
   );
 }
 
@@ -417,21 +412,14 @@ export function SpinControlCard({
   updatePolicy,
 }: SpinControlCardProps) {
   return (
-    <section className="action-runtime-card">
-      <div className="action-runtime-header config-disclosure-copy">
-        <strong>Spin control</strong>
-        <small>Configure the native spin macro request guard.</small>
-      </div>
+    <ActionCard description="Configure the native spin macro request guard." title="Spin control">
       {action.include_spin ? null : (
-        <p className="action-note">
+        <ActionNote>
           Spin is not in the action output right now, so this runtime guard is inactive.
-        </p>
+        </ActionNote>
       )}
-      <fieldset
-        className="dependent-fieldset action-runtime-fields"
-        disabled={!action.include_spin}
-      >
-        <div className="action-runtime-two-col">
+      <ActionFieldset disabled={!action.include_spin}>
+        <ActionTwoColumn>
           <IntegerField
             help="After a completed native spin macro, keep spin requests masked for this many native frames."
             label="Cooldown frames"
@@ -444,9 +432,9 @@ export function SpinControlCard({
             value={policy.spin_idle_logit}
             onChange={(value) => updatePolicy({ spin_idle_logit: value })}
           />
-        </div>
-      </fieldset>
-    </section>
+        </ActionTwoColumn>
+      </ActionFieldset>
+    </ActionCard>
   );
 }
 

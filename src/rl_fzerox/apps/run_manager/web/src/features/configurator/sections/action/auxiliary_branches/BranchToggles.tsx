@@ -1,4 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/auxiliary_branches/BranchToggles.tsx
+
+import {
+  ActionToggleGrid,
+  ActionToggleHeader,
+  ActionToggleHeading,
+} from "@/features/configurator/sections/action/ActionLayout";
 import { ActionToggleRow } from "@/features/configurator/sections/action/ActionToggleRow";
 import type {
   AuxiliaryActionConfig,
@@ -23,25 +29,25 @@ export function BranchToggles({ action, checkpointLocked, updateAction }: Branch
   const spinEnabled = spinAvailable && action.enable_spin;
   return (
     <>
-      <div className="action-toggle-header">
+      <ActionToggleHeader>
         <span>Branch</span>
-        <span className="action-toggle-heading">
+        <ActionToggleHeading>
           <span>Output</span>
           <HelpTooltipButton
             label="Output"
             text="Keep this branch in the final action output shape."
           />
-        </span>
-        <span className="action-toggle-heading">
+        </ActionToggleHeading>
+        <ActionToggleHeading>
           <span>Enabled</span>
           <HelpTooltipButton
             label="Enabled"
             position="left"
             text="Mask or unmask this branch at runtime without changing the output shape."
           />
-        </span>
-      </div>
-      <div className="action-toggle-grid">
+        </ActionToggleHeading>
+      </ActionToggleHeader>
+      <ActionToggleGrid>
         <ActionToggleRow
           description={
             action.air_brake_mode === "pwm"
@@ -156,7 +162,7 @@ export function BranchToggles({ action, checkpointLocked, updateAction }: Branch
             })
           }
         />
-      </div>
+      </ActionToggleGrid>
     </>
   );
 }

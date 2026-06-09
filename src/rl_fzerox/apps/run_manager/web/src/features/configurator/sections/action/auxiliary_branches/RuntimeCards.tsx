@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/auxiliary_branches/RuntimeCards.tsx
+import { ActionRuntimeStack } from "@/features/configurator/sections/action/ActionLayout";
 import {
   PitchControlCard,
   SteeringGuardCard,
@@ -45,7 +46,7 @@ export function RuntimeCards({
   updateTrain,
 }: RuntimeCardsProps) {
   return (
-    <div className="action-behavior-grid">
+    <ActionRuntimeStack>
       <AirBrakeCard
         action={action}
         checkpointLocked={checkpointLocked}
@@ -85,6 +86,6 @@ export function RuntimeCards({
         updateAction={updateAction}
         updateTrain={updateTrain}
       />
-    </div>
+    </ActionRuntimeStack>
   );
 }

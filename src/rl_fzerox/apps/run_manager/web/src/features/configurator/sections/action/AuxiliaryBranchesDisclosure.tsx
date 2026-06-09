@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/AuxiliaryBranchesDisclosure.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
+import { ActionAuxStack } from "@/features/configurator/sections/action/ActionLayout";
 import { BranchToggles } from "@/features/configurator/sections/action/auxiliary_branches/BranchToggles";
 import { resetAuxiliaryBranchesAction } from "@/features/configurator/sections/action/auxiliary_branches/model";
 import { RuntimeCards } from "@/features/configurator/sections/action/auxiliary_branches/RuntimeCards";
@@ -39,7 +40,7 @@ export function AuxiliaryBranchesDisclosure({
       open={open}
       title="Auxiliary branches"
     >
-      <div className="action-aux-stack">
+      <ActionAuxStack>
         <BranchToggles
           action={action}
           checkpointLocked={checkpointLocked}
@@ -58,7 +59,7 @@ export function AuxiliaryBranchesDisclosure({
           updatePolicy={updatePolicy}
           updateTrain={updateTrain}
         />
-      </div>
+      </ActionAuxStack>
     </ConfigDisclosure>
   );
 }
