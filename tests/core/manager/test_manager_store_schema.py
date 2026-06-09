@@ -1,0 +1,377 @@
+# tests/core/manager/test_manager_store_schema.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal
+
+import pytest
+from pydantic import ValidationError
+
+import rl_fzerox.core.manager.store as store_module
+from rl_fzerox.core.manager import (
+    ManagedRunConfig,
+    ManagerStore,
+    default_managed_run_config,
+)
+from rl_fzerox.core.manager.db import manager_engine, manager_session
+from rl_fzerox.core.manager.db.models import (
+    RunTemplateModel,
+)
+from rl_fzerox.core.manager.storage.serialization import config_hash, config_json, load_config_json
+from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingRuntimeEntry,
+    TrackSamplingRuntimeState,
+)
+from tests.core.manager.manager_store_support import (
+    _config_snapshot_json,
+    _insert_config_snapshot,
+    _insert_stale_draft_config,
+    _table_columns,
+)
+
+SnapshotKind = Literal["run", "draft", "template", "import"]
+
+
+def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "runs.db")
+
+    templates = store.list_templates()
+
+    assert len(templates) == 1
+    assert templates[0].id == "all_cups_recurrent_ppo"
+    assert templates[0].config == default_managed_run_config()
+
+
+def test_manager_store_initializes_schema_only_once_per_instance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    call_count = 0
+    original_initialize_schema = store_module.initialize_manager_schema
+
+    def wrapped_initialize_schema(db_path: Path, *, applied_at: str) -> None:
+        nonlocal call_count
+        call_count += 1
+        original_initialize_schema(db_path, applied_at=applied_at)
+
+    monkeypatch.setattr(store_module, "initialize_manager_schema", wrapped_initialize_schema)
+
+    store = ManagerStore(tmp_path / "runs.db")
+
+    assert store.pending_run_command("missing-run") is None
+    assert store.pending_run_command("missing-run") is None
+
+    assert call_count == 1
+
+
+def test_manager_store_refreshes_system_template_to_current_defaults(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "runs.db")
+    store.initialize()
+
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["reward"]["energy_refill_progress_multiplier"] = 1.0
+    stale_model = ManagedRunConfig.model_validate(stale_config)
+
+    with manager_session(store.db_path) as session:
+        snapshot_id = _insert_config_snapshot(
+            session=session,
+            snapshot_id="stale-template-config",
+            kind="template",
+            raw_config_json=config_json(stale_model),
+            stored_config_hash=config_hash(stale_model),
+            created_at="2026-05-01T00:00:00+00:00",
+        )
+        template = session.get(RunTemplateModel, "all_cups_recurrent_ppo")
+        assert template is not None
+        template.config_snapshot_id = snapshot_id
+        template.updated_at = "2026-05-01T00:00:00+00:00"
+
+    template = store.default_template()
+
+    assert template.config == default_managed_run_config()
+    assert template.config.reward.energy_refill_progress_multiplier == 3.0
+    assert load_config_json(_config_snapshot_json(store, "stale-template-config")) == stale_model
+
+
+def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["reward"] = {"manual_boost_reward": 0.5}
+
+    _insert_stale_draft_config(store, draft_id="old-draft", name="Old Draft", config=stale_config)
+
+    draft = store.list_drafts()[0]
+
+    assert draft.config.reward.manual_boost_reward == 0.5
+    assert draft.config.reward.time_penalty_per_frame == 0.0
+
+
+def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+
+    columns = _table_columns(store, "runs")
+    group_columns = _table_columns(store, "lineage_groups")
+    snapshot_columns = _table_columns(store, "config_snapshots")
+    save_game_columns = _table_columns(store, "save_games")
+    save_attempt_columns = _table_columns(store, "save_game_attempts")
+    course_setup_columns = _table_columns(store, "save_game_course_setups")
+
+    assert columns == {
+        "id",
+        "name",
+        "status",
+        "config_snapshot_id",
+        "run_dir",
+        "lineage_id",
+        "lineage_step_offset",
+        "parent_run_id",
+        "source_run_id",
+        "source_artifact",
+        "source_snapshot_dir",
+        "source_num_timesteps",
+        "created_at",
+        "started_at",
+        "stopped_at",
+    }
+    assert group_columns == {"lineage_id", "group_name", "updated_at"}
+    assert snapshot_columns == {
+        "id",
+        "kind",
+        "schema_version",
+        "created_at",
+        "config_json",
+        "config_hash",
+    }
+    assert save_game_columns == {
+        "id",
+        "name",
+        "status",
+        "save_path",
+        "created_at",
+        "updated_at",
+        "last_finished_at",
+    }
+    assert save_attempt_columns == {
+        "id",
+        "save_game_id",
+        "policy_run_id",
+        "policy_artifact",
+        "status",
+        "target_kind",
+        "difficulty",
+        "cup_id",
+        "course_id",
+        "started_at",
+        "finished_at",
+        "finish_position",
+        "finish_time_s",
+        "failure_reason",
+    }
+    assert course_setup_columns == {
+        "id",
+        "save_game_id",
+        "scope",
+        "difficulty",
+        "cup_id",
+        "course_id",
+        "policy_run_id",
+        "policy_artifact",
+        "vehicle_id",
+        "engine_setting_raw_value",
+        "created_at",
+        "updated_at",
+    }
+
+
+def test_manager_store_rejects_removed_observation_fields(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["observation"] = {
+        "frame_stack": 2,
+        "minimap_layer": False,
+        "preset": "crop_84x84",
+        "progress_source": "segment_progress",
+        "stack_mode": "rgb",
+        "zero_edge_ratio": True,
+        "zero_outside_track_bounds": True,
+    }
+
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-observation",
+        name="Old Observation",
+        config=stale_config,
+    )
+
+    with pytest.raises(ValidationError):
+        store.list_drafts()
+
+
+def test_manager_store_rejects_removed_state_modes(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["observation"]["state_components"] = [
+        {"name": "vehicle_state", "mode": "include"},
+        {"name": "track_position", "mode": "zero", "progress_source": "segment_progress"},
+        {"name": "course_context", "mode": "exclude", "encoding": "one_hot_builtin"},
+    ]
+    stale_config["observation"]["state_feature_modes"] = [
+        {"name": "track_position.segment_progress", "mode": "include", "dropout_prob": 0.25},
+        {"name": "track_position.edge_ratio", "mode": "exclude", "dropout_prob": 0.0},
+    ]
+
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-state-modes",
+        name="Old State Modes",
+        config=stale_config,
+    )
+
+    with pytest.raises(ValidationError):
+        store.list_drafts()
+
+
+def test_manager_store_rejects_removed_vehicle_fields(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["vehicle"] = {
+        "vehicle_id": "golden_fox",
+        "engine_setting_raw_value": 65,
+    }
+
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-vehicle",
+        name="Old Vehicle",
+        config=stale_config,
+    )
+
+    with pytest.raises(ValidationError):
+        store.list_drafts()
+
+
+def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config.pop("action", None)
+
+    _insert_stale_draft_config(store, draft_id="old-action", name="Old Action", config=stale_config)
+
+    draft = store.list_drafts()[0]
+
+    assert draft.config.action.action_repeat == 2
+    assert draft.config.action.steering_mode == "continuous"
+    assert draft.config.action.drive_mode == "on_off"
+    assert draft.config.action.force_full_throttle is False
+    assert draft.config.action.include_air_brake is True
+    assert draft.config.action.enable_air_brake is True
+    assert draft.config.action.boost_decision_interval_steps == 1
+    assert draft.config.action.boost_unmask_max_speed_kph is None
+    assert draft.config.action.boost_min_energy_fraction == 0.1
+    assert draft.config.action.lean_output_mode == "three_way"
+    assert draft.config.action.lean_mode == "release_cooldown"
+    assert draft.config.action.lean_unmask_min_speed_kph is None
+    assert draft.config.action.lean_initial_lockout_frames == 0
+    assert draft.config.action.include_pitch is True
+    assert draft.config.action.enable_pitch is True
+    assert draft.config.action.pitch_mode == "discrete"
+    assert draft.config.action.pitch_buckets == 5
+
+
+def test_manager_store_rejects_removed_progress_suspend_field(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["reward"]["suspend_progress_while_outside_track_bounds"] = False
+    stale_config["reward"].pop("suspend_progress_while_outside_track_bounds")
+    stale_config["reward"]["suspend_progress_while_airborne"] = True
+
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-progress-suspend",
+        name="Old Progress Suspend",
+        config=stale_config,
+    )
+
+    with pytest.raises(ValidationError):
+        store.list_drafts()
+
+
+def test_manager_store_rejects_legacy_track_sampling_identity_columns(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Legacy Track Pool State Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    state = TrackSamplingRuntimeState(
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=5,
+        ema_alpha=0.1,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.8,
+        adaptive_target_completion=0.5,
+        adaptive_min_confidence_episodes=12,
+        adaptive_confidence_scale=3.0,
+        update_count=7,
+        episodes_since_update=2,
+        entries=(
+            TrackSamplingRuntimeEntry(
+                track_id="x_cup_slot_1",
+                course_key="x_cup_slot_1",
+                label="X Cup 1234abcd",
+                base_weight=1.0,
+                current_weight=2.0,
+                completed_frames=1000,
+                episode_count=4,
+                finished_episode_count=1,
+                success_sample_count=4,
+                ema_episode_frames=250.0,
+                ema_completion_fraction=0.75,
+                generation_episode_count=2,
+                generation_finished_episode_count=1,
+                generation_success_sample_count=2,
+                generation_ema_completion_fraction=0.8,
+                generated_course_slot=1,
+                generated_course_generation=3,
+                generated_course_id="x_cup_1234abcd",
+                generated_course_name="X Cup 1234abcd",
+                generated_course_hash="1234abcd",
+                generated_course_seed=12_647_406_722_013_964_192,
+                generated_course_segment_count=128,
+                generated_course_length=12345.0,
+            ),
+        ),
+    )
+    store.upsert_run_track_sampling_state(run_id=run.id, state=state)
+    legacy_engine = manager_engine(store.db_path)
+    try:
+        with legacy_engine.begin() as connection:
+            connection.exec_driver_sql(
+                "ALTER TABLE run_track_sampling_entries ADD COLUMN generated_entry_id TEXT"
+            )
+            connection.exec_driver_sql(
+                "ALTER TABLE run_track_sampling_entries "
+                "ADD COLUMN generated_baseline_state_path TEXT"
+            )
+            connection.exec_driver_sql(
+                "UPDATE run_track_sampling_entries "
+                "SET generated_entry_id = 'x_cup_1234abcd_gp_race_novice', "
+                "generated_baseline_state_path = '/tmp/stale.state'"
+            )
+    finally:
+        legacy_engine.dispose()
+
+    with pytest.raises(RuntimeError, match="legacy columns"):
+        ManagerStore(store.db_path).get_run_track_sampling_state(run.id)
