@@ -168,7 +168,7 @@ export function SignedBiasBalanceCard({
                   updateTrain({
                     actor_regularization: {
                       ...train.actor_regularization,
-                      steer_signed_balance_loss_weight: steerBalanceLossWeight > 0 ? 0 : 0.00005,
+                      steer_signed_balance_loss_weight: steerBalanceLossWeight > 0 ? 0 : 0.0005,
                     },
                   })
                 }
@@ -179,7 +179,7 @@ export function SignedBiasBalanceCard({
                 help="Coefficient for relu(abs(batch_mean_steer) - deadzone)^2. Use a small value so steering remains free to turn."
                 label="Loss weight"
                 resetValue={defaultTrain.actor_regularization.steer_signed_balance_loss_weight}
-                step="0.00005"
+                step="0.0001"
                 value={steerBalanceLossWeight > 0 ? steerBalanceLossWeight : 0}
                 onChange={(value) =>
                   updateTrain({
@@ -237,7 +237,7 @@ export function SignedBiasBalanceCard({
                   updateTrain({
                     actor_regularization: {
                       ...train.actor_regularization,
-                      lean_signed_balance_loss_weight: leanBalanceLossWeight > 0 ? 0 : 0.0001,
+                      lean_signed_balance_loss_weight: leanBalanceLossWeight > 0 ? 0 : 0.001,
                     },
                   })
                 }
@@ -248,7 +248,7 @@ export function SignedBiasBalanceCard({
                 help="Coefficient for relu(abs(batch_expected_lean) - deadzone)^2. Start small; this should remove bias, not prevent side attacks."
                 label="Loss weight"
                 resetValue={defaultTrain.actor_regularization.lean_signed_balance_loss_weight}
-                step="0.0001"
+                step="0.001"
                 value={leanBalanceLossWeight > 0 ? leanBalanceLossWeight : 0}
                 onChange={(value) =>
                   updateTrain({
