@@ -301,9 +301,9 @@ def build_callbacks(
                 )
                 weights = self._controller.current_weights()
                 self.training_env.env_method("set_track_sampling_weights", weights)
+                self._save_materialized_artifacts(rotation_update.materialized_artifacts)
                 if rotation_manager is not None:
                     rotation_manager.commit(rotation_update)
-                self._save_materialized_artifacts(rotation_update.materialized_artifacts)
                 self._save_runtime_state()
             elif weights is not None:
                 self.training_env.env_method("set_track_sampling_weights", weights)
@@ -430,9 +430,9 @@ def build_callbacks(
                     queue_length=DEFICIT_QUEUE_SETTINGS.initial_queue_length,
                 )
             )
+            self._save_materialized_artifacts(rotation_update.materialized_artifacts)
             if rotation_manager is not None:
                 rotation_manager.commit(rotation_update)
-            self._save_materialized_artifacts(rotation_update.materialized_artifacts)
             self._save_runtime_state()
 
         def _refill_env_queues(self) -> None:

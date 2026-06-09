@@ -147,7 +147,10 @@ class XCupRotationManager:
         self._config = update.train_config
         if self._persist_manifest_on_commit:
             save_train_run_config(config=update.train_config, run_dir=self._run_paths.run_dir)
-        self._prune_inactive_x_cup_baselines(update.env_config.track_sampling)
+        self._prune_inactive_x_cup_baselines(
+            update.env_config.track_sampling,
+            protected_artifacts=update.materialized_artifacts,
+        )
 
     def _materialized_replacement_entries(
         self,
@@ -187,9 +190,16 @@ class XCupRotationManager:
         )
         return entry.model_copy(update=_materialized_entry_update(artifact))
 
-    def _prune_inactive_x_cup_baselines(self, track_sampling: TrackSamplingConfig) -> None:
+    def _prune_inactive_x_cup_baselines(
+        self,
+        track_sampling: TrackSamplingConfig,
+        *,
+        protected_artifacts: Sequence[TrackSamplingMaterializedArtifact],
+    ) -> None:
         active_paths = _active_x_cup_state_paths(track_sampling.entries)
+        active_paths |= _active_x_cup_artifact_paths(protected_artifacts)
         active_groups = _active_x_cup_baseline_groups(track_sampling.entries)
+        active_groups |= _active_x_cup_artifact_groups(protected_artifacts)
         inactive_groups = _inactive_x_cup_baseline_groups(
             self._run_paths.baselines_dir,
             active_groups=active_groups,
@@ -390,6 +400,22 @@ def _active_x_cup_baseline_groups(
     )
 
 
+def _active_x_cup_artifact_paths(
+    artifacts: Sequence[TrackSamplingMaterializedArtifact],
+) -> frozenset[Path]:
+    return frozenset(artifact.baseline_state_path.expanduser().resolve() for artifact in artifacts)
+
+
+def _active_x_cup_artifact_groups(
+    artifacts: Sequence[TrackSamplingMaterializedArtifact],
+) -> frozenset[tuple[object, ...]]:
+    return frozenset(
+        key
+        for artifact in artifacts
+        if (key := _x_cup_artifact_group_key(artifact)) is not None
+    )
+
+
 def _inactive_x_cup_baseline_groups(
     baselines_dir: Path,
     *,
@@ -417,6 +443,24 @@ def _inactive_x_cup_baseline_groups(
         for artifacts in groups.values()
     ]
     return sorted(candidates, key=lambda candidate: candidate[0])
+
+
+def _x_cup_artifact_group_key(
+    artifact: TrackSamplingMaterializedArtifact,
+) -> tuple[object, ...] | None:
+    if (
+        artifact.generated_course_hash is None
+        or artifact.generated_course_seed is None
+        or artifact.generated_course_slot is None
+        or artifact.generated_course_generation is None
+    ):
+        return None
+    return (
+        artifact.generated_course_hash,
+        int(artifact.generated_course_seed),
+        int(artifact.generated_course_slot),
+        int(artifact.generated_course_generation),
+    )
 
 
 def _x_cup_entry_group_key(entry: TrackSamplingEntryConfig) -> tuple[object, ...] | None:

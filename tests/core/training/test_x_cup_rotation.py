@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 
 from pytest import MonkeyPatch
@@ -57,6 +58,16 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
         )
         + "\n",
         encoding="utf-8",
+    )
+    protected_group_paths = _write_x_cup_state_group(
+        run_paths.baselines_dir,
+        "protected_extra",
+        timestamp=0,
+        course_hash="protected-extra",
+        seed=14,
+        slot=13,
+        generation=1,
+        count=2,
     )
     oldest_stale_paths = _write_x_cup_state_group(
         run_paths.baselines_dir,
@@ -205,6 +216,19 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     assert update.materialized_artifacts[0].baseline_state_path == new_state_path.resolve()
     assert update.materialized_artifacts[0].source_gp_difficulty == "novice"
     assert update.materialized_artifacts[0].source_vehicle == "blue_falcon"
+    protected_artifact = replace(
+        update.materialized_artifacts[0],
+        baseline_state_path=protected_group_paths[0].resolve(),
+        metadata_path=protected_group_paths[0].with_suffix(".json").resolve(),
+        generated_course_hash="protected-extra",
+        generated_course_seed=14,
+        generated_course_slot=13,
+        generated_course_generation=1,
+    )
+    update = replace(
+        update,
+        materialized_artifacts=(*update.materialized_artifacts, protected_artifact),
+    )
 
     manager.commit(update)
 
@@ -216,6 +240,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     assert all(not path.exists() for path in middle_stale_paths)
     assert all(not path.with_suffix(".json").exists() for path in middle_stale_paths)
     assert all(path.exists() for path in newest_stale_paths)
+    assert all(path.exists() for path in protected_group_paths)
     assert old_state_path.exists()
     assert new_state_path.exists()
 
