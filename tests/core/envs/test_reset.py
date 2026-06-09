@@ -5,7 +5,7 @@ from typing import Literal
 
 import numpy as np
 import pytest
-from gymnasium.spaces import MultiDiscrete
+from gymnasium.spaces import Box, Dict, MultiDiscrete
 
 from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs import FZeroXEnv
@@ -55,8 +55,11 @@ def test_reset_returns_stacked_observation():
     assert np.array_equal(obs[:, :, 0:3], obs[:, :, 3:6])
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
     assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
-    assert isinstance(env.action_space, MultiDiscrete)
-    assert env.action_space.nvec.tolist() == [7, 2, 2, 3]
+    assert isinstance(env.action_space, Dict)
+    assert isinstance(env.action_space.spaces["continuous"], Box)
+    assert env.action_space.spaces["continuous"].shape == (0,)
+    assert isinstance(env.action_space.spaces["discrete"], MultiDiscrete)
+    assert env.action_space.spaces["discrete"].nvec.tolist() == [7, 2, 2, 3]
 
 
 def test_reset_can_return_image_state_observation() -> None:
