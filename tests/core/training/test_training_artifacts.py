@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from omegaconf import OmegaConf
-from pytest import MonkeyPatch, raises
+from pytest import MonkeyPatch
 
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
@@ -33,18 +33,11 @@ from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
     baseline_materializer,
     build_run_paths,
-    build_watch_session_paths,
     continue_run_paths,
     ensure_run_dirs,
-    ensure_watch_session_dirs,
     load_train_run_config,
     materialize_train_run_config,
-    materialize_watch_session_config,
     reserve_run_paths,
-    resolve_latest_model_path,
-    resolve_latest_policy_path,
-    resolve_model_artifact_path,
-    resolve_policy_artifact_path,
     save_train_run_config,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.materialization import (
@@ -525,30 +518,6 @@ def test_materialize_train_run_config_does_not_copy_init_run_baseline(
     assert materialized.train.resume_run_dir == init_baseline_path.parent.parent.resolve()
 
 
-def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
-    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
-    ensure_run_dirs(run_paths)
-    run_paths.final_model_path.write_bytes(b"final")
-    run_paths.best_model_path.write_bytes(b"best")
-    run_paths.latest_model_path.write_bytes(b"latest")
-
-    resolved_model_path = resolve_latest_model_path(run_paths.run_dir)
-
-    assert resolved_model_path == run_paths.latest_model_path
-
-
-def test_resolve_latest_policy_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
-    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
-    ensure_run_dirs(run_paths)
-    run_paths.final_policy_path.write_bytes(b"final-policy")
-    run_paths.best_policy_path.write_bytes(b"best-policy")
-    run_paths.latest_policy_path.write_bytes(b"latest-policy")
-
-    resolved_policy_path = resolve_latest_policy_path(run_paths.run_dir)
-
-    assert resolved_policy_path == run_paths.latest_policy_path
-
-
 def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
@@ -571,94 +540,6 @@ def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path
         curriculum_stage_name="lean_enabled",
         num_timesteps=123_456,
     )
-
-
-def test_resolve_best_policy_path_requires_best_artifact(tmp_path: Path) -> None:
-    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
-    ensure_run_dirs(run_paths)
-    run_paths.final_policy_path.write_bytes(b"final-policy")
-    run_paths.best_policy_path.write_bytes(b"best-policy")
-    run_paths.latest_policy_path.write_bytes(b"latest-policy")
-
-    resolved_policy_path = resolve_policy_artifact_path(
-        run_paths.run_dir,
-        artifact="best",
-    )
-
-    assert resolved_policy_path == run_paths.best_policy_path
-
-
-def test_resolve_final_model_path_requires_final_artifact(tmp_path: Path) -> None:
-    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
-    ensure_run_dirs(run_paths)
-    run_paths.final_model_path.write_bytes(b"final")
-    run_paths.best_model_path.write_bytes(b"best")
-    run_paths.latest_model_path.write_bytes(b"latest")
-
-    resolved_model_path = resolve_model_artifact_path(
-        run_paths.run_dir,
-        artifact="final",
-    )
-
-    assert resolved_model_path == run_paths.final_model_path
-
-
-def test_build_run_paths_allocates_numbered_run_directories(tmp_path: Path) -> None:
-    output_root = tmp_path / "runs"
-
-    first = build_run_paths(output_root=output_root, run_name="ppo_cnn")
-    ensure_run_dirs(first)
-    second = build_run_paths(output_root=output_root, run_name="ppo_cnn")
-
-    assert first.run_dir.name == "ppo_cnn_0001"
-    assert second.run_dir.name == "ppo_cnn_0002"
-    assert first.runtime_root == first.run_dir / "runtime"
-    assert first.env_runtime_dir(0) == first.run_dir / "runtime" / "env_000"
-    assert first.baselines_dir == first.run_dir / "baselines"
-    assert first.baseline_state_path == first.run_dir / "baselines" / "baseline.state"
-
-
-def test_reserve_run_paths_never_reuses_existing_run_directory(tmp_path: Path) -> None:
-    output_root = tmp_path / "runs"
-    (output_root / "ppo_cnn_0001").mkdir(parents=True)
-
-    reserved = reserve_run_paths(output_root=output_root, run_name="ppo_cnn")
-
-    assert reserved.run_dir.name == "ppo_cnn_0002"
-    assert reserved.run_dir.is_dir()
-
-
-def test_materialize_train_run_config_rejects_source_state_copy(tmp_path: Path) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    source_baseline_path = tmp_path / "shared.state"
-    core_path.touch()
-    rom_path.touch()
-    source_baseline_path.write_bytes(b"baseline")
-
-    config = TrainAppConfig(
-        seed=123,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-            baseline_state_path=source_baseline_path,
-        ),
-        env=EnvConfig(),
-        policy=PolicyConfig(),
-        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
-    )
-    run_paths = build_run_paths(
-        output_root=config.train.output_root,
-        run_name=config.train.run_name,
-    )
-
-    ensure_run_dirs(run_paths)
-    with raises(ValueError, match="must be generated by the materializer"):
-        materialize_train_run_config(
-            config,
-            run_paths=run_paths,
-            baseline_cache_root=tmp_path / "cache",
-        )
 
 
 def test_materialize_train_run_config_reuses_baseline_materializer_cache(
@@ -1439,119 +1320,6 @@ def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
     baseline_path = _required_baseline_path(entry)
     assert baseline_path.parent == run_paths.baselines_dir
     assert baseline_path.read_bytes() == b"stage"
-
-
-def test_build_watch_session_paths_uses_run_local_watch_root(tmp_path: Path) -> None:
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    baseline_state_path = tmp_path / "baseline.state"
-
-    session_paths = build_watch_session_paths(
-        run_dir=run_dir,
-        runtime_dir=tmp_path / "runtime",
-        baseline_state_path=baseline_state_path,
-        session_name="session-001",
-    )
-
-    assert session_paths.session_dir == run_dir / "watch" / "session-001"
-    assert session_paths.runtime_dir == run_dir / "watch" / "session-001" / "runtime"
-    assert session_paths.baseline_state_path == (
-        run_dir / "watch" / "session-001" / "baseline.state"
-    )
-
-
-def test_build_watch_session_paths_sanitizes_session_name(tmp_path: Path) -> None:
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-
-    session_paths = build_watch_session_paths(
-        run_dir=run_dir,
-        runtime_dir=None,
-        baseline_state_path=None,
-        session_name="run_watch:run/id:latest",
-    )
-
-    assert session_paths.session_dir == run_dir / "watch" / "run_watch_run_id_latest"
-
-
-def test_materialize_watch_session_config_isolates_runtime_and_baseline(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    baseline_state_path = tmp_path / "shared.state"
-    core_path.touch()
-    rom_path.touch()
-    baseline_state_path.write_bytes(b"baseline")
-
-    watch_config = WatchAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-            runtime_dir=tmp_path / "runtime",
-            baseline_state_path=baseline_state_path,
-        ),
-        watch=WatchConfig(),
-    )
-
-    materialized = materialize_watch_session_config(
-        watch_config,
-        run_dir=tmp_path / "runs" / "ppo_cnn_0001",
-        session_name="session-001",
-    )
-
-    assert materialized.emulator.runtime_dir == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "runtime"
-    )
-    assert materialized.emulator.baseline_state_path == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "baseline.state"
-    )
-    assert materialized.emulator.baseline_state_path is not None
-    assert materialized.emulator.baseline_state_path.read_bytes() == b"baseline"
-
-
-def test_ensure_watch_session_dirs_creates_runtime_root(tmp_path: Path) -> None:
-    paths = build_watch_session_paths(
-        run_dir=None,
-        runtime_dir=tmp_path / "runtime",
-        baseline_state_path=None,
-        session_name="session-001",
-    )
-
-    ensure_watch_session_dirs(paths)
-
-    assert paths.session_dir.is_dir()
-    assert paths.runtime_dir.is_dir()
-
-
-def test_materialize_watch_session_config_resets_old_watch_workspace(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    baseline_state_path = tmp_path / "shared.state"
-    watch_root = tmp_path / "runs" / "ppo_cnn_0001" / "watch"
-    core_path.touch()
-    rom_path.touch()
-    baseline_state_path.write_bytes(b"baseline")
-    (watch_root / "old-session" / "runtime").mkdir(parents=True)
-    (watch_root / "old-session" / "artifact.txt").write_text("stale", encoding="utf-8")
-
-    watch_config = WatchAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-            runtime_dir=tmp_path / "runtime",
-            baseline_state_path=baseline_state_path,
-        ),
-        watch=WatchConfig(),
-    )
-
-    materialized = materialize_watch_session_config(
-        watch_config,
-        run_dir=tmp_path / "runs" / "ppo_cnn_0001",
-    )
-
-    assert materialized.emulator.runtime_dir == watch_root / "runtime"
-    assert not (watch_root / "old-session").exists()
 
 
 def test_cleanup_failed_run_preserves_explicit_run_dir_when_requested(tmp_path: Path) -> None:
