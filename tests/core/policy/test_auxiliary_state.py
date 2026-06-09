@@ -8,13 +8,13 @@ import torch
 from gymnasium import spaces
 from sb3x.common.auxiliary_losses import PolicyAuxiliaryLoss
 
-from rl_fzerox.core.policy.auxiliary_state.observations import (
-    auxiliary_state_targets_field,
-)
-from rl_fzerox.core.policy.auxiliary_state.policies import (
-    _AuxiliaryStatePolicyMixin,
+from rl_fzerox.core.policy.auxiliary_state.actor_regularization import (
     _AxisDistributionStats,
     _std_cap_loss,
+)
+from rl_fzerox.core.policy.auxiliary_state.mixin import _AuxiliaryStatePolicyMixin
+from rl_fzerox.core.policy.auxiliary_state.observations import (
+    auxiliary_state_targets_field,
 )
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_name_for_feature,
