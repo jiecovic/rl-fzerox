@@ -890,20 +890,18 @@ def test_manager_config_omits_gp_difficulties_outside_gp_race() -> None:
     assert "gp_difficulties" not in dumped["tracks"]
 
 
-def test_manager_config_accepts_legacy_gp_difficulty() -> None:
-    config = ManagedRunConfig.model_validate(
-        {
-            **default_managed_run_config().model_dump(mode="json"),
-            "tracks": {
-                **default_managed_run_config().tracks.model_dump(mode="json"),
-                "race_mode": "gp_race",
-                "gp_difficulty": "expert",
-            },
-        }
-    )
-
-    assert config.tracks.gp_difficulties == ("expert",)
-    assert "gp_difficulty" not in config.model_dump(mode="json")["tracks"]
+def test_manager_config_rejects_legacy_gp_difficulty() -> None:
+    with pytest.raises(ValueError, match="gp_difficulty"):
+        ManagedRunConfig.model_validate(
+            {
+                **default_managed_run_config().model_dump(mode="json"),
+                "tracks": {
+                    **default_managed_run_config().tracks.model_dump(mode="json"),
+                    "race_mode": "gp_race",
+                    "gp_difficulty": "expert",
+                },
+            }
+        )
 
 
 def test_manager_training_bridge_projects_configured_gp_difficulties(

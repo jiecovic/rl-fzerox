@@ -101,19 +101,6 @@ class ManagedTracksConfig(BaseModel):
     deficit_budget_weight_update_rollouts: int = Field(default=20, ge=1)
     selected_course_ids: tuple[str, ...] = Field(default_factory=default_selected_course_ids)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate_legacy_gp_difficulty(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        values: dict[str, object] = dict(data)
-        legacy_difficulty = values.pop("gp_difficulty", None)
-        if values.get("gp_difficulties") is None:
-            values.pop("gp_difficulties", None)
-        if legacy_difficulty is not None and "gp_difficulties" not in values:
-            values["gp_difficulties"] = (legacy_difficulty,)
-        return values
-
     def active_course_count(self) -> int:
         """Return distinct reset targets exposed to course sampling."""
 

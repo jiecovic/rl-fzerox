@@ -2,15 +2,6 @@
 import type { RunPlotPoint } from "@/features/runs/charts/RunPlotCard";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
 
-const LEGACY_SAMPLE_FIELD_BY_METRIC_KEY: Partial<Record<string, keyof ManagedRunMetricSample>> = {
-  "rollout/ep_len_mean": "episode_length_mean",
-  "rollout/ep_rew_mean": "episode_reward_mean",
-  "train/approx_kl": "approx_kl",
-  "train/entropy_loss": "entropy_loss",
-  "train/policy_gradient_loss": "policy_gradient_loss",
-  "train/value_loss": "value_loss",
-};
-
 const metricPointsCache = new WeakMap<
   readonly ManagedRunMetricSample[],
   Map<string, RunPlotPoint[]>
@@ -51,15 +42,7 @@ export function buildEnvStepRatePoints(run: ManagedRun, samples: ManagedRunMetri
 
 function metricValueFromSample(sample: ManagedRunMetricSample, key: string) {
   const metricValue = sample.metrics[key];
-  if (metricValue !== undefined) {
-    return metricValue;
-  }
-  const legacyField = LEGACY_SAMPLE_FIELD_BY_METRIC_KEY[key];
-  if (legacyField === undefined) {
-    return undefined;
-  }
-  const legacyValue = sample[legacyField];
-  return typeof legacyValue === "number" ? legacyValue : undefined;
+  return metricValue === undefined ? undefined : metricValue;
 }
 
 function sampleEnvStepRateValue(run: ManagedRun, samples: ManagedRunMetricSample[], index: number) {

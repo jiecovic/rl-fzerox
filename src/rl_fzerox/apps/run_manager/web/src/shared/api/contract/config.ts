@@ -96,11 +96,9 @@ type GpDifficulty = z.infer<typeof gpDifficultySchema>;
 type RaceMode = z.infer<typeof raceModeSchema>;
 
 function normalizedGpDifficulties({
-  gpDifficulty,
   gpDifficulties,
   raceMode,
 }: {
-  gpDifficulty?: GpDifficulty | null;
   gpDifficulties?: GpDifficulty[];
   raceMode: RaceMode;
 }) {
@@ -108,18 +106,13 @@ function normalizedGpDifficulties({
     return [];
   }
   const configured =
-    gpDifficulties !== undefined && gpDifficulties.length > 0
-      ? gpDifficulties
-      : gpDifficulty != null
-        ? [gpDifficulty]
-        : ["novice"];
+    gpDifficulties !== undefined && gpDifficulties.length > 0 ? gpDifficulties : ["novice"];
   return [...new Set(configured)];
 }
 
 const tracksConfigSchema = z
   .object({
     race_mode: raceModeSchema,
-    gp_difficulty: gpDifficultySchema.nullable().optional(),
     gp_difficulties: z.array(gpDifficultySchema).optional(),
     include_x_cup: z.boolean(),
     x_cup_course_count: z.number().int().positive(),
@@ -145,10 +138,9 @@ const tracksConfigSchema = z
     deficit_budget_weight_update_rollouts: z.number().int().positive(),
     selected_course_ids: z.array(z.string()),
   })
-  .transform(({ gp_difficulty, gp_difficulties, ...tracks }) => ({
+  .transform(({ gp_difficulties, ...tracks }) => ({
     ...tracks,
     gp_difficulties: normalizedGpDifficulties({
-      gpDifficulty: gp_difficulty,
       gpDifficulties: gp_difficulties,
       raceMode: tracks.race_mode,
     }),
