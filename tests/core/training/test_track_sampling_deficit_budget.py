@@ -17,11 +17,12 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.deficit import (
     DeficitBudgetSettings,
     DeficitBudgetTrackSamplingController,
 )
+from tests.core.training.track_sampling_support import resolved_track_sampling_courses
 
 
 def test_fixed_env_controller_tracks_runtime_stats_without_reweighting(tmp_path: Path) -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         sampling_mode="fixed_env",
         action_repeat=2,
         update_episodes=2,
@@ -133,7 +134,13 @@ def test_deficit_budget_payload_uses_uniform_adaptive_target_mix() -> None:
 
 def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
     controller = DeficitBudgetTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute", "silence": "silence"},
+            log_keys={"mute": "mute", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+            log_enabled={"mute": True, "silence": True},
+        ),
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
@@ -142,10 +149,6 @@ def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
-        track_course_keys={"mute": "mute", "silence": "silence"},
-        track_log_keys={"mute": "mute", "silence": "silence"},
-        track_labels={"mute": "Mute City", "silence": "Silence"},
-        track_log_enabled={"mute": True, "silence": True},
         seed=7,
     )
 
@@ -158,7 +161,13 @@ def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
 
 def test_deficit_budget_controller_refills_bounded_balanced_queues() -> None:
     controller = DeficitBudgetTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute", "silence": "silence"},
+            log_keys={"mute": "mute", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+            log_enabled={"mute": True, "silence": True},
+        ),
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
@@ -167,10 +176,6 @@ def test_deficit_budget_controller_refills_bounded_balanced_queues() -> None:
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
-        track_course_keys={"mute": "mute", "silence": "silence"},
-        track_log_keys={"mute": "mute", "silence": "silence"},
-        track_labels={"mute": "Mute City", "silence": "Silence"},
-        track_log_enabled={"mute": True, "silence": True},
         seed=7,
     )
 
@@ -184,7 +189,13 @@ def test_deficit_budget_controller_refills_bounded_balanced_queues() -> None:
 
 def test_deficit_budget_controller_prefers_courses_with_positive_step_debt() -> None:
     controller = DeficitBudgetTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute", "silence": "silence"},
+            log_keys={"mute": "mute", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+            log_enabled={"mute": True, "silence": True},
+        ),
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
@@ -193,10 +204,6 @@ def test_deficit_budget_controller_prefers_courses_with_positive_step_debt() -> 
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
-        track_course_keys={"mute": "mute", "silence": "silence"},
-        track_log_keys={"mute": "mute", "silence": "silence"},
-        track_labels={"mute": "Mute City", "silence": "Silence"},
-        track_log_enabled={"mute": True, "silence": True},
         seed=7,
     )
 
@@ -208,7 +215,13 @@ def test_deficit_budget_controller_prefers_courses_with_positive_step_debt() -> 
 
 def test_deficit_budget_runtime_state_persists_accounted_step_totals() -> None:
     controller = DeficitBudgetTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute", "silence": "silence"},
+            log_keys={"mute": "mute", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+            log_enabled={"mute": True, "silence": True},
+        ),
         action_repeat=2,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
@@ -217,10 +230,6 @@ def test_deficit_budget_runtime_state_persists_accounted_step_totals() -> None:
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
-        track_course_keys={"mute": "mute", "silence": "silence"},
-        track_log_keys={"mute": "mute", "silence": "silence"},
-        track_labels={"mute": "Mute City", "silence": "Silence"},
-        track_log_enabled={"mute": True, "silence": True},
         seed=7,
     )
 
@@ -241,7 +250,13 @@ def test_deficit_budget_runtime_state_persists_accounted_step_totals() -> None:
 
 def test_deficit_budget_controller_raises_target_share_for_problem_course() -> None:
     controller = DeficitBudgetTrackSamplingController(
-        track_base_weights={"easy": 1.0, "hard": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"easy": 1.0, "hard": 1.0},
+            course_keys={"easy": "easy", "hard": "hard"},
+            log_keys={"easy": "easy", "hard": "hard"},
+            labels={"easy": "Easy", "hard": "Hard"},
+            log_enabled={"easy": True, "hard": True},
+        ),
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=0.7,
@@ -250,10 +265,6 @@ def test_deficit_budget_controller_raises_target_share_for_problem_course() -> N
             ema_alpha=1.0,
             weight_update_rollouts=1,
         ),
-        track_course_keys={"easy": "easy", "hard": "hard"},
-        track_log_keys={"easy": "easy", "hard": "hard"},
-        track_labels={"easy": "Easy", "hard": "Hard"},
-        track_log_enabled={"easy": True, "hard": True},
         seed=7,
     )
 
@@ -327,7 +338,13 @@ def test_deficit_budget_controller_restores_runtime_stats() -> None:
         ),
     )
     controller = DeficitBudgetTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute", "silence": "silence"},
+            log_keys={"mute": "mute", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+            log_enabled={"mute": True, "silence": True},
+        ),
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=0.7,
@@ -336,10 +353,6 @@ def test_deficit_budget_controller_restores_runtime_stats() -> None:
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
-        track_course_keys={"mute": "mute", "silence": "silence"},
-        track_log_keys={"mute": "mute", "silence": "silence"},
-        track_labels={"mute": "Mute City", "silence": "Silence"},
-        track_log_enabled={"mute": True, "silence": True},
         restored_state=restored,
         seed=7,
     )
@@ -405,7 +418,13 @@ def test_deficit_budget_controller_backfills_first_x_cup_generation_stats() -> N
         ),
     )
     controller = DeficitBudgetTrackSamplingController(
-        track_base_weights={"x_cup_entry": 1.0, "mute": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"x_cup_entry": 1.0, "mute": 1.0},
+            course_keys={"x_cup_entry": slot_key, "mute": "mute"},
+            log_keys={"x_cup_entry": slot_key, "mute": "mute"},
+            labels={slot_key: "X Cup abcd1234", "mute": "Mute City"},
+            log_enabled={slot_key: True, "mute": True},
+        ),
         action_repeat=2,
         settings=DeficitBudgetSettings(
             uniform_fraction=0.7,
@@ -415,10 +434,6 @@ def test_deficit_budget_controller_backfills_first_x_cup_generation_stats() -> N
             weight_update_rollouts=20,
             x_cup_generation_ema_alpha=0.1,
         ),
-        track_course_keys={"x_cup_entry": slot_key, "mute": "mute"},
-        track_log_keys={"x_cup_entry": slot_key, "mute": "mute"},
-        track_labels={slot_key: "X Cup abcd1234", "mute": "Mute City"},
-        track_log_enabled={slot_key: True, "mute": True},
         restored_state=restored,
         seed=7,
     )

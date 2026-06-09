@@ -10,6 +10,11 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
 from rl_fzerox.core.training.session.callbacks.track_sampling.controller import (
     StepBalancedTrackSamplingController,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
+    GeneratedCourseMetadata,
+    TrackSamplingCourseEntry,
+    resolve_track_sampling_courses_from_entries,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.deficit import (
     DEFICIT_QUEUE_SETTINGS,
     DeficitBudgetTrackSamplingController,
@@ -42,7 +47,9 @@ __all__ = (
     "DEFICIT_QUEUE_SETTINGS",
     "DeficitBudgetTrackSamplingController",
     "TrackSamplingRuntimeEntry",
+    "GeneratedCourseMetadata",
     "TrackSamplingMaterializedArtifact",
+    "TrackSamplingCourseEntry",
     "TrackSamplingRuntimePersistence",
     "TrackSamplingRuntimeState",
     "XCupRotationManager",
@@ -55,6 +62,7 @@ __all__ = (
     "load_track_sampling_runtime_state_json",
     "materialized_track_sampling_artifacts",
     "replace_runtime_generation",
+    "resolve_track_sampling_courses_from_entries",
     "save_track_sampling_runtime_state",
     "track_sampling_runtime_state_json",
 )

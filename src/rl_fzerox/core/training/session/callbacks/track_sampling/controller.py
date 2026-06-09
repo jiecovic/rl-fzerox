@@ -7,7 +7,6 @@ from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
 from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
     ResolvedTrackSamplingCourses,
     resolve_track_sampling_courses_from_configs,
-    resolve_track_sampling_courses_from_parts,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     episode_completion_fraction,
@@ -40,7 +39,7 @@ class StepBalancedTrackSamplingController:
     def __init__(
         self,
         *,
-        track_base_weights: dict[str, float],
+        resolved_courses: ResolvedTrackSamplingCourses,
         sampling_mode: str = "step_balanced",
         action_repeat: int,
         update_episodes: int,
@@ -52,36 +51,9 @@ class StepBalancedTrackSamplingController:
         adaptive_confidence_scale: float = 4.0,
         x_cup_generation_ema_alpha: float = 0.3,
         log_details: bool = False,
-        track_course_keys: dict[str, str] | None = None,
-        track_log_keys: dict[str, str] | None = None,
-        track_labels: dict[str, str] | None = None,
-        track_log_enabled: dict[str, bool] | None = None,
-        track_generated_course_slots: dict[str, int] | None = None,
-        track_generated_course_generations: dict[str, int] | None = None,
-        track_generated_course_ids: dict[str, str] | None = None,
-        track_generated_course_names: dict[str, str] | None = None,
-        track_generated_course_hashes: dict[str, str] | None = None,
-        track_generated_course_seeds: dict[str, int] | None = None,
-        track_generated_course_segment_counts: dict[str, int] | None = None,
-        track_generated_course_lengths: dict[str, float] | None = None,
-        resolved_courses: ResolvedTrackSamplingCourses | None = None,
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> None:
-        resolved = resolved_courses or resolve_track_sampling_courses_from_parts(
-            track_base_weights=track_base_weights,
-            track_course_keys=track_course_keys,
-            track_log_keys=track_log_keys,
-            track_labels=track_labels,
-            track_log_enabled=track_log_enabled,
-            track_generated_course_slots=track_generated_course_slots,
-            track_generated_course_generations=track_generated_course_generations,
-            track_generated_course_ids=track_generated_course_ids,
-            track_generated_course_names=track_generated_course_names,
-            track_generated_course_hashes=track_generated_course_hashes,
-            track_generated_course_seeds=track_generated_course_seeds,
-            track_generated_course_segment_counts=track_generated_course_segment_counts,
-            track_generated_course_lengths=track_generated_course_lengths,
-        )
+        resolved = resolved_courses
         self._entry_base_weights = dict(resolved.entry_base_weights)
         self._entry_course_keys = dict(resolved.entry_course_keys)
         self._courses = dict(resolved.courses)
@@ -132,7 +104,7 @@ class StepBalancedTrackSamplingController:
 
         settings = configs[0]
         return cls(
-            track_base_weights=resolved_courses.entry_base_weights,
+            resolved_courses=resolved_courses,
             sampling_mode=settings.sampling_mode,
             action_repeat=env_config.action_repeat,
             update_episodes=settings.step_balance_update_episodes,
@@ -146,7 +118,6 @@ class StepBalancedTrackSamplingController:
             adaptive_confidence_scale=settings.adaptive_step_balance_confidence_scale,
             x_cup_generation_ema_alpha=settings.x_cup_rotation.ema_alpha,
             log_details=settings.step_balance_log_details,
-            resolved_courses=resolved_courses,
             restored_state=restored_state,
         )
 

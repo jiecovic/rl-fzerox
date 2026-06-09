@@ -83,6 +83,17 @@ class GeneratedCourseMetadata:
 
 
 @dataclass(frozen=True, slots=True)
+class TrackSamplingCourseEntry:
+    entry_id: str
+    base_weight: float
+    course_key: str | None = None
+    label: str | None = None
+    log_key: str | None = None
+    log_enabled: bool = True
+    generated: GeneratedCourseMetadata = field(default_factory=GeneratedCourseMetadata)
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedTrackSamplingCourse:
     course_key: str
     entry_ids: tuple[str, ...]
@@ -156,110 +167,49 @@ class ResolvedTrackSamplingCourses:
 def resolve_track_sampling_courses_from_configs(
     configs: Sequence[TrackSamplingConfig],
 ) -> ResolvedTrackSamplingCourses:
+    entries: list[TrackSamplingCourseEntry] = []
+    for config in configs:
+        for entry in config.entries:
+            course_key = _entry_course_key(entry)
+            entries.append(
+                TrackSamplingCourseEntry(
+                    entry_id=entry.id,
+                    base_weight=float(entry.weight),
+                    course_key=course_key,
+                    label=entry.course_name or entry.course_id or entry.display_name or entry.id,
+                    log_key=course_key,
+                    log_enabled=entry.log_per_course,
+                    generated=GeneratedCourseMetadata.from_entry(entry),
+                )
+            )
+    return resolve_track_sampling_courses_from_entries(entries)
+
+
+def resolve_track_sampling_courses_from_entries(
+    entries: Sequence[TrackSamplingCourseEntry],
+) -> ResolvedTrackSamplingCourses:
     base_weights: dict[str, float] = {}
     builders: dict[str, _CourseBuilder] = {}
     entry_course_keys: dict[str, str] = {}
-    for config in configs:
-        for entry in config.entries:
-            base_weights.setdefault(entry.id, float(entry.weight))
-            course_key = _entry_course_key(entry)
-            entry_course_keys.setdefault(entry.id, course_key)
-            builder = builders.setdefault(
-                course_key,
-                _CourseBuilder(
-                    course_key=course_key,
-                    label=entry.course_name or entry.course_id or entry.display_name or entry.id,
-                    log_key=sanitize_log_key(course_key),
-                    log_enabled=False,
-                ),
-            )
-            builder.add_entry(
-                entry_id=entry.id,
-                base_weight=base_weights[entry.id],
-                log_enabled=entry.log_per_course,
-                generated=GeneratedCourseMetadata.from_entry(entry),
-            )
-    return _resolved_courses(
-        entry_base_weights=base_weights,
-        entry_course_keys=entry_course_keys,
-        builders=builders,
-    )
-
-
-def resolve_track_sampling_courses_from_parts(
-    *,
-    track_base_weights: Mapping[str, float],
-    track_course_keys: Mapping[str, str] | None = None,
-    track_log_keys: Mapping[str, str] | None = None,
-    track_labels: Mapping[str, str] | None = None,
-    track_log_enabled: Mapping[str, bool] | None = None,
-    track_generated_course_slots: Mapping[str, int] | None = None,
-    track_generated_course_generations: Mapping[str, int] | None = None,
-    track_generated_course_ids: Mapping[str, str] | None = None,
-    track_generated_course_names: Mapping[str, str] | None = None,
-    track_generated_course_hashes: Mapping[str, str] | None = None,
-    track_generated_course_seeds: Mapping[str, int] | None = None,
-    track_generated_course_segment_counts: Mapping[str, int] | None = None,
-    track_generated_course_lengths: Mapping[str, float] | None = None,
-) -> ResolvedTrackSamplingCourses:
-    base_weights = {track_id: float(weight) for track_id, weight in track_base_weights.items()}
-    builders: dict[str, _CourseBuilder] = {}
-    entry_course_keys: dict[str, str] = {}
-    for track_id, base_weight in base_weights.items():
-        course_key = (
-            _mapped_value(track_course_keys, track_id, track_id)
-            or _mapped_value(
-                track_log_keys,
-                track_id,
-                track_id,
-            )
-            or track_id
-        )
-        entry_course_keys[track_id] = course_key
+    for entry in entries:
+        entry_id = entry.entry_id
+        base_weights.setdefault(entry_id, float(entry.base_weight))
+        course_key = entry.course_key or entry_id
+        entry_course_keys.setdefault(entry_id, course_key)
         builder = builders.setdefault(
             course_key,
             _CourseBuilder(
                 course_key=course_key,
-                label=(
-                    _mapped_value(track_labels, track_id, course_key)
-                    or _mapped_value(track_labels, course_key, track_id)
-                    or course_key
-                ),
-                log_key=sanitize_log_key(
-                    _mapped_value(track_log_keys, track_id, course_key)
-                    or _mapped_value(track_log_keys, course_key, track_id)
-                    or course_key
-                ),
+                label=entry.label or course_key,
+                log_key=sanitize_log_key(entry.log_key or course_key),
                 log_enabled=False,
             ),
         )
         builder.add_entry(
-            entry_id=track_id,
-            base_weight=base_weight,
-            log_enabled=_mapped_bool(
-                track_log_enabled,
-                primary_key=track_id,
-                fallback_key=course_key,
-                default=True,
-            ),
-            generated=GeneratedCourseMetadata(
-                slot=_mapped_value(track_generated_course_slots, track_id, course_key),
-                generation=_mapped_value(
-                    track_generated_course_generations,
-                    track_id,
-                    course_key,
-                ),
-                course_id=_mapped_value(track_generated_course_ids, track_id, course_key),
-                name=_mapped_value(track_generated_course_names, track_id, course_key),
-                hash=_mapped_value(track_generated_course_hashes, track_id, course_key),
-                seed=_mapped_value(track_generated_course_seeds, track_id, course_key),
-                segment_count=_mapped_value(
-                    track_generated_course_segment_counts,
-                    track_id,
-                    course_key,
-                ),
-                length=_mapped_value(track_generated_course_lengths, track_id, course_key),
-            ),
+            entry_id=entry_id,
+            base_weight=base_weights[entry_id],
+            log_enabled=entry.log_enabled,
+            generated=entry.generated,
         )
     return _resolved_courses(
         entry_base_weights=base_weights,
@@ -322,29 +272,6 @@ def _resolved_courses(
 
 def _entry_course_key(entry: TrackSamplingEntryConfig) -> str:
     return entry.runtime_course_key or entry.course_id or entry.id
-
-
-def _mapped_value(
-    mapping: Mapping[str, _ValueT] | None,
-    primary_key: str,
-    fallback_key: str,
-) -> _ValueT | None:
-    if mapping is None:
-        return None
-    if primary_key in mapping:
-        return mapping[primary_key]
-    return mapping.get(fallback_key)
-
-
-def _mapped_bool(
-    mapping: Mapping[str, bool] | None,
-    *,
-    primary_key: str,
-    fallback_key: str,
-    default: bool,
-) -> bool:
-    value = _mapped_value(mapping, primary_key, fallback_key)
-    return default if value is None else bool(value)
 
 
 def _overlay_value(old: _ValueT | None, new: _ValueT | None) -> _ValueT | None:

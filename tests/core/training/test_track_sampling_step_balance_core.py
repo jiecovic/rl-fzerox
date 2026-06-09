@@ -5,11 +5,12 @@ import pytest
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     StepBalancedTrackSamplingController,
 )
+from tests.core.training.track_sampling_support import resolved_track_sampling_courses
 
 
 def test_step_balance_controller_raises_short_track_weight() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         action_repeat=2,
         update_episodes=2,
         ema_alpha=1.0,
@@ -29,7 +30,7 @@ def test_step_balance_controller_raises_short_track_weight() -> None:
 
 def test_step_balance_controller_can_use_monitor_length_fallback() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         action_repeat=3,
         update_episodes=2,
         ema_alpha=1.0,
@@ -49,7 +50,7 @@ def test_step_balance_controller_can_use_monitor_length_fallback() -> None:
 
 def test_step_balance_controller_skips_tensorboard_track_logs_by_default() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         action_repeat=1,
         update_episodes=2,
         ema_alpha=1.0,
@@ -69,7 +70,7 @@ def test_step_balance_controller_skips_tensorboard_track_logs_by_default() -> No
 
 def test_step_balance_controller_can_log_detailed_distribution_shares() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         action_repeat=1,
         update_episodes=2,
         ema_alpha=1.0,
@@ -102,7 +103,7 @@ def test_step_balance_controller_can_log_detailed_distribution_shares() -> None:
 
 def test_step_balance_controller_tracks_finished_episode_counts() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         action_repeat=2,
         update_episodes=2,
         ema_alpha=1.0,

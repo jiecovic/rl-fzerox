@@ -17,6 +17,7 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
     load_track_sampling_runtime_state,
     save_track_sampling_runtime_state,
 )
+from tests.core.training.track_sampling_support import resolved_track_sampling_courses
 
 
 def test_step_balance_controller_builds_from_env_config() -> None:
@@ -151,30 +152,32 @@ def test_step_balance_controller_aggregates_duplicate_courses() -> None:
 
 def test_step_balance_controller_aggregates_duplicate_course_entries() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={
-            "mute_blue_falcon": 1.0,
-            "mute_white_cat": 1.0,
-            "silence_blue_falcon": 1.0,
-        },
+        resolved_courses=resolved_track_sampling_courses(
+            {
+                "mute_blue_falcon": 1.0,
+                "mute_white_cat": 1.0,
+                "silence_blue_falcon": 1.0,
+            },
+            course_keys={
+                "mute_blue_falcon": "mute_city",
+                "mute_white_cat": "mute_city",
+                "silence_blue_falcon": "silence",
+            },
+            log_keys={
+                "mute_blue_falcon": "mute_city",
+                "mute_white_cat": "mute_city",
+                "silence_blue_falcon": "silence",
+            },
+            labels={
+                "mute_blue_falcon": "Mute City",
+                "mute_white_cat": "Mute City",
+                "silence_blue_falcon": "Silence",
+            },
+        ),
         action_repeat=1,
         update_episodes=2,
         ema_alpha=1.0,
         max_weight_scale=5.0,
-        track_course_keys={
-            "mute_blue_falcon": "mute_city",
-            "mute_white_cat": "mute_city",
-            "silence_blue_falcon": "silence",
-        },
-        track_log_keys={
-            "mute_blue_falcon": "mute_city",
-            "mute_white_cat": "mute_city",
-            "silence_blue_falcon": "silence",
-        },
-        track_labels={
-            "mute_blue_falcon": "Mute City",
-            "mute_white_cat": "Mute City",
-            "silence_blue_falcon": "Silence",
-        },
     )
 
     weights = controller.record_episodes(
@@ -200,13 +203,16 @@ def test_step_balance_controller_aggregates_duplicate_course_entries() -> None:
 
 def test_step_balance_controller_state_round_trip_and_restore(tmp_path: Path) -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute_city", "silence": "silence"},
+            log_keys={"mute": "mute_city", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+        ),
         action_repeat=2,
         update_episodes=2,
         ema_alpha=0.5,
         max_weight_scale=5.0,
-        track_log_keys={"mute": "mute_city", "silence": "silence"},
-        track_labels={"mute": "Mute City", "silence": "Silence"},
     )
     controller.record_episodes(
         (
@@ -222,13 +228,16 @@ def test_step_balance_controller_state_round_trip_and_restore(tmp_path: Path) ->
     assert restored_state is not None
     assert restored_state.sampling_mode == "step_balanced"
     restored = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute_city", "silence": "silence"},
+            log_keys={"mute": "mute_city", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+        ),
         action_repeat=2,
         update_episodes=2,
         ema_alpha=0.5,
         max_weight_scale=5.0,
-        track_log_keys={"mute": "mute_city", "silence": "silence"},
-        track_labels={"mute": "Mute City", "silence": "Silence"},
         restored_state=restored_state,
     )
 
@@ -296,7 +305,7 @@ def test_step_balance_controller_recomputes_restored_weights_from_ema_stats() ->
     )
 
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"short": 1.0, "long": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"short": 1.0, "long": 1.0}),
         action_repeat=2,
         update_episodes=2,
         ema_alpha=1.0,
@@ -353,7 +362,9 @@ def test_step_balance_controller_keeps_over_budget_courses_sampleable() -> None:
     )
 
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"failed_over_budget": 1.0, "under_budget": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"failed_over_budget": 1.0, "under_budget": 1.0}
+        ),
         sampling_mode="adaptive_step_balanced",
         action_repeat=1,
         update_episodes=2,
@@ -414,7 +425,7 @@ def test_step_balance_controller_uses_steady_state_weights_when_no_course_has_de
     )
 
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"short": 1.0, "long": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"short": 1.0, "long": 1.0}),
         action_repeat=1,
         update_episodes=2,
         ema_alpha=1.0,

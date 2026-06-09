@@ -4,11 +4,12 @@
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     StepBalancedTrackSamplingController,
 )
+from tests.core.training.track_sampling_support import resolved_track_sampling_courses
 
 
 def test_adaptive_step_balance_controller_tilts_weight_toward_lower_completion() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"mute": 1.0, "silence": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         sampling_mode="adaptive_step_balanced",
         action_repeat=2,
         update_episodes=2,
@@ -31,7 +32,9 @@ def test_adaptive_step_balance_controller_tilts_weight_toward_lower_completion()
 
 def test_adaptive_step_balance_controller_uses_finish_rate_when_completion_is_similar() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"sector_alpha": 1.0, "white_land": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"sector_alpha": 1.0, "white_land": 1.0}
+        ),
         sampling_mode="adaptive_step_balanced",
         action_repeat=2,
         update_episodes=2,
@@ -64,7 +67,7 @@ def test_adaptive_step_balance_controller_uses_finish_rate_when_completion_is_si
 
 def test_adaptive_step_balance_controller_can_create_large_target_spread() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"easy": 1.0, "hard": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"easy": 1.0, "hard": 1.0}),
         sampling_mode="adaptive_step_balanced",
         action_repeat=2,
         update_episodes=2,
@@ -99,7 +102,7 @@ def test_adaptive_step_balance_controller_can_create_large_target_spread() -> No
 
 def test_adaptive_step_balance_prioritizes_low_confidence_courses() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"known": 1.0, "unknown": 1.0},
+        resolved_courses=resolved_track_sampling_courses({"known": 1.0, "unknown": 1.0}),
         sampling_mode="adaptive_step_balanced",
         action_repeat=1,
         update_episodes=2,
@@ -152,7 +155,9 @@ def test_adaptive_step_balance_prioritizes_low_confidence_courses() -> None:
 
 def test_adaptive_step_balance_converts_frame_target_to_reset_weight() -> None:
     controller = StepBalancedTrackSamplingController(
-        track_base_weights={"easy_short": 1.0, "hard_long": 1.0},
+        resolved_courses=resolved_track_sampling_courses(
+            {"easy_short": 1.0, "hard_long": 1.0}
+        ),
         sampling_mode="adaptive_step_balanced",
         action_repeat=2,
         update_episodes=2,

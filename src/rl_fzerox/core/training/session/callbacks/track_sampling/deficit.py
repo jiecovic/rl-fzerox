@@ -9,7 +9,6 @@ from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
 from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
     ResolvedTrackSamplingCourses,
     resolve_track_sampling_courses_from_configs,
-    resolve_track_sampling_courses_from_parts,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     episode_completion_fraction,
@@ -65,40 +64,13 @@ class DeficitBudgetTrackSamplingController:
     def __init__(
         self,
         *,
-        track_base_weights: dict[str, float],
+        resolved_courses: ResolvedTrackSamplingCourses,
         action_repeat: int,
         settings: DeficitBudgetSettings,
-        track_course_keys: dict[str, str] | None = None,
-        track_log_keys: dict[str, str] | None = None,
-        track_labels: dict[str, str] | None = None,
-        track_log_enabled: dict[str, bool] | None = None,
-        track_generated_course_slots: dict[str, int] | None = None,
-        track_generated_course_generations: dict[str, int] | None = None,
-        track_generated_course_ids: dict[str, str] | None = None,
-        track_generated_course_names: dict[str, str] | None = None,
-        track_generated_course_hashes: dict[str, str] | None = None,
-        track_generated_course_seeds: dict[str, int] | None = None,
-        track_generated_course_segment_counts: dict[str, int] | None = None,
-        track_generated_course_lengths: dict[str, float] | None = None,
-        resolved_courses: ResolvedTrackSamplingCourses | None = None,
         restored_state: TrackSamplingRuntimeState | None = None,
         seed: int = 0,
     ) -> None:
-        resolved = resolved_courses or resolve_track_sampling_courses_from_parts(
-            track_base_weights=track_base_weights,
-            track_course_keys=track_course_keys,
-            track_log_keys=track_log_keys,
-            track_labels=track_labels,
-            track_log_enabled=track_log_enabled,
-            track_generated_course_slots=track_generated_course_slots,
-            track_generated_course_generations=track_generated_course_generations,
-            track_generated_course_ids=track_generated_course_ids,
-            track_generated_course_names=track_generated_course_names,
-            track_generated_course_hashes=track_generated_course_hashes,
-            track_generated_course_seeds=track_generated_course_seeds,
-            track_generated_course_segment_counts=track_generated_course_segment_counts,
-            track_generated_course_lengths=track_generated_course_lengths,
-        )
+        resolved = resolved_courses
         self._entry_course_keys = dict(resolved.entry_course_keys)
         self._courses = dict(resolved.courses)
         self._course_entry_ids = resolved.course_entry_ids
@@ -148,7 +120,7 @@ class DeficitBudgetTrackSamplingController:
 
         settings_source = configs[0]
         return cls(
-            track_base_weights=resolved_courses.entry_base_weights,
+            resolved_courses=resolved_courses,
             action_repeat=env_config.action_repeat,
             settings=DeficitBudgetSettings(
                 uniform_fraction=settings_source.deficit_budget_uniform_fraction,
@@ -158,7 +130,6 @@ class DeficitBudgetTrackSamplingController:
                 weight_update_rollouts=settings_source.deficit_budget_weight_update_rollouts,
                 x_cup_generation_ema_alpha=settings_source.x_cup_rotation.ema_alpha,
             ),
-            resolved_courses=resolved_courses,
             restored_state=restored_state,
         )
 
