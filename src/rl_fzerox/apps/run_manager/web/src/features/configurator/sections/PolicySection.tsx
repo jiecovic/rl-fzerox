@@ -159,7 +159,7 @@ export function PolicySection({
         </ConfigPanel>
 
         <ConfigPanel
-          className="order-3"
+          className="order-4"
           title="Recurrent core"
           onReset={
             checkpointLocked
@@ -227,7 +227,7 @@ export function PolicySection({
 
         <ConfigPanel
           className="order-2"
-          title="State and fusion"
+          title="State encoder"
           onReset={
             checkpointLocked
               ? undefined
@@ -235,6 +235,42 @@ export function PolicySection({
                   updatePolicy({
                     state_net_arch: defaultConfig.policy.state_net_arch,
                     state_activation: defaultConfig.policy.state_activation,
+                  })
+          }
+        >
+          <ConfigFieldset disabled={checkpointLocked}>
+            <ConfigFieldGroup>
+              <LayerListField
+                help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
+                label="State MLP"
+                resetValue={defaultConfig.policy.state_net_arch}
+                value={config.policy.state_net_arch}
+                onChange={(value) => updatePolicy({ state_net_arch: value })}
+              />
+              <ConfigFieldset
+                disabled={checkpointLocked || config.policy.state_net_arch.length === 0}
+              >
+                <SelectField
+                  help="Activation after each state-branch MLP layer."
+                  label="State activation"
+                  options={activationOptions}
+                  resetValue={defaultConfig.policy.state_activation}
+                  value={config.policy.state_activation}
+                  onChange={(value) => updatePolicy({ state_activation: value })}
+                />
+              </ConfigFieldset>
+            </ConfigFieldGroup>
+          </ConfigFieldset>
+        </ConfigPanel>
+
+        <ConfigPanel
+          className="order-3"
+          title="Feature fusion"
+          onReset={
+            checkpointLocked
+              ? undefined
+              : () =>
+                  updatePolicy({
                     fusion_features_dim: defaultConfig.policy.fusion_features_dim,
                     fusion_activation: defaultConfig.policy.fusion_activation,
                     layer_norm: defaultConfig.policy.layer_norm,
@@ -243,29 +279,8 @@ export function PolicySection({
           }
         >
           <ConfigFieldset disabled={checkpointLocked}>
-            <ConfigGrid columns="two" className="items-start">
-              <ConfigFieldGroup>
-                <LayerListField
-                  help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
-                  label="State MLP"
-                  resetValue={defaultConfig.policy.state_net_arch}
-                  value={config.policy.state_net_arch}
-                  onChange={(value) => updatePolicy({ state_net_arch: value })}
-                />
-                <ConfigFieldset
-                  disabled={checkpointLocked || config.policy.state_net_arch.length === 0}
-                >
-                  <SelectField
-                    help="Activation after each state-branch MLP layer."
-                    label="State activation"
-                    options={activationOptions}
-                    resetValue={defaultConfig.policy.state_activation}
-                    value={config.policy.state_activation}
-                    onChange={(value) => updatePolicy({ state_activation: value })}
-                  />
-                </ConfigFieldset>
-              </ConfigFieldGroup>
-              <ConfigFieldGroup>
+            <ConfigFieldGroup>
+              <ConfigGrid columns="two" className="items-start">
                 <BooleanField
                   help="Insert a learned MLP after image/state concatenation. Turn off to feed the concatenated features directly to the recurrent core or heads."
                   label="Fusion MLP"
@@ -273,58 +288,59 @@ export function PolicySection({
                   value={fusionEnabled}
                   onChange={updateFusionEnabled}
                 />
-                <ConfigFieldset disabled={checkpointLocked || !fusionEnabled}>
-                  <ConfigGrid columns="two" className="items-start">
-                    <IntegerField
-                      help="Feature width of the learned fusion MLP."
-                      label="Fusion features"
-                      min={1}
-                      resetValue={
-                        defaultConfig.policy.fusion_features_dim ?? fallbackFusionFeaturesDim
-                      }
-                      value={fusionFeaturesDim}
-                      onChange={(value) => updatePolicy({ fusion_features_dim: value })}
-                    />
-                    <SelectField
-                      help="Activation after the learned fusion projection."
-                      label="Fusion activation"
-                      options={activationOptions}
-                      resetValue={defaultConfig.policy.fusion_activation}
-                      value={config.policy.fusion_activation}
-                      onChange={(value) => updatePolicy({ fusion_activation: value })}
-                    />
-                  </ConfigGrid>
-                </ConfigFieldset>
+                <BooleanField
+                  help="Apply layer normalization after the fusion stage or direct concatenation."
+                  label="Layer norm"
+                  resetValue={defaultConfig.policy.layer_norm}
+                  value={config.policy.layer_norm}
+                  onChange={(value) => updatePolicy({ layer_norm: value })}
+                />
+              </ConfigGrid>
+              <ConfigFieldset disabled={checkpointLocked || !fusionEnabled}>
                 <ConfigGrid columns="two" className="items-start">
-                  <BooleanField
-                    help="Apply layer normalization after the fusion stage or direct concatenation."
-                    label="Layer norm"
-                    resetValue={defaultConfig.policy.layer_norm}
-                    value={config.policy.layer_norm}
-                    onChange={(value) => updatePolicy({ layer_norm: value })}
+                  <IntegerField
+                    help="Feature width of the learned fusion MLP."
+                    label="Fusion features"
+                    min={1}
+                    resetValue={
+                      defaultConfig.policy.fusion_features_dim ?? fallbackFusionFeaturesDim
+                    }
+                    value={fusionFeaturesDim}
+                    onChange={(value) => updatePolicy({ fusion_features_dim: value })}
                   />
-                  <ConfigFieldset disabled={checkpointLocked || !config.policy.layer_norm}>
-                    <SelectField
-                      help="Optional activation applied after layer normalization."
-                      label="Post-LN activation"
-                      optionLabels={{ none: "None" }}
-                      options={optionalActivationOptions}
-                      resetValue={defaultLayerNormActivationValue}
-                      value={layerNormActivationValue}
-                      onChange={(value) =>
-                        updatePolicy({ layer_norm_activation: value === "none" ? null : value })
-                      }
-                    />
-                  </ConfigFieldset>
+                  <SelectField
+                    help="Activation after the learned fusion projection."
+                    label="Fusion activation"
+                    options={activationOptions}
+                    resetValue={defaultConfig.policy.fusion_activation}
+                    value={config.policy.fusion_activation}
+                    onChange={(value) => updatePolicy({ fusion_activation: value })}
+                  />
                 </ConfigGrid>
-              </ConfigFieldGroup>
-            </ConfigGrid>
+              </ConfigFieldset>
+              <ConfigFieldset disabled={checkpointLocked || !config.policy.layer_norm}>
+                <div className="w-[240px] max-w-full">
+                  <SelectField
+                    help="Optional activation applied after layer normalization."
+                    label="Post-LN activation"
+                    optionLabels={{ none: "None" }}
+                    options={optionalActivationOptions}
+                    resetValue={defaultLayerNormActivationValue}
+                    value={layerNormActivationValue}
+                    onChange={(value) =>
+                      updatePolicy({ layer_norm_activation: value === "none" ? null : value })
+                    }
+                  />
+                </div>
+              </ConfigFieldset>
+            </ConfigFieldGroup>
           </ConfigFieldset>
         </ConfigPanel>
 
         <ConfigPanel
-          className="order-4"
+          className="order-5"
           title="Heads"
+          wide
           onReset={() =>
             updatePolicy({
               auxiliary_state_head_arch: defaultConfig.policy.auxiliary_state_head_arch,
