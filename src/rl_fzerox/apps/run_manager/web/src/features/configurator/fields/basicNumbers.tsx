@@ -1,10 +1,28 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/basicNumbers.tsx
-import { type ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
 import { formatEditableDecimal, formatInteger } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseDecimalInput,
+  parsePositiveScientificInput,
+  parseSafeIntegerInput,
+  useEditableNumberInput,
+} from "@/features/configurator/fields/numberInput";
 import { resetHandler } from "@/features/configurator/fields/reset";
 import { FieldInput, FieldNote, FieldShell } from "@/shared/ui/Field";
+
+interface IntegerTextInputProps {
+  "aria-label": string;
+  className?: string;
+  disabled?: boolean;
+  max?: number;
+  min?: number;
+  value: number;
+  onChange: (value: number) => void;
+}
 
 export function NumberField({
   help,
@@ -21,26 +39,13 @@ export function NumberField({
   resetValue?: number;
   step?: string;
 }) {
-  const [rawValue, setRawValue] = useState(formatEditableDecimal(value));
-
-  useEffect(() => {
-    setRawValue(formatEditableDecimal(value));
-  }, [value]);
-
-  function commitValue() {
-    const normalized = rawValue.trim();
-    if (normalized === "" || normalized === "-" || normalized === "." || normalized === "-.") {
-      setRawValue(formatEditableDecimal(value));
-      return;
-    }
-    const parsed = Number(normalized);
-    if (!Number.isFinite(parsed)) {
-      setRawValue(formatEditableDecimal(value));
-      return;
-    }
-    onChange(parsed);
-    setRawValue(formatEditableDecimal(parsed));
-  }
+  const input = useEditableNumberInput({
+    format: formatEditableDecimal,
+    formattedValue: formatEditableDecimal(value),
+    normalize: (nextValue) => nextValue,
+    onCommit: onChange,
+    parse: parseDecimalInput,
+  });
 
   return (
     <FieldShell>
@@ -48,11 +53,11 @@ export function NumberField({
       <FieldInput
         aria-label={label}
         className="min-w-[9ch] max-w-[14ch] justify-self-start"
-        inputMode="decimal"
-        spellCheck={false}
-        value={rawValue}
-        onBlur={commitValue}
-        onChange={(event) => setRawValue(event.target.value)}
+        {...editableNumberInputProps("decimal")}
+        value={input.rawValue}
+        onBlur={input.commitRawValue}
+        onChange={(event) => input.changeRawValue(event.target.value)}
+        onKeyDown={blurOnEnter}
       />
     </FieldShell>
   );
@@ -77,21 +82,13 @@ export function IntegerField({
   onChange: (value: number) => void;
   resetValue?: number;
 }) {
-  const [rawValue, setRawValue] = useState(formatInteger(value));
-
-  useEffect(() => {
-    setRawValue(formatInteger(value));
-  }, [value]);
-
-  function commitValue() {
-    const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-    if (!Number.isSafeInteger(parsed) || parsed < min || (max !== undefined && parsed > max)) {
-      setRawValue(formatInteger(value));
-      return;
-    }
-    onChange(parsed);
-    setRawValue(formatInteger(parsed));
-  }
+  const input = useEditableNumberInput({
+    format: formatInteger,
+    formattedValue: formatInteger(value),
+    normalize: Math.round,
+    onCommit: onChange,
+    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max, min }),
+  });
 
   return (
     <FieldShell>
@@ -99,14 +96,48 @@ export function IntegerField({
       <FieldInput
         aria-label={label}
         className="min-w-[9ch] max-w-[14ch] justify-self-start"
-        inputMode="numeric"
-        spellCheck={false}
-        value={rawValue}
-        onBlur={commitValue}
-        onChange={(event) => setRawValue(event.target.value)}
+        {...editableNumberInputProps("integer")}
+        value={input.rawValue}
+        onBlur={input.commitRawValue}
+        onChange={(event) => input.changeRawValue(event.target.value)}
+        onKeyDown={blurOnEnter}
       />
       {note !== undefined ? <FieldNote>{note}</FieldNote> : null}
     </FieldShell>
+  );
+}
+
+export function IntegerTextInput({
+  "aria-label": ariaLabel,
+  className,
+  disabled = false,
+  max,
+  min = 0,
+  value,
+  onChange,
+}: IntegerTextInputProps) {
+  const input = useEditableNumberInput({
+    format: formatInteger,
+    formattedValue: formatInteger(value),
+    normalize: Math.round,
+    onCommit: onChange,
+    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max, min }),
+  });
+
+  return (
+    <input
+      aria-label={ariaLabel}
+      className={className}
+      disabled={disabled}
+      max={max}
+      min={min}
+      step={1}
+      {...editableNumberInputProps("integer")}
+      value={input.rawValue}
+      onBlur={input.commitRawValue}
+      onChange={(event) => input.changeRawValue(event.target.value)}
+      onKeyDown={blurOnEnter}
+    />
   );
 }
 
@@ -123,21 +154,13 @@ export function ScientificNumberField({
   onChange: (value: number) => void;
   resetValue?: number;
 }) {
-  const [rawValue, setRawValue] = useState(value.toExponential(2));
-
-  useEffect(() => {
-    setRawValue(value.toExponential(2));
-  }, [value]);
-
-  function commitValue() {
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setRawValue(value.toExponential(2));
-      return;
-    }
-    onChange(parsed);
-    setRawValue(parsed.toExponential(2));
-  }
+  const input = useEditableNumberInput({
+    format: (nextValue) => nextValue.toExponential(2),
+    formattedValue: value.toExponential(2),
+    normalize: (nextValue) => nextValue,
+    onCommit: onChange,
+    parse: parsePositiveScientificInput,
+  });
 
   return (
     <FieldShell>
@@ -145,11 +168,11 @@ export function ScientificNumberField({
       <FieldInput
         aria-label={label}
         className="min-w-[9ch] max-w-[14ch] justify-self-start"
-        inputMode="decimal"
-        spellCheck={false}
-        value={rawValue}
-        onBlur={commitValue}
-        onChange={(event) => setRawValue(event.target.value)}
+        {...editableNumberInputProps("scientific")}
+        value={input.rawValue}
+        onBlur={input.commitRawValue}
+        onChange={(event) => input.changeRawValue(event.target.value)}
+        onKeyDown={blurOnEnter}
       />
     </FieldShell>
   );

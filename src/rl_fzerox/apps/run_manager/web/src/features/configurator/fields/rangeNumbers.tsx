@@ -10,7 +10,14 @@ import {
   roundToStepPrecision,
 } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
-import { useEditableNumberInput } from "@/features/configurator/fields/numberInput";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseDecimalInput,
+  parsePositiveScientificInput,
+  parseSafeIntegerInput,
+  useEditableNumberInput,
+} from "@/features/configurator/fields/numberInput";
 import { resetHandler } from "@/features/configurator/fields/reset";
 import {
   discreteSliderTicks,
@@ -55,8 +62,7 @@ export function RangeNumberField({
     formattedValue: formatDecimalInput(value, numberStep),
     normalize: (nextValue) => roundToStepPrecision(nextValue, numberStep),
     onCommit: onChange,
-    onValidInput: onChange,
-    parse: (rawValue) => parseFiniteRangeNumber(rawValue, min, max),
+    parse: (rawValue) => parseDecimalInput(rawValue, { max, min }),
   });
 
   function updateFromSlider(nextValue: number) {
@@ -85,15 +91,11 @@ export function RangeNumberField({
           max={max}
           min={min}
           step={numberStep}
-          type="number"
+          {...editableNumberInputProps("decimal")}
           value={manualInput.rawValue}
           onBlur={manualInput.commitRawValue}
           onChange={(event) => manualInput.changeRawValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-            }
-          }}
+          onKeyDown={blurOnEnter}
         />
       </RangeRow>
     </FieldShell>
@@ -126,7 +128,7 @@ export function RangeIntegerField({
     formattedValue: formatInteger(value),
     normalize: Math.round,
     onCommit: onChange,
-    parse: (rawValue) => parseSafeIntegerRange(rawValue, min, max),
+    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max, min }),
   });
 
   function updateFromSlider(nextValue: number) {
@@ -154,25 +156,15 @@ export function RangeIntegerField({
         <FieldInput
           aria-label={label}
           className="h-[34px] indent-0 tabular-nums"
-          inputMode="numeric"
-          spellCheck={false}
+          {...editableNumberInputProps("integer")}
           value={manualInput.rawValue}
           onBlur={manualInput.commitRawValue}
           onChange={(event) => manualInput.changeRawValue(event.target.value)}
+          onKeyDown={blurOnEnter}
         />
       </RangeRow>
     </FieldShell>
   );
-}
-
-function parseFiniteRangeNumber(rawValue: string, min: number, max: number) {
-  const parsed = Number(rawValue);
-  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null;
-}
-
-function parseSafeIntegerRange(rawValue: string, min: number, max: number) {
-  const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-  return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max ? parsed : null;
 }
 
 export function DiscreteSliderNumberField({
@@ -205,8 +197,8 @@ export function DiscreteSliderNumberField({
   }, [value]);
 
   function commitManualValue() {
-    const parsed = Number(rawValue);
-    if (!Number.isSafeInteger(parsed) || parsed < minManual || parsed > maxManual) {
+    const parsed = parseSafeIntegerInput(rawValue, { max: maxManual, min: minManual });
+    if (parsed === null) {
       setRawValue(String(value));
       return;
     }
@@ -217,13 +209,6 @@ export function DiscreteSliderNumberField({
 
   function changeManualValue(nextRawValue: string) {
     setRawValue(nextRawValue);
-    if (!snapManualToOptions) {
-      return;
-    }
-    const parsed = Number(nextRawValue);
-    if (Number.isSafeInteger(parsed) && parsed >= minManual && parsed <= maxManual) {
-      onChange(nearestOption(parsed, sliderValues));
-    }
   }
 
   function updateFromSlider(index: number) {
@@ -251,18 +236,12 @@ export function DiscreteSliderNumberField({
           className="h-[34px] indent-0 tabular-nums"
           max={maxManual}
           min={minManual}
-          inputMode="numeric"
-          spellCheck={false}
+          {...editableNumberInputProps("integer")}
           step="1"
-          type="number"
           value={rawValue}
           onBlur={commitManualValue}
           onChange={(event) => changeManualValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-            }
-          }}
+          onKeyDown={blurOnEnter}
         />
       </RangeRow>
     </FieldShell>
@@ -288,24 +267,16 @@ export function LogRangeNumberField({
   resetValue?: number;
   ticks?: readonly SliderTick[];
 }) {
-  const [rawValue, setRawValue] = useState(value.toExponential(2));
   const logMin = Math.log10(min);
   const logMax = Math.log10(max);
   const logValue = clamp(Math.log10(value), logMin, logMax);
-
-  useEffect(() => {
-    setRawValue(value.toExponential(2));
-  }, [value]);
-
-  function commitValue() {
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setRawValue(value.toExponential(2));
-      return;
-    }
-    onChange(parsed);
-    setRawValue(parsed.toExponential(2));
-  }
+  const input = useEditableNumberInput({
+    format: (nextValue) => nextValue.toExponential(2),
+    formattedValue: value.toExponential(2),
+    normalize: (nextValue) => roundSignificant(nextValue, 3),
+    onCommit: onChange,
+    parse: (rawValue) => parsePositiveScientificInput(rawValue, { max, min }),
+  });
 
   function updateFromSlider(nextLogValue: number) {
     onChange(roundSignificant(10 ** nextLogValue, 3));
@@ -322,17 +293,17 @@ export function LogRangeNumberField({
           step={0.01}
           ticks={ticks.map((tick) => ({ label: tick.label, value: Math.log10(tick.value) }))}
           value={logValue}
-          valueLabel={rawValue}
+          valueLabel={input.rawValue}
           onChange={updateFromSlider}
         />
         <FieldInput
           aria-label={label}
           className="h-[34px] indent-0 tabular-nums"
-          inputMode="decimal"
-          spellCheck={false}
-          value={rawValue}
-          onBlur={commitValue}
-          onChange={(event) => setRawValue(event.target.value)}
+          {...editableNumberInputProps("scientific")}
+          value={input.rawValue}
+          onBlur={input.commitRawValue}
+          onChange={(event) => input.changeRawValue(event.target.value)}
+          onKeyDown={blurOnEnter}
         />
       </RangeRow>
     </FieldShell>
@@ -404,8 +375,8 @@ export function OptionalNumberField({
     if (!enabled) {
       return;
     }
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    const parsed = parseDecimalInput(rawValue, { max, min });
+    if (parsed === null) {
       setRawValue(formatDecimalInput(value, step));
       return;
     }
@@ -416,14 +387,6 @@ export function OptionalNumberField({
 
   function changeValue(nextRawValue: string) {
     setRawValue(nextRawValue);
-    if (nextRawValue.trim().length === 0) {
-      return;
-    }
-    const parsed = Number(nextRawValue);
-    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-      return;
-    }
-    onChange(roundToStepPrecision(parsed, step));
   }
 
   return (
@@ -463,15 +426,11 @@ export function OptionalNumberField({
           max={max}
           min={min}
           step={step}
-          type="number"
+          {...editableNumberInputProps("decimal")}
           value={rawValue}
           onBlur={commitValue}
           onChange={(event) => changeValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-            }
-          }}
+          onKeyDown={blurOnEnter}
         />
       </div>
     </FieldShell>

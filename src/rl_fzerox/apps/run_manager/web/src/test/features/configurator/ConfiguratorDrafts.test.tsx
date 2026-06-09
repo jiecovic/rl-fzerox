@@ -72,9 +72,10 @@ describe("Configurator", () => {
     fetchPolicyPreviewMock.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "Training" }));
-    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    const clipRangeInput = screen.getByRole("textbox", { name: "Clip range" });
     fireEvent.change(clipRangeInput, { target: { value: "0.17" } });
     fireEvent.change(clipRangeInput, { target: { value: "0.18" } });
+    fireEvent.blur(clipRangeInput);
 
     expect(fetchPolicyPreviewMock).not.toHaveBeenCalled();
     await waitFor(() => expect(fetchPolicyPreviewMock).toHaveBeenCalledTimes(1));

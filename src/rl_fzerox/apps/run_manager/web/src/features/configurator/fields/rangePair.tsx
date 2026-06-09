@@ -8,7 +8,12 @@ import {
   formatCompactNumber,
 } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
-import { useEditableNumberInput } from "@/features/configurator/fields/numberInput";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseDecimalInput,
+  useEditableNumberInput,
+} from "@/features/configurator/fields/numberInput";
 import type { SliderTick } from "@/features/configurator/fields/types";
 import { cn } from "@/shared/ui/cn";
 import { FieldInput, FieldShell, SwitchButton } from "@/shared/ui/Field";
@@ -53,16 +58,14 @@ export function RangePairField({
     formattedValue: String(valueMin),
     normalize: (nextValue) => normalizeRangeValue(nextValue, min, valueMax, step),
     onCommit: (normalized) => onChange({ min: normalized, max: valueMax }),
-    onValidInput: (normalized) => onChange({ min: normalized, max: valueMax }),
-    parse: parseEditableNumberInput,
+    parse: parseDecimalInput,
   });
   const maxInput = useEditableNumberInput({
     format: String,
     formattedValue: String(valueMax),
     normalize: (nextValue) => normalizeRangeValue(nextValue, valueMin, max, step),
     onCommit: (normalized) => onChange({ min: valueMin, max: normalized }),
-    onValidInput: (normalized) => onChange({ min: valueMin, max: normalized }),
-    parse: parseEditableNumberInput,
+    parse: parseDecimalInput,
   });
 
   function updateMin(nextValue: number) {
@@ -100,15 +103,11 @@ export function RangePairField({
             max={valueMax}
             min={min}
             step={step}
-            type="number"
+            {...editableNumberInputProps("decimal")}
             value={minInput.rawValue}
             onBlur={minInput.commitRawValue}
             onChange={(event) => minInput.changeRawValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
+            onKeyDown={blurOnEnter}
           />
           <FieldInput
             aria-label={`${label} maximum`}
@@ -116,15 +115,11 @@ export function RangePairField({
             max={max}
             min={valueMin}
             step={step}
-            type="number"
+            {...editableNumberInputProps("decimal")}
             value={maxInput.rawValue}
             onBlur={maxInput.commitRawValue}
             onChange={(event) => maxInput.changeRawValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
+            onKeyDown={blurOnEnter}
           />
         </div>
       </div>
@@ -177,12 +172,7 @@ export function OptionalRangePairField({
         onChange({ min: normalized, max: activeMax });
       }
     },
-    onValidInput: (normalized) => {
-      if (enabled) {
-        onChange({ min: normalized, max: activeMax });
-      }
-    },
-    parse: parseEditableNumberInput,
+    parse: parseDecimalInput,
   });
   const maxInput = useEditableNumberInput({
     format: String,
@@ -193,12 +183,7 @@ export function OptionalRangePairField({
         onChange({ min: activeMin, max: normalized });
       }
     },
-    onValidInput: (normalized) => {
-      if (enabled) {
-        onChange({ min: activeMin, max: normalized });
-      }
-    },
-    parse: parseEditableNumberInput,
+    parse: parseDecimalInput,
   });
 
   function updateEnabled() {
@@ -260,15 +245,11 @@ export function OptionalRangePairField({
             max={activeMax}
             min={min}
             step={step}
-            type="number"
+            {...editableNumberInputProps("decimal")}
             value={minInput.rawValue}
             onBlur={minInput.commitRawValue}
             onChange={(event) => minInput.changeRawValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
+            onKeyDown={blurOnEnter}
           />
           <FieldInput
             aria-label={`${label} maximum`}
@@ -277,15 +258,11 @@ export function OptionalRangePairField({
             max={max}
             min={activeMin}
             step={step}
-            type="number"
+            {...editableNumberInputProps("decimal")}
             value={maxInput.rawValue}
             onBlur={maxInput.commitRawValue}
             onChange={(event) => maxInput.changeRawValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
+            onKeyDown={blurOnEnter}
           />
         </div>
       </div>
@@ -511,14 +488,6 @@ function snapToStep(value: number, min: number, step: number) {
   const snapped = min + Math.round((value - min) / step) * step;
   const decimals = step.toString().split(".")[1]?.length ?? 0;
   return Number(snapped.toFixed(decimals));
-}
-
-function parseEditableNumberInput(rawValue: string) {
-  if (rawValue.trim().length === 0) {
-    return null;
-  }
-  const parsed = Number(rawValue);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function normalizeRangeValue(value: number, min: number, max: number, step: number) {

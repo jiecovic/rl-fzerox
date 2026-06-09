@@ -7,7 +7,12 @@ import {
   SegmentedChoiceStrip,
 } from "@/features/configurator/fields";
 import { formatEditableDecimal } from "@/features/configurator/fields/format";
-import { useEditableNumberInput } from "@/features/configurator/fields/numberInput";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseDecimalInput,
+  useEditableNumberInput,
+} from "@/features/configurator/fields/numberInput";
 import { resetHandler } from "@/features/configurator/fields/reset";
 import {
   ActionCard,
@@ -471,10 +476,9 @@ function SpinIdleLogitField({
     formattedValue: formatEditableDecimal(value),
     normalize: (nextValue) => nextValue,
     onCommit: onChange,
-    onValidInput: onChange,
-    parse: parseFiniteDecimal,
+    parse: parseDecimalInput,
   });
-  const noteValue = parseFiniteDecimal(input.rawValue) ?? value;
+  const noteValue = parseDecimalInput(input.rawValue) ?? value;
   const idleProbability = spinIdleProbability(noteValue);
   const sideProbability = (1 - idleProbability) / 2;
 
@@ -488,26 +492,17 @@ function SpinIdleLogitField({
       <FieldInput
         aria-label="No-spin logit"
         className="min-w-[9ch] max-w-[14ch] justify-self-start"
-        inputMode="decimal"
-        spellCheck={false}
+        {...editableNumberInputProps("decimal")}
         value={input.rawValue}
         onBlur={input.commitRawValue}
         onChange={(event) => input.changeRawValue(event.target.value)}
+        onKeyDown={blurOnEnter}
       />
       <FieldNote>
         {`logit ${formatSignedDecimal(noteValue)} -> idle ${formatPercent(idleProbability)}, left/right ${formatPercent(sideProbability)} each`}
       </FieldNote>
     </FieldShell>
   );
-}
-
-function parseFiniteDecimal(rawValue: string): number | null {
-  const normalized = rawValue.trim();
-  if (normalized === "" || normalized === "-" || normalized === "." || normalized === "-.") {
-    return null;
-  }
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function spinIdleProbability(value: number): number {

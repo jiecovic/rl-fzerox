@@ -96,7 +96,7 @@ describe("Configurator", () => {
 
     await user.click(screen.getByRole("button", { name: "Training" }));
 
-    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    const clipRangeInput = screen.getByRole("textbox", { name: "Clip range" });
     await user.clear(clipRangeInput);
     await user.type(clipRangeInput, "0.17");
     await user.click(screen.getByRole("button", { name: "Save draft" }));
@@ -135,7 +135,7 @@ describe("Configurator", () => {
 
     await user.click(screen.getByRole("button", { name: "Training" }));
 
-    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    const clipRangeInput = screen.getByRole("textbox", { name: "Clip range" });
     await user.clear(clipRangeInput);
     await user.type(clipRangeInput, "0.17");
     await user.click(screen.getByRole("button", { name: "Train" }));
@@ -415,7 +415,7 @@ describe("Configurator", () => {
     expect(gasToggle).toBeDisabled();
     expect(gasToggle).toBeChecked();
     expect(
-      within(gasRow).getByRole("spinbutton", { name: "Gas at time t-1 episode dropout" }),
+      within(gasRow).getByRole("textbox", { name: "Gas at time t-1 episode dropout" }),
     ).toBeEnabled();
     expect(
       within(gasRow).getByRole("checkbox", { name: "Gas at time t-1 uses real value" }),

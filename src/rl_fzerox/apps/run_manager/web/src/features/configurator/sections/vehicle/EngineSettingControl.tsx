@@ -1,7 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/vehicle/EngineSettingControl.tsx
 import { FieldLabel } from "@/features/configurator/fields/label";
-
-import { parseBoundedInt } from "@/features/configurator/sections/vehicle/engineSetting/math";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseSafeIntegerInput,
+  useEditableNumberInput,
+} from "@/features/configurator/fields/numberInput";
 import { RangeSlider } from "@/features/configurator/sections/vehicle/engineSetting/RangeSlider";
 import { SingleSlider } from "@/features/configurator/sections/vehicle/engineSetting/SingleSlider";
 import type {
@@ -51,6 +55,27 @@ export function EngineSettingControl({
       : rangeMin === defaultRangeMin && rangeMax === defaultRangeMax
         ? undefined
         : () => onRangeChange({ max: defaultRangeMax, min: defaultRangeMin });
+  const fixedInput = useEditableNumberInput({
+    format: String,
+    formattedValue: String(fixedValue),
+    normalize: (nextValue) => clampInteger(nextValue, min, max),
+    onCommit: onFixedChange,
+    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max, min }),
+  });
+  const rangeMinInput = useEditableNumberInput({
+    format: String,
+    formattedValue: String(rangeMin),
+    normalize: (nextValue) => clampInteger(nextValue, min, rangeMax),
+    onCommit: (nextMin) => onRangeChange({ max: rangeMax, min: nextMin }),
+    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max: rangeMax, min }),
+  });
+  const rangeMaxInput = useEditableNumberInput({
+    format: String,
+    formattedValue: String(rangeMax),
+    normalize: (nextValue) => clampInteger(nextValue, rangeMin, max),
+    onCommit: (nextMax) => onRangeChange({ max: nextMax, min: rangeMin }),
+    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max, min: rangeMin }),
+  });
 
   return (
     <FieldShell>
@@ -86,14 +111,14 @@ export function EngineSettingControl({
               <FieldInput
                 aria-label={label}
                 className="col-span-2 !h-[34px] !w-[176px] text-center tabular-nums"
-                inputMode="numeric"
                 max={max}
                 min={min}
-                spellCheck={false}
                 step={1}
-                type="number"
-                value={fixedValue}
-                onChange={(event) => onFixedChange(parseBoundedInt(event.target.value, min, max))}
+                {...editableNumberInputProps("integer")}
+                value={fixedInput.rawValue}
+                onBlur={fixedInput.commitRawValue}
+                onChange={(event) => fixedInput.changeRawValue(event.target.value)}
+                onKeyDown={blurOnEnter}
               />
             </div>
           ) : (
@@ -101,36 +126,26 @@ export function EngineSettingControl({
               <FieldInput
                 aria-label={`${label} minimum`}
                 className="!h-[34px] !w-[84px] text-center tabular-nums"
-                inputMode="numeric"
                 max={rangeMax}
                 min={min}
-                spellCheck={false}
                 step={1}
-                type="number"
-                value={rangeMin}
-                onChange={(event) =>
-                  onRangeChange({
-                    max: rangeMax,
-                    min: Math.min(parseBoundedInt(event.target.value, min, max), rangeMax),
-                  })
-                }
+                {...editableNumberInputProps("integer")}
+                value={rangeMinInput.rawValue}
+                onBlur={rangeMinInput.commitRawValue}
+                onChange={(event) => rangeMinInput.changeRawValue(event.target.value)}
+                onKeyDown={blurOnEnter}
               />
               <FieldInput
                 aria-label={`${label} maximum`}
                 className="!h-[34px] !w-[84px] text-center tabular-nums"
-                inputMode="numeric"
                 max={max}
                 min={rangeMin}
-                spellCheck={false}
                 step={1}
-                type="number"
-                value={rangeMax}
-                onChange={(event) =>
-                  onRangeChange({
-                    max: Math.max(parseBoundedInt(event.target.value, min, max), rangeMin),
-                    min: rangeMin,
-                  })
-                }
+                {...editableNumberInputProps("integer")}
+                value={rangeMaxInput.rawValue}
+                onBlur={rangeMaxInput.commitRawValue}
+                onChange={(event) => rangeMaxInput.changeRawValue(event.target.value)}
+                onKeyDown={blurOnEnter}
               />
             </div>
           )}
@@ -138,4 +153,8 @@ export function EngineSettingControl({
       </div>
     </FieldShell>
   );
+}
+
+function clampInteger(value: number, min: number, max: number) {
+  return Math.min(Math.max(Math.round(value), min), max);
 }

@@ -25,11 +25,3 @@ function snapToStep(value: number, min: number, step: number) {
   const decimals = step.toString().split(".")[1]?.length ?? 0;
   return Number(snapped.toFixed(decimals));
 }
-
-export function parseBoundedInt(rawValue: string, min: number, max: number) {
-  const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-  if (!Number.isFinite(parsed)) {
-    return min;
-  }
-  return Math.round(clamp(parsed, min, max));
-}

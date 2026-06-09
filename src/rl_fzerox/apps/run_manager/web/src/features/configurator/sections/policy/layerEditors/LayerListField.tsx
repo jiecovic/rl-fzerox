@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policy/layerEditors/LayerListField.tsx
 import { useRef } from "react";
 
+import { IntegerTextInput } from "@/features/configurator/fields/basicNumbers";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import {
   layerListResetHandler,
@@ -52,13 +53,11 @@ export function LayerListField({
         {value.map((layer, index) => (
           <div className="layer-list-row" key={rowIdsRef.current[index]}>
             <span className="layer-index">L{index + 1}</span>
-            <input
+            <IntegerTextInput
               aria-label={`${label} layer ${index + 1}`}
               min={1}
-              step={1}
-              type="number"
               value={layer}
-              onChange={(event) => setLayer(index, Number(event.target.value))}
+              onChange={(nextValue) => setLayer(index, nextValue)}
             />
             <AppTooltip content="Remove layer">
               <button

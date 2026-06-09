@@ -280,7 +280,7 @@ describe("App", () => {
     await user.click(await screen.findByRole("button", { name: "Fork latest checkpoint" }));
     await user.click(screen.getByRole("button", { name: "Training" }));
 
-    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    const clipRangeInput = screen.getByRole("textbox", { name: "Clip range" });
     await user.clear(clipRangeInput);
     await user.type(clipRangeInput, "0.17");
     await user.click(screen.getByRole("button", { name: "Train" }));
@@ -363,9 +363,11 @@ describe("App", () => {
     await user.click(await screen.findByRole("button", { name: "Create draft" }));
     await user.click(screen.getByRole("button", { name: "Training" }));
 
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Clip range" }), {
+    const clipRangeInput = screen.getByRole("textbox", { name: "Clip range" });
+    fireEvent.change(clipRangeInput, {
       target: { value: "0.17" },
     });
+    fireEvent.blur(clipRangeInput);
     await user.click(screen.getByRole("button", { name: "Save draft" }));
     await waitFor(() => expect(createDraftWithSourceMock).toHaveBeenCalled());
 

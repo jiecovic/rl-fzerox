@@ -14,7 +14,7 @@ describe("Configurator field inputs", () => {
     cleanup();
   });
 
-  it("commits valid range number edits before blur", () => {
+  it("drafts range number edits until blur", () => {
     const onChange = vi.fn();
 
     render(
@@ -30,8 +30,11 @@ describe("Configurator field inputs", () => {
       />,
     );
 
-    const input = screen.getByRole("spinbutton", { name: "Clip range" });
+    const input = screen.getByRole("textbox", { name: "Clip range" });
     fireEvent.change(input, { target: { value: "0.17" } });
+
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.blur(input);
 
     expect(onChange).toHaveBeenLastCalledWith(0.17);
   });
@@ -52,11 +55,11 @@ describe("Configurator field inputs", () => {
       />,
     );
 
-    const input = screen.getByRole("spinbutton", { name: "Clip range" });
+    const input = screen.getByRole("textbox", { name: "Clip range" });
     fireEvent.change(input, { target: { value: "" } });
 
     expect(onChange).not.toHaveBeenCalledWith(0);
-    expect(input).toHaveValue(null);
+    expect(input).toHaveValue("");
   });
 
   it("does not coerce a cleared optional number input to zero", () => {
@@ -64,11 +67,11 @@ describe("Configurator field inputs", () => {
 
     render(<OptionalNumberField help="test" label="Penalty" value={0.25} onChange={onChange} />);
 
-    const input = screen.getByRole("spinbutton", { name: "Penalty" });
+    const input = screen.getByRole("textbox", { name: "Penalty" });
     fireEvent.change(input, { target: { value: "" } });
 
     expect(onChange).not.toHaveBeenCalledWith(0);
-    expect(input).toHaveValue(null);
+    expect(input).toHaveValue("");
   });
 
   it("does not coerce a cleared range minimum input to zero", () => {
@@ -87,11 +90,11 @@ describe("Configurator field inputs", () => {
       />,
     );
 
-    const input = screen.getByRole("spinbutton", { name: "Window minimum" });
+    const input = screen.getByRole("textbox", { name: "Window minimum" });
     fireEvent.change(input, { target: { value: "" } });
 
     expect(onChange).not.toHaveBeenCalledWith({ max: 20, min: 0 });
-    expect(input).toHaveValue(null);
+    expect(input).toHaveValue("");
   });
 
   it("does not coerce a cleared optional range maximum input to zero", () => {
@@ -112,10 +115,10 @@ describe("Configurator field inputs", () => {
       />,
     );
 
-    const input = screen.getByRole("spinbutton", { name: "Soft limit maximum" });
+    const input = screen.getByRole("textbox", { name: "Soft limit maximum" });
     fireEvent.change(input, { target: { value: "" } });
 
     expect(onChange).not.toHaveBeenCalledWith({ max: 0, min: 10 });
-    expect(input).toHaveValue(null);
+    expect(input).toHaveValue("");
   });
 });

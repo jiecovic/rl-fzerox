@@ -2,6 +2,11 @@
 import { useEffect, useState } from "react";
 
 import { formatDecimalInput } from "@/features/configurator/fields/format";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseDecimalInput,
+} from "@/features/configurator/fields/numberInput";
 
 interface BoundedDecimalInputProps {
   className: string;
@@ -31,22 +36,11 @@ export function BoundedDecimalInput({
   }, [step, value]);
 
   function parseBounded(raw: string) {
-    if (raw.trim() === "") {
-      return null;
-    }
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed < min || (max !== undefined && parsed > max)) {
+    const parsed = parseDecimalInput(raw, { max, min });
+    if (parsed === null) {
       return null;
     }
     return Math.round(parsed * 100) / 100;
-  }
-
-  function tryCommitRaw(nextRawValue: string) {
-    const parsed = parseBounded(nextRawValue);
-    if (parsed === null) {
-      return;
-    }
-    onChange(parsed);
   }
 
   function commitValue() {
@@ -64,23 +58,14 @@ export function BoundedDecimalInput({
       aria-label={label}
       className={className}
       disabled={disabled}
-      inputMode="decimal"
       max={max}
       min={min}
       step={step}
-      type="number"
+      {...editableNumberInputProps("decimal")}
       value={rawValue}
       onBlur={commitValue}
-      onChange={(event) => {
-        const nextRawValue = event.target.value;
-        setRawValue(nextRawValue);
-        tryCommitRaw(nextRawValue);
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.currentTarget.blur();
-        }
-      }}
+      onChange={(event) => setRawValue(event.target.value)}
+      onKeyDown={blurOnEnter}
     />
   );
 }

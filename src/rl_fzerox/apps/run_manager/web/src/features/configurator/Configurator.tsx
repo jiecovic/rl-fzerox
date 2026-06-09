@@ -9,6 +9,12 @@ import {
   type ConfigSection,
 } from "@/features/configurator/configurator/sections";
 import { FieldLabel } from "@/features/configurator/fields";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseSafeIntegerInput,
+  useEditableNumberInput,
+} from "@/features/configurator/fields/numberInput";
 import { ActionSection } from "@/features/configurator/sections/ActionSection";
 import { EnvironmentSection } from "@/features/configurator/sections/EnvironmentSection";
 import { LoggingSection } from "@/features/configurator/sections/LoggingSection";
@@ -91,6 +97,13 @@ export function Configurator({
   const configRef = useRef(config);
   const resetSourceKeyRef = useRef<string | null>(null);
   configRef.current = config;
+  const seedInput = useEditableNumberInput({
+    format: String,
+    formattedValue: String(config.seed),
+    normalize: Math.round,
+    onCommit: (seed) => setConfig((currentConfig) => ({ ...currentConfig, seed })),
+    parse: (rawValue) => parseSafeIntegerInput(rawValue, { min: 0 }),
+  });
   const normalizedDraftName = draftName.trim();
   const normalizedBaselineDraftName = baselineDraftName.trim();
   const normalizedLoadedDraftName = loadedDraft?.name.trim().toLowerCase() ?? null;
@@ -362,12 +375,11 @@ export function Configurator({
             />
             <FieldInput
               aria-label="Seed"
-              type="number"
-              value={config.seed}
-              onChange={(event) => {
-                const seed = Number(event.target.value);
-                setConfig((currentConfig) => ({ ...currentConfig, seed }));
-              }}
+              {...editableNumberInputProps("integer")}
+              value={seedInput.rawValue}
+              onBlur={seedInput.commitRawValue}
+              onChange={(event) => seedInput.changeRawValue(event.target.value)}
+              onKeyDown={blurOnEnter}
             />
           </FieldShell>
           <TooltipIconButton

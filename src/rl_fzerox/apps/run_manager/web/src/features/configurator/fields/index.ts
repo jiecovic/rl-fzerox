@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/index.ts
 export {
   IntegerField,
+  IntegerTextInput,
   NumberField,
   ScientificNumberField,
 } from "@/features/configurator/fields/basicNumbers";

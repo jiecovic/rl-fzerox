@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policy/layerEditors/CustomConvTableRows.tsx
 import { useRef } from "react";
 
+import { IntegerTextInput } from "@/features/configurator/fields/basicNumbers";
 import {
   formatConvSpatial,
   formatFitMode,
@@ -152,17 +153,13 @@ export function CustomConvTableRows({
                     {preview === null ? "same" : preview.out_channels}
                   </span>
                 ) : (
-                  <input
+                  <IntegerTextInput
                     aria-label={`custom CNN layer ${index + 1} output channels`}
                     className="custom-conv-table-input"
                     disabled={disabled}
                     min={1}
-                    step={1}
-                    type="number"
                     value={layer.out_channels}
-                    onChange={(event) =>
-                      setLayerValue(index, "out_channels", Number(event.target.value))
-                    }
+                    onChange={(nextValue) => setLayerValue(index, "out_channels", nextValue)}
                   />
                 )}
               </div>
@@ -171,17 +168,13 @@ export function CustomConvTableRows({
               {isActivationLayerKind(layer.kind) ? (
                 <span className="custom-conv-static-value">-</span>
               ) : (
-                <input
+                <IntegerTextInput
                   aria-label={`custom CNN layer ${index + 1} kernel size`}
                   className="custom-conv-table-input"
                   disabled={disabled}
                   min={1}
-                  step={1}
-                  type="number"
                   value={layer.kernel_size}
-                  onChange={(event) =>
-                    setLayerValue(index, "kernel_size", Number(event.target.value))
-                  }
+                  onChange={(nextValue) => setLayerValue(index, "kernel_size", nextValue)}
                 />
               )}
             </td>
@@ -189,15 +182,13 @@ export function CustomConvTableRows({
               {isActivationLayerKind(layer.kind) ? (
                 <span className="custom-conv-static-value">-</span>
               ) : (
-                <input
+                <IntegerTextInput
                   aria-label={`custom CNN layer ${index + 1} stride`}
                   className="custom-conv-table-input"
                   disabled={disabled}
                   min={1}
-                  step={1}
-                  type="number"
                   value={layer.stride}
-                  onChange={(event) => setLayerValue(index, "stride", Number(event.target.value))}
+                  onChange={(nextValue) => setLayerValue(index, "stride", nextValue)}
                 />
               )}
             </td>
@@ -205,15 +196,13 @@ export function CustomConvTableRows({
               {isActivationLayerKind(layer.kind) ? (
                 <span className="custom-conv-static-value">-</span>
               ) : (
-                <input
+                <IntegerTextInput
                   aria-label={`custom CNN layer ${index + 1} padding`}
                   className="custom-conv-table-input"
                   min={0}
-                  step={1}
-                  type="number"
                   value={layer.padding}
                   disabled={disabled || isResidualLayerKind(layer.kind)}
-                  onChange={(event) => setLayerValue(index, "padding", Number(event.target.value))}
+                  onChange={(nextValue) => setLayerValue(index, "padding", nextValue)}
                 />
               )}
             </td>

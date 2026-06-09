@@ -142,11 +142,11 @@ describe("Configurator", () => {
     if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
       throw new Error("Missing track position panel");
     }
-    const edgeRatioInput = within(trackPositionPanel).getByRole("spinbutton", {
+    const edgeRatioInput = within(trackPositionPanel).getByRole("textbox", {
       name: "Edge ratio episode dropout",
     });
     expect(edgeRatioInput).toBeEnabled();
-    expect(edgeRatioInput).toHaveValue(1);
+    expect(edgeRatioInput).toHaveValue("1");
 
     const edgeRatioRow = within(trackPositionPanel).getByText("Edge ratio").closest("tr");
     if (!(edgeRatioRow instanceof HTMLTableRowElement)) {
@@ -169,14 +169,14 @@ describe("Configurator", () => {
     await waitFor(() => {
       expect(edgeRatioIncludedToggle).toBeChecked();
       expect(edgeRatioValueToggle).toBeChecked();
-      expect(edgeRatioInput).toHaveValue(0);
+      expect(edgeRatioInput).toHaveValue("0");
     });
 
     await user.clear(edgeRatioInput);
     await user.type(edgeRatioInput, "0.25");
     edgeRatioInput.blur();
 
-    await waitFor(() => expect(edgeRatioInput).toHaveValue(0.25));
+    await waitFor(() => expect(edgeRatioInput).toHaveValue("0.25"));
 
     await user.clear(edgeRatioInput);
     await user.type(edgeRatioInput, "1");
@@ -184,7 +184,7 @@ describe("Configurator", () => {
 
     await waitFor(() => {
       expect(edgeRatioInput).toBeEnabled();
-      expect(edgeRatioInput).toHaveValue(1);
+      expect(edgeRatioInput).toHaveValue("1");
       expect(edgeRatioValueToggle).not.toBeChecked();
     });
 
@@ -192,7 +192,7 @@ describe("Configurator", () => {
 
     await waitFor(() => {
       expect(edgeRatioInput).toBeEnabled();
-      expect(edgeRatioInput).toHaveValue(0);
+      expect(edgeRatioInput).toHaveValue("0");
       expect(edgeRatioValueToggle).toBeChecked();
     });
   });
@@ -259,7 +259,7 @@ describe("Configurator", () => {
     if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
       throw new Error("Missing track position panel");
     }
-    const lapProgressInput = within(trackPositionPanel).getByRole("spinbutton", {
+    const lapProgressInput = within(trackPositionPanel).getByRole("textbox", {
       name: "Progress scalar episode dropout",
     });
 
@@ -311,7 +311,7 @@ describe("Configurator", () => {
         name: "Edge ratio auxiliary loss enabled",
       }),
     );
-    const weightInput = within(trackPositionPanel).getByRole("spinbutton", {
+    const weightInput = within(trackPositionPanel).getByRole("textbox", {
       name: "Edge ratio auxiliary loss weight",
     });
     await user.clear(weightInput);
