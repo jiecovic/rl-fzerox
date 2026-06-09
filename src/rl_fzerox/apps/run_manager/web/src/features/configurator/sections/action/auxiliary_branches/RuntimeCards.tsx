@@ -54,6 +54,7 @@ export function RuntimeCards({
 }: RuntimeCardsProps) {
   const groundedPitchLossWeight = train.actor_regularization.grounded_pitch_neutral_loss_weight;
   const pitchStdCapLossWeight = train.actor_regularization.pitch_std_cap_loss_weight;
+  const steerStdCapLossWeight = train.actor_regularization.steer_std_cap_loss_weight;
 
   return (
     <div className="action-behavior-grid">
@@ -416,6 +417,89 @@ export function RuntimeCards({
               value={policy.spin_idle_logit}
               onChange={(value) => updatePolicy({ spin_idle_logit: value })}
             />
+          </div>
+        </fieldset>
+      </section>
+
+      <section className="action-runtime-card">
+        <div className="action-runtime-header config-disclosure-copy">
+          <strong>Steering guard</strong>
+          <small>Optionally keep continuous steering exploration inside a useful range.</small>
+        </div>
+        {action.steering_mode === "continuous" ? null : (
+          <p className="action-note">
+            Steering is discrete right now, so this continuous std guard is inactive.
+          </p>
+        )}
+        <fieldset
+          className="dependent-fieldset action-runtime-fields"
+          disabled={action.steering_mode !== "continuous"}
+        >
+          <div className="action-runtime-control-panel">
+            <div className="action-runtime-control-header">
+              <FieldLabel
+                help="Add a policy-side loss that softly caps the continuous steering Gaussian std. It does not change the action head or clamp the sampled action."
+                label="Steer std cap loss"
+                onReset={() =>
+                  updateTrain({
+                    actor_regularization: {
+                      ...train.actor_regularization,
+                      steer_std_cap_loss_weight:
+                        defaultTrain.actor_regularization.steer_std_cap_loss_weight,
+                      steer_std_cap: defaultTrain.actor_regularization.steer_std_cap,
+                    },
+                  })
+                }
+              />
+              <SwitchButton
+                active={steerStdCapLossWeight > 0}
+                className="action-runtime-compact-switch"
+                label="Steer std cap loss"
+                onClick={() =>
+                  updateTrain({
+                    actor_regularization: {
+                      ...train.actor_regularization,
+                      steer_std_cap_loss_weight: steerStdCapLossWeight > 0 ? 0 : 0.01,
+                    },
+                  })
+                }
+              />
+            </div>
+            <fieldset
+              className="dependent-fieldset action-runtime-two-col"
+              disabled={steerStdCapLossWeight <= 0}
+            >
+              <NumberField
+                help="Coefficient for relu(steer_std - cap)^2. Keep this low; it is a guardrail, not a steering objective."
+                label="Loss weight"
+                resetValue={defaultTrain.actor_regularization.steer_std_cap_loss_weight}
+                step="0.001"
+                value={steerStdCapLossWeight > 0 ? steerStdCapLossWeight : 0}
+                onChange={(value) =>
+                  updateTrain({
+                    actor_regularization: {
+                      ...train.actor_regularization,
+                      steer_std_cap_loss_weight: Math.max(0, value),
+                    },
+                  })
+                }
+              />
+              <NumberField
+                help="Soft upper bound for the continuous steering distribution std before action clipping."
+                label="Std cap"
+                resetValue={defaultTrain.actor_regularization.steer_std_cap}
+                step="0.05"
+                value={train.actor_regularization.steer_std_cap}
+                onChange={(value) =>
+                  updateTrain({
+                    actor_regularization: {
+                      ...train.actor_regularization,
+                      steer_std_cap: Math.max(0.001, value),
+                    },
+                  })
+                }
+              />
+            </fieldset>
           </div>
         </fieldset>
       </section>

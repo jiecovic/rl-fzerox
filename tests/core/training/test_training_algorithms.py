@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gymnasium import spaces
 
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import (
@@ -301,6 +302,61 @@ def test_hybrid_ppo_accepts_state_scoped_pitch_std_actor_loss() -> None:
 
     assert isinstance(model, MaskableHybridActionPPO)
     assert model.policy.continuous_log_std_mode == "parameter"
+
+
+def test_hybrid_ppo_accepts_continuous_steer_std_actor_loss_without_aux_targets() -> None:
+    from sb3x import MaskableHybridActionPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env_config = EnvConfig(
+        action=configured_hybrid_action(
+            continuous_axes=("steer",),
+            discrete_axes=("boost", "lean"),
+        ),
+        observation=ObservationConfig(
+            mode="image_state",
+            state_components=_VEHICLE_STATE_COMPONENT,
+        ),
+    )
+    policy_config = PolicyConfig()
+    train_config = TrainConfig(
+        algorithm="maskable_hybrid_action_ppo",
+        n_steps=4,
+        batch_size=4,
+        device="cpu",
+        actor_regularization=TrainActorRegularizationConfig(
+            steer_std_cap_loss_weight=0.05,
+            steer_std_cap=1.0,
+        ),
+    )
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: maybe_wrap_training_auxiliary_state_observation(
+                FZeroXEnv(
+                    backend=SyntheticBackend(),
+                    config=env_config,
+                ),
+                policy_config=policy_config,
+                train_config=train_config,
+            )
+        )
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=train_config,
+            policy_config=policy_config,
+            env_config=env_config,
+            tensorboard_log=None,
+        )
+        model.learn(total_timesteps=4)
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridActionPPO)
+    assert isinstance(model.observation_space, spaces.Dict)
+    assert "auxiliary_state_targets" not in model.observation_space.spaces
 
 
 def test_hybrid_ppo_accepts_discrete_pitch_actor_loss() -> None:

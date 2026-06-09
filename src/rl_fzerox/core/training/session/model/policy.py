@@ -27,9 +27,7 @@ def resolve_policy_entry(
 
     actor_regularization_enabled = train_config.actor_regularization.enabled()
     if actor_regularization_enabled and effective_algorithm not in TRAINING_ALGORITHMS.hybrid:
-        raise RuntimeError(
-            "train.actor_regularization requires a hybrid action algorithm with pitch"
-        )
+        raise RuntimeError("train.actor_regularization requires a hybrid action algorithm")
 
     auxiliary_state_enabled = _needs_auxiliary_policy(policy_config, train_config)
     if auxiliary_state_enabled:

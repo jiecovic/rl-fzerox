@@ -48,7 +48,7 @@ from rl_fzerox.core.policy.auxiliary_state.targets import (
 
 
 @dataclass(frozen=True, slots=True)
-class _PitchDistributionStats:
+class _AxisDistributionStats:
     mean: torch.Tensor
     std: torch.Tensor
     entropy: torch.Tensor
@@ -120,6 +120,9 @@ class _AuxiliaryStatePolicyMixin:
     _pitch_std_cap_loss_weight: float
     _grounded_pitch_std_cap: float
     _airborne_pitch_std_cap: float
+    _steer_std_cap_loss_weight: float
+    _steer_std_cap: float
+    _continuous_steer_index: int | None
     _continuous_pitch_index: int | None
     _discrete_pitch_index: int | None
     _continuous_action_group_count: int
@@ -152,8 +155,11 @@ class _AuxiliaryStatePolicyMixin:
         self._pitch_std_cap_loss_weight = _pitch_std_cap_loss_weight(actor_regularization)
         self._grounded_pitch_std_cap = _grounded_pitch_std_cap(actor_regularization)
         self._airborne_pitch_std_cap = _airborne_pitch_std_cap(actor_regularization)
+        self._steer_std_cap_loss_weight = _steer_std_cap_loss_weight(actor_regularization)
+        self._steer_std_cap = _steer_std_cap(actor_regularization)
         continuous_names = tuple(continuous_action_group_names)
         discrete_names = tuple(discrete_action_group_names)
+        self._continuous_steer_index = _axis_index(continuous_names, "steer")
         self._continuous_pitch_index = _axis_index(continuous_names, "pitch")
         self._discrete_pitch_index = _axis_index(discrete_names, "pitch")
         self._continuous_action_group_count = len(continuous_names)
@@ -164,6 +170,8 @@ class _AuxiliaryStatePolicyMixin:
             and self._discrete_pitch_index is None
         ):
             raise ValueError("pitch actor regularization requires a pitch action group")
+        if self._steer_actor_regularization_enabled() and self._continuous_steer_index is None:
+            raise ValueError("steer actor regularization requires a continuous steer action group")
 
     def _auxiliary_state_loss(
         self,
@@ -189,57 +197,85 @@ class _AuxiliaryStatePolicyMixin:
         obs: PyTorchObs,
         sample_mask: torch.Tensor | None = None,
     ) -> PolicyAuxiliaryLoss | None:
-        if not self._pitch_actor_regularization_enabled():
+        if not self._actor_regularization_enabled():
             return None
 
-        pitch_stats = self._pitch_distribution_stats(distribution)
-        pitch_mean = pitch_stats.mean
-
-        total_loss = pitch_mean.new_zeros(())
+        total_loss: torch.Tensor | None = None
+        loss_anchor: torch.Tensor | None = None
         metrics: dict[str, float] = {}
 
-        mean_loss = self._grounded_pitch_mean_loss(
-            pitch_mean,
-            obs=obs,
-            sample_mask=sample_mask,
-        )
-        if mean_loss is not None:
-            loss_value, weighted_loss = mean_loss
-            total_loss = total_loss + weighted_loss
-            loss = float(loss_value.detach().cpu().item())
-            weighted = float(weighted_loss.detach().cpu().item())
-            metrics.update(
-                {
-                    "actor/grounded_pitch_mean_loss": loss,
-                    "actor/grounded_pitch_mean_loss_weighted": weighted,
-                    "actor/grounded_pitch_neutral": loss,
-                    "actor/grounded_pitch_neutral_weighted": weighted,
-                }
+        def add_loss(loss_value: torch.Tensor) -> None:
+            nonlocal total_loss
+            total_loss = loss_value if total_loss is None else total_loss + loss_value
+
+        if self._pitch_actor_regularization_enabled():
+            pitch_stats = self._pitch_distribution_stats(distribution)
+            pitch_mean = pitch_stats.mean
+            loss_anchor = pitch_mean
+
+            mean_loss = self._grounded_pitch_mean_loss(
+                pitch_mean,
+                obs=obs,
+                sample_mask=sample_mask,
             )
-
-        std_loss = self._pitch_std_cap_loss(
-            pitch_stats,
-            obs=obs,
-            sample_mask=sample_mask,
-        )
-        if std_loss is not None:
-            total_loss = total_loss + std_loss.total_loss
-            metrics.update(std_loss.metrics)
-
-        aux_targets = _optional_auxiliary_targets(obs)
-        if aux_targets is not None:
-            pitch_sample = self._pitch_action_sample(actions, dtype=pitch_mean.dtype)
-            metrics.update(
-                _pitch_sample_metrics(
-                    pitch_mean=pitch_mean,
-                    pitch_sample=pitch_sample,
-                    aux_targets=aux_targets,
-                    sample_mask=sample_mask,
+            if mean_loss is not None:
+                loss_value, weighted_loss = mean_loss
+                add_loss(weighted_loss)
+                loss = float(loss_value.detach().cpu().item())
+                weighted = float(weighted_loss.detach().cpu().item())
+                metrics.update(
+                    {
+                        "actor/grounded_pitch_mean_loss": loss,
+                        "actor/grounded_pitch_mean_loss_weighted": weighted,
+                        "actor/grounded_pitch_neutral": loss,
+                        "actor/grounded_pitch_neutral_weighted": weighted,
+                    }
                 )
+
+            std_loss = self._pitch_std_cap_loss(
+                pitch_stats,
+                obs=obs,
+                sample_mask=sample_mask,
             )
+            if std_loss is not None:
+                add_loss(std_loss.total_loss)
+                metrics.update(std_loss.metrics)
+
+            aux_targets = _optional_auxiliary_targets(obs)
+            if aux_targets is not None:
+                pitch_sample = self._pitch_action_sample(actions, dtype=pitch_mean.dtype)
+                metrics.update(
+                    _pitch_sample_metrics(
+                        pitch_mean=pitch_mean,
+                        pitch_sample=pitch_sample,
+                        aux_targets=aux_targets,
+                        sample_mask=sample_mask,
+                    )
+                )
+
+        if self._steer_actor_regularization_enabled():
+            steer_index = self._continuous_steer_index
+            if steer_index is None:
+                raise RuntimeError("steer actor regularization was not initialized")
+            steer_stats = self._continuous_axis_distribution_stats(
+                distribution,
+                axis_index=steer_index,
+            )
+            loss_anchor = steer_stats.std
+            steer_loss = self._steer_std_cap_loss(
+                steer_stats,
+                sample_mask=sample_mask,
+            )
+            if steer_loss is not None:
+                add_loss(steer_loss.total_loss)
+                metrics.update(steer_loss.metrics)
 
         if not metrics:
             return None
+        if total_loss is None:
+            if loss_anchor is None:
+                return None
+            total_loss = loss_anchor.new_zeros(())
         return PolicyAuxiliaryLoss(total_loss=total_loss, metrics=metrics)
 
     def _grounded_pitch_mean_loss(
@@ -265,20 +301,12 @@ class _AuxiliaryStatePolicyMixin:
             self._grounded_pitch_neutral_loss_weight * loss_value,
         )
 
-    def _pitch_distribution_stats(self, distribution: object) -> _PitchDistributionStats:
+    def _pitch_distribution_stats(self, distribution: object) -> _AxisDistributionStats:
         continuous_pitch_index = self._continuous_pitch_index
         if continuous_pitch_index is not None:
-            continuous_mode = _continuous_action_mode(distribution)
-            pitch_mean = continuous_mode[:, continuous_pitch_index]
-            continuous_log_std = _continuous_action_log_std(distribution)
-            pitch_log_std = continuous_log_std[:, continuous_pitch_index]
-            pitch_std = pitch_log_std.exp()
-            entropy = pitch_log_std + 0.5 * math.log(2.0 * math.pi * math.e)
-            return _PitchDistributionStats(
-                mean=pitch_mean,
-                std=pitch_std,
-                entropy=entropy,
-                log_std=pitch_log_std,
+            return self._continuous_axis_distribution_stats(
+                distribution,
+                axis_index=continuous_pitch_index,
             )
 
         discrete_pitch_index = self._discrete_pitch_index
@@ -311,7 +339,7 @@ class _AuxiliaryStatePolicyMixin:
 
     def _pitch_std_cap_loss(
         self,
-        pitch_stats: _PitchDistributionStats,
+        pitch_stats: _AxisDistributionStats,
         *,
         obs: PyTorchObs,
         sample_mask: torch.Tensor | None,
@@ -367,10 +395,71 @@ class _AuxiliaryStatePolicyMixin:
 
         return PolicyAuxiliaryLoss(total_loss=total_loss, metrics=metrics)
 
+    def _steer_std_cap_loss(
+        self,
+        steer_stats: _AxisDistributionStats,
+        *,
+        sample_mask: torch.Tensor | None,
+    ) -> PolicyAuxiliaryLoss | None:
+        if self._steer_std_cap_loss_weight <= 0.0:
+            return None
+        steer_std = steer_stats.std
+        total_loss = steer_std.new_zeros(())
+        metrics: dict[str, float] = {
+            "steer/std": _metric_mean(steer_std, sample_mask),
+            "steer/entropy": _metric_mean(steer_stats.entropy, sample_mask),
+        }
+        if steer_stats.log_std is not None:
+            metrics["steer/log_std"] = _metric_mean(steer_stats.log_std, sample_mask)
+
+        loss_value = _std_cap_loss(
+            steer_std,
+            cap=self._steer_std_cap,
+            sample_mask=sample_mask,
+        )
+        if loss_value is not None:
+            weighted_loss = self._steer_std_cap_loss_weight * loss_value
+            total_loss = total_loss + weighted_loss
+            metrics.update(
+                {
+                    "steer/std_cap_loss": float(loss_value.detach().cpu().item()),
+                    "steer/std_cap_loss_weighted": float(weighted_loss.detach().cpu().item()),
+                }
+            )
+
+        return PolicyAuxiliaryLoss(total_loss=total_loss, metrics=metrics)
+
+    def _continuous_axis_distribution_stats(
+        self,
+        distribution: object,
+        *,
+        axis_index: int,
+    ) -> _AxisDistributionStats:
+        continuous_mode = _continuous_action_mode(distribution)
+        axis_mean = continuous_mode[:, axis_index]
+        continuous_log_std = _continuous_action_log_std(distribution)
+        axis_log_std = continuous_log_std[:, axis_index]
+        axis_std = axis_log_std.exp()
+        entropy = axis_log_std + 0.5 * math.log(2.0 * math.pi * math.e)
+        return _AxisDistributionStats(
+            mean=axis_mean,
+            std=axis_std,
+            entropy=entropy,
+            log_std=axis_log_std,
+        )
+
+    def _actor_regularization_enabled(self) -> bool:
+        return (
+            self._pitch_actor_regularization_enabled() or self._steer_actor_regularization_enabled()
+        )
+
     def _pitch_actor_regularization_enabled(self) -> bool:
         return (
             self._grounded_pitch_neutral_loss_weight > 0.0 or self._pitch_std_cap_loss_weight > 0.0
         )
+
+    def _steer_actor_regularization_enabled(self) -> bool:
+        return self._steer_std_cap_loss_weight > 0.0
 
     def _combined_policy_auxiliary_loss(
         self,
@@ -450,6 +539,28 @@ def _airborne_pitch_std_cap(
         key="airborne_pitch_std_cap",
         label="airborne pitch std cap",
         default=0.8,
+    )
+
+
+def _steer_std_cap_loss_weight(
+    config: Mapping[str, object] | None,
+) -> float:
+    return _non_negative_config_float(
+        config,
+        key="steer_std_cap_loss_weight",
+        label="steer std cap loss weight",
+        default=0.0,
+    )
+
+
+def _steer_std_cap(
+    config: Mapping[str, object] | None,
+) -> float:
+    return _positive_config_float(
+        config,
+        key="steer_std_cap",
+        label="steer std cap",
+        default=1.0,
     )
 
 
@@ -534,7 +645,7 @@ def _discrete_pitch_distribution_stats(
     *,
     discrete_pitch_index: int,
     bucket_values: tuple[float, ...],
-) -> _PitchDistributionStats:
+) -> _AxisDistributionStats:
     branch_distribution = _discrete_branch_distribution(
         distribution,
         branch_index=discrete_pitch_index,
@@ -559,7 +670,7 @@ def _discrete_pitch_distribution_stats(
     entropy = entropy_fn()
     if not isinstance(entropy, torch.Tensor):
         raise TypeError("Discrete pitch entropy must be a tensor")
-    return _PitchDistributionStats(mean=mean, std=std, entropy=entropy)
+    return _AxisDistributionStats(mean=mean, std=std, entropy=entropy)
 
 
 def _discrete_branch_distribution(

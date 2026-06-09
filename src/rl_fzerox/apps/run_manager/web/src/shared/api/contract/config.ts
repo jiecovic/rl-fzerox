@@ -77,6 +77,8 @@ const trainConfigSchema = z.object({
     pitch_std_cap_loss_weight: z.number().nonnegative(),
     grounded_pitch_std_cap: z.number().positive(),
     airborne_pitch_std_cap: z.number().positive(),
+    steer_std_cap_loss_weight: z.number().nonnegative(),
+    steer_std_cap: z.number().positive(),
   }),
   vf_coef: z.number().positive(),
   max_grad_norm: z.number().positive(),

@@ -204,6 +204,8 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
     config.train.actor_regularization.pitch_std_cap_loss_weight = 0.07
     config.train.actor_regularization.grounded_pitch_std_cap = 0.35
     config.train.actor_regularization.airborne_pitch_std_cap = 0.8
+    config.train.actor_regularization.steer_std_cap_loss_weight = 0.03
+    config.train.actor_regularization.steer_std_cap = 0.9
 
     train_config = build_managed_train_app_config(
         config,
@@ -222,7 +224,19 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
     assert train_config.train.actor_regularization.pitch_std_cap_loss_weight == pytest.approx(0.07)
     assert train_config.train.actor_regularization.grounded_pitch_std_cap == pytest.approx(0.35)
     assert train_config.train.actor_regularization.airborne_pitch_std_cap == pytest.approx(0.8)
+    assert train_config.train.actor_regularization.steer_std_cap_loss_weight == 0.0
+    assert train_config.train.actor_regularization.steer_std_cap == pytest.approx(0.9)
 
+    config.action.steering_mode = "continuous"
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-action-loss-controls-continuous-steer",
+        run_dir=tmp_path / "runs" / "bridge-action-loss-controls-continuous-steer_0001",
+    )
+
+    assert train_config.train.actor_regularization.steer_std_cap_loss_weight == pytest.approx(0.03)
+
+    config.action.steering_mode = "discrete"
     config.action.pitch_mode = "discrete"
     train_config = build_managed_train_app_config(
         config,
