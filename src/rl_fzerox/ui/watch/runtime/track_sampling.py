@@ -76,10 +76,9 @@ class ManagedTrackSamplingRefresh:
             state=state,
         )
         projected_signature = _generated_x_cup_signature(projected_config)
-        if (
-            projected_signature == _generated_x_cup_signature(current_config)
-            and not missing_generated_x_cup_baseline_paths(current_config)
-        ):
+        if projected_signature == _generated_x_cup_signature(
+            current_config
+        ) and not missing_generated_x_cup_baseline_paths(current_config):
             self._last_blocked_signature = None
             return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)
         refreshed_config = self._with_materialized_x_cup_artifacts(projected_config)

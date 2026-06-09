@@ -76,9 +76,7 @@ class _FakePygame:
         key_mod: int = 0,
         mouse_click: tuple[int, int] | None = None,
     ) -> None:
-        events = [
-            SimpleNamespace(type=self.KEYDOWN, key=key, mod=key_mod) for key in key_events
-        ]
+        events = [SimpleNamespace(type=self.KEYDOWN, key=key, mod=key_mod) for key in key_events]
         if mouse_click is not None:
             events.append(
                 SimpleNamespace(
