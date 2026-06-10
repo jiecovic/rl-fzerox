@@ -1,8 +1,8 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/RunActivityIndicator.tsx
+// src/rl_fzerox/apps/run_manager/web/src/entities/run/ui/RunActivityIndicator.tsx
 
+import { latestFailureMessage } from "@/entities/run/model/runtime";
 import type { ManagedRun } from "@/shared/api/contract";
 import { formatRelativeTime } from "@/shared/ui/format";
-import { latestFailureMessage } from "@/widgets/runWorkspace/workspace/model";
 
 const RUN_HEARTBEAT_FRESH_MS = 8_000;
 

@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/workspace/actions.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/runWorkspaceActions/useRunWorkspaceActions.ts
 import { useEffect, useState } from "react";
 import type {
   ManagedRunDetail,

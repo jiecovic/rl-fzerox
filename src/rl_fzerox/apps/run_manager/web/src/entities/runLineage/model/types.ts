@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/pages/runs/panel/types.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runLineage/model/types.ts
 import type { ManagedRun } from "@/shared/api/contract";
 
 export type RunSource =

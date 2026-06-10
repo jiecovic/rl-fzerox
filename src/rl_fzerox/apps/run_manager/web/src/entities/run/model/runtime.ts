@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/workspace/model.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/run/model/runtime.ts
 import type { ManagedRun, ManagedRunDetail } from "@/shared/api/contract";
 
 export function progressHeadline(run: ManagedRun): string {

@@ -1,7 +1,6 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/track_pool_panel/parts.tsx
+// src/rl_fzerox/apps/run_manager/web/src/entities/trackPool/ui/TrackPoolParts.tsx
 import type { KeyboardEvent } from "react";
-import { cn } from "@/shared/ui/cn";
-import { AppTooltip } from "@/shared/ui/Tooltip";
+import type { TrackPoolCourseView, TrackPoolCupView } from "@/entities/trackPool/model/types";
 import {
   completionSummary,
   displaySuccessRate,
@@ -12,11 +11,9 @@ import {
   successSummary,
   xCupGenerationSummary,
   xCupRegenerationSummary,
-} from "@/widgets/runWorkspace/track_pool_panel/model";
-import type {
-  TrackPoolCourseView,
-  TrackPoolCupView,
-} from "@/widgets/runWorkspace/track_pool_panel/types";
+} from "@/entities/trackPool/model/view";
+import { cn } from "@/shared/ui/cn";
+import { AppTooltip } from "@/shared/ui/Tooltip";
 
 interface DistributionBarProps {
   completionValue?: number | null;

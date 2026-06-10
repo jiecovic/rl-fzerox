@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/track_pool_panel/types.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/trackPool/model/types.ts
 import type {
   ConfigMetadata,
   ManagedRunDetail,

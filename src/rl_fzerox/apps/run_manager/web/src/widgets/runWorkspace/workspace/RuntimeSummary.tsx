@@ -1,5 +1,24 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/workspace/RuntimeSummary.tsx
 import type { ReactNode } from "react";
+import {
+  envStepRateLabel,
+  lineageSimGameTimeLabel,
+  lineageSimToWallRatioLabel,
+  lineageStepsLabel,
+  lineageWallTimeLabel,
+  localSimGameTimeLabel,
+  localSimToWallRatioLabel,
+  localWallTimeLabel,
+  progressHeadline,
+  progressNote,
+  showsLineageTotals,
+  timeLeftLabel,
+  trainFpsLabel,
+} from "@/entities/run/model/runtime";
+import { RunActivityIndicator } from "@/entities/run/ui/RunActivityIndicator";
+import { RunTrackPoolPanel } from "@/entities/trackPool/ui/RunTrackPoolPanel";
+import { useRunClock } from "@/features/runLiveData/hooks";
+import type { RunWorkspaceActionState } from "@/features/runWorkspaceActions/useRunWorkspaceActions";
 import type {
   ConfigMetadata,
   ManagedRun,
@@ -21,25 +40,6 @@ import {
   WatchIcon,
 } from "@/shared/ui/icons";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
-import { RunActivityIndicator } from "@/widgets/runWorkspace/RunActivityIndicator";
-import { RunTrackPoolPanel } from "@/widgets/runWorkspace/RunTrackPoolPanel";
-import type { RunWorkspaceActionState } from "@/widgets/runWorkspace/workspace/actions";
-import {
-  envStepRateLabel,
-  lineageSimGameTimeLabel,
-  lineageSimToWallRatioLabel,
-  lineageStepsLabel,
-  lineageWallTimeLabel,
-  localSimGameTimeLabel,
-  localSimToWallRatioLabel,
-  localWallTimeLabel,
-  progressHeadline,
-  progressNote,
-  showsLineageTotals,
-  timeLeftLabel,
-  trainFpsLabel,
-} from "@/widgets/runWorkspace/workspace/model";
-import { useRunClock } from "@/widgets/runWorkspace/workspace/polling";
 
 interface RunRuntimeSummaryProps {
   actions: RunWorkspaceActionState;

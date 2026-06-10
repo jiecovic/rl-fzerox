@@ -1,6 +1,6 @@
-// src/rl_fzerox/apps/run_manager/web/src/pages/runs/panel/actions.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/runsPanelActions/useRunsPanelActions.ts
 import { useState } from "react";
-import type { PendingDelete, RunLineageGroup } from "@/pages/runs/panel/types";
+import type { PendingDelete, RunLineageGroup } from "@/entities/runLineage/model/types";
 import type { ManagedRun } from "@/shared/api/contract";
 
 interface RunsPanelActionOptions {

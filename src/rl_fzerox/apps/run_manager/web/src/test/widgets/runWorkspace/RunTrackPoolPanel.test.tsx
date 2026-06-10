@@ -2,10 +2,10 @@
 
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RunTrackPoolPanel } from "@/entities/trackPool/ui/RunTrackPoolPanel";
 import type { TrackSamplingRuntimeState } from "@/shared/api/contract";
 import { configMetadataFixture, managedRunConfigFixture, runFixture } from "@/test/fixtures";
 import { cleanup, render, screen, within } from "@/test/render";
-import { RunTrackPoolPanel } from "@/widgets/runWorkspace/RunTrackPoolPanel";
 
 function enabledResetButton() {
   const button = screen

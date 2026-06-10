@@ -1,5 +1,10 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/track_pool_panel/model.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/trackPool/model/view.ts
 
+import type {
+  TrackPoolCourseView,
+  TrackPoolCupView,
+  TrackPoolView,
+} from "@/entities/trackPool/model/types";
 import type {
   ConfigMetadata,
   ManagedRunDetail,
@@ -7,11 +12,6 @@ import type {
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
 import { formatRelativeTime } from "@/shared/ui/format";
-import type {
-  TrackPoolCourseView,
-  TrackPoolCupView,
-  TrackPoolView,
-} from "@/widgets/runWorkspace/track_pool_panel/types";
 
 const X_CUP_TRACK_POOL = {
   courseKeyPrefix: "x_cup_",

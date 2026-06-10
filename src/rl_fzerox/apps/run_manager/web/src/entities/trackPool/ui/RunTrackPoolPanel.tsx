@@ -1,7 +1,6 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/RunTrackPoolPanel.tsx
+// src/rl_fzerox/apps/run_manager/web/src/entities/trackPool/ui/RunTrackPoolPanel.tsx
 import { useMemo, useState } from "react";
-import { Button } from "@/shared/ui/Button";
-import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import type { RunTrackPoolPanelProps } from "@/entities/trackPool/model/types";
 import {
   buildTrackPoolView,
   expectsTrackSamplingState,
@@ -9,9 +8,10 @@ import {
   trackPoolEmptyMessage,
   trackSamplingModeLabel,
   trackSamplingUpdatedLabel,
-} from "@/widgets/runWorkspace/track_pool_panel/model";
-import { CupTabs, TrackPoolBody } from "@/widgets/runWorkspace/track_pool_panel/parts";
-import type { RunTrackPoolPanelProps } from "@/widgets/runWorkspace/track_pool_panel/types";
+} from "@/entities/trackPool/model/view";
+import { CupTabs, TrackPoolBody } from "@/entities/trackPool/ui/TrackPoolParts";
+import { Button } from "@/shared/ui/Button";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 
 export function RunTrackPoolPanel({
   canReset,

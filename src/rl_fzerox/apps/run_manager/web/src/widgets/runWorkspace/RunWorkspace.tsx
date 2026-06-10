@@ -1,6 +1,8 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/RunWorkspace.tsx
 import { useEffect, useState } from "react";
 import type { ConfigSection } from "@/entities/runConfig/model/sections";
+import { useRunPolicyPreview, useRunTrackSamplingState } from "@/features/runLiveData/hooks";
+import { useRunWorkspaceActions } from "@/features/runWorkspaceActions/useRunWorkspaceActions";
 import type {
   ConfigMetadata,
   ManagedRun,
@@ -13,11 +15,6 @@ import { RenameIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
-import { useRunWorkspaceActions } from "@/widgets/runWorkspace/workspace/actions";
-import {
-  useRunPolicyPreview,
-  useRunTrackSamplingState,
-} from "@/widgets/runWorkspace/workspace/polling";
 import { RunReadonlyConfig } from "@/widgets/runWorkspace/workspace/ReadonlyConfig";
 import {
   RunRuntimeSummary,

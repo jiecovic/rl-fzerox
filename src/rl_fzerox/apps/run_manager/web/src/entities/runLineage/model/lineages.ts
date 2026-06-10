@@ -1,11 +1,11 @@
-// src/rl_fzerox/apps/run_manager/web/src/pages/runs/panel/model.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runLineage/model/lineages.ts
 import type {
   PendingDelete,
   RunLineageBucket,
   RunLineageGroup,
   RunLineageRun,
   RunSource,
-} from "@/pages/runs/panel/types";
+} from "@/entities/runLineage/model/types";
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
 
 export function disclosureDefaults(lineages: readonly RunLineageGroup[]) {

@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/workspace/polling.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/runLiveData/hooks.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {

@@ -1,5 +1,6 @@
-// src/rl_fzerox/apps/run_manager/web/src/pages/runs/panel/RunRow.tsx
-import { runLineageMainGridClass, runLineageOuterGridClass } from "@/pages/runs/panel/layout";
+// src/rl_fzerox/apps/run_manager/web/src/entities/runLineage/ui/RunRow.tsx
+
+import { RunActivityIndicator } from "@/entities/run/ui/RunActivityIndicator";
 import {
   deleteDisabledReason,
   progressLabel,
@@ -7,12 +8,12 @@ import {
   runtimeSecondaryLabel,
   statusLabel,
   stepLabel,
-} from "@/pages/runs/panel/model";
-import type { RunLineageRun } from "@/pages/runs/panel/types";
+} from "@/entities/runLineage/model/lineages";
+import type { RunLineageRun } from "@/entities/runLineage/model/types";
+import { runLineageMainGridClass, runLineageOuterGridClass } from "@/entities/runLineage/ui/layout";
 import { formatDate } from "@/shared/ui/format";
 import { BranchSourceIcon, ExportIcon, ResumeIcon, StopIcon, TrashIcon } from "@/shared/ui/icons";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
-import { RunActivityIndicator } from "@/widgets/runWorkspace/RunActivityIndicator";
 
 interface RunRowProps {
   busyActionRunId: string | null;

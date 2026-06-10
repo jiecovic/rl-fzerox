@@ -1,14 +1,14 @@
 // src/rl_fzerox/apps/run_manager/web/src/pages/runs/RunsPanel.tsx
 import { useMemo, useRef, useState } from "react";
-import { useRunsPanelActions } from "@/pages/runs/panel/actions";
-import { LineageCard } from "@/pages/runs/panel/LineageCard";
 import {
   buildLineageBuckets,
   buildLineageGroups,
   deleteDescription,
   disclosureDefaults,
   disclosureStateFor,
-} from "@/pages/runs/panel/model";
+} from "@/entities/runLineage/model/lineages";
+import { LineageCard } from "@/entities/runLineage/ui/LineageCard";
+import { useRunsPanelActions } from "@/features/runsPanelActions/useRunsPanelActions";
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";

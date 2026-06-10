@@ -1,8 +1,8 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/widgets/runWorkspace/RunActivityIndicator.test.tsx
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RunActivityIndicator } from "@/entities/run/ui/RunActivityIndicator";
 import { runFixture } from "@/test/fixtures";
 import { cleanup, render, screen } from "@/test/render";
-import { RunActivityIndicator } from "@/widgets/runWorkspace/RunActivityIndicator";
 
 describe("RunActivityIndicator", () => {
   beforeEach(() => {

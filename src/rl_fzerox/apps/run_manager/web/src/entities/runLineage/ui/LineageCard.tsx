@@ -1,8 +1,8 @@
-// src/rl_fzerox/apps/run_manager/web/src/pages/runs/panel/LineageCard.tsx
+// src/rl_fzerox/apps/run_manager/web/src/entities/runLineage/ui/LineageCard.tsx
 import { useEffect, useState } from "react";
-import { runLineageMainGridClass, runLineageOuterGridClass } from "@/pages/runs/panel/layout";
-import { RunRow } from "@/pages/runs/panel/RunRow";
-import type { RunLineageGroup } from "@/pages/runs/panel/types";
+import type { RunLineageGroup } from "@/entities/runLineage/model/types";
+import { runLineageMainGridClass, runLineageOuterGridClass } from "@/entities/runLineage/ui/layout";
+import { RunRow } from "@/entities/runLineage/ui/RunRow";
 import type { ManagedRun } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { FieldInput } from "@/shared/ui/Field";
