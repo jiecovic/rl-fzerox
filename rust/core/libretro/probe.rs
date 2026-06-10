@@ -1,6 +1,11 @@
 // rust/core/libretro/probe.rs
 //! Lightweight metadata probe for libretro cores without constructing the full
 //! higher-level emulator host runtime.
+//!
+//! This module is for loader/core diagnostics only. It verifies that the shared
+//! library can be opened and that the libretro metadata entry points can be
+//! queried. It intentionally does not load content, allocate an emulator
+//! runtime, or inspect game RAM/save-RAM.
 
 use std::path::Path;
 

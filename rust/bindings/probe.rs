@@ -1,5 +1,10 @@
 // rust/bindings/probe.rs
 //! Python binding for lightweight libretro core metadata probing.
+//!
+//! The probe path deliberately stops at dynamic loading and libretro system
+//! metadata. It is useful when debugging a core path, native extension build, or
+//! loader issue without requiring a ROM, runtime directory, save state, or full
+//! emulator host construction.
 
 use std::path::Path;
 
@@ -20,6 +25,10 @@ pub struct PyCoreInfo {
     pub blocks_extract: bool,
 }
 
+/// Load a libretro core and return its advertised metadata.
+///
+/// This does not initialize content, boot a game, read system RAM, or touch
+/// save-RAM. It is intentionally narrower than constructing `Emulator`.
 #[pyfunction]
 pub fn probe_core(core_path: &str) -> PyResult<PyCoreInfo> {
     let core_info = probe(Path::new(core_path)).map_err(map_core_error)?;

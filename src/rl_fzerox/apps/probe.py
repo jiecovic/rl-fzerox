@@ -1,4 +1,13 @@
 # src/rl_fzerox/apps/probe.py
+"""Developer CLI for probing libretro core metadata without booting a ROM.
+
+This command is a cheap native-extension and dynamic-loader sanity check. It
+loads the libretro core, reads the metadata exposed by the core itself, and then
+exits. It does not construct the emulator runtime, boot F-Zero X, read system
+RAM, inspect save-RAM, or validate ROM compatibility. Use the dev telemetry and
+save tools for those game-specific probes.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -13,15 +22,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments for the core probe command."""
 
     parser = argparse.ArgumentParser(
-        description="Load a libretro core natively and print its system metadata.",
+        description=(
+            "Load a libretro core without a ROM and print the core metadata "
+            "advertised through the native libretro API."
+        ),
         allow_abbrev=False,
     )
-    parser.add_argument("core_path", help="Path to a libretro core shared library.")
+    parser.add_argument(
+        "core_path",
+        help="Path to a libretro core shared library, e.g. mupen64plus_next_libretro.so.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Run the core probe CLI."""
+    """Run the libretro core metadata probe and print JSON."""
 
     args = parse_args(argv)
     core_info = probe_core(str(Path(args.core_path).expanduser().resolve()))
