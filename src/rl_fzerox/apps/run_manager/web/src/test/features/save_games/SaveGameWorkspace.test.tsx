@@ -110,13 +110,14 @@ describe("SaveGameWorkspace", () => {
       onUpsertCourseSetup,
     });
 
-    const muteCityEngine = screen.getByRole("spinbutton", { name: "Mute City engine" });
+    const muteCityEngine = screen.getByRole("textbox", { name: "Mute City engine" });
     await user.clear(muteCityEngine);
     await user.type(muteCityEngine, "40");
+    await user.tab();
 
-    expect(screen.getByRole("spinbutton", { name: "Silence engine" })).toHaveValue(50);
+    expect(screen.getByRole("textbox", { name: "Silence engine" })).toHaveValue("50");
 
-    await user.click(screen.getByRole("button", { name: "Save 1 change" }));
+    await user.click(await screen.findByRole("button", { name: "Save 1 change" }));
 
     expect(onUpsertCourseSetup).toHaveBeenCalledTimes(1);
     expect(onUpsertCourseSetup).toHaveBeenCalledWith({
