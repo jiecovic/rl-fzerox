@@ -1,0 +1,60 @@
+/* web/run-manager/src/shared/styles/runs/runtime.css */
+.readonly-config-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.readonly-config-shell {
+  min-width: 0;
+}
+
+.readonly-config-shell :is(input, select, textarea) {
+  background: var(--surface-muted);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+.readonly-config-shell
+  :is(
+    .field-shell input,
+    .field-shell select,
+    .field-shell textarea,
+    .switch-button,
+    .slider-track-shell,
+    .range-pair-slider,
+    .vehicle-engine-slider,
+    .vehicle-engine-slider-thumb,
+    .course-card,
+    .field-reset-button,
+    .layer-add-placeholder,
+    .layer-add-button,
+    .custom-conv-add-row-button,
+    .section-actions > button
+  ) {
+  pointer-events: none;
+}
+
+.readonly-config-shell
+  :is(
+    .switch-button,
+    .slider-track-shell,
+    .range-pair-slider,
+    .vehicle-engine-slider,
+    .vehicle-engine-slider-thumb,
+    .course-card,
+    .layer-add-placeholder,
+    .layer-add-button,
+    .custom-conv-add-row-button,
+    .section-actions > button
+  ) {
+  opacity: 0.68;
+  filter: saturate(0.7);
+}
+
+.readonly-config-shell .disclosure-toolbar .icon-button,
+.readonly-config-shell .config-disclosure-summary,
+.readonly-config-shell .config-disclosure-summary * {
+  pointer-events: auto;
+}

@@ -18,12 +18,16 @@ from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.core.manager import ManagerStore
 
 
+def _default_web_root() -> Path:
+    return Path(__file__).resolve().parents[4] / "web" / "run-manager"
+
+
 @dataclass(frozen=True, slots=True)
 class RunManagerLauncherDefaults:
     api_port: int = 8765
     web_port: int = 5174
     web_host: str = "127.0.0.1"
-    web_root: Path = Path(__file__).with_name("web")
+    web_root: Path = _default_web_root()
 
 
 @dataclass(frozen=True, slots=True)

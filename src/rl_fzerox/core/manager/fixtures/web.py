@@ -3,7 +3,7 @@
 
 Run-manager web tests and default UI state read these generated fixtures. When
 backend default values change, regenerate them with ``npm run sync-fixtures`` in
-``src/rl_fzerox/apps/run_manager/web`` so the frontend keeps the backend as the
+``web/run-manager`` so the frontend keeps the backend as the
 single source of truth.
 """
 
@@ -36,7 +36,7 @@ def web_test_fixture_text() -> str:
 def web_test_fixture_output_path() -> Path:
     return (
         Path(__file__).resolve().parents[5]
-        / "src/rl_fzerox/apps/run_manager/web/src/test/generated/manager-fixtures.json"
+        / "web/run-manager/src/test/generated/manager-fixtures.json"
     )
 
 
@@ -81,7 +81,7 @@ def main() -> None:
         return
     raise SystemExit(
         "run-manager frontend fixtures are stale; backend defaults changed, so "
-        "run npm run sync-fixtures --prefix src/rl_fzerox/apps/run_manager/web"
+        "run npm run sync-fixtures --prefix web/run-manager"
     )
 
 

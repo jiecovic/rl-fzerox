@@ -46,15 +46,15 @@ py-test: native
 
 # Install the local React run-manager frontend dependencies.
 run-manager-install:
-    npm install --prefix src/rl_fzerox/apps/run_manager/web
+    npm install --prefix web/run-manager
 
 # Verify the local React run-manager frontend.
 run-manager-check:
-    npm run --prefix src/rl_fzerox/apps/run_manager/web check
+    npm run --prefix web/run-manager check
 
 # Build the local React run-manager frontend.
 run-manager-build:
-    npm run --prefix src/rl_fzerox/apps/run_manager/web build
+    npm run --prefix web/run-manager build
 
 # Launch the local React run manager with the Python SQLite API.
 run-manager:

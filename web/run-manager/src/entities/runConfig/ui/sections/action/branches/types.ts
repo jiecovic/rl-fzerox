@@ -1,0 +1,16 @@
+// web/run-manager/src/entities/runConfig/ui/sections/action/branches/types.ts
+
+import type { ActionUpdateContext } from "@/entities/runConfig/ui/sections/action/types";
+import type { ManagedRunConfig } from "@/shared/api/contract";
+
+export type AuxiliaryBranchesDisclosureProps = Omit<ActionUpdateContext, "setConfig"> & {
+  checkpointLocked?: boolean;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+};
+
+export type AuxiliaryActionConfig = ManagedRunConfig["action"];
+
+export type UpdateAction = ActionUpdateContext["updateAction"];
+export type UpdatePolicy = ActionUpdateContext["updatePolicy"];
+export type UpdateTrain = ActionUpdateContext["updateTrain"];

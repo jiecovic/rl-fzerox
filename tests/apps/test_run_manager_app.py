@@ -4,6 +4,12 @@ from __future__ import annotations
 from rl_fzerox.apps.run_manager.app import DEFAULTS, _parse_args, _web_dev_command
 
 
+def test_run_manager_web_root_is_top_level_frontend() -> None:
+    assert DEFAULTS.web_root.parent.name == "web"
+    assert DEFAULTS.web_root.name == "run-manager"
+    assert (DEFAULTS.web_root / "package.json").is_file()
+
+
 def test_run_manager_web_host_defaults_to_loopback() -> None:
     args = _parse_args([])
 

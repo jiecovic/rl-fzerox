@@ -1,0 +1,59 @@
+/* web/run-manager/src/shared/styles/runs/trackPool.css */
+
+.run-track-distribution-legend-swatch-sample {
+  background: color-mix(in srgb, var(--accent) 78%, white);
+}
+
+.run-track-distribution-legend-swatch-episodes {
+  background: color-mix(in srgb, var(--run-accent) 76%, white);
+}
+
+.run-track-distribution-legend-swatch-success {
+  background: color-mix(in srgb, #2cbe7f 76%, white);
+}
+
+.run-track-distribution-legend-swatch-steps {
+  background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
+}
+
+.run-track-distribution-legend-swatch-completion {
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed color-mix(in srgb, #f8fafc 86%, var(--accent));
+}
+
+.run-track-distribution-legend-swatch-target {
+  width: 12px;
+  height: 0;
+  border-top: 2px solid color-mix(in srgb, #f5c542 82%, white);
+}
+
+.run-track-distribution-columns {
+  grid-template-columns: repeat(var(--track-column-count), minmax(0, 1fr));
+}
+
+.run-track-distribution-bar-target {
+  border-top: 2px solid color-mix(in srgb, #f5c542 82%, white);
+}
+
+.run-track-distribution-completion-marker {
+  height: 0;
+  border-top: 2px dashed color-mix(in srgb, #f8fafc 86%, var(--accent));
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 34%, transparent));
+}
+
+.run-track-distribution-bar-fill-sample {
+  background: color-mix(in srgb, var(--accent) 78%, white);
+}
+
+.run-track-distribution-bar-fill-episodes {
+  background: color-mix(in srgb, var(--run-accent) 76%, white);
+}
+
+.run-track-distribution-bar-fill-success {
+  background: color-mix(in srgb, #2cbe7f 76%, white);
+}
+
+.run-track-distribution-bar-fill-steps {
+  background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
+}
