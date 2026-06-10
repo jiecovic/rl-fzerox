@@ -271,31 +271,12 @@ def _mark_worker_boot_failure(
 ) -> None:
     """Record failures that happen before the run config can be validated."""
 
-    store._ensure_schema_initialized()
-    with store._connect() as connection:
-        row = connection.execute("SELECT id FROM runs WHERE id = ?", (run_id,)).fetchone()
-        if row is None:
-            return
-        connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
-        connection.execute(
-            "DELETE FROM run_workers WHERE run_id = ? AND launch_token = ?",
-            (run_id, launch_token),
-        )
-        connection.execute(
-            """
-            UPDATE runs
-            SET status = ?, stopped_at = ?
-            WHERE id = ?
-            """,
-            ("failed", _now(), run_id),
-        )
-        connection.execute(
-            """
-            INSERT INTO run_events(run_id, created_at, kind, message)
-            VALUES (?, ?, ?, ?)
-            """,
-            (run_id, _now(), "failed", message),
-        )
+    store.mark_worker_boot_failure(
+        run_id=run_id,
+        launch_token=launch_token,
+        message=message,
+        failed_at=_now(),
+    )
 
 
 def _now() -> str:

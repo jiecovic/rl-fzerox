@@ -311,6 +311,22 @@ class ManagerStore:
     def clear_run_worker(self, run_id: str, *, launch_token: str | None = None) -> None:
         run_registry.clear_run_worker(self, run_id, launch_token=launch_token)
 
+    def mark_worker_boot_failure(
+        self,
+        *,
+        run_id: str,
+        launch_token: str,
+        message: str,
+        failed_at: str,
+    ) -> bool:
+        return run_registry.mark_worker_boot_failure(
+            self,
+            run_id=run_id,
+            launch_token=launch_token,
+            message=message,
+            failed_at=failed_at,
+        )
+
     def upsert_run_runtime(
         self,
         *,

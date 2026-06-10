@@ -40,6 +40,7 @@ from rl_fzerox.core.manager.registry.runs.track_sampling import (
 from rl_fzerox.core.manager.registry.runs.workers import (
     clear_run_worker,
     heartbeat_run_worker,
+    mark_worker_boot_failure,
     register_run_worker,
 )
 
@@ -59,6 +60,7 @@ __all__ = [
     "list_runs",
     "list_visible_run_summaries",
     "list_visible_runs",
+    "mark_worker_boot_failure",
     "pending_run_command",
     "reconcile_orphaned_runs",
     "register_run_worker",
