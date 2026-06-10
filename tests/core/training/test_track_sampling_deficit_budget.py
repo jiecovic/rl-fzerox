@@ -153,7 +153,9 @@ def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
     )
 
     controller.add_rollout_budget(total_steps=200)
-    assignments = tuple(controller.next_course_key(assignment_cost=100.0) for _ in range(4))
+    assignments = tuple(
+        controller.next_course_key(fallback_assignment_steps=100.0) for _ in range(4)
+    )
 
     assert assignments.count("mute") == 2
     assert assignments.count("silence") == 2
@@ -180,7 +182,7 @@ def test_deficit_budget_controller_refills_bounded_balanced_queues() -> None:
     )
 
     controller.add_rollout_budget(total_steps=200)
-    refills = controller.refill_queues((0, 99), rollout_steps=100)
+    refills = controller.refill_queues((0, 99), fallback_assignment_steps=100)
 
     assert set(refills) == {0}
     assert len(refills[0]) == DEFICIT_QUEUE_SETTINGS.minimum_refill_size
@@ -210,7 +212,122 @@ def test_deficit_budget_controller_prefers_courses_with_positive_step_debt() -> 
     controller.add_rollout_budget(total_steps=200)
     controller.record_step_infos(({"track_id": "mute"},) * 75)
 
-    assert controller.next_course_key(assignment_cost=1.0) == "silence"
+    assert controller.next_course_key(fallback_assignment_steps=1.0) == "silence"
+
+
+def test_deficit_budget_controller_restores_historical_step_debt() -> None:
+    restored = TrackSamplingRuntimeState(
+        sampling_mode="deficit_budget",
+        action_repeat=1,
+        update_episodes=20,
+        ema_alpha=0.02,
+        max_weight_scale=3.0,
+        adaptive_completion_weight=0.0,
+        adaptive_target_completion=1.0,
+        adaptive_min_confidence_episodes=1,
+        adaptive_confidence_scale=3.0,
+        update_count=1,
+        episodes_since_update=0,
+        entries=(
+            TrackSamplingRuntimeEntry(
+                track_id="balanced",
+                course_key="balanced",
+                label="Balanced",
+                base_weight=1.0,
+                current_weight=1.0,
+                completed_frames=1000,
+                episode_count=10,
+                finished_episode_count=10,
+                success_sample_count=10,
+                ema_episode_frames=100.0,
+                ema_completion_fraction=1.0,
+            ),
+            TrackSamplingRuntimeEntry(
+                track_id="crash",
+                course_key="crash",
+                label="Crash",
+                base_weight=1.0,
+                current_weight=1.0,
+                completed_frames=100,
+                episode_count=10,
+                finished_episode_count=0,
+                success_sample_count=10,
+                ema_episode_frames=10.0,
+                ema_completion_fraction=0.1,
+            ),
+        ),
+    )
+    controller = DeficitBudgetTrackSamplingController(
+        resolved_courses=resolved_track_sampling_courses(
+            {"balanced": 1.0, "crash": 1.0},
+            course_keys={"balanced": "balanced", "crash": "crash"},
+            log_keys={"balanced": "balanced", "crash": "crash"},
+            labels={"balanced": "Balanced", "crash": "Crash"},
+            log_enabled={"balanced": True, "crash": True},
+        ),
+        action_repeat=1,
+        settings=DeficitBudgetSettings(
+            uniform_fraction=1.0,
+            min_weight=1.0,
+            max_weight=3.0,
+            ema_alpha=0.02,
+            weight_update_rollouts=20,
+        ),
+        restored_state=restored,
+        seed=7,
+    )
+
+    assignments = tuple(
+        controller.next_course_key(fallback_assignment_steps=100.0) for _ in range(8)
+    )
+
+    assert assignments == ("crash",) * 8
+
+
+def test_deficit_budget_controller_uses_episode_ema_as_assignment_cost() -> None:
+    controller = DeficitBudgetTrackSamplingController(
+        resolved_courses=resolved_track_sampling_courses(
+            {"long": 1.0, "short": 1.0},
+            course_keys={"long": "long", "short": "short"},
+            log_keys={"long": "long", "short": "short"},
+            labels={"long": "Long", "short": "Short"},
+            log_enabled={"long": True, "short": True},
+        ),
+        action_repeat=1,
+        settings=DeficitBudgetSettings(
+            uniform_fraction=1.0,
+            min_weight=1.0,
+            max_weight=3.0,
+            ema_alpha=1.0,
+            weight_update_rollouts=20,
+        ),
+        seed=7,
+    )
+
+    controller.record_episodes(
+        (
+            {
+                "track_id": "long",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "short",
+                "episode_step": 10,
+                "episode_completion_fraction": 0.1,
+                "termination_reason": "crashed",
+            },
+        )
+    )
+    controller.add_rollout_budget(total_steps=200)
+    controller.record_step_infos(({"track_id": "long"},) * 100)
+
+    assignments = tuple(
+        controller.next_course_key(fallback_assignment_steps=100.0) for _ in range(5)
+    )
+
+    assert assignments == ("short",) * 5
 
 
 def test_deficit_budget_runtime_state_persists_accounted_step_totals() -> None:

@@ -97,6 +97,7 @@ class DeficitBudgetTrackSamplingController:
         self._restore_state(restored_state)
         self._seed_problem_scores_from_restored_stats()
         self._recompute_target_weights()
+        self._rebuild_deficits_from_completed_steps()
 
     @classmethod
     def from_configs(
@@ -189,38 +190,41 @@ class DeficitBudgetTrackSamplingController:
         self.update_count += 1
         self._update_problem_scores()
         self._recompute_target_weights()
+        self._rebuild_deficits_from_completed_steps()
 
-    def initial_queues(self, *, num_envs: int, queue_length: int) -> dict[int, tuple[str, ...]]:
+    def initial_queues(
+        self,
+        *,
+        num_envs: int,
+        queue_length: int,
+        fallback_assignment_steps: float = 1.0,
+    ) -> dict[int, tuple[str, ...]]:
         queues: dict[int, tuple[str, ...]] = {}
-        assignment_cost = max(1.0, float(queue_length))
         for env_index in range(max(0, int(num_envs))):
-            first_course = self._course_keys[env_index % len(self._course_keys)]
-            self._reserve_course_assignment(first_course, assignment_cost=assignment_cost)
-            extra = tuple(
-                self.next_course_key(assignment_cost=assignment_cost)
-                for _ in range(max(0, queue_length - 1))
+            queues[env_index] = tuple(
+                self.next_course_key(fallback_assignment_steps=fallback_assignment_steps)
+                for _ in range(max(0, queue_length))
             )
-            queues[env_index] = (first_course, *extra)
         return queues
 
     def refill_queues(
         self,
         queue_lengths: Sequence[int],
         *,
-        rollout_steps: int,
+        fallback_assignment_steps: float,
     ) -> dict[int, tuple[str, ...]]:
         refill_size = DEFICIT_QUEUE_SETTINGS.minimum_refill_size
         refills: dict[int, tuple[str, ...]] = {}
-        assignment_cost = max(1.0, float(rollout_steps))
         for env_index, queue_length in enumerate(queue_lengths):
             if int(queue_length) > DEFICIT_QUEUE_SETTINGS.refill_low_watermark:
                 continue
             refills[env_index] = tuple(
-                self.next_course_key(assignment_cost=assignment_cost) for _ in range(refill_size)
+                self.next_course_key(fallback_assignment_steps=fallback_assignment_steps)
+                for _ in range(refill_size)
             )
         return refills
 
-    def next_course_key(self, *, assignment_cost: float = 1.0) -> str:
+    def next_course_key(self, *, fallback_assignment_steps: float = 1.0) -> str:
         course_key = max(
             self._course_keys,
             key=lambda course_key: (
@@ -228,7 +232,13 @@ class DeficitBudgetTrackSamplingController:
                 self._rng.random() * 1e-9,
             ),
         )
-        self._reserve_course_assignment(course_key, assignment_cost=assignment_cost)
+        self._reserve_course_assignment(
+            course_key,
+            assignment_cost=self._assignment_cost(
+                course_key,
+                fallback_assignment_steps=fallback_assignment_steps,
+            ),
+        )
         return course_key
 
     def log_values(self) -> dict[str, float]:
@@ -392,6 +402,37 @@ class DeficitBudgetTrackSamplingController:
             + adaptive_fraction * adaptive_fractions[course_key]
             for course_key in self._course_keys
         }
+
+    def _rebuild_deficits_from_completed_steps(self) -> None:
+        """Derive live scheduler debt from durable per-course step totals."""
+
+        total_steps = sum(self._accounted_env_steps.values())
+        if total_steps <= 0:
+            return
+        target_fractions = self._target_fractions()
+        for course_key in self._course_keys:
+            target_steps = total_steps * target_fractions[course_key]
+            self._deficit_steps[course_key] = target_steps - self._accounted_env_steps[course_key]
+            self._reserved_reset_steps[course_key] = 0.0
+
+    def _assignment_cost(
+        self,
+        course_key: str,
+        *,
+        fallback_assignment_steps: float,
+    ) -> float:
+        stats = self._stats[course_key]
+        if stats.ema_episode_frames is not None and stats.ema_episode_frames > 0.0:
+            return max(1.0, float(stats.ema_episode_frames) / self._action_repeat)
+
+        known_costs = tuple(
+            float(candidate.ema_episode_frames) / self._action_repeat
+            for candidate in self._stats.values()
+            if candidate.ema_episode_frames is not None and candidate.ema_episode_frames > 0.0
+        )
+        if known_costs:
+            return max(1.0, sum(known_costs) / len(known_costs))
+        return max(1.0, float(fallback_assignment_steps))
 
     def _reserve_course_assignment(self, course_key: str, *, assignment_cost: float) -> None:
         self._reserved_reset_steps[course_key] += max(1.0, float(assignment_cost))

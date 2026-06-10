@@ -356,6 +356,7 @@ def build_callbacks(
                 self._controller.initial_queues(
                     num_envs=train_config.num_envs,
                     queue_length=DEFICIT_QUEUE_SETTINGS.initial_queue_length,
+                    fallback_assignment_steps=train_config.n_steps,
                 )
             )
             self._save_runtime_state()
@@ -375,7 +376,9 @@ def build_callbacks(
             if episodes:
                 self._controller.record_episodes(episodes)
                 self._runtime_state_dirty = True
-                self._maybe_rotate_x_cup()
+                rotated = self._maybe_rotate_x_cup()
+                if not rotated:
+                    self._refill_env_queues()
             return True
 
         def _on_rollout_end(self) -> None:
@@ -388,7 +391,7 @@ def build_callbacks(
         def _on_training_end(self) -> None:
             self._save_runtime_state()
 
-        def _maybe_rotate_x_cup(self) -> None:
+        def _maybe_rotate_x_cup(self) -> bool:
             runtime_state = self._controller.runtime_state()
             rotation_manager = self._rotation_manager
             rotation_update = (
@@ -400,7 +403,7 @@ def build_callbacks(
                 )
             )
             if rotation_update is None:
-                return
+                return False
             runtime_state = replace_runtime_generation(
                 runtime_state,
                 course_key=rotation_update.replaced_course_key,
@@ -428,12 +431,14 @@ def build_callbacks(
                 self._controller.initial_queues(
                     num_envs=train_config.num_envs,
                     queue_length=DEFICIT_QUEUE_SETTINGS.initial_queue_length,
+                    fallback_assignment_steps=train_config.n_steps,
                 )
             )
             self._save_materialized_artifacts(rotation_update.materialized_artifacts)
             if rotation_manager is not None:
                 rotation_manager.commit(rotation_update)
             self._save_runtime_state()
+            return True
 
         def _refill_env_queues(self) -> None:
             raw_lengths = self.training_env.env_method("track_sampling_reset_queue_length")
@@ -443,7 +448,7 @@ def build_callbacks(
             self._extend_env_queues(
                 self._controller.refill_queues(
                     queue_lengths,
-                    rollout_steps=train_config.n_steps,
+                    fallback_assignment_steps=train_config.n_steps,
                 )
             )
 
