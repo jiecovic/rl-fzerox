@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from rl_fzerox.apps.run_manager.api.contracts import UpdateLineageGroupsRequest
-from rl_fzerox.apps.run_manager.api.payloads import tensorboard_view_group_payload
+from rl_fzerox.apps.run_manager.api.payloads.metrics import tensorboard_view_group_payload
 from rl_fzerox.core.manager import ManagerStore
 
 

@@ -12,7 +12,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     WatchRenderer,
 )
 from rl_fzerox.apps.run_manager.api.handlers.common import require_run, run_response
-from rl_fzerox.apps.run_manager.api.payloads import run_summary_payload
+from rl_fzerox.apps.run_manager.api.payloads.runs import run_summary_payload
 from rl_fzerox.apps.run_manager.desktop import open_directory
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.errors import ManagerNameConflictError

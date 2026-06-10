@@ -5,7 +5,7 @@ from typing import Literal
 
 from fastapi import HTTPException
 
-from rl_fzerox.apps.run_manager.api.payloads import run_payload
+from rl_fzerox.apps.run_manager.api.payloads.runs import run_payload
 from rl_fzerox.core.manager import ManagedRun, ManagerStore
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from rl_fzerox.apps.run_manager.api.contracts import CreateDraftRequest, UpdateDraftRequest
-from rl_fzerox.apps.run_manager.api.payloads import draft_payload, template_payload
+from rl_fzerox.apps.run_manager.api.payloads.drafts import draft_payload, template_payload
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 

@@ -2,7 +2,9 @@
 
 import pytest
 
-from rl_fzerox.apps.run_manager.api.payloads import track_sampling_state_payload
+from rl_fzerox.apps.run_manager.api.payloads.track_sampling import (
+    track_sampling_state_payload,
+)
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,

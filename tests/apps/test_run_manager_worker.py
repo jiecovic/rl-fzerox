@@ -7,7 +7,10 @@ from time import monotonic, sleep
 import pytest
 
 from rl_fzerox.apps.run_manager.training_monitor import RunControlSignal
-from rl_fzerox.apps.run_manager.worker import _startup_reporter, _WorkerHeartbeatLoop
+from rl_fzerox.apps.run_manager.worker.heartbeat import (
+    _startup_reporter,
+    _WorkerHeartbeatLoop,
+)
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 
 
