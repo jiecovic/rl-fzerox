@@ -40,7 +40,7 @@ import type {
   SaveGameSession,
   WorkspaceTabId,
 } from "@/app/workspace/types";
-import { randomAttemptSeedText } from "@/features/save_games/runnerSeed";
+import { randomAttemptSeedText } from "@/widgets/saveGameWorkspace/runnerSeed";
 
 export function useWorkspaceSessions({
   drafts,

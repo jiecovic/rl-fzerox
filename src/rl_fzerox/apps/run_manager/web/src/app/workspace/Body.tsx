@@ -3,13 +3,9 @@ import { useEffect, useState } from "react";
 
 import type { WorkspaceActions } from "@/app/workspace/actions";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
-import { Configurator } from "@/features/configurator/Configurator";
-import { DraftsPanel } from "@/features/drafts/DraftsPanel";
-import { ChartsPanel } from "@/features/runs/ChartsPanel";
-import { RunsPanel } from "@/features/runs/RunsPanel";
-import { RunWorkspace } from "@/features/runs/RunWorkspace";
-import { SaveGamesPanel } from "@/features/save_games/SaveGamesPanel";
-import { SaveGameWorkspace } from "@/features/save_games/SaveGameWorkspace";
+import { DraftsPanel } from "@/pages/drafts/DraftsPanel";
+import { RunsPanel } from "@/pages/runs/RunsPanel";
+import { SaveGamesPanel } from "@/pages/saveGames/SaveGamesPanel";
 import type {
   ConfigMetadata,
   ManagedDraft,
@@ -20,6 +16,10 @@ import type {
 } from "@/shared/api/contract";
 import { FloatingNotice } from "@/shared/ui/FloatingNotice";
 import { Notice } from "@/shared/ui/Panel";
+import { Configurator } from "@/widgets/configurator/Configurator";
+import { ChartsPanel } from "@/widgets/runCharts/ChartsPanel";
+import { RunWorkspace } from "@/widgets/runWorkspace/RunWorkspace";
+import { SaveGameWorkspace } from "@/widgets/saveGameWorkspace/SaveGameWorkspace";
 
 interface WorkspaceBodyProps {
   actions: WorkspaceActions;
