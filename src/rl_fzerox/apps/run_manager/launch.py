@@ -273,6 +273,7 @@ class ManagerRunLauncher:
         artifact: str,
         device: Literal["cpu", "cuda"],
         renderer: Literal["angrylion", "gliden64"] | None,
+        deterministic_policy: bool,
     ) -> launching.WatchLaunchStatus:
         """Launch the desktop watch app against one saved artifact for one run."""
 
@@ -282,6 +283,7 @@ class ManagerRunLauncher:
             artifact=artifact,
             device=device,
             renderer=renderer,
+            deterministic_policy=deterministic_policy,
         )
 
     def start_career_mode(

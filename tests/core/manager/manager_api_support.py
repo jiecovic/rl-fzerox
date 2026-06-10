@@ -64,8 +64,9 @@ class _LauncherStub:
         artifact: str,
         device: Literal["cpu", "cuda"],
         renderer: WatchRenderer | None,
+        deterministic_policy: bool,
     ) -> Literal["started", "already_running"]:
-        del run_id, artifact, device, renderer
+        del run_id, artifact, device, renderer, deterministic_policy
         raise AssertionError("watch should not be called")
 
     def start_career_mode(

@@ -110,6 +110,7 @@ export interface WorkspaceActions {
     artifact: "latest" | "best",
     device: WatchDevice,
     renderer: WatchRenderer,
+    policyMode: PolicyPlaybackMode,
   ) => Promise<"started" | "already_running">;
   startManagedCareerMode: (
     saveGameId: string,
@@ -348,8 +349,9 @@ export function useWorkspaceActions({
     artifact: "latest" | "best",
     device: WatchDevice,
     renderer: WatchRenderer,
+    policyMode: PolicyPlaybackMode,
   ): Promise<"started" | "already_running"> {
-    return await watchRun(runId, artifact, device, renderer);
+    return await watchRun(runId, artifact, device, renderer, policyMode);
   }
 
   async function startManagedCareerMode(

@@ -354,6 +354,7 @@ def test_watch_artifact_skips_duplicate_window(
         artifact="latest",
         device="cuda",
         renderer=None,
+        deterministic_policy=True,
     )
 
 
@@ -419,6 +420,7 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
         artifact="latest",
         device="cuda",
         renderer="angrylion",
+        deterministic_policy=False,
     )
 
     assert status == "started"
@@ -441,6 +443,7 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
         lease_id,
         "--",
         "watch.device=cuda",
+        "watch.deterministic_policy=false",
         "emulator.renderer=angrylion",
     ]
     lease = store.get_viewer_lease(lease_id)

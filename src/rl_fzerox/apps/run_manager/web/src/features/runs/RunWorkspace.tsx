@@ -9,6 +9,7 @@ import type {
   ConfigMetadata,
   ManagedRun,
   ManagedRunDetail,
+  PolicyPlaybackMode,
   WatchDevice,
   WatchRenderer,
 } from "@/shared/api/contract";
@@ -33,6 +34,7 @@ interface RunWorkspaceProps {
     artifact: "latest" | "best",
     device: WatchDevice,
     renderer: WatchRenderer,
+    policyMode: PolicyPlaybackMode,
   ) => Promise<"started" | "already_running">;
   run: ManagedRunDetail;
 }

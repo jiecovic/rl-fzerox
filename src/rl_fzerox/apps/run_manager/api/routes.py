@@ -316,6 +316,7 @@ def create_manager_api_app(
     ) -> dict[str, str]:
         device: Literal["cpu", "cuda"] = "cuda" if request is None else request.device
         renderer: WatchRenderer | None = None if request is None else request.renderer
+        deterministic_policy = True if request is None else request.policy_mode == "deterministic"
         return await _run_sync(
             handlers.watch_run_payload,
             launcher,
@@ -323,6 +324,7 @@ def create_manager_api_app(
             artifact,
             device,
             renderer,
+            deterministic_policy,
         )
 
     @app.get("/api/config-metadata")

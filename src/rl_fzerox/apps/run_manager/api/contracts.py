@@ -104,6 +104,7 @@ class WatchRunRequest(BaseModel):
 
     device: WatchDevice = "cuda"
     renderer: WatchRenderer | None = None
+    policy_mode: PolicyPlaybackMode = "deterministic"
 
 
 class UpdateLineageGroupsRequest(BaseModel):
@@ -169,6 +170,7 @@ class RunLauncher(Protocol):
         artifact: str,
         device: WatchDevice,
         renderer: WatchRenderer | None,
+        deterministic_policy: bool,
     ) -> Literal["started", "already_running"]: ...
 
     def start_career_mode(

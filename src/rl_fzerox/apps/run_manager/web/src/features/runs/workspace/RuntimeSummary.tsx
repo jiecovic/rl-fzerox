@@ -144,16 +144,106 @@ export function RunRuntimeSummary({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-start gap-2">
-        <TooltipIconButton
-          aria-label={actions.isOpeningDirectory ? "Opening run folder" : "Open run folder"}
-          disabled={actions.isOpeningDirectory}
-          tooltip={actions.isOpeningDirectory ? "Opening..." : "Open folder"}
-          onClick={() => void actions.openRunDirectoryInBrowser()}
-        >
-          <FolderIcon />
-        </TooltipIconButton>
-        <div className="run-watch-control relative inline-grid auto-cols-max grid-flow-col items-center gap-1.5">
+      <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-[minmax(0,auto)_minmax(0,1fr)]">
+        <fieldset className={toolbarPanelClass()}>
+          <legend className={toolbarPanelTitleClass()}>Run control</legend>
+          <div className="flex min-w-0 flex-wrap items-end gap-2">
+            <div className="inline-flex min-w-0 flex-wrap items-center gap-1.5">
+              <TooltipIconButton
+                aria-label={actions.isOpeningDirectory ? "Opening run folder" : "Open run folder"}
+                disabled={actions.isOpeningDirectory}
+                tooltip={actions.isOpeningDirectory ? "Opening..." : "Open folder"}
+                onClick={() => void actions.openRunDirectoryInBrowser()}
+              >
+                <FolderIcon />
+              </TooltipIconButton>
+              <TooltipIconButton
+                aria-label={
+                  actions.isCreatingDraftFromRun
+                    ? "Creating draft from run"
+                    : "Create editable draft from run"
+                }
+                disabled={actions.isCreatingDraftFromRun}
+                tooltip={
+                  actions.isCreatingDraftFromRun ? "Creating draft..." : "Create editable draft"
+                }
+                onClick={() => void actions.createDraftFromRun()}
+              >
+                <SaveDraftIcon />
+              </TooltipIconButton>
+              <TooltipIconButton
+                aria-label="Show run charts"
+                tooltip="Charts"
+                onClick={() => onShowCharts(run.id)}
+              >
+                <ChartIcon />
+              </TooltipIconButton>
+              <TooltipIconButton
+                aria-label={
+                  actions.isStopping
+                    ? "Stopping run"
+                    : run.pending_command === "stop"
+                      ? "Stop requested"
+                      : "Stop run"
+                }
+                disabled={!actions.canStop}
+                tooltip={
+                  actions.isStopping
+                    ? "Stopping..."
+                    : run.pending_command === "stop"
+                      ? "Stop requested"
+                      : "Stop"
+                }
+                onClick={() => void actions.stopRun()}
+              >
+                <StopIcon />
+              </TooltipIconButton>
+              <TooltipIconButton
+                aria-label={actions.isResuming ? "Resuming run" : "Resume run"}
+                disabled={!actions.canResume}
+                tooltip={actions.isResuming ? "Resuming..." : "Resume latest checkpoint"}
+                onClick={() => void actions.resumeRun()}
+              >
+                <ResumeIcon />
+              </TooltipIconButton>
+            </div>
+
+            <div aria-hidden="true" className="hidden h-10 w-px bg-app-border sm:block" />
+            <ToolbarSelect label="Fork checkpoint">
+              <FieldSelect
+                aria-label="Fork checkpoint artifact"
+                className={toolbarSelectClass("!w-[104px]")}
+                value={actions.selectedForkArtifact}
+                disabled={actions.isForking}
+                onChange={(event) =>
+                  actions.setSelectedForkArtifact(event.target.value === "best" ? "best" : "latest")
+                }
+              >
+                <option value="latest">latest</option>
+                <option value="best">best</option>
+              </FieldSelect>
+            </ToolbarSelect>
+            <TooltipIconButton
+              aria-label={
+                actions.isForking
+                  ? `Forking ${actions.selectedForkArtifact} checkpoint`
+                  : `Fork ${actions.selectedForkArtifact} checkpoint`
+              }
+              disabled={actions.isForking}
+              tooltip={
+                actions.isForking
+                  ? `Forking ${actions.selectedForkArtifact}...`
+                  : `Fork ${actions.selectedForkArtifact}`
+              }
+              onClick={() => void actions.forkRunArtifact(actions.selectedForkArtifact)}
+            >
+              <ForkIcon />
+            </TooltipIconButton>
+          </div>
+        </fieldset>
+
+        <fieldset className={cn(toolbarPanelClass(), "run-watch-control relative")}>
+          <legend className={toolbarPanelTitleClass()}>Watch launch</legend>
           {actions.watchToast !== null ? (
             <div
               aria-live="polite"
@@ -163,139 +253,93 @@ export function RunRuntimeSummary({
               {actions.watchToast.message}
             </div>
           ) : null}
-          <div className="relative inline-flex items-center">
-            <span className="sr-only">Checkpoint artifact</span>
-            <FieldSelect
-              aria-label="Checkpoint artifact"
-              className="h-10 min-w-[82px] px-2.5 pr-[30px] text-xs lowercase hover:border-app-border-strong hover:bg-app-surface-muted"
-              value={actions.selectedArtifact}
-              disabled={actions.watchingArtifact !== null || actions.isForking}
-              onChange={(event) =>
-                actions.setSelectedArtifact(event.target.value === "best" ? "best" : "latest")
+          <div className="flex min-w-0 flex-wrap items-end gap-2">
+            <ToolbarSelect label="Checkpoint">
+              <FieldSelect
+                aria-label="Watch checkpoint artifact"
+                className={toolbarSelectClass("!w-[104px]")}
+                value={actions.selectedWatchArtifact}
+                disabled={actions.watchingArtifact !== null}
+                onChange={(event) =>
+                  actions.setSelectedWatchArtifact(
+                    event.target.value === "best" ? "best" : "latest",
+                  )
+                }
+              >
+                <option value="latest">latest</option>
+                <option value="best">best</option>
+              </FieldSelect>
+            </ToolbarSelect>
+            <ToolbarSelect label="Policy mode">
+              <FieldSelect
+                aria-label="Watch policy mode"
+                className={toolbarSelectClass("!w-[142px]")}
+                value={actions.selectedWatchPolicyMode}
+                disabled={actions.watchingArtifact !== null}
+                onChange={(event) =>
+                  actions.setSelectedWatchPolicyMode(
+                    event.target.value === "stochastic" ? "stochastic" : "deterministic",
+                  )
+                }
+              >
+                <option value="deterministic">deterministic</option>
+                <option value="stochastic">stochastic</option>
+              </FieldSelect>
+            </ToolbarSelect>
+            <ToolbarSelect label="Device">
+              <FieldSelect
+                aria-label="Watch policy device"
+                className={toolbarSelectClass("!w-[94px]")}
+                value={actions.selectedWatchDevice}
+                disabled={actions.watchingArtifact !== null}
+                onChange={(event) =>
+                  actions.setSelectedWatchDevice(event.target.value === "cpu" ? "cpu" : "cuda")
+                }
+              >
+                <option value="cuda">cuda</option>
+                <option value="cpu">cpu</option>
+              </FieldSelect>
+            </ToolbarSelect>
+            <ToolbarSelect label="Renderer">
+              <FieldSelect
+                aria-label="Watch renderer"
+                className={toolbarSelectClass("!w-[196px]")}
+                value={actions.selectedWatchRenderer}
+                disabled={actions.watchingArtifact !== null}
+                onChange={(event) =>
+                  actions.setSelectedWatchRenderer(
+                    watchRendererOptions.find((renderer) => renderer === event.target.value) ??
+                      run.config.environment.renderer,
+                  )
+                }
+              >
+                {watchRendererOptions.map((renderer) => (
+                  <option key={renderer} value={renderer}>
+                    {renderer === run.config.environment.renderer
+                      ? `${renderer} (training)`
+                      : renderer}
+                  </option>
+                ))}
+              </FieldSelect>
+            </ToolbarSelect>
+            <TooltipIconButton
+              aria-label={
+                actions.watchingArtifact === actions.selectedWatchArtifact
+                  ? `Opening ${actions.selectedWatchArtifact} checkpoint watch`
+                  : `Watch ${actions.selectedWatchArtifact} checkpoint`
               }
-            >
-              <option value="latest">latest</option>
-              <option value="best">best</option>
-            </FieldSelect>
-          </div>
-          <div className="relative inline-flex items-center">
-            <span className="sr-only">Policy device</span>
-            <FieldSelect
-              aria-label="Policy device"
-              className="h-10 min-w-[82px] px-2.5 pr-[30px] text-xs lowercase hover:border-app-border-strong hover:bg-app-surface-muted"
-              value={actions.selectedWatchDevice}
               disabled={actions.watchingArtifact !== null}
-              onChange={(event) =>
-                actions.setSelectedWatchDevice(event.target.value === "cpu" ? "cpu" : "cuda")
+              tooltip={
+                actions.watchingArtifact === actions.selectedWatchArtifact
+                  ? `Opening ${actions.selectedWatchArtifact}...`
+                  : `Watch ${actions.selectedWatchArtifact}`
               }
+              onClick={() => void actions.watchRunArtifact(actions.selectedWatchArtifact)}
             >
-              <option value="cuda">cuda</option>
-              <option value="cpu">cpu</option>
-            </FieldSelect>
+              <WatchIcon />
+            </TooltipIconButton>
           </div>
-          <div className="relative inline-flex items-center">
-            <span className="sr-only">Renderer</span>
-            <FieldSelect
-              aria-label="Watch renderer"
-              className="h-10 min-w-[82px] px-2.5 pr-[30px] text-xs lowercase hover:border-app-border-strong hover:bg-app-surface-muted"
-              value={actions.selectedWatchRenderer}
-              disabled={actions.watchingArtifact !== null}
-              onChange={(event) =>
-                actions.setSelectedWatchRenderer(
-                  watchRendererOptions.find((renderer) => renderer === event.target.value) ??
-                    run.config.environment.renderer,
-                )
-              }
-            >
-              {watchRendererOptions.map((renderer) => (
-                <option key={renderer} value={renderer}>
-                  {renderer === run.config.environment.renderer
-                    ? `${renderer} (training)`
-                    : renderer}
-                </option>
-              ))}
-            </FieldSelect>
-          </div>
-          <TooltipIconButton
-            aria-label={
-              actions.watchingArtifact === actions.selectedArtifact
-                ? `Opening ${actions.selectedArtifact} checkpoint watch`
-                : `Watch ${actions.selectedArtifact} checkpoint`
-            }
-            disabled={actions.watchingArtifact !== null}
-            tooltip={
-              actions.watchingArtifact === actions.selectedArtifact
-                ? `Opening ${actions.selectedArtifact}...`
-                : `Watch ${actions.selectedArtifact}`
-            }
-            onClick={() => void actions.watchRunArtifact(actions.selectedArtifact)}
-          >
-            <WatchIcon />
-          </TooltipIconButton>
-          <TooltipIconButton
-            aria-label={
-              actions.isForking
-                ? `Forking ${actions.selectedArtifact} checkpoint`
-                : `Fork ${actions.selectedArtifact} checkpoint`
-            }
-            disabled={actions.isForking}
-            tooltip={
-              actions.isForking
-                ? `Forking ${actions.selectedArtifact}...`
-                : `Fork ${actions.selectedArtifact}`
-            }
-            onClick={() => void actions.forkRunArtifact(actions.selectedArtifact)}
-          >
-            <ForkIcon />
-          </TooltipIconButton>
-        </div>
-        <TooltipIconButton
-          aria-label={
-            actions.isCreatingDraftFromRun
-              ? "Creating draft from run"
-              : "Create editable draft from run"
-          }
-          disabled={actions.isCreatingDraftFromRun}
-          tooltip={actions.isCreatingDraftFromRun ? "Creating draft..." : "Create editable draft"}
-          onClick={() => void actions.createDraftFromRun()}
-        >
-          <SaveDraftIcon />
-        </TooltipIconButton>
-        <TooltipIconButton
-          aria-label="Show run charts"
-          tooltip="Charts"
-          onClick={() => onShowCharts(run.id)}
-        >
-          <ChartIcon />
-        </TooltipIconButton>
-        <TooltipIconButton
-          aria-label={
-            actions.isStopping
-              ? "Stopping run"
-              : run.pending_command === "stop"
-                ? "Stop requested"
-                : "Stop run"
-          }
-          disabled={!actions.canStop}
-          tooltip={
-            actions.isStopping
-              ? "Stopping..."
-              : run.pending_command === "stop"
-                ? "Stop requested"
-                : "Stop"
-          }
-          onClick={() => void actions.stopRun()}
-        >
-          <StopIcon />
-        </TooltipIconButton>
-        <TooltipIconButton
-          aria-label={actions.isResuming ? "Resuming run" : "Resume run"}
-          disabled={!actions.canResume}
-          tooltip={actions.isResuming ? "Resuming..." : "Resume"}
-          onClick={() => void actions.resumeRun()}
-        >
-          <ResumeIcon />
-        </TooltipIconButton>
+        </fieldset>
       </div>
 
       <RunTrackPoolPanel
@@ -318,6 +362,34 @@ function RunMetric({ children, label }: { children: ReactNode; label: ReactNode 
         {children}
       </div>
     </div>
+  );
+}
+
+function ToolbarSelect({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <div className="grid min-w-0 gap-1">
+      <span className={toolbarLegendClass()}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function toolbarPanelClass() {
+  return "m-0 grid min-w-0 gap-2 border border-app-border bg-app-surface-muted p-2";
+}
+
+function toolbarPanelTitleClass() {
+  return "px-1 text-[11px] font-semibold tracking-[0.08em] text-app-muted uppercase";
+}
+
+function toolbarLegendClass() {
+  return "text-[10px] tracking-[0.08em] text-app-muted uppercase";
+}
+
+function toolbarSelectClass(widthClass: string) {
+  return cn(
+    "h-10 px-2.5 pr-[30px] text-xs lowercase hover:border-app-border-strong hover:bg-app-surface",
+    widthClass,
   );
 }
 

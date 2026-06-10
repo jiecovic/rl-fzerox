@@ -73,7 +73,9 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
 async def test_manager_api_watches_run_with_requested_policy_device(tmp_path: Path) -> None:
     class FakeLauncher(_LauncherStub):
         def __init__(self) -> None:
-            self.calls: list[tuple[str, str, Literal["cpu", "cuda"], WatchRenderer | None]] = []
+            self.calls: list[
+                tuple[str, str, Literal["cpu", "cuda"], WatchRenderer | None, bool]
+            ] = []
 
         def watch_artifact(
             self,
@@ -82,8 +84,9 @@ async def test_manager_api_watches_run_with_requested_policy_device(tmp_path: Pa
             artifact: str,
             device: Literal["cpu", "cuda"],
             renderer: WatchRenderer | None,
+            deterministic_policy: bool,
         ) -> Literal["started", "already_running"]:
-            self.calls.append((run_id, artifact, device, renderer))
+            self.calls.append((run_id, artifact, device, renderer, deterministic_policy))
             return "started"
 
     launcher = FakeLauncher()
@@ -92,12 +95,12 @@ async def test_manager_api_watches_run_with_requested_policy_device(tmp_path: Pa
 
     response = await client.post(
         "/api/runs/run-1/watch?artifact=best",
-        json={"device": "cpu", "renderer": "angrylion"},
+        json={"device": "cpu", "renderer": "angrylion", "policy_mode": "stochastic"},
     )
 
     assert response.status_code == 200
     assert response.json() == {"status": "started"}
-    assert launcher.calls == [("run-1", "best", "cpu", "angrylion")]
+    assert launcher.calls == [("run-1", "best", "cpu", "angrylion", False)]
 
 
 async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> None:
@@ -105,6 +108,7 @@ async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> N
         def __init__(self) -> None:
             self.device: Literal["cpu", "cuda"] | None = None
             self.renderer: WatchRenderer | None = None
+            self.deterministic_policy: bool | None = None
 
         def watch_artifact(
             self,
@@ -113,10 +117,12 @@ async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> N
             artifact: str,
             device: Literal["cpu", "cuda"],
             renderer: WatchRenderer | None,
+            deterministic_policy: bool,
         ) -> Literal["started", "already_running"]:
             del run_id, artifact
             self.device = device
             self.renderer = renderer
+            self.deterministic_policy = deterministic_policy
             return "already_running"
 
     launcher = FakeLauncher()
@@ -129,6 +135,7 @@ async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> N
     assert response.json() == {"status": "already_running"}
     assert launcher.device == "cuda"
     assert launcher.renderer is None
+    assert launcher.deterministic_policy is True
 
 
 async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Path) -> None:

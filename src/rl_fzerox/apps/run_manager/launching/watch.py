@@ -26,6 +26,7 @@ def launch_watch_artifact(
     artifact: str,
     device: Literal["cpu", "cuda"],
     renderer: WatchRenderer | None,
+    deterministic_policy: bool,
 ) -> WatchLaunchStatus:
     run = store.get_run(run_id)
     if run is None:
@@ -49,7 +50,11 @@ def launch_watch_artifact(
         is not None
     ):
         return "already_running"
-    overrides = watch_config_overrides(device=device, renderer=renderer)
+    overrides = watch_config_overrides(
+        device=device,
+        renderer=renderer,
+        deterministic_policy=deterministic_policy,
+    )
     resolve_watch_app_config(
         policy_run_dir=None,
         policy_artifact="best" if artifact == "best" else "latest",
@@ -104,8 +109,12 @@ def watch_config_overrides(
     *,
     device: Literal["cpu", "cuda"],
     renderer: WatchRenderer | None,
+    deterministic_policy: bool,
 ) -> tuple[str, ...]:
-    overrides = [f"watch.device={device}"]
+    overrides = [
+        f"watch.device={device}",
+        f"watch.deterministic_policy={str(deterministic_policy).lower()}",
+    ]
     if renderer is not None:
         overrides.append(f"emulator.renderer={renderer}")
     return tuple(overrides)

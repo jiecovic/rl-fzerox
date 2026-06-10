@@ -75,7 +75,8 @@ vi.mock("@/shared/api/client", async () => {
       artifact: "latest" | "best",
       device: "cpu" | "cuda",
       renderer: "angrylion" | "gliden64",
-    ) => watchRunMock(runId, artifact, device, renderer),
+      policyMode: "deterministic" | "stochastic",
+    ) => watchRunMock(runId, artifact, device, renderer, policyMode),
     updateDraftWithSource: (
       id: string,
       name: string,
@@ -540,12 +541,20 @@ describe("App", () => {
     }
     await user.click(openRunButton);
 
+    await user.selectOptions(await screen.findByLabelText("Watch policy mode"), "stochastic");
     const watchButton = await screen.findByRole("button", { name: "Watch latest checkpoint" });
     await user.click(watchButton);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Saved train config is not compatible with the current schema");
     expect(watchButton.closest(".run-watch-control")).toContainElement(alert);
+    expect(watchRunMock).toHaveBeenCalledWith(
+      "run-001",
+      "latest",
+      "cuda",
+      "gliden64",
+      "stochastic",
+    );
   });
 
   it("derives local wall time from active runtime instead of stale initial launch timestamps", async () => {

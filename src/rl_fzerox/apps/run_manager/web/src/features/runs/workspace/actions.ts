@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type {
   ManagedRunDetail,
+  PolicyPlaybackMode,
   TrackSamplingRuntimeState,
   WatchDevice,
   WatchRenderer,
@@ -29,6 +30,7 @@ export interface RunWorkspaceActionsProps {
     artifact: CheckpointArtifact,
     device: WatchDevice,
     renderer: WatchRenderer,
+    policyMode: PolicyPlaybackMode,
   ) => Promise<"started" | "already_running">;
   run: ManagedRunDetail;
   runName: string;
@@ -54,10 +56,14 @@ export interface RunWorkspaceActionState {
   renameRunLabel: (name?: string) => Promise<boolean>;
   resetTrackPoolState: () => Promise<void>;
   resumeRun: () => Promise<void>;
-  selectedArtifact: CheckpointArtifact;
-  setSelectedArtifact: (artifact: CheckpointArtifact) => void;
+  selectedForkArtifact: CheckpointArtifact;
+  setSelectedForkArtifact: (artifact: CheckpointArtifact) => void;
+  selectedWatchArtifact: CheckpointArtifact;
+  setSelectedWatchArtifact: (artifact: CheckpointArtifact) => void;
   selectedWatchDevice: WatchDevice;
   setSelectedWatchDevice: (device: WatchDevice) => void;
+  selectedWatchPolicyMode: PolicyPlaybackMode;
+  setSelectedWatchPolicyMode: (mode: PolicyPlaybackMode) => void;
   selectedWatchRenderer: WatchRenderer;
   setSelectedWatchRenderer: (renderer: WatchRenderer) => void;
   stopRun: () => Promise<void>;
@@ -88,8 +94,11 @@ export function useRunWorkspaceActions({
   const [isRenaming, setIsRenaming] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
-  const [selectedArtifact, setSelectedArtifact] = useState<CheckpointArtifact>("latest");
+  const [selectedForkArtifact, setSelectedForkArtifact] = useState<CheckpointArtifact>("latest");
+  const [selectedWatchArtifact, setSelectedWatchArtifact] = useState<CheckpointArtifact>("latest");
   const [selectedWatchDevice, setSelectedWatchDevice] = useState<WatchDevice>("cuda");
+  const [selectedWatchPolicyMode, setSelectedWatchPolicyMode] =
+    useState<PolicyPlaybackMode>("deterministic");
   const [watchRendererSelection, setWatchRendererSelection] = useState<{
     renderer: WatchRenderer;
     runId: string;
@@ -221,7 +230,13 @@ export function useRunWorkspaceActions({
     setControlError(null);
     setWatchToast(null);
     try {
-      const status = await onWatch(run.id, artifact, selectedWatchDevice, selectedWatchRenderer);
+      const status = await onWatch(
+        run.id,
+        artifact,
+        selectedWatchDevice,
+        selectedWatchRenderer,
+        selectedWatchPolicyMode,
+      );
       if (status === "already_running") {
         setWatchToast({
           message: `${artifact} watch is already running`,
@@ -296,10 +311,14 @@ export function useRunWorkspaceActions({
     renameRunLabel,
     resetTrackPoolState,
     resumeRun,
-    selectedArtifact,
-    setSelectedArtifact,
+    selectedForkArtifact,
+    setSelectedForkArtifact,
+    selectedWatchArtifact,
+    setSelectedWatchArtifact,
     selectedWatchDevice,
     setSelectedWatchDevice,
+    selectedWatchPolicyMode,
+    setSelectedWatchPolicyMode,
     selectedWatchRenderer,
     setSelectedWatchRenderer,
     stopRun,

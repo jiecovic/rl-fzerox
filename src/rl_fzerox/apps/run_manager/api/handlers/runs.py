@@ -154,6 +154,7 @@ def watch_run_payload(
     artifact: str,
     device: Literal["cpu", "cuda"],
     renderer: WatchRenderer | None,
+    deterministic_policy: bool,
 ) -> dict[str, str]:
     try:
         status = launcher.watch_artifact(
@@ -161,6 +162,7 @@ def watch_run_payload(
             artifact=artifact,
             device=device,
             renderer=renderer,
+            deterministic_policy=deterministic_policy,
         )
     except FileNotFoundError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

@@ -299,13 +299,14 @@ export async function watchRun(
   artifact: "latest" | "best",
   device: "cpu" | "cuda",
   renderer: WatchRenderer,
+  policyMode: PolicyPlaybackMode,
 ): Promise<"started" | "already_running"> {
   const response = await fetch(
     `/api/runs/${encodeURIComponent(runId)}/watch?artifact=${encodeURIComponent(artifact)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device, renderer }),
+      body: JSON.stringify({ device, renderer, policy_mode: policyMode }),
     },
   );
   const payload = parseApiPayload(watchRunResponseSchema, await parseJson(response));
