@@ -40,6 +40,7 @@ import type {
   SaveGameSession,
   WorkspaceTabId,
 } from "@/app/workspace/types";
+import { randomAttemptSeedText } from "@/features/save_games/runnerSeed";
 
 export function useWorkspaceSessions({
   drafts,
@@ -354,10 +355,4 @@ function saveGameSessionForManagedSave(
     sessionId,
     title: name,
   };
-}
-
-function randomAttemptSeedText(): string {
-  const values = new Uint32Array(1);
-  crypto.getRandomValues(values);
-  return String(values[0]);
 }

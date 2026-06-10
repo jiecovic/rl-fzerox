@@ -10,12 +10,13 @@ import {
   unlockCompletionFraction,
 } from "@/features/save_games/model";
 import { ProgressMeter } from "@/features/save_games/ProgressMeter";
+import { parseAttemptSeed, randomAttemptSeedText } from "@/features/save_games/runnerSeed";
 import { UnlockPathPanel } from "@/features/save_games/UnlockPathPanel";
+import { resolveSavedCourseSetup } from "@/features/save_games/unlock_path/courseSetupModel";
 import type {
   ConfigMetadata,
   CourseSetupScope,
   ManagedRun,
-  ManagedSaveCourseSetup,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
   PolicyPlaybackMode,
@@ -631,78 +632,4 @@ function DetailRow({
       </dd>
     </div>
   );
-}
-
-function resolveSavedCourseSetup(
-  setups: readonly ManagedSaveCourseSetup[],
-  target: ManagedSaveUnlockTarget,
-  courses: ConfigMetadata["built_in_courses"],
-): ManagedSaveCourseSetup | null {
-  if (target.course_id === null && target.cup_id !== null) {
-    const cupCourses = courses
-      .filter((course) => course.cup === target.cup_id)
-      .sort((left, right) => left.course_index - right.course_index);
-    if (cupCourses.length > 0) {
-      const resolvedSetups = cupCourses.map((course) =>
-        resolveSavedCourseSetupForCourse(setups, {
-          ...target,
-          course_id: course.id,
-        }),
-      );
-      return resolvedSetups.every((setup) => setup !== null) ? (resolvedSetups[0] ?? null) : null;
-    }
-  }
-  return resolveSavedCourseSetupForCourse(setups, target);
-}
-
-function resolveSavedCourseSetupForCourse(
-  setups: readonly ManagedSaveCourseSetup[],
-  target: ManagedSaveUnlockTarget,
-): ManagedSaveCourseSetup | null {
-  return (
-    setups.find(
-      (setup) =>
-        setup.scope === "course" &&
-        setup.course_id === target.course_id &&
-        optionalMatch(setup.cup_id, target.cup_id) &&
-        optionalMatch(setup.difficulty, target.difficulty),
-    ) ??
-    // Cup-scoped setup rows remain valid persisted data for cup unlock targets.
-    // Course rows win; the course setup editor writes course rows for bulk edits.
-    setups.find(
-      (setup) =>
-        setup.scope === "cup" &&
-        setup.cup_id === target.cup_id &&
-        optionalMatch(setup.difficulty, target.difficulty),
-    ) ??
-    setups.find(
-      (setup) => setup.scope === "difficulty" && setup.difficulty === target.difficulty,
-    ) ??
-    setups.find((setup) => setup.scope === "global") ??
-    null
-  );
-}
-
-function optionalMatch(expected: string | null, actual: string | null): boolean {
-  return expected === null || expected === actual;
-}
-
-function parseAttemptSeed(value: string): string | "invalid" | null {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-  if (!/^\d+$/.test(trimmed)) {
-    return "invalid";
-  }
-  const parsed = Number(trimmed);
-  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= 0xffffffff
-    ? String(parsed)
-    : "invalid";
-}
-
-function randomAttemptSeedText(): string {
-  const values = new Uint32Array(1);
-  crypto.getRandomValues(values);
-  return String(values[0]);
 }

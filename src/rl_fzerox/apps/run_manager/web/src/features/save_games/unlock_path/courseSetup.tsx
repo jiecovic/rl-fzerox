@@ -6,46 +6,25 @@ import { courseCardClass } from "@/features/configurator/sections/tracks/courseP
 import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/features/configurator/sections/tracks/TrackMinimap";
 import type {
-  ConfigMetadata,
-  CourseSetupScope,
-  ManagedRun,
-  ManagedSaveCourseSetup,
-  SavePolicyArtifact,
-} from "@/shared/api/contract";
+  CourseSetupDraft,
+  CourseSetupDraftMap,
+  CourseSetupScopeValues,
+  CupView,
+  PolicyArtifactDraft,
+} from "@/features/save_games/unlock_path/courseSetupModel";
+import {
+  courseSetupScopeValues,
+  courseSetupsForCups,
+  cupSetupScopeValues,
+  EMPTY_COURSE_SETUP_DRAFT,
+  exactCourseSetupDraft,
+  preferredVehicleSetup,
+  sharedCourseDraft,
+} from "@/features/save_games/unlock_path/courseSetupModel";
+import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { SaveDraftIcon } from "@/shared/ui/icons";
-
-export interface CupView {
-  courses: ConfigMetadata["built_in_courses"];
-  id: string;
-  label: string;
-  order: number;
-}
-
-export type CourseSetupScopeValues = {
-  courseId?: string | null;
-  cupId?: string | null;
-  difficulty?: string | null;
-  scope: CourseSetupScope;
-};
-
-export type PolicyArtifactDraft = {
-  engineSettingRawValue: number;
-  policyArtifact: SavePolicyArtifact;
-  policyRunId: string;
-  vehicleId: string;
-};
-
-export type CourseSetupDraft = CourseSetupScopeValues & PolicyArtifactDraft;
-export type CourseSetupDraftMap = Record<string, CourseSetupDraft>;
-
-const EMPTY_COURSE_SETUP_DRAFT: PolicyArtifactDraft = {
-  engineSettingRawValue: 50,
-  policyArtifact: "best",
-  policyRunId: "",
-  vehicleId: "blue_falcon",
-};
 
 export function GlobalPolicyPanel({
   assignableRuns,
@@ -367,26 +346,6 @@ function CupSetupBlock({
   );
 }
 
-function courseSetupsForCups(cups: readonly CupView[]): CourseSetupScopeValues[] {
-  return cups.flatMap((cup) => cup.courses.map((course) => courseSetupScopeValues(cup, course.id)));
-}
-
-function cupSetupScopeValues(cup: CupView): CourseSetupScopeValues {
-  return {
-    courseId: null,
-    cupId: cup.id,
-    scope: "cup",
-  };
-}
-
-function courseSetupScopeValues(cup: CupView, courseId: string): CourseSetupScopeValues {
-  return {
-    courseId,
-    cupId: cup.id,
-    scope: "course",
-  };
-}
-
 function PolicyDraftSelect({
   assignableRuns,
   disabled,
@@ -556,136 +515,4 @@ function ArtifactDraftSelect({
       </FieldSelect>
     </FieldShell>
   );
-}
-
-export function courseSetupDraftsFromSavedSetups(
-  setups: readonly ManagedSaveCourseSetup[],
-): CourseSetupDraftMap {
-  const drafts: CourseSetupDraftMap = {};
-  for (const setup of setups) {
-    const scopeValues = scopeValuesFromSetup(setup);
-    drafts[courseSetupKey(scopeValues)] = {
-      ...scopeValues,
-      engineSettingRawValue: setup.engine_setting_raw_value,
-      policyArtifact: setup.policy_artifact,
-      policyRunId: setup.policy_run_id,
-      vehicleId: setup.vehicle_id,
-    };
-  }
-  return drafts;
-}
-
-function scopeValuesFromSetup(setup: ManagedSaveCourseSetup): CourseSetupScopeValues {
-  return {
-    courseId: setup.course_id,
-    cupId: setup.cup_id,
-    difficulty: setup.difficulty,
-    scope: setup.scope,
-  };
-}
-
-function exactCourseSetupDraft(
-  courseSetupDrafts: CourseSetupDraftMap,
-  scopeValues: CourseSetupScopeValues,
-): CourseSetupDraft | null {
-  return courseSetupDrafts[courseSetupKey(scopeValues)] ?? null;
-}
-
-function sharedCourseDraft(
-  drafts: readonly CourseSetupDraft[],
-  expectedCount: number,
-): CourseSetupDraft | null {
-  if (expectedCount === 0 || drafts.length !== expectedCount) {
-    return null;
-  }
-  const [firstDraft] = drafts;
-  if (firstDraft === undefined) {
-    return null;
-  }
-  return drafts.every((draft) => policyArtifactDraftsEqual(draft, firstDraft)) ? firstDraft : null;
-}
-
-function policyArtifactDraftsEqual(left: PolicyArtifactDraft, right: PolicyArtifactDraft): boolean {
-  return (
-    left.policyRunId === right.policyRunId &&
-    left.policyArtifact === right.policyArtifact &&
-    left.vehicleId === right.vehicleId &&
-    left.engineSettingRawValue === right.engineSettingRawValue
-  );
-}
-
-export function countDirtyCourseSetups(
-  current: CourseSetupDraftMap,
-  saved: CourseSetupDraftMap,
-): number {
-  return dirtyCourseSetupDrafts(current, saved).length;
-}
-
-export function dirtyCourseSetupDrafts(
-  current: CourseSetupDraftMap,
-  saved: CourseSetupDraftMap,
-): CourseSetupDraft[] {
-  return Object.values(current).filter((draft) => {
-    const savedDraft = saved[courseSetupKey(draft)] ?? null;
-    return (
-      draft.policyRunId !== "" &&
-      (savedDraft === null ||
-        savedDraft.policyRunId !== draft.policyRunId ||
-        savedDraft.policyArtifact !== draft.policyArtifact ||
-        savedDraft.vehicleId !== draft.vehicleId ||
-        savedDraft.engineSettingRawValue !== draft.engineSettingRawValue)
-    );
-  });
-}
-
-function preferredVehicleSetup({
-  currentDraft,
-  metadata,
-  run,
-  unlockedVehicleIds,
-}: {
-  currentDraft: PolicyArtifactDraft;
-  metadata: ConfigMetadata;
-  run: ManagedRun | null;
-  unlockedVehicleIds: readonly string[];
-}): Pick<PolicyArtifactDraft, "engineSettingRawValue" | "vehicleId"> {
-  const unlockedVehicleSet = new Set(unlockedVehicleIds);
-  const fallbackVehicleId = unlockedVehicleSet.has("blue_falcon")
-    ? "blue_falcon"
-    : (unlockedVehicleIds[0] ?? metadata.vehicles[0]?.id ?? currentDraft.vehicleId);
-  if (run === null) {
-    return {
-      engineSettingRawValue: currentDraft.engineSettingRawValue,
-      vehicleId: currentDraft.vehicleId,
-    };
-  }
-  const trainedVehicleId = run.vehicle_setup.selected_vehicle_ids[0] ?? null;
-  const vehicleId =
-    trainedVehicleId !== null && unlockedVehicleSet.has(trainedVehicleId)
-      ? trainedVehicleId
-      : fallbackVehicleId;
-  return {
-    engineSettingRawValue: preferredEngineSetting(run),
-    vehicleId,
-  };
-}
-
-function preferredEngineSetting(run: ManagedRun): number {
-  const vehicle = run.vehicle_setup;
-  if (vehicle.engine_mode === "fixed") {
-    return vehicle.engine_setting_raw_value;
-  }
-  if (vehicle.engine_setting_min_raw_value === vehicle.engine_setting_max_raw_value) {
-    return vehicle.engine_setting_min_raw_value;
-  }
-  return 50;
-}
-
-export function courseSetupKey(scopeValues: CourseSetupScopeValues): string {
-  return [
-    scopeValues.scope,
-    scopeValues.difficulty ?? "",
-    scopeValues.cupId ?? "",
-    scopeValues.courseId ?? "",
-  ].join(":");
 }

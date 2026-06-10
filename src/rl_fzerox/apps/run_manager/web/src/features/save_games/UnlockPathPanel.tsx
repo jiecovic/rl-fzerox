@@ -3,20 +3,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCupBanner";
 import { formatUnlockTargetStatus, unlockTargetStatusClass } from "@/features/save_games/model";
+import { CourseSetupPanel, GlobalPolicyPanel } from "@/features/save_games/unlock_path/courseSetup";
 import type {
   CourseSetupDraftMap,
   CourseSetupScopeValues,
   CupView,
   PolicyArtifactDraft,
-} from "@/features/save_games/unlock_path/courseSetup";
+} from "@/features/save_games/unlock_path/courseSetupModel";
 import {
-  CourseSetupPanel,
   countDirtyCourseSetups,
   courseSetupDraftsFromSavedSetups,
   courseSetupKey,
+  cupsWithCourses,
   dirtyCourseSetupDrafts,
-  GlobalPolicyPanel,
-} from "@/features/save_games/unlock_path/courseSetup";
+} from "@/features/save_games/unlock_path/courseSetupModel";
 import type {
   ConfigMetadata,
   CourseSetupScope,
@@ -263,20 +263,6 @@ function TargetMatrix({
       ))}
     </div>
   );
-}
-
-function cupsWithCourses(metadata: ConfigMetadata): CupView[] {
-  return metadata.track_cups
-    .filter((cup) => cup.id !== "x")
-    .map((cup) => ({
-      id: cup.id,
-      label: cup.label,
-      order: cup.order,
-      courses: metadata.built_in_courses
-        .filter((course) => course.cup === cup.id)
-        .sort((left, right) => left.course_index - right.course_index),
-    }))
-    .sort((left, right) => left.order - right.order);
 }
 
 function targetStatusLabel(target: ManagedSaveUnlockTarget | undefined): string {
