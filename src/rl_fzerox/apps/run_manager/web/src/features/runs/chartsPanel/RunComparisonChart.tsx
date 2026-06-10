@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/RunComparisonChart.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/chartsPanel/RunComparisonChart.tsx
 import { useMemo } from "react";
 
 import { RunPlotCard, type RunPlotPoint } from "@/features/runs/charts/RunPlotCard";
@@ -6,7 +6,7 @@ import {
   chartSeriesColor,
   formatChartValue,
   latestPointValue,
-} from "@/features/runs/charts_panel/model";
+} from "@/features/runs/chartsPanel/model";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
 
 interface RunComparisonChartProps {

@@ -1,11 +1,11 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/RunChartSelectionPanel.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/chartsPanel/RunChartSelectionPanel.tsx
 import { useCallback } from "react";
 import {
   chartSeriesColor,
   type LineageRunGroup,
   type LineageSelectionState,
   lineageSelectionState,
-} from "@/features/runs/charts_panel/model";
+} from "@/features/runs/chartsPanel/model";
 import type { ManagedRun } from "@/shared/api/contract";
 import { cn } from "@/shared/ui/cn";
 import { ChevronIcon } from "@/shared/ui/icons";

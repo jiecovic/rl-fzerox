@@ -1,7 +1,7 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/model/catalog.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/chartsPanel/model/catalog.ts
 
-import { buildEnvStepRatePoints, metricPoints } from "@/features/runs/charts_panel/model/points";
-import type { RunChartDescriptor, RunChartGroup } from "@/features/runs/charts_panel/model/types";
+import { buildEnvStepRatePoints, metricPoints } from "@/features/runs/chartsPanel/model/points";
+import type { RunChartDescriptor, RunChartGroup } from "@/features/runs/chartsPanel/model/types";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
 

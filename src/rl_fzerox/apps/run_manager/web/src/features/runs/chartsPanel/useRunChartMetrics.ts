@@ -1,6 +1,6 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/useRunChartMetrics.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/chartsPanel/useRunChartMetrics.ts
 import { useEffect, useState } from "react";
-import { cachedMetricsByRun } from "@/features/runs/charts_panel/storage";
+import { cachedMetricsByRun } from "@/features/runs/chartsPanel/storage";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import { fetchFreshRunMetrics } from "@/shared/api/client";
 import type { ManagedRunMetricSample } from "@/shared/api/contract";

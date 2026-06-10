@@ -16,15 +16,15 @@ import {
   INITIAL_GROUP_OPEN,
   RUN_CHART_GROUPS,
   type RunChartGroupId,
-} from "@/features/runs/charts_panel/model";
-import { RunChartLegend } from "@/features/runs/charts_panel/RunChartLegend";
-import { RunChartSelectionPanel } from "@/features/runs/charts_panel/RunChartSelectionPanel";
-import { RunComparisonChart } from "@/features/runs/charts_panel/RunComparisonChart";
+} from "@/features/runs/chartsPanel/model";
+import { RunChartLegend } from "@/features/runs/chartsPanel/RunChartLegend";
+import { RunChartSelectionPanel } from "@/features/runs/chartsPanel/RunChartSelectionPanel";
+import { RunComparisonChart } from "@/features/runs/chartsPanel/RunComparisonChart";
 import {
   readStoredSelectedRunIds,
   writeStoredSelectedRunIds,
-} from "@/features/runs/charts_panel/storage";
-import { useRunChartMetrics } from "@/features/runs/charts_panel/useRunChartMetrics";
+} from "@/features/runs/chartsPanel/storage";
+import { useRunChartMetrics } from "@/features/runs/chartsPanel/useRunChartMetrics";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import type { ManagedRun } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";

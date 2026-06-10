@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { plotSeriesKey } from "@/features/runs/charts/run_plot_card/model";
-import { buildEnvStepRatePoints, metricPoints } from "@/features/runs/charts_panel/model/points";
+import { buildEnvStepRatePoints, metricPoints } from "@/features/runs/chartsPanel/model/points";
 import { runFixture, runMetricSampleFixture } from "@/test/fixtures";
 
 describe("run chart points", () => {

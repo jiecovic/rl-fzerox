@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/model/format.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/chartsPanel/model/format.ts
 
 export function latestPointValue(points: { value: number }[]) {
   return points.at(-1)?.value ?? null;

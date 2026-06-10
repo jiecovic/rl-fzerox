@@ -1,6 +1,6 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/RunChartLegend.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/chartsPanel/RunChartLegend.tsx
 
-import { chartSeriesColor, type LineageRunGroup } from "@/features/runs/charts_panel/model";
+import { chartSeriesColor, type LineageRunGroup } from "@/features/runs/chartsPanel/model";
 import type { ManagedRun } from "@/shared/api/contract";
 
 interface RunChartLegendProps {
