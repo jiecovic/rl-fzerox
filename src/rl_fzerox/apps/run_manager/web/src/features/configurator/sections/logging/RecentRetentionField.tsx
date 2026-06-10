@@ -1,7 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/logging/RecentRetentionField.tsx
-import { useEffect, useState } from "react";
-
-import { formatInteger } from "@/features/configurator/fields/format";
+import { IntegerTextInput } from "@/features/configurator/fields";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
 import { Slider } from "@/features/configurator/fields/slider";
@@ -14,7 +12,7 @@ import {
   recentRetentionValueFromSlider,
 } from "@/features/configurator/sections/logging/derived";
 import type { ManagedRunConfig } from "@/shared/api/contract";
-import { FieldInput, FieldShell, RangeReadonly, RangeRow } from "@/shared/ui/Field";
+import { FieldShell, RangeReadonly, RangeRow } from "@/shared/ui/Field";
 
 interface RecentRetentionFieldProps {
   help: string;
@@ -35,29 +33,6 @@ export function RecentRetentionField({
   const sliderMax = recentRetentionSliderMax();
   const sliderValue = recentRetentionSliderValue(train);
   const resetValue = defaultTrain.recent_checkpoint_limit;
-  const [rawValue, setRawValue] = useState(
-    train.recent_checkpoint_limit === null ? "" : formatInteger(train.recent_checkpoint_limit),
-  );
-
-  useEffect(() => {
-    setRawValue(
-      train.recent_checkpoint_limit === null ? "" : formatInteger(train.recent_checkpoint_limit),
-    );
-  }, [train.recent_checkpoint_limit]);
-
-  function commitManualValue() {
-    if (train.recent_checkpoint_limit === null) {
-      setRawValue("");
-      return;
-    }
-    const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-    if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > finiteMax) {
-      setRawValue(formatInteger(train.recent_checkpoint_limit));
-      return;
-    }
-    onChange(parsed);
-    setRawValue(formatInteger(parsed));
-  }
 
   return (
     <FieldShell>
@@ -84,19 +59,13 @@ export function RecentRetentionField({
         {train.recent_checkpoint_limit === null ? (
           <RangeReadonly>{recentRetentionSummary(train)}</RangeReadonly>
         ) : (
-          <FieldInput
+          <IntegerTextInput
             aria-label={label}
             className="h-[34px] indent-0 tabular-nums"
-            inputMode="numeric"
-            spellCheck={false}
-            value={rawValue}
-            onBlur={commitManualValue}
-            onChange={(event) => setRawValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
+            max={finiteMax}
+            min={1}
+            value={train.recent_checkpoint_limit}
+            onChange={onChange}
           />
         )}
       </RangeRow>

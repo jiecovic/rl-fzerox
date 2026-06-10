@@ -2,6 +2,7 @@
 import { useState } from "react";
 
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
+import { IntegerTextInput } from "@/features/configurator/fields";
 import { courseCardClass } from "@/features/configurator/sections/tracks/coursePoolStyle";
 import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/features/configurator/sections/tracks/TrackMinimap";
@@ -23,7 +24,7 @@ import {
 } from "@/features/save_games/unlock_path/courseSetupModel";
 import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
-import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
+import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { SaveDraftIcon } from "@/shared/ui/icons";
 
 export function GlobalPolicyPanel({
@@ -460,22 +461,17 @@ function EngineDraftInput({
   return (
     <FieldShell>
       <span>{visibleLabel ?? label}</span>
-      <FieldInput
+      <IntegerTextInput
         aria-label={label}
+        className="h-[34px] indent-0 tabular-nums"
         disabled={disabled}
-        inputMode="numeric"
         max={100}
         min={0}
-        type="number"
         value={draft.engineSettingRawValue}
-        onChange={(event) => {
-          const value = Number(event.currentTarget.value);
-          if (!Number.isFinite(value)) {
-            return;
-          }
+        onChange={(value) => {
           onDraftChange({
             ...draft,
-            engineSettingRawValue: Math.max(0, Math.min(100, Math.trunc(value))),
+            engineSettingRawValue: value,
           });
         }}
       />

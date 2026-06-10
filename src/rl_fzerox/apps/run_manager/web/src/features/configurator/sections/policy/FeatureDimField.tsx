@@ -1,7 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policy/FeatureDimField.tsx
-import { useEffect, useState } from "react";
-import { SegmentedChoiceStrip } from "@/features/configurator/fields";
-import { formatInteger } from "@/features/configurator/fields/format";
+import { IntegerTextInput, SegmentedChoiceStrip } from "@/features/configurator/fields";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
 
@@ -25,23 +23,6 @@ export function FeatureDimField({
   onChange,
 }: FeatureDimFieldProps) {
   const numericValue = typeof value === "number" ? value : defaultCustomValue(resetValue);
-  const [rawValue, setRawValue] = useState(formatInteger(numericValue));
-
-  useEffect(() => {
-    if (typeof value === "number") {
-      setRawValue(formatInteger(value));
-    }
-  }, [value]);
-
-  function commitCustomValue() {
-    const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-      setRawValue(formatInteger(numericValue));
-      return;
-    }
-    onChange(parsed);
-    setRawValue(formatInteger(parsed));
-  }
 
   function enableAuto() {
     onChange("auto");
@@ -53,7 +34,6 @@ export function FeatureDimField({
     }
     const nextValue = defaultCustomValue(resetValue);
     onChange(nextValue);
-    setRawValue(formatInteger(nextValue));
   }
 
   return (
@@ -78,14 +58,12 @@ export function FeatureDimField({
           ]}
         />
         {typeof value === "number" ? (
-          <input
+          <IntegerTextInput
             aria-label={label}
             className="feature-dim-input"
-            inputMode="numeric"
-            spellCheck={false}
-            value={rawValue}
-            onBlur={commitCustomValue}
-            onChange={(event) => setRawValue(event.target.value)}
+            min={1}
+            value={numericValue}
+            onChange={onChange}
           />
         ) : null}
       </div>
