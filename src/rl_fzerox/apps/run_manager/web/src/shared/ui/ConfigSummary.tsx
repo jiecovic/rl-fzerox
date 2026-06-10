@@ -141,19 +141,24 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
         : config.action.lean_output_mode === "four_way_categorical"
           ? "4-way lean"
           : "lean";
+    const leanEpisodeMaskProbability = config.action.lean_episode_mask_probability ?? 0;
+    const leanEpisodeMask =
+      leanEpisodeMaskProbability > 0
+        ? `, ${(leanEpisodeMaskProbability * 100).toFixed(0)}% episode mask`
+        : "";
     if (!config.action.enable_lean) {
       labels.push(`${leanSummary} masked`);
     } else if (config.action.lean_output_mode === "independent_buttons") {
       labels.push(
         config.action.lean_unmask_min_speed_kph === null
-          ? `${leanSummary}, fully free`
-          : `${leanSummary}, ≥ ${config.action.lean_unmask_min_speed_kph} kph`,
+          ? `${leanSummary}, fully free${leanEpisodeMask}`
+          : `${leanSummary}, ≥ ${config.action.lean_unmask_min_speed_kph} kph${leanEpisodeMask}`,
       );
     } else {
       labels.push(
         config.action.lean_mode === "raw"
-          ? `${leanSummary}, raw`
-          : `${leanSummary}, ${config.action.lean_mode}`,
+          ? `${leanSummary}, raw${leanEpisodeMask}`
+          : `${leanSummary}, ${config.action.lean_mode}${leanEpisodeMask}`,
       );
     }
   }

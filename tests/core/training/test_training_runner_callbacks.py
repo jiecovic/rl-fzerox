@@ -74,6 +74,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "steer_level": -0.25,
             "lean_level": -1.0,
             "lean_request_level": -1.0,
+            "lean_episode_masked": True,
             "gas_used": True,
             "air_brake_used": False,
             "boost_used": True,
@@ -89,6 +90,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
                 "race_time_ms": 123_400,
                 "episode_step": 7_404,
                 "episode_airborne_frames": 2,
+                "lean_episode_masked": True,
                 "termination_reason": "finished",
                 "truncation_reason": None,
                 "track_course_id": "mute_city",
@@ -114,6 +116,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "steer_level": 0.75,
             "lean_level": 1.0,
             "lean_request_level": 0.0,
+            "lean_episode_masked": False,
             "gas_used": False,
             "air_brake_used": True,
             "boost_used": False,
@@ -129,6 +132,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
                 "race_time_ms": 40_000,
                 "episode_step": 2_400,
                 "episode_airborne_frames": 3,
+                "lean_episode_masked": False,
                 "termination_reason": None,
                 "truncation_reason": "progress_stalled",
             },
@@ -153,6 +157,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.step_rates["air_brake_used"].rate() == 0.5
     assert accumulator.step_rates["boost_used"].rate() == 0.5
     assert accumulator.step_rates["lean_used"].rate() == 0.5
+    assert accumulator.step_rates["lean_episode_masked"].rate() == 0.5
     assert accumulator.step_rates["spin_requested"].rate() == 0.5
     assert accumulator.step_rates["spin_started"].rate() == 0.5
     assert accumulator.step_rates["ko_star_reward_event"].rate() == 0.5
@@ -173,6 +178,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.airborne_episode_count == 2
     assert accumulator.airborne_finished_count == 1
     assert accumulator.airborne_failed_count == 1
+    assert accumulator.lean_masked_episode_count == 1
     assert accumulator.termination_counts["finished"] == 1
     assert accumulator.truncation_counts["progress_stalled"] == 1
 
@@ -191,6 +197,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["action/air_brake_used_step_rate"] == 0.5
     assert logger.records["action/boost_used_step_rate"] == 0.5
     assert logger.records["action/lean_used_step_rate"] == 0.5
+    assert logger.records["action/lean_episode_masked_step_rate"] == 0.5
     assert logger.records["action/spin_requested_step_rate"] == 0.5
     assert logger.records["action/spin_started_step_rate"] == 0.5
     assert logger.records["action/spin_macro_frame_ratio"] == 0.2
@@ -209,6 +216,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["episode/airborne_episode_rate"] == 1.0
     assert logger.records["episode/airborne_finish_rate"] == 0.5
     assert logger.records["episode/airborne_failure_rate"] == 0.5
+    assert logger.records["episode/lean_episode_masked_rate"] == 0.5
 
 
 def test_info_sequence_accepts_tuple_infos() -> None:

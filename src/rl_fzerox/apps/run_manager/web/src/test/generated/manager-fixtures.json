@@ -1244,6 +1244,7 @@
       "include_lean": true,
       "include_pitch": true,
       "include_spin": false,
+      "lean_episode_mask_probability": 0.0,
       "lean_initial_lockout_frames": 0,
       "lean_mode": "release_cooldown",
       "lean_output_mode": "three_way",

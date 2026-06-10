@@ -177,6 +177,9 @@ class EngineResetCoordinator:
     def reward_episode_seed(self, seed: int | None) -> int | None:
         return self._reset_seeds.reward_episode_seed(seed)
 
+    def action_episode_mask_seed(self, seed: int | None) -> int | None:
+        return self._reset_seeds.action_episode_mask_seed(seed)
+
     def advance_reset_count(self) -> None:
         self._reset_seeds.advance_reset_count()
 

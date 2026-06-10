@@ -26,6 +26,10 @@ def test_monitor_info_keys_exclude_step_only_action_rates() -> None:
     assert "boost_pad_entered" not in MONITOR_INFO_KEYS
 
 
+def test_monitor_info_keys_include_episode_action_masks() -> None:
+    assert "lean_episode_masked" in MONITOR_INFO_KEYS
+
+
 def test_monitor_info_keys_include_track_context_for_course_metrics() -> None:
     assert "track_id" in MONITOR_INFO_KEYS
     assert "track_course_id" in MONITOR_INFO_KEYS

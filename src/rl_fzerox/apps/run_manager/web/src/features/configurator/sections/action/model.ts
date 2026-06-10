@@ -213,15 +213,24 @@ function leanOutputSummary(action: ManagedActionConfig): string {
   if (!action.enable_lean) {
     return `${base} masked`;
   }
+  const leanEpisodeMaskProbability = action.lean_episode_mask_probability ?? 0;
+  const episodeMask =
+    leanEpisodeMaskProbability > 0
+      ? `, ${(leanEpisodeMaskProbability * 100).toFixed(0)}% episode mask`
+      : "";
   if (action.lean_output_mode === "independent_buttons") {
-    return action.lean_unmask_min_speed_kph === null
-      ? `${base}, fully free`
-      : `${base}, above ${action.lean_unmask_min_speed_kph} kph`;
+    const speedGate =
+      action.lean_unmask_min_speed_kph === null
+        ? `${base}, fully free`
+        : `${base}, above ${action.lean_unmask_min_speed_kph} kph`;
+    return `${speedGate}${episodeMask}`;
   }
   if (action.lean_output_mode === "four_way_categorical") {
-    return action.lean_mode === "raw" ? `${base}, raw` : `${base}, ${action.lean_mode}`;
+    const mode = action.lean_mode === "raw" ? `${base}, raw` : `${base}, ${action.lean_mode}`;
+    return `${mode}${episodeMask}`;
   }
-  return action.lean_mode === "raw" ? `${base}, raw` : `${base}, ${action.lean_mode}`;
+  const mode = action.lean_mode === "raw" ? `${base}, raw` : `${base}, ${action.lean_mode}`;
+  return `${mode}${episodeMask}`;
 }
 
 function pitchOutputSummary(action: ManagedActionConfig): string {

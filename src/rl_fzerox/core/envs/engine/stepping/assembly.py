@@ -207,6 +207,7 @@ class EngineStepAssembler:
         info["steer_level"] = steer_level
         info["lean_level"] = lean_level
         info["lean_request_level"] = requested_lean_level
+        info["lean_episode_masked"] = self.mask_controller.lean_episode_masked
         info["gas_used"] = gas_level > 0.0
         info["air_brake_used"] = air_brake_used
         info["boost_used"] = boost_used

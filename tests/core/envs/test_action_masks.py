@@ -306,6 +306,46 @@ def test_env_action_masks_disable_lean_below_speed_threshold() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 2 + 2 + 3))
 
 
+def test_env_action_masks_can_mask_lean_for_full_episode() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "boost",
+                "lean",
+                "spin",
+                lean_episode_mask_probability=1.0,
+            ),
+        ),
+    )
+
+    _, reset_info = env.reset(seed=1)
+
+    assert reset_info["lean_episode_masked"] is True
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 2) + ([True] * 2) + [True, False, False] + [True, False, False]
+    )
+
+    _, _, _, _, info = env.step(_discrete_gas_boost_lean_spin_action(lean_index=1, spin_index=1))
+
+    assert info["lean_episode_masked"] is True
+    assert info["spin_requested"] is False
+    assert not backend.last_race_control_state.lean_left
+    assert not backend.last_race_control_state.lean_right
+
+
 def test_env_action_masks_disable_spin_and_lean_during_native_spin_macro() -> None:
     backend = ScriptedStepBackend(
         [

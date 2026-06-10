@@ -34,6 +34,7 @@ _MONITOR_INFO_FIELDS: tuple[_MonitorInfoField, ...] = (
     _MonitorInfoField("boost_pad_entries", 0),
     _MonitorInfoField("boost_pad_entries_per_lap", None),
     _MonitorInfoField("episode_airborne_frames", 0),
+    _MonitorInfoField("lean_episode_masked", False),
     _MonitorInfoField("track_id", None),
     _MonitorInfoField("track_course_id", None),
     _MonitorInfoField("track_course_name", None),

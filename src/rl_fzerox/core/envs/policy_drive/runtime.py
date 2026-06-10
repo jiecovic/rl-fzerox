@@ -20,6 +20,7 @@ from rl_fzerox.core.envs.engine.controls import (
     apply_spin_semantics,
     sync_dynamic_action_masks,
 )
+from rl_fzerox.core.envs.engine.controls.episode_dropout import sample_episode_lean_mask
 from rl_fzerox.core.envs.engine.info import backend_step_info, set_curriculum_info, telemetry_info
 from rl_fzerox.core.envs.engine.stepping import (
     EnvStepRequest,
@@ -84,6 +85,11 @@ class PolicyDriveRuntime:
         self._episode.uses_custom_baseline = False
         self._backend.set_controller_state(ControllerState())
         self._control_state.reset()
+        self._episode.lean_episode_masked = sample_episode_lean_mask(
+            probability=self._action_config.lean_episode_mask_probability,
+            seed=seed,
+        )
+        self._mask_controller.set_lean_episode_masked(self._episode.lean_episode_masked)
         self._mask_controller.set_lean_allowed_values(
             self._control_state.lean_action_mask_override()
         )
@@ -121,6 +127,7 @@ class PolicyDriveRuntime:
         info["episode_step"] = self._episode.frame_count
         info["episode_return"] = self._episode.return_value
         info["episode_airborne_frames"] = self._episode.airborne_frames
+        info["lean_episode_masked"] = self._episode.lean_episode_masked
         image_observation = self._observation_builder.render_image()
         observation = self._observation_builder.build_observation(
             image=image_observation,

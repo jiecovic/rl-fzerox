@@ -23,6 +23,7 @@ class EngineEpisodeState:
     return_value: float = 0.0
     boost_pad_entries: int = 0
     airborne_frames: int = 0
+    lean_episode_masked: bool = False
     held_control_state: RaceControlState = field(default_factory=RaceControlState)
     last_requested_control_state: RaceControlState = field(default_factory=RaceControlState)
     last_gas_level: float = 0.0
@@ -42,6 +43,7 @@ class EngineEpisodeState:
         self.return_value = 0.0
         self.boost_pad_entries = 0
         self.airborne_frames = 0
+        self.lean_episode_masked = False
         self.held_control_state = RaceControlState()
         self.last_requested_control_state = RaceControlState()
         self.last_gas_level = 0.0

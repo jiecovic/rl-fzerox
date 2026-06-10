@@ -34,6 +34,7 @@ export function resetAuxiliaryBranchesAction({
     lean_mode: defaultAction.lean_mode,
     lean_unmask_min_speed_kph: defaultAction.lean_unmask_min_speed_kph,
     lean_initial_lockout_frames: defaultAction.lean_initial_lockout_frames,
+    lean_episode_mask_probability: defaultAction.lean_episode_mask_probability,
     include_spin: checkpointLocked ? action.include_spin : defaultAction.include_spin,
     enable_spin: checkpointLocked && action.include_spin ? true : defaultAction.enable_spin,
     spin_cooldown_frames: defaultAction.spin_cooldown_frames,

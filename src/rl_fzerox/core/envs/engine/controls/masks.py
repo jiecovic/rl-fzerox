@@ -41,6 +41,7 @@ class ActionMaskController:
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
     _spin_allowed_values: tuple[int, ...] | None = None
+    _lean_episode_masked: bool = False
     _speed_kph: float | None = None
     _airborne: bool | None = None
 
@@ -98,6 +99,7 @@ class ActionMaskController:
                 airborne=self._airborne,
                 lean_allowed_values=self._lean_allowed_values,
                 spin_allowed_values=self._spin_allowed_values,
+                lean_episode_masked=self._lean_episode_masked,
                 speed_kph=self._speed_kph,
                 lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
                 mask_air_brake_on_ground=self.mask_air_brake_on_ground,
@@ -159,6 +161,11 @@ class ActionMaskController:
 
         self._spin_allowed_values = values
 
+    def set_lean_episode_masked(self, masked: bool) -> None:
+        """Force lean and lean-backed spin neutral for the current episode."""
+
+        self._lean_episode_masked = bool(masked)
+
     def set_speed_kph(self, speed_kph: float | None) -> None:
         """Update the live speed used by dynamic speed-gated masks."""
 
@@ -198,6 +205,10 @@ class ActionMaskController:
         stage_gate = self.stage_boost_min_energy_fraction[self._stage_index]
         return float(default if stage_gate is None else stage_gate)
 
+    @property
+    def lean_episode_masked(self) -> bool:
+        return self._lean_episode_masked
+
 
 def _dynamic_action_mask_overrides(
     *,
@@ -205,6 +216,7 @@ def _dynamic_action_mask_overrides(
     airborne: bool | None = None,
     lean_allowed_values: tuple[int, ...] | None = None,
     spin_allowed_values: tuple[int, ...] | None = None,
+    lean_episode_masked: bool = False,
     speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
     mask_air_brake_on_ground: bool = True,
@@ -216,7 +228,7 @@ def _dynamic_action_mask_overrides(
     # In that case keep the branch open instead of masking boost prematurely.
     if boost_unlocked is False:
         overrides["boost"] = (0,)
-    lean_values = lean_allowed_values
+    lean_values = (0,) if lean_episode_masked else lean_allowed_values
     if lean_values is None:
         if (
             lean_unmask_min_speed_kph is not None
@@ -231,6 +243,8 @@ def _dynamic_action_mask_overrides(
             overrides["lean_right"] = (0,)
     if spin_allowed_values is not None:
         overrides["spin"] = spin_allowed_values
+    elif lean_episode_masked:
+        overrides["spin"] = (0,)
     if airborne is False and mask_air_brake_on_ground:
         overrides["air_brake"] = (0,)
     if airborne is False and mask_pitch_on_ground:

@@ -57,6 +57,7 @@ class ManagedActionConfig(BaseModel):
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0
+    lean_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
     include_spin: bool = False
     enable_spin: bool = True
     spin_cooldown_frames: NonNegativeInt = DEFAULT_SPIN_COOLDOWN_FRAMES

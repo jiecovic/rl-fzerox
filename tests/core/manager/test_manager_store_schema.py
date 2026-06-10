@@ -280,6 +280,7 @@ def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
     assert draft.config.action.lean_mode == "release_cooldown"
     assert draft.config.action.lean_unmask_min_speed_kph is None
     assert draft.config.action.lean_initial_lockout_frames == 0
+    assert draft.config.action.lean_episode_mask_probability == 0.0
     assert draft.config.action.include_pitch is True
     assert draft.config.action.enable_pitch is True
     assert draft.config.action.pitch_mode == "discrete"

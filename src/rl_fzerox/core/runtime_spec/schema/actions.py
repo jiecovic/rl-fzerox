@@ -158,6 +158,7 @@ class ActionRuntimeConfig:
     spin_cooldown_frames: int
     lean_unmask_min_speed_kph: float | None
     lean_initial_lockout_frames: int
+    lean_episode_mask_probability: float
     mask_pitch_on_ground: bool
     pitch_deadzone: float
     pitch_buckets: int
@@ -241,6 +242,7 @@ class ActionRuntimeConfig:
                 else float(config.lean_unmask_min_speed_kph)
             ),
             lean_initial_lockout_frames=int(config.lean_initial_lockout_frames),
+            lean_episode_mask_probability=float(config.lean_episode_mask_probability),
             mask_pitch_on_ground=bool(config.mask_pitch_on_ground),
             pitch_deadzone=float(config.pitch_deadzone),
             pitch_buckets=int(config.pitch_buckets),
@@ -277,6 +279,7 @@ class ActionConfig(BaseModel):
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0
+    lean_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
     mask_pitch_on_ground: bool = True
     pitch_deadzone: float = Field(default=0.1, ge=0.0, lt=1.0)
     pitch_buckets: int = Field(default=5, ge=3)

@@ -198,6 +198,7 @@ const actionConfigSchema = z
     lean_mode: leanModeSchema,
     lean_unmask_min_speed_kph: z.number().nonnegative().nullable(),
     lean_initial_lockout_frames: z.number().int().nonnegative(),
+    lean_episode_mask_probability: z.number().min(0).max(1).default(0),
     include_spin: z.boolean().default(false),
     enable_spin: z.boolean().default(false),
     spin_cooldown_frames: z.number().int().nonnegative(),

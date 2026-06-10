@@ -13,6 +13,7 @@ class EngineSeedDomains:
     reset_rng: int = 0xD6E8_2BC9_2A5F_1873
     reward_milestone_phase: int = 0xA409_3822_299F_31D0
     track_sampling: int = 0x35E7_40D8_FF53_42B1
+    action_episode_mask: int = 0x7403_BCE1_0F68_964A
 
 
 ENGINE_SEED_DOMAINS = EngineSeedDomains()
@@ -40,6 +41,9 @@ class EngineResetSeeds:
 
     def track_sampling_seed(self, seed: int | None) -> int | None:
         return self._derive(seed, ENGINE_SEED_DOMAINS.track_sampling)
+
+    def action_episode_mask_seed(self, seed: int | None) -> int | None:
+        return self._derive(seed, ENGINE_SEED_DOMAINS.action_episode_mask)
 
     def _derive(self, seed: int | None, domain: int) -> int | None:
         seed_base = seed if seed is not None else self.seed_base

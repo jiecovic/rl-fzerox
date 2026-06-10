@@ -309,6 +309,9 @@ export function LeanControlCard({
   metadata,
   updateAction,
 }: LeanControlCardProps) {
+  const leanEpisodeMaskProbability = action.lean_episode_mask_probability ?? 0;
+  const defaultLeanEpisodeMaskProbability = defaultAction.lean_episode_mask_probability ?? 0;
+
   return (
     <ActionCard
       description="Define the lean output shape, optional guards, and any post-processing."
@@ -375,7 +378,7 @@ export function LeanControlCard({
             and always bypass lean hold or cooldown assistance.
           </ActionNote>
         )}
-        <ActionTwoColumn>
+        <ActionTripleFields>
           <OptionalNumberField
             defaultValue={700}
             help="Optionally block lean below this vehicle speed."
@@ -393,7 +396,24 @@ export function LeanControlCard({
             value={action.lean_initial_lockout_frames}
             onChange={(value) => updateAction({ lean_initial_lockout_frames: value })}
           />
-        </ActionTwoColumn>
+          <RangeNumberField
+            help="At episode reset, sample this probability and force lean plus lean-backed spin neutral for the full episode."
+            label="Episode mask probability"
+            max={1}
+            min={0}
+            numberStep="0.01"
+            rangeStep={0.01}
+            resetValue={defaultLeanEpisodeMaskProbability}
+            ticks={[
+              { label: "0", value: 0 },
+              { label: "0.1", value: 0.1 },
+              { label: "0.5", value: 0.5 },
+              { label: "1", value: 1 },
+            ]}
+            value={leanEpisodeMaskProbability}
+            onChange={(value) => updateAction({ lean_episode_mask_probability: value })}
+          />
+        </ActionTripleFields>
       </ActionFieldset>
     </ActionCard>
   );
