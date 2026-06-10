@@ -1,4 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/RewardCurvePreview.tsx
+import { cn } from "@/shared/ui/cn";
+
 export interface RewardCurvePreviewPoint {
   label?: string;
   xValue: number;
@@ -6,6 +8,7 @@ export interface RewardCurvePreviewPoint {
 }
 
 interface RewardCurvePreviewProps {
+  className?: string;
   points: readonly RewardCurvePreviewPoint[];
   title: string;
   xAxisLabel: string;
@@ -14,6 +17,7 @@ interface RewardCurvePreviewProps {
 }
 
 export function RewardCurvePreview({
+  className,
   points,
   title,
   xAxisLabel,
@@ -59,7 +63,7 @@ export function RewardCurvePreview({
   const yTickPoints = visibleYTickPoints(plottedTickPoints, { yMax, yMin });
 
   return (
-    <div className="reward-curve-preview">
+    <div className={cn("reward-curve-preview", className)}>
       <div className="reward-curve-preview__header">
         <span>{title}</span>
         <span>

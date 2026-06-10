@@ -144,11 +144,11 @@ export function TrackActionPanels({
           updateAction({ pitch_deadzone: defaultConfig.action.pitch_deadzone });
         }}
       >
-        <div className="reward-action-stack">
-          <section className="reward-action-group">
-            <h4 className="reward-action-group__title">Manual boost</h4>
-            <div className="reward-action-boost-layout">
-              <div className="reward-action-boost-controls">
+        <div className="grid gap-4">
+          <section className={rewardActionGroupClass}>
+            <h4 className={rewardActionTitleClass}>Manual boost</h4>
+            <div className={rewardActionBoostLayoutClass}>
+              <div className={rewardActionFieldsClass}>
                 <NumberField
                   help="Reward added when the policy requests manual boost. With energy shaping enabled, this is the high-energy reward."
                   label="Boost request reward"
@@ -221,9 +221,9 @@ export function TrackActionPanels({
             </div>
           </section>
 
-          <section className="reward-action-group">
-            <h4 className="reward-action-group__title">Boost pads</h4>
-            <div className="reward-action-group__fields">
+          <section className={rewardActionGroupClass}>
+            <h4 className={rewardActionTitleClass}>Boost pads</h4>
+            <div className={rewardActionFieldsClass}>
               <NumberField
                 help="Reward for entering a detected boost pad."
                 label="Boost pad reward"
@@ -243,9 +243,9 @@ export function TrackActionPanels({
             </div>
           </section>
 
-          <section className="reward-action-group">
-            <h4 className="reward-action-group__title">Action penalties</h4>
-            <div className="reward-action-group__fields">
+          <section className={rewardActionGroupClass}>
+            <h4 className={rewardActionTitleClass}>Action penalties</h4>
+            <div className={rewardActionFieldsClass}>
               <NumberField
                 help="Per-step penalty for requesting air brake."
                 label="Air brake request penalty"
@@ -309,3 +309,11 @@ export function TrackActionPanels({
     </>
   );
 }
+
+const rewardActionGroupClass =
+  "grid min-w-0 gap-2.5 border-app-border border-t pt-3.5 first:border-t-0 first:pt-0";
+const rewardActionTitleClass = "m-0 text-[13px] font-bold text-app-text";
+const rewardActionFieldsClass =
+  "grid items-end gap-x-4 gap-y-3 grid-cols-[repeat(auto-fill,minmax(190px,240px))]";
+const rewardActionBoostLayoutClass =
+  "grid items-start gap-x-5 gap-y-4 grid-cols-[minmax(460px,0.9fr)_minmax(560px,1.1fr)] max-[1260px]:grid-cols-1";

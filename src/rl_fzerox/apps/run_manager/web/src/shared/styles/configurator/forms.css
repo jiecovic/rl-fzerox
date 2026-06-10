@@ -201,58 +201,11 @@
   grid-column: span 2;
 }
 
-.reward-action-stack {
-  display: grid;
-  gap: 16px;
-}
-
-.reward-action-group {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-}
-
-.reward-action-group:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.reward-action-group__title {
-  margin: 0;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.reward-action-group__fields,
-.reward-action-boost-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 240px));
-  align-items: end;
-  gap: 12px 16px;
-}
-
-.reward-action-boost-layout {
-  display: grid;
-  grid-template-columns: minmax(460px, 0.9fr) minmax(560px, 1.1fr);
-  align-items: start;
-  gap: 16px 20px;
-}
-
-@media (max-width: 1260px) {
-  .reward-action-boost-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
 .reward-curve-preview {
   display: grid;
   gap: 8px;
   width: 100%;
   box-sizing: border-box;
-  margin: 12px 0;
   padding: 10px 12px;
   border: 1px solid var(--border);
   background: var(--surface-muted);
@@ -306,10 +259,6 @@
   fill: var(--muted);
   font-size: 8px;
   font-weight: 700;
-}
-
-.reward-action-boost-layout .reward-curve-preview {
-  margin: 0;
 }
 
 .reward-accordion-stack .range-pair-field {

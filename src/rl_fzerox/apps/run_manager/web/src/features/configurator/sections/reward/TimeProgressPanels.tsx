@@ -161,6 +161,7 @@ export function TimeProgressPanels({
           />
         </div>
         <RewardCurvePreview
+          className="my-3"
           points={speedPreviewPoints.map((point) => ({
             label: point.label,
             xValue: point.speedKph,
