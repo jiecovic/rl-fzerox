@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 
 from rl_fzerox.core.domain.x_cup import (
     X_CUP_COURSE,
@@ -40,6 +42,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeState,
 )
 
+_LOG = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class XCupRotationUpdate:
@@ -71,10 +75,16 @@ class XCupRotationManager:
         run_paths: RunPaths,
         cache_root: Path | None = None,
         persist_manifest_on_commit: bool = True,
+        materialization_retry_delay_seconds: float = 60.0,
     ) -> None:
         self._config = config
         self._run_paths = run_paths
         self._persist_manifest_on_commit = persist_manifest_on_commit
+        self._materialization_retry_delay_seconds = max(
+            0.0,
+            float(materialization_retry_delay_seconds),
+        )
+        self._materialization_retry_after_by_course_key: dict[str, float] = {}
         self._cache_root = (
             BASELINE_MATERIALIZER_SETTINGS.cache_root
             if cache_root is None
@@ -103,9 +113,22 @@ class XCupRotationManager:
         )
         if eligible is None:
             return None
+        if self._materialization_retry_deferred(eligible.course_key):
+            return None
 
         old_entries = groups[eligible.course_key]
-        replacement_entries = self._materialized_replacement_entries(old_entries)
+        try:
+            replacement_entries = self._materialized_replacement_entries(old_entries)
+        except Exception:
+            self._defer_materialization_retry(eligible.course_key)
+            _LOG.warning(
+                "x cup rotation materialization failed for %s; "
+                "keeping existing baselines and retrying later",
+                eligible.course_key,
+                exc_info=True,
+            )
+            return None
+        self._materialization_retry_after_by_course_key.pop(eligible.course_key, None)
         entries = _replace_generated_x_cup_group_entries(
             track_sampling.entries,
             course_key=eligible.course_key,
@@ -139,6 +162,20 @@ class XCupRotationManager:
             generated_course_segment_count=replacement_entries[0].generated_course_segment_count,
             generated_course_length=replacement_entries[0].generated_course_length,
             materialized_artifacts=materialized_track_sampling_artifacts(next_track_sampling),
+        )
+
+    def _materialization_retry_deferred(self, course_key: str) -> bool:
+        retry_after = self._materialization_retry_after_by_course_key.get(course_key)
+        if retry_after is None:
+            return False
+        if monotonic() < retry_after:
+            return True
+        self._materialization_retry_after_by_course_key.pop(course_key, None)
+        return False
+
+    def _defer_materialization_retry(self, course_key: str) -> None:
+        self._materialization_retry_after_by_course_key[course_key] = (
+            monotonic() + self._materialization_retry_delay_seconds
         )
 
     def commit(self, update: XCupRotationUpdate) -> None:
