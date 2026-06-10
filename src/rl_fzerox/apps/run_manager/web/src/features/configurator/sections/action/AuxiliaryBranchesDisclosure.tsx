@@ -1,10 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/AuxiliaryBranchesDisclosure.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
 import { ActionAuxStack } from "@/features/configurator/sections/action/ActionLayout";
-import { BranchToggles } from "@/features/configurator/sections/action/auxiliary_branches/BranchToggles";
-import { resetAuxiliaryBranchesAction } from "@/features/configurator/sections/action/auxiliary_branches/model";
-import { RuntimeCards } from "@/features/configurator/sections/action/auxiliary_branches/RuntimeCards";
-import type { AuxiliaryBranchesDisclosureProps } from "@/features/configurator/sections/action/auxiliary_branches/types";
+import { BranchToggles } from "@/features/configurator/sections/action/branches/BranchToggles";
+import { resetAuxiliaryBranchesAction } from "@/features/configurator/sections/action/branches/model";
+import type { AuxiliaryBranchesDisclosureProps } from "@/features/configurator/sections/action/branches/types";
+import { RuntimeCards } from "@/features/configurator/sections/action/runtime/RuntimeCards";
 
 export function AuxiliaryBranchesDisclosure({
   checkpointLocked = false,

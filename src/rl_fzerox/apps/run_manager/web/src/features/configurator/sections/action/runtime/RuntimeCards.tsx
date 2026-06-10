@@ -1,22 +1,18 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/auxiliary_branches/RuntimeCards.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/runtime/RuntimeCards.tsx
 import { ActionRuntimeStack } from "@/features/configurator/sections/action/ActionLayout";
-import {
-  PitchControlCard,
-  SignedBiasBalanceCard,
-  SteeringGuardCard,
-} from "@/features/configurator/sections/action/auxiliary_branches/ActorRegularizationCards";
-import {
-  AirBrakeCard,
-  BoostGuardsCard,
-  LeanControlCard,
-  SpinControlCard,
-} from "@/features/configurator/sections/action/auxiliary_branches/RuntimeActionCards";
 import type {
   AuxiliaryActionConfig,
   UpdateAction,
   UpdatePolicy,
   UpdateTrain,
-} from "@/features/configurator/sections/action/auxiliary_branches/types";
+} from "@/features/configurator/sections/action/branches/types";
+import { PitchControlCard } from "@/features/configurator/sections/action/regularization/PitchControlCard";
+import { SignedBiasBalanceCard } from "@/features/configurator/sections/action/regularization/SignedBiasBalanceCard";
+import { SteeringGuardCard } from "@/features/configurator/sections/action/regularization/SteeringGuardCard";
+import { AirBrakeCard } from "@/features/configurator/sections/action/runtime/AirBrakeCard";
+import { BoostGuardsCard } from "@/features/configurator/sections/action/runtime/BoostGuardsCard";
+import { LeanControlCard } from "@/features/configurator/sections/action/runtime/LeanControlCard";
+import { SpinControlCard } from "@/features/configurator/sections/action/runtime/SpinControlCard";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 
 interface RuntimeCardsProps {

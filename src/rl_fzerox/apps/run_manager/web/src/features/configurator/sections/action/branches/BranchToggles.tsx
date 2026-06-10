@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/auxiliary_branches/BranchToggles.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/branches/BranchToggles.tsx
 
 import {
   ActionToggleGrid,
@@ -9,7 +9,7 @@ import { ActionToggleRow } from "@/features/configurator/sections/action/ActionT
 import type {
   AuxiliaryActionConfig,
   UpdateAction,
-} from "@/features/configurator/sections/action/auxiliary_branches/types";
+} from "@/features/configurator/sections/action/branches/types";
 import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 
 interface BranchTogglesProps {
