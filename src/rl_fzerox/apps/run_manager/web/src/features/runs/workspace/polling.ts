@@ -10,6 +10,7 @@ import type {
   ManagedRun,
   ManagedRunConfig,
   PolicyArchitecturePreview,
+  TrackSamplingRuntimeEntry,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
 import { useDocumentVisible } from "@/shared/browser/useDocumentVisible";
@@ -214,5 +215,53 @@ export function useRunTrackSamplingState(
 }
 
 function trackSamplingStateKey(runId: string, state: TrackSamplingRuntimeState | null) {
-  return `${runId}:${JSON.stringify(state)}`;
+  if (state === null) {
+    return `${runId}:none`;
+  }
+  return [
+    runId,
+    state.sampling_mode,
+    state.action_repeat,
+    state.update_episodes,
+    state.ema_alpha,
+    state.max_weight_scale,
+    state.adaptive_completion_weight,
+    state.adaptive_target_completion,
+    state.adaptive_min_confidence_episodes,
+    state.adaptive_confidence_scale,
+    state.update_count,
+    state.episodes_since_update,
+    ...state.entries.map(trackSamplingEntryKey),
+  ].join("\0");
+}
+
+function trackSamplingEntryKey(entry: TrackSamplingRuntimeEntry) {
+  return [
+    entry.track_id,
+    entry.course_key,
+    entry.label,
+    entry.current_weight,
+    entry.current_probability,
+    entry.episode_count,
+    entry.finished_episode_count,
+    entry.success_sample_count,
+    nullableNumberKey(entry.success_rate),
+    entry.generation_episode_count,
+    entry.generation_finished_episode_count,
+    entry.generation_success_sample_count,
+    nullableNumberKey(entry.generation_success_rate),
+    nullableNumberKey(entry.generation_ema_completion_fraction),
+    entry.target_step_share,
+    entry.completed_frames,
+    entry.completed_env_steps,
+    entry.step_share,
+    nullableNumberKey(entry.ema_episode_frames),
+    nullableNumberKey(entry.ema_completion_fraction),
+    nullableNumberKey(entry.generated_course_slot),
+    nullableNumberKey(entry.generated_course_generation),
+  ].join("\u0001");
+}
+
+function nullableNumberKey(value: number | null) {
+  return value === null ? "" : String(value);
 }

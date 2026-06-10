@@ -19,10 +19,28 @@ export function syncLayerRowIds(rowIds: string[], length: number, label: string)
 
 function sameLayerList<T>(left: T[], right: T[]) {
   return (
-    left.length === right.length && left.every((value, index) => deepEqual(value, right[index]))
+    left.length === right.length && left.every((value, index) => sameValue(value, right[index]))
   );
 }
 
-function deepEqual(left: unknown, right: unknown) {
-  return JSON.stringify(left) === JSON.stringify(right);
+function sameValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return sameLayerList(left, right);
+  }
+  if (!isRecord(left) || !isRecord(right)) {
+    return false;
+  }
+  const leftEntries = Object.entries(left);
+  const rightEntries = Object.entries(right);
+  if (leftEntries.length !== rightEntries.length) {
+    return false;
+  }
+  return leftEntries.every(([key, value]) => sameValue(value, right[key]));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
 }
