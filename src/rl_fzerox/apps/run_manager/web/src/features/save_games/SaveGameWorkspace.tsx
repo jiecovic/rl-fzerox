@@ -1,18 +1,20 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/save_games/SaveGameWorkspace.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { SaveGameSession } from "@/app/workspace/types";
+import { CreateSaveGameForm } from "@/features/save_games/CreateSaveGameForm";
 import {
   careerSaveHasStarted,
   nextUnlockTarget,
   summarizeSaveGameTargets,
-  titleizeIdentifier,
   unlockCompletionFraction,
 } from "@/features/save_games/model";
-import { ProgressMeter } from "@/features/save_games/ProgressMeter";
+import { RunnerControlPanel } from "@/features/save_games/RunnerControlPanel";
 import { parseAttemptSeed, randomAttemptSeedText } from "@/features/save_games/runnerSeed";
+import { SaveGameOverview } from "@/features/save_games/SaveGameOverview";
 import { UnlockPathPanel } from "@/features/save_games/UnlockPathPanel";
 import { resolveSavedCourseSetup } from "@/features/save_games/unlock_path/courseSetupModel";
+import { useSaveGameRunnerRefresh } from "@/features/save_games/useSaveGameRunnerRefresh";
 import type {
   ConfigMetadata,
   CourseSetupScope,
@@ -26,10 +28,8 @@ import type {
 } from "@/shared/api/contract";
 import { rendererNames } from "@/shared/api/renderers";
 import { Button } from "@/shared/ui/Button";
-import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { FloatingNotice } from "@/shared/ui/FloatingNotice";
-import { formatDate } from "@/shared/ui/format";
-import { CopyIcon, FolderIcon, PlayIcon, RandomizeIcon, RenameIcon } from "@/shared/ui/icons";
+import { FolderIcon, RenameIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
@@ -93,15 +93,7 @@ export function SaveGameWorkspace({
   const [updatingSaveGameId, setUpdatingSaveGameId] = useState<string | null>(null);
   const assignableRuns = useMemo(() => runs.filter((run) => run.status !== "created"), [runs]);
 
-  useEffect(() => {
-    if (saveGame === null || (!saveGame.runner_active && saveGame.status !== "running")) {
-      return undefined;
-    }
-    const intervalId = window.setInterval(() => {
-      void onRefresh();
-    }, 1500);
-    return () => window.clearInterval(intervalId);
-  }, [onRefresh, saveGame]);
+  useSaveGameRunnerRefresh({ onRefresh, saveGame });
 
   async function createSaveGame() {
     const name = session.nameText.trim();
@@ -386,36 +378,15 @@ export function SaveGameWorkspace({
         onStart={() => void startCareerMode(saveGame)}
       />
       <article className="grid content-start gap-5">
-        <section className="grid gap-5 border border-app-border bg-app-surface p-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="grid content-start gap-4">
-            <div className="grid gap-1">
-              <h3 className="m-0 text-lg font-bold text-app-text">Unlock progress</h3>
-              <p className="m-0 text-sm text-app-muted">
-                {targetSummary.succeeded.toLocaleString()} of {targetSummary.total.toLocaleString()}{" "}
-                targets complete
-              </p>
-            </div>
-            <ProgressMeter label={`${saveGame.name} progress`} value={completion} />
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StatusCard label="Targets" value={targetSummary.total.toLocaleString()} />
-              <StatusCard label="Status" value={titleizeIdentifier(saveGame.status)} />
-              <StatusCard label="Next target" value={nextTarget?.label ?? "none"} />
-              <StatusCard label="Runner" value={runnerLabel} />
-            </div>
-          </div>
-          <dl className="grid content-start gap-3 border border-app-border bg-app-surface-muted p-3 text-sm">
-            <DetailRow
-              copyLabel={copiedDetail === "id" ? "Copied" : "Copy save id"}
-              label="Save id"
-              value={saveGame.id}
-              monospace
-              onCopy={() => void copyDetail(saveGame.id, "id")}
-            />
-            <DetailRow label="Save path" value={saveGame.save_path} monospace />
-            <DetailRow label="Created" value={formatDate(saveGame.created_at)} />
-            <DetailRow label="Updated" value={formatDate(saveGame.updated_at)} />
-          </dl>
-        </section>
+        <SaveGameOverview
+          completion={completion}
+          copiedSaveId={copiedDetail === "id"}
+          nextTarget={nextTarget}
+          runnerLabel={runnerLabel}
+          saveGame={saveGame}
+          targetSummary={targetSummary}
+          onCopySaveId={() => void copyDetail(saveGame.id, "id")}
+        />
         <UnlockPathPanel
           assignableRuns={assignableRuns}
           metadata={metadata}
@@ -428,208 +399,5 @@ export function SaveGameWorkspace({
         />
       </article>
     </Panel>
-  );
-}
-
-function RunnerControlPanel({
-  attemptSeedText,
-  canStart,
-  onAttemptSeedChange,
-  onRandomizeAttemptSeed,
-  onPolicyModeChange,
-  onRunnerDeviceChange,
-  onRunnerRendererChange,
-  onStart,
-  policyMode,
-  rendererOptions,
-  runnerDevice,
-  runnerRenderer,
-  startLabel,
-  starting,
-  startNote,
-}: {
-  attemptSeedText: string;
-  canStart: boolean;
-  onAttemptSeedChange: (attemptSeedText: string) => void;
-  onRandomizeAttemptSeed: () => void;
-  onPolicyModeChange: (policyMode: PolicyPlaybackMode) => void;
-  onRunnerDeviceChange: (device: WatchDevice) => void;
-  onRunnerRendererChange: (renderer: WatchRenderer) => void;
-  onStart: () => void;
-  policyMode: PolicyPlaybackMode;
-  rendererOptions: readonly WatchRenderer[];
-  runnerDevice: WatchDevice;
-  runnerRenderer: WatchRenderer;
-  startLabel: string;
-  starting: boolean;
-  startNote: string;
-}) {
-  const disabled = startLabel === "Running" || starting;
-  return (
-    <div className="mb-5 grid gap-3 border border-app-border bg-app-surface px-3 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,48ch)] lg:items-end">
-      <div className="grid gap-2 md:grid-cols-[104px_140px_140px_minmax(180px,240px)_max-content] md:items-end">
-        <FieldShell>
-          <span>Device</span>
-          <FieldSelect
-            aria-label="Career Mode device"
-            disabled={disabled}
-            value={runnerDevice}
-            onChange={(event) => onRunnerDeviceChange(event.currentTarget.value as WatchDevice)}
-          >
-            <option value="cuda">cuda</option>
-            <option value="cpu">cpu</option>
-          </FieldSelect>
-        </FieldShell>
-        <FieldShell>
-          <span>Renderer</span>
-          <FieldSelect
-            aria-label="Career Mode renderer"
-            disabled={disabled}
-            value={runnerRenderer}
-            onChange={(event) => onRunnerRendererChange(event.currentTarget.value as WatchRenderer)}
-          >
-            {rendererOptions.map((renderer) => (
-              <option key={renderer} value={renderer}>
-                {renderer}
-              </option>
-            ))}
-          </FieldSelect>
-        </FieldShell>
-        <FieldShell>
-          <span>Mode</span>
-          <FieldSelect
-            aria-label="Career Mode initial policy mode"
-            disabled={disabled}
-            value={policyMode}
-            onChange={(event) =>
-              onPolicyModeChange(event.currentTarget.value as PolicyPlaybackMode)
-            }
-          >
-            <option value="deterministic">deterministic</option>
-            <option value="stochastic">stochastic</option>
-          </FieldSelect>
-        </FieldShell>
-        <FieldShell>
-          <span>Runtime seed</span>
-          <span className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <FieldInput
-              aria-label="Career Mode runtime seed"
-              disabled={disabled}
-              inputMode="numeric"
-              value={attemptSeedText}
-              onChange={(event) => onAttemptSeedChange(event.currentTarget.value)}
-            />
-            <TooltipIconButton
-              aria-label="Randomize runtime seed"
-              disabled={disabled}
-              tooltip="Randomize runtime seed"
-              onClick={onRandomizeAttemptSeed}
-            >
-              <RandomizeIcon />
-            </TooltipIconButton>
-          </span>
-        </FieldShell>
-        <Button
-          className="w-fit gap-2 px-5"
-          disabled={!canStart || starting}
-          type="button"
-          variant="primary"
-          onClick={onStart}
-        >
-          <PlayIcon />
-          <span>{starting ? "Opening" : startLabel}</span>
-        </Button>
-      </div>
-      <span className="text-xs text-app-muted lg:pb-3">{startNote}</span>
-    </div>
-  );
-}
-
-function CreateSaveGameForm({
-  error,
-  isCreating,
-  onCreateSaveGame,
-  onPatchSession,
-  session,
-}: {
-  error: string | null;
-  isCreating: boolean;
-  onCreateSaveGame: () => void;
-  onPatchSession: (
-    sessionId: SaveGameSession["sessionId"],
-    patch: Partial<Omit<SaveGameSession, "sessionId">>,
-  ) => void;
-  session: SaveGameSession;
-}) {
-  return (
-    <section className="grid gap-4 border border-app-border bg-app-surface p-5">
-      {error !== null ? <FloatingNotice tone="error">{error}</FloatingNotice> : null}
-      <div className="grid gap-4 md:grid-cols-[minmax(280px,1fr)_auto] md:items-end">
-        <FieldShell>
-          <span>Name</span>
-          <FieldInput
-            aria-label="Save game name"
-            value={session.nameText}
-            onChange={(event) =>
-              onPatchSession(session.sessionId, { nameText: event.currentTarget.value })
-            }
-          />
-        </FieldShell>
-        <Button disabled={isCreating} variant="primary" onClick={onCreateSaveGame}>
-          {isCreating ? "Creating" : "Create"}
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-function StatusCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 border border-app-border bg-app-surface-muted px-3 py-2">
-      <div className="text-xs font-bold tracking-[0.04em] text-app-muted uppercase">{label}</div>
-      <div className="mt-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-app-text">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function DetailRow({
-  copyLabel,
-  label,
-  monospace = false,
-  onCopy,
-  value,
-}: {
-  copyLabel?: string;
-  label: string;
-  monospace?: boolean;
-  onCopy?: () => void;
-  value: string;
-}) {
-  return (
-    <div className="grid gap-1">
-      <dt className="text-xs font-bold tracking-[0.04em] text-app-muted uppercase">{label}</dt>
-      <dd className="m-0 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <span
-          className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-app-text ${
-            monospace ? "font-mono text-xs" : ""
-          }`}
-          title={value}
-        >
-          {value}
-        </span>
-        {onCopy === undefined ? null : (
-          <TooltipIconButton
-            aria-label={copyLabel ?? `Copy ${label.toLowerCase()}`}
-            size="compact"
-            tooltip={copyLabel ?? `Copy ${label.toLowerCase()}`}
-            onClick={onCopy}
-          >
-            <CopyIcon />
-          </TooltipIconButton>
-        )}
-      </dd>
-    </div>
   );
 }
