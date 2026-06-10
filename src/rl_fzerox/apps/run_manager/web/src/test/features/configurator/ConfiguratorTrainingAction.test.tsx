@@ -179,10 +179,17 @@ describe("Configurator", () => {
       throw new Error("Missing entropy groups panel");
     }
 
-    const pitchEntropy = within(entropyPanel).getByRole("button", { name: "Pitch" });
+    const pitchGroup = within(entropyPanel).getByRole("region", {
+      name: "Pitch entropy group",
+    });
+    expect(within(pitchGroup).getByText("Effective coeff")).toBeInTheDocument();
+    expect(within(pitchGroup).getByText("1.00e-2")).toBeInTheDocument();
+
+    const pitchEntropy = within(pitchGroup).getByRole("button", { name: "Pitch" });
     expect(pitchEntropy).toHaveAttribute("aria-pressed", "true");
     await user.click(pitchEntropy);
     expect(pitchEntropy).toHaveAttribute("aria-pressed", "false");
+    expect(within(pitchGroup).getByText("0")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save draft" }));
 

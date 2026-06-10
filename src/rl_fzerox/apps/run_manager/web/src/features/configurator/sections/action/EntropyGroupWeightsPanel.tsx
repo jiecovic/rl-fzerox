@@ -63,8 +63,10 @@ export function EntropyGroupWeightsPanel({
           {groups.map((group) => {
             const weight = weightFor(group.key);
             const enabled = weight > 0;
+            const effectiveEntCoef = enabled ? train.ent_coef * weight : 0;
             return (
-              <div
+              <section
+                aria-label={`${group.label} entropy group`}
                 className="grid grid-cols-[minmax(0,1fr)_minmax(9ch,14ch)] items-end gap-3 border border-app-border bg-app-surface p-3"
                 key={group.key}
               >
@@ -83,7 +85,13 @@ export function EntropyGroupWeightsPanel({
                     onChange={(value) => updateGroupWeight(group.key, value)}
                   />
                 </fieldset>
-              </div>
+                <div className="col-span-2 flex items-baseline justify-between gap-3 border-app-border border-t pt-2 text-xs text-app-muted">
+                  <span>Effective coeff</span>
+                  <strong className="font-mono text-app-text">
+                    {formatEntropyCoefficient(effectiveEntCoef)}
+                  </strong>
+                </div>
+              </section>
             );
           })}
         </div>
@@ -109,6 +117,13 @@ function normalizedEntropyWeights(
     groups.map((group) => [group.key, Math.max(0, weights[group.key] ?? 0)]),
   );
   return Object.values(normalized).every((value) => value === 1) ? {} : normalized;
+}
+
+function formatEntropyCoefficient(value: number): string {
+  if (value === 0) {
+    return "0";
+  }
+  return value.toExponential(2);
 }
 
 function actionEntropyGroups(action: ManagedRunConfig["action"]): EntropyGroup[] {
