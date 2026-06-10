@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/useSaveGameRunnerRefresh.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/careerRunner/model/useSaveGameRunnerRefresh.ts
 import { useEffect } from "react";
 
 import type { ManagedSaveGame } from "@/shared/api/contract";

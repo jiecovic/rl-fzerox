@@ -1,7 +1,24 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/UnlockPathPanel.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/saveGameCourseSetup/ui/UnlockPathPanel.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
 import { formatUnlockTargetStatus, unlockTargetStatusClass } from "@/entities/saveGame/model";
+import type {
+  CourseSetupDraftMap,
+  CourseSetupScopeValues,
+  CupView,
+  PolicyArtifactDraft,
+} from "@/features/saveGameCourseSetup/model/courseSetup";
+import {
+  countDirtyCourseSetups,
+  courseSetupDraftsFromSavedSetups,
+  courseSetupKey,
+  cupsWithCourses,
+  dirtyCourseSetupDrafts,
+} from "@/features/saveGameCourseSetup/model/courseSetup";
+import {
+  CourseSetupPanel,
+  GlobalPolicyPanel,
+} from "@/features/saveGameCourseSetup/ui/CourseSetupPanels";
 import type {
   ConfigMetadata,
   CourseSetupScope,
@@ -10,23 +27,6 @@ import type {
   ManagedSaveUnlockTarget,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
-import {
-  CourseSetupPanel,
-  GlobalPolicyPanel,
-} from "@/widgets/saveGameWorkspace/unlock_path/courseSetup";
-import type {
-  CourseSetupDraftMap,
-  CourseSetupScopeValues,
-  CupView,
-  PolicyArtifactDraft,
-} from "@/widgets/saveGameWorkspace/unlock_path/courseSetupModel";
-import {
-  countDirtyCourseSetups,
-  courseSetupDraftsFromSavedSetups,
-  courseSetupKey,
-  cupsWithCourses,
-  dirtyCourseSetupDrafts,
-} from "@/widgets/saveGameWorkspace/unlock_path/courseSetupModel";
 
 interface UnlockPathPanelProps {
   assignableRuns: readonly ManagedRun[];

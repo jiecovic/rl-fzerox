@@ -8,6 +8,13 @@ import {
   summarizeSaveGameTargets,
   unlockCompletionFraction,
 } from "@/entities/saveGame/model";
+import { SaveGameOverview } from "@/entities/saveGame/ui/SaveGameOverview";
+import { parseAttemptSeed, randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
+import { useSaveGameRunnerRefresh } from "@/features/careerRunner/model/useSaveGameRunnerRefresh";
+import { RunnerControlPanel } from "@/features/careerRunner/ui/RunnerControlPanel";
+import { CreateSaveGameForm } from "@/features/createSaveGame/ui/CreateSaveGameForm";
+import { resolveSavedCourseSetup } from "@/features/saveGameCourseSetup/model/courseSetup";
+import { UnlockPathPanel } from "@/features/saveGameCourseSetup/ui/UnlockPathPanel";
 import type {
   ConfigMetadata,
   CourseSetupScope,
@@ -26,13 +33,6 @@ import { FolderIcon, RenameIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
-import { CreateSaveGameForm } from "@/widgets/saveGameWorkspace/CreateSaveGameForm";
-import { RunnerControlPanel } from "@/widgets/saveGameWorkspace/RunnerControlPanel";
-import { parseAttemptSeed, randomAttemptSeedText } from "@/widgets/saveGameWorkspace/runnerSeed";
-import { SaveGameOverview } from "@/widgets/saveGameWorkspace/SaveGameOverview";
-import { UnlockPathPanel } from "@/widgets/saveGameWorkspace/UnlockPathPanel";
-import { resolveSavedCourseSetup } from "@/widgets/saveGameWorkspace/unlock_path/courseSetupModel";
-import { useSaveGameRunnerRefresh } from "@/widgets/saveGameWorkspace/useSaveGameRunnerRefresh";
 
 interface SaveGameWorkspaceProps {
   metadata: ConfigMetadata | null;

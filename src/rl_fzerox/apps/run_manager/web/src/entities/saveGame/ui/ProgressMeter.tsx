@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/entities/saveGame/ProgressMeter.tsx
+// src/rl_fzerox/apps/run_manager/web/src/entities/saveGame/ui/ProgressMeter.tsx
 import { cn } from "@/shared/ui/cn";
 
 interface ProgressMeterProps {

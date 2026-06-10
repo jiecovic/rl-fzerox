@@ -1,21 +1,15 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/unlock_path/courseSetup.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/saveGameCourseSetup/ui/CourseSetupPanels.tsx
 import { useState } from "react";
 import { courseCardClass } from "@/entities/runConfig/ui/sections/tracks/coursePoolStyle";
 import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/entities/runConfig/ui/sections/tracks/TrackMinimap";
-import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
-import { Button } from "@/shared/ui/Button";
-import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
-import { IntegerTextInput } from "@/shared/ui/configFields";
-import { FieldSelect, FieldShell } from "@/shared/ui/Field";
-import { SaveDraftIcon } from "@/shared/ui/icons";
 import type {
   CourseSetupDraft,
   CourseSetupDraftMap,
   CourseSetupScopeValues,
   CupView,
   PolicyArtifactDraft,
-} from "@/widgets/saveGameWorkspace/unlock_path/courseSetupModel";
+} from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   courseSetupScopeValues,
   courseSetupsForCups,
@@ -24,7 +18,13 @@ import {
   exactCourseSetupDraft,
   preferredVehicleSetup,
   sharedCourseDraft,
-} from "@/widgets/saveGameWorkspace/unlock_path/courseSetupModel";
+} from "@/features/saveGameCourseSetup/model/courseSetup";
+import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
+import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
+import { IntegerTextInput } from "@/shared/ui/configFields";
+import { FieldSelect, FieldShell } from "@/shared/ui/Field";
+import { SaveDraftIcon } from "@/shared/ui/icons";
 
 export function GlobalPolicyPanel({
   assignableRuns,

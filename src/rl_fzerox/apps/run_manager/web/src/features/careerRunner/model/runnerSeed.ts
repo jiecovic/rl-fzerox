@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/runnerSeed.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/careerRunner/model/runnerSeed.ts
 export function parseAttemptSeed(value: string): string | "invalid" | null {
   const trimmed = value.trim();
   if (trimmed.length === 0) {

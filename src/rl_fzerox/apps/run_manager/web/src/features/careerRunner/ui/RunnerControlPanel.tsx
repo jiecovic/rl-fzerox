@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/RunnerControlPanel.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/careerRunner/ui/RunnerControlPanel.tsx
 import type { PolicyPlaybackMode, WatchDevice, WatchRenderer } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";

@@ -1,7 +1,7 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/SaveGameOverview.tsx
+// src/rl_fzerox/apps/run_manager/web/src/entities/saveGame/ui/SaveGameOverview.tsx
 import type { UnlockTargetSummary } from "@/entities/saveGame/model";
 import { titleizeIdentifier } from "@/entities/saveGame/model";
-import { ProgressMeter } from "@/entities/saveGame/ProgressMeter";
+import { ProgressMeter } from "@/entities/saveGame/ui/ProgressMeter";
 import type { ManagedSaveGame, ManagedSaveUnlockTarget } from "@/shared/api/contract";
 import { formatDate } from "@/shared/ui/format";
 import { CopyIcon } from "@/shared/ui/icons";

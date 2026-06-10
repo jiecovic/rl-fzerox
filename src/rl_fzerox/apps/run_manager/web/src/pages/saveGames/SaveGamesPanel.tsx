@@ -4,7 +4,7 @@ import {
   titleizeIdentifier,
   unlockCompletionFraction,
 } from "@/entities/saveGame/model";
-import { ProgressMeter } from "@/entities/saveGame/ProgressMeter";
+import { ProgressMeter } from "@/entities/saveGame/ui/ProgressMeter";
 import type { ManagedSaveGame } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { formatDate } from "@/shared/ui/format";

@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/unlock_path/courseSetupModel.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/saveGameCourseSetup/model/courseSetup.ts
 import type {
   ConfigMetadata,
   CourseSetupScope,

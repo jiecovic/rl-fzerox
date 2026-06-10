@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/CreateSaveGameForm.tsx
+// src/rl_fzerox/apps/run_manager/web/src/features/createSaveGame/ui/CreateSaveGameForm.tsx
 import type { SaveGameSession } from "@/app/workspace/types";
 import { Button } from "@/shared/ui/Button";
 import { FieldInput, FieldShell } from "@/shared/ui/Field";
