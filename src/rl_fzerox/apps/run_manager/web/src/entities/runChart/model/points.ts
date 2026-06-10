@@ -1,7 +1,7 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/model/points.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/model/points.ts
 
+import type { RunPlotPoint } from "@/entities/runChart/ui/RunPlotCard";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
-import type { RunPlotPoint } from "@/widgets/runCharts/charts/RunPlotCard";
 
 const metricPointsCache = new WeakMap<
   readonly ManagedRunMetricSample[],

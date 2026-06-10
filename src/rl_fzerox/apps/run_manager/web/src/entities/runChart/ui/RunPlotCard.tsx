@@ -1,14 +1,14 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/charts/RunPlotCard.tsx
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/ui/RunPlotCard.tsx
 import "uplot/dist/uPlot.min.css";
 
-import { ResetIcon } from "@/shared/ui/icons";
-import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 import type {
   RunPlotCardProps,
   RunPlotPoint,
   RunPlotSeries,
-} from "@/widgets/runCharts/charts/run_plot_card/types";
-import { useRunPlot } from "@/widgets/runCharts/charts/run_plot_card/usePlot";
+} from "@/entities/runChart/ui/runPlotCard/types";
+import { useRunPlot } from "@/entities/runChart/ui/runPlotCard/usePlot";
+import { ResetIcon } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 export type { RunPlotPoint, RunPlotSeries };
 

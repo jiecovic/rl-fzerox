@@ -1,12 +1,9 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/model/catalog.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/model/catalog.ts
 
+import { buildEnvStepRatePoints, metricPoints } from "@/entities/runChart/model/points";
+import type { RunChartDescriptor, RunChartGroup } from "@/entities/runChart/model/types";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
-import { buildEnvStepRatePoints, metricPoints } from "@/widgets/runCharts/chartsPanel/model/points";
-import type {
-  RunChartDescriptor,
-  RunChartGroup,
-} from "@/widgets/runCharts/chartsPanel/model/types";
 
 export const RUN_CHART_GROUPS = [
   { id: "progress", title: "Progress" },

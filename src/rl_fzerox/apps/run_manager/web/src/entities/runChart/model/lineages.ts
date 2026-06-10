@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/model/lineages.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/model/lineages.ts
 import type { ManagedRun } from "@/shared/api/contract";
 
 export type LineageInfo = {

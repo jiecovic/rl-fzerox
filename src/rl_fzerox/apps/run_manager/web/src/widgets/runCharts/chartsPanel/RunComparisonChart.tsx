@@ -1,12 +1,8 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/RunComparisonChart.tsx
 import { useMemo } from "react";
+import { chartSeriesColor, formatChartValue, latestPointValue } from "@/entities/runChart/model";
+import { RunPlotCard, type RunPlotPoint } from "@/entities/runChart/ui/RunPlotCard";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
-import { RunPlotCard, type RunPlotPoint } from "@/widgets/runCharts/charts/RunPlotCard";
-import {
-  chartSeriesColor,
-  formatChartValue,
-  latestPointValue,
-} from "@/widgets/runCharts/chartsPanel/model";
 
 interface RunComparisonChartProps {
   buildPoints: (run: ManagedRun, samples: ManagedRunMetricSample[]) => RunPlotPoint[];

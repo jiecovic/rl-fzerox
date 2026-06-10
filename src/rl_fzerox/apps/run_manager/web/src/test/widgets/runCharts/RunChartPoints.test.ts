@@ -1,8 +1,8 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/widgets/runCharts/RunChartPoints.test.ts
 import { describe, expect, it } from "vitest";
+import { buildEnvStepRatePoints, metricPoints } from "@/entities/runChart/model/points";
+import { plotSeriesKey } from "@/entities/runChart/ui/runPlotCard/model";
 import { runFixture, runMetricSampleFixture } from "@/test/fixtures";
-import { plotSeriesKey } from "@/widgets/runCharts/charts/run_plot_card/model";
-import { buildEnvStepRatePoints, metricPoints } from "@/widgets/runCharts/chartsPanel/model/points";
 
 describe("run chart points", () => {
   it("bridges a forked run back to its lineage offset", () => {

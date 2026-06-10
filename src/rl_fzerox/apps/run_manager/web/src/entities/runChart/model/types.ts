@@ -1,8 +1,8 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/model/types.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/model/types.ts
 
+import type { RunChartGroupId } from "@/entities/runChart/model/catalog";
+import type { RunPlotPoint } from "@/entities/runChart/ui/RunPlotCard";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
-import type { RunPlotPoint } from "@/widgets/runCharts/charts/RunPlotCard";
-import type { RunChartGroupId } from "@/widgets/runCharts/chartsPanel/model/catalog";
 
 export type RunChartDescriptor = {
   id: string;

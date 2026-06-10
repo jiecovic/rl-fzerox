@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/model/colors.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/model/colors.ts
 import type { ManagedRun } from "@/shared/api/contract";
 
 const RUN_CHART_SERIES_PALETTE = [

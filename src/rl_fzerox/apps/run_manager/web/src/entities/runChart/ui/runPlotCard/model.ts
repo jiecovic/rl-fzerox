@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/charts/run_plot_card/model.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/ui/runPlotCard/model.ts
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type UPlot from "uplot";
@@ -10,7 +10,7 @@ import type {
   TooltipState,
   UPlotConstructor,
   XRange,
-} from "@/widgets/runCharts/charts/run_plot_card/types";
+} from "@/entities/runChart/ui/runPlotCard/types";
 
 export const PLOT_HEIGHT = 204;
 const TOOLTIP_CHROME_HEIGHT = 34;

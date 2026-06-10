@@ -1,14 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/ChartsPanel.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RunMetricRangeMode } from "@/shared/api/client";
-import type { ManagedRun } from "@/shared/api/contract";
-import { Button } from "@/shared/ui/Button";
-import { ConfigDisclosure } from "@/shared/ui/config/ConfigDisclosure";
-import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
-import { usePersistentDisclosureMap } from "@/shared/ui/config/disclosureState";
-import { SegmentedChoiceStrip } from "@/shared/ui/configFields/choices";
-import { FieldSelect } from "@/shared/ui/Field";
-import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import {
   buildChartColorByRunId,
   buildChartGroups,
@@ -20,15 +11,24 @@ import {
   INITIAL_GROUP_OPEN,
   RUN_CHART_GROUPS,
   type RunChartGroupId,
-} from "@/widgets/runCharts/chartsPanel/model";
-import { RunChartLegend } from "@/widgets/runCharts/chartsPanel/RunChartLegend";
-import { RunChartSelectionPanel } from "@/widgets/runCharts/chartsPanel/RunChartSelectionPanel";
-import { RunComparisonChart } from "@/widgets/runCharts/chartsPanel/RunComparisonChart";
+} from "@/entities/runChart/model";
 import {
   readStoredSelectedRunIds,
   writeStoredSelectedRunIds,
-} from "@/widgets/runCharts/chartsPanel/storage";
-import { useRunChartMetrics } from "@/widgets/runCharts/chartsPanel/useRunChartMetrics";
+} from "@/features/runChartMetrics/model/storage";
+import { useRunChartMetrics } from "@/features/runChartMetrics/model/useRunChartMetrics";
+import type { RunMetricRangeMode } from "@/shared/api/client";
+import type { ManagedRun } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
+import { ConfigDisclosure } from "@/shared/ui/config/ConfigDisclosure";
+import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
+import { usePersistentDisclosureMap } from "@/shared/ui/config/disclosureState";
+import { SegmentedChoiceStrip } from "@/shared/ui/configFields/choices";
+import { FieldSelect } from "@/shared/ui/Field";
+import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
+import { RunChartLegend } from "@/widgets/runCharts/chartsPanel/RunChartLegend";
+import { RunChartSelectionPanel } from "@/widgets/runCharts/chartsPanel/RunChartSelectionPanel";
+import { RunComparisonChart } from "@/widgets/runCharts/chartsPanel/RunComparisonChart";
 
 interface ChartsPanelProps {
   focusedRunId?: string | null;

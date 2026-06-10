@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/charts/run_plot_card/usePlot.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/ui/runPlotCard/usePlot.ts
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type UPlot from "uplot";
@@ -12,13 +12,13 @@ import {
   PLOT_HEIGHT,
   plotSeriesKey,
   xRange,
-} from "@/widgets/runCharts/charts/run_plot_card/model";
+} from "@/entities/runChart/ui/runPlotCard/model";
 import type {
   RunPlotSeries,
   TooltipState,
   UPlotConstructor,
   XRange,
-} from "@/widgets/runCharts/charts/run_plot_card/types";
+} from "@/entities/runChart/ui/runPlotCard/types";
 
 export function useRunPlot({
   formatValue,

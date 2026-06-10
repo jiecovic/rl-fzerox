@@ -1,4 +1,4 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/model/index.ts
+// src/rl_fzerox/apps/run_manager/web/src/entities/runChart/model/index.ts
 
 export {
   buildChartGroups,
@@ -7,15 +7,15 @@ export {
   INITIAL_GROUP_OPEN,
   RUN_CHART_GROUPS,
   type RunChartGroupId,
-} from "@/widgets/runCharts/chartsPanel/model/catalog";
+} from "@/entities/runChart/model/catalog";
 export {
   buildChartColorByRunId,
   chartSeriesColor,
-} from "@/widgets/runCharts/chartsPanel/model/colors";
+} from "@/entities/runChart/model/colors";
 export {
   formatChartValue,
   latestPointValue,
-} from "@/widgets/runCharts/chartsPanel/model/format";
+} from "@/entities/runChart/model/format";
 export {
   buildLineageInfoById,
   buildLineageRunGroups,
@@ -24,8 +24,8 @@ export {
   type LineageRunGroup,
   type LineageSelectionState,
   lineageSelectionState,
-} from "@/widgets/runCharts/chartsPanel/model/lineages";
+} from "@/entities/runChart/model/lineages";
 export type {
   RunChartDescriptor,
   RunChartGroup,
-} from "@/widgets/runCharts/chartsPanel/model/types";
+} from "@/entities/runChart/model/types";

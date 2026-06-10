@@ -1,9 +1,9 @@
-// src/rl_fzerox/apps/run_manager/web/src/widgets/runCharts/chartsPanel/storage.ts
+// src/rl_fzerox/apps/run_manager/web/src/features/runChartMetrics/model/storage.ts
 
+import { defaultSelectedRunIds } from "@/entities/runChart/model";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import { getCachedRunMetrics } from "@/shared/api/client";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
-import { defaultSelectedRunIds } from "@/widgets/runCharts/chartsPanel/model";
 
 export const CHART_SELECTION_STORAGE_KEY = "run-chart-selected-runs";
 
