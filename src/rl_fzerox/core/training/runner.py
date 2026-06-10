@@ -5,6 +5,7 @@ from collections.abc import Callable, Sequence
 from operator import attrgetter
 
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
+from rl_fzerox.core.runtime_spec.x_cup_slots import generated_x_cup_slots_from_track_sampling
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import (
     continue_run_paths,
@@ -85,6 +86,13 @@ def run_training(
             if publish_artifacts is not None:
                 publish_artifacts(
                     materialized_track_sampling_artifacts(run_config.env.track_sampling)
+                )
+            publish_generated_slots = (
+                track_sampling_runtime_persistence.replace_generated_x_cup_slots
+            )
+            if publish_generated_slots is not None:
+                publish_generated_slots(
+                    generated_x_cup_slots_from_track_sampling(run_config.env.track_sampling)
                 )
         validate_training_baseline_state(run_config)
         _report_startup(

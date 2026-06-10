@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
     TrackSamplingMaterializedArtifact,
 )
@@ -29,6 +30,7 @@ class TrackSamplingRuntimePersistence:
     replace_materialized_artifacts: (
         Callable[[tuple[TrackSamplingMaterializedArtifact, ...]], None] | None
     ) = None
+    replace_generated_x_cup_slots: Callable[[tuple[GeneratedXCupSlot, ...]], None] | None = None
 
 
 def file_track_sampling_runtime_persistence(path: Path) -> TrackSamplingRuntimePersistence:

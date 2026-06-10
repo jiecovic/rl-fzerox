@@ -7,10 +7,7 @@ from rl_fzerox.apps.run_manager.worker.cli import _mark_worker_boot_failure
 from rl_fzerox.apps.run_manager.worker.config import _resolved_train_config
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
-from rl_fzerox.core.training.session.callbacks.track_sampling import (
-    TrackSamplingRuntimeEntry,
-    TrackSamplingRuntimeState,
-)
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 
 
 def test_worker_boot_failure_marks_run_failed_without_loading_config(tmp_path: Path) -> None:
@@ -67,40 +64,19 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
         managed_runs_root=tmp_path / "runs",
     )
     slot_key = generated_x_cup_slot_key(0)
-    store.upsert_run_track_sampling_state(
+    store.replace_run_generated_x_cup_slots(
         run_id=run.id,
-        state=TrackSamplingRuntimeState(
-            sampling_mode="adaptive_step_balanced",
-            action_repeat=config.action.action_repeat,
-            update_episodes=5,
-            ema_alpha=0.1,
-            max_weight_scale=5.0,
-            adaptive_completion_weight=0.35,
-            adaptive_target_completion=0.9,
-            adaptive_min_confidence_episodes=24,
-            adaptive_confidence_scale=4.0,
-            update_count=1,
-            episodes_since_update=0,
-            entries=(
-                TrackSamplingRuntimeEntry(
-                    track_id=slot_key,
-                    course_key=slot_key,
-                    label="X Cup rotated",
-                    base_weight=1.0,
-                    current_weight=1.0,
-                    completed_frames=100,
-                    episode_count=1,
-                    finished_episode_count=1,
-                    success_sample_count=1,
-                    ema_episode_frames=100.0,
-                    ema_completion_fraction=1.0,
-                    generated_course_slot=0,
-                    generated_course_generation=3,
-                    generated_course_id="x_cup_rotated",
-                    generated_course_name="X Cup rotated",
-                    generated_course_hash="rotated",
-                    generated_course_seed=99,
-                ),
+        slots=(
+            GeneratedXCupSlot(
+                course_key=slot_key,
+                slot=0,
+                generation=3,
+                course_id="x_cup_rotated",
+                course_name="X Cup rotated",
+                course_hash="rotated",
+                course_seed=99,
+                segment_count=None,
+                course_length=None,
             ),
         ),
     )
@@ -109,6 +85,7 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
 
     entry = train_config.env.track_sampling.entries[0]
     assert entry.generated_course_kind == X_CUP_COURSE.generated_kind
+    assert entry.id == "x_cup_rotated_gp_race_novice_blue_falcon"
     assert entry.runtime_course_key == slot_key
     assert entry.course_id == "x_cup_rotated"
     assert entry.course_name == "X Cup rotated"

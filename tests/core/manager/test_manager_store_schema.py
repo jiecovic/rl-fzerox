@@ -117,6 +117,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     save_game_columns = _table_columns(store, "save_games")
     save_attempt_columns = _table_columns(store, "save_game_attempts")
     course_setup_columns = _table_columns(store, "save_game_course_setups")
+    generated_slot_columns = _table_columns(store, "run_track_sampling_generated_slots")
 
     assert columns == {
         "id",
@@ -181,6 +182,19 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "vehicle_id",
         "engine_setting_raw_value",
         "created_at",
+        "updated_at",
+    }
+    assert generated_slot_columns == {
+        "run_id",
+        "slot",
+        "course_key",
+        "generation",
+        "course_id",
+        "course_name",
+        "course_hash",
+        "course_seed",
+        "segment_count",
+        "course_length",
         "updated_at",
     }
 

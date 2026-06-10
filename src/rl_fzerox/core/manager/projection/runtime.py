@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
-    restore_generated_x_cup_artifacts_from_state,
-    restore_generated_x_cup_entries_from_state,
+    restore_generated_x_cup_artifacts,
+    restore_generated_x_cup_entries_from_slots,
 )
 from rl_fzerox.core.manager.store import ManagerStore
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
@@ -18,13 +18,13 @@ def restore_managed_runtime_track_sampling(
 ) -> TrainAppConfig:
     """Apply manager-owned mutable track-sampling runtime state to a train config."""
 
-    restored = restore_generated_x_cup_entries_from_state(
+    restored = restore_generated_x_cup_entries_from_slots(
         config,
-        state=store.get_run_track_sampling_state(run_id),
+        slots=store.get_run_generated_x_cup_slots(run_id),
     )
     if not include_artifacts:
         return restored
-    return restore_generated_x_cup_artifacts_from_state(
+    return restore_generated_x_cup_artifacts(
         restored,
         artifacts=store.get_run_track_sampling_artifacts(run_id),
     )

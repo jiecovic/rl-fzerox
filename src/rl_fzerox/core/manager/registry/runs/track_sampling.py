@@ -10,9 +10,11 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from rl_fzerox.core.manager.db.models import (
     RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
+    RunTrackSamplingGeneratedSlotModel,
     RunTrackSamplingRuntimeModel,
 )
 from rl_fzerox.core.manager.registry.common import utc_now
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
     TrackSamplingMaterializedArtifact,
 )
@@ -34,6 +36,12 @@ def clear_run_track_sampling_state(store: ManagerStore, run_id: str) -> None:
             )
         ):
             session.delete(artifact)
+        for slot in session.scalars(
+            select(RunTrackSamplingGeneratedSlotModel).where(
+                RunTrackSamplingGeneratedSlotModel.run_id == run_id
+            )
+        ):
+            session.delete(slot)
         for entry in session.scalars(
             select(RunTrackSamplingEntryModel).where(RunTrackSamplingEntryModel.run_id == run_id)
         ):
@@ -162,6 +170,46 @@ def replace_run_track_sampling_artifacts(
         if not artifact_values:
             return
         session.execute(sqlite_insert(RunTrackSamplingArtifactModel).values(artifact_values))
+
+
+def get_run_generated_x_cup_slots(
+    store: ManagerStore,
+    run_id: str,
+) -> tuple[GeneratedXCupSlot, ...]:
+    store._ensure_schema_initialized()
+    with store._orm_session() as session:
+        slots = tuple(
+            session.scalars(
+                select(RunTrackSamplingGeneratedSlotModel)
+                .where(RunTrackSamplingGeneratedSlotModel.run_id == run_id)
+                .order_by(RunTrackSamplingGeneratedSlotModel.slot)
+            )
+        )
+    return tuple(_generated_x_cup_slot_from_model(slot) for slot in slots)
+
+
+def replace_run_generated_x_cup_slots(
+    store: ManagerStore,
+    *,
+    run_id: str,
+    slots: tuple[GeneratedXCupSlot, ...],
+    updated_at: str | None = None,
+) -> None:
+    store._ensure_schema_initialized()
+    saved_at = updated_at or utc_now()
+    with store._orm_session() as session:
+        session.execute(
+            delete(RunTrackSamplingGeneratedSlotModel).where(
+                RunTrackSamplingGeneratedSlotModel.run_id == run_id
+            )
+        )
+        slot_values = tuple(
+            _generated_x_cup_slot_values(run_id=run_id, slot=slot, updated_at=saved_at)
+            for slot in slots
+        )
+        if not slot_values:
+            return
+        session.execute(sqlite_insert(RunTrackSamplingGeneratedSlotModel).values(slot_values))
 
 
 def _runtime_values(
@@ -298,6 +346,43 @@ def _track_sampling_artifact_values(
         "generated_course_seed": _optional_seed_text(artifact.generated_course_seed),
         "generated_course_segment_count": artifact.generated_course_segment_count,
         "generated_course_length": artifact.generated_course_length,
+    }
+
+
+def _generated_x_cup_slot_from_model(
+    slot: RunTrackSamplingGeneratedSlotModel,
+) -> GeneratedXCupSlot:
+    return GeneratedXCupSlot(
+        course_key=slot.course_key,
+        slot=slot.slot,
+        generation=slot.generation,
+        course_id=slot.course_id,
+        course_name=slot.course_name,
+        course_hash=slot.course_hash,
+        course_seed=int(slot.course_seed),
+        segment_count=slot.segment_count,
+        course_length=slot.course_length,
+    )
+
+
+def _generated_x_cup_slot_values(
+    *,
+    run_id: str,
+    slot: GeneratedXCupSlot,
+    updated_at: str,
+) -> dict[str, object]:
+    return {
+        "run_id": run_id,
+        "slot": slot.slot,
+        "course_key": slot.course_key,
+        "generation": slot.generation,
+        "course_id": slot.course_id,
+        "course_name": slot.course_name,
+        "course_hash": slot.course_hash,
+        "course_seed": _optional_seed_text(slot.course_seed),
+        "segment_count": slot.segment_count,
+        "course_length": slot.course_length,
+        "updated_at": updated_at,
     }
 
 

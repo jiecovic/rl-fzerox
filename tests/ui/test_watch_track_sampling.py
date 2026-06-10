@@ -15,10 +15,9 @@ from rl_fzerox.core.runtime_spec.schema import (
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingMaterializedArtifact,
-    TrackSamplingRuntimeEntry,
-    TrackSamplingRuntimeState,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import reset_variant_key
 from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
@@ -43,7 +42,7 @@ def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
         run_id=run.id,
         artifacts=(_x_cup_artifact(baseline_path),),
     )
-    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    _write_x_cup_slot_state(store, run.id)
 
     refresh = ManagedTrackSamplingRefresh.from_config(
         WatchAppConfig(
@@ -86,7 +85,7 @@ def test_managed_watch_track_sampling_refresh_ignores_unchanged_slots(tmp_path: 
     baseline_path = tmp_path / "baselines" / "x_cup_old.state"
     baseline_path.parent.mkdir(parents=True)
     baseline_path.touch()
-    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    _write_x_cup_slot_state(store, run.id)
     config = _track_sampling_config(
         entry_id="x_cup_new",
         course_id="x_cup_new",
@@ -125,7 +124,7 @@ def test_managed_watch_track_sampling_refresh_waits_for_run_local_baseline_artif
     run.run_dir.mkdir(parents=True, exist_ok=True)
     old_baseline_path = tmp_path / "old.state"
     old_baseline_path.write_bytes(b"old")
-    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    _write_x_cup_slot_state(store, run.id)
     config = _track_sampling_config(baseline_path=old_baseline_path)
     refresh = ManagedTrackSamplingRefresh.from_config(
         WatchAppConfig(
@@ -160,7 +159,7 @@ def test_managed_watch_track_sampling_refresh_remembers_blocked_state_between_ch
     run.run_dir.mkdir(parents=True, exist_ok=True)
     old_baseline_path = tmp_path / "old.state"
     old_baseline_path.write_bytes(b"old")
-    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    _write_x_cup_slot_state(store, run.id)
     config = _track_sampling_config(baseline_path=old_baseline_path)
     refresh = ManagedTrackSamplingRefresh.from_config(
         WatchAppConfig(
@@ -180,7 +179,7 @@ def test_managed_watch_track_sampling_refresh_remembers_blocked_state_between_ch
     def fail_store_read(_run_id: str) -> None:
         raise AssertionError("blocked watch refresh should wait for the next interval")
 
-    monkeypatch.setattr(refresh.store, "get_run_track_sampling_state", fail_store_read)
+    monkeypatch.setattr(refresh.store, "get_run_generated_x_cup_slots", fail_store_read)
 
     status = refresh.refresh_status(config, force=False)
 
@@ -208,7 +207,7 @@ def test_managed_watch_track_sampling_refresh_repairs_missing_current_baseline(
         run_id=run.id,
         artifacts=(_x_cup_artifact(baseline_path),),
     )
-    store.upsert_run_track_sampling_state(run_id=run.id, state=_runtime_state())
+    _write_x_cup_slot_state(store, run.id)
     config = _track_sampling_config(
         entry_id="x_cup_new",
         course_id="x_cup_new",
@@ -279,38 +278,20 @@ def _managed_x_cup_run_config():
     return config
 
 
-def _runtime_state() -> TrackSamplingRuntimeState:
-    return TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
-        action_repeat=1,
-        update_episodes=5,
-        ema_alpha=0.3,
-        max_weight_scale=10.0,
-        adaptive_completion_weight=0.9,
-        adaptive_target_completion=0.5,
-        adaptive_min_confidence_episodes=24,
-        adaptive_confidence_scale=4.0,
-        update_count=1,
-        episodes_since_update=0,
-        entries=(
-            TrackSamplingRuntimeEntry(
-                track_id="x_cup_slot_1",
+def _write_x_cup_slot_state(store: ManagerStore, run_id: str) -> None:
+    store.replace_run_generated_x_cup_slots(
+        run_id=run_id,
+        slots=(
+            GeneratedXCupSlot(
                 course_key="x_cup_slot_1",
-                label="X Cup new",
-                base_weight=1.0,
-                current_weight=1.0,
-                completed_frames=0,
-                episode_count=0,
-                finished_episode_count=0,
-                success_sample_count=0,
-                ema_episode_frames=None,
-                ema_completion_fraction=None,
-                generated_course_slot=0,
-                generated_course_generation=3,
-                generated_course_id="x_cup_new",
-                generated_course_name="X Cup new",
-                generated_course_hash="newhash",
-                generated_course_seed=1234,
+                slot=0,
+                generation=3,
+                course_id="x_cup_new",
+                course_name="X Cup new",
+                course_hash="newhash",
+                course_seed=1234,
+                segment_count=None,
+                course_length=None,
             ),
         ),
     )

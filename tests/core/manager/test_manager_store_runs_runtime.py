@@ -14,6 +14,7 @@ from rl_fzerox.core.manager import (
     default_managed_run_config,
     new_managed_run_id,
 )
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
@@ -208,6 +209,55 @@ def test_manager_store_replaces_track_sampling_artifact_rows(tmp_path: Path) -> 
     store.clear_run_track_sampling_state(run.id)
 
     assert store.get_run_track_sampling_artifacts(run.id) == ()
+
+
+def test_manager_store_replaces_generated_x_cup_slot_rows(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Generated Slot State Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    first_slot = GeneratedXCupSlot(
+        course_key="x_cup_slot_1",
+        slot=1,
+        generation=3,
+        course_id="x_cup_1234abcd",
+        course_name="X Cup 1234abcd",
+        course_hash="1234abcd",
+        course_seed=1234,
+        segment_count=38,
+        course_length=61_743.98046875,
+    )
+    second_slot = GeneratedXCupSlot(
+        course_key="x_cup_slot_2",
+        slot=2,
+        generation=1,
+        course_id="x_cup_abcd1234",
+        course_name="X Cup abcd1234",
+        course_hash="abcd1234",
+        course_seed=5678,
+        segment_count=None,
+        course_length=None,
+    )
+
+    store.replace_run_generated_x_cup_slots(
+        run_id=run.id,
+        slots=(second_slot, first_slot),
+    )
+
+    assert ManagerStore(store.db_path).get_run_generated_x_cup_slots(run.id) == (
+        first_slot,
+        second_slot,
+    )
+
+    store.replace_run_generated_x_cup_slots(run_id=run.id, slots=(second_slot,))
+
+    assert store.get_run_generated_x_cup_slots(run.id) == (second_slot,)
+
+    store.clear_run_track_sampling_state(run.id)
+
+    assert store.get_run_generated_x_cup_slots(run.id) == ()
 
 
 def test_manager_store_updates_track_sampling_rows_incrementally(tmp_path: Path) -> None:

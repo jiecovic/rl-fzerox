@@ -28,6 +28,7 @@ from rl_fzerox.core.manager.db.models.save_games import (
 from rl_fzerox.core.manager.db.models.track_sampling import (
     RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
+    RunTrackSamplingGeneratedSlotModel,
     RunTrackSamplingRuntimeModel,
 )
 
@@ -44,6 +45,7 @@ __all__ = [
     "RunTemplateModel",
     "RunTrackSamplingArtifactModel",
     "RunTrackSamplingEntryModel",
+    "RunTrackSamplingGeneratedSlotModel",
     "RunTrackSamplingRuntimeModel",
     "RunWorkerModel",
     "SaveGameAttemptModel",

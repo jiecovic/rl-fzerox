@@ -23,6 +23,10 @@ from rl_fzerox.core.runtime_spec.schema import (
     XCupRotationConfig,
 )
 from rl_fzerox.core.runtime_spec.track_sampling_identity import track_sampling_entry_id
+from rl_fzerox.core.runtime_spec.x_cup_slots import (
+    GeneratedXCupSlot,
+    generated_x_cup_slots_from_track_sampling,
+)
 from rl_fzerox.core.training.runs import RunPaths, save_train_run_config
 from rl_fzerox.core.training.runs.baseline_materializer import (
     BASELINE_MATERIALIZER_SETTINGS,
@@ -63,6 +67,7 @@ class XCupRotationUpdate:
     generated_course_segment_count: int | None
     generated_course_length: float | None
     materialized_artifacts: tuple[TrackSamplingMaterializedArtifact, ...]
+    generated_x_cup_slots: tuple[GeneratedXCupSlot, ...]
 
 
 class XCupRotationManager:
@@ -89,6 +94,9 @@ class XCupRotationManager:
             BASELINE_MATERIALIZER_SETTINGS.cache_root
             if cache_root is None
             else cache_root.expanduser().resolve()
+        )
+        self._slots_by_index = _slots_by_index(
+            generated_x_cup_slots_from_track_sampling(config.env.track_sampling)
         )
 
     def rotate_once(
@@ -145,6 +153,7 @@ class XCupRotationManager:
         next_track_sampling = track_sampling.model_copy(update={"entries": entries})
         next_env_config = env_config.model_copy(update={"track_sampling": next_track_sampling})
         next_train_config = self._config.model_copy(update={"env": next_env_config})
+        generated_slots = generated_x_cup_slots_from_track_sampling(next_track_sampling)
         return XCupRotationUpdate(
             env_config=next_env_config,
             train_config=next_train_config,
@@ -162,6 +171,7 @@ class XCupRotationManager:
             generated_course_segment_count=replacement_entries[0].generated_course_segment_count,
             generated_course_length=replacement_entries[0].generated_course_length,
             materialized_artifacts=materialized_track_sampling_artifacts(next_track_sampling),
+            generated_x_cup_slots=generated_slots,
         )
 
     def _materialization_retry_deferred(self, course_key: str) -> bool:
@@ -182,6 +192,7 @@ class XCupRotationManager:
         """Persist one successful env replacement and prune inactive states."""
 
         self._config = update.train_config
+        self._slots_by_index = _slots_by_index(update.generated_x_cup_slots)
         if self._persist_manifest_on_commit:
             save_train_run_config(config=update.train_config, run_dir=self._run_paths.run_dir)
         self._prune_inactive_x_cup_baselines(
@@ -194,7 +205,7 @@ class XCupRotationManager:
         old_entries: Sequence[TrackSamplingEntryConfig],
     ) -> tuple[TrackSamplingEntryConfig, ...]:
         slot = _required_single_slot(old_entries)
-        generation = _next_generation(old_entries)
+        generation = self._next_generation(slot=slot, old_entries=old_entries)
         identity = generated_x_cup_course_identity(
             master_seed=self._config.seed,
             slot=slot,
@@ -204,6 +215,17 @@ class XCupRotationManager:
             self._materialize_entry(_replacement_entry(old_entry, identity_course=identity))
             for old_entry in old_entries
         )
+
+    def _next_generation(
+        self,
+        *,
+        slot: int,
+        old_entries: Sequence[TrackSamplingEntryConfig],
+    ) -> int:
+        current_slot = self._slots_by_index.get(slot)
+        if current_slot is not None:
+            return current_slot.generation + 1
+        return _next_generation_from_entries(old_entries)
 
     def _materialize_entry(
         self,
@@ -406,7 +428,11 @@ def _single_slot(entries: Sequence[TrackSamplingEntryConfig]) -> int | None:
     return None if slot is None else int(slot)
 
 
-def _next_generation(entries: Sequence[TrackSamplingEntryConfig]) -> int:
+def _slots_by_index(slots: Sequence[GeneratedXCupSlot]) -> dict[int, GeneratedXCupSlot]:
+    return {slot.slot: slot for slot in slots}
+
+
+def _next_generation_from_entries(entries: Sequence[TrackSamplingEntryConfig]) -> int:
     generations = [
         int(entry.generated_course_generation)
         for entry in entries

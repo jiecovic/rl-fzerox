@@ -20,6 +20,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainAppConfig,
     TrainConfig,
 )
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training import runner
 from rl_fzerox.core.training.runs import RUN_LAYOUT, build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import (
@@ -459,10 +460,12 @@ def test_run_training_publishes_initial_track_sampling_artifacts(
     env = _RunTrainingEnv()
     model = _RunTrainingModel(num_timesteps=900)
     captured_artifacts: list[tuple[TrackSamplingMaterializedArtifact, ...]] = []
+    captured_slots: list[tuple[GeneratedXCupSlot, ...]] = []
     persistence = TrackSamplingRuntimePersistence(
         load=lambda: None,
         save=lambda _: None,
         replace_materialized_artifacts=captured_artifacts.append,
+        replace_generated_x_cup_slots=captured_slots.append,
     )
     _stub_run_training_dependencies(monkeypatch, config=config, env=env, model=model)
     monkeypatch.setattr(runner, "_learn_model", lambda **_: None)
@@ -472,3 +475,18 @@ def test_run_training_publishes_initial_track_sampling_artifacts(
     assert captured_artifacts
     assert captured_artifacts[0][0].course_key == "x_cup_slot_1"
     assert captured_artifacts[0][0].baseline_state_path == baseline_path.resolve()
+    assert captured_slots == [
+        (
+            GeneratedXCupSlot(
+                course_key="x_cup_slot_1",
+                slot=1,
+                generation=2,
+                course_id="x_cup_abcd1234",
+                course_name="X Cup abcd1234",
+                course_hash="abcd1234",
+                course_seed=1234,
+                segment_count=None,
+                course_length=None,
+            ),
+        ),
+    ]

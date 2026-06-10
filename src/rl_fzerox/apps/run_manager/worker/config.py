@@ -34,6 +34,11 @@ def _track_sampling_runtime_persistence(
                 artifacts=artifacts,
             )
         ),
+        replace_generated_x_cup_slots=lambda slots: store.replace_run_generated_x_cup_slots(
+            run_id=run_id,
+            slots=slots,
+            updated_at=now_iso(),
+        ),
     )
 
 

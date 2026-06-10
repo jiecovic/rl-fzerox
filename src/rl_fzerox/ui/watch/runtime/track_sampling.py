@@ -10,7 +10,7 @@ from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
     restore_generated_x_cup_track_sampling_artifacts,
-    restore_generated_x_cup_track_sampling_from_state,
+    restore_generated_x_cup_track_sampling_from_slots,
 )
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackSamplingEntryConfig
@@ -68,10 +68,10 @@ class ManagedTrackSamplingRefresh:
                 ready_for_reset=self._last_blocked_signature is None,
             )
         self._last_check_monotonic = time.monotonic()
-        state = self.store.get_run_track_sampling_state(self.run_id)
-        projected_config = restore_generated_x_cup_track_sampling_from_state(
+        slots = self.store.get_run_generated_x_cup_slots(self.run_id)
+        projected_config = restore_generated_x_cup_track_sampling_from_slots(
             current_config,
-            state=state,
+            slots=slots,
         )
         projected_signature = _generated_x_cup_signature(projected_config)
         has_materialized_x_cup_entries = not unmaterialized_generated_x_cup_entries(current_config)

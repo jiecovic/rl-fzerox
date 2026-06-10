@@ -8,7 +8,7 @@ from pytest import MonkeyPatch
 
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
-    restore_generated_x_cup_entries_from_state,
+    restore_generated_x_cup_entries_from_slots,
 )
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
@@ -20,6 +20,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainConfig,
     XCupRotationConfig,
 )
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.runs import (
     build_run_paths,
     continue_run_paths,
@@ -33,10 +34,6 @@ from rl_fzerox.core.training.runs.baseline_materializer.settings import (
     BASELINE_MATERIALIZER_SETTINGS,
 )
 from rl_fzerox.core.training.runs.race_start.x_cup import XCupMaterializedCourse
-from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
-    TrackSamplingRuntimeEntry,
-    TrackSamplingRuntimeState,
-)
 from tests.core.training.training_artifacts_support import (
     _required_baseline_path,
 )
@@ -140,7 +137,7 @@ def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
     assert metadata["x_cup_generation"] == 2
 
 
-def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
+def test_generated_slot_state_restores_rotated_x_cup_entries_for_managed_continue(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -228,42 +225,17 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="x-cup-continue"),
     )
-    runtime_state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
-        action_repeat=2,
-        update_episodes=5,
-        ema_alpha=0.1,
-        max_weight_scale=5.0,
-        adaptive_completion_weight=0.35,
-        adaptive_target_completion=0.9,
-        adaptive_min_confidence_episodes=24,
-        adaptive_confidence_scale=4.0,
-        update_count=1,
-        episodes_since_update=0,
-        entries=(
-            TrackSamplingRuntimeEntry(
-                track_id=generated_x_cup_slot_key(0),
-                course_key=generated_x_cup_slot_key(0),
-                label="X Cup rotated",
-                base_weight=1.0,
-                current_weight=1.0,
-                completed_frames=100,
-                episode_count=1,
-                finished_episode_count=1,
-                success_sample_count=1,
-                ema_episode_frames=100.0,
-                ema_completion_fraction=1.0,
-                generation_episode_count=1,
-                generation_finished_episode_count=1,
-                generation_success_sample_count=1,
-                generation_ema_completion_fraction=1.0,
-                generated_course_slot=0,
-                generated_course_generation=3,
-                generated_course_id="x_cup_rotated",
-                generated_course_name="X Cup rotated",
-                generated_course_hash="rotated",
-                generated_course_seed=99,
-            ),
+    slots = (
+        GeneratedXCupSlot(
+            course_key=generated_x_cup_slot_key(0),
+            slot=0,
+            generation=3,
+            course_id="x_cup_rotated",
+            course_name="X Cup rotated",
+            course_hash="rotated",
+            course_seed=99,
+            segment_count=None,
+            course_length=None,
         ),
     )
 
@@ -295,9 +267,9 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
             )
         }
     )
-    restored_config = restore_generated_x_cup_entries_from_state(
+    restored_config = restore_generated_x_cup_entries_from_slots(
         projected_config,
-        state=runtime_state,
+        slots=slots,
     )
 
     materialized = materialize_train_run_config(
@@ -307,6 +279,7 @@ def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
     )
 
     entry = materialized.env.track_sampling.entries[0]
+    assert entry.id == "x_cup_rotated_gp_race_novice_blue_falcon"
     assert entry.course_id == "x_cup_rotated"
     assert entry.generated_course_generation == 3
     baseline_state_path = _required_baseline_path(entry)

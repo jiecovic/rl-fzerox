@@ -9,6 +9,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainAppConfig,
     TrainConfig,
 )
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
     current_policy_artifact_metadata,
@@ -302,6 +303,7 @@ def build_callbacks(
                 weights = self._controller.current_weights()
                 self.training_env.env_method("set_track_sampling_weights", weights)
                 self._save_materialized_artifacts(rotation_update.materialized_artifacts)
+                self._save_generated_x_cup_slots(rotation_update.generated_x_cup_slots)
                 if rotation_manager is not None:
                     rotation_manager.commit(rotation_update)
                 self._save_runtime_state()
@@ -330,6 +332,14 @@ def build_callbacks(
             persist = self._runtime_persistence.replace_materialized_artifacts
             if persist is not None:
                 persist(artifacts)
+
+        def _save_generated_x_cup_slots(
+            self,
+            slots: tuple[GeneratedXCupSlot, ...],
+        ) -> None:
+            persist = self._runtime_persistence.replace_generated_x_cup_slots
+            if persist is not None:
+                persist(slots)
 
     class DeficitBudgetTrackSamplingCallback(BaseCallback):
         """Schedule reset queues from deterministic per-course step deficits."""
@@ -435,6 +445,7 @@ def build_callbacks(
                 )
             )
             self._save_materialized_artifacts(rotation_update.materialized_artifacts)
+            self._save_generated_x_cup_slots(rotation_update.generated_x_cup_slots)
             if rotation_manager is not None:
                 rotation_manager.commit(rotation_update)
             self._save_runtime_state()
@@ -473,6 +484,14 @@ def build_callbacks(
             persist = self._runtime_persistence.replace_materialized_artifacts
             if persist is not None:
                 persist(artifacts)
+
+        def _save_generated_x_cup_slots(
+            self,
+            slots: tuple[GeneratedXCupSlot, ...],
+        ) -> None:
+            persist = self._runtime_persistence.replace_generated_x_cup_slots
+            if persist is not None:
+                persist(slots)
 
     checkpoint_policy = resolve_checkpoint_policy(train_config)
     callbacks: list[BaseCallback] = [

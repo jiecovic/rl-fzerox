@@ -83,3 +83,21 @@ class RunTrackSamplingArtifactModel(ManagerBase):
     generated_course_seed: Mapped[str | None]
     generated_course_segment_count: Mapped[int | None]
     generated_course_length: Mapped[float | None]
+
+
+class RunTrackSamplingGeneratedSlotModel(ManagerBase):
+    """Active generated X Cup identity for one stable sampling slot."""
+
+    __tablename__ = "run_track_sampling_generated_slots"
+
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), primary_key=True)
+    slot: Mapped[int] = mapped_column(primary_key=True)
+    course_key: Mapped[str]
+    generation: Mapped[int]
+    course_id: Mapped[str]
+    course_name: Mapped[str]
+    course_hash: Mapped[str]
+    course_seed: Mapped[str]
+    segment_count: Mapped[int | None]
+    course_length: Mapped[float | None]
+    updated_at: Mapped[str]

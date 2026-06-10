@@ -32,8 +32,10 @@ from rl_fzerox.core.manager.registry.runs.runtime import (
 )
 from rl_fzerox.core.manager.registry.runs.track_sampling import (
     clear_run_track_sampling_state,
+    get_run_generated_x_cup_slots,
     get_run_track_sampling_artifacts,
     get_run_track_sampling_state,
+    replace_run_generated_x_cup_slots,
     replace_run_track_sampling_artifacts,
     upsert_run_track_sampling_state,
 )
@@ -53,6 +55,7 @@ __all__ = [
     "create_run",
     "drain_pending_filesystem_operations",
     "get_run",
+    "get_run_generated_x_cup_slots",
     "get_run_track_sampling_artifacts",
     "get_run_track_sampling_state",
     "heartbeat_run_worker",
@@ -65,6 +68,7 @@ __all__ = [
     "reconcile_orphaned_runs",
     "register_run_worker",
     "request_run_command",
+    "replace_run_generated_x_cup_slots",
     "replace_run_track_sampling_artifacts",
     "update_run_fork_source",
     "update_run_name",

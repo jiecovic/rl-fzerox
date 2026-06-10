@@ -54,6 +54,7 @@ from rl_fzerox.core.manager.storage.schema import (
 )
 
 if TYPE_CHECKING:
+    from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
     from rl_fzerox.core.training.session.callbacks.track_sampling import (
         TrackSamplingMaterializedArtifact,
         TrackSamplingRuntimeState,
@@ -270,6 +271,26 @@ class ManagerStore:
             self,
             run_id=run_id,
             artifacts=artifacts,
+        )
+
+    def get_run_generated_x_cup_slots(
+        self,
+        run_id: str,
+    ) -> tuple[GeneratedXCupSlot, ...]:
+        return run_registry.get_run_generated_x_cup_slots(self, run_id)
+
+    def replace_run_generated_x_cup_slots(
+        self,
+        *,
+        run_id: str,
+        slots: tuple[GeneratedXCupSlot, ...],
+        updated_at: str | None = None,
+    ) -> None:
+        run_registry.replace_run_generated_x_cup_slots(
+            self,
+            run_id=run_id,
+            slots=slots,
+            updated_at=updated_at,
         )
 
     def register_run_worker(
