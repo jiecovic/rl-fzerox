@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Path
 
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.contracts import CreateDraftRequest, UpdateDraftRequest
 from rl_fzerox.apps.run_manager.api.execution import run_sync
+from rl_fzerox.apps.run_manager.api.validation import required_name
 from rl_fzerox.core.manager import ManagerStore
 
 
@@ -20,9 +21,7 @@ def create_drafts_router(store: ManagerStore) -> APIRouter:
 
     @router.post("/api/drafts", status_code=201)
     async def create_draft(request: CreateDraftRequest) -> dict[str, dict[str, object]]:
-        name = request.name.strip()
-        if not name:
-            raise HTTPException(status_code=400, detail="draft name is required")
+        name = required_name(request.name, subject="draft")
         handlers.validate_source_fields(
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
@@ -34,9 +33,7 @@ def create_drafts_router(store: ManagerStore) -> APIRouter:
         draft_id: Annotated[str, Path(min_length=1)],
         request: UpdateDraftRequest,
     ) -> dict[str, dict[str, object]]:
-        name = request.name.strip()
-        if not name:
-            raise HTTPException(status_code=400, detail="draft name is required")
+        name = required_name(request.name, subject="draft")
         handlers.validate_source_fields(
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,

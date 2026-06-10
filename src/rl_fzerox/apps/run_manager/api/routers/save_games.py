@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, Path
 
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.contracts import (
@@ -14,6 +14,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     UpsertSaveCourseSetupRequest,
 )
 from rl_fzerox.apps.run_manager.api.execution import run_sync
+from rl_fzerox.apps.run_manager.api.validation import required_name
 from rl_fzerox.core.manager import ManagerStore
 
 
@@ -28,9 +29,7 @@ def create_save_games_router(store: ManagerStore, launcher: RunLauncher) -> APIR
     async def create_save_game(
         request: CreateSaveGameRequest,
     ) -> dict[str, dict[str, object]]:
-        name = request.name.strip()
-        if not name:
-            raise HTTPException(status_code=400, detail="save-game name is required")
+        name = required_name(request.name, subject="save-game")
         return await run_sync(handlers.create_save_game_payload, store, request, name)
 
     @router.post("/api/save-games/{save_game_id}/open-dir")
@@ -44,9 +43,7 @@ def create_save_games_router(store: ManagerStore, launcher: RunLauncher) -> APIR
         save_game_id: Annotated[str, Path(min_length=1)],
         request: UpdateSaveGameRequest,
     ) -> dict[str, dict[str, object]]:
-        name = request.name.strip()
-        if not name:
-            raise HTTPException(status_code=400, detail="save-game name is required")
+        name = required_name(request.name, subject="save-game")
         return await run_sync(
             handlers.update_save_game_payload,
             store,

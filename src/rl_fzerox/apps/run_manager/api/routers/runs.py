@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, Path, Query
 
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.contracts import (
@@ -15,6 +15,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     WatchRunRequest,
 )
 from rl_fzerox.apps.run_manager.api.execution import run_sync
+from rl_fzerox.apps.run_manager.api.validation import required_name
 from rl_fzerox.core.manager import ManagerStore
 
 
@@ -36,16 +37,12 @@ def create_runs_router(store: ManagerStore, launcher: RunLauncher) -> APIRouter:
         run_id: Annotated[str, Path(min_length=1)],
         request: UpdateRunRequest,
     ) -> dict[str, dict[str, object]]:
-        name = request.name.strip()
-        if not name:
-            raise HTTPException(status_code=400, detail="run name is required")
+        name = required_name(request.name, subject="run")
         return await run_sync(handlers.update_run_payload, store, run_id, name)
 
     @router.post("/api/runs", status_code=201)
     async def launch_run(request: LaunchRunRequest) -> dict[str, dict[str, object]]:
-        name = request.name.strip()
-        if not name:
-            raise HTTPException(status_code=400, detail="run name is required")
+        name = required_name(request.name, subject="run")
         handlers.validate_source_fields(
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
