@@ -26,7 +26,7 @@ def _default_web_root() -> Path:
 class RunManagerLauncherDefaults:
     api_port: int = 8765
     web_port: int = 5174
-    web_host: str = "127.0.0.1"
+    web_host: str = "localhost"
     web_root: Path = _default_web_root()
 
 

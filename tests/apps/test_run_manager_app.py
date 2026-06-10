@@ -20,7 +20,7 @@ def test_run_manager_web_host_defaults_to_loopback() -> None:
         "dev",
         "--",
         "--host",
-        "127.0.0.1",
+        "localhost",
         "--port",
         "5174",
         "--strictPort",
