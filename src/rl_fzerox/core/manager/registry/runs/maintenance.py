@@ -1,15 +1,28 @@
 # src/rl_fzerox/core/manager/registry/runs/maintenance.py
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from sqlalchemy import select
+
 import rl_fzerox.core.manager.artifacts.filesystem as filesystem_ops
+from rl_fzerox.core.manager.db.models import (
+    RunCommandModel,
+    RunEventModel,
+    RunModel,
+    RunWorkerModel,
+)
+from rl_fzerox.core.manager.db.repositories.filesystem import (
+    delete_filesystem_operation,
+    list_filesystem_operations,
+)
 from rl_fzerox.core.manager.registry.common import pid_exists, utc_now
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from rl_fzerox.core.manager.store import ManagerStore
 
 
@@ -34,25 +47,15 @@ RUN_WORKER_LEASE_POLICY = RunWorkerLeasePolicy()
 def reconcile_orphaned_runs(store: ManagerStore) -> None:
     store.initialize()
     now = datetime.now(UTC)
-    with store._connect() as connection:
-        rows = connection.execute(
-            """
-            SELECT id
-            FROM runs
-            WHERE status = 'running'
-            """
-        ).fetchall()
-        worker_rows = connection.execute(
-            """
-            SELECT run_id, launch_token, pid, launched_at, heartbeat_at
-            FROM run_workers
-            """
-        ).fetchall()
+    with store._orm_session() as session:
+        run_ids = tuple(
+            session.scalars(select(RunModel.id).where(RunModel.status == "running"))
+        )
         worker_by_run_id = {
-            str(row["run_id"]): _run_worker_lease_from_row(row) for row in worker_rows
+            worker.run_id: _run_worker_lease_from_model(worker)
+            for worker in session.scalars(select(RunWorkerModel))
         }
-        for row in rows:
-            run_id = str(row["id"])
+        for run_id in run_ids:
             worker = worker_by_run_id.get(run_id)
             if worker is None:
                 continue
@@ -60,58 +63,48 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
             if now - heartbeat_at <= RUN_WORKER_LEASE_POLICY.heartbeat_timeout:
                 continue
             if not pid_exists(worker.pid):
-                _mark_orphaned_run_failed(connection, run_id=run_id)
+                _mark_orphaned_run_failed(session, run_id=run_id)
                 continue
 
 
-def _run_worker_lease_from_row(row: sqlite3.Row) -> RunWorkerLease:
+def _run_worker_lease_from_model(worker: RunWorkerModel) -> RunWorkerLease:
     return RunWorkerLease(
-        run_id=str(row["run_id"]),
-        launch_token=str(row["launch_token"]),
-        pid=int(row["pid"]),
-        launched_at=str(row["launched_at"]),
-        heartbeat_at=str(row["heartbeat_at"]),
+        run_id=worker.run_id,
+        launch_token=worker.launch_token,
+        pid=worker.pid,
+        launched_at=worker.launched_at,
+        heartbeat_at=worker.heartbeat_at,
     )
 
 
-def _mark_orphaned_run_failed(connection: sqlite3.Connection, *, run_id: str) -> None:
+def _mark_orphaned_run_failed(session: Session, *, run_id: str) -> None:
     failed_at = utc_now()
-    connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
-    connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
-    connection.execute(
-        """
-        UPDATE runs
-        SET status = ?, stopped_at = ?
-        WHERE id = ?
-        """,
-        ("failed", failed_at, run_id),
-    )
-    connection.execute(
-        """
-        INSERT INTO run_events(run_id, created_at, kind, message)
-        VALUES (?, ?, ?, ?)
-        """,
-        (
-            run_id,
-            failed_at,
-            "failed",
-            "manager worker disappeared before reporting a clean final state",
-        ),
+    pending_command = session.get(RunCommandModel, run_id)
+    if pending_command is not None:
+        session.delete(pending_command)
+    worker = session.get(RunWorkerModel, run_id)
+    if worker is not None:
+        session.delete(worker)
+    run = session.get(RunModel, run_id)
+    if run is None:
+        return
+    run.status = "failed"
+    run.stopped_at = failed_at
+    session.add(
+        RunEventModel(
+            run_id=run_id,
+            created_at=failed_at,
+            kind="failed",
+            message="manager worker disappeared before reporting a clean final state",
+        )
     )
 
 
 def drain_pending_filesystem_operations(store: ManagerStore) -> None:
     store._ensure_schema_initialized()
-    with store._connect() as connection:
-        rows = connection.execute(
-            """
-            SELECT id, kind, source_path, target_path, created_at
-            FROM filesystem_operations
-            ORDER BY id ASC
-            """
-        ).fetchall()
-    for row in rows:
-        operation = filesystem_ops.filesystem_operation_from_row(row)
+    with store._orm_session() as session:
+        operations = list_filesystem_operations(session)
+    for operation in operations:
         try:
             complete = filesystem_ops.apply_filesystem_operation(operation)
         except Exception:
@@ -120,8 +113,5 @@ def drain_pending_filesystem_operations(store: ManagerStore) -> None:
             continue
         if not complete:
             continue
-        with store._connect() as connection:
-            connection.execute(
-                "DELETE FROM filesystem_operations WHERE id = ?",
-                (operation.id,),
-            )
+        with store._orm_session() as session:
+            delete_filesystem_operation(session, operation.id)

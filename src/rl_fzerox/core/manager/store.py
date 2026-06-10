@@ -112,12 +112,6 @@ class ManagerStore:
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         initialize_manager_schema(self.db_path, applied_at=self.utc_now())
-        with self._connect() as connection:
-            lineage_registry.backfill_lineage_ids(connection)
-            lineage_registry.migrate_lineage_layout_rows(
-                connection,
-                migrated_at=self.utc_now(),
-            )
         self._schema_initialized = True
 
     def refresh_system_templates(self) -> None:
@@ -439,9 +433,6 @@ class ManagerStore:
             self.list_visible_runs(),
             view_root=self.tensorboard_views_root(),
         )
-
-    def migrate_lineage_layout(self) -> int:
-        return lineage_registry.migrate_lineage_layout(self)
 
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         return run_registry.update_run_name(self, run_id=run_id, name=name)

@@ -57,7 +57,7 @@ def resolve_lineage_id(
     parent_run = session.get(RunModel, parent_id)
     if parent_run is None:
         return fallback_run_id
-    return parent_run.lineage_id or parent_id
+    return _required_lineage_id(parent_run)
 
 
 def assert_draft_name_available(
@@ -327,7 +327,7 @@ def rename_run(
 def managed_run_from_model(session: Session, run: RunModel) -> ManagedRun:
     """Build the public run dataclass from ORM rows in the current transaction."""
 
-    lineage_id = run.lineage_id or run.id
+    lineage_id = _required_lineage_id(run)
     lineage_groups = tuple(
         session.scalars(
             select(LineageGroupModel.group_name)
@@ -367,7 +367,7 @@ def managed_run_from_model(session: Session, run: RunModel) -> ManagedRun:
 def managed_run_summary_from_model(session: Session, run: RunModel) -> ManagedRunSummary:
     """Build the lightweight run-list dataclass from ORM rows."""
 
-    lineage_id = run.lineage_id or run.id
+    lineage_id = _required_lineage_id(run)
     lineage_groups = tuple(
         session.scalars(
             select(LineageGroupModel.group_name)
@@ -462,6 +462,14 @@ def _vehicle_summary_from_config_json(config_json: str) -> ManagedRunVehicleSumm
             vehicle.get("engine_setting_max_raw_value"),
             fallback=80,
         ),
+    )
+
+
+def _required_lineage_id(run: RunModel) -> str:
+    if run.lineage_id:
+        return run.lineage_id
+    raise RuntimeError(
+        f"manager DB is not current: run {run.id} is missing lineage_id"
     )
 
 

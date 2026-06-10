@@ -8,7 +8,6 @@ import pytest
 
 import rl_fzerox.core.manager.artifacts.filesystem as filesystem_ops_module
 import rl_fzerox.core.manager.registry.drafts.fork_sources as draft_fork_sources
-import rl_fzerox.core.manager.registry.paths as registry_paths
 from rl_fzerox.core.manager import (
     ManagerStore,
     default_managed_run_config,
@@ -16,7 +15,6 @@ from rl_fzerox.core.manager import (
 from rl_fzerox.core.manager.artifacts.filesystem import FilesystemOperation
 from tests.core.manager.manager_store_support import (
     _filesystem_operation_count,
-    _stored_run_dir,
 )
 
 SnapshotKind = Literal["run", "draft", "template", "import"]
@@ -308,57 +306,3 @@ def test_manager_store_delete_lineage_defers_failed_filesystem_cleanup(
 
     assert not parent.run_dir.exists()
     assert _filesystem_operation_count(store) == 0
-
-
-def test_manager_store_replays_pending_old_directory_move(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    managed_runs_root = tmp_path / "local" / "runs"
-    old_lineages_root = tmp_path / "local" / "lineages"
-    monkeypatch.setattr(registry_paths, "manager_root", lambda output_root=None: managed_runs_root)
-    monkeypatch.setattr(
-        registry_paths,
-        "manager_run_dir",
-        lambda *, run_id, lineage_id, output_root=None: managed_runs_root / lineage_id / run_id,
-    )
-
-    store = ManagerStore(tmp_path / "manager" / "runs.db")
-    run = store.create_run(
-        run_id="old-run",
-        name="Old Run",
-        config=default_managed_run_config(),
-        explicit_run_dir=old_lineages_root / "old-run" / "old-run",
-        lineage_id="old-run",
-    )
-    run.run_dir.mkdir(parents=True)
-    (run.run_dir / "artifact.bin").write_text("payload", encoding="utf-8")
-    target_run_dir = managed_runs_root / "old-run" / "old-run"
-    original_apply = filesystem_ops_module.apply_filesystem_operation
-    seen_move = False
-
-    def fail_first_move(operation: FilesystemOperation) -> bool:
-        nonlocal seen_move
-        if operation.kind == "move_tree" and not seen_move:
-            seen_move = True
-            raise OSError("filesystem busy")
-        return original_apply(operation)
-
-    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", fail_first_move)
-
-    with pytest.raises(OSError, match="filesystem busy"):
-        store.migrate_lineage_layout()
-
-    assert run.run_dir.exists()
-    assert _stored_run_dir(store, run.id).resolve() == target_run_dir.resolve()
-    assert _filesystem_operation_count(store, kind="move_tree") == 1
-
-    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", original_apply)
-    recovered = ManagerStore(store.db_path)
-    recovered.initialize()
-    refreshed = recovered.get_run(run.id)
-
-    assert refreshed is not None
-    assert refreshed.run_dir == target_run_dir.resolve()
-    assert target_run_dir.exists()
-    assert not run.run_dir.exists()

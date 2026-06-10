@@ -8,9 +8,7 @@ filesystem operations that must survive process restarts.
 from rl_fzerox.core.manager.artifacts.filesystem import (
     FilesystemOperation,
     apply_filesystem_operation,
-    filesystem_operation_from_row,
-    queue_delete_tree,
-    queue_move_tree,
+    filesystem_operation_from_values,
 )
 from rl_fzerox.core.manager.artifacts.fork_source import (
     clone_fork_source,
@@ -37,13 +35,11 @@ __all__ = [
     "apply_filesystem_operation",
     "clone_fork_source",
     "draft_fork_source_dir",
-    "filesystem_operation_from_row",
+    "filesystem_operation_from_values",
     "manager_runs_root",
     "manager_tensorboard_views_root",
     "predicted_managed_lineage_dir",
     "predicted_managed_run_dir",
-    "queue_delete_tree",
-    "queue_move_tree",
     "rebuild_tensorboard_views",
     "reset_fork_source_dir",
     "run_fork_source_dir",

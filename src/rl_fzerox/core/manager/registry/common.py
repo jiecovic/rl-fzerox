@@ -19,12 +19,6 @@ from rl_fzerox.core.manager.models import (
 )
 
 
-def sql_placeholders(count: int) -> str:
-    if count <= 0:
-        raise ValueError("count must be positive")
-    return ", ".join("?" for _ in range(count))
-
-
 def new_run_id() -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     return f"{timestamp}-{uuid4().hex[:8]}"

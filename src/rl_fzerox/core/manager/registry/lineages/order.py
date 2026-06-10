@@ -1,17 +1,21 @@
 # src/rl_fzerox/core/manager/registry/lineages/order.py
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
-
-from rl_fzerox.core.manager.registry.common import optional_str
+from collections.abc import Iterable
+from dataclasses import dataclass
 
 
-def delete_order_for_lineage(rows: list[sqlite3.Row]) -> tuple[str, ...]:
-    parent_by_id = {
-        str(row["id"]): optional_str(row["parent_run_id"]) or optional_str(row["source_run_id"])
-        for row in rows
-    }
+@dataclass(frozen=True, slots=True)
+class LineageRunLink:
+    """Run graph edge needed to delete children before parents."""
+
+    run_id: str
+    parent_run_id: str | None
+    source_run_id: str | None
+
+
+def delete_order_for_lineage(rows: Iterable[LineageRunLink]) -> tuple[str, ...]:
+    parent_by_id = {row.run_id: row.parent_run_id or row.source_run_id for row in rows}
     depth_by_id: dict[str, int] = {}
 
     def depth(run_id: str) -> int:
@@ -27,16 +31,8 @@ def delete_order_for_lineage(rows: list[sqlite3.Row]) -> tuple[str, ...]:
         return resolved_depth
 
     ordered = sorted(
-        (str(row["id"]) for row in rows),
+        parent_by_id,
         key=lambda run_id: (depth(run_id), run_id),
         reverse=True,
     )
     return tuple(ordered)
-
-
-def is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-    except ValueError:
-        return False
-    return True

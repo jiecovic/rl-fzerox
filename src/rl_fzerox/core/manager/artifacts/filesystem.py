@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import shutil
-import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -23,58 +22,22 @@ class FilesystemOperation:
     created_at: str
 
 
-def queue_delete_tree(
-    connection: sqlite3.Connection,
+def filesystem_operation_from_values(
     *,
-    path: Path,
-    created_at: str,
-) -> None:
-    """Record one best-effort directory deletion to run after DB commit."""
-
-    resolved_path = path.expanduser().resolve()
-    connection.execute(
-        """
-        INSERT INTO filesystem_operations(kind, source_path, target_path, created_at)
-        VALUES (?, ?, ?, ?)
-        """,
-        ("delete_tree", str(resolved_path), None, created_at),
-    )
-
-
-def queue_move_tree(
-    connection: sqlite3.Connection,
-    *,
-    source_path: Path,
-    target_path: Path,
-    created_at: str,
-) -> None:
-    """Record one directory move that must be replayed until it succeeds."""
-
-    resolved_source_path = source_path.expanduser().resolve()
-    resolved_target_path = target_path.expanduser().resolve()
-    connection.execute(
-        """
-        INSERT INTO filesystem_operations(kind, source_path, target_path, created_at)
-        VALUES (?, ?, ?, ?)
-        """,
-        (
-            "move_tree",
-            str(resolved_source_path),
-            str(resolved_target_path),
-            created_at,
-        ),
-    )
-
-
-def filesystem_operation_from_row(row: sqlite3.Row) -> FilesystemOperation:
-    """Decode one persisted filesystem operation row."""
+    operation_id: int,
+    kind: object,
+    source_path: object,
+    target_path: object,
+    created_at: object,
+) -> FilesystemOperation:
+    """Decode one persisted filesystem operation."""
 
     return FilesystemOperation(
-        id=int(row["id"]),
-        kind=_filesystem_operation_kind(row["kind"]),
-        source_path=Path(str(row["source_path"])).expanduser().resolve(),
-        target_path=_optional_path(row["target_path"]),
-        created_at=str(row["created_at"]),
+        id=operation_id,
+        kind=_filesystem_operation_kind(kind),
+        source_path=Path(str(source_path)).expanduser().resolve(),
+        target_path=_optional_path(target_path),
+        created_at=str(created_at),
     )
 
 
