@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.apps import career_mode
+from rl_fzerox.apps.career_mode_cli.config import career_mode_base_config
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, EmulatorConfig
 
 
@@ -18,7 +18,7 @@ def test_career_mode_base_config_uses_save_runtime_without_policy_template(
     save_path.parent.mkdir()
     save_path.write_bytes(b"save")
 
-    config = career_mode._career_mode_base_config(
+    config = career_mode_base_config(
         db_path=tmp_path / "manager.db",
         save_game_id="save-a",
         save_path=save_path,

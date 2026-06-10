@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.apps.train import main, parse_args
+from rl_fzerox.apps.train_cli import main, parse_args
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
     EnvConfig,
@@ -49,11 +49,11 @@ def test_main_loads_saved_run_config_for_in_place_continue_without_config(
         return base_config
 
     monkeypatch.setattr(
-        "rl_fzerox.apps.train.load_train_run_config",
+        "rl_fzerox.apps.train_cli.cli.load_train_run_config",
         _load_train_run_config,
     )
     monkeypatch.setattr(
-        "rl_fzerox.apps.train.run_training",
+        "rl_fzerox.apps.train_cli.cli.run_training",
         lambda config: captured.setdefault("config", config),
     )
 
@@ -84,7 +84,7 @@ def test_main_applies_overrides_to_saved_run_continue_without_config(
 
     captured: dict[str, TrainAppConfig] = {}
     monkeypatch.setattr(
-        "rl_fzerox.apps.train.load_train_run_config",
+        "rl_fzerox.apps.train_cli.cli.load_train_run_config",
         lambda _path: TrainAppConfig(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
             env=EnvConfig(),
@@ -96,7 +96,7 @@ def test_main_applies_overrides_to_saved_run_continue_without_config(
         ),
     )
     monkeypatch.setattr(
-        "rl_fzerox.apps.train.run_training",
+        "rl_fzerox.apps.train_cli.cli.run_training",
         lambda config: captured.setdefault("config", config),
     )
 
