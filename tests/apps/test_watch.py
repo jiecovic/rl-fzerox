@@ -272,7 +272,7 @@ def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
     child.run_dir.mkdir(parents=True)
 
     monkeypatch.setattr(
-        "rl_fzerox.apps.watch_cli.resolve.materialize_train_run_config",
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
         lambda config, *, run_paths: config,
     )
     monkeypatch.setattr(

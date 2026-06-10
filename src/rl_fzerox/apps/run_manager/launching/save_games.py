@@ -58,7 +58,11 @@ def launch_career_mode_runner(
         cup_id=cup_id,
         course_id=course_id,
     )
-    overrides = watch_config_overrides(device=device, renderer=renderer)
+    overrides = watch_config_overrides(
+        device=device,
+        renderer=renderer,
+        deterministic_policy=deterministic_policy,
+    )
     log_path = manager_career_mode_log_path(save_game_id)
     command = [
         sys.executable,

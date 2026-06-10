@@ -564,6 +564,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         "stochastic",
         "--",
         "watch.device=cpu",
+        "watch.deterministic_policy=false",
         "emulator.renderer=angrylion",
     ]
     lease = store.get_viewer_lease(lease_id)

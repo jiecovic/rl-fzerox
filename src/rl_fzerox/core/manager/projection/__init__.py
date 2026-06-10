@@ -26,6 +26,10 @@ from rl_fzerox.core.manager.projection.policy import (
     fork_policy_signature,
 )
 from rl_fzerox.core.manager.projection.tracks import build_track_sampling_data
+from rl_fzerox.core.manager.projection.watch import (
+    lineage_frame_offset_for_run,
+    managed_watch_train_config,
+)
 
 __all__ = [
     "build_action_data",
@@ -43,4 +47,6 @@ __all__ = [
     "fork_compatibility_signature",
     "fork_observation_signature",
     "fork_policy_signature",
+    "lineage_frame_offset_for_run",
+    "managed_watch_train_config",
 ]
