@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/UnlockPathPanel.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
 import { formatUnlockTargetStatus, unlockTargetStatusClass } from "@/entities/saveGame/model";
 import type {
   ConfigMetadata,
@@ -9,7 +10,6 @@ import type {
   ManagedSaveUnlockTarget,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
-import { TrackCupBanner } from "@/widgets/configurator/sections/tracks/TrackCupBanner";
 import {
   CourseSetupPanel,
   GlobalPolicyPanel,

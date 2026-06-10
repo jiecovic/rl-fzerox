@@ -1,24 +1,21 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/workspace/ReadonlyConfig.tsx
 import type { ReactNode } from "react";
+import { CONFIG_SECTION_TABS, type ConfigSection } from "@/entities/runConfig/model/sections";
+import { ActionSection } from "@/entities/runConfig/ui/sections/ActionSection";
+import { EnvironmentSection } from "@/entities/runConfig/ui/sections/EnvironmentSection";
+import { LoggingSection } from "@/entities/runConfig/ui/sections/LoggingSection";
+import { ObservationSection } from "@/entities/runConfig/ui/sections/ObservationSection";
+import { PolicySection } from "@/entities/runConfig/ui/sections/PolicySection";
+import { RewardSection } from "@/entities/runConfig/ui/sections/RewardSection";
+import { TracksSection } from "@/entities/runConfig/ui/sections/TracksSection";
+import { TrainingSection } from "@/entities/runConfig/ui/sections/TrainingSection";
+import { VehicleSection } from "@/entities/runConfig/ui/sections/VehicleSection";
 import type {
   ConfigMetadata,
   ManagedRunDetail,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
 import { Tabs } from "@/shared/ui/Tabs";
-import {
-  CONFIG_SECTION_TABS,
-  type ConfigSection,
-} from "@/widgets/configurator/configurator/sections";
-import { ActionSection } from "@/widgets/configurator/sections/ActionSection";
-import { EnvironmentSection } from "@/widgets/configurator/sections/EnvironmentSection";
-import { LoggingSection } from "@/widgets/configurator/sections/LoggingSection";
-import { ObservationSection } from "@/widgets/configurator/sections/ObservationSection";
-import { PolicySection } from "@/widgets/configurator/sections/PolicySection";
-import { RewardSection } from "@/widgets/configurator/sections/RewardSection";
-import { TracksSection } from "@/widgets/configurator/sections/TracksSection";
-import { TrainingSection } from "@/widgets/configurator/sections/TrainingSection";
-import { VehicleSection } from "@/widgets/configurator/sections/VehicleSection";
 
 interface RunReadonlyConfigProps {
   metadata: ConfigMetadata;

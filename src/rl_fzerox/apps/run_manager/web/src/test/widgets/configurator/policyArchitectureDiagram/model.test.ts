@@ -1,8 +1,8 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/widgets/configurator/policyArchitectureDiagram/model.test.ts
 import { describe, expect, it } from "vitest";
+import { buildArchitectureGraph } from "@/entities/runConfig/ui/sections/policyArchitectureDiagram/model";
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";
 import { policyPreviewFixture } from "@/test/fixtures";
-import { buildArchitectureGraph } from "@/widgets/configurator/sections/policyArchitectureDiagram/model";
 
 describe("policy architecture graph model", () => {
   it("splits MLP activation details onto their own line", () => {

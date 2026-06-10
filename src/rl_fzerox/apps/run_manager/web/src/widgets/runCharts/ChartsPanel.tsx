@@ -3,12 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import type { ManagedRun } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
+import { ConfigDisclosure } from "@/shared/ui/config/ConfigDisclosure";
+import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
+import { usePersistentDisclosureMap } from "@/shared/ui/config/disclosureState";
+import { SegmentedChoiceStrip } from "@/shared/ui/configFields/choices";
 import { FieldSelect } from "@/shared/ui/Field";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
-import { ConfigDisclosure } from "@/widgets/configurator/ConfigDisclosure";
-import { DisclosureToolbar } from "@/widgets/configurator/DisclosureToolbar";
-import { usePersistentDisclosureMap } from "@/widgets/configurator/disclosureState";
-import { SegmentedChoiceStrip } from "@/widgets/configurator/fields/choices";
 import {
   buildChartColorByRunId,
   buildChartGroups,

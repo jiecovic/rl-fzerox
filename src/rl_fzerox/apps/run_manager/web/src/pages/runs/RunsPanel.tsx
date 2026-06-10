@@ -12,10 +12,10 @@ import {
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
+import { usePersistentDisclosureMap } from "@/shared/ui/config/disclosureState";
 import { ChevronIcon, ImportIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
-import { DisclosureToolbar } from "@/widgets/configurator/DisclosureToolbar";
-import { usePersistentDisclosureMap } from "@/widgets/configurator/disclosureState";
 
 interface RunsPanelProps {
   drafts: ManagedDraft[];

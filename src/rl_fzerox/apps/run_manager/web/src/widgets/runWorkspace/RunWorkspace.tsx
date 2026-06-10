@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/runWorkspace/RunWorkspace.tsx
 import { useEffect, useState } from "react";
+import type { ConfigSection } from "@/entities/runConfig/model/sections";
 import type {
   ConfigMetadata,
   ManagedRun,
@@ -12,7 +13,6 @@ import { RenameIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
-import type { ConfigSection } from "@/widgets/configurator/configurator/sections";
 import { useRunWorkspaceActions } from "@/widgets/runWorkspace/workspace/actions";
 import {
   useRunPolicyPreview,

@@ -1,13 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/widgets/configurator/FieldInputs.test.tsx
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@/test/render";
 import {
   OptionalNumberField,
   OptionalRangePairField,
   RangeNumberField,
   RangePairField,
-} from "@/widgets/configurator/fields";
+} from "@/shared/ui/configFields";
+import { cleanup, fireEvent, render, screen } from "@/test/render";
 
 describe("Configurator field inputs", () => {
   afterEach(() => {

@@ -1,14 +1,14 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/saveGameWorkspace/unlock_path/courseSetup.tsx
 import { useState } from "react";
+import { courseCardClass } from "@/entities/runConfig/ui/sections/tracks/coursePoolStyle";
+import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
+import { TrackMinimap } from "@/entities/runConfig/ui/sections/tracks/TrackMinimap";
 import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
+import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
+import { IntegerTextInput } from "@/shared/ui/configFields";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { SaveDraftIcon } from "@/shared/ui/icons";
-import { DisclosureToolbar } from "@/widgets/configurator/DisclosureToolbar";
-import { IntegerTextInput } from "@/widgets/configurator/fields";
-import { courseCardClass } from "@/widgets/configurator/sections/tracks/coursePoolStyle";
-import { TrackCupBanner } from "@/widgets/configurator/sections/tracks/TrackCupBanner";
-import { TrackMinimap } from "@/widgets/configurator/sections/tracks/TrackMinimap";
 import type {
   CourseSetupDraft,
   CourseSetupDraftMap,

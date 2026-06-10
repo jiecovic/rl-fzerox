@@ -1,6 +1,17 @@
 // src/rl_fzerox/apps/run_manager/web/src/widgets/configurator/Configurator.tsx
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { CONFIG_SECTION_TABS, type ConfigSection } from "@/entities/runConfig/model/sections";
+import { ActionSection } from "@/entities/runConfig/ui/sections/ActionSection";
+import { EnvironmentSection } from "@/entities/runConfig/ui/sections/EnvironmentSection";
+import { LoggingSection } from "@/entities/runConfig/ui/sections/LoggingSection";
+import { ObservationSection } from "@/entities/runConfig/ui/sections/ObservationSection";
+import { PolicySection } from "@/entities/runConfig/ui/sections/PolicySection";
+import { RewardSection } from "@/entities/runConfig/ui/sections/RewardSection";
+import { TracksSection } from "@/entities/runConfig/ui/sections/TracksSection";
+import { TrainingSection } from "@/entities/runConfig/ui/sections/TrainingSection";
+import { fixedEnvAssignmentIssue } from "@/entities/runConfig/ui/sections/tracks/fixedEnvAssignment";
+import { VehicleSection } from "@/entities/runConfig/ui/sections/VehicleSection";
 import { fetchPolicyPreview } from "@/shared/api/client";
 import type {
   ConfigMetadata,
@@ -9,36 +20,22 @@ import type {
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
+import { ConfigGrid } from "@/shared/ui/config/ConfigLayout";
+import { FieldLabel } from "@/shared/ui/configFields";
+import {
+  blurOnEnter,
+  editableNumberInputProps,
+  parseSafeIntegerInput,
+  useEditableNumberInput,
+} from "@/shared/ui/configFields/numberInput";
 import { FieldInput, FieldShell } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
 import { RandomizeIcon } from "@/shared/ui/icons";
 import { Notice, Panel } from "@/shared/ui/Panel";
 import { Tabs } from "@/shared/ui/Tabs";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
-import { ConfigGrid } from "@/widgets/configurator/ConfigLayout";
-import { ActionBar } from "@/widgets/configurator/configurator/ActionBar";
-import { configuratorDraftName } from "@/widgets/configurator/configurator/draftName";
-import {
-  CONFIG_SECTION_TABS,
-  type ConfigSection,
-} from "@/widgets/configurator/configurator/sections";
-import { FieldLabel } from "@/widgets/configurator/fields";
-import {
-  blurOnEnter,
-  editableNumberInputProps,
-  parseSafeIntegerInput,
-  useEditableNumberInput,
-} from "@/widgets/configurator/fields/numberInput";
-import { ActionSection } from "@/widgets/configurator/sections/ActionSection";
-import { EnvironmentSection } from "@/widgets/configurator/sections/EnvironmentSection";
-import { LoggingSection } from "@/widgets/configurator/sections/LoggingSection";
-import { ObservationSection } from "@/widgets/configurator/sections/ObservationSection";
-import { PolicySection } from "@/widgets/configurator/sections/PolicySection";
-import { RewardSection } from "@/widgets/configurator/sections/RewardSection";
-import { TracksSection } from "@/widgets/configurator/sections/TracksSection";
-import { TrainingSection } from "@/widgets/configurator/sections/TrainingSection";
-import { fixedEnvAssignmentIssue } from "@/widgets/configurator/sections/tracks/fixedEnvAssignment";
-import { VehicleSection } from "@/widgets/configurator/sections/VehicleSection";
+import { ActionBar } from "@/widgets/configurator/ActionBar";
+import { configuratorDraftName } from "@/widgets/configurator/draftName";
 
 interface ConfiguratorProps {
   active?: boolean;

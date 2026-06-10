@@ -2,9 +2,9 @@
 
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CustomConvTableRows } from "@/entities/runConfig/ui/sections/policy/LayerEditors";
 import type { ManagedRunConfig } from "@/shared/api/contract";
 import { cleanup, fireEvent, render, screen } from "@/test/render";
-import { CustomConvTableRows } from "@/widgets/configurator/sections/policy/LayerEditors";
 
 type CustomConvLayer = ManagedRunConfig["policy"]["custom_conv_layers"][number];
 

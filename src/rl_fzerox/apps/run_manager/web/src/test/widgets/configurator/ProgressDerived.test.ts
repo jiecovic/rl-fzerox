@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   progressBucketRewardFromDensity,
   progressRewardDensityFromValues,
-} from "@/widgets/configurator/sections/reward/progressDerived";
+} from "@/entities/runConfig/ui/sections/reward/progressDerived";
 
 describe("progress reward derived values", () => {
   it("preserves reward density when switching to continuous progress", () => {

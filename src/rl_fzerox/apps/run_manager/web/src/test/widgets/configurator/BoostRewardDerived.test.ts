@@ -1,11 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/widgets/configurator/BoostRewardDerived.test.ts
 import { describe, expect, it } from "vitest";
-import type { ManagedRunConfig } from "@/shared/api/contract";
-import { managedRunConfigFixture } from "@/test/fixtures";
 import {
   boostRequestRewardPreviewPoints,
   boostRequestRewardValue,
-} from "@/widgets/configurator/sections/reward/boostDerived";
+} from "@/entities/runConfig/ui/sections/reward/boostDerived";
+import type { ManagedRunConfig } from "@/shared/api/contract";
+import { managedRunConfigFixture } from "@/test/fixtures";
 
 function configWithBoostShaping(
   rewardOverrides: Partial<ManagedRunConfig["reward"]>,
