@@ -1,0 +1,123 @@
+# src/rl_fzerox/apps/run_manager/api/payloads/save_games.py
+from __future__ import annotations
+
+from rl_fzerox.apps.run_manager.api.payloads.runs import run_summary_payload
+from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
+from rl_fzerox.core.manager import (
+    ManagedSaveAttempt,
+    ManagedSaveCourseSetup,
+    ManagedSaveGame,
+    ManagedSaveUnlockProgress,
+    ManagedSaveUnlockTarget,
+)
+
+
+def save_course_setup_payload(
+    assignment: ManagedSaveCourseSetup,
+) -> dict[str, object]:
+    return {
+        "id": assignment.id,
+        "save_game_id": assignment.save_game_id,
+        "scope": assignment.scope,
+        "difficulty": assignment.difficulty,
+        "cup_id": assignment.cup_id,
+        "course_id": assignment.course_id,
+        "policy_run_id": assignment.policy_run_id,
+        "policy_artifact": assignment.policy_artifact,
+        "vehicle_id": assignment.vehicle_id,
+        "engine_setting_raw_value": assignment.engine_setting_raw_value,
+        "created_at": assignment.created_at,
+        "updated_at": assignment.updated_at,
+    }
+
+
+def save_attempt_payload(attempt: ManagedSaveAttempt) -> dict[str, object]:
+    return {
+        "id": attempt.id,
+        "save_game_id": attempt.save_game_id,
+        "target_kind": attempt.target_kind,
+        "policy_run_id": attempt.policy_run_id,
+        "policy_artifact": attempt.policy_artifact,
+        "status": attempt.status,
+        "difficulty": attempt.difficulty,
+        "cup_id": attempt.cup_id,
+        "course_id": attempt.course_id,
+        "started_at": attempt.started_at,
+        "finished_at": attempt.finished_at,
+        "finish_position": attempt.finish_position,
+        "finish_time_s": attempt.finish_time_s,
+        "failure_reason": attempt.failure_reason,
+    }
+
+
+def save_attempt_execution_context_payload(
+    context: SaveAttemptExecutionContext,
+) -> dict[str, object]:
+    """Serialize one resolved career-runner attempt context."""
+
+    return {
+        "save_game": save_game_payload(context.save_game),
+        "attempt": save_attempt_payload(context.attempt),
+        "target": {
+            "kind": context.target.kind,
+            "label": context.target.label,
+            "difficulty": context.target.difficulty,
+            "cup_id": context.target.cup_id,
+            "course_id": context.target.course_id,
+        },
+        "course_setup": save_course_setup_payload(context.course_setup),
+        "policy_run": run_summary_payload(context.policy_run),
+        "policy_artifact": context.policy_artifact,
+        "policy_path": str(context.policy_path),
+    }
+
+
+def save_unlock_target_payload(target: ManagedSaveUnlockTarget) -> dict[str, object]:
+    return {
+        "sequence_index": target.sequence_index,
+        "kind": target.kind,
+        "status": target.status,
+        "label": target.label,
+        "difficulty": target.difficulty,
+        "cup_id": target.cup_id,
+        "course_id": target.course_id,
+    }
+
+
+def save_unlock_progress_payload(progress: ManagedSaveUnlockProgress) -> dict[str, object]:
+    return {
+        "inspection_status": progress.inspection_status,
+        "completed_count": progress.completed_count,
+        "total_count": progress.total_count,
+        "unlocked_vehicle_count": progress.unlocked_vehicle_count,
+        "unlocked_vehicle_ids": list(progress.unlocked_vehicle_ids),
+        "next_target": None
+        if progress.next_target is None
+        else save_unlock_target_payload(progress.next_target),
+        "targets": [save_unlock_target_payload(target) for target in progress.targets],
+    }
+
+
+def save_game_payload(
+    save_game: ManagedSaveGame,
+    *,
+    runner_active: bool = False,
+    unlock_progress: ManagedSaveUnlockProgress | None = None,
+    attempts: tuple[ManagedSaveAttempt, ...] = (),
+    course_setups: tuple[ManagedSaveCourseSetup, ...] = (),
+) -> dict[str, object]:
+    return {
+        "id": save_game.id,
+        "name": save_game.name,
+        "status": save_game.status,
+        "save_path": str(save_game.save_path),
+        "created_at": save_game.created_at,
+        "updated_at": save_game.updated_at,
+        "last_finished_at": save_game.last_finished_at,
+        "runner_active": runner_active,
+        "unlock_progress": None
+        if unlock_progress is None
+        else save_unlock_progress_payload(unlock_progress),
+        "attempts": [save_attempt_payload(attempt) for attempt in attempts],
+        "course_setups": [save_course_setup_payload(assignment) for assignment in course_setups],
+    }
