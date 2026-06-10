@@ -6,20 +6,13 @@ from pathlib import Path
 from typing import Literal
 
 from rl_fzerox.apps._cli import normalize_cli_overrides
-from rl_fzerox.apps.watch_cli.delta import (
-    apply_watch_config_delta,
-    watch_config_delta_from_dotlist,
+from rl_fzerox.core.manager.projection.watch import (
+    default_watch_config_from_train_run,
 )
-from rl_fzerox.core.manager import (
-    default_manager_db_path,
+from rl_fzerox.core.manager.projection.watch import (
+    resolve_watch_app_config as resolve_watch_app_config_from_core,
 )
-from rl_fzerox.core.manager.projection.watch import managed_watch_train_config
-from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, WatchAppConfig, WatchConfig
-from rl_fzerox.core.training.runs import (
-    apply_train_run_to_watch_config,
-    load_train_run_config_for_watch,
-    materialize_watch_session_config,
-)
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
 
 def resolve_watch_app_config(
@@ -31,110 +24,19 @@ def resolve_watch_app_config(
     session_name: str | None = None,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
-    """Resolve watch config from the canonical managed or saved-run surfaces."""
+    """Resolve watch config from CLI arguments."""
 
-    normalized_overrides = normalize_cli_overrides(overrides)
-    source_count = sum(value is not None for value in (policy_run_dir, managed_run_id))
-    if source_count > 1:
-        raise ValueError("--run-dir and --managed-run-id are mutually exclusive")
-    cli_run_dir = policy_run_dir.expanduser().resolve() if policy_run_dir is not None else None
-    resolved_manager_db_path = (
-        manager_db_path.expanduser().resolve()
-        if manager_db_path is not None
-        else default_manager_db_path().resolve()
-    )
-    cli_override_delta: dict[str, object] = {}
-    train_config: TrainAppConfig | None = None
-    lineage_frame_offset: int | None = None
-    resolved_policy_artifact: Literal["latest", "best", "final"] = policy_artifact or "latest"
-    if policy_artifact is not None and cli_run_dir is None and managed_run_id is None:
-        raise ValueError("--artifact requires --run-dir or --managed-run-id")
-    if source_count == 0:
-        raise ValueError("--run-dir or --managed-run-id is required")
-    if normalized_overrides:
-        cli_override_delta = watch_config_delta_from_dotlist(normalized_overrides)
-    if managed_run_id is not None:
-        cli_run_dir, train_config, lineage_frame_offset = managed_watch_train_config(
-            db_path=resolved_manager_db_path,
-            run_id=managed_run_id,
-        )
-    elif cli_run_dir is not None:
-        train_config = load_train_run_config_for_watch(cli_run_dir)
-    else:
-        raise ValueError("watch config resolution requires a run directory")
-    config = default_watch_config_from_train_run(
-        train_config,
-        run_dir=cli_run_dir,
-        artifact=resolved_policy_artifact,
-    )
-    if lineage_frame_offset is not None:
-        config = config.model_copy(
-            update={
-                "watch": config.watch.model_copy(
-                    update={"lineage_frame_offset": lineage_frame_offset}
-                )
-            }
-        )
-
-    resolved_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
-    if policy_artifact is not None and resolved_run_dir is None:
-        raise ValueError("--artifact requires --run-dir or --managed-run-id")
-    if resolved_run_dir is not None:
-        resolved_train_config = train_config or load_train_run_config_for_watch(resolved_run_dir)
-        config = apply_train_run_to_watch_config(
-            config,
-            run_dir=resolved_run_dir,
-            train_config=resolved_train_config,
-        )
-        if cli_override_delta:
-            config = apply_watch_config_delta(config, cli_override_delta)
-        if policy_artifact is not None:
-            config = config.model_copy(
-                update={
-                    "watch": config.watch.model_copy(update={"policy_artifact": policy_artifact})
-                }
-            )
-    elif cli_override_delta:
-        config = apply_watch_config_delta(config, cli_override_delta)
-
-    if managed_run_id is not None:
-        config = config.model_copy(
-            update={
-                "watch": config.watch.model_copy(
-                    update={
-                        "manager_db_path": resolved_manager_db_path,
-                        "managed_run_id": managed_run_id,
-                    }
-                )
-            }
-        )
-
-    return materialize_watch_session_config(
-        config,
-        run_dir=config.watch.policy_run_dir,
+    return resolve_watch_app_config_from_core(
+        policy_run_dir=policy_run_dir,
+        policy_artifact=policy_artifact,
+        manager_db_path=manager_db_path,
+        managed_run_id=managed_run_id,
         session_name=session_name,
+        overrides=normalize_cli_overrides(overrides),
     )
 
 
-def default_watch_config_from_train_run(
-    train_config: TrainAppConfig,
-    *,
-    run_dir: Path,
-    artifact: Literal["latest", "best", "final"],
-) -> WatchAppConfig:
-    """Build one minimal watch config directly from a saved train run."""
-
-    return WatchAppConfig(
-        seed=train_config.seed,
-        emulator=train_config.emulator,
-        env=train_config.env,
-        reward=train_config.reward,
-        policy=train_config.policy,
-        curriculum=train_config.curriculum,
-        train=train_config.train,
-        watch=WatchConfig(
-            policy_run_dir=run_dir,
-            policy_artifact=artifact,
-            policy_algorithm=train_config.train.algorithm,
-        ),
-    )
+__all__ = [
+    "default_watch_config_from_train_run",
+    "resolve_watch_app_config",
+]

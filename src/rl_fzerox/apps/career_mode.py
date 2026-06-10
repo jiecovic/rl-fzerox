@@ -7,10 +7,6 @@ from pathlib import Path
 
 from rl_fzerox.apps._cli import normalize_cli_overrides
 from rl_fzerox.apps.viewer_runtime import manager_viewer_lease_session
-from rl_fzerox.apps.watch_cli.delta import (
-    apply_watch_config_delta,
-    watch_config_delta_from_dotlist,
-)
 from rl_fzerox.core.career_mode.runner.race import (
     SaveRaceSetup,
     build_save_race_execution_plan,
@@ -22,6 +18,10 @@ from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
     WatchAppConfig,
     WatchConfig,
+)
+from rl_fzerox.core.runtime_spec.watch_overrides import (
+    apply_watch_config_delta,
+    watch_config_delta_from_dotlist,
 )
 from rl_fzerox.ui.watch import run_viewer
 from rl_fzerox.ui.watch.runtime import start_career_mode_worker

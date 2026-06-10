@@ -25,10 +25,13 @@ from rl_fzerox.core.manager.projection.policy import (
     build_policy_data,
     fork_policy_signature,
 )
+from rl_fzerox.core.manager.projection.runtime import restore_managed_runtime_track_sampling
 from rl_fzerox.core.manager.projection.tracks import build_track_sampling_data
 from rl_fzerox.core.manager.projection.watch import (
+    default_watch_config_from_train_run,
     lineage_frame_offset_for_run,
     managed_watch_train_config,
+    resolve_watch_app_config,
 )
 
 __all__ = [
@@ -49,4 +52,7 @@ __all__ = [
     "fork_policy_signature",
     "lineage_frame_offset_for_run",
     "managed_watch_train_config",
+    "default_watch_config_from_train_run",
+    "resolve_watch_app_config",
+    "restore_managed_runtime_track_sampling",
 ]

@@ -10,8 +10,8 @@ from rl_fzerox.apps.run_manager.launching.processes import (
     fresh_process_log,
     reap_child_when_done,
 )
-from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager.projection.watch import resolve_watch_app_config
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.training.runs import resolve_model_artifact_path
 

@@ -4,9 +4,7 @@ from __future__ import annotations
 from rl_fzerox.apps.run_manager.worker.clock import now_iso
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.models import ManagedRun
-from rl_fzerox.core.manager.projection.x_cup_runtime import (
-    restore_generated_x_cup_entries_from_state,
-)
+from rl_fzerox.core.manager.projection.runtime import restore_managed_runtime_track_sampling
 from rl_fzerox.core.manager.training import (
     build_managed_fork_train_app_config,
     build_managed_resume_train_app_config,
@@ -47,9 +45,11 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
             run_dir=run.run_dir,
             tensorboard_step_offset=run.lineage_step_offset,
         )
-        return restore_generated_x_cup_entries_from_state(
+        return restore_managed_runtime_track_sampling(
             config,
-            state=store.get_run_track_sampling_state(run.id),
+            store=store,
+            run_id=run.id,
+            include_artifacts=False,
         )
     if run.source_snapshot_dir is not None and run.source_artifact is not None:
         if run.source_run_id is None:
