@@ -27,7 +27,13 @@ validated launch/watch snapshots derived from it.
 ## Main Packages
 
 - `src/rl_fzerox/apps/run_manager/`
-  Local FastAPI backend, worker launcher, and Vite frontend.
+  Local FastAPI backend, process launcher, and managed worker entrypoint.
+  App modules are adapters: they parse CLI input, register HTTP routes, launch
+  subprocesses, and delegate persistent state/projection work to `core`.
+
+- `web/run-manager/`
+  Vite/React frontend for the run manager. Python packages reference its built
+  or development server entrypoints, but do not own the TypeScript source tree.
 
 - `src/rl_fzerox/core/manager/`
   Canonical run specs, SQLite storage, projections into runtime configs, run
@@ -64,6 +70,9 @@ validated launch/watch snapshots derived from it.
   truncation/termination, and Gym-compatible observations/info.
 - Manager code owns experiment editing and persistent run state.
 - Training/watch code owns model lifecycle and human-facing playback.
+- App code owns process and protocol adaptation only. Reusable managed-run
+  persistence, runtime projections, and artifact indexing belong under
+  `core/manager`.
 - `local/` is the ignored machine-local workspace. It stores user-provided ROMs
   and emulator cores plus SQLite files, generated baselines, TensorBoard views,
   and run artifacts.
