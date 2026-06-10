@@ -60,6 +60,7 @@ class EngineResetCoordinator:
     def set_curriculum_stage(self, stage_index: int | None) -> None:
         self._stage_index = stage_index
         self._active_track_sampling = self._stage_track_sampling_config(stage_index)
+        self._prune_baseline_cache_to_active_tracks()
 
     def set_track_sampling_weights(self, weights_by_track_id: dict[str, float]) -> None:
         """Update adaptive reset weights used by step-balanced track sampling."""
@@ -80,6 +81,7 @@ class EngineResetCoordinator:
         self._config = self._config.model_copy(update={"track_sampling": config})
         self._queued_reset_course_ids.clear()
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
+        self._prune_baseline_cache_to_active_tracks()
 
     def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
         """Append externally scheduled course ids for deficit-budget resets."""
@@ -211,6 +213,13 @@ class EngineResetCoordinator:
             for entry in config.entries
         )
         return config.model_copy(update={"entries": entries})
+
+    def _prune_baseline_cache_to_active_tracks(self) -> None:
+        self._track_baseline_cache.retain_paths(
+            entry.baseline_state_path
+            for entry in self._active_track_sampling.entries
+            if entry.baseline_state_path is not None
+        )
 
     def _select_queued_track(self, *, seed: int | None) -> SelectedTrack | None:
         if not self._active_track_sampling.enabled:

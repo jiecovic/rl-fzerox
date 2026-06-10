@@ -269,6 +269,51 @@ def test_terminal_reset_reuses_sampled_baseline_instead_of_continuing_race(
     ]
 
 
+def test_track_sampling_config_replacement_prunes_stale_baseline_cache(
+    tmp_path: Path,
+) -> None:
+    old_path = tmp_path / "old.state"
+    new_path = tmp_path / "new.state"
+    old_path.write_bytes(b"old")
+    new_path.write_bytes(b"new")
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(TrackSamplingEntryConfig(id="old", baseline_state_path=old_path),),
+            ),
+        ),
+    )
+
+    env.reset(seed=123)
+    env.set_track_sampling_config(
+        TrackSamplingConfig(
+            enabled=True,
+            entries=(TrackSamplingEntryConfig(id="new", baseline_state_path=new_path),),
+        ),
+    )
+    old_path.write_bytes(b"fresh")
+    env._runtime._episode.done = True
+    env.reset(seed=124)
+    env.set_track_sampling_config(
+        TrackSamplingConfig(
+            enabled=True,
+            entries=(TrackSamplingEntryConfig(id="old", baseline_state_path=old_path),),
+        ),
+    )
+    env._runtime._episode.done = True
+    env.reset(seed=125)
+
+    assert backend.loaded_baseline_bytes == [
+        (old_path, len(b"old")),
+        (new_path, len(b"new")),
+        (old_path, len(b"fresh")),
+    ]
+
+
 def test_track_baseline_cache_reads_each_state_once(tmp_path: Path) -> None:
     baseline_path = tmp_path / "silence.state"
     baseline_path.write_bytes(b"one")
@@ -320,6 +365,30 @@ def test_track_baseline_cache_skips_caching_oversized_states(tmp_path: Path) -> 
     assert backend.loaded_baseline_bytes == [
         (baseline_path, len(b"12345")),
         (baseline_path, len(b"12")),
+    ]
+
+
+def test_track_baseline_cache_forgets_paths_not_retained(tmp_path: Path) -> None:
+    stale_path = tmp_path / "stale.state"
+    active_path = tmp_path / "active.state"
+    stale_path.write_bytes(b"old")
+    active_path.write_bytes(b"keep")
+    backend = SyntheticBackend()
+    cache = TrackBaselineCache()
+
+    cache.load_into_backend(backend, stale_path)
+    cache.load_into_backend(backend, active_path)
+    cache.retain_paths([active_path])
+    stale_path.write_bytes(b"fresh")
+    active_path.write_bytes(b"changed")
+    cache.load_into_backend(backend, stale_path)
+    cache.load_into_backend(backend, active_path)
+
+    assert backend.loaded_baseline_bytes == [
+        (stale_path, len(b"old")),
+        (active_path, len(b"keep")),
+        (stale_path, len(b"fresh")),
+        (active_path, len(b"keep")),
     ]
 
 

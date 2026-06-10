@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Iterable
 from pathlib import Path
 
 from fzerox_emulator import EmulatorBackend
@@ -29,13 +30,24 @@ class TrackBaselineCache:
         self._states_by_path: OrderedDict[Path, bytes] = OrderedDict()
 
     def load_into_backend(self, backend: EmulatorBackend, path: Path) -> None:
-        state = self._states_by_path.get(path)
+        cache_path = _cache_path(path)
+        state = self._states_by_path.get(cache_path)
         if state is None:
             state = path.read_bytes()
-            self._remember_state(path, state)
+            self._remember_state(cache_path, state)
         else:
-            self._states_by_path.move_to_end(path)
+            self._states_by_path.move_to_end(cache_path)
         backend.load_baseline_bytes(state, source_path=path)
+
+    def retain_paths(self, paths: Iterable[Path]) -> None:
+        """Forget cached savestates that are no longer reset candidates."""
+
+        retained_paths = {_cache_path(path) for path in paths}
+        for cached_path in tuple(self._states_by_path):
+            if cached_path in retained_paths:
+                continue
+            state = self._states_by_path.pop(cached_path)
+            self._cached_state_bytes -= len(state)
 
     def _remember_state(self, path: Path, state: bytes) -> None:
         state_size = len(state)
@@ -49,3 +61,7 @@ class TrackBaselineCache:
             self._cached_state_bytes -= len(evicted_state)
         self._states_by_path[path] = state
         self._cached_state_bytes += state_size
+
+
+def _cache_path(path: Path) -> Path:
+    return path.expanduser().resolve()
