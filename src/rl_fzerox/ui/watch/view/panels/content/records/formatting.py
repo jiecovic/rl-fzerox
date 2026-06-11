@@ -155,20 +155,23 @@ def format_latest_compact_time(
     best_time_ms: int | None,
     *,
     latest_delta_ms: int | None,
+    rank: int | None = None,
+    setup: dict[str, str | int] | None = None,
     failed_attempt: bool,
 ) -> str:
     if latest_time_ms is None:
         return "failed" if failed_attempt else "--"
     latest = format_compact_race_time_ms(latest_time_ms)
-    if best_time_ms is None:
-        return latest
-
-    # Delta is latest finish time minus the comparison PB. Negative is faster.
-    delta_ms = latest_delta_ms if latest_delta_ms is not None else latest_time_ms - best_time_ms
-    if delta_ms == 0:
-        return latest
-    sign = "+" if delta_ms > 0 else "-"
-    return f"{latest} ({sign}{format_compact_duration_ms(abs(delta_ms))})"
+    if best_time_ms is not None:
+        # Delta is latest finish time minus the comparison PB. Negative is faster.
+        delta_ms = latest_delta_ms if latest_delta_ms is not None else latest_time_ms - best_time_ms
+        if delta_ms != 0:
+            sign = "+" if delta_ms > 0 else "-"
+            latest = f"{latest} ({sign}{format_compact_duration_ms(abs(delta_ms))})"
+    parts = [latest] if rank is None else [f"P{rank}", latest]
+    if setup_text := format_finish_setup(setup):
+        parts.append(setup_text)
+    return " · ".join(parts)
 
 
 def latest_time_color(

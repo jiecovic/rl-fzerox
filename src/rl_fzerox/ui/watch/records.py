@@ -100,8 +100,10 @@ class TrackRecordEntry:
     best_finish_time_ms: int | None = None
     best_finish_time_rank: int | None = None
     best_finish_time_setup: TrackFinishSetup | None = None
+    latest_finish_rank: int | None = None
     latest_finish_time_ms: int | None = None
     latest_finish_delta_ms: int | None = None
+    latest_finish_setup: TrackFinishSetup | None = None
     attempt_stats: TrackAttemptStats = field(default_factory=TrackAttemptStats)
     failed_attempt: bool = False
 
@@ -118,13 +120,17 @@ class TrackRecordEntry:
         best_finish_time_ms = self.best_finish_time_ms
         best_finish_time_rank = self.best_finish_time_rank
         best_finish_time_setup = self.best_finish_time_setup
+        latest_finish_rank = self.latest_finish_rank
         latest_finish_time_ms = self.latest_finish_time_ms
         latest_finish_delta_ms = self.latest_finish_delta_ms
+        latest_finish_setup = self.latest_finish_setup
         if finish_time_ms is not None:
+            latest_finish_rank = finish_position
             latest_finish_time_ms = finish_time_ms
             latest_finish_delta_ms = (
                 None if best_finish_time_ms is None else finish_time_ms - best_finish_time_ms
             )
+            latest_finish_setup = setup or latest_finish_setup
             if best_finish_time_ms is None or finish_time_ms < best_finish_time_ms:
                 best_finish_time_ms = finish_time_ms
                 best_finish_time_rank = finish_position
@@ -157,8 +163,10 @@ class TrackRecordEntry:
             best_finish_time_ms=best_finish_time_ms,
             best_finish_time_rank=best_finish_time_rank,
             best_finish_time_setup=_copy_setup(best_finish_time_setup),
+            latest_finish_rank=latest_finish_rank,
             latest_finish_time_ms=latest_finish_time_ms,
             latest_finish_delta_ms=latest_finish_delta_ms,
+            latest_finish_setup=_copy_setup(latest_finish_setup),
             attempt_stats=self.attempt_stats.update(
                 info=info,
                 telemetry=telemetry,
@@ -187,8 +195,10 @@ class TrackRecordBook:
                     best_finish_time_ms=entry.best_finish_time_ms,
                     best_finish_time_rank=entry.best_finish_time_rank,
                     best_finish_time_setup=_copy_setup(entry.best_finish_time_setup),
+                    latest_finish_rank=entry.latest_finish_rank,
                     latest_finish_time_ms=entry.latest_finish_time_ms,
                     latest_finish_delta_ms=entry.latest_finish_delta_ms,
+                    latest_finish_setup=_copy_setup(entry.latest_finish_setup),
                     attempt_stats=entry.attempt_stats,
                     failed_attempt=entry.failed_attempt,
                 )

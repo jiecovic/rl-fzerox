@@ -128,8 +128,13 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
                     best_finish_time_ms=98_000,
                     best_finish_time_rank=2,
                     best_finish_time_setup={"engine_setting_raw_value": 60},
+                    latest_finish_rank=3,
                     latest_finish_time_ms=101_000,
                     latest_finish_delta_ms=3_000,
+                    latest_finish_setup={
+                        "vehicle_name": "Blue Falcon",
+                        "engine_setting_raw_value": 40,
+                    },
                     attempt_stats={
                         "attempts": 2,
                         "finishes": 1,
@@ -187,8 +192,13 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert entry.best_finish_time_ms == 98_000
         assert entry.best_finish_time_rank == 2
         assert entry.best_finish_time_setup == {"engine_setting_raw_value": 60}
+        assert entry.latest_finish_rank == 3
         assert entry.latest_finish_time_ms == 101_000
         assert entry.latest_finish_delta_ms == 3_000
+        assert entry.latest_finish_setup == {
+            "vehicle_name": "Blue Falcon",
+            "engine_setting_raw_value": 40,
+        }
         assert entry.attempt_stats.as_mapping() == {
             "attempts": 2,
             "finishes": 1,

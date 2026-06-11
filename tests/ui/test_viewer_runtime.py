@@ -599,7 +599,12 @@ def test_track_record_book_metadata_tracks_the_finish_that_set_the_record() -> N
         "vehicle_name": "Twin Noritta",
         "engine_setting_raw_value": 70,
     }
+    assert entry.latest_finish_rank == 1
     assert entry.latest_finish_delta_ms == -1_000
+    assert entry.latest_finish_setup == {
+        "vehicle_name": "Twin Noritta",
+        "engine_setting_raw_value": 70,
+    }
 
 
 def test_track_record_book_tracks_gp_difficulties_separately() -> None:

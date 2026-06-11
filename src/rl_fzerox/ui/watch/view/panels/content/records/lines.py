@@ -59,8 +59,10 @@ def track_record_pool_lines(
     watch_best = None if entry is None else entry.best_finish_time_ms
     watch_best_time_rank = None if entry is None else entry.best_finish_time_rank
     watch_best_time_setup = None if entry is None else entry.best_finish_time_setup
+    watch_latest_rank = None if entry is None else entry.latest_finish_rank
     watch_latest = None if entry is None else entry.latest_finish_time_ms
     watch_latest_delta = None if entry is None else entry.latest_finish_delta_ms
+    watch_latest_setup = None if entry is None else entry.latest_finish_setup
     watch_attempt_stats = None if entry is None else entry.attempt_stats.as_mapping()
     failed_attempt = bool(entry is not None and entry.failed_attempt and watch_best is None)
     best_time = optional_int_info(record, "track_non_agg_best_time_ms")
@@ -118,6 +120,8 @@ def track_record_pool_lines(
                     watch_latest,
                     watch_best,
                     latest_delta_ms=watch_latest_delta,
+                    rank=watch_latest_rank if _shows_finish_rank(record, current_info) else None,
+                    setup=watch_latest_setup,
                     failed_attempt=failed_attempt,
                 ),
                 latest_time_color(

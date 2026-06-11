@@ -80,7 +80,12 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
             {
                 "silence": record_entry(
                     best_finish_time_ms=98765,
+                    latest_finish_rank=5,
                     latest_finish_time_ms=101234,
+                    latest_finish_setup={
+                        "vehicle_name": "Blue Falcon",
+                        "engine_setting_raw_value": 40,
+                    },
                     attempt_stats={
                         "attempts": 3,
                         "finishes": 1,
@@ -95,6 +100,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
             {
                 "track_id": "silence",
                 "track_display_name": "Silence Time Attack - Blue Falcon Engine 50",
+                "track_mode": "gp_race",
                 "track_non_agg_best_time_ms": 60638,
                 "track_non_agg_worst_time_ms": 63279,
             },
@@ -110,7 +116,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
     assert header_line.status_icon == "outside"
     assert header_line.status_text == "+35.5s"
     assert pb_line.value == "1:38.765"
-    assert latest_line.value == "1:41.234 (+2.5s)"
+    assert latest_line.value == "P5 · 1:41.234 (+2.5s) · Blue Falcon / Engine 40"
     assert attempts_line.value == "3 · finish 33.3% · comp 75.0%"
 
 

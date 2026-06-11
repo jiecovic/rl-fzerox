@@ -98,8 +98,10 @@ def record_entry(
     best_finish_time_ms: int | None = None,
     best_finish_time_rank: int | None = None,
     best_finish_time_setup: dict[str, str | int] | None = None,
+    latest_finish_rank: int | None = None,
     latest_finish_time_ms: int | None = None,
     latest_finish_delta_ms: int | None = None,
+    latest_finish_setup: dict[str, str | int] | None = None,
     attempt_stats: dict[str, int | float] | None = None,
     failed_attempt: bool = False,
 ) -> TrackRecordEntry:
@@ -110,8 +112,10 @@ def record_entry(
         best_finish_time_ms=best_finish_time_ms,
         best_finish_time_rank=best_finish_time_rank,
         best_finish_time_setup=best_finish_time_setup,
+        latest_finish_rank=latest_finish_rank,
         latest_finish_time_ms=latest_finish_time_ms,
         latest_finish_delta_ms=latest_finish_delta_ms,
+        latest_finish_setup=latest_finish_setup,
         attempt_stats=TrackAttemptStats.from_mapping(attempt_stats),
         failed_attempt=failed_attempt,
     )
