@@ -17,7 +17,6 @@ from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.policy_drive import PolicyDriveFrame
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
-from rl_fzerox.ui.watch.runtime.observation import configured_watch_zeroed_features
 from rl_fzerox.ui.watch.runtime.timing import _resolve_control_fps, _target_seconds
 
 if TYPE_CHECKING:
@@ -148,15 +147,7 @@ class CareerModeRuntimeSession:
         self._active_policy_key = policy_control.key
         self._active_policy_control = policy_control
         train_config = self._policy_race.train_config
-        self.watch_zeroed_state_features = configured_watch_zeroed_features(
-            self.config.model_copy(
-                update={
-                    "env": train_config.env,
-                    "policy": train_config.policy,
-                    "curriculum": train_config.curriculum,
-                }
-            )
-        )
+        self.watch_zeroed_state_features = frozenset()
         self.auxiliary_target_names = tuple(
             loss.name for loss in train_config.policy.auxiliary_state.losses
         )

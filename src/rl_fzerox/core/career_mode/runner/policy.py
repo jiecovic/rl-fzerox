@@ -98,8 +98,25 @@ class CareerPolicyRaceDriver:
 
 
 def _policy_train_config(policy_control: CareerModePolicyControl) -> TrainAppConfig:
-    return build_managed_train_app_config(
+    train_config = build_managed_train_app_config(
         policy_control.policy_run.config,
         run_id=policy_control.policy_run.id,
         run_dir=policy_control.policy_run.run_dir,
     )
+    return _career_runtime_train_config(train_config)
+
+
+def _career_runtime_train_config(train_config: TrainAppConfig) -> TrainAppConfig:
+    """Return an evaluation-style runtime config for Career Mode policy handoff."""
+
+    # Career attempts should replay the trained policy without episode-scoped
+    # training randomization. Keep the observation/action layout intact so the
+    # checkpoint still loads against its original shape.
+    action_config = train_config.env.action.model_copy(
+        update={"lean_episode_mask_probability": 0.0}
+    )
+    env_config = train_config.env.model_copy(update={"action": action_config})
+    runtime_train_config = train_config.train.model_copy(
+        update={"state_feature_dropout_groups": ()}
+    )
+    return train_config.model_copy(update={"env": env_config, "train": runtime_train_config})

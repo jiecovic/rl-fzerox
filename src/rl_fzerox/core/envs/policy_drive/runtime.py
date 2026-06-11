@@ -22,6 +22,7 @@ from rl_fzerox.core.envs.engine.controls import (
 )
 from rl_fzerox.core.envs.engine.controls.episode_dropout import sample_episode_lean_mask
 from rl_fzerox.core.envs.engine.info import backend_step_info, set_curriculum_info, telemetry_info
+from rl_fzerox.core.envs.engine.reset import EngineResetSeeds
 from rl_fzerox.core.envs.engine.stepping import (
     EnvStepRequest,
     set_episode_boost_pad_info,
@@ -66,6 +67,7 @@ class PolicyDriveRuntime:
         self._control_state = components.control_state
         self._step_assembler = components.step_assembler
         self._episode = components.episode
+        self._reset_seeds = EngineResetSeeds()
 
     @property
     def last_requested_control_state(self) -> RaceControlState:
@@ -81,13 +83,14 @@ class PolicyDriveRuntime:
         seed: int | None,
         course_id: str | None,
     ) -> tuple[ObservationValue, dict[str, object]]:
+        self._reset_seeds.remember_reset_seed(seed)
         self._episode.begin_reset(active_track=None)
         self._episode.uses_custom_baseline = False
         self._backend.set_controller_state(ControllerState())
         self._control_state.reset()
         self._episode.lean_episode_masked = sample_episode_lean_mask(
             probability=self._action_config.lean_episode_mask_probability,
-            seed=seed,
+            seed=self._reset_seeds.action_episode_mask_seed(seed),
         )
         self._mask_controller.set_lean_episode_masked(self._episode.lean_episode_masked)
         self._mask_controller.set_lean_allowed_values(
@@ -104,7 +107,11 @@ class PolicyDriveRuntime:
             mask_boost_when_airborne=self._action_config.mask_boost_when_airborne,
         )
         self._episode.last_telemetry = telemetry
-        self._reward_tracker.reset(telemetry, episode_seed=seed, course_id=course_id)
+        self._reward_tracker.reset(
+            telemetry,
+            episode_seed=self._reset_seeds.reward_episode_seed(seed),
+            course_id=course_id,
+        )
         self._reward_summary_config = self._reward_tracker.summary_config()
         self._step_assembler.reward_summary_config = self._reward_summary_config
         if isinstance(self._action_adapter, ResettableActionAdapter):
@@ -139,6 +146,7 @@ class PolicyDriveRuntime:
             image_shape=tuple(int(value) for value in image_observation.shape),
         )
         self._episode.last_info = dict(info)
+        self._reset_seeds.advance_reset_count()
         return observation, info
 
     def step_policy(self, action: ActionValue) -> PolicyDriveFrame:

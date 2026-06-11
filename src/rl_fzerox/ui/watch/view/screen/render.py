@@ -200,9 +200,9 @@ def _add_career_mode_info(info: dict[str, object], config: WatchAppConfig) -> No
     if config.watch.managed_save_game_id is None:
         return
     if config.watch.unlock_target_label is not None:
-        info["career_mode_target_label"] = config.watch.unlock_target_label
+        info.setdefault("career_mode_target_label", config.watch.unlock_target_label)
     if config.watch.save_attempt_id is not None:
-        info["career_mode_attempt_id"] = config.watch.save_attempt_id
+        info.setdefault("career_mode_attempt_id", config.watch.save_attempt_id)
 
 
 def _track_pool_records(

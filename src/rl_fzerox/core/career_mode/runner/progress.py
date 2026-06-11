@@ -118,7 +118,7 @@ class CareerAttemptProgress:
                 failure_reason=None,
             )
 
-        if info.get("termination_reason") == "finished":
+        if _keeps_current_gp_attempt(info):
             return CareerProgressTransition(attempt_finished=False)
 
         return self._finish_and_advance(
@@ -222,6 +222,11 @@ def _target_succeeded(
 def _failure_reason(info: dict[str, object]) -> str:
     reason = info.get("termination_reason")
     return reason if isinstance(reason, str) and reason else "race ended before cup clear"
+
+
+def _keeps_current_gp_attempt(info: dict[str, object]) -> bool:
+    reason = info.get("termination_reason")
+    return reason in {"finished", "crashed", "retired"}
 
 
 def _positive_int_info(info: dict[str, object], key: str) -> int | None:

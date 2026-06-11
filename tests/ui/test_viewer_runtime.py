@@ -27,6 +27,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingEntryConfig,
     TrainConfig,
     WatchAppConfig,
+    WatchConfig,
 )
 from rl_fzerox.ui.watch.records import TrackRecordBook, track_record_key
 from rl_fzerox.ui.watch.runtime.career_mode.menu import reset_race_progress_info
@@ -54,6 +55,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
 )
 from rl_fzerox.ui.watch.view.panels.content.records import track_record_sections
 from rl_fzerox.ui.watch.view.screen.render import (
+    _add_career_mode_info,
     _add_config_track_info,
     _observation_state_feature_names,
     _track_pool_records,
@@ -165,6 +167,32 @@ def test_configured_watch_zeroed_features_inherits_dropout_one_groups(tmp_path: 
     assert configured_watch_zeroed_features(config) == frozenset(
         {"track_position.edge_ratio", "course_context"}
     )
+
+
+def test_career_mode_render_info_keeps_runtime_target_and_attempt(tmp_path: Path) -> None:
+    db_path = tmp_path / "runs.db"
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    info: dict[str, object] = {
+        "career_mode_target_label": "Clear Expert Jack Cup",
+        "career_mode_attempt_id": "live-attempt",
+    }
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        watch=WatchConfig(
+            manager_db_path=db_path,
+            managed_save_game_id="save",
+            save_attempt_id="launch-attempt",
+            unlock_target_label="Clear Novice Joker Cup",
+        ),
+    )
+
+    _add_career_mode_info(info, config)
+
+    assert info["career_mode_target_label"] == "Clear Expert Jack Cup"
+    assert info["career_mode_attempt_id"] == "live-attempt"
 
 
 def test_viewer_state_feature_names_fall_back_to_image_state_config(tmp_path: Path) -> None:

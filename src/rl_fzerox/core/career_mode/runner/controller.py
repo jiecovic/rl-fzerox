@@ -275,12 +275,16 @@ class CareerModeController:
                     if selected_cup_index == target_cup_index:
                         self._enter_phase(CareerPhase.ENTER_MACHINE_SELECT)
                         return self._accept_until_phase("enter_machine_select")
+                    cup_input = _cup_selection_input(
+                        selected_cup_index=selected_cup_index,
+                        target_cup_index=target_cup_index,
+                    )
                     self._enter_phase(CareerPhase.SELECT_CUP)
                     return self._queue_tap(
-                        MenuInput.RIGHT,
+                        cup_input,
                         hold_frames=MENU_TIMING.menu_hold_frames,
                         settle_frames=MENU_TIMING.menu_settle_frames,
-                        phase="select_cup:right",
+                        phase=f"select_cup:{cup_input.value}",
                     )
                 case ObservedMenuScreen.MACHINE_SELECT:
                     self._difficulty_popup_state = DifficultyPopupState.CLOSED
@@ -856,6 +860,12 @@ def _pending_step_matches_observed_screen(
             ObservedMenuScreen.POST_GP,
         }
     return False
+
+
+def _cup_selection_input(*, selected_cup_index: int | None, target_cup_index: int) -> MenuInput:
+    if selected_cup_index is None or selected_cup_index < target_cup_index:
+        return MenuInput.RIGHT
+    return MenuInput.LEFT
 
 
 def _post_terminal_progress_screen(facts: MenuFacts) -> bool:

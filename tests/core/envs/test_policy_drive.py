@@ -213,6 +213,34 @@ def test_policy_drive_manual_spin_bypasses_policy_spin_mask(tmp_path: Path) -> N
     assert backend.last_spin_request == "right"
 
 
+def test_policy_drive_resamples_episode_lean_mask_with_fixed_attempt_seed(
+    tmp_path: Path,
+) -> None:
+    train_config = _train_config(tmp_path).model_copy(
+        update={
+            "env": EnvConfig(
+                action_repeat=3,
+                action=configured_discrete_action(
+                    "steer",
+                    "gas",
+                    "lean",
+                    lean_episode_mask_probability=0.5,
+                ),
+            )
+        }
+    )
+    runtime = PolicyDriveRuntime(
+        emulator=ScriptedPolicyDriveBackend([]),
+        train_config=train_config,
+    )
+
+    masks = [
+        runtime.begin(seed=7, course_id="mute_city")[1]["lean_episode_masked"] for _ in range(3)
+    ]
+
+    assert masks == [False, True, False]
+
+
 def _backend_step(
     *,
     frames_run: int,
