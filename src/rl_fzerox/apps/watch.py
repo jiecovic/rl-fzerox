@@ -16,7 +16,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     with manager_viewer_lease_session(
         db_path=args.manager_db_path,
         lease_id=args.viewer_lease_id,
-    ):
+    ) as lease_session:
         try:
             config = resolve_watch_app_config(
                 policy_run_dir=args.policy_run_dir,
@@ -29,7 +29,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         except (RuntimeError, ValueError) as exc:
             raise SystemExit(str(exc)) from exc
 
-        run_viewer(config)
+        run_viewer(config, viewer_heartbeat=lease_session.heartbeat)
 
 
 def _watch_session_name(viewer_lease_id: str | None) -> str | None:

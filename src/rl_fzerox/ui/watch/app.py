@@ -40,6 +40,7 @@ from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
 from rl_fzerox.ui.watch.view.screen.types import PygameModule, ViewerHitboxes
 
 WatchWorkerFactory = Callable[[WatchAppConfig], WatchWorker]
+ViewerHeartbeat = Callable[[], bool]
 
 __all__ = ["WatchWorkerFactory", "run_viewer"]
 
@@ -48,6 +49,7 @@ def run_viewer(
     config: WatchAppConfig,
     *,
     worker_factory: WatchWorkerFactory = start_watch_worker,
+    viewer_heartbeat: ViewerHeartbeat | None = None,
 ) -> None:
     """Run the watch UI while a worker process advances emulator state."""
 
@@ -64,7 +66,7 @@ def run_viewer(
     pygame.init()
     render_clock = pygame.time.Clock()
     try:
-        snapshot, worker_closed = wait_initial_snapshot(worker)
+        snapshot, worker_closed = wait_initial_snapshot(worker, viewer_heartbeat=viewer_heartbeat)
         target_render_fps = _resolve_render_fps(
             config.watch.render_fps,
             native_fps=snapshot.native_fps,
@@ -83,11 +85,13 @@ def run_viewer(
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
         auxiliary_metrics.observe_snapshot(snapshot)
         live_episode_series = getattr(snapshot, "live_episode_series", None)
-        policy_observation_layout_shape = _snapshot_policy_observation_shape(snapshot)
+        policy_observation_layout_shape = _initial_policy_observation_layout_shape(snapshot)
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
             render_clock.tick(render_limit)
+            if viewer_heartbeat is not None and not viewer_heartbeat():
+                return
 
             viewer_input = _poll_viewer_input(
                 pygame,
@@ -129,7 +133,8 @@ def run_viewer(
             )
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
-                policy_observation_layout_shape = _snapshot_policy_observation_shape(
+                policy_observation_layout_shape = _next_policy_observation_layout_shape(
+                    policy_observation_layout_shape,
                     snapshot,
                 )
                 auxiliary_metrics.observe_snapshot(snapshot)
@@ -220,11 +225,24 @@ def _default_policy_observation_layout_shape() -> tuple[int, int, int]:
     return (72, 96, 3)
 
 
-def _snapshot_policy_observation_shape(snapshot: object) -> tuple[int, ...]:
+def _initial_policy_observation_layout_shape(snapshot: object) -> tuple[int, ...]:
+    return (
+        _snapshot_policy_observation_shape(snapshot) or _default_policy_observation_layout_shape()
+    )
+
+
+def _next_policy_observation_layout_shape(
+    current_shape: tuple[int, ...],
+    snapshot: object,
+) -> tuple[int, ...]:
+    return _snapshot_policy_observation_shape(snapshot) or current_shape
+
+
+def _snapshot_policy_observation_shape(snapshot: object) -> tuple[int, ...] | None:
     value = getattr(snapshot, "policy_observation_shape", None)
     if isinstance(value, tuple) and all(isinstance(item, int) for item in value):
         return value
-    return _default_policy_observation_layout_shape()
+    return None
 
 
 def _system_cursor(pygame: PygameModule, name: str) -> object | None:

@@ -5,7 +5,11 @@ import numpy as np
 import pygame
 
 from fzerox_emulator import RaceControlState, display_size
-from rl_fzerox.ui.watch.app import _next_panel_tab_index
+from rl_fzerox.ui.watch.app import (
+    _initial_policy_observation_layout_shape,
+    _next_panel_tab_index,
+    _next_policy_observation_layout_shape,
+)
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_observation_preview_in_rect,
@@ -135,6 +139,22 @@ def test_next_panel_tab_index_cycles_tabs() -> None:
 
 def test_next_panel_tab_index_honors_direct_selection() -> None:
     assert _next_panel_tab_index(0, ViewerInput(panel_tab_index=2)) == 2
+
+
+def test_menu_snapshot_keeps_previous_policy_observation_layout_shape() -> None:
+    class _Snapshot:
+        def __init__(self, shape: tuple[int, ...] | None) -> None:
+            self.policy_observation_shape = shape
+
+    policy_shape = (72, 96, 6)
+    menu_snapshot = _Snapshot(None)
+
+    assert _initial_policy_observation_layout_shape(menu_snapshot) == (72, 96, 3)
+    assert _next_policy_observation_layout_shape(policy_shape, menu_snapshot) == policy_shape
+    assert _next_policy_observation_layout_shape(
+        policy_shape,
+        _Snapshot((84, 84, 12)),
+    ) == (84, 84, 12)
 
 
 def test_panel_tab_hint_shows_active_tab_position() -> None:

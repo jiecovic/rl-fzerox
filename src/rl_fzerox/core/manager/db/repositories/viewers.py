@@ -42,6 +42,22 @@ def get_viewer_lease(session: Session, lease_id: str) -> ManagedViewerLease | No
     return None if row is None else viewer_lease_from_model(row)
 
 
+def heartbeat_viewer_lease(
+    session: Session,
+    *,
+    lease_id: str,
+    pid: int,
+    heartbeat_at: str,
+) -> bool:
+    """Refresh one viewer lease heartbeat when it still belongs to a pid."""
+
+    row = session.get(ViewerLeaseModel, lease_id)
+    if row is None or row.pid != pid:
+        return False
+    row.heartbeat_at = heartbeat_at
+    return True
+
+
 def clear_viewer_lease(
     session: Session,
     *,

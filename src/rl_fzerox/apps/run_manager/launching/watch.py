@@ -12,6 +12,7 @@ from rl_fzerox.apps.run_manager.launching.processes import (
 )
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.watch import resolve_watch_app_config
+from rl_fzerox.core.manager.registry.viewers import viewer_lease_is_fresh
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
@@ -167,6 +168,9 @@ def active_watch_pid(
         return None
     if lease.kind != "run_watch" or lease.owner_id != run_id or lease.qualifier != artifact:
         store.clear_viewer_lease(lease_id=lease_id)
+        return None
+    if not viewer_lease_is_fresh(lease):
+        store.clear_viewer_lease(lease_id=lease_id, pid=lease.pid)
         return None
     if watch_process_matches(
         pid=lease.pid,

@@ -18,7 +18,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     with manager_viewer_lease_session(
         db_path=db_path,
         lease_id=args.viewer_lease_id,
-    ):
+    ) as lease_session:
         try:
             config = resolve_career_mode_config(
                 db_path=db_path,
@@ -30,4 +30,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
         except (FileNotFoundError, KeyError, RuntimeError, ValueError) as exc:
             raise SystemExit(str(exc)) from exc
-        run_viewer(config, worker_factory=start_career_mode_worker)
+        run_viewer(
+            config,
+            worker_factory=start_career_mode_worker,
+            viewer_heartbeat=lease_session.heartbeat,
+        )

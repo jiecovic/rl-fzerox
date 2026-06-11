@@ -714,6 +714,20 @@ class ManagerStore:
     def get_viewer_lease(self, lease_id: str) -> ManagedViewerLease | None:
         return viewer_registry.get_viewer_lease(self, lease_id)
 
+    def heartbeat_viewer_lease(
+        self,
+        *,
+        lease_id: str,
+        pid: int,
+        heartbeat_at: str,
+    ) -> bool:
+        return viewer_registry.heartbeat_viewer_lease(
+            self,
+            lease_id=lease_id,
+            pid=pid,
+            heartbeat_at=heartbeat_at,
+        )
+
     def clear_viewer_lease(
         self,
         *,

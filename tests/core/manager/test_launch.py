@@ -1,15 +1,19 @@
 # tests/core/manager/test_launch.py
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import BinaryIO
 
 import pytest
 
 from rl_fzerox.apps.run_manager.launch import ManagerRunLauncher
-from rl_fzerox.apps.run_manager.launching.watch import watch_failure_detail
+from rl_fzerox.apps.run_manager.launching.save_games import active_career_mode_runner_pid
+from rl_fzerox.apps.run_manager.launching.watch import active_watch_pid, watch_failure_detail
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_managed_run_config
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 
@@ -358,6 +362,52 @@ def test_watch_artifact_skips_duplicate_window(
     )
 
 
+def test_active_watch_pid_clears_stale_viewer_lease(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="watch-run",
+        name="Watch Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "watch-run",
+    )
+    lease_id = store.viewer_lease_id(
+        kind="run_watch",
+        owner_id=run.id,
+        qualifier="latest",
+    )
+    store.upsert_viewer_lease(
+        lease_id=lease_id,
+        kind="run_watch",
+        owner_id=run.id,
+        pid=os.getpid(),
+        qualifier="latest",
+    )
+    assert store.heartbeat_viewer_lease(
+        lease_id=lease_id,
+        pid=os.getpid(),
+        heartbeat_at=_stale_heartbeat_at(),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.watch.watch_process_matches",
+        lambda **_kwargs: True,
+    )
+
+    assert (
+        active_watch_pid(
+            store=store,
+            lease_id=lease_id,
+            run_id=run.id,
+            run_dir=run.run_dir,
+            artifact="latest",
+        )
+        is None
+    )
+    assert store.get_viewer_lease(lease_id) is None
+
+
 def test_watch_artifact_passes_viewer_lease_to_watch_process(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -490,12 +540,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
-    store.upsert_save_course_setup(
-        save_game_id=save_game.id,
-        scope="global",
-        policy_run_id=run.id,
-        policy_artifact="best",
-    )
+    _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="jack")
     launcher = ManagerRunLauncher(store)
     log_path = tmp_path / "logs" / f"{save_game.id}.log"
     log_path.parent.mkdir(parents=True)
@@ -578,3 +623,68 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
     assert "# launched_at=" in log_text
     assert "# command=" in log_text
     assert "career mode started" in log_text
+
+
+def test_active_career_mode_runner_pid_clears_stale_viewer_lease(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Unlock Save",
+        save_games_root=tmp_path / "career-saves",
+    )
+    lease_id = store.viewer_lease_id(kind="career_mode", owner_id=save_game.id)
+    store.upsert_viewer_lease(
+        lease_id=lease_id,
+        kind="career_mode",
+        owner_id=save_game.id,
+        pid=os.getpid(),
+    )
+    assert store.heartbeat_viewer_lease(
+        lease_id=lease_id,
+        pid=os.getpid(),
+        heartbeat_at=_stale_heartbeat_at(),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.save_games.career_mode_process_matches",
+        lambda **_kwargs: True,
+    )
+
+    assert (
+        active_career_mode_runner_pid(
+            store=store,
+            lease_id=lease_id,
+            save_game_id=save_game.id,
+        )
+        is None
+    )
+    assert store.get_viewer_lease(lease_id) is None
+
+
+def _stale_heartbeat_at() -> str:
+    return (datetime.now(UTC) - timedelta(minutes=1)).isoformat(timespec="seconds")
+
+
+def _configure_gp_cup(
+    store: ManagerStore,
+    *,
+    save_game_id: str,
+    run_id: str,
+    cup_id: str,
+) -> None:
+    store.upsert_save_cup_setup(
+        save_game_id=save_game_id,
+        cup_id=cup_id,
+        vehicle_id="blue_falcon",
+    )
+    for course in sorted(BUILT_IN_COURSES, key=lambda item: item.course_index):
+        if course.cup != cup_id:
+            continue
+        store.upsert_save_course_setup(
+            save_game_id=save_game_id,
+            cup_id=cup_id,
+            course_id=course.id,
+            policy_run_id=run_id,
+            policy_artifact="best",
+        )

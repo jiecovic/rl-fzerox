@@ -16,6 +16,7 @@ from rl_fzerox.apps.run_manager.launching.watch import (
     watch_config_overrides,
 )
 from rl_fzerox.core.manager import ManagedSaveAttempt, ManagerStore
+from rl_fzerox.core.manager.registry.viewers import viewer_lease_is_fresh
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
 WatchRenderer = Literal["angrylion", "gliden64"]
@@ -151,6 +152,9 @@ def active_career_mode_runner_pid(
         return None
     if lease.kind != "career_mode" or lease.owner_id != save_game_id:
         store.clear_viewer_lease(lease_id=lease_id)
+        return None
+    if not viewer_lease_is_fresh(lease):
+        store.clear_viewer_lease(lease_id=lease_id, pid=lease.pid)
         return None
     if career_mode_process_matches(pid=lease.pid, save_game_id=save_game_id):
         return lease.pid

@@ -125,7 +125,7 @@ def test_watch_clears_owned_viewer_lease_on_exit(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
         lambda config, **kwargs: (captured_materialize_kwargs.update(kwargs) or config),
     )
-    monkeypatch.setattr("rl_fzerox.apps.watch.run_viewer", lambda _config: None)
+    monkeypatch.setattr("rl_fzerox.apps.watch.run_viewer", lambda _config, **_kwargs: None)
 
     main(
         [
@@ -175,7 +175,7 @@ def test_watch_allows_run_dir_overrides_without_config(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch.run_viewer",
-        lambda config: captured.setdefault("config", config),
+        lambda config, **_kwargs: captured.setdefault("config", config),
     )
 
     main(
@@ -343,7 +343,7 @@ def test_watch_allows_run_dir_without_config(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch.run_viewer",
-        lambda config: captured.setdefault("config", config),
+        lambda config, **_kwargs: captured.setdefault("config", config),
     )
 
     main(["--run-dir", str(run_dir)])
@@ -396,7 +396,7 @@ def test_watch_cli_overrides_apply_after_run_manifest(
     )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch.run_viewer",
-        lambda config: captured.setdefault("config", config),
+        lambda config, **_kwargs: captured.setdefault("config", config),
     )
 
     main(
@@ -547,7 +547,7 @@ def test_run_viewer_exits_quietly_on_keyboard_interrupt(
     )
     monkeypatch.setattr(
         "rl_fzerox.ui.watch.app.wait_initial_snapshot",
-        lambda _worker: (SimpleNamespace(native_fps=30.0), False),
+        lambda _worker, **_kwargs: (SimpleNamespace(native_fps=30.0), False),
     )
     monkeypatch.setattr("rl_fzerox.ui.watch.app._create_fonts", lambda _pygame: object())
     monkeypatch.setattr(

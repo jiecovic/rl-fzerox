@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
 from queue import Empty, Full
@@ -275,8 +276,17 @@ def apply_viewer_input(
     return next_paused
 
 
-def wait_initial_snapshot(worker: WatchWorker) -> tuple[WatchSnapshot, bool]:
+ViewerHeartbeat = Callable[[], bool]
+
+
+def wait_initial_snapshot(
+    worker: WatchWorker,
+    *,
+    viewer_heartbeat: ViewerHeartbeat | None = None,
+) -> tuple[WatchSnapshot, bool]:
     while True:
+        if viewer_heartbeat is not None and not viewer_heartbeat():
+            raise RuntimeError("viewer lease is no longer active")
         try:
             message = worker.snapshot_queue.get(timeout=0.1)
         except Empty:
