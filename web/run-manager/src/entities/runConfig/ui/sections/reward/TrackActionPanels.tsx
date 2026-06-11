@@ -264,7 +264,7 @@ export function TrackActionPanels({
                 onChange={(value) => updateReward({ spin_request_penalty: value })}
               />
               <NumberField
-                help="Per-frame penalty while lean is held."
+                help="Per-frame penalty while lean remains active after startup."
                 label="Lean hold penalty"
                 resetValue={defaultConfig.reward.lean_request_penalty}
                 step="0.001"
@@ -272,7 +272,7 @@ export function TrackActionPanels({
                 onChange={(value) => updateReward({ lean_request_penalty: value })}
               />
               <NumberField
-                help="One-time penalty when lean changes from idle to active. This discourages lean chatter without making long holds expensive."
+                help="One-env-step startup penalty when lean changes from idle to active, scaled by action-repeat native frames."
                 label="Lean activation penalty"
                 resetValue={defaultConfig.reward.lean_activation_penalty}
                 step="0.001"

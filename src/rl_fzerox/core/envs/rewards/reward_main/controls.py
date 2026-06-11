@@ -30,15 +30,19 @@ def lean_request_penalty(
     summary: StepSummary,
     action_context: RewardActionContext | None,
     *,
+    previous_lean_requested: bool,
     weights: RewardMainWeights,
 ) -> float:
     penalty = weights.lean_request_penalty
     if penalty >= 0.0 or action_context is None or not action_context.lean_requested:
         return 0.0
+    if not previous_lean_requested and weights.lean_activation_penalty < 0.0:
+        return 0.0
     return max(int(summary.frames_run), 0) * penalty
 
 
 def lean_activation_penalty(
+    summary: StepSummary,
     action_context: RewardActionContext | None,
     *,
     previous_lean_requested: bool,
@@ -52,7 +56,7 @@ def lean_activation_penalty(
         or not action_context.lean_requested
     ):
         return 0.0
-    return penalty
+    return max(int(summary.frames_run), 0) * penalty
 
 
 def air_brake_request_penalty(

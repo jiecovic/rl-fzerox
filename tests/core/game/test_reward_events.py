@@ -162,7 +162,7 @@ def test_reward_main_penalizes_lean_request() -> None:
     assert step.breakdown == {"lean": -0.003}
 
 
-def test_reward_main_penalizes_lean_activation_once() -> None:
+def test_reward_main_uses_activation_penalty_for_first_lean_step() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
@@ -199,14 +199,14 @@ def test_reward_main_penalizes_lean_activation_once() -> None:
         RewardActionContext(lean_requested=True),
     )
 
-    assert first.reward == pytest.approx(-0.013)
-    assert first.breakdown == {"lean": -0.003, "lean_activation": -0.01}
+    assert first.reward == pytest.approx(-0.03)
+    assert first.breakdown == {"lean_activation": -0.03}
     assert held.reward == pytest.approx(-0.003)
     assert held.breakdown == {"lean": -0.003}
     assert released.reward == 0.0
     assert released.breakdown == {}
-    assert reactivated.reward == pytest.approx(-0.013)
-    assert reactivated.breakdown == {"lean": -0.003, "lean_activation": -0.01}
+    assert reactivated.reward == pytest.approx(-0.03)
+    assert reactivated.breakdown == {"lean_activation": -0.03}
 
 
 def test_reward_main_penalizes_grounded_pitch_outside_deadzone() -> None:

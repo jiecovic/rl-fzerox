@@ -288,6 +288,7 @@ class RewardMainTracker:
         lean_penalty = lean_request_penalty(
             summary,
             action_context,
+            previous_lean_requested=self._previous_lean_requested,
             weights=self._weights,
         )
         if lean_penalty:
@@ -295,6 +296,7 @@ class RewardMainTracker:
             breakdown["lean"] = lean_penalty
 
         lean_activation = lean_activation_penalty(
+            summary,
             action_context,
             previous_lean_requested=self._previous_lean_requested,
             weights=self._weights,
