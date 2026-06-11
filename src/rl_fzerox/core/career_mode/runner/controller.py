@@ -19,6 +19,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     continue_after_race_step,
     continue_next_course_step,
     course_id_from_info,
+    engine_adjust_steps,
     in_gp_race,
     machine_select_steps,
     observed_menu_screen,
@@ -87,6 +88,9 @@ class CareerModeController:
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
         self._engine_applied_course_id: str | None = None
         self._engine_adjust_taps = 0
+        self._engine_ready_course_id: str | None = None
+        self._engine_ready_target: int | None = None
+        self._engine_ready_frames = 0
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
@@ -480,6 +484,24 @@ class CareerModeController:
         )
         return raw_step(menu_input, hold_frames, phase=phase)
 
+    def _queue_menu_steps(self, steps: tuple[RawMenuStep, ...]) -> RawMenuStep:
+        if not steps:
+            return raw_step(MenuInput.NEUTRAL, 1, phase="menu_steps:empty")
+        self._pending_steps.extend(steps[1:])
+        return steps[0]
+
+    def _reset_engine_adjustment(self) -> None:
+        self._engine_applied_course_id = None
+        self._engine_adjust_taps = 0
+        self._engine_ready_course_id = None
+        self._engine_ready_target = None
+        self._engine_ready_frames = 0
+
+    def _reset_engine_confirmation(self) -> None:
+        self._engine_ready_course_id = None
+        self._engine_ready_target = None
+        self._engine_ready_frames = 0
+
     def _open_difficulty_popup(self) -> RawMenuStep:
         self._pending_steps.clear()
         self._difficulty_popup_state = DifficultyPopupState.OPENING
@@ -592,30 +614,35 @@ class CareerModeController:
         current = facts.engine_setting_raw_value
         target = course_setup.engine_setting_raw_value
         if current == target:
-            self._engine_applied_course_id = course_id
             self._engine_adjust_taps = 0
-            return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:ready")
+            if (
+                self._engine_ready_course_id == course_id
+                and self._engine_ready_target == target
+            ):
+                self._engine_ready_frames += 1
+            else:
+                self._engine_ready_course_id = course_id
+                self._engine_ready_target = target
+                self._engine_ready_frames = 1
+            if self._engine_ready_frames >= MENU_TIMING.engine_ready_confirm_frames:
+                self._engine_applied_course_id = course_id
+                return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:ready")
+            return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:confirm")
+        self._reset_engine_confirmation()
         if current is None:
             return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_read")
-        if self._engine_adjust_taps >= MENU_TIMING.max_engine_adjust_taps:
+        remaining_taps = MENU_TIMING.max_engine_adjust_taps - self._engine_adjust_taps
+        if remaining_taps <= 0:
             raise RuntimeError(
                 f"Career Mode could not reach the requested engine setting {target} from {current}"
             )
-        self._engine_adjust_taps += 1
-        delta = target - current
-        if delta > 0:
-            return self._queue_tap(
-                MenuInput.RIGHT,
-                hold_frames=MENU_TIMING.menu_hold_frames,
-                settle_frames=MENU_TIMING.menu_settle_frames,
-                phase="apply_engine:right",
-            )
-        return self._queue_tap(
-            MenuInput.LEFT,
-            hold_frames=MENU_TIMING.menu_hold_frames,
-            settle_frames=MENU_TIMING.menu_settle_frames,
-            phase="apply_engine:left",
+        steps = engine_adjust_steps(
+            current=current,
+            target=target,
+            max_taps=remaining_taps,
         )
+        self._engine_adjust_taps += _engine_adjust_tap_count(steps)
+        return self._queue_menu_steps(steps)
 
     def _course_select_matches_target(self, facts: MenuFacts) -> bool:
         return facts.difficulty_raw == self._setup_difficulty_raw_value()
@@ -701,8 +728,7 @@ class CareerModeController:
         self._setup = career_mode_race_setup_config(plan.race_setup)
         self._pending_steps.clear()
         self._phase = CareerPhase.CONTINUE_AFTER_RACE
-        self._engine_applied_course_id = None
-        self._engine_adjust_taps = 0
+        self._reset_engine_adjustment()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
@@ -723,6 +749,7 @@ class CareerModeController:
         self._phase = CareerPhase.CONTINUE_AFTER_RACE
         self._advance_presses_in_phase = 0
         self._engine_adjust_taps = 0
+        self._reset_engine_confirmation()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._awaiting_new_race_after_terminal = True
@@ -953,3 +980,7 @@ def _number_info(info: dict[str, object], key: str) -> float | None:
 
 def _non_empty_str(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _engine_adjust_tap_count(steps: tuple[RawMenuStep, ...]) -> int:
+    return sum(step.menu_input is not MenuInput.NEUTRAL for step in steps)

@@ -78,6 +78,10 @@ class CareerMenuTiming:
     start_settle_frames: int = 38
     menu_hold_frames: int = 8
     menu_settle_frames: int = 16
+    engine_adjust_hold_frames: int = 4
+    engine_adjust_settle_frames: int = 2
+    engine_adjust_max_taps_per_burst: int = 10
+    engine_ready_confirm_frames: int = 2
     difficulty_popup_open_settle_frames: int = 60
     result_continue_hold_frames: int = 4
     result_continue_settle_frames: int = 2
@@ -92,6 +96,10 @@ class CareerMenuTiming:
             self.start_settle_frames,
             self.menu_hold_frames,
             self.menu_settle_frames,
+            self.engine_adjust_hold_frames,
+            self.engine_adjust_settle_frames,
+            self.engine_adjust_max_taps_per_burst,
+            self.engine_ready_confirm_frames,
             self.difficulty_popup_open_settle_frames,
             self.result_continue_hold_frames,
             self.result_continue_settle_frames,
@@ -385,6 +393,38 @@ def machine_select_steps(
                 hold_frames=MENU_TIMING.menu_hold_frames,
                 settle_frames=MENU_TIMING.menu_settle_frames,
                 phase=f"select_machine:right:{tap_index + 1}",
+            )
+        )
+    return tuple(steps)
+
+
+def engine_adjust_steps(
+    *,
+    current: int,
+    target: int,
+    max_taps: int | None = None,
+) -> tuple[RawMenuStep, ...]:
+    """Return a bounded burst of engine slider taps toward the target value."""
+
+    delta = target - current
+    if delta == 0:
+        return ()
+    if max_taps is not None and max_taps <= 0:
+        return ()
+    menu_input = MenuInput.RIGHT if delta > 0 else MenuInput.LEFT
+    tap_count = min(
+        abs(delta),
+        MENU_TIMING.engine_adjust_max_taps_per_burst,
+        max_taps if max_taps is not None else abs(delta),
+    )
+    steps: list[RawMenuStep] = []
+    for tap_index in range(tap_count):
+        steps.extend(
+            tap_steps(
+                menu_input,
+                hold_frames=MENU_TIMING.engine_adjust_hold_frames,
+                settle_frames=MENU_TIMING.engine_adjust_settle_frames,
+                phase=f"apply_engine:{menu_input.value}:{tap_index + 1}/{tap_count}",
             )
         )
     return tuple(steps)
