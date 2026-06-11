@@ -33,7 +33,7 @@ interface WorkspaceBodyProps {
   runDetailsById: Record<string, ManagedRunDetail>;
   saveGames: ManagedSaveGame[];
   sessions: WorkspaceSessions;
-  onRefresh: () => Promise<void>;
+  onRefreshSaveGames: () => Promise<void>;
 }
 
 export function WorkspaceBody({
@@ -48,7 +48,7 @@ export function WorkspaceBody({
   runDetailsById,
   saveGames,
   sessions,
-  onRefresh,
+  onRefreshSaveGames,
 }: WorkspaceBodyProps) {
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const activeRunTab = sessions.activeRunTab;
@@ -138,7 +138,7 @@ export function WorkspaceBody({
           onOpenSaveGameDirectory={actions.openManagedSaveGameDirectory}
           onPatchSession={sessions.patchSaveGameSession}
           onRenameSaveGame={actions.renameManagedSaveGame}
-          onRefresh={onRefresh}
+          onRefresh={onRefreshSaveGames}
           onUpsertCourseSetup={actions.upsertManagedSaveCourseSetup}
           onUpsertCupSetup={actions.upsertManagedSaveCupSetup}
           onStartCareerMode={actions.startManagedCareerMode}

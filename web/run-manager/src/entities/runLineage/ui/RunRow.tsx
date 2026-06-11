@@ -1,5 +1,7 @@
 // web/run-manager/src/entities/runLineage/ui/RunRow.tsx
 
+import { memo } from "react";
+
 import { RunActivityIndicator } from "@/entities/run/ui/RunActivityIndicator";
 import {
   deleteDisabledReason,
@@ -27,7 +29,7 @@ interface RunRowProps {
   onStopRun: () => Promise<void>;
 }
 
-export function RunRow({
+export const RunRow = memo(function RunRow({
   busyActionRunId,
   entry,
   isDeleting,
@@ -185,6 +187,85 @@ export function RunRow({
       </div>
     </div>
   );
-}
+}, sameRunRowProps);
 
 const runSubtleClass = "text-[11px] tabular-nums text-app-muted";
+
+function sameRunRowProps(left: RunRowProps, right: RunRowProps) {
+  return (
+    left.busyActionRunId === right.busyActionRunId &&
+    left.isDeleting === right.isDeleting &&
+    sameRunLineageRun(left.entry, right.entry)
+  );
+}
+
+export function sameRunLineageRun(left: RunLineageRun, right: RunLineageRun) {
+  return (
+    left.childCount === right.childCount &&
+    left.dependentDraftCount === right.dependentDraftCount &&
+    left.depth === right.depth &&
+    left.isRoot === right.isRoot &&
+    left.stageLabel === right.stageLabel &&
+    sameRunSource(left.source, right.source) &&
+    sameRunForRow(left.run, right.run)
+  );
+}
+
+function sameRunSource(left: RunLineageRun["source"], right: RunLineageRun["source"]) {
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "root" || right.kind === "root") {
+    return true;
+  }
+  return (
+    left.artifactLabel === right.artifactLabel &&
+    left.parentName === right.parentName &&
+    left.stepLabel === right.stepLabel
+  );
+}
+
+function sameRunForRow(left: RunLineageRun["run"], right: RunLineageRun["run"]) {
+  return (
+    left.id === right.id &&
+    left.name === right.name &&
+    left.status === right.status &&
+    left.created_at === right.created_at &&
+    left.pending_command === right.pending_command &&
+    left.worker_heartbeat_at === right.worker_heartbeat_at &&
+    sameRuntime(left.runtime, right.runtime) &&
+    sameRecentEvents(left, right)
+  );
+}
+
+function sameRuntime(
+  left: RunLineageRun["run"]["runtime"],
+  right: RunLineageRun["run"]["runtime"],
+) {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  return (
+    left.total_timesteps === right.total_timesteps &&
+    left.num_timesteps === right.num_timesteps &&
+    left.progress_fraction === right.progress_fraction &&
+    left.updated_at === right.updated_at &&
+    left.fps === right.fps &&
+    left.episode_reward_mean === right.episode_reward_mean
+  );
+}
+
+function sameRecentEvents(left: RunLineageRun["run"], right: RunLineageRun["run"]) {
+  if (left.recent_events.length !== right.recent_events.length) {
+    return false;
+  }
+  return left.recent_events.every((event, index) => {
+    const other = right.recent_events[index];
+    return (
+      other !== undefined &&
+      event.created_at === other.created_at &&
+      event.kind === other.kind &&
+      event.message === other.message
+    );
+  });
+}

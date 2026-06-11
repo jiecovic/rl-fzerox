@@ -1,8 +1,8 @@
 // web/run-manager/src/entities/runLineage/ui/LineageCard.tsx
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { RunLineageGroup } from "@/entities/runLineage/model/types";
 import { runLineageMainGridClass, runLineageOuterGridClass } from "@/entities/runLineage/ui/layout";
-import { RunRow } from "@/entities/runLineage/ui/RunRow";
+import { RunRow, sameRunLineageRun } from "@/entities/runLineage/ui/RunRow";
 import type { ManagedRun } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { FieldInput } from "@/shared/ui/Field";
@@ -26,7 +26,7 @@ interface LineageCardProps {
   open: boolean;
 }
 
-export function LineageCard({
+export const LineageCard = memo(function LineageCard({
   busyActionRunId,
   isDeleting,
   lineage,
@@ -178,7 +178,7 @@ export function LineageCard({
       ) : null}
     </section>
   );
-}
+}, sameLineageCardProps);
 
 function parseLineageGroupInput(value: string) {
   return [
@@ -197,4 +197,31 @@ function formatGroupNames(groupNames: readonly string[]) {
 
 function groupNameKey(groupNames: readonly string[]) {
   return [...groupNames].sort((left, right) => left.localeCompare(right)).join("\n");
+}
+
+function sameLineageCardProps(left: LineageCardProps, right: LineageCardProps) {
+  return (
+    left.busyActionRunId === right.busyActionRunId &&
+    left.isDeleting === right.isDeleting &&
+    left.open === right.open &&
+    sameLineage(left.lineage, right.lineage)
+  );
+}
+
+function sameLineage(left: RunLineageGroup, right: RunLineageGroup) {
+  if (
+    left.id !== right.id ||
+    left.label !== right.label ||
+    left.createdAt !== right.createdAt ||
+    left.latestUpdatedAt !== right.latestUpdatedAt ||
+    left.canDeleteLineage !== right.canDeleteLineage ||
+    groupNameKey(left.groupNames) !== groupNameKey(right.groupNames) ||
+    left.runs.length !== right.runs.length
+  ) {
+    return false;
+  }
+  return left.runs.every((entry, index) => {
+    const other = right.runs[index];
+    return other !== undefined && sameRunLineageRun(entry, other);
+  });
 }

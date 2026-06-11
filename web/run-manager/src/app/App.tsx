@@ -73,7 +73,7 @@ export function App() {
           runDetailsById={managerData.runDetailsById}
           saveGames={managerData.saveGames}
           sessions={sessions}
-          onRefresh={() => managerData.reloadManagerData({ showLoading: false })}
+          onRefreshSaveGames={managerData.refreshSaveGames}
         />
         <ScrollButtons />
       </main>
