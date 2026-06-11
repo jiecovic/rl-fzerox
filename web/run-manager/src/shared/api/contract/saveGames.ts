@@ -15,8 +15,6 @@ export const saveUnlockTargetStatusSchema = z.enum([
 
 export const saveAttemptStatusSchema = z.enum(["running", "succeeded", "failed"]);
 
-export const courseSetupScopeSchema = z.enum(["global", "difficulty", "cup", "course"]);
-
 export const savePolicyArtifactSchema = z.enum(["latest", "best"]);
 
 export const policyPlaybackModeSchema = z.enum(["deterministic", "stochastic"]);
@@ -24,14 +22,22 @@ export const policyPlaybackModeSchema = z.enum(["deterministic", "stochastic"]);
 export const managedSaveCourseSetupSchema = z.object({
   id: z.string(),
   save_game_id: z.string(),
-  scope: courseSetupScopeSchema,
   difficulty: z.string().nullable(),
   cup_id: z.string().nullable(),
   course_id: z.string().nullable(),
   policy_run_id: z.string(),
   policy_artifact: savePolicyArtifactSchema,
-  vehicle_id: z.string(),
   engine_setting_raw_value: z.number().int().min(0).max(100),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const managedSaveCupSetupSchema = z.object({
+  id: z.string(),
+  save_game_id: z.string(),
+  difficulty: z.string().nullable(),
+  cup_id: z.string(),
+  vehicle_id: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -60,8 +66,6 @@ export const managedSaveAttemptSchema = z.object({
   id: z.string(),
   save_game_id: z.string(),
   target_kind: z.string().nullable(),
-  policy_run_id: z.string().nullable(),
-  policy_artifact: savePolicyArtifactSchema.nullable(),
   status: saveAttemptStatusSchema,
   difficulty: z.string().nullable(),
   cup_id: z.string().nullable(),
@@ -85,6 +89,7 @@ export const managedSaveGameSchema = z.object({
   unlock_progress: managedSaveUnlockProgressSchema.nullable(),
   attempts: z.array(managedSaveAttemptSchema),
   course_setups: z.array(managedSaveCourseSetupSchema),
+  cup_setups: z.array(managedSaveCupSetupSchema),
 });
 
 export const saveGamesResponseSchema = z.object({
@@ -106,9 +111,9 @@ export const openSaveGameDirectoryResponseSchema = z.object({
 export type ManagedSaveGame = z.infer<typeof managedSaveGameSchema>;
 export type ManagedSaveAttempt = z.infer<typeof managedSaveAttemptSchema>;
 export type ManagedSaveCourseSetup = z.infer<typeof managedSaveCourseSetupSchema>;
+export type ManagedSaveCupSetup = z.infer<typeof managedSaveCupSetupSchema>;
 export type ManagedSaveUnlockProgress = z.infer<typeof managedSaveUnlockProgressSchema>;
 export type ManagedSaveUnlockTarget = z.infer<typeof managedSaveUnlockTargetSchema>;
-export type CourseSetupScope = z.infer<typeof courseSetupScopeSchema>;
 export type PolicyPlaybackMode = z.infer<typeof policyPlaybackModeSchema>;
 export type SaveAttemptStatus = z.infer<typeof saveAttemptStatusSchema>;
 export type SavePolicyArtifact = z.infer<typeof savePolicyArtifactSchema>;

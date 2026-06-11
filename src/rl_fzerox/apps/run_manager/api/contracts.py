@@ -5,7 +5,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from rl_fzerox.core.manager import CourseSetupScope, ManagedRun, ManagedRunConfig
+from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
 
 WatchDevice = Literal["cpu", "cuda"]
 WatchRenderer = Literal["angrylion", "gliden64"]
@@ -64,18 +64,26 @@ class UpdateSaveGameRequest(BaseModel):
 
 
 class UpsertSaveCourseSetupRequest(BaseModel):
-    """Request body for assigning a policy to one save-game scope."""
+    """Request body for assigning a policy and engine to one save-game course."""
 
     model_config = ConfigDict(extra="forbid")
 
-    scope: CourseSetupScope
     policy_run_id: str
     policy_artifact: Literal["latest", "best"] = "best"
-    vehicle_id: str = "blue_falcon"
     engine_setting_raw_value: int = Field(default=50, ge=0, le=100)
     difficulty: str | None = None
     cup_id: str | None = None
     course_id: str | None = None
+
+
+class UpsertSaveCupSetupRequest(BaseModel):
+    """Request body for assigning a vehicle to one save-game cup."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cup_id: str
+    vehicle_id: str = "blue_falcon"
+    difficulty: str | None = None
 
 
 class UpdateDraftRequest(BaseModel):

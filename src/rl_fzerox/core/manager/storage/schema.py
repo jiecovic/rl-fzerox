@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import inspect, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.reflection import Inspector
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import (
@@ -16,6 +16,9 @@ from rl_fzerox.core.manager.db.models import (
     RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
     RunTrackSamplingGeneratedSlotModel,
+    SaveGameAttemptModel,
+    SaveGameCourseSetupModel,
+    SaveGameCupSetupModel,
     SchemaVersionModel,
 )
 from rl_fzerox.core.manager.db.repositories.configs import create_config_snapshot
@@ -24,12 +27,13 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
     "save_game_attempts",
     "save_game_course_setups",
+    "save_game_cup_setups",
 )
 RUN_CHILD_TABLES = (
     "run_commands",
@@ -150,25 +154,29 @@ def _assert_current_schema(
 
 
 def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
-    save_game_columns = {column["name"] for column in inspector.get_columns("save_games")}
-    legacy_columns = save_game_columns & {"last_started_at", "seed"}
-    if legacy_columns:
-        joined_columns = ", ".join(sorted(legacy_columns))
-        raise RuntimeError(
-            f"manager DB is not current: save_games has legacy columns {joined_columns}"
-        )
     for table_name in SAVE_GAME_CHILD_TABLES:
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "save_game_id" not in columns:
             raise RuntimeError(f"manager DB is not current: {table_name} is missing save_game_id")
     attempt_columns = {column["name"] for column in inspector.get_columns("save_game_attempts")}
-    if "target_kind" not in attempt_columns:
-        raise RuntimeError("manager DB is not current: save_game_attempts is missing target_kind")
     setup_columns = {column["name"] for column in inspector.get_columns("save_game_course_setups")}
-    for column_name in ("vehicle_id", "engine_setting_raw_value"):
+    for column_name in _required_column_names(SaveGameCourseSetupModel):
         if column_name not in setup_columns:
             raise RuntimeError(
                 f"manager DB is not current: save_game_course_setups is missing {column_name}"
+            )
+    cup_setup_columns = {
+        column["name"] for column in inspector.get_columns("save_game_cup_setups")
+    }
+    for column_name in _required_column_names(SaveGameCupSetupModel):
+        if column_name not in cup_setup_columns:
+            raise RuntimeError(
+                f"manager DB is not current: save_game_cup_setups is missing {column_name}"
+            )
+    for column_name in _required_column_names(SaveGameAttemptModel):
+        if column_name not in attempt_columns:
+            raise RuntimeError(
+                f"manager DB is not current: save_game_attempts is missing {column_name}"
             )
 
 
@@ -188,6 +196,10 @@ def _assert_track_sampling_entry_columns(*, inspector: Inspector) -> None:
         raise RuntimeError(
             f"manager DB is not current: run_track_sampling_entries is missing {joined_columns}"
         )
+
+
+def _required_column_names(model: type[DeclarativeBase]) -> set[str]:
+    return {column.name for column in model.__table__.columns}
 
 
 def _assert_track_sampling_artifact_columns(*, inspector: Inspector) -> None:

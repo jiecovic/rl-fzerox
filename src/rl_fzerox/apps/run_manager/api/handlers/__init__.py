@@ -52,6 +52,7 @@ from rl_fzerox.apps.run_manager.api.handlers.save_games import (
     save_games_payload,
     update_save_game_payload,
     upsert_save_course_setup_payload,
+    upsert_save_cup_setup_payload,
 )
 from rl_fzerox.apps.run_manager.api.handlers.transfer import (
     export_run_bundle_path,
@@ -93,6 +94,7 @@ __all__ = [
     "update_run_payload",
     "update_save_game_payload",
     "upsert_save_course_setup_payload",
+    "upsert_save_cup_setup_payload",
     "validate_source_fields",
     "watch_run_payload",
 ]

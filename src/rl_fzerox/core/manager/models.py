@@ -13,7 +13,6 @@ SaveGameStatus = Literal["created", "running", "paused", "finished", "failed"]
 SaveAttemptStatus = Literal["running", "succeeded", "failed"]
 SaveUnlockInspectionStatus = Literal["not_inspected", "inspected"]
 SaveUnlockTargetStatus = Literal["pending", "locked", "succeeded", "failed", "skipped"]
-CourseSetupScope = Literal["global", "difficulty", "cup", "course"]
 ViewerLeaseKind = Literal["run_watch", "career_mode"]
 
 
@@ -208,15 +207,26 @@ class ManagedSaveUnlockProgress:
 
 
 @dataclass(frozen=True, slots=True)
-class ManagedSaveCourseSetup:
-    """Policy and machine setup rule used by the career runner."""
+class ManagedSaveCupSetup:
+    """Machine setup selected once when a GP cup starts."""
 
     id: str
     save_game_id: str
-    scope: CourseSetupScope
+    cup_id: str
+    vehicle_id: str
+    created_at: str
+    updated_at: str
+    difficulty: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedSaveCourseSetup:
+    """Policy and engine setup for one career course."""
+
+    id: str
+    save_game_id: str
     policy_run_id: str
     policy_artifact: Literal["latest", "best"]
-    vehicle_id: str
     engine_setting_raw_value: int
     created_at: str
     updated_at: str
@@ -233,8 +243,6 @@ class ManagedSaveAttempt:
     save_game_id: str
     status: SaveAttemptStatus
     started_at: str
-    policy_run_id: str | None = None
-    policy_artifact: Literal["latest", "best"] | None = None
     target_kind: str | None = None
     difficulty: str | None = None
     cup_id: str | None = None

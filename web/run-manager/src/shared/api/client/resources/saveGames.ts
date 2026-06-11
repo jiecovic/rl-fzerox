@@ -1,7 +1,6 @@
 // web/run-manager/src/shared/api/client/resources/saveGames.ts
 import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
-  type CourseSetupScope,
   createSaveGameResponseSchema,
   type ManagedSaveGame,
   type ManagedSaveUnlockTarget,
@@ -86,8 +85,6 @@ export async function upsertSaveCourseSetup({
   policyArtifact,
   policyRunId,
   saveGameId,
-  scope,
-  vehicleId,
 }: {
   courseId?: string | null;
   cupId?: string | null;
@@ -96,21 +93,41 @@ export async function upsertSaveCourseSetup({
   policyArtifact: SavePolicyArtifact;
   policyRunId: string;
   saveGameId: string;
-  scope: CourseSetupScope;
-  vehicleId: string;
 }): Promise<ManagedSaveGame> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/course-setups`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      scope,
       difficulty: difficulty ?? null,
       cup_id: cupId ?? null,
       course_id: courseId ?? null,
       policy_run_id: policyRunId,
       policy_artifact: policyArtifact,
-      vehicle_id: vehicleId,
       engine_setting_raw_value: engineSettingRawValue,
+    }),
+  });
+  const payload = parseApiPayload(upsertSaveCourseSetupResponseSchema, await parseJson(response));
+  return payload.save_game;
+}
+
+export async function upsertSaveCupSetup({
+  cupId,
+  difficulty,
+  saveGameId,
+  vehicleId,
+}: {
+  cupId: string;
+  difficulty?: string | null;
+  saveGameId: string;
+  vehicleId: string;
+}): Promise<ManagedSaveGame> {
+  const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/cup-setups`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      cup_id: cupId,
+      difficulty: difficulty ?? null,
+      vehicle_id: vehicleId,
     }),
   });
   const payload = parseApiPayload(upsertSaveCourseSetupResponseSchema, await parseJson(response));

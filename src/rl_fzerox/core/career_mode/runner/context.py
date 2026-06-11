@@ -12,6 +12,7 @@ from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
+    ManagedSaveCupSetup,
     ManagedSaveGame,
     ManagedSaveUnlockTarget,
 )
@@ -26,6 +27,7 @@ class SaveAttemptExecutionContext:
     target: ManagedSaveUnlockTarget
     course_setup_target: CourseSetupTarget
     course_setup: ManagedSaveCourseSetup
+    cup_setup: ManagedSaveCupSetup
     policy_run: ManagedRun
     policy_artifact: Literal["latest", "best"]
     policy_path: Path

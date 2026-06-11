@@ -6,6 +6,7 @@ from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContex
 from rl_fzerox.core.manager import (
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
+    ManagedSaveCupSetup,
     ManagedSaveGame,
     ManagedSaveUnlockProgress,
     ManagedSaveUnlockTarget,
@@ -18,14 +19,26 @@ def save_course_setup_payload(
     return {
         "id": assignment.id,
         "save_game_id": assignment.save_game_id,
-        "scope": assignment.scope,
         "difficulty": assignment.difficulty,
         "cup_id": assignment.cup_id,
         "course_id": assignment.course_id,
         "policy_run_id": assignment.policy_run_id,
         "policy_artifact": assignment.policy_artifact,
-        "vehicle_id": assignment.vehicle_id,
         "engine_setting_raw_value": assignment.engine_setting_raw_value,
+        "created_at": assignment.created_at,
+        "updated_at": assignment.updated_at,
+    }
+
+
+def save_cup_setup_payload(
+    assignment: ManagedSaveCupSetup,
+) -> dict[str, object]:
+    return {
+        "id": assignment.id,
+        "save_game_id": assignment.save_game_id,
+        "difficulty": assignment.difficulty,
+        "cup_id": assignment.cup_id,
+        "vehicle_id": assignment.vehicle_id,
         "created_at": assignment.created_at,
         "updated_at": assignment.updated_at,
     }
@@ -36,8 +49,6 @@ def save_attempt_payload(attempt: ManagedSaveAttempt) -> dict[str, object]:
         "id": attempt.id,
         "save_game_id": attempt.save_game_id,
         "target_kind": attempt.target_kind,
-        "policy_run_id": attempt.policy_run_id,
-        "policy_artifact": attempt.policy_artifact,
         "status": attempt.status,
         "difficulty": attempt.difficulty,
         "cup_id": attempt.cup_id,
@@ -66,6 +77,7 @@ def save_attempt_execution_context_payload(
             "course_id": context.target.course_id,
         },
         "course_setup": save_course_setup_payload(context.course_setup),
+        "cup_setup": save_cup_setup_payload(context.cup_setup),
         "policy_run": run_summary_payload(context.policy_run),
         "policy_artifact": context.policy_artifact,
         "policy_path": str(context.policy_path),
@@ -105,6 +117,7 @@ def save_game_payload(
     unlock_progress: ManagedSaveUnlockProgress | None = None,
     attempts: tuple[ManagedSaveAttempt, ...] = (),
     course_setups: tuple[ManagedSaveCourseSetup, ...] = (),
+    cup_setups: tuple[ManagedSaveCupSetup, ...] = (),
 ) -> dict[str, object]:
     return {
         "id": save_game.id,
@@ -120,4 +133,5 @@ def save_game_payload(
         else save_unlock_progress_payload(unlock_progress),
         "attempts": [save_attempt_payload(attempt) for attempt in attempts],
         "course_setups": [save_course_setup_payload(assignment) for assignment in course_setups],
+        "cup_setups": [save_cup_setup_payload(assignment) for assignment in cup_setups],
     }

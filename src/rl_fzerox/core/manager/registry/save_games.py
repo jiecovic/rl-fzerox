@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING, Literal
 
 from rl_fzerox.core.career_mode.course_setup import (
     CourseSetupTarget,
+    has_cup_setup,
     missing_course_setup_targets,
     required_course_setup_targets,
     resolve_course_setup,
+    resolve_cup_setup,
 )
 from rl_fzerox.core.career_mode.progress import (
     UnlockRuleTarget,
@@ -22,9 +24,9 @@ from rl_fzerox.core.manager.artifacts.paths import predicted_managed_save_game_p
 from rl_fzerox.core.manager.db.repositories import runs as run_repository
 from rl_fzerox.core.manager.db.repositories import save_games as save_game_repository
 from rl_fzerox.core.manager.models import (
-    CourseSetupScope,
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
+    ManagedSaveCupSetup,
     ManagedSaveGame,
     ManagedSaveUnlockProgress,
     ManagedSaveUnlockTarget,
@@ -134,31 +136,34 @@ def list_course_setups(
         return save_game_repository.list_course_setups(session, save_game_id)
 
 
+def list_cup_setups(
+    store: ManagerStore,
+    save_game_id: str,
+) -> tuple[ManagedSaveCupSetup, ...]:
+    """Return cup vehicle setups for one save game."""
+
+    store.initialize()
+    with store._orm_session() as session:
+        return save_game_repository.list_cup_setups(session, save_game_id)
+
+
 def start_save_attempt(
     store: ManagerStore,
     *,
     save_game_id: str,
     target_kind: str | None = None,
-    policy_run_id: str | None = None,
-    policy_artifact: Literal["latest", "best"] | None = None,
     difficulty: str | None = None,
     cup_id: str | None = None,
     course_id: str | None = None,
 ) -> ManagedSaveAttempt:
     """Record the start of one unlock attempt."""
 
-    if policy_run_id is None and policy_artifact is not None:
-        raise ValueError("policy_artifact requires policy_run_id")
-    if policy_run_id is not None and policy_artifact is None:
-        raise ValueError("policy_run_id requires policy_artifact")
     store.initialize()
     now = utc_now()
     attempt = ManagedSaveAttempt(
         id=new_record_id(f"{save_game_id} attempt"),
         save_game_id=save_game_id,
         target_kind=target_kind,
-        policy_run_id=policy_run_id,
-        policy_artifact=policy_artifact,
         status="running",
         difficulty=difficulty,
         cup_id=cup_id,
@@ -168,10 +173,6 @@ def start_save_attempt(
     with store._orm_session() as session:
         if save_game_repository.get_save_game(session, save_game_id) is None:
             raise KeyError("save game not found")
-        if policy_run_id is not None and not save_game_repository.run_exists(
-            session, policy_run_id
-        ):
-            raise KeyError("policy run not found")
         save_game_repository.insert_save_attempt(session, attempt)
         save_game_repository.touch_save_game(
             session,
@@ -340,16 +341,10 @@ def get_save_attempt_execution_context(
             raise ValueError("save attempt is not running")
         if attempt.target_kind is None:
             raise ValueError("save attempt is missing an unlock target")
-        if attempt.policy_run_id is None or attempt.policy_artifact is None:
-            raise ValueError("save attempt is missing a resolved policy")
-
         save_game = save_game_repository.get_save_game(session, attempt.save_game_id)
         if save_game is None:
             raise KeyError("save game not found")
         target = _target_for_attempt(attempt)
-        policy_run = run_repository.get_managed_run(session, attempt.policy_run_id)
-        if policy_run is None:
-            raise KeyError("policy run not found")
 
         course_setups = save_game_repository.list_course_setups(session, attempt.save_game_id)
         course_setup_target = CourseSetupTarget(
@@ -357,6 +352,10 @@ def get_save_attempt_execution_context(
             cup_id=attempt.cup_id,
             course_id=attempt.course_id,
         )
+        cup_setups = save_game_repository.list_cup_setups(session, attempt.save_game_id)
+        cup_setup = resolve_cup_setup(cup_setups, course_setup_target)
+        if cup_setup is None:
+            raise ValueError("save attempt is missing a resolved cup vehicle setup")
         missing_targets = missing_course_setup_targets(
             course_setups,
             course_setup_target,
@@ -374,17 +373,23 @@ def get_save_attempt_execution_context(
         )
         if course_setup is None:
             raise ValueError("save attempt is missing a resolved course setup")
+        if not save_game_repository.run_exists(session, course_setup.policy_run_id):
+            raise KeyError("policy run not found")
+        policy_run = run_repository.get_managed_run(session, course_setup.policy_run_id)
+        if policy_run is None:
+            raise KeyError("policy run not found")
         return SaveAttemptExecutionContext(
             save_game=save_game,
             attempt=attempt,
             target=target.to_progress_target(status="pending"),
             course_setup_target=course_setup_target,
             course_setup=course_setup,
+            cup_setup=cup_setup,
             policy_run=policy_run,
-            policy_artifact=attempt.policy_artifact,
+            policy_artifact=course_setup.policy_artifact,
             policy_path=resolve_policy_artifact_path(
                 policy_run.run_dir,
-                artifact=attempt.policy_artifact,
+                artifact=course_setup.policy_artifact,
             ),
         )
 
@@ -427,10 +432,8 @@ def upsert_course_setup(
     store: ManagerStore,
     *,
     save_game_id: str,
-    scope: CourseSetupScope,
     policy_run_id: str,
     policy_artifact: Literal["latest", "best"],
-    vehicle_id: str = "blue_falcon",
     engine_setting_raw_value: int = 50,
     difficulty: str | None = None,
     cup_id: str | None = None,
@@ -438,35 +441,22 @@ def upsert_course_setup(
 ) -> ManagedSaveCourseSetup:
     """Create or update one save-game course setup."""
 
-    _validate_course_setup_scope(
-        scope=scope,
-        difficulty=difficulty,
-        cup_id=cup_id,
-        course_id=course_id,
-    )
-    _validate_vehicle_setup(
-        vehicle_id=vehicle_id,
-        engine_setting_raw_value=engine_setting_raw_value,
-    )
+    _validate_course_setup_target(course_id=course_id)
+    _validate_engine_setting(engine_setting_raw_value=engine_setting_raw_value)
     store.initialize()
     now = utc_now()
     with store._orm_session() as session:
         save_game = save_game_repository.get_save_game(session, save_game_id)
         if save_game is None:
             raise KeyError("save game not found")
-        progress = build_unlock_progress(save_game.save_path)
-        if vehicle_id not in progress.unlocked_vehicle_ids:
-            raise ValueError(f"vehicle {vehicle_id!r} is not unlocked in this save game")
         if not save_game_repository.run_exists(session, policy_run_id):
             raise KeyError("policy run not found")
         course_setup = save_game_repository.upsert_course_setup(
             session,
             setup_id=new_record_id(f"{save_game_id} setup"),
             save_game_id=save_game_id,
-            scope=scope,
             policy_run_id=policy_run_id,
             policy_artifact=policy_artifact,
-            vehicle_id=vehicle_id,
             engine_setting_raw_value=engine_setting_raw_value,
             created_at=now,
             updated_at=now,
@@ -480,6 +470,44 @@ def upsert_course_setup(
             updated_at=now,
         )
         return course_setup
+
+
+def upsert_cup_setup(
+    store: ManagerStore,
+    *,
+    save_game_id: str,
+    cup_id: str,
+    vehicle_id: str,
+    difficulty: str | None = None,
+) -> ManagedSaveCupSetup:
+    """Create or update one save-game cup vehicle setup."""
+
+    vehicle_by_id(vehicle_id)
+    store.initialize()
+    now = utc_now()
+    with store._orm_session() as session:
+        save_game = save_game_repository.get_save_game(session, save_game_id)
+        if save_game is None:
+            raise KeyError("save game not found")
+        progress = build_unlock_progress(save_game.save_path)
+        if vehicle_id not in progress.unlocked_vehicle_ids:
+            raise ValueError(f"vehicle {vehicle_id!r} is not unlocked in this save game")
+        cup_setup = save_game_repository.upsert_cup_setup(
+            session,
+            setup_id=new_record_id(f"{save_game_id} cup setup"),
+            save_game_id=save_game_id,
+            cup_id=cup_id,
+            vehicle_id=vehicle_id,
+            created_at=now,
+            updated_at=now,
+            difficulty=difficulty,
+        )
+        save_game_repository.touch_save_game(
+            session,
+            save_game_id=save_game_id,
+            updated_at=now,
+        )
+        return cup_setup
 
 
 def update_save_game_status(
@@ -512,11 +540,14 @@ def _insert_policy_backed_save_attempt(
     error_subject: str,
 ) -> ManagedSaveAttempt:
     course_setups = save_game_repository.list_course_setups(session, save_game_id)
+    cup_setups = save_game_repository.list_cup_setups(session, save_game_id)
     course_setup_target = CourseSetupTarget(
         difficulty=target.difficulty,
         cup_id=target.cup_id,
         course_id=target.course_id,
     )
+    if not has_cup_setup(cup_setups, course_setup_target):
+        raise ValueError(f"{error_subject} has no matching cup vehicle setup")
     missing_targets = missing_course_setup_targets(course_setups, course_setup_target)
     if missing_targets:
         missing_labels = ", ".join(_course_setup_target_label(item) for item in missing_targets)
@@ -526,14 +557,15 @@ def _insert_policy_backed_save_attempt(
     course_setup = resolve_course_setup(course_setups, course_setup_target)
     if course_setup is None:
         raise ValueError(f"{error_subject} has no matching course setup")
-    if not save_game_repository.run_exists(session, course_setup.policy_run_id):
-        raise KeyError("policy run not found")
+    _validate_required_course_setup_runs(
+        session,
+        course_setups=course_setups,
+        targets=resolved_targets,
+    )
     attempt = ManagedSaveAttempt(
         id=new_record_id(f"{save_game_id} attempt"),
         save_game_id=save_game_id,
         target_kind=target.kind,
-        policy_run_id=course_setup.policy_run_id,
-        policy_artifact=course_setup.policy_artifact,
         status="running",
         difficulty=target.difficulty,
         cup_id=target.cup_id,
@@ -582,23 +614,23 @@ def _target_for_attempt(attempt: ManagedSaveAttempt) -> UnlockRuleTarget:
     raise ValueError("save attempt target is not part of the unlock path")
 
 
-def _validate_course_setup_scope(
+def _validate_required_course_setup_runs(
+    session: Session,
     *,
-    scope: CourseSetupScope,
-    difficulty: str | None,
-    cup_id: str | None,
-    course_id: str | None,
+    course_setups: tuple[ManagedSaveCourseSetup, ...],
+    targets: tuple[CourseSetupTarget, ...],
 ) -> None:
-    if scope == "global" and any(value is not None for value in (difficulty, cup_id, course_id)):
-        raise ValueError("global course setups cannot include difficulty, cup, or course")
-    if scope == "difficulty" and (
-        difficulty is None or cup_id is not None or course_id is not None
-    ):
-        raise ValueError("difficulty course setups require only difficulty")
-    if scope == "cup" and (cup_id is None or course_id is not None):
-        raise ValueError("cup course setups require cup and may include difficulty")
-    if scope == "course" and course_id is None:
-        raise ValueError("course course setups require course")
+    for target in targets:
+        course_setup = resolve_course_setup(course_setups, target)
+        if course_setup is None:
+            raise ValueError(f"save attempt has no matching course setup for {target.course_id}")
+        if not save_game_repository.run_exists(session, course_setup.policy_run_id):
+            raise KeyError("policy run not found")
+
+
+def _validate_course_setup_target(*, course_id: str | None) -> None:
+    if course_id is None:
+        raise ValueError("course setups require course")
 
 
 def _course_setup_target_label(target: CourseSetupTarget) -> str:
@@ -610,8 +642,7 @@ def _course_setup_target_label(target: CourseSetupTarget) -> str:
     return "/".join(parts)
 
 
-def _validate_vehicle_setup(*, vehicle_id: str, engine_setting_raw_value: int) -> None:
-    vehicle_by_id(vehicle_id)
+def _validate_engine_setting(*, engine_setting_raw_value: int) -> None:
     if not 0 <= engine_setting_raw_value <= 100:
         raise ValueError(
             f"engine_setting_raw_value must be in [0, 100], got {engine_setting_raw_value}"

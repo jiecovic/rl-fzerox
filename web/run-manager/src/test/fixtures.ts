@@ -182,6 +182,7 @@ export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): Manag
     },
     attempts: [],
     course_setups: [],
+    cup_setups: [],
     ...overrides,
   };
 }

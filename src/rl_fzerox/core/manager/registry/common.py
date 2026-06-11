@@ -11,7 +11,6 @@ from uuid import uuid4
 
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.models import (
-    CourseSetupScope,
     RunCommand,
     RunStatus,
     SaveAttemptStatus,
@@ -103,19 +102,6 @@ def save_attempt_status(value: object) -> SaveAttemptStatus:
         case "failed":
             return "failed"
     raise ValueError(f"Unsupported managed save attempt status: {value!r}")
-
-
-def course_setup_scope(value: object) -> CourseSetupScope:
-    match value:
-        case "global":
-            return "global"
-        case "difficulty":
-            return "difficulty"
-        case "cup":
-            return "cup"
-        case "course":
-            return "course"
-    raise ValueError(f"Unsupported save course setup scope: {value!r}")
 
 
 def run_command(value: object) -> RunCommand | None:

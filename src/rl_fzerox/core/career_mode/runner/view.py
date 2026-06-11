@@ -73,7 +73,6 @@ def career_viewer_info(
                 "career_mode_policy_artifact": active_policy_control.course_setup.policy_artifact,
                 "career_mode_policy_run_id": active_policy_control.policy_run.id,
                 "career_mode_policy_run_name": active_policy_control.policy_run.name,
-                "career_mode_policy_scope": active_policy_control.course_setup.scope,
                 "career_mode_policy_course_id": (
                     active_policy_control.course_setup.course_id or course_id_from_info(info)
                 ),

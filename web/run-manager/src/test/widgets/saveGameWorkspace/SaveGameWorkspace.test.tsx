@@ -55,16 +55,30 @@ describe("SaveGameWorkspace", () => {
   it("stages broad course setup controls and saves course setups", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture();
-    const run = runFixture({ id: "run-policy", name: "fast policy", status: "finished" });
+    const run = runFixture({
+      id: "run-policy",
+      name: "fast policy",
+      status: "finished",
+      vehicle_setup: {
+        engine_mode: "fixed",
+        engine_setting_max_raw_value: 70,
+        engine_setting_min_raw_value: 70,
+        engine_setting_raw_value: 70,
+        selected_vehicle_ids: ["blue_falcon"],
+        selection_mode: "fixed",
+      },
+    });
     const onUpsertCourseSetup = vi.fn().mockResolvedValue(saveGame);
+    const onUpsertCupSetup = vi.fn().mockResolvedValue(saveGame);
 
     renderSaveGameWorkspace({
       runs: [run],
       saveGame,
       onUpsertCourseSetup,
+      onUpsertCupSetup,
     });
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Default policy" }), run.id);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), run.id);
     expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
@@ -81,27 +95,14 @@ describe("SaveGameWorkspace", () => {
       policyArtifact: "best",
       policyRunId: "run-policy",
       saveGameId: "save-001",
-      scope: "course",
-      vehicleId: "blue_falcon",
     });
-    expect(onUpsertCourseSetup).not.toHaveBeenCalledWith(
-      expect.objectContaining({ scope: "global" }),
-    );
-    expect(onUpsertCourseSetup).not.toHaveBeenCalledWith(expect.objectContaining({ scope: "cup" }));
+    expect(onUpsertCupSetup).not.toHaveBeenCalled();
   });
 
   it("counts one dirty change for one course engine override", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
-      course_setups: [
-        {
-          ...globalCourseSetupFixture(),
-          id: "assignment-jack-cup",
-          course_id: null,
-          cup_id: "jack",
-          scope: "cup",
-        },
-      ],
+      course_setups: [courseSetupFixture({ course_id: "mute_city", cup_id: "jack" })],
     });
     const onUpsertCourseSetup = vi.fn().mockResolvedValue(saveGame);
 
@@ -128,15 +129,14 @@ describe("SaveGameWorkspace", () => {
       policyArtifact: "best",
       policyRunId: "run-policy",
       saveGameId: "save-001",
-      scope: "course",
-      vehicleId: "blue_falcon",
     });
   });
 
   it("starts the visible career runner for the next target", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
-      course_setups: [globalCourseSetupFixture()],
+      course_setups: courseSetupsForCup("jack"),
+      cup_setups: [cupSetupFixture({ cup_id: "jack" })],
     });
     const onStartCareerMode = vi.fn().mockResolvedValue("started");
     const onRefresh = vi.fn().mockResolvedValue(undefined);
@@ -169,7 +169,8 @@ describe("SaveGameWorkspace", () => {
   it("starts the visible career runner for a clicked unlock target", async () => {
     const user = userEvent.setup();
     const baseSaveGame = saveGameFixture({
-      course_setups: [globalCourseSetupFixture()],
+      course_setups: courseSetupsForCup("queen"),
+      cup_setups: [cupSetupFixture({ cup_id: "queen" })],
     });
     const baseProgress = baseSaveGame.unlock_progress;
     if (baseProgress === null) {
@@ -181,7 +182,8 @@ describe("SaveGameWorkspace", () => {
     }
     const launchableSelectedTarget = { ...selectedTarget, status: "pending" } as const;
     const saveGame = saveGameFixture({
-      course_setups: [globalCourseSetupFixture()],
+      course_setups: courseSetupsForCup("queen"),
+      cup_setups: [cupSetupFixture({ cup_id: "queen" })],
       unlock_progress: {
         ...baseProgress,
         inspection_status: "inspected",
@@ -210,15 +212,8 @@ describe("SaveGameWorkspace", () => {
   it("starts a cup target from a cup setup", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
-      course_setups: [
-        {
-          ...globalCourseSetupFixture(),
-          id: "assignment-king-1",
-          course_id: null,
-          cup_id: "king",
-          scope: "cup",
-        },
-      ],
+      course_setups: courseSetupsForCup("king"),
+      cup_setups: [cupSetupFixture({ cup_id: "king" })],
       unlock_progress: {
         inspection_status: "inspected",
         completed_count: 2,
@@ -273,7 +268,8 @@ describe("SaveGameWorkspace", () => {
     renderSaveGameWorkspace({
       saveGame: saveGameFixture({
         status: "paused",
-        course_setups: [globalCourseSetupFixture()],
+        course_setups: courseSetupsForCup("jack"),
+        cup_setups: [cupSetupFixture({ cup_id: "jack" })],
       }),
     });
 
@@ -285,7 +281,8 @@ describe("SaveGameWorkspace", () => {
     renderSaveGameWorkspace({
       saveGame: saveGameFixture({
         status: "paused",
-        course_setups: [globalCourseSetupFixture()],
+        course_setups: courseSetupsForCup("queen"),
+        cup_setups: [cupSetupFixture({ cup_id: "queen" })],
         unlock_progress: {
           inspection_status: "inspected",
           completed_count: 1,
@@ -339,7 +336,8 @@ describe("SaveGameWorkspace", () => {
     renderSaveGameWorkspace({
       saveGame: saveGameFixture({
         status: "paused",
-        course_setups: [globalCourseSetupFixture()],
+        course_setups: courseSetupsForCup("jack"),
+        cup_setups: [cupSetupFixture({ cup_id: "jack" })],
         attempts: [
           {
             id: "attempt-001",
@@ -350,8 +348,6 @@ describe("SaveGameWorkspace", () => {
             finish_position: 1,
             finish_time_s: null,
             finished_at: "2026-06-02T10:40:00+00:00",
-            policy_artifact: "best",
-            policy_run_id: "run-policy",
             save_game_id: "save-001",
             started_at: "2026-06-02T10:30:00+00:00",
             status: "failed",
@@ -382,6 +378,7 @@ function renderSaveGameWorkspace({
   onOpenSaveGameDirectory = vi.fn(),
   onRefresh = vi.fn(),
   onUpsertCourseSetup = vi.fn(),
+  onUpsertCupSetup = vi.fn(),
   onStartCareerMode = vi.fn(),
   runs = [],
   saveGame,
@@ -389,6 +386,7 @@ function renderSaveGameWorkspace({
   onOpenSaveGameDirectory?: (saveGameId: string) => Promise<void>;
   onRefresh?: () => Promise<void>;
   onUpsertCourseSetup?: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
+  onUpsertCupSetup?: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCupSetup"];
   onStartCareerMode?: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
   runs?: Parameters<typeof SaveGameWorkspace>[0]["runs"];
   saveGame: ManagedSaveGame;
@@ -399,26 +397,55 @@ function renderSaveGameWorkspace({
       onRefresh={onRefresh}
       onStartCareerMode={onStartCareerMode}
       onUpsertCourseSetup={onUpsertCourseSetup}
+      onUpsertCupSetup={onUpsertCupSetup}
       runs={runs}
       saveGame={saveGame}
     />,
   );
 }
 
-function globalCourseSetupFixture() {
+function courseSetupsForCup(cupId: string): ManagedSaveGame["course_setups"] {
+  return configMetadataFixture.built_in_courses
+    .filter((course) => course.cup === cupId)
+    .map((course) =>
+      courseSetupFixture({
+        id: `assignment-${course.id}`,
+        cup_id: cupId,
+        course_id: course.id,
+      }),
+    );
+}
+
+function courseSetupFixture(
+  overrides: Partial<ManagedSaveGame["course_setups"][number]> = {},
+): ManagedSaveGame["course_setups"][number] {
   return {
     id: "assignment-001",
-    course_id: null,
-    cup_id: null,
+    course_id: "mute_city",
+    cup_id: "jack",
     difficulty: null,
     policy_artifact: "best" as const,
     policy_run_id: "run-policy",
     save_game_id: "save-001",
-    scope: "global" as const,
-    vehicle_id: "blue_falcon",
     engine_setting_raw_value: 50,
     created_at: "2026-06-02T10:30:00+00:00",
     updated_at: "2026-06-02T10:30:00+00:00",
+    ...overrides,
+  };
+}
+
+function cupSetupFixture(
+  overrides: Partial<ManagedSaveGame["cup_setups"][number]> = {},
+): ManagedSaveGame["cup_setups"][number] {
+  return {
+    id: "cup-setup-001",
+    cup_id: "jack",
+    difficulty: null,
+    save_game_id: "save-001",
+    vehicle_id: "blue_falcon",
+    created_at: "2026-06-02T10:30:00+00:00",
+    updated_at: "2026-06-02T10:30:00+00:00",
+    ...overrides,
   };
 }
 
@@ -463,6 +490,7 @@ function StatefulNewSaveGameWorkspace({
       onRefresh={vi.fn()}
       onRenameSaveGame={vi.fn()}
       onUpsertCourseSetup={vi.fn()}
+      onUpsertCupSetup={vi.fn()}
       onStartCareerMode={vi.fn()}
     />
   );
@@ -473,6 +501,7 @@ function StatefulExistingSaveGameWorkspace({
   onRefresh,
   onStartCareerMode,
   onUpsertCourseSetup,
+  onUpsertCupSetup,
   runs,
   saveGame,
 }: {
@@ -480,6 +509,7 @@ function StatefulExistingSaveGameWorkspace({
   onRefresh: () => Promise<void>;
   onStartCareerMode: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
   onUpsertCourseSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
+  onUpsertCupSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCupSetup"];
   runs: Parameters<typeof SaveGameWorkspace>[0]["runs"];
   saveGame: ManagedSaveGame;
 }) {
@@ -500,6 +530,7 @@ function StatefulExistingSaveGameWorkspace({
       onRefresh={onRefresh}
       onRenameSaveGame={vi.fn()}
       onUpsertCourseSetup={onUpsertCourseSetup}
+      onUpsertCupSetup={onUpsertCupSetup}
       onStartCareerMode={onStartCareerMode}
     />
   );

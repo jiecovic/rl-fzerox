@@ -157,8 +157,6 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     assert save_attempt_columns == {
         "id",
         "save_game_id",
-        "policy_run_id",
-        "policy_artifact",
         "status",
         "target_kind",
         "difficulty",
@@ -173,14 +171,22 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     assert course_setup_columns == {
         "id",
         "save_game_id",
-        "scope",
         "difficulty",
         "cup_id",
         "course_id",
         "policy_run_id",
         "policy_artifact",
-        "vehicle_id",
         "engine_setting_raw_value",
+        "created_at",
+        "updated_at",
+    }
+    cup_setup_columns = _table_columns(store, "save_game_cup_setups")
+    assert cup_setup_columns == {
+        "id",
+        "save_game_id",
+        "difficulty",
+        "cup_id",
+        "vehicle_id",
         "created_at",
         "updated_at",
     }

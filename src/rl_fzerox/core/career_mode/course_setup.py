@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
-from rl_fzerox.core.manager.models import CourseSetupScope, ManagedSaveCourseSetup
+from rl_fzerox.core.manager.models import ManagedSaveCourseSetup, ManagedSaveCupSetup
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,27 +18,37 @@ class CourseSetupTarget:
     course_id: str | None = None
 
 
-COURSE_SETUP_RESOLUTION_ORDER: tuple[CourseSetupScope, ...] = (
-    "course",
-    "cup",
-    "difficulty",
-    "global",
-)
-
-
 def resolve_course_setup(
     setups: tuple[ManagedSaveCourseSetup, ...],
     target: CourseSetupTarget,
 ) -> ManagedSaveCourseSetup | None:
-    """Return the most specific course setup that matches a race target."""
+    """Return the concrete course setup that matches a race target."""
 
-    for scope in COURSE_SETUP_RESOLUTION_ORDER:
-        matching = [
-            setup for setup in setups if setup.scope == scope and _setup_matches(setup, target)
-        ]
-        if matching:
-            return max(matching, key=_setup_preference_key)
-    return None
+    if target.course_id is None:
+        return None
+    matching = tuple(setup for setup in setups if _setup_matches(setup, target))
+    if not matching:
+        return None
+    return max(matching, key=lambda setup: _setup_preference_key(setup, target))
+
+
+def resolve_cup_setup(
+    setups: tuple[ManagedSaveCupSetup, ...],
+    target: CourseSetupTarget,
+) -> ManagedSaveCupSetup | None:
+    """Return the cup-level vehicle setup for a race target."""
+
+    if target.cup_id is None:
+        return None
+    matching = tuple(
+        setup
+        for setup in setups
+        if setup.cup_id == target.cup_id
+        and _optional_match(setup.difficulty, target.difficulty)
+    )
+    if not matching:
+        return None
+    return max(matching, key=lambda setup: _cup_setup_preference_key(setup, target))
 
 
 def required_course_setup_targets(
@@ -73,30 +83,52 @@ def missing_course_setup_targets(
     )
 
 
+def has_cup_setup(
+    setups: tuple[ManagedSaveCupSetup, ...],
+    target: CourseSetupTarget,
+) -> bool:
+    """Return whether a target can resolve its GP cup vehicle setup."""
+
+    return resolve_cup_setup(setups, target) is not None
+
+
 def _setup_matches(
     setup: ManagedSaveCourseSetup,
     target: CourseSetupTarget,
 ) -> bool:
-    match setup.scope:
-        case "global":
-            return True
-        case "difficulty":
-            return setup.difficulty == target.difficulty
-        case "cup":
-            return setup.cup_id == target.cup_id and _optional_match(
-                setup.difficulty, target.difficulty
-            )
-        case "course":
-            return (
-                setup.course_id == target.course_id
-                and _optional_match(setup.cup_id, target.cup_id)
-                and _optional_match(setup.difficulty, target.difficulty)
-            )
+    return (
+        setup.course_id == target.course_id
+        and _optional_match(setup.cup_id, target.cup_id)
+        and _optional_match(setup.difficulty, target.difficulty)
+    )
 
 
-def _setup_preference_key(setup: ManagedSaveCourseSetup) -> tuple[str, str]:
-    return setup.updated_at, setup.id
+def _setup_preference_key(
+    setup: ManagedSaveCourseSetup,
+    target: CourseSetupTarget,
+) -> tuple[int, int, str, str]:
+    return (
+        _specificity(setup.difficulty, target.difficulty),
+        _specificity(setup.cup_id, target.cup_id),
+        setup.updated_at,
+        setup.id,
+    )
+
+
+def _cup_setup_preference_key(
+    setup: ManagedSaveCupSetup,
+    target: CourseSetupTarget,
+) -> tuple[int, str, str]:
+    return (
+        _specificity(setup.difficulty, target.difficulty),
+        setup.updated_at,
+        setup.id,
+    )
 
 
 def _optional_match(expected: str | None, actual: str | None) -> bool:
     return expected is None or expected == actual
+
+
+def _specificity(expected: str | None, actual: str | None) -> int:
+    return 1 if expected is not None and expected == actual else 0

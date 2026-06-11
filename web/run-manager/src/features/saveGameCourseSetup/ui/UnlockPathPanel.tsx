@@ -4,16 +4,23 @@ import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCup
 import { formatUnlockTargetStatus, unlockTargetStatusClass } from "@/entities/saveGame/model";
 import type {
   CourseSetupDraftMap,
-  CourseSetupScopeValues,
+  CourseSetupValues,
+  CupSetupDraftMap,
+  CupSetupValues,
   CupView,
   PolicyArtifactDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   countDirtyCourseSetups,
+  countDirtyCupSetups,
   courseSetupDraftsFromSavedSetups,
   courseSetupKey,
+  cupSetupDraftsFromSavedSetups,
+  cupSetupKey,
   cupsWithCourses,
   dirtyCourseSetupDrafts,
+  dirtyCupSetupDrafts,
+  EMPTY_COURSE_SETUP_DRAFT,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   CourseSetupPanel,
@@ -21,7 +28,6 @@ import {
 } from "@/features/saveGameCourseSetup/ui/CourseSetupPanels";
 import type {
   ConfigMetadata,
-  CourseSetupScope,
   ManagedRun,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
@@ -39,7 +45,11 @@ interface UnlockPathPanelProps {
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-    scope: CourseSetupScope;
+  }) => Promise<ManagedSaveGame>;
+  onUpsertCupSetup: (request: {
+    cupId: string;
+    difficulty?: string | null;
+    saveGameId: string;
     vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onCourseSetupDirtyChange: (dirty: boolean) => void;
@@ -49,6 +59,8 @@ interface UnlockPathPanelProps {
   updating: boolean;
 }
 
+type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
+
 export function UnlockPathPanel({
   assignableRuns,
   canStartTarget,
@@ -56,6 +68,7 @@ export function UnlockPathPanel({
   onCourseSetupDirtyChange,
   onStartTarget,
   onUpsertCourseSetup,
+  onUpsertCupSetup,
   saveGame,
   updating,
 }: UnlockPathPanelProps) {
@@ -65,10 +78,16 @@ export function UnlockPathPanel({
     () => courseSetupDraftsFromSavedSetups(saveGame.course_setups),
     [saveGame.course_setups],
   );
+  const savedCupSetupDrafts = useMemo(
+    () => cupSetupDraftsFromSavedSetups(saveGame.cup_setups),
+    [saveGame.cup_setups],
+  );
   const [courseSetupDrafts, setCourseSetupDrafts] = useState<CourseSetupDraftMap>(
     () => savedCourseSetupDrafts,
   );
+  const [cupSetupDrafts, setCupSetupDrafts] = useState<CupSetupDraftMap>(() => savedCupSetupDrafts);
   const previousSavedCourseSetupDrafts = useRef<CourseSetupDraftMap>(savedCourseSetupDrafts);
+  const previousSavedCupSetupDrafts = useRef<CupSetupDraftMap>(savedCupSetupDrafts);
   const [savingCourseSetups, setSavingSetups] = useState(false);
 
   useEffect(() => {
@@ -83,18 +102,32 @@ export function UnlockPathPanel({
     previousSavedCourseSetupDrafts.current = savedCourseSetupDrafts;
   }, [savedCourseSetupDrafts]);
 
+  useEffect(() => {
+    const previousSavedDrafts = previousSavedCupSetupDrafts.current;
+    setCupSetupDrafts((current) => {
+      const next = { ...savedCupSetupDrafts };
+      for (const dirtyDraft of dirtyCupSetupDrafts(current, previousSavedDrafts)) {
+        next[cupSetupKey(dirtyDraft)] = dirtyDraft;
+      }
+      return next;
+    });
+    previousSavedCupSetupDrafts.current = savedCupSetupDrafts;
+  }, [savedCupSetupDrafts]);
+
   const dirtyCourseSetupCount = countDirtyCourseSetups(courseSetupDrafts, savedCourseSetupDrafts);
-  const courseSetupsDirty = dirtyCourseSetupCount > 0;
+  const dirtyCupSetupCount = countDirtyCupSetups(cupSetupDrafts, savedCupSetupDrafts);
+  const dirtySetupCount = dirtyCourseSetupCount + dirtyCupSetupCount;
+  const courseSetupsDirty = dirtySetupCount > 0;
 
   useEffect(() => {
     onCourseSetupDirtyChange(courseSetupsDirty);
   }, [courseSetupsDirty, onCourseSetupDirtyChange]);
 
-  function updateCourseSetupDraft(scopeValues: CourseSetupScopeValues, draft: PolicyArtifactDraft) {
+  function updateCourseSetupDraft(values: CourseSetupValues, draft: PolicyArtifactDraft) {
     setCourseSetupDrafts((current) => ({
       ...current,
-      [courseSetupKey(scopeValues)]: {
-        ...scopeValues,
+      [courseSetupKey(values)]: {
+        ...values,
         engineSettingRawValue: draft.engineSettingRawValue,
         policyArtifact: draft.policyArtifact,
         policyRunId: draft.policyRunId,
@@ -103,9 +136,19 @@ export function UnlockPathPanel({
     }));
   }
 
+  function updateCupSetupDraft(values: CupSetupValues, vehicleId: string) {
+    setCupSetupDrafts((current) => ({
+      ...current,
+      [cupSetupKey(values)]: {
+        ...values,
+        vehicleId,
+      },
+    }));
+  }
+
   function applyCourseSetupDrafts(
-    setups: readonly CourseSetupScopeValues[],
-    draft: PolicyArtifactDraft,
+    setups: readonly CourseSetupValues[],
+    draft: PolicySelectionDraft,
   ) {
     if (draft.policyRunId === "") {
       return;
@@ -113,12 +156,16 @@ export function UnlockPathPanel({
     setCourseSetupDrafts((current) => {
       const next = { ...current };
       for (const setup of setups) {
+        const currentDraft = current[courseSetupKey(setup)] ?? {
+          ...setup,
+          ...EMPTY_COURSE_SETUP_DRAFT,
+        };
         next[courseSetupKey(setup)] = {
           ...setup,
-          engineSettingRawValue: draft.engineSettingRawValue,
+          engineSettingRawValue: currentDraft.engineSettingRawValue,
           policyArtifact: draft.policyArtifact,
           policyRunId: draft.policyRunId,
-          vehicleId: draft.vehicleId,
+          vehicleId: currentDraft.vehicleId,
         };
       }
       return next;
@@ -126,7 +173,7 @@ export function UnlockPathPanel({
   }
 
   async function saveCourseSetups() {
-    if (dirtyCourseSetupCount === 0 || savingCourseSetups) {
+    if (dirtySetupCount === 0 || savingCourseSetups) {
       return;
     }
     setSavingSetups(true);
@@ -143,7 +190,13 @@ export function UnlockPathPanel({
           policyArtifact: draft.policyArtifact,
           policyRunId: draft.policyRunId,
           saveGameId: saveGame.id,
-          scope: draft.scope,
+        });
+      }
+      for (const draft of dirtyCupSetupDrafts(cupSetupDrafts, savedCupSetupDrafts)) {
+        await onUpsertCupSetup({
+          cupId: draft.cupId,
+          difficulty: draft.difficulty ?? null,
+          saveGameId: saveGame.id,
           vehicleId: draft.vehicleId,
         });
       }
@@ -170,21 +223,21 @@ export function UnlockPathPanel({
       <GlobalPolicyPanel
         assignableRuns={assignableRuns}
         cups={cups}
-        metadata={metadata}
         updating={updating || savingCourseSetups}
-        unlockedVehicleIds={saveGame.unlock_progress?.unlocked_vehicle_ids ?? []}
         onApplySetups={applyCourseSetupDrafts}
       />
       <CourseSetupPanel
         assignableRuns={assignableRuns}
         cups={cups}
-        dirtyCourseSetupCount={dirtyCourseSetupCount}
+        dirtySetupCount={dirtySetupCount}
         courseSetupDrafts={courseSetupDrafts}
         metadata={metadata}
         savingCourseSetups={savingCourseSetups}
+        cupSetupDrafts={cupSetupDrafts}
         updating={updating}
         unlockedVehicleIds={saveGame.unlock_progress?.unlocked_vehicle_ids ?? []}
         onCourseSetupDraftChange={updateCourseSetupDraft}
+        onCupSetupDraftChange={updateCupSetupDraft}
         onSaveSetups={() => void saveCourseSetups()}
       />
     </section>

@@ -54,7 +54,7 @@ def build_save_race_execution_plan(
     if context.course_setup_target.difficulty is None or context.course_setup_target.cup_id is None:
         raise ValueError("save-game unlock attempt requires difficulty and cup")
 
-    vehicle_id = context.course_setup.vehicle_id
+    vehicle_id = context.cup_setup.vehicle_id
     vehicle = vehicle_by_id(vehicle_id)
     route = machine_select_route_for_slot(vehicle.machine_select_slot)
     return SaveRaceExecutionPlan(

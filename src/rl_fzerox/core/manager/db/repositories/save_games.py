@@ -13,19 +13,19 @@ from rl_fzerox.core.manager.db.models.runs import RunModel
 from rl_fzerox.core.manager.db.models.save_games import (
     SaveGameAttemptModel,
     SaveGameCourseSetupModel,
+    SaveGameCupSetupModel,
     SaveGameModel,
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.models import (
-    CourseSetupScope,
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
+    ManagedSaveCupSetup,
     ManagedSaveGame,
     SaveAttemptStatus,
     SaveGameStatus,
 )
 from rl_fzerox.core.manager.registry.common import (
-    course_setup_scope,
     optional_float,
     optional_int,
     optional_source_artifact,
@@ -144,8 +144,6 @@ def insert_save_attempt(session: Session, attempt: ManagedSaveAttempt) -> None:
         SaveGameAttemptModel(
             id=attempt.id,
             save_game_id=attempt.save_game_id,
-            policy_run_id=attempt.policy_run_id,
-            policy_artifact=attempt.policy_artifact,
             status=attempt.status,
             target_kind=attempt.target_kind,
             difficulty=attempt.difficulty,
@@ -288,10 +286,8 @@ def upsert_course_setup(
     *,
     setup_id: str,
     save_game_id: str,
-    scope: CourseSetupScope,
     policy_run_id: str,
     policy_artifact: Literal["latest", "best"],
-    vehicle_id: str,
     engine_setting_raw_value: int,
     created_at: str,
     updated_at: str,
@@ -304,7 +300,6 @@ def upsert_course_setup(
     row = session.scalar(
         select(SaveGameCourseSetupModel).where(
             SaveGameCourseSetupModel.save_game_id == save_game_id,
-            SaveGameCourseSetupModel.scope == scope,
             SaveGameCourseSetupModel.difficulty.is_(difficulty)
             if difficulty is None
             else SaveGameCourseSetupModel.difficulty == difficulty,
@@ -320,13 +315,11 @@ def upsert_course_setup(
         row = SaveGameCourseSetupModel(
             id=setup_id,
             save_game_id=save_game_id,
-            scope=scope,
             difficulty=difficulty,
             cup_id=cup_id,
             course_id=course_id,
             policy_run_id=policy_run_id,
             policy_artifact=policy_artifact,
-            vehicle_id=vehicle_id,
             engine_setting_raw_value=engine_setting_raw_value,
             created_at=created_at,
             updated_at=updated_at,
@@ -335,11 +328,67 @@ def upsert_course_setup(
     else:
         row.policy_run_id = policy_run_id
         row.policy_artifact = policy_artifact
-        row.vehicle_id = vehicle_id
         row.engine_setting_raw_value = engine_setting_raw_value
         row.updated_at = updated_at
     session.flush()
     return course_setup_from_model(row)
+
+
+def list_cup_setups(
+    session: Session,
+    save_game_id: str,
+) -> tuple[ManagedSaveCupSetup, ...]:
+    """Return cup vehicle setup rules for one save game."""
+
+    rows = session.scalars(
+        select(SaveGameCupSetupModel)
+        .where(SaveGameCupSetupModel.save_game_id == save_game_id)
+        .order_by(
+            SaveGameCupSetupModel.updated_at.desc(),
+            SaveGameCupSetupModel.id.desc(),
+        )
+    )
+    return tuple(cup_setup_from_model(row) for row in rows)
+
+
+def upsert_cup_setup(
+    session: Session,
+    *,
+    setup_id: str,
+    save_game_id: str,
+    cup_id: str,
+    vehicle_id: str,
+    created_at: str,
+    updated_at: str,
+    difficulty: str | None = None,
+) -> ManagedSaveCupSetup:
+    """Create or replace one cup vehicle setup."""
+
+    row = session.scalar(
+        select(SaveGameCupSetupModel).where(
+            SaveGameCupSetupModel.save_game_id == save_game_id,
+            SaveGameCupSetupModel.difficulty.is_(difficulty)
+            if difficulty is None
+            else SaveGameCupSetupModel.difficulty == difficulty,
+            SaveGameCupSetupModel.cup_id == cup_id,
+        )
+    )
+    if row is None:
+        row = SaveGameCupSetupModel(
+            id=setup_id,
+            save_game_id=save_game_id,
+            difficulty=difficulty,
+            cup_id=cup_id,
+            vehicle_id=vehicle_id,
+            created_at=created_at,
+            updated_at=updated_at,
+        )
+        session.add(row)
+    else:
+        row.vehicle_id = vehicle_id
+        row.updated_at = updated_at
+    session.flush()
+    return cup_setup_from_model(row)
 
 
 def save_game_from_model(row: SaveGameModel) -> ManagedSaveGame:
@@ -365,10 +414,8 @@ def course_setup_from_model(
     return ManagedSaveCourseSetup(
         id=row.id,
         save_game_id=row.save_game_id,
-        scope=course_setup_scope(row.scope),
         policy_run_id=row.policy_run_id,
         policy_artifact=_required_policy_artifact(row.policy_artifact),
-        vehicle_id=row.vehicle_id,
         engine_setting_raw_value=50
         if engine_setting_raw_value is None
         else engine_setting_raw_value,
@@ -380,14 +427,28 @@ def course_setup_from_model(
     )
 
 
+def cup_setup_from_model(
+    row: SaveGameCupSetupModel,
+) -> ManagedSaveCupSetup:
+    """Convert one ORM row into a domain cup setup."""
+
+    return ManagedSaveCupSetup(
+        id=row.id,
+        save_game_id=row.save_game_id,
+        cup_id=row.cup_id,
+        vehicle_id=row.vehicle_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        difficulty=row.difficulty,
+    )
+
+
 def save_attempt_from_model(row: SaveGameAttemptModel) -> ManagedSaveAttempt:
     """Convert one ORM row into a domain attempt record."""
 
     return ManagedSaveAttempt(
         id=row.id,
         save_game_id=row.save_game_id,
-        policy_run_id=row.policy_run_id,
-        policy_artifact=optional_source_artifact(row.policy_artifact),
         status=save_attempt_status(row.status),
         target_kind=row.target_kind,
         difficulty=row.difficulty,

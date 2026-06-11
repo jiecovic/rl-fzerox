@@ -28,14 +28,13 @@ class SaveGameModel(ManagerBase):
 
 
 class SaveGameCourseSetupModel(ManagerBase):
-    """Policy resolution rule for one save game."""
+    """Policy and machine setup for one save-game course."""
 
     __tablename__ = "save_game_course_setups"
     __table_args__ = (
         Index(
-            "save_game_course_setups_save_scope_idx",
+            "save_game_course_setups_save_course_idx",
             "save_game_id",
-            "scope",
             "difficulty",
             "cup_id",
             "course_id",
@@ -44,20 +43,40 @@ class SaveGameCourseSetupModel(ManagerBase):
 
     id: Mapped[str] = mapped_column(primary_key=True)
     save_game_id: Mapped[str] = mapped_column(ForeignKey("save_games.id"))
-    scope: Mapped[str]
     difficulty: Mapped[str | None]
     cup_id: Mapped[str | None]
     course_id: Mapped[str | None]
     policy_run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
     policy_artifact: Mapped[str]
-    vehicle_id: Mapped[str]
     engine_setting_raw_value: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[str]
     updated_at: Mapped[str]
 
 
+class SaveGameCupSetupModel(ManagerBase):
+    """Vehicle setup for one save-game GP cup."""
+
+    __tablename__ = "save_game_cup_setups"
+    __table_args__ = (
+        Index(
+            "save_game_cup_setups_save_cup_idx",
+            "save_game_id",
+            "difficulty",
+            "cup_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    save_game_id: Mapped[str] = mapped_column(ForeignKey("save_games.id"))
+    difficulty: Mapped[str | None]
+    cup_id: Mapped[str]
+    vehicle_id: Mapped[str]
+    created_at: Mapped[str]
+    updated_at: Mapped[str]
+
+
 class SaveGameAttemptModel(ManagerBase):
-    """One recorded policy attempt for one unlock-path target."""
+    """One recorded attempt for one unlock-path target."""
 
     __tablename__ = "save_game_attempts"
     __table_args__ = (
@@ -74,8 +93,6 @@ class SaveGameAttemptModel(ManagerBase):
 
     id: Mapped[str] = mapped_column(primary_key=True)
     save_game_id: Mapped[str] = mapped_column(ForeignKey("save_games.id"))
-    policy_run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"))
-    policy_artifact: Mapped[str | None]
     status: Mapped[str]
     target_kind: Mapped[str | None]
     difficulty: Mapped[str | None]

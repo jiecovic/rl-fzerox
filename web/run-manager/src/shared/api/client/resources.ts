@@ -33,5 +33,6 @@ export {
   renameSaveGame,
   startCareerModeRunner,
   upsertSaveCourseSetup,
+  upsertSaveCupSetup,
 } from "@/shared/api/client/resources/saveGames";
 export { rebuildTensorboardViews } from "@/shared/api/client/resources/tensorboard";

@@ -53,6 +53,7 @@ def save_game_payload_for_store(
         unlock_progress=unlock_progress,
         attempts=attempts,
         course_setups=store.list_save_course_setups(save_game.id),
+        cup_setups=store.list_save_cup_setups(save_game.id),
     )
 
 

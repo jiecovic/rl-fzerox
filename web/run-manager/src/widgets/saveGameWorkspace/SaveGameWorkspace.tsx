@@ -13,11 +13,13 @@ import { parseAttemptSeed, randomAttemptSeedText } from "@/features/careerRunner
 import { useSaveGameRunnerRefresh } from "@/features/careerRunner/model/useSaveGameRunnerRefresh";
 import { RunnerControlPanel } from "@/features/careerRunner/ui/RunnerControlPanel";
 import { CreateSaveGameForm } from "@/features/createSaveGame/ui/CreateSaveGameForm";
-import { resolveSavedCourseSetup } from "@/features/saveGameCourseSetup/model/courseSetup";
+import {
+  resolveSavedCourseSetup,
+  resolveSavedCupSetup,
+} from "@/features/saveGameCourseSetup/model/courseSetup";
 import { UnlockPathPanel } from "@/features/saveGameCourseSetup/ui/UnlockPathPanel";
 import type {
   ConfigMetadata,
-  CourseSetupScope,
   ManagedRun,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
@@ -52,7 +54,11 @@ interface SaveGameWorkspaceProps {
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-    scope: CourseSetupScope;
+  }) => Promise<ManagedSaveGame>;
+  onUpsertCupSetup: (request: {
+    cupId: string;
+    difficulty?: string | null;
+    saveGameId: string;
     vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onStartCareerMode: (
@@ -76,6 +82,7 @@ export function SaveGameWorkspace({
   onRefresh,
   onRenameSaveGame,
   onUpsertCourseSetup,
+  onUpsertCupSetup,
   onStartCareerMode,
   runs,
   saveGame,
@@ -154,8 +161,6 @@ export function SaveGameWorkspace({
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-    scope: CourseSetupScope;
-    vehicleId: string;
   }) {
     setError(null);
     setUpdatingSaveGameId(request.saveGameId);
@@ -163,6 +168,24 @@ export function SaveGameWorkspace({
       return await onUpsertCourseSetup(request);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to save course setup");
+      throw caught;
+    } finally {
+      setUpdatingSaveGameId(null);
+    }
+  }
+
+  async function upsertCupSetup(request: {
+    cupId: string;
+    difficulty?: string | null;
+    saveGameId: string;
+    vehicleId: string;
+  }) {
+    setError(null);
+    setUpdatingSaveGameId(request.saveGameId);
+    try {
+      return await onUpsertCupSetup(request);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "failed to save cup setup");
       throw caught;
     } finally {
       setUpdatingSaveGameId(null);
@@ -196,6 +219,10 @@ export function SaveGameWorkspace({
       null
     ) {
       setError("choose a policy for the selected cup");
+      return;
+    }
+    if (resolveSavedCupSetup(target.cup_setups, launchTarget) === null) {
+      setError("choose a vehicle for the selected cup");
       return;
     }
     setError(null);
@@ -276,6 +303,8 @@ export function SaveGameWorkspace({
           nextTarget,
           activeMetadata.built_in_courses,
         );
+  const nextCupSetup =
+    nextTarget === null ? null : resolveSavedCupSetup(activeSaveGame.cup_setups, nextTarget);
   function canStartUnlockTarget(target: ManagedSaveUnlockTarget): boolean {
     return (
       startingRunnerSaveGameId === null &&
@@ -286,7 +315,8 @@ export function SaveGameWorkspace({
         activeSaveGame.course_setups,
         target,
         activeMetadata.built_in_courses,
-      ) !== null
+      ) !== null &&
+      resolveSavedCupSetup(activeSaveGame.cup_setups, target) !== null
     );
   }
   const canStartRunner = nextTarget !== null && canStartUnlockTarget(nextTarget);
@@ -303,7 +333,9 @@ export function SaveGameWorkspace({
         ? "All unlock targets are complete."
         : nextSetup === null
           ? "Choose a policy for the next cup."
-          : `${nextTarget.label} is ready.`;
+          : nextCupSetup === null
+            ? "Choose a vehicle for the next cup."
+            : `${nextTarget.label} is ready.`;
   const runnerLabel = saveGame.runner_active
     ? "running"
     : careerSaveHasStarted(saveGame)
@@ -396,6 +428,7 @@ export function SaveGameWorkspace({
           onCourseSetupDirtyChange={setCourseSetupDirty}
           onStartTarget={(target) => void startCareerMode(saveGame, target)}
           onUpsertCourseSetup={upsertCourseSetup}
+          onUpsertCupSetup={upsertCupSetup}
         />
       </article>
     </Panel>

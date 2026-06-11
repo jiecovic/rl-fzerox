@@ -24,7 +24,6 @@ from rl_fzerox.core.manager.artifacts.tensorboard_views import (
 )
 from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
-    CourseSetupScope,
     ManagedRun,
     ManagedRunDraft,
     ManagedRunEvent,
@@ -32,6 +31,7 @@ from rl_fzerox.core.manager.models import (
     ManagedRunTemplate,
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
+    ManagedSaveCupSetup,
     ManagedSaveGame,
     ManagedSaveUnlockProgress,
     ManagedViewerLease,
@@ -524,13 +524,17 @@ class ManagerStore:
     ) -> tuple[ManagedSaveCourseSetup, ...]:
         return save_game_registry.list_course_setups(self, save_game_id)
 
+    def list_save_cup_setups(
+        self,
+        save_game_id: str,
+    ) -> tuple[ManagedSaveCupSetup, ...]:
+        return save_game_registry.list_cup_setups(self, save_game_id)
+
     def start_save_attempt(
         self,
         *,
         save_game_id: str,
         target_kind: str | None = None,
-        policy_run_id: str | None = None,
-        policy_artifact: Literal["latest", "best"] | None = None,
         difficulty: str | None = None,
         cup_id: str | None = None,
         course_id: str | None = None,
@@ -539,8 +543,6 @@ class ManagerStore:
             self,
             save_game_id=save_game_id,
             target_kind=target_kind,
-            policy_run_id=policy_run_id,
-            policy_artifact=policy_artifact,
             difficulty=difficulty,
             cup_id=cup_id,
             course_id=course_id,
@@ -632,10 +634,8 @@ class ManagerStore:
         self,
         *,
         save_game_id: str,
-        scope: CourseSetupScope,
         policy_run_id: str,
         policy_artifact: Literal["latest", "best"],
-        vehicle_id: str = "blue_falcon",
         engine_setting_raw_value: int = 50,
         difficulty: str | None = None,
         cup_id: str | None = None,
@@ -644,14 +644,28 @@ class ManagerStore:
         return save_game_registry.upsert_course_setup(
             self,
             save_game_id=save_game_id,
-            scope=scope,
             policy_run_id=policy_run_id,
             policy_artifact=policy_artifact,
-            vehicle_id=vehicle_id,
             engine_setting_raw_value=engine_setting_raw_value,
             difficulty=difficulty,
             cup_id=cup_id,
             course_id=course_id,
+        )
+
+    def upsert_save_cup_setup(
+        self,
+        *,
+        save_game_id: str,
+        cup_id: str,
+        vehicle_id: str,
+        difficulty: str | None = None,
+    ) -> ManagedSaveCupSetup:
+        return save_game_registry.upsert_cup_setup(
+            self,
+            save_game_id=save_game_id,
+            cup_id=cup_id,
+            vehicle_id=vehicle_id,
+            difficulty=difficulty,
         )
 
     def update_save_game_status(

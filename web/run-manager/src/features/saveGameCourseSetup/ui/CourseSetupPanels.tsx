@@ -6,15 +6,20 @@ import { TrackMinimap } from "@/entities/runConfig/ui/sections/tracks/TrackMinim
 import type {
   CourseSetupDraft,
   CourseSetupDraftMap,
-  CourseSetupScopeValues,
+  CourseSetupValues,
+  CupSetupDraft,
+  CupSetupDraftMap,
+  CupSetupValues,
   CupView,
   PolicyArtifactDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
-  courseSetupScopeValues,
   courseSetupsForCups,
-  cupSetupScopeValues,
+  courseSetupValues,
+  cupSetupKey,
+  cupSetupValues,
   EMPTY_COURSE_SETUP_DRAFT,
+  EMPTY_CUP_SETUP_DRAFT,
   exactCourseSetupDraft,
   preferredVehicleSetup,
   sharedCourseDraft,
@@ -26,22 +31,25 @@ import { IntegerTextInput } from "@/shared/ui/configFields";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { SaveDraftIcon } from "@/shared/ui/icons";
 
+type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
+
+const EMPTY_POLICY_SELECTION_DRAFT: PolicySelectionDraft = {
+  policyArtifact: "best",
+  policyRunId: "",
+};
+
 export function GlobalPolicyPanel({
   assignableRuns,
   cups,
-  metadata,
   onApplySetups,
   updating,
-  unlockedVehicleIds,
 }: {
   assignableRuns: readonly ManagedRun[];
   cups: readonly CupView[];
-  metadata: ConfigMetadata;
-  onApplySetups: (setups: readonly CourseSetupScopeValues[], draft: PolicyArtifactDraft) => void;
+  onApplySetups: (setups: readonly CourseSetupValues[], draft: PolicySelectionDraft) => void;
   updating: boolean;
-  unlockedVehicleIds: readonly string[];
 }) {
-  const [draft, setDraft] = useState<PolicyArtifactDraft>(EMPTY_COURSE_SETUP_DRAFT);
+  const [draft, setDraft] = useState<PolicySelectionDraft>(EMPTY_POLICY_SELECTION_DRAFT);
   const canApply = !updating && draft.policyRunId !== "";
   const allCourseSetups = courseSetupsForCups(cups);
 
@@ -50,10 +58,10 @@ export function GlobalPolicyPanel({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="grid gap-1">
           <h4 className="m-0 text-sm font-bold tracking-[0.04em] text-app-muted uppercase">
-            Default setup
+            Bulk policy
           </h4>
           <p className="m-0 text-sm text-app-muted">
-            Stage a trained policy artifact, then copy it into each course setup.
+            Copy a trained policy artifact into course rows without changing engines.
           </p>
         </div>
         <Button
@@ -66,16 +74,14 @@ export function GlobalPolicyPanel({
         </Button>
       </div>
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
-        <PolicyDraftSelect
+        <PolicySelectionSelect
           assignableRuns={assignableRuns}
           disabled={updating}
           draft={draft}
-          label="Default policy"
-          metadata={metadata}
-          unlockedVehicleIds={unlockedVehicleIds}
+          label="Policy"
           onDraftChange={setDraft}
         />
-        <ArtifactDraftSelect
+        <PolicySelectionArtifactSelect
           disabled={updating}
           draft={draft}
           label="Artifact"
@@ -89,32 +95,33 @@ export function GlobalPolicyPanel({
 export function CourseSetupPanel({
   assignableRuns,
   cups,
-  dirtyCourseSetupCount,
+  dirtySetupCount,
   metadata,
   onCourseSetupDraftChange,
+  onCupSetupDraftChange,
   onSaveSetups,
   courseSetupDrafts,
+  cupSetupDrafts,
   savingCourseSetups,
   updating,
   unlockedVehicleIds,
 }: {
   assignableRuns: readonly ManagedRun[];
   cups: readonly CupView[];
-  dirtyCourseSetupCount: number;
+  dirtySetupCount: number;
   metadata: ConfigMetadata;
-  onCourseSetupDraftChange: (
-    scopeValues: CourseSetupScopeValues,
-    draft: PolicyArtifactDraft,
-  ) => void;
+  onCourseSetupDraftChange: (values: CourseSetupValues, draft: PolicyArtifactDraft) => void;
+  onCupSetupDraftChange: (values: CupSetupValues, vehicleId: string) => void;
   onSaveSetups: () => void;
   courseSetupDrafts: CourseSetupDraftMap;
+  cupSetupDrafts: CupSetupDraftMap;
   savingCourseSetups: boolean;
   updating: boolean;
   unlockedVehicleIds: readonly string[];
 }) {
   const [collapsedCupIds, setCollapsedCupIds] = useState<readonly string[]>([]);
   const collapsedCupIdSet = new Set(collapsedCupIds);
-  const saveDisabled = dirtyCourseSetupCount === 0 || savingCourseSetups || updating;
+  const saveDisabled = dirtySetupCount === 0 || savingCourseSetups || updating;
 
   function setCupCollapsed(cupId: string, collapsed: boolean) {
     setCollapsedCupIds((current) =>
@@ -148,15 +155,15 @@ export function CourseSetupPanel({
             className="gap-2"
             disabled={saveDisabled}
             type="button"
-            variant={dirtyCourseSetupCount > 0 ? "primary" : "secondary"}
+            variant={dirtySetupCount > 0 ? "primary" : "secondary"}
             onClick={onSaveSetups}
           >
             <SaveDraftIcon />
             <span>
               {savingCourseSetups
                 ? "Saving"
-                : dirtyCourseSetupCount > 0
-                  ? `Save ${dirtyCourseSetupCount} change${dirtyCourseSetupCount === 1 ? "" : "s"}`
+                : dirtySetupCount > 0
+                  ? `Save ${dirtySetupCount} change${dirtySetupCount === 1 ? "" : "s"}`
                   : "Saved"}
             </span>
           </Button>
@@ -170,11 +177,13 @@ export function CourseSetupPanel({
             collapsed={collapsedCupIdSet.has(cup.id)}
             cup={cup}
             courseSetupDrafts={courseSetupDrafts}
+            cupSetupDrafts={cupSetupDrafts}
             metadata={metadata}
             updating={updating || savingCourseSetups}
             unlockedVehicleIds={unlockedVehicleIds}
             onCollapsedChange={setCupCollapsed}
             onCourseSetupDraftChange={onCourseSetupDraftChange}
+            onCupSetupDraftChange={onCupSetupDraftChange}
           />
         ))}
       </div>
@@ -186,9 +195,11 @@ function CupSetupBlock({
   assignableRuns,
   collapsed,
   cup,
+  cupSetupDrafts,
   metadata,
   onCollapsedChange,
   onCourseSetupDraftChange,
+  onCupSetupDraftChange,
   courseSetupDrafts,
   updating,
   unlockedVehicleIds,
@@ -196,38 +207,43 @@ function CupSetupBlock({
   assignableRuns: readonly ManagedRun[];
   collapsed: boolean;
   cup: CupView;
+  cupSetupDrafts: CupSetupDraftMap;
   metadata: ConfigMetadata;
   onCollapsedChange: (cupId: string, collapsed: boolean) => void;
-  onCourseSetupDraftChange: (
-    scopeValues: CourseSetupScopeValues,
-    draft: PolicyArtifactDraft,
-  ) => void;
+  onCourseSetupDraftChange: (values: CourseSetupValues, draft: PolicyArtifactDraft) => void;
+  onCupSetupDraftChange: (values: CupSetupValues, vehicleId: string) => void;
   courseSetupDrafts: CourseSetupDraftMap;
   updating: boolean;
   unlockedVehicleIds: readonly string[];
 }) {
-  const cupScopeValues = cupSetupScopeValues(cup);
-  const cupFallbackDraft = exactCourseSetupDraft(courseSetupDrafts, cupScopeValues);
-  const courseScopeValues = cup.courses.map((course) => courseSetupScopeValues(cup, course.id));
-  const courseDrafts = courseScopeValues
-    .map((scopeValues) => exactCourseSetupDraft(courseSetupDrafts, scopeValues))
+  const cupValues = cupSetupValues(cup);
+  const cupDraft = cupSetupDraft(cupSetupDrafts, cupValues);
+  const courseValuesList = cup.courses.map((course) => courseSetupValues(cup, course.id));
+  const courseDrafts = courseValuesList
+    .map((values) => exactCourseSetupDraft(courseSetupDrafts, values))
     .filter((draft): draft is CourseSetupDraft => draft !== null);
-  // New bulk edits fan out to course rows, but existing save games can still
-  // have cup-scoped rows. Use them only to seed empty course rows.
-  const fallbackDraft = cupFallbackDraft ?? EMPTY_COURSE_SETUP_DRAFT;
-  const bulkDraft = sharedCourseDraft(courseDrafts, courseScopeValues.length) ?? fallbackDraft;
+  const fallbackDraft: PolicyArtifactDraft = {
+    ...EMPTY_COURSE_SETUP_DRAFT,
+    vehicleId: cupDraft.vehicleId,
+  };
+  const sharedDraft = sharedCourseDraft(courseDrafts, courseValuesList.length) ?? fallbackDraft;
+  const bulkDraft: PolicyArtifactDraft = {
+    ...sharedDraft,
+    vehicleId: cupDraft.vehicleId,
+  };
+  const bulkPolicyDraft: PolicySelectionDraft = {
+    policyArtifact: bulkDraft.policyArtifact,
+    policyRunId: bulkDraft.policyRunId,
+  };
 
-  function applyBulkCourseDraft(
-    nextDraft: PolicyArtifactDraft,
-    options: { replaceEngine: boolean },
-  ) {
-    for (const scopeValues of courseScopeValues) {
-      const currentDraft = exactCourseSetupDraft(courseSetupDrafts, scopeValues) ?? fallbackDraft;
-      onCourseSetupDraftChange(scopeValues, {
-        ...nextDraft,
-        engineSettingRawValue: options.replaceEngine
-          ? nextDraft.engineSettingRawValue
-          : currentDraft.engineSettingRawValue,
+  function applyBulkCoursePolicy(nextDraft: PolicySelectionDraft) {
+    for (const values of courseValuesList) {
+      const currentDraft = exactCourseSetupDraft(courseSetupDrafts, values) ?? fallbackDraft;
+      onCourseSetupDraftChange(values, {
+        ...currentDraft,
+        policyArtifact: nextDraft.policyArtifact,
+        policyRunId: nextDraft.policyRunId,
+        vehicleId: cupDraft.vehicleId,
       });
     }
   }
@@ -249,42 +265,42 @@ function CupSetupBlock({
       </summary>
       <div className="config-disclosure-body gap-3">
         <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_130px_minmax(180px,240px)] md:items-end">
-          <PolicyDraftSelect
+          <PolicySelectionSelect
             assignableRuns={assignableRuns}
             disabled={updating}
-            draft={bulkDraft}
+            draft={bulkPolicyDraft}
             label={`${cup.label} policy`}
-            metadata={metadata}
-            unlockedVehicleIds={unlockedVehicleIds}
             visibleLabel="Policy"
-            onDraftChange={(nextDraft) => applyBulkCourseDraft(nextDraft, { replaceEngine: true })}
+            onDraftChange={applyBulkCoursePolicy}
           />
-          <ArtifactDraftSelect
+          <PolicySelectionArtifactSelect
             disabled={updating}
-            draft={bulkDraft}
+            draft={bulkPolicyDraft}
             label={`${cup.label} artifact`}
             visibleLabel="Artifact"
-            onDraftChange={(nextDraft) => applyBulkCourseDraft(nextDraft, { replaceEngine: false })}
+            onDraftChange={applyBulkCoursePolicy}
           />
           <VehicleDraftSelect
             disabled={updating}
-            draft={bulkDraft}
+            draft={cupDraft}
             label={`${cup.label} vehicle`}
             metadata={metadata}
             unlockedVehicleIds={unlockedVehicleIds}
             visibleLabel="Vehicle"
-            onDraftChange={(nextDraft) => applyBulkCourseDraft(nextDraft, { replaceEngine: false })}
+            onDraftChange={(nextDraft) => onCupSetupDraftChange(cupValues, nextDraft.vehicleId)}
           />
         </div>
         <div className="grid grid-cols-1 gap-3 border-t border-app-border pt-3 xl:grid-cols-2 2xl:grid-cols-3">
           {cup.courses.map((course, courseIndex) => {
-            const courseScopeValues = courseSetupScopeValues(cup, course.id);
-            const courseDraft =
-              exactCourseSetupDraft(courseSetupDrafts, courseScopeValues) ?? fallbackDraft;
+            const values = courseSetupValues(cup, course.id);
+            const courseDraft = {
+              ...(exactCourseSetupDraft(courseSetupDrafts, values) ?? fallbackDraft),
+              vehicleId: cupDraft.vehicleId,
+            };
             const updateCourseDraft = (nextDraft: PolicyArtifactDraft) =>
-              onCourseSetupDraftChange(courseScopeValues, {
+              onCourseSetupDraftChange(values, {
                 ...nextDraft,
-                vehicleId: bulkDraft.vehicleId,
+                vehicleId: cupDraft.vehicleId,
               });
             return (
               <div
@@ -316,7 +332,7 @@ function CupSetupBlock({
                     disabled={updating}
                     draft={courseDraft}
                     label={`${course.display_name} policy`}
-                    lockedVehicleId={bulkDraft.vehicleId}
+                    lockedVehicleId={cupDraft.vehicleId}
                     metadata={metadata}
                     unlockedVehicleIds={unlockedVehicleIds}
                     visibleLabel="Policy"
@@ -343,6 +359,82 @@ function CupSetupBlock({
         </div>
       </div>
     </details>
+  );
+}
+
+function PolicySelectionSelect({
+  assignableRuns,
+  disabled,
+  draft,
+  label,
+  onDraftChange,
+  visibleLabel,
+}: {
+  assignableRuns: readonly ManagedRun[];
+  disabled: boolean;
+  draft: PolicySelectionDraft;
+  label: string;
+  onDraftChange: (draft: PolicySelectionDraft) => void;
+  visibleLabel?: string;
+}) {
+  return (
+    <FieldShell>
+      <span>{visibleLabel ?? label}</span>
+      <FieldSelect
+        aria-label={label}
+        disabled={disabled || assignableRuns.length === 0}
+        value={draft.policyRunId}
+        onChange={(event) =>
+          onDraftChange({
+            ...draft,
+            policyRunId: event.currentTarget.value,
+          })
+        }
+      >
+        <option disabled value="">
+          Select policy
+        </option>
+        {assignableRuns.map((run) => (
+          <option key={run.id} value={run.id}>
+            {run.name}
+          </option>
+        ))}
+      </FieldSelect>
+    </FieldShell>
+  );
+}
+
+function PolicySelectionArtifactSelect({
+  disabled,
+  draft,
+  label,
+  onDraftChange,
+  visibleLabel,
+}: {
+  disabled: boolean;
+  draft: PolicySelectionDraft;
+  label: string;
+  onDraftChange: (draft: PolicySelectionDraft) => void;
+  visibleLabel?: string;
+}) {
+  return (
+    <FieldShell>
+      <span>{visibleLabel ?? label}</span>
+      <FieldSelect
+        aria-label={label}
+        disabled={disabled || draft.policyRunId === ""}
+        value={draft.policyArtifact}
+        onChange={(event) => {
+          onDraftChange({
+            ...draft,
+            policyArtifact: event.currentTarget.value as SavePolicyArtifact,
+          });
+        }}
+      >
+        <option value="best">best</option>
+        <option value="latest">latest</option>
+      </FieldSelect>
+    </FieldShell>
   );
 }
 
@@ -414,10 +506,10 @@ function VehicleDraftSelect({
   visibleLabel,
 }: {
   disabled: boolean;
-  draft: PolicyArtifactDraft;
+  draft: Pick<PolicyArtifactDraft, "vehicleId">;
   label: string;
   metadata: ConfigMetadata;
-  onDraftChange: (draft: PolicyArtifactDraft) => void;
+  onDraftChange: (draft: Pick<PolicyArtifactDraft, "vehicleId">) => void;
   unlockedVehicleIds: readonly string[];
   visibleLabel?: string;
 }) {
@@ -441,6 +533,15 @@ function VehicleDraftSelect({
         ))}
       </FieldSelect>
     </FieldShell>
+  );
+}
+
+function cupSetupDraft(drafts: CupSetupDraftMap, values: CupSetupValues): CupSetupDraft {
+  return (
+    drafts[cupSetupKey(values)] ?? {
+      ...values,
+      ...EMPTY_CUP_SETUP_DRAFT,
+    }
   );
 }
 

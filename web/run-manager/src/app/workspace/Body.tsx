@@ -140,6 +140,7 @@ export function WorkspaceBody({
           onRenameSaveGame={actions.renameManagedSaveGame}
           onRefresh={onRefresh}
           onUpsertCourseSetup={actions.upsertManagedSaveCourseSetup}
+          onUpsertCupSetup={actions.upsertManagedSaveCupSetup}
           onStartCareerMode={actions.startManagedCareerMode}
         />
       ) : null}

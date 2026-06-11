@@ -11,11 +11,13 @@ import rl_fzerox.apps.run_manager.api.handlers.save_games as manager_api_save_ga
 from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
 from rl_fzerox.apps.run_manager.api.routes import _run_sync
 from rl_fzerox.core.career_mode.progress import default_unlock_targets
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager import (
     ManagerStore,
     default_managed_run_config,
 )
 from tests.core.manager.manager_api_support import (
+    _ApiClient,
     _client,
     _LauncherStub,
     _write_policy_artifact,
@@ -69,6 +71,7 @@ async def test_manager_api_creates_save_game(tmp_path: Path) -> None:
     assert payload["save_game"]["unlock_progress"]["next_target"]["cup_id"] == "jack"
     assert payload["save_game"]["attempts"] == []
     assert payload["save_game"]["course_setups"] == []
+    assert payload["save_game"]["cup_setups"] == []
 
     list_response = await client.get("/api/save-games")
 
@@ -165,9 +168,11 @@ async def test_manager_api_upserts_save_course_setup(tmp_path: Path) -> None:
     response = await client.put(
         f"/api/save-games/{save_game_id}/course-setups",
         json={
+            "cup_id": "jack",
+            "course_id": "mute_city",
             "policy_artifact": "best",
             "policy_run_id": run.id,
-            "scope": "global",
+            "engine_setting_raw_value": 60,
         },
     )
 
@@ -176,9 +181,25 @@ async def test_manager_api_upserts_save_course_setup(tmp_path: Path) -> None:
     assignments = save_game["course_setups"]
     assert len(assignments) == 1
     assert assignments[0]["save_game_id"] == save_game_id
+    assert assignments[0]["cup_id"] == "jack"
+    assert assignments[0]["course_id"] == "mute_city"
     assert assignments[0]["policy_run_id"] == "policy-run"
     assert assignments[0]["policy_artifact"] == "best"
-    assert assignments[0]["scope"] == "global"
+    assert assignments[0]["engine_setting_raw_value"] == 60
+
+    cup_response = await client.put(
+        f"/api/save-games/{save_game_id}/cup-setups",
+        json={
+            "cup_id": "jack",
+            "vehicle_id": "blue_falcon",
+        },
+    )
+
+    assert cup_response.status_code == 200
+    cup_setups = cup_response.json()["save_game"]["cup_setups"]
+    assert len(cup_setups) == 1
+    assert cup_setups[0]["cup_id"] == "jack"
+    assert cup_setups[0]["vehicle_id"] == "blue_falcon"
 
 
 async def test_manager_api_starts_next_save_attempt(tmp_path: Path) -> None:
@@ -192,14 +213,7 @@ async def test_manager_api_starts_next_save_attempt(tmp_path: Path) -> None:
     client = _client(tmp_path, store=store)
     create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
     save_game_id = create_response.json()["save_game"]["id"]
-    await client.put(
-        f"/api/save-games/{save_game_id}/course-setups",
-        json={
-            "policy_artifact": "best",
-            "policy_run_id": run.id,
-            "scope": "global",
-        },
-    )
+    await _configure_api_gp_cup(client, save_game_id=save_game_id, run_id=run.id, cup_id="jack")
 
     response = await client.post(f"/api/save-games/{save_game_id}/attempts/next")
 
@@ -210,8 +224,6 @@ async def test_manager_api_starts_next_save_attempt(tmp_path: Path) -> None:
     assert save_game["attempts"][0]["target_kind"] == "clear_gp_cup"
     assert save_game["attempts"][0]["difficulty"] == "novice"
     assert save_game["attempts"][0]["cup_id"] == "jack"
-    assert save_game["attempts"][0]["policy_run_id"] == "policy-run"
-    assert save_game["attempts"][0]["policy_artifact"] == "best"
 
     repeated_response = await client.post(f"/api/save-games/{save_game_id}/attempts/next")
 
@@ -293,14 +305,7 @@ async def test_manager_api_returns_save_attempt_execution_context(tmp_path: Path
     client = _client(tmp_path, store=store)
     create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
     save_game_id = create_response.json()["save_game"]["id"]
-    await client.put(
-        f"/api/save-games/{save_game_id}/course-setups",
-        json={
-            "policy_artifact": "best",
-            "policy_run_id": run.id,
-            "scope": "global",
-        },
-    )
+    await _configure_api_gp_cup(client, save_game_id=save_game_id, run_id=run.id, cup_id="jack")
     attempt_response = await client.post(f"/api/save-games/{save_game_id}/attempts/next")
     attempt = attempt_response.json()["save_game"]["attempts"][0]
 
@@ -331,6 +336,36 @@ async def test_manager_api_returns_save_attempt_execution_context(tmp_path: Path
     assert plan["race_setup"]["difficulty"] == "novice"
     assert plan["race_setup"]["cup_id"] == "jack"
     assert plan["race_setup"]["vehicle_id"] == "blue_falcon"
+
+
+async def _configure_api_gp_cup(
+    client: _ApiClient,
+    *,
+    save_game_id: str,
+    run_id: str,
+    cup_id: str,
+) -> None:
+    cup_response = await client.put(
+        f"/api/save-games/{save_game_id}/cup-setups",
+        json={
+            "cup_id": cup_id,
+            "vehicle_id": "blue_falcon",
+        },
+    )
+    assert cup_response.status_code == 200
+    for course in sorted(BUILT_IN_COURSES, key=lambda item: item.course_index):
+        if course.cup != cup_id:
+            continue
+        response = await client.put(
+            f"/api/save-games/{save_game_id}/course-setups",
+            json={
+                "cup_id": cup_id,
+                "course_id": course.id,
+                "policy_artifact": "best",
+                "policy_run_id": run_id,
+            },
+        )
+        assert response.status_code == 200
 
 
 async def test_manager_api_rejects_duplicate_save_game_name(tmp_path: Path) -> None:

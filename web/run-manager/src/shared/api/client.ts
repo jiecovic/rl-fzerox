@@ -47,5 +47,6 @@ export {
   updateDraftWithSource,
   updateLineageGroups,
   upsertSaveCourseSetup,
+  upsertSaveCupSetup,
   watchRun,
 } from "@/shared/api/client/resources";

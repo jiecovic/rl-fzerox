@@ -1,9 +1,9 @@
 // web/run-manager/src/features/saveGameCourseSetup/model/courseSetup.ts
 import type {
   ConfigMetadata,
-  CourseSetupScope,
   ManagedRun,
   ManagedSaveCourseSetup,
+  ManagedSaveCupSetup,
   ManagedSaveUnlockTarget,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
@@ -15,11 +15,15 @@ export interface CupView {
   order: number;
 }
 
-export type CourseSetupScopeValues = {
-  courseId?: string | null;
-  cupId?: string | null;
+export type CourseSetupValues = {
+  courseId: string;
+  cupId: string;
   difficulty?: string | null;
-  scope: CourseSetupScope;
+};
+
+export type CupSetupValues = {
+  cupId: string;
+  difficulty?: string | null;
 };
 
 export type PolicyArtifactDraft = {
@@ -29,13 +33,19 @@ export type PolicyArtifactDraft = {
   vehicleId: string;
 };
 
-export type CourseSetupDraft = CourseSetupScopeValues & PolicyArtifactDraft;
+export type CourseSetupDraft = CourseSetupValues & PolicyArtifactDraft;
 export type CourseSetupDraftMap = Record<string, CourseSetupDraft>;
+export type CupSetupDraft = CupSetupValues & Pick<PolicyArtifactDraft, "vehicleId">;
+export type CupSetupDraftMap = Record<string, CupSetupDraft>;
 
 export const EMPTY_COURSE_SETUP_DRAFT: PolicyArtifactDraft = {
   engineSettingRawValue: 50,
   policyArtifact: "best",
   policyRunId: "",
+  vehicleId: "blue_falcon",
+};
+
+export const EMPTY_CUP_SETUP_DRAFT: Pick<PolicyArtifactDraft, "vehicleId"> = {
   vehicleId: "blue_falcon",
 };
 
@@ -53,23 +63,20 @@ export function cupsWithCourses(metadata: ConfigMetadata): CupView[] {
     .sort((left, right) => left.order - right.order);
 }
 
-export function courseSetupsForCups(cups: readonly CupView[]): CourseSetupScopeValues[] {
-  return cups.flatMap((cup) => cup.courses.map((course) => courseSetupScopeValues(cup, course.id)));
+export function courseSetupsForCups(cups: readonly CupView[]): CourseSetupValues[] {
+  return cups.flatMap((cup) => cup.courses.map((course) => courseSetupValues(cup, course.id)));
 }
 
-export function cupSetupScopeValues(cup: CupView): CourseSetupScopeValues {
+export function cupSetupValues(cup: CupView): CupSetupValues {
   return {
-    courseId: null,
     cupId: cup.id,
-    scope: "cup",
   };
 }
 
-export function courseSetupScopeValues(cup: CupView, courseId: string): CourseSetupScopeValues {
+export function courseSetupValues(cup: CupView, courseId: string): CourseSetupValues {
   return {
     courseId,
     cupId: cup.id,
-    scope: "course",
   };
 }
 
@@ -78,12 +85,29 @@ export function courseSetupDraftsFromSavedSetups(
 ): CourseSetupDraftMap {
   const drafts: CourseSetupDraftMap = {};
   for (const setup of setups) {
-    const scopeValues = scopeValuesFromSetup(setup);
-    drafts[courseSetupKey(scopeValues)] = {
-      ...scopeValues,
+    const values = valuesFromSetup(setup);
+    drafts[courseSetupKey(values)] = {
+      ...values,
       engineSettingRawValue: setup.engine_setting_raw_value,
       policyArtifact: setup.policy_artifact,
       policyRunId: setup.policy_run_id,
+      vehicleId: EMPTY_COURSE_SETUP_DRAFT.vehicleId,
+    };
+  }
+  return drafts;
+}
+
+export function cupSetupDraftsFromSavedSetups(
+  setups: readonly ManagedSaveCupSetup[],
+): CupSetupDraftMap {
+  const drafts: CupSetupDraftMap = {};
+  for (const setup of setups) {
+    const values: CupSetupValues = {
+      cupId: setup.cup_id,
+      difficulty: setup.difficulty,
+    };
+    drafts[cupSetupKey(values)] = {
+      ...values,
       vehicleId: setup.vehicle_id,
     };
   }
@@ -92,9 +116,9 @@ export function courseSetupDraftsFromSavedSetups(
 
 export function exactCourseSetupDraft(
   courseSetupDrafts: CourseSetupDraftMap,
-  scopeValues: CourseSetupScopeValues,
+  values: CourseSetupValues,
 ): CourseSetupDraft | null {
-  return courseSetupDrafts[courseSetupKey(scopeValues)] ?? null;
+  return courseSetupDrafts[courseSetupKey(values)] ?? null;
 }
 
 export function sharedCourseDraft(
@@ -129,9 +153,22 @@ export function dirtyCourseSetupDrafts(
       (savedDraft === null ||
         savedDraft.policyRunId !== draft.policyRunId ||
         savedDraft.policyArtifact !== draft.policyArtifact ||
-        savedDraft.vehicleId !== draft.vehicleId ||
         savedDraft.engineSettingRawValue !== draft.engineSettingRawValue)
     );
+  });
+}
+
+export function countDirtyCupSetups(current: CupSetupDraftMap, saved: CupSetupDraftMap): number {
+  return dirtyCupSetupDrafts(current, saved).length;
+}
+
+export function dirtyCupSetupDrafts(
+  current: CupSetupDraftMap,
+  saved: CupSetupDraftMap,
+): CupSetupDraft[] {
+  return Object.values(current).filter((draft) => {
+    const savedDraft = saved[cupSetupKey(draft)] ?? null;
+    return savedDraft === null || savedDraft.vehicleId !== draft.vehicleId;
   });
 }
 
@@ -189,29 +226,26 @@ export function resolveSavedCourseSetup(
   return resolveSavedCourseSetupForCourse(setups, target);
 }
 
-export function courseSetupKey(scopeValues: CourseSetupScopeValues): string {
-  return [
-    scopeValues.scope,
-    scopeValues.difficulty ?? "",
-    scopeValues.cupId ?? "",
-    scopeValues.courseId ?? "",
-  ].join(":");
+export function courseSetupKey(values: CourseSetupValues): string {
+  return [values.difficulty ?? "", values.cupId, values.courseId].join(":");
 }
 
-function scopeValuesFromSetup(setup: ManagedSaveCourseSetup): CourseSetupScopeValues {
+function valuesFromSetup(setup: ManagedSaveCourseSetup): CourseSetupValues {
   return {
-    courseId: setup.course_id,
-    cupId: setup.cup_id,
+    courseId: setup.course_id ?? "",
+    cupId: setup.cup_id ?? "",
     difficulty: setup.difficulty,
-    scope: setup.scope,
   };
+}
+
+export function cupSetupKey(values: CupSetupValues): string {
+  return [values.difficulty ?? "", values.cupId].join(":");
 }
 
 function policyArtifactDraftsEqual(left: PolicyArtifactDraft, right: PolicyArtifactDraft): boolean {
   return (
     left.policyRunId === right.policyRunId &&
     left.policyArtifact === right.policyArtifact &&
-    left.vehicleId === right.vehicleId &&
     left.engineSettingRawValue === right.engineSettingRawValue
   );
 }
@@ -234,24 +268,25 @@ function resolveSavedCourseSetupForCourse(
   return (
     setups.find(
       (setup) =>
-        setup.scope === "course" &&
         setup.course_id === target.course_id &&
         optionalMatch(setup.cup_id, target.cup_id) &&
         optionalMatch(setup.difficulty, target.difficulty),
-    ) ??
-    // Cup-scoped setup rows remain valid persisted data for cup unlock targets.
-    // Course rows win; the course setup editor writes course rows for bulk edits.
+    ) ?? null
+  );
+}
+
+export function resolveSavedCupSetup(
+  setups: readonly ManagedSaveCupSetup[],
+  target: ManagedSaveUnlockTarget,
+): ManagedSaveCupSetup | null {
+  if (target.cup_id === null) {
+    return null;
+  }
+  return (
     setups.find(
       (setup) =>
-        setup.scope === "cup" &&
-        setup.cup_id === target.cup_id &&
-        optionalMatch(setup.difficulty, target.difficulty),
-    ) ??
-    setups.find(
-      (setup) => setup.scope === "difficulty" && setup.difficulty === target.difficulty,
-    ) ??
-    setups.find((setup) => setup.scope === "global") ??
-    null
+        setup.cup_id === target.cup_id && optionalMatch(setup.difficulty, target.difficulty),
+    ) ?? null
   );
 }
 

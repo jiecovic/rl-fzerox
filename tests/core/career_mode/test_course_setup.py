@@ -9,21 +9,25 @@ from rl_fzerox.core.career_mode.course_setup import (
     missing_course_setup_targets,
     required_course_setup_targets,
     resolve_course_setup,
+    resolve_cup_setup,
 )
-from rl_fzerox.core.manager.models import CourseSetupScope, ManagedSaveCourseSetup
+from rl_fzerox.core.manager.models import ManagedSaveCourseSetup, ManagedSaveCupSetup
 
 
-def test_resolve_course_setup_prefers_course_over_broader_scopes() -> None:
+def test_resolve_course_setup_prefers_specific_difficulty_over_generic_row() -> None:
     setups = (
-        _setup("global", "run-global"),
-        _setup("difficulty", "run-expert", difficulty="expert"),
-        _setup("cup", "run-joker", difficulty="expert", cup_id="joker"),
-        _setup(
-            "course",
-            "run-big-hand",
+        _course_setup(
+            "run-generic",
+            cup_id="joker",
+            course_id="big_hand",
+            updated_at="2026-01-02T00:00:00Z",
+        ),
+        _course_setup(
+            "run-expert",
             difficulty="expert",
             cup_id="joker",
             course_id="big_hand",
+            updated_at="2026-01-01T00:00:00Z",
         ),
     )
 
@@ -33,13 +37,13 @@ def test_resolve_course_setup_prefers_course_over_broader_scopes() -> None:
     )
 
     assert resolved is not None
-    assert resolved.policy_run_id == "run-big-hand"
+    assert resolved.policy_run_id == "run-expert"
 
 
-def test_resolve_course_setup_uses_cup_before_difficulty() -> None:
+def test_resolve_course_setup_prefers_cup_specific_over_course_only_row() -> None:
     setups = (
-        _setup("difficulty", "run-expert", difficulty="expert"),
-        _setup("cup", "run-jack", difficulty="expert", cup_id="jack"),
+        _course_setup("run-course-only", difficulty="expert", course_id="mute_city"),
+        _course_setup("run-jack", difficulty="expert", cup_id="jack", course_id="mute_city"),
     )
 
     resolved = resolve_course_setup(
@@ -53,9 +57,9 @@ def test_resolve_course_setup_uses_cup_before_difficulty() -> None:
 
 def test_resolve_course_setup_does_not_use_course_rows_for_cup_target() -> None:
     setups = (
-        _setup("course", "run-port-town", cup_id="jack", course_id="port_town"),
-        _setup("course", "run-mute-city", cup_id="jack", course_id="mute_city"),
-        _setup("course", "run-silence", cup_id="jack", course_id="silence"),
+        _course_setup("run-port-town", cup_id="jack", course_id="port_town"),
+        _course_setup("run-mute-city", cup_id="jack", course_id="mute_city"),
+        _course_setup("run-silence", cup_id="jack", course_id="silence"),
     )
 
     resolved = resolve_course_setup(
@@ -83,12 +87,12 @@ def test_required_course_setup_targets_expands_cup_target_in_game_order() -> Non
 
 def test_missing_course_setup_targets_accepts_course_rows_for_cup_target() -> None:
     setups = (
-        _setup("course", "run-1", cup_id="jack", course_id="mute_city"),
-        _setup("course", "run-2", cup_id="jack", course_id="silence"),
-        _setup("course", "run-3", cup_id="jack", course_id="sand_ocean"),
-        _setup("course", "run-4", cup_id="jack", course_id="devils_forest"),
-        _setup("course", "run-5", cup_id="jack", course_id="big_blue"),
-        _setup("course", "run-6", cup_id="jack", course_id="port_town"),
+        _course_setup("run-1", cup_id="jack", course_id="mute_city"),
+        _course_setup("run-2", cup_id="jack", course_id="silence"),
+        _course_setup("run-3", cup_id="jack", course_id="sand_ocean"),
+        _course_setup("run-4", cup_id="jack", course_id="devils_forest"),
+        _course_setup("run-5", cup_id="jack", course_id="big_blue"),
+        _course_setup("run-6", cup_id="jack", course_id="port_town"),
     )
 
     missing = missing_course_setup_targets(
@@ -101,8 +105,8 @@ def test_missing_course_setup_targets_accepts_course_rows_for_cup_target() -> No
 
 def test_resolve_course_setup_preserves_per_course_engine_values() -> None:
     setups = (
-        _setup("course", "run-1", cup_id="jack", course_id="mute_city", engine=60),
-        _setup("course", "run-2", cup_id="jack", course_id="silence", engine=40),
+        _course_setup("run-1", cup_id="jack", course_id="mute_city", engine=60),
+        _course_setup("run-2", cup_id="jack", course_id="silence", engine=40),
     )
 
     mute_city = resolve_course_setup(
@@ -122,8 +126,8 @@ def test_resolve_course_setup_preserves_per_course_engine_values() -> None:
 
 def test_missing_course_setup_targets_reports_missing_cup_courses() -> None:
     setups = (
-        _setup("course", "run-1", cup_id="jack", course_id="mute_city"),
-        _setup("course", "run-2", cup_id="jack", course_id="silence"),
+        _course_setup("run-1", cup_id="jack", course_id="mute_city"),
+        _course_setup("run-2", cup_id="jack", course_id="silence"),
     )
 
     missing = missing_course_setup_targets(
@@ -139,10 +143,10 @@ def test_missing_course_setup_targets_reports_missing_cup_courses() -> None:
     ]
 
 
-def test_resolve_course_setup_treats_missing_scope_fields_as_wildcards() -> None:
+def test_resolve_course_setup_treats_missing_difficulty_and_cup_as_wildcards() -> None:
     setups = (
-        _setup("cup", "run-any-joker", cup_id="joker"),
-        _setup("global", "run-global"),
+        _course_setup("run-any-rainbow", course_id="rainbow_road"),
+        _course_setup("run-joker-rainbow", cup_id="joker", course_id="rainbow_road"),
     )
 
     resolved = resolve_course_setup(
@@ -151,14 +155,13 @@ def test_resolve_course_setup_treats_missing_scope_fields_as_wildcards() -> None
     )
 
     assert resolved is not None
-    assert resolved.policy_run_id == "run-any-joker"
+    assert resolved.policy_run_id == "run-joker-rainbow"
 
 
 def test_resolve_course_setup_rejects_non_matching_filters() -> None:
     setups = (
-        _setup("course", "run-wrong-course", course_id="mute_city"),
-        _setup("difficulty", "run-expert", difficulty="expert"),
-        _setup("global", "run-global"),
+        _course_setup("run-wrong-course", course_id="mute_city"),
+        _course_setup("run-expert", difficulty="expert", course_id="big_hand"),
     )
 
     resolved = resolve_course_setup(
@@ -166,33 +169,66 @@ def test_resolve_course_setup_rejects_non_matching_filters() -> None:
         CourseSetupTarget(difficulty="standard", cup_id="joker", course_id="big_hand"),
     )
 
-    assert resolved is not None
-    assert resolved.policy_run_id == "run-global"
+    assert resolved is None
 
 
-def test_resolve_course_setup_uses_newer_duplicate_for_same_scope() -> None:
+def test_resolve_course_setup_uses_newer_duplicate_for_same_target() -> None:
     setups = (
-        _setup("global", "run-old", setup_id="a", updated_at="2026-01-01T00:00:00Z"),
-        _setup("global", "run-new", setup_id="b", updated_at="2026-01-02T00:00:00Z"),
+        _course_setup(
+            "run-old",
+            setup_id="a",
+            cup_id="jack",
+            course_id="mute_city",
+            updated_at="2026-01-01T00:00:00Z",
+        ),
+        _course_setup(
+            "run-new",
+            setup_id="b",
+            cup_id="jack",
+            course_id="mute_city",
+            updated_at="2026-01-02T00:00:00Z",
+        ),
     )
 
-    resolved = resolve_course_setup(setups, CourseSetupTarget())
+    resolved = resolve_course_setup(
+        setups,
+        CourseSetupTarget(cup_id="jack", course_id="mute_city"),
+    )
 
     assert resolved is not None
     assert resolved.policy_run_id == "run-new"
 
 
-def test_resolve_course_setup_returns_none_without_match() -> None:
+def test_resolve_course_setup_returns_none_without_course_target() -> None:
     resolved = resolve_course_setup(
-        (_setup("difficulty", "run-expert", difficulty="expert"),),
+        (_course_setup("run-expert", difficulty="expert", course_id="mute_city"),),
         CourseSetupTarget(difficulty="standard"),
     )
 
     assert resolved is None
 
 
-def _setup(
-    scope: CourseSetupScope,
+def test_resolve_cup_setup_prefers_specific_difficulty_over_generic_row() -> None:
+    setups = (
+        _cup_setup("blue_falcon", cup_id="jack", updated_at="2026-01-02T00:00:00Z"),
+        _cup_setup(
+            "deep_claw",
+            difficulty="expert",
+            cup_id="jack",
+            updated_at="2026-01-01T00:00:00Z",
+        ),
+    )
+
+    resolved = resolve_cup_setup(
+        setups,
+        CourseSetupTarget(difficulty="expert", cup_id="jack"),
+    )
+
+    assert resolved is not None
+    assert resolved.vehicle_id == "deep_claw"
+
+
+def _course_setup(
     policy_run_id: str,
     *,
     setup_id: str | None = None,
@@ -204,16 +240,33 @@ def _setup(
     updated_at: str = "2026-01-01T00:00:00Z",
 ) -> ManagedSaveCourseSetup:
     return ManagedSaveCourseSetup(
-        id=setup_id or f"{scope}-{policy_run_id}",
+        id=setup_id or f"course-{policy_run_id}",
         save_game_id="save",
-        scope=scope,
         policy_run_id=policy_run_id,
         policy_artifact=policy_artifact,
-        vehicle_id="blue_falcon",
         engine_setting_raw_value=engine,
         difficulty=difficulty,
         cup_id=cup_id,
         course_id=course_id,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at=updated_at,
+    )
+
+
+def _cup_setup(
+    vehicle_id: str,
+    *,
+    setup_id: str | None = None,
+    difficulty: str | None = None,
+    cup_id: str = "jack",
+    updated_at: str = "2026-01-01T00:00:00Z",
+) -> ManagedSaveCupSetup:
+    return ManagedSaveCupSetup(
+        id=setup_id or f"cup-{vehicle_id}",
+        save_game_id="save",
+        cup_id=cup_id,
+        vehicle_id=vehicle_id,
+        difficulty=difficulty,
         created_at="2026-01-01T00:00:00Z",
         updated_at=updated_at,
     )

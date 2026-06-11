@@ -7,6 +7,7 @@ from typing import Literal
 import pytest
 
 from rl_fzerox.core.career_mode.progress import default_unlock_targets
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager import (
     ManagerStore,
     default_managed_run_config,
@@ -83,15 +84,18 @@ def test_manager_store_upserts_save_course_setups(tmp_path: Path) -> None:
 
     created = store.upsert_save_course_setup(
         save_game_id=save_game.id,
-        scope="global",
+        cup_id="jack",
+        course_id="mute_city",
         policy_run_id=run.id,
         policy_artifact="best",
     )
     updated = store.upsert_save_course_setup(
         save_game_id=save_game.id,
-        scope="global",
+        cup_id="jack",
+        course_id="mute_city",
         policy_run_id=run.id,
         policy_artifact="latest",
+        engine_setting_raw_value=60,
     )
 
     assignments = store.list_save_course_setups(save_game.id)
@@ -100,7 +104,9 @@ def test_manager_store_upserts_save_course_setups(tmp_path: Path) -> None:
     assert assignments[0].save_game_id == save_game.id
     assert assignments[0].policy_run_id == "policy-run"
     assert assignments[0].policy_artifact == "latest"
-    assert assignments[0].scope == "global"
+    assert assignments[0].cup_id == "jack"
+    assert assignments[0].course_id == "mute_city"
+    assert assignments[0].engine_setting_raw_value == 60
 
 
 def test_manager_store_records_save_target_attempts(tmp_path: Path) -> None:
@@ -146,19 +152,12 @@ def test_manager_store_starts_next_save_attempt_from_course_setup(
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
-    store.upsert_save_course_setup(
-        save_game_id=save_game.id,
-        scope="global",
-        policy_run_id=run.id,
-        policy_artifact="best",
-    )
+    _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="jack")
 
     attempt = store.start_next_save_attempt(save_game.id)
 
     assert attempt.save_game_id == save_game.id
     assert attempt.target_kind == "clear_gp_cup"
-    assert attempt.policy_run_id == run.id
-    assert attempt.policy_artifact == "best"
     assert attempt.difficulty == "novice"
     assert attempt.cup_id == "jack"
     assert attempt.status == "running"
@@ -178,12 +177,7 @@ def test_manager_store_starts_selected_save_attempt_from_course_setup(
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
-    store.upsert_save_course_setup(
-        save_game_id=save_game.id,
-        scope="global",
-        policy_run_id=run.id,
-        policy_artifact="best",
-    )
+    _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="king")
 
     attempt = store.start_target_save_attempt(
         save_game.id,
@@ -194,8 +188,6 @@ def test_manager_store_starts_selected_save_attempt_from_course_setup(
 
     assert attempt.save_game_id == save_game.id
     assert attempt.target_kind == "clear_gp_cup"
-    assert attempt.policy_run_id == run.id
-    assert attempt.policy_artifact == "best"
     assert attempt.difficulty == "novice"
     assert attempt.cup_id == "king"
     assert attempt.status == "running"
@@ -214,12 +206,7 @@ def test_manager_store_rejects_selected_save_attempt_before_save_inspection(
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
-    store.upsert_save_course_setup(
-        save_game_id=save_game.id,
-        scope="global",
-        policy_run_id=run.id,
-        policy_artifact="best",
-    )
+    _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="king")
 
     with pytest.raises(ValueError, match="selected unlock target is locked"):
         store.start_target_save_attempt(
@@ -242,12 +229,7 @@ def test_manager_store_resolves_save_attempt_execution_context(tmp_path: Path) -
         managed_runs_root=tmp_path / "runs",
     )
     policy_path = _write_policy_artifact(run.run_dir, "best")
-    store.upsert_save_course_setup(
-        save_game_id=save_game.id,
-        scope="global",
-        policy_run_id=run.id,
-        policy_artifact="best",
-    )
+    _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="jack")
 
     attempt = store.start_next_save_attempt(save_game.id)
     context = store.get_save_attempt_execution_context(attempt.id)
@@ -258,5 +240,30 @@ def test_manager_store_resolves_save_attempt_execution_context(tmp_path: Path) -
     assert context.target.kind == "clear_gp_cup"
     assert context.target.difficulty == "novice"
     assert context.target.cup_id == "jack"
+    assert context.cup_setup.vehicle_id == "blue_falcon"
     assert context.policy_run.id == run.id
     assert context.policy_path == policy_path.resolve()
+
+
+def _configure_gp_cup(
+    store: ManagerStore,
+    *,
+    save_game_id: str,
+    run_id: str,
+    cup_id: str,
+) -> None:
+    store.upsert_save_cup_setup(
+        save_game_id=save_game_id,
+        cup_id=cup_id,
+        vehicle_id="blue_falcon",
+    )
+    for course in sorted(BUILT_IN_COURSES, key=lambda item: item.course_index):
+        if course.cup != cup_id:
+            continue
+        store.upsert_save_course_setup(
+            save_game_id=save_game_id,
+            cup_id=cup_id,
+            course_id=course.id,
+            policy_run_id=run_id,
+            policy_artifact="best",
+        )

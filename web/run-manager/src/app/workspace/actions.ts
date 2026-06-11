@@ -32,10 +32,10 @@ import {
   updateDraftWithSource,
   updateLineageGroups,
   upsertSaveCourseSetup,
+  upsertSaveCupSetup,
   watchRun,
 } from "@/shared/api/client";
 import type {
-  CourseSetupScope,
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
@@ -77,10 +77,14 @@ export interface WorkspaceActions {
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-    scope: CourseSetupScope;
-    vehicleId: string;
     courseId?: string | null;
     cupId?: string | null;
+    difficulty?: string | null;
+  }) => Promise<ManagedSaveGame>;
+  upsertManagedSaveCupSetup: (request: {
+    cupId: string;
+    saveGameId: string;
+    vehicleId: string;
     difficulty?: string | null;
   }) => Promise<ManagedSaveGame>;
   exportManagedRun: (run: ManagedRun) => Promise<void>;
@@ -149,13 +153,22 @@ export function useWorkspaceActions({
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-    scope: CourseSetupScope;
-    vehicleId: string;
     courseId?: string | null;
     cupId?: string | null;
     difficulty?: string | null;
   }) {
     const saveGame = await upsertSaveCourseSetup(request);
+    setSaveGames((current) => upsertSaveGame(current, saveGame));
+    return saveGame;
+  }
+
+  async function upsertManagedSaveCupSetup(request: {
+    cupId: string;
+    saveGameId: string;
+    vehicleId: string;
+    difficulty?: string | null;
+  }) {
+    const saveGame = await upsertSaveCupSetup(request);
     setSaveGames((current) => upsertSaveGame(current, saveGame));
     return saveGame;
   }
@@ -413,6 +426,7 @@ export function useWorkspaceActions({
     updateManagedLineageGroups,
     updateExistingDraft,
     upsertManagedSaveCourseSetup,
+    upsertManagedSaveCupSetup,
     watchManagedRun,
     startManagedCareerMode,
   };
