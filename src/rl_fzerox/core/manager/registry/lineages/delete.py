@@ -15,6 +15,7 @@ from rl_fzerox.core.manager.db.models import (
     RunRuntimeModel,
     RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
+    RunTrackSamplingGeneratedSlotModel,
     RunTrackSamplingRuntimeModel,
     RunWorkerModel,
 )
@@ -149,6 +150,11 @@ def _delete_run_sidecars(session: Session, run_id: str) -> None:
     )
     session.execute(
         delete(RunTrackSamplingEntryModel).where(RunTrackSamplingEntryModel.run_id == run_id)
+    )
+    session.execute(
+        delete(RunTrackSamplingGeneratedSlotModel).where(
+            RunTrackSamplingGeneratedSlotModel.run_id == run_id
+        )
     )
     session.execute(
         delete(RunTrackSamplingRuntimeModel).where(

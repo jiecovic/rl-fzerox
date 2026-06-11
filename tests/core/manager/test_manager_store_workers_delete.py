@@ -14,6 +14,7 @@ from rl_fzerox.core.manager import (
     default_managed_run_config,
 )
 from rl_fzerox.core.manager.artifacts.filesystem import FilesystemOperation
+from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
@@ -87,6 +88,45 @@ def test_manager_store_deletes_non_running_runs_with_runtime_rows(tmp_path: Path
     assert store.delete_run(run.id) is True
     assert store.get_run(run.id) is None
     assert store.get_run_track_sampling_state(run.id) is None
+
+
+def test_manager_store_deletes_runs_with_generated_x_cup_slots(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Delete Generated Slot Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    stopped = store.update_run_status(
+        run_id=run.id,
+        status="stopped",
+        started_at="2026-05-03T12:00:00+00:00",
+        stopped_at="2026-05-03T12:30:00+00:00",
+        message="worker stopped",
+    )
+
+    assert stopped is not None
+
+    store.replace_run_generated_x_cup_slots(
+        run_id=run.id,
+        slots=(
+            GeneratedXCupSlot(
+                course_key="x_cup_slot_1",
+                slot=1,
+                generation=7,
+                course_id="x_cup_abcdef12",
+                course_name="X Cup abcdef12",
+                course_hash="abcdef12",
+                course_seed=123456,
+                segment_count=30,
+                course_length=1234.5,
+            ),
+        ),
+    )
+
+    assert store.delete_run(run.id) is True
+    assert store.get_run(run.id) is None
+    assert store.get_run_generated_x_cup_slots(run.id) == ()
 
 
 def test_manager_store_delete_run_defers_failed_filesystem_cleanup(
