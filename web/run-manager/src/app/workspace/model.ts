@@ -2,9 +2,11 @@
 import type {
   DraftEditorSession,
   ForkSource,
+  PrimaryWorkspaceTabId,
   RunSession,
   SaveGameSession,
   WorkspaceTab,
+  WorkspaceTabId,
 } from "@/app/workspace/types";
 import { isPinnedRun } from "@/entities/run/model/runtime";
 import type {
@@ -24,6 +26,31 @@ export function runSessionId(seed: string): `run:${string}` {
 
 export function saveGameSessionId(seed: string): `save-game:${string}` {
   return `save-game:${seed}`;
+}
+
+export const primaryWorkspaceTabs = [
+  { id: "drafts", icon: "draft", label: "Drafts" },
+  { id: "runs", icon: "run", label: "Runs" },
+  { id: "charts", icon: "charts", label: "Charts" },
+  { id: "save-games", icon: "career", label: "Career Mode", shortLabel: "Career" },
+] satisfies readonly (WorkspaceTab & { id: PrimaryWorkspaceTabId })[];
+
+export function activePrimaryWorkspaceTabId(id: WorkspaceTabId): PrimaryWorkspaceTabId {
+  switch (id) {
+    case "drafts":
+    case "runs":
+    case "charts":
+    case "save-games":
+      return id;
+    default:
+      if (id.startsWith("editor:")) {
+        return "drafts";
+      }
+      if (id.startsWith("run:")) {
+        return "runs";
+      }
+      return "save-games";
+  }
 }
 
 export function normalizeDraftTabTitle(title: string) {
@@ -187,17 +214,13 @@ export function draftForkSource(draft: ManagedDraft): ForkSource | null {
   };
 }
 
-export function buildWorkspaceTabs(
+export function buildWorkspaceSessionTabs(
   draftEditors: readonly DraftEditorSession[],
   runTabs: readonly RunSession[],
   runs: readonly ManagedRun[],
   saveGameSessions: readonly SaveGameSession[],
 ): WorkspaceTab[] {
   return [
-    { id: "drafts", icon: "draft", label: "Drafts" },
-    { id: "runs", icon: "run", label: "Runs" },
-    { id: "charts", icon: "charts", label: "Charts" },
-    { id: "save-games", icon: "career", label: "Career Mode" },
     ...runTabs.map((session) => ({
       id: session.sessionId,
       icon: "run" as const,

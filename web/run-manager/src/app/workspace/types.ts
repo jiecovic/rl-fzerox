@@ -16,6 +16,11 @@ export type WorkspaceTabId =
   | `run:${string}`
   | `save-game:${string}`;
 
+export type PrimaryWorkspaceTabId = Extract<
+  WorkspaceTabId,
+  "drafts" | "runs" | "charts" | "save-games"
+>;
+
 export interface ForkSource {
   artifact: "latest" | "best";
   runId: string;
@@ -57,5 +62,6 @@ export interface WorkspaceTab {
   id: WorkspaceTabId;
   icon?: "career" | "charts" | "draft" | "run";
   label: string;
+  shortLabel?: string;
   tone?: "draft" | "run";
 }

@@ -2,7 +2,8 @@
 import { useMemo, useState } from "react";
 
 import {
-  buildWorkspaceTabs,
+  activePrimaryWorkspaceTabId,
+  buildWorkspaceSessionTabs,
   defaultDraftName,
   editorSessionId,
   nextAvailableDraftName,
@@ -75,8 +76,9 @@ export function useWorkspaceSessions({
         : null,
     [activeTabId, saveGameSessions],
   );
-  const workspaceTabs = useMemo(
-    () => buildWorkspaceTabs(draftEditors, runTabs, runs, saveGameSessions),
+  const activePrimaryTabId = activePrimaryWorkspaceTabId(activeTabId);
+  const sessionTabs = useMemo(
+    () => buildWorkspaceSessionTabs(draftEditors, runTabs, runs, saveGameSessions),
     [draftEditors, runTabs, runs, saveGameSessions],
   );
 
@@ -294,6 +296,7 @@ export function useWorkspaceSessions({
 
   return {
     activeDraftEditor,
+    activePrimaryTabId,
     activeRunTab,
     activeSaveGameSession,
     activeTabId,
@@ -320,7 +323,7 @@ export function useWorkspaceSessions({
     setChartsFocusRunId,
     setDraftEditorTitle,
     showRunCharts,
-    workspaceTabs,
+    sessionTabs,
   };
 }
 

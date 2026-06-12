@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useWorkspaceActions } from "@/app/workspace/actions";
 import { WorkspaceBody } from "@/app/workspace/Body";
+import { primaryWorkspaceTabs } from "@/app/workspace/model";
 import { useWorkspaceSessions } from "@/app/workspace/sessions";
 import { useManagerData } from "@/app/workspace/useManagerData";
 import { ScrollButtons } from "@/shared/ui/ScrollButtons";
@@ -36,7 +37,7 @@ export function App() {
   return (
     <AppTooltipProvider>
       <main className="app-shell">
-        <header className="app-header">
+        <header className="app-header ml-[126px]">
           <div className="brand-lockup">
             <div className="brand-mark">FX</div>
             <div>
@@ -50,31 +51,47 @@ export function App() {
           />
         </header>
 
-        <div className="navigation-strip">
-          <Tabs
-            label="Run manager sections"
-            activeId={sessions.activeTabId}
-            items={sessions.workspaceTabs}
-            variant="workspace"
-            onClose={(id) => sessions.closeWorkspaceTab(id)}
-            onSelect={(id) => sessions.setActiveTabId(id)}
-          />
-        </div>
+        <div className="mt-[18px] grid grid-cols-[118px_minmax(0,1fr)] items-start gap-2">
+          <aside className="sticky top-4 border border-app-border bg-app-surface p-1">
+            <Tabs
+              label="Run manager sections"
+              activeId={sessions.activePrimaryTabId}
+              items={primaryWorkspaceTabs}
+              variant="sidebar"
+              onSelect={(id) => sessions.setActiveTabId(id)}
+            />
+          </aside>
 
-        <WorkspaceBody
-          actions={actions}
-          defaultConfig={managerData.defaultConfig}
-          drafts={managerData.drafts}
-          error={managerData.error}
-          isLoading={managerData.isLoading}
-          loadRunDetail={managerData.loadRunDetail}
-          metadata={managerData.metadata}
-          runs={managerData.runs}
-          runDetailsById={managerData.runDetailsById}
-          saveGames={managerData.saveGames}
-          sessions={sessions}
-          onRefreshSaveGames={managerData.refreshSaveGames}
-        />
+          <div className="min-w-0">
+            {sessions.sessionTabs.length > 0 ? (
+              <div className="border border-b-0 border-app-border bg-app-surface px-4">
+                <Tabs
+                  label="Open workspace tabs"
+                  activeId={sessions.activeTabId}
+                  items={sessions.sessionTabs}
+                  variant="workspace"
+                  onClose={(id) => sessions.closeWorkspaceTab(id)}
+                  onSelect={(id) => sessions.setActiveTabId(id)}
+                />
+              </div>
+            ) : null}
+
+            <WorkspaceBody
+              actions={actions}
+              defaultConfig={managerData.defaultConfig}
+              drafts={managerData.drafts}
+              error={managerData.error}
+              isLoading={managerData.isLoading}
+              loadRunDetail={managerData.loadRunDetail}
+              metadata={managerData.metadata}
+              runs={managerData.runs}
+              runDetailsById={managerData.runDetailsById}
+              saveGames={managerData.saveGames}
+              sessions={sessions}
+              onRefreshSaveGames={managerData.refreshSaveGames}
+            />
+          </div>
+        </div>
         <ScrollButtons />
       </main>
     </AppTooltipProvider>

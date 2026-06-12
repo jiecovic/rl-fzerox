@@ -4,6 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type {
   DraftEditorSession,
   ForkSource,
+  PrimaryWorkspaceTabId,
   RunSession,
   SaveGameSession,
   WorkspaceTab,
@@ -19,6 +20,7 @@ export interface UseWorkspaceSessionsOptions {
 
 export interface WorkspaceSessions {
   activeDraftEditor: DraftEditorSession | null;
+  activePrimaryTabId: PrimaryWorkspaceTabId;
   activeRunTab: RunSession | null;
   activeSaveGameSession: SaveGameSession | null;
   activeTabId: WorkspaceTabId;
@@ -56,5 +58,5 @@ export interface WorkspaceSessions {
     patch: Partial<Omit<SaveGameSession, "sessionId">>,
   ) => void;
   showRunCharts: (runId: string) => void;
-  workspaceTabs: WorkspaceTab[];
+  sessionTabs: WorkspaceTab[];
 }

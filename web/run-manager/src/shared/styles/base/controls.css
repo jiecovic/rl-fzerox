@@ -62,18 +62,6 @@ button:disabled {
   opacity: 0.56;
 }
 
-.navigation-strip {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  margin: 18px 0 0;
-  padding: 0 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0;
-  border-bottom-color: var(--border-strong);
-}
-
 .section-tabs-row {
   display: flex;
   align-items: flex-end;

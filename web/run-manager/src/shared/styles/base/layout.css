@@ -22,7 +22,6 @@ body {
 
 .workspace {
   border: 1px solid var(--border);
-  border-top: 0;
   background: var(--surface);
   padding: 24px;
 }
