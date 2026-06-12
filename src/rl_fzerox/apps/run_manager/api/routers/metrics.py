@@ -32,6 +32,18 @@ def create_metrics_router(store: ManagerStore) -> APIRouter:
     ) -> dict[str, object]:
         return await run_sync(handlers.run_track_sampling_payload, store, run_id)
 
+    @router.get("/api/runs/{run_id}/engine-tuning")
+    async def run_engine_tuning(
+        run_id: Annotated[str, Path(min_length=1)],
+        artifact: Literal["latest", "best", "final"] = Query(default="latest"),
+    ) -> dict[str, object]:
+        return await run_sync(
+            handlers.run_engine_tuning_payload,
+            store,
+            run_id,
+            artifact=artifact,
+        )
+
     @router.post("/api/runs/{run_id}/track-sampling/reset")
     async def reset_run_track_sampling(
         run_id: Annotated[str, Path(min_length=1)],

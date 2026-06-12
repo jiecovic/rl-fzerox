@@ -46,6 +46,11 @@ interface UnlockPathPanelProps {
     policyRunId: string;
     saveGameId: string;
   }) => Promise<ManagedSaveGame>;
+  onImportEngineTuning: (request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
+  }) => Promise<ManagedSaveGame>;
   onUpsertCupSetup: (request: {
     cupId: string;
     difficulty?: string | null;
@@ -67,6 +72,7 @@ export function UnlockPathPanel({
   metadata,
   onCourseSetupDirtyChange,
   onStartTarget,
+  onImportEngineTuning,
   onUpsertCourseSetup,
   onUpsertCupSetup,
   saveGame,
@@ -223,7 +229,9 @@ export function UnlockPathPanel({
       <GlobalPolicyPanel
         assignableRuns={assignableRuns}
         cups={cups}
+        saveGameId={saveGame.id}
         updating={updating || savingCourseSetups}
+        onImportEngineTuning={onImportEngineTuning}
         onApplySetups={applyCourseSetupDrafts}
       />
       <CourseSetupPanel

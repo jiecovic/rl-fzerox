@@ -7,8 +7,12 @@ import gymnasium as gym
 
 from fzerox_emulator import EmulatorBackend, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
+from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
+from rl_fzerox.core.envs.engine.reset.track_sampling.selection import (
+    EngineTuningSelectionMode,
+)
 from rl_fzerox.core.envs.gym_runtime import FZeroXEnvRuntime
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.runtime_spec.schema import (
@@ -116,6 +120,22 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Replace the active reset candidates after generated-course rotation."""
 
         self._runtime.set_track_sampling_config(config)
+
+    def set_engine_tuning_state(self, state: EngineTuningRuntimeState | None) -> None:
+        """Replace adaptive engine-tuning stats used at future resets."""
+
+        self._runtime.set_engine_tuning_state(state)
+
+    def set_engine_tuning_selection(self, selection: EngineTuningSelectionMode) -> None:
+        """Choose whether adaptive engine tuning samples or picks greedy bins."""
+
+        self._runtime.set_engine_tuning_selection(selection)
+
+    @property
+    def engine_tuning_state(self) -> EngineTuningRuntimeState | None:
+        """Return adaptive engine-tuning stats used at future resets."""
+
+        return self._runtime.engine_tuning_state
 
     def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
         """Append externally scheduled course ids for deficit-budget resets."""

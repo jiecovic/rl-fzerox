@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from operator import attrgetter
 
+from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.runtime_spec.x_cup_slots import generated_x_cup_slots_from_track_sampling
 from rl_fzerox.core.seed import seed_process
@@ -21,7 +22,9 @@ from rl_fzerox.core.training.session import (
     build_training_env,
     build_training_model,
     cleanup_failed_run,
+    current_engine_tuning_checkpoint_state,
     current_policy_artifact_metadata,
+    load_engine_tuning_checkpoint_state,
     load_policy_artifact_metadata,
     maybe_resume_training_model,
     print_training_startup,
@@ -126,11 +129,14 @@ def run_training(
             policy_config=run_config.policy,
         )
         initial_curriculum_stage_index = _resume_curriculum_stage_index(run_config)
+        initial_engine_tuning_state = _resume_engine_tuning_state(run_config)
         if initial_curriculum_stage_index is not None:
             train_env.env_method(
                 "sync_checkpoint_curriculum_stage",
                 initial_curriculum_stage_index,
             )
+        if initial_engine_tuning_state is not None:
+            train_env.env_method("set_engine_tuning_state", initial_engine_tuning_state)
         _report_startup(
             startup_reporter,
             "startup_prepare",
@@ -163,6 +169,7 @@ def run_training(
             save_latest_artifacts(
                 model,
                 run_paths,
+                engine_tuning_state=current_engine_tuning_checkpoint_state(train_env),
                 policy_metadata=current_policy_artifact_metadata(
                     train_env,
                     model,
@@ -176,6 +183,7 @@ def run_training(
             curriculum_config=run_config.curriculum,
             run_paths=run_paths,
             initial_curriculum_stage_index=initial_curriculum_stage_index,
+            initial_engine_tuning_state=initial_engine_tuning_state,
             track_sampling_runtime_persistence=track_sampling_runtime_persistence,
             extra_callbacks=extra_callbacks,
         )
@@ -206,6 +214,7 @@ def run_training(
                 save_latest_artifacts(
                     model,
                     run_paths,
+                    engine_tuning_state=current_engine_tuning_checkpoint_state(train_env),
                     policy_metadata=current_policy_artifact_metadata(
                         train_env,
                         model,
@@ -217,6 +226,7 @@ def run_training(
             model=model,
             model_path=run_paths.final_model_path,
             policy_path=run_paths.final_policy_path,
+            engine_tuning_state=current_engine_tuning_checkpoint_state(train_env),
             policy_metadata=current_policy_artifact_metadata(
                 train_env,
                 model,
@@ -227,6 +237,7 @@ def run_training(
             save_latest_artifacts(
                 model,
                 run_paths,
+                engine_tuning_state=current_engine_tuning_checkpoint_state(train_env),
                 policy_metadata=current_policy_artifact_metadata(
                     train_env,
                     model,
@@ -265,6 +276,18 @@ def _resume_curriculum_stage_index(config: TrainAppConfig) -> int | None:
     if metadata is None:
         return None
     return metadata.curriculum_stage_index
+
+
+def _resume_engine_tuning_state(config: TrainAppConfig) -> EngineTuningRuntimeState | None:
+    if not config.env.track_sampling.engine_tuning.enabled:
+        return None
+    if config.train.resume_run_dir is None:
+        return None
+    policy_path = resolve_policy_artifact_path(
+        config.train.resume_run_dir,
+        artifact=config.train.resume_artifact,
+    )
+    return load_engine_tuning_checkpoint_state(policy_path)
 
 
 def _learn_total_timesteps(

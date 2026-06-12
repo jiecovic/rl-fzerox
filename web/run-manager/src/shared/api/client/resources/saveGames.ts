@@ -3,6 +3,7 @@ import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
   type CareerModeRunnerLaunchRequest,
   createSaveGameResponseSchema,
+  importSaveEngineTuningResponseSchema,
   type ManagedSaveGame,
   openSaveGameDirectoryResponseSchema,
   type SavePolicyArtifact,
@@ -108,6 +109,30 @@ export async function upsertSaveCourseSetup({
     }),
   });
   const payload = parseApiPayload(upsertSaveCourseSetupResponseSchema, await parseJson(response));
+  return payload.save_game;
+}
+
+export async function importSaveEngineTuning({
+  policyArtifact,
+  policyRunId,
+  saveGameId,
+}: {
+  policyArtifact: SavePolicyArtifact;
+  policyRunId: string;
+  saveGameId: string;
+}): Promise<ManagedSaveGame> {
+  const response = await fetch(
+    `/api/save-games/${encodeURIComponent(saveGameId)}/course-setups/import-engine-tuning`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        policy_artifact: policyArtifact,
+        policy_run_id: policyRunId,
+      }),
+    },
+  );
+  const payload = parseApiPayload(importSaveEngineTuningResponseSchema, await parseJson(response));
   return payload.save_game;
 }
 

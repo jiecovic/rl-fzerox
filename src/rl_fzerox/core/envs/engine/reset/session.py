@@ -7,6 +7,10 @@ from dataclasses import dataclass
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import sync_race_intro_target
+from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
+from rl_fzerox.core.envs.engine.reset.track_sampling.selection import (
+    EngineTuningSelectionMode,
+)
 from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
 
 from ..info import (
@@ -57,6 +61,8 @@ class EngineResetCoordinator:
         self._track_selector = TrackResetSelector(env_index=env_index)
         self._track_baseline_cache = TrackBaselineCache()
         self._reset_seeds = EngineResetSeeds()
+        self._engine_tuning_state: EngineTuningRuntimeState | None = None
+        self._engine_tuning_selection: EngineTuningSelectionMode = "sample"
 
     def set_curriculum_stage(self, stage_index: int | None) -> None:
         self._stage_index = stage_index
@@ -83,6 +89,22 @@ class EngineResetCoordinator:
         self._queued_reset_course_ids.clear()
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
         self._prune_baseline_cache_to_active_tracks()
+
+    def set_engine_tuning_state(self, state: EngineTuningRuntimeState | None) -> None:
+        """Replace the adaptive engine-tuning snapshot used at future resets."""
+
+        self._engine_tuning_state = state
+
+    def set_engine_tuning_selection(self, selection: EngineTuningSelectionMode) -> None:
+        """Choose whether adaptive engine tuning samples or picks greedy bins."""
+
+        self._engine_tuning_selection = selection
+
+    @property
+    def engine_tuning_state(self) -> EngineTuningRuntimeState | None:
+        """Return the adaptive engine-tuning snapshot used at future resets."""
+
+        return self._engine_tuning_state
 
     def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
         """Append externally scheduled course ids for deficit-budget resets."""
@@ -121,6 +143,8 @@ class EngineResetCoordinator:
                 self._active_track_sampling,
                 course_id=self._locked_reset_course_id,
                 seed=seed,
+                engine_tuning_state=self._engine_tuning_state,
+                engine_tuning_selection=self._engine_tuning_selection,
             )
             if selected_track is not None:
                 return selected_track
@@ -128,12 +152,16 @@ class EngineResetCoordinator:
             return self._track_selector.select_sequential(
                 self._active_track_sampling,
                 seed=self._reset_seeds.track_sampling_seed(seed),
+                engine_tuning_state=self._engine_tuning_state,
+                engine_tuning_selection=self._engine_tuning_selection,
             )
         if self._active_track_sampling.sampling_mode == "deficit_budget":
             return self._select_queued_track(seed=seed)
         return self._track_selector.select(
             self._active_track_sampling,
             seed=self._reset_seeds.track_sampling_seed(seed),
+            engine_tuning_state=self._engine_tuning_state,
+            engine_tuning_selection=self._engine_tuning_selection,
         )
 
     def reset_race(
@@ -230,6 +258,8 @@ class EngineResetCoordinator:
             return self._track_selector.select(
                 self._active_track_sampling,
                 seed=self._reset_seeds.track_sampling_seed(seed),
+                engine_tuning_state=self._engine_tuning_state,
+                engine_tuning_selection=self._engine_tuning_selection,
             )
         course_id = self._queued_reset_course_ids.pop(0)
         selected_track = select_reset_track_by_course_id(
@@ -237,6 +267,8 @@ class EngineResetCoordinator:
             course_id=course_id,
             sampling_mode="deficit_budget",
             seed=self._reset_seeds.track_sampling_seed(seed),
+            engine_tuning_state=self._engine_tuning_state,
+            engine_tuning_selection=self._engine_tuning_selection,
         )
         if selected_track is None:
             raise RuntimeError(

@@ -55,6 +55,7 @@ from rl_fzerox.core.runtime_spec.schema.policy import (
     PolicyRecurrentConfig,
 )
 from rl_fzerox.core.runtime_spec.schema.tracks import (
+    AdaptiveEngineTuningConfig,
     TrackConfig,
     TrackRecordEntryConfig,
     TrackRecordsConfig,
@@ -73,6 +74,7 @@ __all__ = [
     "ActionMaskConfig",
     "ActionMaskOverrides",
     "ActionRuntimeConfig",
+    "AdaptiveEngineTuningConfig",
     "ContinuousAirBrakeMode",
     "CareerModeRaceSetupConfig",
     "CurriculumConfig",

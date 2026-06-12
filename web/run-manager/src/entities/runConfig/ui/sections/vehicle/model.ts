@@ -46,7 +46,8 @@ export function engineSettingSummary(config: ManagedRunConfig["vehicle"]) {
   if (config.engine_mode === "fixed") {
     return String(config.engine_setting_raw_value);
   }
-  return `${config.engine_setting_min_raw_value}-${config.engine_setting_max_raw_value}`;
+  const range = `${config.engine_setting_min_raw_value}-${config.engine_setting_max_raw_value}`;
+  return config.engine_mode === "adaptive_bandit" ? `adaptive ${range}` : range;
 }
 
 export function vehicleSlotLabel(machineSelectSlot: number) {

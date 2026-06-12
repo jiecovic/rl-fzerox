@@ -142,6 +142,46 @@ export const trackSamplingRuntimeStateSchema = z.object({
   entries: z.array(trackSamplingRuntimeEntrySchema),
 });
 
+export const engineTuningRuntimeArmSchema = z.object({
+  context_key: z.string(),
+  course_key: z.string(),
+  vehicle_id: z.string(),
+  engine_setting_raw_value: z.number().int().min(0).max(100),
+  attempts: z.number().int().nonnegative(),
+  finished_attempts: z.number().int().nonnegative(),
+  finish_rate: z.number().min(0).max(1).nullable(),
+  mean_completion: z.number().min(0).max(1).nullable(),
+  mean_score: z.number().nullable(),
+  raw_mean_score: z.number().nullable(),
+  best_score: z.number().nullable(),
+});
+
+export const engineTuningRuntimeBinSchema = z.object({
+  engine_setting_raw_value: z.number().int().min(0).max(100),
+  selection_probability: z.number().min(0).max(1),
+  posterior_mean: z.number(),
+  attempts: z.number().int().nonnegative(),
+  finish_rate: z.number().min(0).max(1).nullable(),
+  mean_completion: z.number().min(0).max(1).nullable(),
+});
+
+export const engineTuningRuntimeContextSchema = z.object({
+  context_key: z.string(),
+  course_key: z.string(),
+  vehicle_id: z.string(),
+  attempts: z.number().int().nonnegative(),
+  observed_arm_count: z.number().int().nonnegative(),
+  recommended_engine_setting_raw_value: z.number().int().min(0).max(100),
+  bins: z.array(engineTuningRuntimeBinSchema),
+});
+
+export const engineTuningRuntimeStateSchema = z.object({
+  version: z.number().int().positive(),
+  update_count: z.number().int().nonnegative(),
+  arms: z.array(engineTuningRuntimeArmSchema),
+  contexts: z.array(engineTuningRuntimeContextSchema).default([]),
+});
+
 export const templatesResponseSchema = z.object({
   templates: z.array(managedTemplateSchema),
 });
@@ -221,6 +261,11 @@ export const runTrackSamplingResponseSchema = z.object({
   state: trackSamplingRuntimeStateSchema.nullable(),
 });
 
+export const runEngineTuningResponseSchema = z.object({
+  enabled: z.boolean(),
+  state: engineTuningRuntimeStateSchema.nullable(),
+});
+
 export const tensorboardViewGroupSchema = z.object({
   name: z.string(),
   slug: z.string(),
@@ -246,6 +291,10 @@ export type ManagedRunDetail = z.infer<typeof managedRunSchema>;
 export type ManagedRunMetricSample = z.infer<typeof managedRunMetricSampleSchema>;
 export type RunsLiveUpdate = z.infer<typeof runsLiveUpdateSchema>;
 export type RunTrackSamplingLiveUpdate = z.infer<typeof runTrackSamplingLiveUpdateSchema>;
+export type EngineTuningRuntimeArm = z.infer<typeof engineTuningRuntimeArmSchema>;
+export type EngineTuningRuntimeBin = z.infer<typeof engineTuningRuntimeBinSchema>;
+export type EngineTuningRuntimeContext = z.infer<typeof engineTuningRuntimeContextSchema>;
+export type EngineTuningRuntimeState = z.infer<typeof engineTuningRuntimeStateSchema>;
 export type TrackSamplingRuntimeEntry = z.infer<typeof trackSamplingRuntimeEntrySchema>;
 export type TrackSamplingRuntimeState = z.infer<typeof trackSamplingRuntimeStateSchema>;
 export type TensorboardViewGroup = z.infer<typeof tensorboardViewGroupSchema>;

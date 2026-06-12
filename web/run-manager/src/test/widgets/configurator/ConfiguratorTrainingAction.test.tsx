@@ -291,6 +291,7 @@ describe("Configurator", () => {
     await user.click(screen.getByRole("checkbox", { name: "Boost enabled" }));
     expect(screen.getByRole("checkbox", { name: "Boost enabled" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeChecked();
+    await user.click(screen.getByText("Control family"));
     expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeEnabled();
   });
 

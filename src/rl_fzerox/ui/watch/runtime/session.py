@@ -8,6 +8,8 @@ from fzerox_emulator import Emulator
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
+from rl_fzerox.core.training.runs import resolve_policy_artifact_path
+from rl_fzerox.core.training.session.artifacts import load_engine_tuning_checkpoint_state
 from rl_fzerox.ui.watch.runtime.observation import configured_watch_zeroed_features
 from rl_fzerox.ui.watch.runtime.policy import (
     _load_policy_runner,
@@ -55,6 +57,10 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
         curriculum_config=config.curriculum,
     )
     env.set_sequential_track_sampling(True)
+    env.set_engine_tuning_selection(
+        "greedy" if config.watch.deterministic_policy else "sample"
+    )
+    load_watch_engine_tuning_state(config, env)
     policy_runner = _load_policy_runner(
         config.watch.policy_run_dir,
         artifact=config.watch.policy_artifact,
@@ -83,3 +89,20 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
         watch_zeroed_state_features=configured_watch_zeroed_features(config),
         auxiliary_target_names=auxiliary_target_names,
     )
+
+
+def load_watch_engine_tuning_state(config: WatchAppConfig, env: FZeroXEnv) -> None:
+    if not config.env.track_sampling.engine_tuning.enabled:
+        return
+    if config.watch.policy_run_dir is None:
+        env.set_engine_tuning_state(None)
+        return
+    try:
+        policy_path = resolve_policy_artifact_path(
+            config.watch.policy_run_dir,
+            artifact=config.watch.policy_artifact,
+        )
+    except FileNotFoundError:
+        env.set_engine_tuning_state(None)
+        return
+    env.set_engine_tuning_state(load_engine_tuning_checkpoint_state(policy_path))

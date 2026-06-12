@@ -1,5 +1,6 @@
 // web/run-manager/src/widgets/runWorkspace/workspace/RuntimeSummary.tsx
 import type { ReactNode } from "react";
+import { RunEngineTuningPanel } from "@/entities/engineTuning/ui/RunEngineTuningPanel";
 import {
   envStepRateLabel,
   lineageSimGameTimeLabel,
@@ -21,6 +22,7 @@ import { useRunClock } from "@/features/runLiveData/hooks";
 import type { RunWorkspaceActionState } from "@/features/runWorkspaceActions/useRunWorkspaceActions";
 import type {
   ConfigMetadata,
+  EngineTuningRuntimeState,
   ManagedRun,
   ManagedRunDetail,
   TrackSamplingRuntimeState,
@@ -47,6 +49,7 @@ interface RunRuntimeSummaryProps {
   metadata: ConfigMetadata;
   onShowCharts: (runId: string) => void;
   run: ManagedRunDetail;
+  engineTuningState: EngineTuningRuntimeState | null;
   trackSamplingState: TrackSamplingRuntimeState | null;
 }
 
@@ -56,6 +59,7 @@ export function RunRuntimeSummary({
   metadata,
   onShowCharts,
   run,
+  engineTuningState,
   trackSamplingState,
 }: RunRuntimeSummaryProps) {
   const nowMs = useRunClock(run.status);
@@ -348,6 +352,12 @@ export function RunRuntimeSummary({
         onReset={() => void actions.resetTrackPoolState()}
         run={run}
         state={trackSamplingState}
+      />
+      <RunEngineTuningPanel
+        artifact={actions.selectedWatchArtifact}
+        enabled={run.config.vehicle.engine_mode === "adaptive_bandit"}
+        metadata={metadata}
+        state={engineTuningState}
       />
     </div>
   );

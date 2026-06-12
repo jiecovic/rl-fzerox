@@ -16,7 +16,13 @@ import { ConfigGrid, ConfigStack } from "@/shared/ui/config/ConfigLayout";
 import { ConfigPanel } from "@/shared/ui/config/ConfigPanel";
 import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
 import { usePersistentCollapsedIds } from "@/shared/ui/config/disclosureState";
-import { ToggleSwitch } from "@/shared/ui/configFields";
+import {
+  IntegerField,
+  NumberField,
+  RangeNumberField,
+  SegmentedChoiceStrip,
+  ToggleSwitch,
+} from "@/shared/ui/configFields";
 
 interface VehicleSectionProps {
   config: ManagedRunConfig;
@@ -73,14 +79,26 @@ export function VehicleSection({
     patchConfigSection(
       setConfig,
       "vehicle",
-      (currentConfig): Partial<ManagedRunConfig["vehicle"]> =>
-        mode === "random_range" && currentConfig.vehicle.engine_mode !== "random_range"
-          ? {
-              engine_mode: "random_range",
-              engine_setting_min_raw_value: randomEngineDefaults.min,
-              engine_setting_max_raw_value: randomEngineDefaults.max,
-            }
-          : { engine_mode: mode },
+      (currentConfig): Partial<ManagedRunConfig["vehicle"]> => {
+        if (mode === "fixed") {
+          return { engine_mode: mode };
+        }
+        if (mode === "adaptive_bandit") {
+          return {
+            engine_mode: mode,
+            engine_setting_min_raw_value: 0,
+            engine_setting_max_raw_value: 100,
+          };
+        }
+        if (currentConfig.vehicle.engine_mode !== "fixed") {
+          return { engine_mode: mode };
+        }
+        return {
+          engine_mode: mode,
+          engine_setting_min_raw_value: randomEngineDefaults.min,
+          engine_setting_max_raw_value: randomEngineDefaults.max,
+        };
+      },
     );
   };
 
@@ -156,6 +174,19 @@ export function VehicleSection({
         <ConfigPanel
           onReset={() =>
             updateVehicle({
+              adaptive_engine_bin_size: defaultConfig.vehicle.adaptive_engine_bin_size,
+              adaptive_engine_completion_weight:
+                defaultConfig.vehicle.adaptive_engine_completion_weight,
+              adaptive_engine_exploration_scale:
+                defaultConfig.vehicle.adaptive_engine_exploration_scale,
+              adaptive_engine_finish_bonus: defaultConfig.vehicle.adaptive_engine_finish_bonus,
+              adaptive_engine_position_weight:
+                defaultConfig.vehicle.adaptive_engine_position_weight,
+              adaptive_engine_prior_mean: defaultConfig.vehicle.adaptive_engine_prior_mean,
+              adaptive_engine_prior_strength: defaultConfig.vehicle.adaptive_engine_prior_strength,
+              adaptive_engine_stat_decay: defaultConfig.vehicle.adaptive_engine_stat_decay,
+              adaptive_engine_uniform_exploration:
+                defaultConfig.vehicle.adaptive_engine_uniform_exploration,
               engine_mode: defaultConfig.vehicle.engine_mode,
               engine_setting_raw_value: defaultConfig.vehicle.engine_setting_raw_value,
               engine_setting_min_raw_value: defaultConfig.vehicle.engine_setting_min_raw_value,
@@ -165,25 +196,35 @@ export function VehicleSection({
           title="Engine setting"
         >
           <div className="grid gap-3">
-            <div className="grid min-h-[34px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+            <div className="grid min-h-[34px] gap-2">
               <div className="grid gap-1">
-                <strong className="text-[13px] text-app-text">Random range</strong>
+                <strong className="text-[13px] text-app-text">Engine mode</strong>
                 <small className="m-0 text-xs leading-snug text-app-muted">
-                  {config.vehicle.engine_mode === "fixed"
-                    ? "Keep one global slider value for every selected machine."
-                    : "Resample one global slider value inside the selected range on each reset."}
+                  {engineModeDescription(config.vehicle.engine_mode)}
                 </small>
               </div>
-              <ToggleSwitch
-                checked={config.vehicle.engine_mode === "random_range"}
-                hideLabel
-                label="Random range"
-                tooltip={
-                  config.vehicle.engine_mode === "random_range"
-                    ? "Random range enabled"
-                    : "Random range disabled"
-                }
-                onChange={(checked) => setEngineMode(checked ? "random_range" : "fixed")}
+              <SegmentedChoiceStrip
+                ariaLabel="Engine mode"
+                options={[
+                  {
+                    active: config.vehicle.engine_mode === "fixed",
+                    key: "fixed",
+                    label: "Fixed",
+                    onClick: () => setEngineMode("fixed"),
+                  },
+                  {
+                    active: config.vehicle.engine_mode === "random_range",
+                    key: "random_range",
+                    label: "Random",
+                    onClick: () => setEngineMode("random_range"),
+                  },
+                  {
+                    active: config.vehicle.engine_mode === "adaptive_bandit",
+                    key: "adaptive_bandit",
+                    label: "Adaptive",
+                    onClick: () => setEngineMode("adaptive_bandit"),
+                  },
+                ]}
               />
             </div>
             <EngineSettingControl
@@ -194,7 +235,9 @@ export function VehicleSection({
               help={
                 config.vehicle.engine_mode === "fixed"
                   ? "F-Zero X engine slider. Lower values bias acceleration, higher values bias top speed."
-                  : "Sample one engine slider value inside this range on each episode reset."
+                  : config.vehicle.engine_mode === "random_range"
+                    ? "Sample one engine slider value inside this range on each episode reset."
+                    : "Candidate engine slider range used by the adaptive bandit at episode reset."
               }
               label={config.vehicle.engine_mode === "fixed" ? "Engine slider" : "Engine range"}
               max={100}
@@ -211,6 +254,13 @@ export function VehicleSection({
                 })
               }
             />
+            {config.vehicle.engine_mode === "adaptive_bandit" ? (
+              <AdaptiveEngineControls
+                config={config}
+                defaultConfig={defaultConfig}
+                onChange={updateVehicle}
+              />
+            ) : null}
           </div>
         </ConfigPanel>
 
@@ -353,6 +403,134 @@ export function VehicleSection({
       </ConfigPanel>
     </ConfigStack>
   );
+}
+
+function AdaptiveEngineControls({
+  config,
+  defaultConfig,
+  onChange,
+}: {
+  config: ManagedRunConfig;
+  defaultConfig: ManagedRunConfig;
+  onChange: (patch: Partial<ManagedRunConfig["vehicle"]>) => void;
+}) {
+  const vehicle = config.vehicle;
+  const defaultVehicle = defaultConfig.vehicle;
+  return (
+    <div className="grid gap-3 border-t border-app-border pt-3">
+      <div className="grid gap-1">
+        <strong className="text-[13px] text-app-text">Adaptive bandit</strong>
+        <small className="m-0 text-xs leading-snug text-app-muted">
+          Learns engine bins per course and vehicle while preserving uniform exploration.
+        </small>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <IntegerField
+          help="Raw engine-slider step between candidate arms."
+          label="Bin size"
+          max={100}
+          min={1}
+          resetValue={defaultVehicle.adaptive_engine_bin_size}
+          value={vehicle.adaptive_engine_bin_size}
+          onChange={(adaptive_engine_bin_size) => onChange({ adaptive_engine_bin_size })}
+        />
+        <RangeNumberField
+          help="Discount factor for old score statistics. Higher values remember longer."
+          label="Stat decay"
+          max={0.999}
+          min={0.001}
+          numberStep="0.001"
+          rangeStep={0.001}
+          resetValue={defaultVehicle.adaptive_engine_stat_decay}
+          value={vehicle.adaptive_engine_stat_decay}
+          onChange={(adaptive_engine_stat_decay) => onChange({ adaptive_engine_stat_decay })}
+        />
+        <RangeNumberField
+          help="Probability of taking a uniformly random engine bin."
+          label="Uniform exploration"
+          max={1}
+          min={0}
+          numberStep="0.01"
+          rangeStep={0.01}
+          resetValue={defaultVehicle.adaptive_engine_uniform_exploration}
+          value={vehicle.adaptive_engine_uniform_exploration}
+          onChange={(adaptive_engine_uniform_exploration) =>
+            onChange({ adaptive_engine_uniform_exploration })
+          }
+        />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <NumberField
+          help="Initial expected score for unseen bins."
+          label="Prior mean"
+          resetValue={defaultVehicle.adaptive_engine_prior_mean}
+          step="0.01"
+          value={vehicle.adaptive_engine_prior_mean}
+          onChange={(adaptive_engine_prior_mean) => onChange({ adaptive_engine_prior_mean })}
+        />
+        <NumberField
+          help="Virtual sample count behind the prior mean."
+          label="Prior strength"
+          resetValue={defaultVehicle.adaptive_engine_prior_strength}
+          step="0.1"
+          value={vehicle.adaptive_engine_prior_strength}
+          onChange={(adaptive_engine_prior_strength) =>
+            onChange({ adaptive_engine_prior_strength })
+          }
+        />
+        <NumberField
+          help="Thompson-sampling noise scale. Higher values explore longer."
+          label="Exploration scale"
+          resetValue={defaultVehicle.adaptive_engine_exploration_scale}
+          step="0.01"
+          value={vehicle.adaptive_engine_exploration_scale}
+          onChange={(adaptive_engine_exploration_scale) =>
+            onChange({ adaptive_engine_exploration_scale })
+          }
+        />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <NumberField
+          help="Score contribution from episode completion fraction."
+          label="Completion weight"
+          resetValue={defaultVehicle.adaptive_engine_completion_weight}
+          step="0.1"
+          value={vehicle.adaptive_engine_completion_weight}
+          onChange={(adaptive_engine_completion_weight) =>
+            onChange({ adaptive_engine_completion_weight })
+          }
+        />
+        <NumberField
+          help="Score bonus added for finished episodes."
+          label="Finish bonus"
+          resetValue={defaultVehicle.adaptive_engine_finish_bonus}
+          step="0.1"
+          value={vehicle.adaptive_engine_finish_bonus}
+          onChange={(adaptive_engine_finish_bonus) => onChange({ adaptive_engine_finish_bonus })}
+        />
+        <NumberField
+          help="Score contribution from finishing position among racers."
+          label="Position weight"
+          resetValue={defaultVehicle.adaptive_engine_position_weight}
+          step="0.1"
+          value={vehicle.adaptive_engine_position_weight}
+          onChange={(adaptive_engine_position_weight) =>
+            onChange({ adaptive_engine_position_weight })
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function engineModeDescription(mode: ManagedRunConfig["vehicle"]["engine_mode"]) {
+  if (mode === "fixed") {
+    return "Keep one global slider value for every selected machine.";
+  }
+  if (mode === "random_range") {
+    return "Resample one global slider value inside the selected range on each reset.";
+  }
+  return "Learn engine-bin preferences per course and vehicle during training.";
 }
 
 function VehicleMetric({ label, value }: { label: string; value: string }) {

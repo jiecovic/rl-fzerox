@@ -2,8 +2,10 @@
 
 import { getJson, parseApiPayload, parseJson, type RequestOptions } from "@/shared/api/client/http";
 import {
+  type EngineTuningRuntimeState,
   type ManagedRunMetricSample,
   resetTrackSamplingResponseSchema,
+  runEngineTuningResponseSchema,
   runMetricsResponseSchema,
   runTrackSamplingResponseSchema,
   type TrackSamplingRuntimeState,
@@ -34,6 +36,21 @@ export async function fetchRunTrackSamplingState(
     await getJson(`/api/runs/${encodeURIComponent(runId)}/track-sampling`, options),
   );
   return payload.state;
+}
+
+export async function fetchRunEngineTuningState(
+  runId: string,
+  artifact: "latest" | "best" | "final" = "latest",
+  options: RequestOptions = {},
+): Promise<{ enabled: boolean; state: EngineTuningRuntimeState | null }> {
+  const query = new URLSearchParams({ artifact });
+  return parseApiPayload(
+    runEngineTuningResponseSchema,
+    await getJson(
+      `/api/runs/${encodeURIComponent(runId)}/engine-tuning?${query.toString()}`,
+      options,
+    ),
+  );
 }
 
 export async function resetRunTrackSamplingState(runId: string): Promise<void> {

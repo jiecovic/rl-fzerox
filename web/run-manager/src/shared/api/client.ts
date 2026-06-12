@@ -13,6 +13,7 @@ export {
 } from "@/shared/api/client/live";
 export {
   fetchFreshRunMetrics,
+  fetchRunEngineTuningState,
   fetchRunMetrics,
   fetchRunTrackSamplingState,
   getCachedRunMetrics,
@@ -34,6 +35,7 @@ export {
   fetchSaveGames,
   fetchTemplates,
   forkRun,
+  importSaveEngineTuning,
   launchRun,
   openRunDirectory,
   openSaveGameDirectory,

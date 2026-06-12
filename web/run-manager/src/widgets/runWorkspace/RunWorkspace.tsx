@@ -1,7 +1,11 @@
 // web/run-manager/src/widgets/runWorkspace/RunWorkspace.tsx
 import { useEffect, useState } from "react";
 import type { ConfigSection } from "@/entities/runConfig/model/sections";
-import { useRunPolicyPreview, useRunTrackSamplingState } from "@/features/runLiveData/hooks";
+import {
+  useRunEngineTuningState,
+  useRunPolicyPreview,
+  useRunTrackSamplingState,
+} from "@/features/runLiveData/hooks";
 import { useRunWorkspaceActions } from "@/features/runWorkspaceActions/useRunWorkspaceActions";
 import type {
   ConfigMetadata,
@@ -76,8 +80,16 @@ export function RunWorkspace({
     run,
     runName,
   });
+  const engineTuningEnabled = run.config.vehicle.engine_mode === "adaptive_bandit";
+  const { engineTuningError, engineTuningState } = useRunEngineTuningState(
+    run.id,
+    run.status,
+    engineTuningEnabled,
+    actions.selectedWatchArtifact,
+  );
   const hasFeedback =
     actions.controlError !== null ||
+    engineTuningError !== null ||
     trackSamplingError !== null ||
     (previewEnabled && previewError !== null);
 
@@ -130,6 +142,7 @@ export function RunWorkspace({
         metadata={metadata}
         onShowCharts={onShowCharts}
         run={run}
+        engineTuningState={engineTuningState}
         trackSamplingState={trackSamplingState}
       />
 
@@ -138,6 +151,7 @@ export function RunWorkspace({
           {actions.controlError !== null ? (
             <Notice tone="error">{actions.controlError}</Notice>
           ) : null}
+          {engineTuningError !== null ? <Notice tone="error">{engineTuningError}</Notice> : null}
           {trackSamplingError !== null ? <Notice tone="error">{trackSamplingError}</Notice> : null}
           {previewEnabled && previewError !== null ? (
             <Notice tone="error">{previewError}</Notice>

@@ -10,7 +10,9 @@ export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
   const engineSummary =
     config.vehicle.engine_mode === "fixed"
       ? `engine ${config.vehicle.engine_setting_raw_value}`
-      : `engine ${config.vehicle.engine_setting_min_raw_value}-${config.vehicle.engine_setting_max_raw_value}`;
+      : config.vehicle.engine_mode === "random_range"
+        ? `engine ${config.vehicle.engine_setting_min_raw_value}-${config.vehicle.engine_setting_max_raw_value}`
+        : `adaptive engine ${config.vehicle.engine_setting_min_raw_value}-${config.vehicle.engine_setting_max_raw_value}`;
   const actionSummary = `${displayActionRepeatSummary(config)} · ${displaySteeringSummary(config)} · ${displayDriveSummary(config)}${
     config.action.include_air_brake ||
     config.action.include_boost ||

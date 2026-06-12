@@ -91,6 +91,15 @@ class UpsertSaveCupSetupRequest(BaseModel):
     difficulty: str | None = None
 
 
+class ImportSaveEngineTuningRequest(BaseModel):
+    """Request body for importing learned engine settings into course setups."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    policy_run_id: str
+    policy_artifact: Literal["latest", "best"] = "latest"
+
+
 class UpdateDraftRequest(BaseModel):
     """Request body for updating one SQLite-backed draft."""
 

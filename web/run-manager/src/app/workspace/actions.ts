@@ -20,6 +20,7 @@ import {
   deleteRun,
   exportRunBundle,
   importRunBundle,
+  importSaveEngineTuning,
   launchRun,
   openRunDirectory,
   openSaveGameDirectory,
@@ -86,6 +87,11 @@ export interface WorkspaceActions {
     saveGameId: string;
     vehicleId: string;
     difficulty?: string | null;
+  }) => Promise<ManagedSaveGame>;
+  importManagedSaveEngineTuning: (request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
   }) => Promise<ManagedSaveGame>;
   exportManagedRun: (run: ManagedRun) => Promise<void>;
   importManagedRunBundle: (file: File) => Promise<void>;
@@ -164,6 +170,16 @@ export function useWorkspaceActions({
     difficulty?: string | null;
   }) {
     const saveGame = await upsertSaveCupSetup(request);
+    setSaveGames((current) => upsertSaveGame(current, saveGame));
+    return saveGame;
+  }
+
+  async function importManagedSaveEngineTuning(request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
+  }) {
+    const saveGame = await importSaveEngineTuning(request);
     setSaveGames((current) => upsertSaveGame(current, saveGame));
     return saveGame;
   }
@@ -397,6 +413,7 @@ export function useWorkspaceActions({
     openManagedSaveGameDirectory,
     exportManagedRun,
     importManagedRunBundle,
+    importManagedSaveEngineTuning,
     removeDraft,
     removeLineage,
     removeRun,

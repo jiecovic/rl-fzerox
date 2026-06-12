@@ -204,7 +204,6 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "updated_at",
     }
 
-
 def test_manager_store_rejects_removed_observation_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()

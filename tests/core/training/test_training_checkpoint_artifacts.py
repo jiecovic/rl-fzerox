@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rl_fzerox.core.engine_tuning import EngineTuningArmState, EngineTuningRuntimeState
 from rl_fzerox.core.training.runs import (
     build_run_paths,
     ensure_run_dirs,
@@ -10,6 +11,7 @@ from rl_fzerox.core.training.runs import (
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
     list_recent_checkpoint_dirs,
+    load_engine_tuning_checkpoint_state,
     load_policy_artifact_metadata,
     save_artifacts_atomically,
     save_recent_checkpoint_artifacts,
@@ -84,3 +86,38 @@ def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path
         curriculum_stage_name="lean_enabled",
         num_timesteps=123_456,
     )
+
+
+def test_save_artifacts_atomically_persists_engine_tuning_checkpoint(
+    tmp_path: Path,
+) -> None:
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    state = EngineTuningRuntimeState(
+        version=1,
+        update_count=7,
+        arms=(
+            EngineTuningArmState(
+                context_key="mute_city|blue_falcon",
+                course_key="mute_city",
+                vehicle_id="blue_falcon",
+                engine_setting_raw_value=65,
+                attempts=3,
+                finished_attempts=2,
+                decayed_count=2.5,
+                decayed_score_total=3.75,
+                completion_total=2.4,
+                score_total=4.5,
+                best_score=2.0,
+            ),
+        ),
+    )
+
+    save_artifacts_atomically(
+        model=_FakeModel(),
+        model_path=run_paths.latest_model_path,
+        policy_path=run_paths.latest_policy_path,
+        engine_tuning_state=state,
+    )
+
+    assert load_engine_tuning_checkpoint_state(run_paths.latest_policy_path) == state

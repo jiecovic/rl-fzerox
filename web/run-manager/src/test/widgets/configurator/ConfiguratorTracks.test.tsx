@@ -184,7 +184,7 @@ describe("Configurator", () => {
     await user.click(screen.getByRole("button", { name: "Vehicle" }));
     await user.click(screen.getByRole("button", { name: "Select all" }));
     await user.click(screen.getByRole("button", { name: "Golden Fox" }));
-    await user.click(screen.getByRole("checkbox", { name: "Random range" }));
+    await user.click(screen.getByRole("radio", { name: "Random" }));
 
     expect(screen.getByRole("button", { name: "Golden Fox" })).toHaveAttribute(
       "aria-pressed",

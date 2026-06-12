@@ -29,6 +29,7 @@ export {
 export {
   createSaveGame,
   fetchSaveGames,
+  importSaveEngineTuning,
   openSaveGameDirectory,
   renameSaveGame,
   startCareerModeRunner,

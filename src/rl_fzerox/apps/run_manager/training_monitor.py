@@ -9,6 +9,7 @@ from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.models import RunCommand
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session import (
+    current_engine_tuning_checkpoint_state,
     current_policy_artifact_metadata,
     save_artifacts_atomically,
 )
@@ -154,6 +155,9 @@ def build_manager_training_callback(
                 model=self.model,
                 model_path=run_paths.latest_model_path,
                 policy_path=run_paths.latest_policy_path,
+                engine_tuning_state=current_engine_tuning_checkpoint_state(
+                    self.training_env
+                ),
                 policy_metadata=current_policy_artifact_metadata(
                     self.training_env,
                     self.model,

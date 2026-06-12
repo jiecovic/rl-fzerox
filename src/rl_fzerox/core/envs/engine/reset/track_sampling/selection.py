@@ -6,19 +6,32 @@ from fractions import Fraction
 from functools import reduce
 from math import gcd
 from random import Random, choice, random
-from typing import TypeVar
+from typing import Literal, TypeVar
 
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.engine_tuning import (
+    AdaptiveEngineBandit,
+    EngineTuningChoice,
+    EngineTuningContext,
+    EngineTuningRuntimeState,
+    engine_bandit_settings,
+)
 from rl_fzerox.core.envs.engine.reset.track_sampling.models import (
     TRACK_SAMPLING_LIMITS,
     SelectedTrack,
 )
-from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    AdaptiveEngineTuningConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+)
 from rl_fzerox.core.runtime_spec.track_sampling_identity import (
     track_sampling_reset_target_key,
 )
 from rl_fzerox.core.runtime_spec.vehicle_catalog import EngineSetting, resolve_engine_setting
 
 _T = TypeVar("_T")
+EngineTuningSelectionMode = Literal["sample", "greedy"]
 
 
 class TrackResetSelector:
@@ -31,23 +44,45 @@ class TrackResetSelector:
         self._sequential_course_buckets: tuple[tuple[TrackSamplingEntryConfig, ...], ...] = ()
         self._cursor = 0
 
-    def select(self, config: TrackSamplingConfig, *, seed: int | None) -> SelectedTrack | None:
+    def select(
+        self,
+        config: TrackSamplingConfig,
+        *,
+        seed: int | None,
+        engine_tuning_state: EngineTuningRuntimeState | None = None,
+        engine_tuning_selection: EngineTuningSelectionMode = "sample",
+    ) -> SelectedTrack | None:
         if config.sampling_mode == "random":
-            return select_reset_track(config, seed=seed)
+            return select_reset_track(
+                config,
+                seed=seed,
+                engine_tuning_state=engine_tuning_state,
+                engine_tuning_selection=engine_tuning_selection,
+            )
         if config.sampling_mode == "balanced":
             return self._select_balanced(
                 config,
                 sampling_mode=config.sampling_mode,
                 seed=seed,
+                engine_tuning_state=engine_tuning_state,
+                engine_tuning_selection=engine_tuning_selection,
             )
         if config.sampling_mode in {"step_balanced", "adaptive_step_balanced"}:
             return select_reset_track_by_course_weight(
                 config,
                 seed=seed,
                 sampling_mode=config.sampling_mode,
+                engine_tuning_state=engine_tuning_state,
+                engine_tuning_selection=engine_tuning_selection,
             )
         if config.sampling_mode in {"deficit_budget", "fixed_env"}:
-            return self._select_fixed_env(config, sampling_mode=config.sampling_mode, seed=seed)
+            return self._select_fixed_env(
+                config,
+                sampling_mode=config.sampling_mode,
+                seed=seed,
+                engine_tuning_state=engine_tuning_state,
+                engine_tuning_selection=engine_tuning_selection,
+            )
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
 
     def select_sequential(
@@ -55,6 +90,8 @@ class TrackResetSelector:
         config: TrackSamplingConfig,
         *,
         seed: int | None,
+        engine_tuning_state: EngineTuningRuntimeState | None = None,
+        engine_tuning_selection: EngineTuningSelectionMode = "sample",
     ) -> SelectedTrack | None:
         """Select configured tracks in list order, ignoring training weights."""
 
@@ -74,6 +111,9 @@ class TrackResetSelector:
             sampling_mode="sequential",
             cycle_position=position,
             seed=seed,
+            engine_tuning_config=config.engine_tuning,
+            engine_tuning_state=engine_tuning_state,
+            engine_tuning_selection=engine_tuning_selection,
         )
 
     def set_next_sequential_course(
@@ -99,6 +139,8 @@ class TrackResetSelector:
         *,
         sampling_mode: str,
         seed: int | None,
+        engine_tuning_state: EngineTuningRuntimeState | None,
+        engine_tuning_selection: EngineTuningSelectionMode,
     ) -> SelectedTrack | None:
         if not config.enabled:
             return None
@@ -113,6 +155,9 @@ class TrackResetSelector:
             sampling_mode=sampling_mode,
             cycle_position=position,
             seed=seed,
+            engine_tuning_config=config.engine_tuning,
+            engine_tuning_state=engine_tuning_state,
+            engine_tuning_selection=engine_tuning_selection,
         )
 
     def _sync_balanced_cycle(self, config: TrackSamplingConfig) -> None:
@@ -137,6 +182,8 @@ class TrackResetSelector:
         *,
         sampling_mode: str,
         seed: int | None,
+        engine_tuning_state: EngineTuningRuntimeState | None,
+        engine_tuning_selection: EngineTuningSelectionMode,
     ) -> SelectedTrack | None:
         if not config.enabled:
             return None
@@ -150,6 +197,9 @@ class TrackResetSelector:
             sampling_mode=sampling_mode,
             cycle_position=position,
             seed=seed,
+            engine_tuning_config=config.engine_tuning,
+            engine_tuning_state=engine_tuning_state,
+            engine_tuning_selection=engine_tuning_selection,
         )
 
 
@@ -159,6 +209,8 @@ def select_reset_track_by_course_id(
     course_id: str,
     sampling_mode: str = "locked",
     seed: int | None = None,
+    engine_tuning_state: EngineTuningRuntimeState | None = None,
+    engine_tuning_selection: EngineTuningSelectionMode = "sample",
 ) -> SelectedTrack | None:
     """Select one configured reset baseline for a specific course id."""
 
@@ -172,6 +224,9 @@ def select_reset_track_by_course_id(
             _pick_track_entry(matching_entries, seed=seed),
             sampling_mode=sampling_mode,
             seed=seed,
+            engine_tuning_config=config.engine_tuning,
+            engine_tuning_state=engine_tuning_state,
+            engine_tuning_selection=engine_tuning_selection,
         )
     return None
 
@@ -181,6 +236,8 @@ def select_reset_track(
     *,
     seed: int | None,
     sampling_mode: str = "random",
+    engine_tuning_state: EngineTuningRuntimeState | None = None,
+    engine_tuning_selection: EngineTuningSelectionMode = "sample",
 ) -> SelectedTrack | None:
     """Select one configured reset baseline with deterministic seeding when available."""
 
@@ -197,6 +254,9 @@ def select_reset_track(
         _weighted_entry(config.entries, sample=sample),
         sampling_mode=sampling_mode,
         seed=seed,
+        engine_tuning_config=config.engine_tuning,
+        engine_tuning_state=engine_tuning_state,
+        engine_tuning_selection=engine_tuning_selection,
     )
 
 
@@ -205,6 +265,8 @@ def select_reset_track_by_course_weight(
     *,
     seed: int | None,
     sampling_mode: str,
+    engine_tuning_state: EngineTuningRuntimeState | None = None,
+    engine_tuning_selection: EngineTuningSelectionMode = "sample",
 ) -> SelectedTrack | None:
     """Select one course by summed weight, then one baseline within that course."""
 
@@ -228,6 +290,9 @@ def select_reset_track_by_course_weight(
         entry,
         sampling_mode=sampling_mode,
         seed=seed,
+        engine_tuning_config=config.engine_tuning,
+        engine_tuning_state=engine_tuning_state,
+        engine_tuning_selection=engine_tuning_selection,
     )
 
 
@@ -266,12 +331,22 @@ def _selected_track_from_entry(
     sampling_mode: str,
     cycle_position: int | None = None,
     seed: int | None,
+    engine_tuning_config: AdaptiveEngineTuningConfig,
+    engine_tuning_state: EngineTuningRuntimeState | None,
+    engine_tuning_selection: EngineTuningSelectionMode,
 ) -> SelectedTrack:
     if entry.baseline_state_path is None:
         raise ValueError(
             f"track sampling entry {entry.id!r} has no materialized baseline_state_path"
         )
-    resolved_engine = _resolved_engine_setting(entry, seed=seed)
+    engine_choice = _engine_tuning_choice(
+        entry,
+        config=engine_tuning_config,
+        state=engine_tuning_state,
+        seed=seed,
+        selection=engine_tuning_selection,
+    )
+    resolved_engine = _resolved_engine_setting(entry, seed=seed, engine_choice=engine_choice)
     return SelectedTrack(
         id=entry.id,
         display_name=entry.display_name,
@@ -291,6 +366,16 @@ def _selected_track_from_entry(
         ),
         engine_setting_min_raw_value=entry.engine_setting_min_raw_value,
         engine_setting_max_raw_value=entry.engine_setting_max_raw_value,
+        engine_tuning_context_key=None if engine_choice is None else engine_choice.context.key,
+        engine_tuning_course_key=(
+            None if engine_choice is None else engine_choice.context.course_key
+        ),
+        engine_tuning_vehicle_id=(
+            None if engine_choice is None else engine_choice.context.vehicle_id
+        ),
+        engine_tuning_sampled_score=None if engine_choice is None else engine_choice.sampled_score,
+        engine_tuning_mean_score=None if engine_choice is None else engine_choice.mean_score,
+        engine_tuning_attempts=None if engine_choice is None else engine_choice.attempts,
         source_vehicle=entry.source_vehicle,
         source_course_index=entry.source_course_index,
         source_gp_difficulty=entry.source_gp_difficulty,
@@ -313,13 +398,56 @@ def _resolved_engine_setting(
     entry: TrackSamplingEntryConfig,
     *,
     seed: int | None,
+    engine_choice: EngineTuningChoice | None,
 ) -> EngineSetting | None:
-    raw_value = _target_engine_setting_raw_value(entry, seed=seed)
+    raw_value = (
+        engine_choice.engine_setting_raw_value
+        if engine_choice is not None
+        else _target_engine_setting_raw_value(entry, seed=seed)
+    )
     if raw_value is None:
         return None
     return resolve_engine_setting(
         raw_value,
         context=f"track sampling entry {entry.id!r}",
+    )
+
+
+def _engine_tuning_choice(
+    entry: TrackSamplingEntryConfig,
+    *,
+    config: AdaptiveEngineTuningConfig,
+    state: EngineTuningRuntimeState | None,
+    seed: int | None,
+    selection: EngineTuningSelectionMode,
+) -> EngineTuningChoice | None:
+    if not config.enabled:
+        return None
+    context = _engine_tuning_context(entry)
+    bandit = AdaptiveEngineBandit(
+        settings=engine_bandit_settings(config),
+        state=state,
+    )
+    if selection == "greedy":
+        return bandit.recommendation(context)
+    return bandit.choose(context, seed=seed)
+
+
+def _engine_tuning_context(entry: TrackSamplingEntryConfig) -> EngineTuningContext:
+    return EngineTuningContext(
+        course_key=_engine_tuning_course_key(entry),
+        vehicle_id=entry.vehicle or entry.source_vehicle or "unknown",
+    )
+
+
+def _engine_tuning_course_key(entry: TrackSamplingEntryConfig) -> str:
+    if entry.generated_course_kind == X_CUP_COURSE.generated_kind:
+        return "x_cup"
+    return (
+        entry.runtime_course_key
+        or entry.course_id
+        or entry.course_ref
+        or (f"course_index:{entry.course_index}" if entry.course_index is not None else entry.id)
     )
 
 

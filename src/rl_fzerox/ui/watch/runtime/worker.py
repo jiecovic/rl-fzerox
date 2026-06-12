@@ -46,7 +46,10 @@ from rl_fzerox.ui.watch.runtime.policy import (
     _reset_policy_runner,
     _sync_policy_curriculum_stage,
 )
-from rl_fzerox.ui.watch.runtime.session import open_watch_runtime_session
+from rl_fzerox.ui.watch.runtime.session import (
+    load_watch_engine_tuning_state,
+    open_watch_runtime_session,
+)
 from rl_fzerox.ui.watch.runtime.snapshots import (
     _build_snapshot,
     _next_boost_lamp_level,
@@ -243,6 +246,8 @@ def _run_simulation_loop(
             while not track_sampling_ready_for_reset(force=force_track_sampling_check):
                 force_track_sampling_check = False
                 time.sleep(0.25)
+            load_watch_engine_tuning_state(config, env)
+            env.set_engine_tuning_selection("greedy" if deterministic_policy else "sample")
             env.set_locked_reset_course(persistent_locked_reset_target_key)
             if persistent_locked_reset_target_key is None and selected_reset_target_key is not None:
                 env.set_next_sequential_reset_course(selected_reset_target_key)
@@ -381,6 +386,9 @@ def _run_simulation_loop(
                     )
                 if commands.toggle_deterministic_policy and policy_runner is not None:
                     deterministic_policy = not deterministic_policy
+                    env.set_engine_tuning_selection(
+                        "greedy" if deterministic_policy else "sample"
+                    )
                 if manual_control_enabled:
                     current_control_state = commands.control_state
 

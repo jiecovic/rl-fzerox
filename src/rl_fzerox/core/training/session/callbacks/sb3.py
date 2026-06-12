@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from rl_fzerox.core.engine_tuning import (
+    EngineTuningRuntimeState,
+    EngineTuningTrainingController,
+)
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -12,6 +16,7 @@ from rl_fzerox.core.runtime_spec.schema import (
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
+    current_engine_tuning_checkpoint_state,
     current_policy_artifact_metadata,
     save_artifacts_atomically,
     save_recent_checkpoint_artifacts,
@@ -43,6 +48,7 @@ def build_callbacks(
     curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
     initial_curriculum_stage_index: int | None = None,
+    initial_engine_tuning_state: EngineTuningRuntimeState | None = None,
     track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None = None,
     extra_callbacks: Sequence[object] = (),
 ):
@@ -80,8 +86,15 @@ def build_callbacks(
     class RollingArtifactCallback(BaseCallback):
         """Maintain rolling latest and best training artifacts."""
 
-        def __init__(self, *, policy: CheckpointPolicy, run_paths: RunPaths) -> None:
+        def __init__(
+            self,
+            *,
+            engine_tuning_enabled: bool,
+            policy: CheckpointPolicy,
+            run_paths: RunPaths,
+        ) -> None:
             super().__init__(verbose=0)
+            self._engine_tuning_enabled = engine_tuning_enabled
             self._policy = policy
             self._run_paths = run_paths
             self._best_episode_return: float | None = None
@@ -92,6 +105,7 @@ def build_callbacks(
                 model=self.model,
                 model_path=self._run_paths.latest_model_path,
                 policy_path=self._run_paths.latest_policy_path,
+                engine_tuning_state=self._engine_tuning_state(),
                 policy_metadata=current_policy_artifact_metadata(
                     self.training_env,
                     self.model,
@@ -106,6 +120,7 @@ def build_callbacks(
             save_recent_checkpoint_artifacts(
                 self.model,
                 self._run_paths,
+                engine_tuning_state=self._engine_tuning_state(),
                 num_timesteps=num_timesteps,
                 policy_metadata=current_policy_artifact_metadata(
                     self.training_env,
@@ -135,6 +150,7 @@ def build_callbacks(
                 model=self.model,
                 model_path=self._run_paths.best_model_path,
                 policy_path=self._run_paths.best_policy_path,
+                engine_tuning_state=self._engine_tuning_state(),
                 policy_metadata=current_policy_artifact_metadata(
                     self.training_env,
                     self.model,
@@ -177,6 +193,11 @@ def build_callbacks(
             self._rollout_count += 1
             if self._rollout_count % self._policy.rollout_interval == 0:
                 self._save_periodic()
+
+        def _engine_tuning_state(self) -> EngineTuningRuntimeState | None:
+            if not self._engine_tuning_enabled:
+                return None
+            return current_engine_tuning_checkpoint_state(self.training_env)
 
     class CurriculumCallback(BaseCallback):
         """Promote curriculum stages and apply their rollout-time overrides."""
@@ -493,15 +514,63 @@ def build_callbacks(
             if persist is not None:
                 persist(slots)
 
+    class EngineTuningCallback(BaseCallback):
+        """Update adaptive engine-setting stats from completed episodes."""
+
+        def __init__(
+            self,
+            *,
+            controller: EngineTuningTrainingController,
+        ) -> None:
+            super().__init__(verbose=0)
+            self._controller = controller
+
+        def _on_training_start(self) -> None:
+            self.training_env.env_method(
+                "set_engine_tuning_state",
+                self._controller.runtime_state,
+            )
+
+        def _on_step(self) -> bool:
+            infos = info_sequence(self.locals.get("infos"))
+            if infos is None:
+                return True
+            episodes = episode_dicts(infos)
+            if not episodes:
+                return True
+            if self._controller.record_episodes(episodes):
+                self.training_env.env_method(
+                    "set_engine_tuning_state",
+                    self._controller.runtime_state,
+                )
+            return True
+
+        def _on_rollout_end(self) -> None:
+            for key, value in self._controller.log_values().items():
+                self.logger.record(key, value)
+
     checkpoint_policy = resolve_checkpoint_policy(train_config)
+    engine_tuning_enabled = bool(
+        env_config is not None and env_config.track_sampling.engine_tuning.enabled
+    )
     callbacks: list[BaseCallback] = [
         RollingArtifactCallback(
+            engine_tuning_enabled=engine_tuning_enabled,
             policy=checkpoint_policy,
             run_paths=run_paths,
         ),
         InfoLoggingCallback(),
     ]
     if env_config is not None:
+        if env_config.track_sampling.engine_tuning.enabled:
+            callbacks.append(
+                EngineTuningCallback(
+                    controller=EngineTuningTrainingController(
+                        env_config.track_sampling.engine_tuning,
+                        state=initial_engine_tuning_state,
+                    ),
+                )
+            )
         runtime_persistence = track_sampling_runtime_persistence
         if runtime_persistence is None:
             runtime_persistence = file_track_sampling_runtime_persistence(

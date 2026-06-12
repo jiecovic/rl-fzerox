@@ -23,6 +23,7 @@ from rl_fzerox.apps.run_manager.api.handlers.lineages import (
 )
 from rl_fzerox.apps.run_manager.api.handlers.metrics import (
     reset_run_track_sampling_payload,
+    run_engine_tuning_payload,
     run_metrics_payload,
     run_track_sampling_payload,
 )
@@ -48,6 +49,7 @@ from rl_fzerox.apps.run_manager.api.handlers.save_game_runner import (
 )
 from rl_fzerox.apps.run_manager.api.handlers.save_games import (
     create_save_game_payload,
+    import_save_engine_tuning_payload,
     open_save_game_dir_payload,
     save_games_payload,
     update_save_game_payload,
@@ -77,6 +79,7 @@ __all__ = [
     "policy_preview_payload",
     "rebuild_tensorboard_views_payload",
     "reset_run_track_sampling_payload",
+    "run_engine_tuning_payload",
     "resume_run_payload",
     "run_metrics_payload",
     "run_response_for_id",
@@ -94,6 +97,7 @@ __all__ = [
     "update_run_payload",
     "update_save_game_payload",
     "upsert_save_course_setup_payload",
+    "import_save_engine_tuning_payload",
     "upsert_save_cup_setup_payload",
     "validate_source_fields",
     "watch_run_payload",

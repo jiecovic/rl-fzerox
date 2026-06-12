@@ -415,6 +415,7 @@ describe("SaveGameWorkspace", () => {
 });
 
 function renderSaveGameWorkspace({
+  onImportEngineTuning = vi.fn(),
   onOpenSaveGameDirectory = vi.fn(),
   onRefresh = vi.fn(),
   onUpsertCourseSetup = vi.fn(),
@@ -423,6 +424,7 @@ function renderSaveGameWorkspace({
   runs = [],
   saveGame,
 }: {
+  onImportEngineTuning?: Parameters<typeof SaveGameWorkspace>[0]["onImportEngineTuning"];
   onOpenSaveGameDirectory?: (saveGameId: string) => Promise<void>;
   onRefresh?: () => Promise<void>;
   onUpsertCourseSetup?: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
@@ -434,6 +436,7 @@ function renderSaveGameWorkspace({
   return render(
     <StatefulExistingSaveGameWorkspace
       onOpenSaveGameDirectory={onOpenSaveGameDirectory}
+      onImportEngineTuning={onImportEngineTuning}
       onRefresh={onRefresh}
       onStartCareerMode={onStartCareerMode}
       onUpsertCourseSetup={onUpsertCourseSetup}
@@ -522,6 +525,7 @@ function StatefulNewSaveGameWorkspace({
       saveGame={null}
       session={session}
       onCreateSaveGame={onCreateSaveGame}
+      onImportEngineTuning={vi.fn()}
       onOpenSaveGameDirectory={vi.fn()}
       onPatchSession={(sessionId, patch) => {
         onPatchSession(sessionId, patch);
@@ -540,6 +544,7 @@ function StatefulNewSaveGameWorkspace({
 
 function StatefulExistingSaveGameWorkspace({
   onOpenSaveGameDirectory,
+  onImportEngineTuning,
   onRefresh,
   onStartCareerMode,
   onUpsertCourseSetup,
@@ -548,6 +553,7 @@ function StatefulExistingSaveGameWorkspace({
   saveGame,
 }: {
   onOpenSaveGameDirectory: (saveGameId: string) => Promise<void>;
+  onImportEngineTuning: Parameters<typeof SaveGameWorkspace>[0]["onImportEngineTuning"];
   onRefresh: () => Promise<void>;
   onStartCareerMode: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
   onUpsertCourseSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
@@ -563,6 +569,7 @@ function StatefulExistingSaveGameWorkspace({
       saveGame={saveGame}
       session={session}
       onCreateSaveGame={vi.fn()}
+      onImportEngineTuning={onImportEngineTuning}
       onOpenSaveGameDirectory={onOpenSaveGameDirectory}
       onPatchSession={(sessionId, patch) => {
         setSession((current) =>

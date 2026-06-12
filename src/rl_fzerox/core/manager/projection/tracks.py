@@ -47,6 +47,7 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
             "max_episodes": config.tracks.x_cup_auto_regeneration.max_episodes,
             "ema_alpha": config.tracks.x_cup_auto_regeneration.ema_alpha,
         },
+        "engine_tuning": _engine_tuning(config),
     }
 
 
@@ -83,12 +84,12 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                         ),
                         random_engine_min_raw_value=(
                             config.vehicle.engine_setting_min_raw_value
-                            if config.vehicle.engine_mode == "random_range"
+                            if config.vehicle.engine_mode in {"random_range", "adaptive_bandit"}
                             else None
                         ),
                         random_engine_max_raw_value=(
                             config.vehicle.engine_setting_max_raw_value
-                            if config.vehicle.engine_mode == "random_range"
+                            if config.vehicle.engine_mode in {"random_range", "adaptive_bandit"}
                             else None
                         ),
                     )
@@ -119,12 +120,14 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                             ),
                             random_engine_min_raw_value=(
                                 config.vehicle.engine_setting_min_raw_value
-                                if config.vehicle.engine_mode == "random_range"
+                                if config.vehicle.engine_mode
+                                in {"random_range", "adaptive_bandit"}
                                 else None
                             ),
                             random_engine_max_raw_value=(
                                 config.vehicle.engine_setting_max_raw_value
-                                if config.vehicle.engine_mode == "random_range"
+                                if config.vehicle.engine_mode
+                                in {"random_range", "adaptive_bandit"}
                                 else None
                             ),
                             course_index=X_CUP_COURSE.course_index,
@@ -226,6 +229,24 @@ def _source_engine_setting(config: ManagedRunConfig) -> int:
     return (
         config.vehicle.engine_setting_min_raw_value + config.vehicle.engine_setting_max_raw_value
     ) // 2
+
+
+def _engine_tuning(config: ManagedRunConfig) -> dict[str, object]:
+    vehicle = config.vehicle
+    return {
+        "enabled": vehicle.engine_mode == "adaptive_bandit",
+        "min_raw_value": vehicle.engine_setting_min_raw_value,
+        "max_raw_value": vehicle.engine_setting_max_raw_value,
+        "bin_size": vehicle.adaptive_engine_bin_size,
+        "stat_decay": vehicle.adaptive_engine_stat_decay,
+        "prior_mean": vehicle.adaptive_engine_prior_mean,
+        "prior_strength": vehicle.adaptive_engine_prior_strength,
+        "exploration_scale": vehicle.adaptive_engine_exploration_scale,
+        "uniform_exploration": vehicle.adaptive_engine_uniform_exploration,
+        "completion_weight": vehicle.adaptive_engine_completion_weight,
+        "finish_bonus": vehicle.adaptive_engine_finish_bonus,
+        "position_weight": vehicle.adaptive_engine_position_weight,
+    }
 
 
 def _course_ref(course_id: str) -> str:

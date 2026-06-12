@@ -68,8 +68,8 @@ def delete_run(store: ManagerStore, run_id: str) -> bool:
             queue_delete_tree(session, path=run_dir, created_at=deleted_at)
 
         _delete_run_sidecars(session, run_id)
-        result = session.execute(delete(RunModel).where(RunModel.id == run_id))
-        deleted = bool(result.rowcount)
+        session.delete(run)
+        deleted = True
     store._drain_pending_filesystem_operations()
     return deleted
 

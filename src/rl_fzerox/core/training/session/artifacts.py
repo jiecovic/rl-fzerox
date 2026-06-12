@@ -9,8 +9,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
 
+from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
+from rl_fzerox.core.engine_tuning.persistence import (
+    load_engine_tuning_runtime_state,
+    save_engine_tuning_runtime_state,
+)
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
-from rl_fzerox.core.training.runs import RunPaths, materialize_train_run_config
+from rl_fzerox.core.training.runs import RUN_LAYOUT, RunPaths, materialize_train_run_config
 
 POLICY_METADATA_SUFFIX = ".metadata.json"
 
@@ -91,12 +96,14 @@ def save_latest_artifacts(
     model: ModelSaveable,
     run_paths: RunPaths,
     *,
+    engine_tuning_state: EngineTuningRuntimeState | None = None,
     policy_metadata: PolicyArtifactMetadata | None = None,
 ) -> None:
     save_artifacts_atomically(
         model=model,
         model_path=run_paths.latest_model_path,
         policy_path=run_paths.latest_policy_path,
+        engine_tuning_state=engine_tuning_state,
         policy_metadata=policy_metadata,
     )
 
@@ -105,6 +112,7 @@ def save_recent_checkpoint_artifacts(
     model: ModelSaveable,
     run_paths: RunPaths,
     *,
+    engine_tuning_state: EngineTuningRuntimeState | None = None,
     num_timesteps: int,
     policy_metadata: PolicyArtifactMetadata | None = None,
 ) -> None:
@@ -114,6 +122,7 @@ def save_recent_checkpoint_artifacts(
         model=model,
         model_path=checkpoint_dir / "model.zip",
         policy_path=checkpoint_dir / "policy.zip",
+        engine_tuning_state=engine_tuning_state,
         policy_metadata=policy_metadata,
     )
 
@@ -133,10 +142,16 @@ def save_artifacts_atomically(
     model: ModelSaveable,
     model_path: Path,
     policy_path: Path,
+    engine_tuning_state: EngineTuningRuntimeState | None = None,
     policy_metadata: PolicyArtifactMetadata | None = None,
 ) -> None:
     atomic_save_artifact(model.save, model_path)
     atomic_save_artifact(_policy_save_fn(model), policy_path)
+    if engine_tuning_state is not None:
+        save_engine_tuning_runtime_state(
+            engine_tuning_checkpoint_path(policy_path),
+            engine_tuning_state,
+        )
     if policy_metadata is not None:
         _atomic_write_json(policy_artifact_metadata_path(policy_path), asdict(policy_metadata))
 
@@ -167,6 +182,23 @@ def load_policy_artifact_metadata(policy_path: Path) -> PolicyArtifactMetadata |
         num_timesteps=_coerce_optional_int(data.get("num_timesteps")),
         lineage_num_timesteps=_coerce_optional_int(data.get("lineage_num_timesteps")),
     )
+
+
+def load_engine_tuning_checkpoint_state(
+    policy_path: Path,
+) -> EngineTuningRuntimeState | None:
+    """Load the optional engine-tuning state stored beside one policy artifact."""
+
+    return load_engine_tuning_runtime_state(engine_tuning_checkpoint_path(policy_path))
+
+
+def current_engine_tuning_checkpoint_state(
+    train_env: TrainingEnvAttrReader,
+) -> EngineTuningRuntimeState | None:
+    """Read the current engine-tuning state from the first vector env."""
+
+    value = _first_env_attr(train_env, "engine_tuning_state")
+    return value if isinstance(value, EngineTuningRuntimeState) else None
 
 
 def current_policy_artifact_metadata(
@@ -204,6 +236,12 @@ def policy_artifact_metadata_path(policy_path: Path) -> Path:
     """Return the sidecar JSON path stored next to one policy checkpoint."""
 
     return policy_path.with_name(f"{policy_path.stem}{POLICY_METADATA_SUFFIX}")
+
+
+def engine_tuning_checkpoint_path(policy_path: Path) -> Path:
+    """Return the engine-tuning sidecar path stored in one checkpoint directory."""
+
+    return policy_path.with_name(RUN_LAYOUT.engine_tuning_state_filename)
 
 
 def recent_checkpoint_dir(run_paths: RunPaths, *, num_timesteps: int) -> Path:

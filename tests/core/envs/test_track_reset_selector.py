@@ -3,8 +3,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rl_fzerox.core.engine_tuning import EngineTuningArmState, EngineTuningRuntimeState
 from rl_fzerox.core.envs.engine.reset import TrackResetSelector, select_reset_track_by_course_id
-from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    AdaptiveEngineTuningConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+)
 
 
 def test_select_reset_track_by_course_id_uses_matching_entry() -> None:
@@ -107,6 +112,54 @@ def test_track_reset_selector_resyncs_when_entry_metadata_changes() -> None:
     assert second is not None
     assert first.engine_setting_raw_value == 20
     assert second.engine_setting_raw_value == 80
+
+
+def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
+    config = TrackSamplingConfig(
+        enabled=True,
+        sampling_mode="balanced",
+        engine_tuning=AdaptiveEngineTuningConfig(
+            enabled=True,
+            min_raw_value=60,
+            max_raw_value=70,
+            bin_size=10,
+            prior_mean=0.0,
+            prior_strength=0.0,
+            exploration_scale=0.0,
+            uniform_exploration=0.0,
+        ),
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute_city",
+                course_id="mute_city",
+                source_vehicle="blue_falcon",
+                baseline_state_path=Path("mute_city.state"),
+            ),
+        ),
+    )
+    state = EngineTuningRuntimeState(
+        version=1,
+        update_count=1,
+        arms=(
+            EngineTuningArmState(
+                context_key="mute_city|blue_falcon",
+                course_key="mute_city",
+                vehicle_id="blue_falcon",
+                engine_setting_raw_value=70,
+                attempts=2,
+                decayed_count=2.0,
+                decayed_score_total=3.0,
+            ),
+        ),
+    )
+
+    selected = TrackResetSelector().select(config, seed=123, engine_tuning_state=state)
+
+    assert selected is not None
+    assert selected.engine_setting_raw_value == 70
+    assert selected.engine_tuning_context_key == "mute_city|blue_falcon"
+    assert selected.engine_tuning_course_key == "mute_city"
+    assert selected.engine_tuning_vehicle_id == "blue_falcon"
 
 
 def test_fixed_env_track_sampling_pins_course_by_env_index() -> None:

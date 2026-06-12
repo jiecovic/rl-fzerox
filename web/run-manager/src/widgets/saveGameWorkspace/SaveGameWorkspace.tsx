@@ -39,6 +39,11 @@ interface SaveGameWorkspaceProps {
   metadata: ConfigMetadata | null;
   onCreateSaveGame: (name: string) => Promise<ManagedSaveGame>;
   onOpenSaveGameDirectory: (saveGameId: string) => Promise<void>;
+  onImportEngineTuning: (request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
+  }) => Promise<ManagedSaveGame>;
   onPatchSession: (
     sessionId: SaveGameSession["sessionId"],
     patch: Partial<Omit<SaveGameSession, "sessionId">>,
@@ -72,6 +77,7 @@ export function SaveGameWorkspace({
   metadata,
   onCreateSaveGame,
   onOpenSaveGameDirectory,
+  onImportEngineTuning,
   onPatchSession,
   onRefresh,
   onRenameSaveGame,
@@ -181,6 +187,25 @@ export function SaveGameWorkspace({
       return await onUpsertCupSetup(request);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to save cup setup");
+      throw caught;
+    } finally {
+      setUpdatingSaveGameId(null);
+    }
+  }
+
+  async function importEngineTuning(request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
+  }) {
+    setError(null);
+    setUpdatingSaveGameId(request.saveGameId);
+    try {
+      const saveGame = await onImportEngineTuning(request);
+      await onRefresh();
+      return saveGame;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "failed to import engine tuning");
       throw caught;
     } finally {
       setUpdatingSaveGameId(null);
@@ -436,6 +461,7 @@ export function SaveGameWorkspace({
           updating={updatingSaveGameId === saveGame.id}
           canStartTarget={canStartUnlockTarget}
           onCourseSetupDirtyChange={setCourseSetupDirty}
+          onImportEngineTuning={importEngineTuning}
           onStartTarget={(target) => void startCareerMode(saveGame, target)}
           onUpsertCourseSetup={upsertCourseSetup}
           onUpsertCupSetup={upsertCupSetup}

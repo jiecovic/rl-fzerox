@@ -36,8 +36,15 @@ _MONITOR_INFO_FIELDS: tuple[_MonitorInfoField, ...] = (
     _MonitorInfoField("episode_airborne_frames", 0),
     _MonitorInfoField("lean_episode_masked", False),
     _MonitorInfoField("track_id", None),
+    _MonitorInfoField("track_course_key", None),
     _MonitorInfoField("track_course_id", None),
     _MonitorInfoField("track_course_name", None),
+    _MonitorInfoField("track_gp_difficulty", None),
+    _MonitorInfoField("track_vehicle", None),
+    _MonitorInfoField("track_engine_setting_raw_value", None),
+    _MonitorInfoField("engine_tuning_context_key", None),
+    _MonitorInfoField("engine_tuning_course_key", None),
+    _MonitorInfoField("engine_tuning_vehicle_id", None),
     _MonitorInfoField("track_log_per_course", True),
 )
 MONITOR_INFO_KEYS: tuple[str, ...] = tuple(field.key for field in _MONITOR_INFO_FIELDS)

@@ -24,7 +24,12 @@ import {
   preferredVehicleSetup,
   sharedCourseDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
-import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
+import type {
+  ConfigMetadata,
+  ManagedRun,
+  ManagedSaveGame,
+  SavePolicyArtifact,
+} from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
 import { IntegerTextInput } from "@/shared/ui/configFields";
@@ -41,17 +46,45 @@ const EMPTY_POLICY_SELECTION_DRAFT: PolicySelectionDraft = {
 export function GlobalPolicyPanel({
   assignableRuns,
   cups,
+  onImportEngineTuning,
   onApplySetups,
+  saveGameId,
   updating,
 }: {
   assignableRuns: readonly ManagedRun[];
   cups: readonly CupView[];
+  onImportEngineTuning: (request: {
+    policyArtifact: SavePolicyArtifact;
+    policyRunId: string;
+    saveGameId: string;
+  }) => Promise<ManagedSaveGame>;
   onApplySetups: (setups: readonly CourseSetupValues[], draft: PolicySelectionDraft) => void;
+  saveGameId: string;
   updating: boolean;
 }) {
   const [draft, setDraft] = useState<PolicySelectionDraft>(EMPTY_POLICY_SELECTION_DRAFT);
+  const [importing, setImporting] = useState(false);
+  const selectedRun = assignableRuns.find((run) => run.id === draft.policyRunId) ?? null;
+  const canImportEngines =
+    !updating && selectedRun?.vehicle_setup.engine_mode === "adaptive_bandit";
   const canApply = !updating && draft.policyRunId !== "";
   const allCourseSetups = courseSetupsForCups(cups);
+
+  async function importEngineTuning() {
+    if (!canImportEngines) {
+      return;
+    }
+    setImporting(true);
+    try {
+      await onImportEngineTuning({
+        policyArtifact: draft.policyArtifact,
+        policyRunId: draft.policyRunId,
+        saveGameId,
+      });
+    } finally {
+      setImporting(false);
+    }
+  }
 
   return (
     <div className="grid content-start gap-3 border border-app-border bg-app-surface-muted p-4">
@@ -71,6 +104,14 @@ export function GlobalPolicyPanel({
           onClick={() => onApplySetups(allCourseSetups, draft)}
         >
           Apply to all courses
+        </Button>
+        <Button
+          className="min-w-[180px]"
+          disabled={!canImportEngines || importing}
+          type="button"
+          onClick={() => void importEngineTuning()}
+        >
+          {importing ? "Importing engines" : "Import learned engines"}
         </Button>
       </div>
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px]">

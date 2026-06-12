@@ -8,6 +8,7 @@ from fastapi import APIRouter, Path
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.contracts import (
     CreateSaveGameRequest,
+    ImportSaveEngineTuningRequest,
     RunLauncher,
     StartCareerModeRequest,
     UpdateSaveGameRequest,
@@ -83,6 +84,18 @@ def create_save_games_router(store: ManagerStore, launcher: RunLauncher) -> APIR
     ) -> dict[str, dict[str, object]]:
         return await run_sync(
             handlers.upsert_save_cup_setup_payload,
+            store,
+            save_game_id,
+            request,
+        )
+
+    @router.post("/api/save-games/{save_game_id}/course-setups/import-engine-tuning")
+    async def import_save_engine_tuning(
+        save_game_id: Annotated[str, Path(min_length=1)],
+        request: ImportSaveEngineTuningRequest,
+    ) -> dict[str, object]:
+        return await run_sync(
+            handlers.import_save_engine_tuning_payload,
             store,
             save_game_id,
             request,

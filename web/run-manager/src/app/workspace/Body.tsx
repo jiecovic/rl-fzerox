@@ -140,6 +140,7 @@ export function WorkspaceBody({
           onCreateSaveGame={actions.createManagedSaveGame}
           onOpenSaveGameDirectory={actions.openManagedSaveGameDirectory}
           onPatchSession={sessions.patchSaveGameSession}
+          onImportEngineTuning={actions.importManagedSaveEngineTuning}
           onRenameSaveGame={actions.renameManagedSaveGame}
           onRefresh={onRefreshSaveGames}
           onUpsertCourseSetup={actions.upsertManagedSaveCourseSetup}

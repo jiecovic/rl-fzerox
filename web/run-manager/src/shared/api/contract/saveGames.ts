@@ -106,6 +106,22 @@ export const upsertSaveCourseSetupResponseSchema = z.object({
   save_game: managedSaveGameSchema,
 });
 
+export const importSaveEngineTuningResponseSchema = z.object({
+  applied: z.array(
+    z.object({
+      setup_id: z.string(),
+      difficulty: z.string().nullable(),
+      cup_id: z.string().nullable(),
+      course_id: z.string().nullable(),
+      vehicle_id: z.string(),
+      engine_setting_raw_value: z.number().int().min(0).max(100),
+      mean_score: z.number().nullable(),
+      attempts: z.number().int().nonnegative(),
+    }),
+  ),
+  save_game: managedSaveGameSchema,
+});
+
 export const openSaveGameDirectoryResponseSchema = z.object({
   opened: z.boolean(),
 });

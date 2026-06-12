@@ -3,10 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   fetchPolicyPreview,
+  fetchRunEngineTuningState,
   fetchRunTrackSamplingState,
   subscribeRunTrackSamplingUpdates,
 } from "@/shared/api/client";
 import type {
+  EngineTuningRuntimeArm,
+  EngineTuningRuntimeState,
   ManagedRun,
   ManagedRunConfig,
   PolicyArchitecturePreview,
@@ -18,6 +21,8 @@ import { useDocumentVisible } from "@/shared/browser/useDocumentVisible";
 const TRACK_SAMPLING_LIVE = {
   fallbackPollMs: 5_000,
 } as const;
+
+const ENGINE_TUNING_POLL_MS = 10_000;
 
 export function useRunClock(status: ManagedRun["status"]): number {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -217,6 +222,89 @@ export function useRunTrackSamplingState(
   };
 }
 
+export function useRunEngineTuningState(
+  runId: string,
+  status: ManagedRun["status"],
+  enabled: boolean,
+  artifact: "latest" | "best" | "final" = "latest",
+): {
+  engineTuningError: string | null;
+  engineTuningState: EngineTuningRuntimeState | null;
+} {
+  const [engineTuningState, setEngineTuningState] = useState<EngineTuningRuntimeState | null>(null);
+  const [engineTuningError, setEngineTuningError] = useState<string | null>(null);
+  const engineTuningStateKeyRef = useRef<string | null>(null);
+  const documentVisible = useDocumentVisible();
+
+  useEffect(() => {
+    if (!enabled) {
+      engineTuningStateKeyRef.current = null;
+      setEngineTuningState(null);
+      setEngineTuningError(null);
+      return undefined;
+    }
+    if (!documentVisible) {
+      return undefined;
+    }
+
+    let ignore = false;
+    let inFlight = false;
+    let activeController: AbortController | null = null;
+
+    async function loadEngineTuningState() {
+      if (inFlight || document.visibilityState === "hidden") {
+        return;
+      }
+      inFlight = true;
+      const controller = new AbortController();
+      activeController = controller;
+      try {
+        const payload = await fetchRunEngineTuningState(runId, artifact, {
+          signal: controller.signal,
+        });
+        if (!ignore) {
+          const state = payload.state;
+          const key = engineTuningStateKey(runId, state);
+          if (engineTuningStateKeyRef.current !== key) {
+            engineTuningStateKeyRef.current = key;
+            setEngineTuningState(state);
+          }
+          setEngineTuningError(null);
+        }
+      } catch (caught) {
+        if (!ignore) {
+          setEngineTuningError(
+            caught instanceof Error ? caught.message : "failed to load engine tuning stats",
+          );
+        }
+      } finally {
+        if (activeController === controller) {
+          activeController = null;
+        }
+        inFlight = false;
+      }
+    }
+
+    void loadEngineTuningState();
+    if (status !== "running") {
+      return () => {
+        ignore = true;
+        activeController?.abort();
+      };
+    }
+    const intervalId = window.setInterval(() => {
+      void loadEngineTuningState();
+    }, ENGINE_TUNING_POLL_MS);
+    return () => {
+      ignore = true;
+      activeController?.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [artifact, documentVisible, enabled, runId, status]);
+
+  return { engineTuningError, engineTuningState };
+}
+
 function trackSamplingStateKey(runId: string, state: TrackSamplingRuntimeState | null) {
   if (state === null) {
     return `${runId}:none`;
@@ -267,4 +355,27 @@ function trackSamplingEntryKey(entry: TrackSamplingRuntimeEntry) {
 
 function nullableNumberKey(value: number | null) {
   return value === null ? "" : String(value);
+}
+
+function engineTuningStateKey(runId: string, state: EngineTuningRuntimeState | null) {
+  if (state === null) {
+    return `${runId}:none`;
+  }
+  return [runId, state.version, state.update_count, ...state.arms.map(engineTuningArmKey)].join(
+    "\0",
+  );
+}
+
+function engineTuningArmKey(arm: EngineTuningRuntimeArm) {
+  return [
+    arm.context_key,
+    arm.engine_setting_raw_value,
+    arm.attempts,
+    arm.finished_attempts,
+    nullableNumberKey(arm.finish_rate),
+    nullableNumberKey(arm.mean_completion),
+    nullableNumberKey(arm.mean_score),
+    nullableNumberKey(arm.raw_mean_score),
+    nullableNumberKey(arm.best_score),
+  ].join("\u0001");
 }

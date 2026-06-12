@@ -52,6 +52,12 @@ class SelectedTrack:
     engine_setting_raw_value: int | None
     engine_setting_min_raw_value: int | None
     engine_setting_max_raw_value: int | None
+    engine_tuning_context_key: str | None
+    engine_tuning_course_key: str | None
+    engine_tuning_vehicle_id: str | None
+    engine_tuning_sampled_score: float | None
+    engine_tuning_mean_score: float | None
+    engine_tuning_attempts: int | None
     source_vehicle: str | None
     source_course_index: int | None
     source_gp_difficulty: RaceDifficultyName | None
@@ -104,6 +110,12 @@ class SelectedTrack:
             "track_vehicle": self.vehicle,
             "track_vehicle_name": self.vehicle_name,
             "track_engine_setting_raw_value": self.engine_setting_raw_value,
+            "engine_tuning_context_key": self.engine_tuning_context_key,
+            "engine_tuning_course_key": self.engine_tuning_course_key,
+            "engine_tuning_vehicle_id": self.engine_tuning_vehicle_id,
+            "engine_tuning_sampled_score": self.engine_tuning_sampled_score,
+            "engine_tuning_mean_score": self.engine_tuning_mean_score,
+            "engine_tuning_attempts": self.engine_tuning_attempts,
             "track_sampling_cycle_position": self.cycle_position,
             "track_generated_course_kind": self.generated_course_kind,
             "track_generated_course_seed": self.generated_course_seed,
