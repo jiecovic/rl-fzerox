@@ -1,4 +1,6 @@
 // web/run-manager/src/entities/runLineage/model/lineages.ts
+
+import { isPinnedRun } from "@/entities/run/model/runtime";
 import type {
   PendingDelete,
   RunLineageBucket,
@@ -42,7 +44,7 @@ export function buildLineageGroups(
     .map(([lineageId, lineageRuns]) =>
       buildLineageGroup(lineageId, lineageRuns, dependentDraftCountByRunId),
     )
-    .sort((left, right) => compareIso(right.latestUpdatedAt, left.latestUpdatedAt));
+    .sort(compareLineageGroups);
 }
 
 export function buildLineageBuckets(lineages: readonly RunLineageGroup[]): RunLineageBucket[] {
@@ -55,6 +57,7 @@ export function buildLineageBuckets(lineages: readonly RunLineageGroup[]): RunLi
       if (existing === undefined) {
         bucketsById.set(id, {
           groupName,
+          hasPinnedRun: lineage.hasPinnedRun,
           id,
           label: groupName ?? "Ungrouped",
           latestUpdatedAt: lineage.latestUpdatedAt,
@@ -62,6 +65,7 @@ export function buildLineageBuckets(lineages: readonly RunLineageGroup[]): RunLi
           slug: id,
         });
       } else {
+        existing.hasPinnedRun = existing.hasPinnedRun || lineage.hasPinnedRun;
         if (compareIso(lineage.latestUpdatedAt, existing.latestUpdatedAt) > 0) {
           existing.latestUpdatedAt = lineage.latestUpdatedAt;
         }
@@ -70,6 +74,9 @@ export function buildLineageBuckets(lineages: readonly RunLineageGroup[]): RunLi
     }
   }
   return [...bucketsById.values()].sort((left, right) => {
+    if (left.hasPinnedRun !== right.hasPinnedRun) {
+      return left.hasPinnedRun ? -1 : 1;
+    }
     const activityDelta = compareIso(right.latestUpdatedAt, left.latestUpdatedAt);
     if (activityDelta !== 0) {
       return activityDelta;
@@ -100,22 +107,13 @@ export function stepLabel(run: ManagedRun) {
   return `${runtime.num_timesteps.toLocaleString()} / ${runtime.total_timesteps.toLocaleString()} steps`;
 }
 
-export function runtimePrimaryLabel(run: ManagedRun) {
+export function runtimeFpsLabel(run: ManagedRun) {
   const runtime = run.runtime;
   if (runtime === null) {
-    return "n/a";
-  }
-  const reward = runtime.episode_reward_mean;
-  return reward === undefined || reward === null ? "n/a" : reward.toFixed(2);
-}
-
-export function runtimeSecondaryLabel(run: ManagedRun) {
-  const runtime = run.runtime;
-  if (runtime === null) {
-    return "n/a";
+    return null;
   }
   const fps = runtime.fps;
-  return fps === undefined || fps === null ? "n/a" : `${fps.toFixed(0)} fps`;
+  return fps === undefined || fps === null ? null : `${fps.toFixed(0)} fps`;
 }
 
 export function statusLabel(run: ManagedRun) {
@@ -173,6 +171,7 @@ function buildLineageGroup(
       compareIso(effectiveUpdatedAt(run), latest) > 0 ? effectiveUpdatedAt(run) : latest,
     createdAt,
   );
+  const hasPinnedRun = orderedRuns.some(isPinnedRun);
   const runs = orderedRuns.map((run) => ({
     childCount: childCountByRunId.get(run.id) ?? 0,
     dependentDraftCount: dependentDraftCountByRunId.get(run.id) ?? 0,
@@ -189,11 +188,19 @@ function buildLineageGroup(
     canDeleteLineage,
     createdAt,
     groupNames: rootRun?.lineage_groups ?? [],
+    hasPinnedRun,
     id: lineageId,
     label,
     latestUpdatedAt,
     runs,
   };
+}
+
+function compareLineageGroups(left: RunLineageGroup, right: RunLineageGroup) {
+  if (left.hasPinnedRun !== right.hasPinnedRun) {
+    return left.hasPinnedRun ? -1 : 1;
+  }
+  return compareIso(right.latestUpdatedAt, left.latestUpdatedAt);
 }
 
 function slugifyGroupName(groupName: string) {

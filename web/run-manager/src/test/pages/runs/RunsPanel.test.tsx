@@ -1,12 +1,16 @@
 // web/run-manager/src/test/pages/runs/RunsPanel.test.tsx
 
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RunsPanel } from "@/pages/runs/RunsPanel";
 import { draftFixture, runFixture } from "@/test/fixtures";
-import { render, screen, within } from "@/test/render";
+import { cleanup, render, screen, within } from "@/test/render";
 
 describe("RunsPanel", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("opens runs and exposes row actions with delete confirmation", async () => {
     const user = userEvent.setup();
     const run = runFixture();
@@ -42,14 +46,16 @@ describe("RunsPanel", () => {
       />,
     );
 
-    const runningRow = screen.getByRole("button", { name: `Open run ${run.name}` }).closest("div");
+    const runningRow = screen
+      .getAllByRole("button", { name: `Open run ${run.name}` })[0]
+      .closest("div");
     const failedRow = screen
       .getByRole("button", { name: `Open run ${failedRun.name}` })
       .closest("div");
     expect(runningRow).not.toBeNull();
     expect(failedRow).not.toBeNull();
 
-    await user.click(screen.getByRole("button", { name: `Open run ${run.name}` }));
+    await user.click(screen.getAllByRole("button", { name: `Open run ${run.name}` })[0]);
     expect(onOpenRun).toHaveBeenCalledWith(run);
 
     await user.click(
@@ -202,6 +208,49 @@ describe("RunsPanel", () => {
       "Current ablations",
       "Recurrent sweep",
     ]);
+  });
+
+  it("pins running runs in a visible active section", () => {
+    const runningRun = runFixture({
+      created_at: "2026-05-01T08:00:00+00:00",
+      id: "running-run",
+      lineage_id: "running-lineage",
+      name: "active older run",
+      status: "running",
+    });
+    const stoppedRun = runFixture({
+      created_at: "2026-05-06T08:00:00+00:00",
+      id: "stopped-run",
+      lineage_id: "stopped-lineage",
+      name: "newer stopped run",
+      runtime: null,
+      status: "stopped",
+    });
+
+    render(
+      <RunsPanel
+        drafts={[]}
+        runs={[stoppedRun, runningRun]}
+        onDeleteLineage={vi.fn().mockResolvedValue(undefined)}
+        onDeleteRun={vi.fn().mockResolvedValue(undefined)}
+        onExportRun={vi.fn().mockResolvedValue(undefined)}
+        onImportRunBundle={vi.fn().mockResolvedValue(undefined)}
+        onOpenRun={vi.fn()}
+        onResumeRun={vi.fn().mockResolvedValue(undefined)}
+        onStopRun={vi.fn().mockResolvedValue(undefined)}
+        onUpdateLineageGroups={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const activeRuns = screen.getAllByRole("region", { name: "Active runs" })[0];
+
+    expect(within(activeRuns).getByText("1 running")).toBeInTheDocument();
+    expect(
+      within(activeRuns).getByRole("button", { name: "Open run active older run" }),
+    ).toBeInTheDocument();
+    expect(
+      within(activeRuns).queryByRole("button", { name: "Open run newer stopped run" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders long lineages as root plus recent runs until expanded", async () => {

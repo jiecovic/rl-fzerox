@@ -6,8 +6,7 @@ import { RunActivityIndicator } from "@/entities/run/ui/RunActivityIndicator";
 import {
   deleteDisabledReason,
   progressLabel,
-  runtimePrimaryLabel,
-  runtimeSecondaryLabel,
+  runtimeFpsLabel,
   statusLabel,
   stepLabel,
 } from "@/entities/runLineage/model/lineages";
@@ -41,6 +40,7 @@ export const RunRow = memo(function RunRow({
   onStopRun,
 }: RunRowProps) {
   const { run } = entry;
+  const runtimeFps = runtimeFpsLabel(run);
   const pendingCommand = run.pending_command;
   const busy = busyActionRunId === run.id;
   const canStop = run.status === "running" && pendingCommand === null && !busy && !isDeleting;
@@ -129,10 +129,9 @@ export const RunRow = memo(function RunRow({
           <span className={runSubtleClass}>{stepLabel(run)}</span>
         </span>
         <span className="grid min-w-0 gap-0.5">
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-            {runtimePrimaryLabel(run)}
-          </span>
-          <span className={runSubtleClass}>{runtimeSecondaryLabel(run)}</span>
+          {runtimeFps !== null ? (
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap">{runtimeFps}</span>
+          ) : null}
         </span>
         <span className="grid min-w-0 gap-0.5">
           <span className="run-status-chip">{statusLabel(run)}</span>
@@ -250,8 +249,7 @@ function sameRuntime(
     left.num_timesteps === right.num_timesteps &&
     left.progress_fraction === right.progress_fraction &&
     left.updated_at === right.updated_at &&
-    left.fps === right.fps &&
-    left.episode_reward_mean === right.episode_reward_mean
+    left.fps === right.fps
   );
 }
 

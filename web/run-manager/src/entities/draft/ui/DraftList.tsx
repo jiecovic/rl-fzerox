@@ -44,7 +44,7 @@ export function DraftList({
           <span>Envs</span>
           <span>Steps</span>
           <span>LR</span>
-          <span>Policy</span>
+          <span>CNN</span>
           <span>Created at</span>
         </div>
         <span className="w-10" />

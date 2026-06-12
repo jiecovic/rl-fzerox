@@ -27,6 +27,9 @@ describe("DraftsPanel", () => {
       />,
     );
 
+    expect(screen.getByText("CNN")).toBeInTheDocument();
+    expect(screen.queryByText("Policy")).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Create draft" }));
     expect(onCreateDraft).toHaveBeenCalledTimes(1);
 

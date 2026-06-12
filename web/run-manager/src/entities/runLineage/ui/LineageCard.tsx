@@ -160,7 +160,7 @@ export const LineageCard = memo(function LineageCard({
             <div className={runLineageMainGridClass}>
               <span>Run</span>
               <span>Progress</span>
-              <span>Reward · FPS</span>
+              <span>FPS</span>
               <span>Status</span>
               <span>Created at</span>
             </div>

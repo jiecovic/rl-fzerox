@@ -1,7 +1,7 @@
 // web/run-manager/src/test/app/workspaceModel.test.ts
 import { describe, expect, it } from "vitest";
 
-import { nextForkDraftName } from "@/app/workspace/model";
+import { compareRuns, nextForkDraftName } from "@/app/workspace/model";
 import { runFixture } from "@/test/fixtures";
 
 describe("workspace naming", () => {
@@ -45,5 +45,31 @@ describe("workspace naming", () => {
     expect(nextForkDraftName(forkRun, [forkRun, rootRun], [rootRun.name, forkRun.name])).toBe(
       "ppo_test_1 2",
     );
+  });
+});
+
+describe("workspace run ordering", () => {
+  it("pins running runs before newer inactive runs", () => {
+    const stoppedRun = runFixture({
+      created_at: "2026-05-04T08:00:00+00:00",
+      id: "stopped-run",
+      status: "stopped",
+    });
+    const failedRun = runFixture({
+      created_at: "2026-05-05T08:00:00+00:00",
+      id: "failed-run",
+      status: "failed",
+    });
+    const runningRun = runFixture({
+      created_at: "2026-05-03T08:00:00+00:00",
+      id: "running-run",
+      status: "running",
+    });
+
+    expect([stoppedRun, failedRun, runningRun].sort(compareRuns).map((run) => run.id)).toEqual([
+      "running-run",
+      "failed-run",
+      "stopped-run",
+    ]);
   });
 });

@@ -1,5 +1,6 @@
 // web/run-manager/src/pages/runs/RunsPanel.tsx
 import { useMemo, useRef, useState } from "react";
+import { isPinnedRun } from "@/entities/run/model/runtime";
 import {
   buildLineageBuckets,
   buildLineageGroups,
@@ -7,7 +8,10 @@ import {
   disclosureDefaults,
   disclosureStateFor,
 } from "@/entities/runLineage/model/lineages";
+import type { RunLineageRun } from "@/entities/runLineage/model/types";
 import { LineageCard } from "@/entities/runLineage/ui/LineageCard";
+import { runLineageMainGridClass, runLineageOuterGridClass } from "@/entities/runLineage/ui/layout";
+import { RunRow } from "@/entities/runLineage/ui/RunRow";
 import { useRunsPanelActions } from "@/features/runsPanelActions/useRunsPanelActions";
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
@@ -77,6 +81,11 @@ export function RunsPanel({
     onDeleteLineage,
     onDeleteRun,
   });
+  const activeRunEntries = useMemo(
+    () =>
+      lineageGroups.flatMap((lineage) => lineage.runs.filter((entry) => isPinnedRun(entry.run))),
+    [lineageGroups],
+  );
 
   async function importSelectedBundle(file: File) {
     setImportError(null);
@@ -135,6 +144,19 @@ export function RunsPanel({
           <Notice>No launched runs yet.</Notice>
         ) : (
           <div className="grid gap-3.5">
+            {activeRunEntries.length > 0 ? (
+              <ActiveRunsSection
+                busyActionRunId={busyActionRunId}
+                entries={activeRunEntries}
+                isDeleting={isDeleting}
+                onExportRun={onExportRun}
+                onOpenRun={onOpenRun}
+                onRequestRunDelete={requestRunDelete}
+                onResumeRun={onResumeRun}
+                onRunAction={runAction}
+                onStopRun={onStopRun}
+              />
+            ) : null}
             {lineageBuckets.map((bucket) => {
               const isBucketOpen = bucketOpen[bucket.id] ?? true;
               return (
@@ -212,5 +234,70 @@ export function RunsPanel({
         onConfirm={() => void confirmDelete()}
       />
     </>
+  );
+}
+
+function ActiveRunsSection({
+  busyActionRunId,
+  entries,
+  isDeleting,
+  onExportRun,
+  onOpenRun,
+  onRequestRunDelete,
+  onResumeRun,
+  onRunAction,
+  onStopRun,
+}: {
+  busyActionRunId: string | null;
+  entries: readonly RunLineageRun[];
+  isDeleting: boolean;
+  onExportRun: (run: ManagedRun) => Promise<void>;
+  onOpenRun: (run: ManagedRun) => void;
+  onRequestRunDelete: (run: ManagedRun) => void;
+  onResumeRun: (run: ManagedRun) => Promise<void>;
+  onRunAction: (runId: string, callback: () => Promise<void>) => Promise<void>;
+  onStopRun: (run: ManagedRun) => Promise<void>;
+}) {
+  return (
+    <section
+      aria-label="Active runs"
+      className="rounded-lg border border-app-accent bg-app-surface"
+    >
+      <div className="flex min-h-11 items-center justify-between gap-3 px-3">
+        <strong>Active runs</strong>
+        <span className="text-[11px] tabular-nums text-app-muted">
+          {entries.length.toLocaleString()} running
+        </span>
+      </div>
+      <div
+        className={`${runLineageOuterGridClass} hidden border-t border-app-border px-3 py-1 text-[11px] font-bold tracking-[0.04em] text-app-muted uppercase min-[761px]:grid`}
+        role="presentation"
+      >
+        <div className={runLineageMainGridClass}>
+          <span>Run</span>
+          <span>Progress</span>
+          <span>FPS</span>
+          <span>Status</span>
+          <span>Created at</span>
+        </div>
+        <span className="w-[136px] justify-self-end text-right">Actions</span>
+      </div>
+      <div className="grid border-t border-app-border">
+        {entries.map((entry) => (
+          <RunRow
+            busyActionRunId={busyActionRunId}
+            entry={entry}
+            isDeleting={isDeleting}
+            key={entry.run.id}
+            onExportRun={() => onExportRun(entry.run)}
+            onOpenRun={() => onOpenRun(entry.run)}
+            onRequestDelete={() => onRequestRunDelete(entry.run)}
+            onResumeRun={() => onResumeRun(entry.run)}
+            onRunAction={onRunAction}
+            onStopRun={() => onStopRun(entry.run)}
+          />
+        ))}
+      </div>
+    </section>
   );
 }

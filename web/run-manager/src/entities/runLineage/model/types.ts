@@ -24,6 +24,7 @@ export type RunLineageGroup = {
   canDeleteLineage: boolean;
   createdAt: string;
   groupNames: readonly string[];
+  hasPinnedRun: boolean;
   id: string;
   label: string;
   latestUpdatedAt: string;
@@ -32,6 +33,7 @@ export type RunLineageGroup = {
 
 export type RunLineageBucket = {
   groupName: string | null;
+  hasPinnedRun: boolean;
   id: string;
   label: string;
   latestUpdatedAt: string;

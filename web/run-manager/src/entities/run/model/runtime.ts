@@ -1,6 +1,10 @@
 // web/run-manager/src/entities/run/model/runtime.ts
 import type { ManagedRun, ManagedRunDetail } from "@/shared/api/contract";
 
+export function isPinnedRun(run: ManagedRun): boolean {
+  return run.status === "running";
+}
+
 export function progressHeadline(run: ManagedRun): string {
   const runtime = run.runtime;
   if (runtime === null) {

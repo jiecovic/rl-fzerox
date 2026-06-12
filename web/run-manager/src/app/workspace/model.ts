@@ -6,6 +6,7 @@ import type {
   SaveGameSession,
   WorkspaceTab,
 } from "@/app/workspace/types";
+import { isPinnedRun } from "@/entities/run/model/runtime";
 import type {
   ManagedDraft,
   ManagedRun,
@@ -158,6 +159,11 @@ export function runSummaryFromDetail(run: ManagedRunDetail): ManagedRun {
 }
 
 export function compareRuns(left: ManagedRun, right: ManagedRun) {
+  const leftPinned = isPinnedRun(left);
+  const rightPinned = isPinnedRun(right);
+  if (leftPinned !== rightPinned) {
+    return leftPinned ? -1 : 1;
+  }
   if (left.created_at !== right.created_at) {
     return right.created_at.localeCompare(left.created_at);
   }
