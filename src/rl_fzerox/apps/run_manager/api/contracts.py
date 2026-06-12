@@ -1,6 +1,7 @@
 # src/rl_fzerox/apps/run_manager/api/contracts.py
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -40,6 +41,8 @@ class StartCareerModeRequest(BaseModel):
     renderer: WatchRenderer | None = None
     attempt_seed: int | None = Field(default=None, ge=0, le=(1 << 32) - 1)
     policy_mode: PolicyPlaybackMode = "deterministic"
+    recording_enabled: bool = False
+    recording_path: Path | None = None
     target_kind: str | None = None
     difficulty: str | None = None
     cup_id: str | None = None
@@ -47,6 +50,8 @@ class StartCareerModeRequest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_target_fields(self) -> StartCareerModeRequest:
+        if self.recording_enabled and self.recording_path is None:
+            raise ValueError("recording_path is required when recording_enabled is true")
         values = (self.target_kind, self.difficulty, self.cup_id, self.course_id)
         if not any(value is not None for value in values):
             return self
@@ -189,6 +194,8 @@ class RunLauncher(Protocol):
         renderer: WatchRenderer | None,
         attempt_seed: int | None,
         deterministic_policy: bool,
+        recording_enabled: bool,
+        recording_path: Path | None,
         target_kind: str | None,
         difficulty: str | None,
         cup_id: str | None,

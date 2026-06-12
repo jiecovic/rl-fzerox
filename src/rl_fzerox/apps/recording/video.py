@@ -17,7 +17,7 @@ from fzerox_emulator.arrays import NumpyArray, RgbFrame
 
 @dataclass(frozen=True)
 class VideoSettings:
-    """MP4 writer settings for one attempt."""
+    """Video writer settings for one attempt."""
 
     path: Path
     ffmpeg_path: str
@@ -25,7 +25,7 @@ class VideoSettings:
 
 
 class FfmpegRgbWriter:
-    """Encode one attempt by streaming rendered RGB frames into ffmpeg."""
+    """Encode rendered RGB frames by streaming them into ffmpeg."""
 
     def __init__(
         self,
@@ -115,7 +115,7 @@ def resolve_ffmpeg_path() -> str:
     if bundled_ffmpeg is not None:
         return bundled_ffmpeg
     raise RuntimeError(
-        "ffmpeg is required for MP4 recording. Install system ffmpeg or run "
+        "ffmpeg is required for video recording. Install system ffmpeg or run "
         "`.venv/bin/python -m pip install imageio-ffmpeg`."
     )
 

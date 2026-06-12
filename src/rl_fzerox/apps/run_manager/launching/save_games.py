@@ -30,6 +30,8 @@ def launch_career_mode_runner(
     renderer: WatchRenderer | None,
     attempt_seed: int | None,
     deterministic_policy: bool,
+    recording_enabled: bool = False,
+    recording_path: Path | None = None,
     target_kind: str | None = None,
     difficulty: str | None = None,
     cup_id: str | None = None,
@@ -64,6 +66,14 @@ def launch_career_mode_runner(
         renderer=renderer,
         deterministic_policy=deterministic_policy,
     )
+    if recording_enabled:
+        if recording_path is None:
+            raise ValueError("recording path is required when recording is enabled")
+        overrides = (
+            *overrides,
+            "watch.recording.enabled=true",
+            f"watch.recording.path={recording_path}",
+        )
     log_path = manager_career_mode_log_path(save_game_id)
     command = [
         sys.executable,

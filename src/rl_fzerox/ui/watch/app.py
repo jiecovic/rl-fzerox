@@ -10,6 +10,7 @@ from rl_fzerox.ui.watch.input import (
     _poll_viewer_input,
     mouse_over_clickable,
 )
+from rl_fzerox.ui.watch.recording import ViewerRecorder, open_viewer_recorder
 from rl_fzerox.ui.watch.runtime import (
     WatchWorker,
     apply_viewer_input,
@@ -65,11 +66,17 @@ def run_viewer(
     panel_tabs = panel_tabs_for_config(config)
     pygame.init()
     render_clock = pygame.time.Clock()
+    recorder: ViewerRecorder | None = None
     try:
         snapshot, worker_closed = wait_initial_snapshot(worker, viewer_heartbeat=viewer_heartbeat)
         target_render_fps = _resolve_render_fps(
             config.watch.render_fps,
             native_fps=snapshot.native_fps,
+        )
+        recorder = open_viewer_recorder(
+            config=config,
+            native_fps=snapshot.native_fps,
+            render_fps=target_render_fps,
         )
         render_rate = RateMeter(window=60)
         game_display_size = _watch_game_display_size()
@@ -173,12 +180,18 @@ def run_viewer(
                 record_tab_index=record_tab_index,
                 policy_observation_layout_shape=policy_observation_layout_shape,
             )
+            if recorder is not None:
+                recorder.write_surface(pygame, screen)
             _sync_mouse_cursor(pygame, hitboxes)
     except KeyboardInterrupt:
         return
     finally:
-        worker.shutdown()
-        pygame.quit()
+        try:
+            if recorder is not None:
+                recorder.close()
+        finally:
+            worker.shutdown()
+            pygame.quit()
 
 
 def _next_panel_tab_index(

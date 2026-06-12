@@ -19,6 +19,7 @@ from rl_fzerox.core.runtime_spec.schema.apps import (
     TrainAppConfig,
     WatchAppConfig,
     WatchConfig,
+    WatchRecordingConfig,
 )
 from rl_fzerox.core.runtime_spec.schema.common import (
     ActionMaskOverrides,
@@ -106,5 +107,6 @@ __all__ = [
     "WatchAppConfig",
     "WatchConfig",
     "WatchFpsSetting",
+    "WatchRecordingConfig",
     "XCupRotationConfig",
 ]

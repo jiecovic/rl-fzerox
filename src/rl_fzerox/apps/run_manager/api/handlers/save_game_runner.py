@@ -18,6 +18,8 @@ def start_career_mode_payload(
             renderer=request.renderer,
             attempt_seed=request.attempt_seed,
             deterministic_policy=request.policy_mode == "deterministic",
+            recording_enabled=request.recording_enabled,
+            recording_path=request.recording_path,
             target_kind=request.target_kind,
             difficulty=request.difficulty,
             cup_id=request.cup_id,

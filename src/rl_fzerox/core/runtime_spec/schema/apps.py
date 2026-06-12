@@ -39,6 +39,15 @@ class CareerModeRaceSetupConfig(BaseModel):
     engine_setting_raw_value: int
 
 
+class WatchRecordingConfig(BaseModel):
+    """Optional recording output for the visible watch window."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    path: Path | None = None
+
+
 class WatchConfig(BaseModel):
     """Human-facing watch UI settings."""
 
@@ -62,6 +71,7 @@ class WatchConfig(BaseModel):
     start_manual_control: bool = False
     career_mode_race_setup: CareerModeRaceSetupConfig | None = None
     policy_observation_shape_hint: tuple[PositiveInt, PositiveInt, PositiveInt] | None = None
+    recording: WatchRecordingConfig = Field(default_factory=WatchRecordingConfig)
 
     @model_validator(mode="after")
     def _default_split_fps(self) -> WatchConfig:
@@ -69,6 +79,8 @@ class WatchConfig(BaseModel):
             self.control_fps = "auto"
         if self.render_fps is None:
             self.render_fps = 60.0
+        if self.recording.enabled and self.recording.path is None:
+            raise ValueError("watch.recording.path is required when recording is enabled")
         return self
 
 

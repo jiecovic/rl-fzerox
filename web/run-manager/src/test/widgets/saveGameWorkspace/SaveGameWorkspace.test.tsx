@@ -30,11 +30,16 @@ describe("SaveGameWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Create" }));
 
     expect(onCreateSaveGame).toHaveBeenCalledWith("unlock save");
-    expect(onPatchSession).toHaveBeenLastCalledWith("save-game:new", {
-      nameText: "unlock save",
-      saveGameId: "save-001",
-      title: "unlock save",
-    });
+    expect(onPatchSession).toHaveBeenLastCalledWith(
+      "save-game:new",
+      expect.objectContaining({
+        nameText: "unlock save",
+        saveGameId: "save-001",
+        title: "unlock save",
+      }),
+    );
+    const patch = onPatchSession.mock.calls.at(-1)?.[1];
+    expect(patch.recordingPathText).toMatch(/^local\/recordings\/career\/save-001\/.+\.mkv$/);
   });
 
   it("opens the save-game directory", async () => {
@@ -154,16 +159,49 @@ describe("SaveGameWorkspace", () => {
     );
     await user.click(screen.getByRole("button", { name: "Start" }));
 
-    expect(onStartCareerMode).toHaveBeenCalledWith(
-      "save-001",
-      "cpu",
-      "gliden64",
-      "123",
-      "stochastic",
-      null,
-    );
+    expect(onStartCareerMode).toHaveBeenCalledWith({
+      attemptSeed: "123",
+      device: "cpu",
+      policyMode: "stochastic",
+      recordingEnabled: false,
+      recordingPath: null,
+      renderer: "gliden64",
+      saveGameId: "save-001",
+      target: null,
+    });
     expect(onRefresh).toHaveBeenCalled();
     expect(await screen.findByText("Runner started.")).toBeInTheDocument();
+  });
+
+  it("starts the career runner with MKV recording enabled", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture({
+      course_setups: courseSetupsForCup("jack"),
+      cup_setups: [cupSetupFixture({ cup_id: "jack" })],
+    });
+    const onStartCareerMode = vi.fn().mockResolvedValue("started");
+
+    renderSaveGameWorkspace({
+      saveGame,
+      onStartCareerMode,
+    });
+
+    await user.click(screen.getByLabelText("Record video"));
+    const pathInput = screen.getByLabelText("Career Mode recording path");
+    await user.clear(pathInput);
+    await user.type(pathInput, "local/recordings/career/save-001/manual.mkv");
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onStartCareerMode).toHaveBeenCalledWith({
+      attemptSeed: "123",
+      device: "cuda",
+      policyMode: "deterministic",
+      recordingEnabled: true,
+      recordingPath: "local/recordings/career/save-001/manual.mkv",
+      renderer: "gliden64",
+      saveGameId: "save-001",
+      target: null,
+    });
   });
 
   it("starts the visible career runner for a clicked unlock target", async () => {
@@ -199,14 +237,16 @@ describe("SaveGameWorkspace", () => {
 
     await user.click(screen.getByRole("button", { name: "Start Clear Novice Queen Cup" }));
 
-    expect(onStartCareerMode).toHaveBeenCalledWith(
-      "save-001",
-      "cuda",
-      "gliden64",
-      "123",
-      "deterministic",
-      launchableSelectedTarget,
-    );
+    expect(onStartCareerMode).toHaveBeenCalledWith({
+      attemptSeed: "123",
+      device: "cuda",
+      policyMode: "deterministic",
+      recordingEnabled: false,
+      recordingPath: null,
+      renderer: "gliden64",
+      saveGameId: "save-001",
+      target: launchableSelectedTarget,
+    });
   });
 
   it("starts a cup target from a cup setup", async () => {
@@ -454,6 +494,8 @@ function newSaveGameSession(): SaveGameSession {
     nameText: "unlock save",
     attemptSeedText: "123",
     policyMode: "deterministic",
+    recordingEnabled: false,
+    recordingPathText: "local/recordings/career/save-001/test.mkv",
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId: null,
@@ -541,6 +583,8 @@ function existingSaveGameSession(saveGameId: string): SaveGameSession {
     nameText: "expert unlock",
     attemptSeedText: "123",
     policyMode: "deterministic",
+    recordingEnabled: false,
+    recordingPathText: "local/recordings/career/save-001/test.mkv",
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId,

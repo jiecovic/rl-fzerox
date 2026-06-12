@@ -543,6 +543,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
     _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="jack")
     launcher = ManagerRunLauncher(store)
     log_path = tmp_path / "logs" / f"{save_game.id}.log"
+    recording_path = tmp_path / "recordings" / "career.mkv"
     log_path.parent.mkdir(parents=True)
     log_path.write_text("stale career failure\n", encoding="utf-8")
     captured: dict[str, object] = {}
@@ -584,6 +585,8 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         renderer="angrylion",
         attempt_seed=1234,
         deterministic_policy=False,
+        recording_enabled=True,
+        recording_path=recording_path,
     )
 
     assert status == "started"
@@ -611,6 +614,8 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         "watch.device=cpu",
         "watch.deterministic_policy=false",
         "emulator.renderer=angrylion",
+        "watch.recording.enabled=true",
+        f"watch.recording.path={recording_path}",
     ]
     lease = store.get_viewer_lease(lease_id)
     assert lease is not None

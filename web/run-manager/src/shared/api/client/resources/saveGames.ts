@@ -1,16 +1,13 @@
 // web/run-manager/src/shared/api/client/resources/saveGames.ts
 import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
+  type CareerModeRunnerLaunchRequest,
   createSaveGameResponseSchema,
   type ManagedSaveGame,
-  type ManagedSaveUnlockTarget,
   openSaveGameDirectoryResponseSchema,
-  type PolicyPlaybackMode,
   type SavePolicyArtifact,
   saveGamesResponseSchema,
   upsertSaveCourseSetupResponseSchema,
-  type WatchDevice,
-  type WatchRenderer,
   watchRunResponseSchema,
 } from "@/shared/api/contract";
 
@@ -47,14 +44,16 @@ export async function openSaveGameDirectory(saveGameId: string): Promise<void> {
   parseApiPayload(openSaveGameDirectoryResponseSchema, await parseJson(response));
 }
 
-export async function startCareerModeRunner(
-  saveGameId: string,
-  device: WatchDevice,
-  renderer: WatchRenderer | null,
-  attemptSeed: string | null,
-  policyMode: PolicyPlaybackMode,
-  target: ManagedSaveUnlockTarget | null = null,
-): Promise<"started" | "already_running"> {
+export async function startCareerModeRunner({
+  attemptSeed,
+  device,
+  policyMode,
+  recordingEnabled,
+  recordingPath,
+  renderer,
+  saveGameId,
+  target,
+}: CareerModeRunnerLaunchRequest): Promise<"started" | "already_running"> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/runner`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -63,6 +62,8 @@ export async function startCareerModeRunner(
       renderer,
       attempt_seed: attemptSeed === null ? null : Number(attemptSeed),
       policy_mode: policyMode,
+      recording_enabled: recordingEnabled,
+      recording_path: recordingEnabled ? recordingPath : null,
       ...(target === null
         ? {}
         : {

@@ -40,6 +40,7 @@ import type {
   SaveGameSession,
   WorkspaceTabId,
 } from "@/app/workspace/types";
+import { defaultCareerRecordingPath } from "@/features/careerRunner/model/recordingPath";
 import { randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
 
 export function useWorkspaceSessions({
@@ -119,6 +120,8 @@ export function useWorkspaceSessions({
         nameText,
         attemptSeedText: randomAttemptSeedText(),
         policyMode: "deterministic",
+        recordingEnabled: false,
+        recordingPathText: defaultCareerRecordingPath(null),
         runnerDevice: "cuda",
         runnerRenderer: "gliden64",
         saveGameId: null,
@@ -349,6 +352,8 @@ function saveGameSessionForManagedSave(
     attemptSeedText: existing?.attemptSeedText ?? randomAttemptSeedText(),
     nameText: name,
     policyMode: existing?.policyMode ?? "deterministic",
+    recordingEnabled: existing?.recordingEnabled ?? false,
+    recordingPathText: existing?.recordingPathText ?? defaultCareerRecordingPath(saveGameId),
     runnerDevice: existing?.runnerDevice ?? "cuda",
     runnerRenderer: existing?.runnerRenderer ?? "gliden64",
     saveGameId,

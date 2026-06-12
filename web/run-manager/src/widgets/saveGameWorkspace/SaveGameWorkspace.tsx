@@ -9,6 +9,7 @@ import {
   unlockCompletionFraction,
 } from "@/entities/saveGame/model";
 import { SaveGameOverview } from "@/entities/saveGame/ui/SaveGameOverview";
+import { defaultCareerRecordingPath } from "@/features/careerRunner/model/recordingPath";
 import { parseAttemptSeed, randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
 import { useSaveGameRunnerRefresh } from "@/features/careerRunner/model/useSaveGameRunnerRefresh";
 import { RunnerControlPanel } from "@/features/careerRunner/ui/RunnerControlPanel";
@@ -19,14 +20,12 @@ import {
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import { UnlockPathPanel } from "@/features/saveGameCourseSetup/ui/UnlockPathPanel";
 import type {
+  CareerModeRunnerLaunchRequest,
   ConfigMetadata,
   ManagedRun,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
-  PolicyPlaybackMode,
   SavePolicyArtifact,
-  WatchDevice,
-  WatchRenderer,
 } from "@/shared/api/contract";
 import { rendererNames } from "@/shared/api/renderers";
 import { Button } from "@/shared/ui/Button";
@@ -62,12 +61,7 @@ interface SaveGameWorkspaceProps {
     vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onStartCareerMode: (
-    saveGameId: string,
-    device: WatchDevice,
-    renderer: WatchRenderer | null,
-    attemptSeed: string | null,
-    policyMode: PolicyPlaybackMode,
-    target: ManagedSaveUnlockTarget | null,
+    request: CareerModeRunnerLaunchRequest,
   ) => Promise<"started" | "already_running">;
   runs: ManagedRun[];
   saveGame: ManagedSaveGame | null;
@@ -114,6 +108,7 @@ export function SaveGameWorkspace({
       const created = await onCreateSaveGame(name);
       onPatchSession(session.sessionId, {
         nameText: created.name,
+        recordingPathText: defaultCareerRecordingPath(created.id),
         saveGameId: created.id,
         title: created.name,
       });
@@ -201,6 +196,11 @@ export function SaveGameWorkspace({
       setError("runtime seed must be an integer from 0 to 4294967295");
       return;
     }
+    const recordingPath = session.recordingEnabled ? session.recordingPathText.trim() : null;
+    if (session.recordingEnabled && recordingPath === "") {
+      setError("recording path is required");
+      return;
+    }
     const launchTarget = requestedTarget ?? nextUnlockTarget(target);
     if (launchTarget === null) {
       setError("career save has no pending unlock target");
@@ -229,14 +229,16 @@ export function SaveGameWorkspace({
     setRunnerStatus(null);
     setStartingRunnerSaveGameId(target.id);
     try {
-      const status = await onStartCareerMode(
-        target.id,
-        session.runnerDevice,
-        session.runnerRenderer,
+      const status = await onStartCareerMode({
         attemptSeed,
-        session.policyMode,
-        requestedTarget,
-      );
+        device: session.runnerDevice,
+        policyMode: session.policyMode,
+        recordingEnabled: session.recordingEnabled,
+        recordingPath,
+        renderer: session.runnerRenderer,
+        saveGameId: target.id,
+        target: requestedTarget,
+      });
       setRunnerStatus(status === "started" ? "Runner started." : "Runner is already open.");
       await onRefresh();
     } catch (caught) {
@@ -391,6 +393,8 @@ export function SaveGameWorkspace({
         runnerDevice={session.runnerDevice}
         runnerRenderer={session.runnerRenderer}
         policyMode={session.policyMode}
+        recordingEnabled={session.recordingEnabled}
+        recordingPathText={session.recordingPathText}
         startLabel={startLabel}
         startNote={startNote}
         starting={startingRunnerSaveGameId === saveGame.id}
@@ -407,6 +411,12 @@ export function SaveGameWorkspace({
           onPatchSession(session.sessionId, { runnerRenderer })
         }
         onPolicyModeChange={(policyMode) => onPatchSession(session.sessionId, { policyMode })}
+        onRecordingEnabledChange={(recordingEnabled) =>
+          onPatchSession(session.sessionId, { recordingEnabled })
+        }
+        onRecordingPathChange={(recordingPathText) =>
+          onPatchSession(session.sessionId, { recordingPathText })
+        }
         onStart={() => void startCareerMode(saveGame)}
       />
       <article className="grid content-start gap-5">

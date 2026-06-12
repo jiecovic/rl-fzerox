@@ -43,6 +43,8 @@ export interface SaveGameSession {
   nameText: string;
   attemptSeedText: string;
   policyMode: PolicyPlaybackMode;
+  recordingEnabled: boolean;
+  recordingPathText: string;
   runnerDevice: WatchDevice;
   runnerRenderer: WatchRenderer;
   saveGameId: string | null;

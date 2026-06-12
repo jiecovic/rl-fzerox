@@ -1,6 +1,8 @@
 // web/run-manager/src/shared/api/contract/saveGames.ts
 import { z } from "zod";
 
+import type { WatchDevice, WatchRenderer } from "@/shared/api/contract/enums";
+
 export const saveGameStatusSchema = z.enum(["created", "running", "paused", "finished", "failed"]);
 
 export const saveUnlockInspectionStatusSchema = z.enum(["not_inspected", "inspected"]);
@@ -118,3 +120,14 @@ export type PolicyPlaybackMode = z.infer<typeof policyPlaybackModeSchema>;
 export type SaveAttemptStatus = z.infer<typeof saveAttemptStatusSchema>;
 export type SavePolicyArtifact = z.infer<typeof savePolicyArtifactSchema>;
 export type SaveUnlockTargetStatus = z.infer<typeof saveUnlockTargetStatusSchema>;
+
+export interface CareerModeRunnerLaunchRequest {
+  attemptSeed: string | null;
+  device: WatchDevice;
+  policyMode: PolicyPlaybackMode;
+  recordingEnabled: boolean;
+  recordingPath: string | null;
+  renderer: WatchRenderer | null;
+  saveGameId: string;
+  target: ManagedSaveUnlockTarget | null;
+}
