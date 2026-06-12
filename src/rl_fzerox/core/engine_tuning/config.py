@@ -26,6 +26,7 @@ def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSett
     return EngineTunerSettings(
         min_raw_value=config.min_raw_value,
         max_raw_value=config.max_raw_value,
+        backend=config.backend,
         stat_decay=config.stat_decay,
         prior_finish_time_seconds=config.prior_finish_time_seconds,
         exploration_seconds=float(config.exploration_scale),

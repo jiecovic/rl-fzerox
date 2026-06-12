@@ -157,7 +157,8 @@ export const engineTuningRuntimeCandidateSchema = z.object({
 export const engineTuningRuntimeCandidateEstimateSchema = z.object({
   engine_setting_raw_value: z.number().int().min(0).max(100),
   selection_probability: z.number().min(0).max(1),
-  posterior_mean: z.number(),
+  mean_score: z.number(),
+  uncertainty_score: z.number().nonnegative(),
   estimated_finish_time_ms: z.number().int().positive(),
   best_finish_time_ms: z.number().int().positive().nullable(),
   finish_count: z.number().int().nonnegative(),
@@ -176,6 +177,7 @@ export const engineTuningRuntimeContextSchema = z.object({
 export const engineTuningRuntimeStateSchema = z.object({
   version: z.number().int().positive(),
   update_count: z.number().int().nonnegative(),
+  model_backend: z.enum(["gaussian_process", "mlp_ensemble"]).nullable().default(null),
   candidates: z.array(engineTuningRuntimeCandidateSchema),
   contexts: z.array(engineTuningRuntimeContextSchema).default([]),
 });

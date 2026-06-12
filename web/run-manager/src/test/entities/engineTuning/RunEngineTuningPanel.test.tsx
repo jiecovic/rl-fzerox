@@ -66,6 +66,7 @@ function engineTuningStateFixture(): EngineTuningRuntimeState {
         recommended_engine_setting_raw_value: 10,
       }),
     ],
+    model_backend: "gaussian_process",
     update_count: 10,
     version: 1,
   };
@@ -111,8 +112,9 @@ function engineTuningCandidateEstimateFixture(
     best_finish_time_ms: 92_000,
     estimated_finish_time_ms: 95_000,
     finish_count: 1,
-    posterior_mean: 2.25,
+    mean_score: 2.25,
     selection_probability: 0.5,
+    uncertainty_score: 0.25,
     ...overrides,
   };
 }

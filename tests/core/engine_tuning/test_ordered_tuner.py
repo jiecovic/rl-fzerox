@@ -4,9 +4,12 @@ from __future__ import annotations
 import pytest
 
 from rl_fzerox.core.engine_tuning import (
+    ENGINE_TUNING_STATE_VERSION,
     EngineTunerSettings,
+    EngineTuningCandidateState,
     EngineTuningContext,
     EngineTuningEpisodeOutcome,
+    EngineTuningRuntimeState,
     OrderedEngineTuner,
 )
 from rl_fzerox.core.engine_tuning.tuner import engine_candidates
@@ -67,6 +70,88 @@ def test_ordered_tuner_recommends_lower_finish_time() -> None:
     assert choice.finish_count == 1
     assert choice.mean_score == pytest.approx(-90.0, abs=0.01)
     assert choice.estimated_finish_time_ms == pytest.approx(90_000, abs=10)
+
+
+def test_mlp_ensemble_backend_records_model_state() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=EngineTunerSettings(
+            min_raw_value=40,
+            max_raw_value=60,
+            backend="mlp_ensemble",
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+    )
+
+    state = tuner.record_many(
+        (
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=40,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=110_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=60,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=90_000,
+            ),
+        )
+    )
+    estimates = tuner.distribution(context, seed=123, draws=16)
+
+    assert state.model_state is not None
+    assert state.model_state.backend == "mlp_ensemble"
+    assert len(estimates) == 21
+    assert tuner.recommendation(context).engine_setting_raw_value in range(40, 61)
+
+
+def test_mlp_ensemble_backend_does_not_warm_start_from_aggregate_candidates() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    aggregate_state = EngineTuningRuntimeState(
+        version=ENGINE_TUNING_STATE_VERSION,
+        update_count=1,
+        candidates=(
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=60,
+                finish_count=1,
+                decayed_count=1.0,
+                decayed_score_total=-90.0,
+                score_total=-90.0,
+                best_score=-90.0,
+                best_time_ms=90_000,
+            ),
+        ),
+    )
+    tuner = OrderedEngineTuner(
+        settings=EngineTunerSettings(
+            min_raw_value=40,
+            max_raw_value=60,
+            backend="mlp_ensemble",
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+        state=aggregate_state,
+    )
+
+    choice = tuner.recommendation(context)
+
+    assert tuner.state.candidates == ()
+    assert choice.finish_count == 0
+    assert choice.mean_score == pytest.approx(-200.0)
 
 
 def test_ordered_tuner_ignores_failed_engine_samples() -> None:
@@ -208,8 +293,8 @@ def test_ordered_tuner_shares_information_with_nearby_candidates() -> None:
         for estimate in tuner.distribution(context, seed=123, draws=16)
     }
 
-    assert estimates[70].posterior_mean > estimates[50].posterior_mean
-    assert estimates[80].posterior_mean > estimates[50].posterior_mean
+    assert estimates[70].mean_score > estimates[50].mean_score
+    assert estimates[80].mean_score > estimates[50].mean_score
 
 
 def test_distribution_samples_correlated_posterior_functions() -> None:

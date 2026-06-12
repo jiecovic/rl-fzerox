@@ -17,6 +17,8 @@ from rl_fzerox.apps.run_manager.desktop import open_directory
 from rl_fzerox.core.engine_tuning import (
     EngineTuningContext,
     OrderedEngineTuner,
+)
+from rl_fzerox.core.engine_tuning.config import (
     engine_tuner_settings,
     engine_tuning_episode_horizon_prior_seconds,
 )
@@ -224,6 +226,7 @@ def _adaptive_engine_config(run: ManagedRun) -> AdaptiveEngineTuningConfig:
         enabled=True,
         min_raw_value=vehicle.engine_setting_min_raw_value,
         max_raw_value=vehicle.engine_setting_max_raw_value,
+        backend=vehicle.adaptive_engine_tuner_backend,
         stat_decay=vehicle.adaptive_engine_stat_decay,
         prior_finish_time_seconds=engine_tuning_episode_horizon_prior_seconds(
             max_episode_steps=run.config.environment.max_episode_steps,

@@ -14,8 +14,8 @@ from rl_fzerox.core.engine_tuning import (
     EngineTuningContext,
     EngineTuningRuntimeState,
     OrderedEngineTuner,
-    engine_tuner_settings,
 )
+from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
 from rl_fzerox.core.envs.engine.reset.track_sampling.models import (
     TRACK_SAMPLING_LIMITS,
     SelectedTrack,

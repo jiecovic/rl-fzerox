@@ -26,6 +26,11 @@ class EngineTuningTrainingController:
     config: AdaptiveEngineTuningConfig
     state: EngineTuningRuntimeState | None = None
     _tuner: OrderedEngineTuner = field(init=False, repr=False)
+    _rollout_outcomes: list[EngineTuningEpisodeOutcome] = field(
+        default_factory=list,
+        init=False,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         self._tuner = OrderedEngineTuner(
@@ -40,15 +45,29 @@ class EngineTuningTrainingController:
     def record_episodes(self, episodes: Sequence[Mapping[str, object]]) -> bool:
         """Record terminal episode dictionaries and return whether state changed."""
 
-        changed = False
+        outcomes: list[EngineTuningEpisodeOutcome] = []
         for episode in episodes:
             outcome = engine_tuning_outcome_from_episode(episode)
             if outcome is None:
                 continue
-            previous_state = self._tuner.state
-            if self._tuner.record(outcome) is not previous_state:
-                changed = True
-        return changed
+            outcomes.append(outcome)
+        if not outcomes:
+            return False
+        if self.config.backend == "mlp_ensemble":
+            self._rollout_outcomes.extend(outcomes)
+            return False
+        previous_state = self._tuner.state
+        return self._tuner.record_many(tuple(outcomes)) is not previous_state
+
+    def record_rollout_episodes(self) -> bool:
+        """Train rollout-scoped tuner backends and return whether state changed."""
+
+        if self.config.backend != "mlp_ensemble" or not self._rollout_outcomes:
+            return False
+        outcomes = tuple(self._rollout_outcomes)
+        self._rollout_outcomes.clear()
+        previous_state = self._tuner.state
+        return self._tuner.record_many(outcomes) is not previous_state
 
     def log_values(self) -> dict[str, float]:
         """Return compact TensorBoard metrics for successful engine observations."""

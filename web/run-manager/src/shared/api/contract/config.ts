@@ -10,6 +10,7 @@ import {
   convProfileSchema,
   customCnnActivationSchema,
   engineSettingModeSchema,
+  engineTunerBackendSchema,
   gpDifficultySchema,
   leanModeSchema,
   leanOutputModeSchema,
@@ -158,7 +159,8 @@ const vehicleConfigSchema = z
     engine_setting_raw_value: z.number().int().min(0).max(100),
     engine_setting_min_raw_value: z.number().int().min(0).max(100),
     engine_setting_max_raw_value: z.number().int().min(0).max(100),
-    adaptive_engine_stat_decay: z.number().gt(0).lt(1).default(0.99),
+    adaptive_engine_tuner_backend: engineTunerBackendSchema.default("gaussian_process"),
+    adaptive_engine_stat_decay: z.number().gt(0).lt(1).default(0.995),
     adaptive_engine_exploration_scale: z.number().nonnegative().default(30),
     adaptive_engine_uniform_exploration: z.number().min(0).max(1).default(0.05),
   })

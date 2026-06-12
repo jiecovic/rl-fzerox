@@ -60,7 +60,7 @@ export function RunEngineTuningPanel({
         <div className="text-right text-xs tabular-nums text-app-muted">
           {state === null
             ? "no samples"
-            : `${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedCandidateCount.toLocaleString()} observed candidates`}
+            : `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedCandidateCount.toLocaleString()} observed candidates`}
         </div>
       </div>
       {selectedContext === null ? (
@@ -102,7 +102,7 @@ export function RunEngineTuningPanel({
               </span>
             </div>
             <EngineSamplingProbabilityBars candidates={selectedContext.candidates} />
-            <EnginePosteriorMeanBars
+            <EngineMeanPerformanceBars
               candidates={selectedContext.candidates}
               recommendedEngineSettingRawValue={
                 selectedContext.recommended_engine_setting_raw_value
@@ -147,6 +147,16 @@ function contextLabel(context: EngineTuningRuntimeContext, labels: EngineTuningL
   const courseLabel = labels.courses.get(context.course_key) ?? humanizeKey(context.course_key);
   const vehicleLabel = labels.vehicles.get(context.vehicle_id) ?? humanizeKey(context.vehicle_id);
   return `${courseLabel} · ${vehicleLabel}`;
+}
+
+function backendLabel(backend: EngineTuningRuntimeState["model_backend"]) {
+  if (backend === "mlp_ensemble") {
+    return "MLP ensemble";
+  }
+  if (backend === "gaussian_process") {
+    return "GP";
+  }
+  return "no model";
 }
 
 function EngineSamplingProbabilityBars({
@@ -218,7 +228,7 @@ function EngineSamplingProbabilityBars({
   );
 }
 
-function EnginePosteriorMeanBars({
+function EngineMeanPerformanceBars({
   candidates,
   recommendedEngineSettingRawValue,
 }: {
@@ -239,7 +249,7 @@ function EnginePosteriorMeanBars({
         <div className="flex flex-wrap gap-3">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-3 bg-app-accent/45" aria-hidden="true" />
-            posterior mean performance
+            predicted mean performance
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
@@ -251,13 +261,13 @@ function EnginePosteriorMeanBars({
         </span>
       </div>
       <svg
-        aria-label="Engine posterior mean performance by raw engine value"
+        aria-label="Engine predicted mean performance by raw engine value"
         className="h-32 w-full border border-app-border bg-app-surface-muted"
         preserveAspectRatio="none"
         role="img"
         viewBox="0 0 100 100"
       >
-        <title>Posterior mean performance from estimated finish time</title>
+        <title>Predicted mean performance from estimated finish time</title>
         {candidates.map((candidate, index) => {
           const isRecommended =
             candidate.engine_setting_raw_value === recommendedEngineSettingRawValue;
@@ -304,7 +314,7 @@ function EngineDistributionTable({
       if (right.selection_probability !== left.selection_probability) {
         return right.selection_probability - left.selection_probability;
       }
-      return right.posterior_mean - left.posterior_mean;
+      return right.mean_score - left.mean_score;
     })
     .slice(0, 8);
 

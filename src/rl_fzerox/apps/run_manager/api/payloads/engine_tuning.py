@@ -28,6 +28,7 @@ def engine_tuning_state_payload(
     return {
         "version": state.version,
         "update_count": state.update_count,
+        "model_backend": None if state.model_state is None else state.model_state.backend,
         "candidates": [
             _engine_tuning_candidate_payload(candidate) for candidate in state.candidates
         ],
@@ -106,7 +107,8 @@ def _engine_tuning_candidate_estimate_payload(
     return {
         "engine_setting_raw_value": probability.engine_setting_raw_value,
         "selection_probability": probability.probability,
-        "posterior_mean": probability.posterior_mean,
+        "mean_score": probability.mean_score,
+        "uncertainty_score": probability.uncertainty_score,
         "estimated_finish_time_ms": probability.estimated_finish_time_ms,
         "best_finish_time_ms": probability.best_finish_time_ms,
         "finish_count": 0 if candidate is None else candidate.finish_count,

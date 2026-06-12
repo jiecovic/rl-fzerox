@@ -3,10 +3,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from rl_fzerox.core.engine_tuning import (
-    EngineTuningRuntimeState,
-    EngineTuningTrainingController,
-)
+from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
+from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -546,6 +544,11 @@ def build_callbacks(
             return True
 
         def _on_rollout_end(self) -> None:
+            if self._controller.record_rollout_episodes():
+                self.training_env.env_method(
+                    "set_engine_tuning_state",
+                    self._controller.runtime_state,
+                )
             for key, value in self._controller.log_values().items():
                 self.logger.record(key, value)
 
@@ -553,24 +556,27 @@ def build_callbacks(
     engine_tuning_enabled = bool(
         env_config is not None and env_config.track_sampling.engine_tuning.enabled
     )
-    callbacks: list[BaseCallback] = [
-        RollingArtifactCallback(
-            engine_tuning_enabled=engine_tuning_enabled,
-            policy=checkpoint_policy,
-            run_paths=run_paths,
-        ),
-        InfoLoggingCallback(),
-    ]
-    if env_config is not None:
-        if env_config.track_sampling.engine_tuning.enabled:
-            callbacks.append(
-                EngineTuningCallback(
-                    controller=EngineTuningTrainingController(
-                        env_config.track_sampling.engine_tuning,
-                        state=initial_engine_tuning_state,
-                    ),
-                )
+    callbacks: list[BaseCallback] = []
+    if env_config is not None and env_config.track_sampling.engine_tuning.enabled:
+        callbacks.append(
+            EngineTuningCallback(
+                controller=EngineTuningTrainingController(
+                    env_config.track_sampling.engine_tuning,
+                    state=initial_engine_tuning_state,
+                ),
             )
+        )
+    callbacks.extend(
+        (
+            RollingArtifactCallback(
+                engine_tuning_enabled=engine_tuning_enabled,
+                policy=checkpoint_policy,
+                run_paths=run_paths,
+            ),
+            InfoLoggingCallback(),
+        )
+    )
+    if env_config is not None:
         runtime_persistence = track_sampling_runtime_persistence
         if runtime_persistence is None:
             runtime_persistence = file_track_sampling_runtime_persistence(

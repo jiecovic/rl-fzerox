@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from rl_fzerox.core.engine_tuning.types import EngineTunerBackend
+
 ENGINE_TUNING_STATE_VERSION = 5
 
 
@@ -74,12 +76,39 @@ class EngineTuningCandidateState:
 
 
 @dataclass(frozen=True, slots=True)
+class EngineTuningTensorState:
+    """One flattened tensor stored in the engine-tuner checkpoint."""
+
+    name: str
+    shape: tuple[int, ...]
+    values: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class EngineTuningEnsembleMemberState:
+    """One persisted MLP ensemble member."""
+
+    tensors: tuple[EngineTuningTensorState, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class EngineTuningModelState:
+    """Optional learned model state for non-aggregate tuner backends."""
+
+    backend: EngineTunerBackend
+    course_keys: tuple[str, ...]
+    vehicle_ids: tuple[str, ...]
+    members: tuple[EngineTuningEnsembleMemberState, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class EngineTuningRuntimeState:
     """One persisted adaptive engine-tuning state snapshot."""
 
     version: int
     update_count: int
     candidates: tuple[EngineTuningCandidateState, ...]
+    model_state: EngineTuningModelState | None = None
 
     def candidate_map(self) -> dict[tuple[str, int], EngineTuningCandidateState]:
         """Return candidates keyed by context and engine raw value."""
@@ -110,6 +139,7 @@ class EngineTuningRuntimeState:
             version=self.version,
             update_count=self.update_count + 1,
             candidates=tuple(candidates),
+            model_state=self.model_state,
         )
 
     def decay(self, stat_decay: float) -> EngineTuningRuntimeState:
@@ -122,6 +152,14 @@ class EngineTuningRuntimeState:
             candidates=tuple(candidate.decay(stat_decay) for candidate in self.candidates),
         )
 
+    def with_model_state(
+        self,
+        model_state: EngineTuningModelState | None,
+    ) -> EngineTuningRuntimeState:
+        """Return state with updated learned model weights."""
+
+        return replace(self, model_state=model_state)
+
 
 def empty_engine_tuning_state() -> EngineTuningRuntimeState:
     """Return an empty state snapshot."""
@@ -130,4 +168,5 @@ def empty_engine_tuning_state() -> EngineTuningRuntimeState:
         version=ENGINE_TUNING_STATE_VERSION,
         update_count=0,
         candidates=(),
+        model_state=None,
     )

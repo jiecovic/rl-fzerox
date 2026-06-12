@@ -5,8 +5,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, model_validator
 
+from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS
 from rl_fzerox.core.manager.run_spec.common import (
     EngineSettingMode,
+    EngineTunerBackend,
     VehicleSelectionMode,
 )
 from rl_fzerox.core.runtime_spec.vehicle_catalog import known_vehicle_ids
@@ -23,9 +25,21 @@ class ManagedVehicleConfig(BaseModel):
     engine_setting_raw_value: NonNegativeInt = Field(default=50, le=100)
     engine_setting_min_raw_value: NonNegativeInt = Field(default=20, le=100)
     engine_setting_max_raw_value: NonNegativeInt = Field(default=80, le=100)
-    adaptive_engine_stat_decay: float = Field(default=0.99, gt=0.0, lt=1.0)
-    adaptive_engine_exploration_scale: float = Field(default=30.0, ge=0.0)
-    adaptive_engine_uniform_exploration: float = Field(default=0.05, ge=0.0, le=1.0)
+    adaptive_engine_tuner_backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
+    adaptive_engine_stat_decay: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.stat_decay,
+        gt=0.0,
+        lt=1.0,
+    )
+    adaptive_engine_exploration_scale: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.exploration_seconds,
+        ge=0.0,
+    )
+    adaptive_engine_uniform_exploration: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.uniform_exploration,
+        ge=0.0,
+        le=1.0,
+    )
 
     @model_validator(mode="before")
     @classmethod

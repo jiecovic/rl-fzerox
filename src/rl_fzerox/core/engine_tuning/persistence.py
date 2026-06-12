@@ -11,8 +11,12 @@ from pathlib import Path
 from rl_fzerox.core.engine_tuning.state import (
     ENGINE_TUNING_STATE_VERSION,
     EngineTuningCandidateState,
+    EngineTuningEnsembleMemberState,
+    EngineTuningModelState,
     EngineTuningRuntimeState,
+    EngineTuningTensorState,
 )
+from rl_fzerox.core.engine_tuning.types import EngineTunerBackend
 
 
 def save_engine_tuning_runtime_state(path: Path, state: EngineTuningRuntimeState) -> None:
@@ -57,6 +61,7 @@ def engine_tuning_runtime_state_json(state: EngineTuningRuntimeState) -> str:
             }
             for candidate in state.candidates
         ],
+        "model_state": _model_state_payload(state.model_state),
     }
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
 
@@ -79,7 +84,31 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
         version=ENGINE_TUNING_STATE_VERSION,
         update_count=max(0, _mapping_int(loaded, "update_count") or 0),
         candidates=candidates,
+        model_state=_model_state_from_mapping(loaded.get("model_state")),
     )
+
+
+def _model_state_payload(state: EngineTuningModelState | None) -> dict[str, object] | None:
+    if state is None:
+        return None
+    return {
+        "backend": state.backend,
+        "course_keys": list(state.course_keys),
+        "vehicle_ids": list(state.vehicle_ids),
+        "members": [
+            {
+                "tensors": [
+                    {
+                        "name": tensor.name,
+                        "shape": list(tensor.shape),
+                        "values": list(tensor.values),
+                    }
+                    for tensor in member.tensors
+                ]
+            }
+            for member in state.members
+        ],
+    }
 
 
 def _candidate_from_mapping(raw: object) -> EngineTuningCandidateState | None:
@@ -108,6 +137,96 @@ def _candidate_from_mapping(raw: object) -> EngineTuningCandidateState | None:
         best_score=_mapping_optional_float(raw, "best_score"),
         best_time_ms=_mapping_optional_int(raw, "best_time_ms"),
     )
+
+
+def _model_state_from_mapping(raw: object) -> EngineTuningModelState | None:
+    if not isinstance(raw, Mapping):
+        return None
+    backend = _backend(raw.get("backend"))
+    if backend is None:
+        return None
+    course_keys = _string_tuple(raw.get("course_keys"))
+    vehicle_ids = _string_tuple(raw.get("vehicle_ids"))
+    members = _members_from_raw(raw.get("members"))
+    if course_keys is None or vehicle_ids is None or members is None:
+        return None
+    return EngineTuningModelState(
+        backend=backend,
+        course_keys=course_keys,
+        vehicle_ids=vehicle_ids,
+        members=members,
+    )
+
+
+def _members_from_raw(raw: object) -> tuple[EngineTuningEnsembleMemberState, ...] | None:
+    if not isinstance(raw, list):
+        return None
+    members: list[EngineTuningEnsembleMemberState] = []
+    for raw_member in raw:
+        if not isinstance(raw_member, Mapping):
+            return None
+        tensors = _tensors_from_raw(raw_member.get("tensors"))
+        if tensors is None:
+            return None
+        members.append(EngineTuningEnsembleMemberState(tensors=tensors))
+    return tuple(members)
+
+
+def _tensors_from_raw(raw: object) -> tuple[EngineTuningTensorState, ...] | None:
+    if not isinstance(raw, list):
+        return None
+    tensors: list[EngineTuningTensorState] = []
+    for raw_tensor in raw:
+        if not isinstance(raw_tensor, Mapping):
+            return None
+        name = _mapping_str(raw_tensor, "name")
+        shape = _int_tuple(raw_tensor.get("shape"))
+        values = _float_tuple(raw_tensor.get("values"))
+        if name is None or shape is None or values is None:
+            return None
+        tensors.append(EngineTuningTensorState(name=name, shape=shape, values=values))
+    return tuple(tensors)
+
+
+def _backend(raw: object) -> EngineTunerBackend | None:
+    if raw == "gaussian_process":
+        return "gaussian_process"
+    if raw == "mlp_ensemble":
+        return "mlp_ensemble"
+    return None
+
+
+def _string_tuple(raw: object) -> tuple[str, ...] | None:
+    if not isinstance(raw, list):
+        return None
+    values: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            return None
+        values.append(item)
+    return tuple(values)
+
+
+def _int_tuple(raw: object) -> tuple[int, ...] | None:
+    if not isinstance(raw, list):
+        return None
+    values: list[int] = []
+    for item in raw:
+        if isinstance(item, bool) or not isinstance(item, int | float):
+            return None
+        values.append(int(item))
+    return tuple(values)
+
+
+def _float_tuple(raw: object) -> tuple[float, ...] | None:
+    if not isinstance(raw, list):
+        return None
+    values: list[float] = []
+    for item in raw:
+        if isinstance(item, bool) or not isinstance(item, int | float):
+            return None
+        values.append(float(item))
+    return tuple(values)
 
 
 def _mapping_str(raw: Mapping[object, object], key: str) -> str | None:

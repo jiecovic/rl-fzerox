@@ -22,6 +22,7 @@ export const trackSamplingModeSchema = z.enum([
 ]);
 export const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
 export const engineSettingModeSchema = z.enum(["fixed", "random_range", "adaptive_tuner"]);
+export const engineTunerBackendSchema = z.enum(["gaussian_process", "mlp_ensemble"]);
 export const actionAxisModeSchema = z.enum(["continuous", "discrete"]);
 export const actionDriveModeSchema = z.enum(["pwm", "on_off"]);
 export const leanOutputModeSchema = z.enum([

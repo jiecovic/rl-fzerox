@@ -8,7 +8,7 @@ from rl_fzerox.core.domain.x_cup import (
     generated_x_cup_course_identity,
     generated_x_cup_slot_key,
 )
-from rl_fzerox.core.engine_tuning import engine_tuning_episode_horizon_prior_seconds
+from rl_fzerox.core.engine_tuning.config import engine_tuning_episode_horizon_prior_seconds
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.track_sampling_identity import track_sampling_entry_id
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
@@ -236,6 +236,7 @@ def _engine_tuning(config: ManagedRunConfig) -> dict[str, object]:
         "enabled": vehicle.engine_mode == "adaptive_tuner",
         "min_raw_value": vehicle.engine_setting_min_raw_value,
         "max_raw_value": vehicle.engine_setting_max_raw_value,
+        "backend": vehicle.adaptive_engine_tuner_backend,
         "stat_decay": vehicle.adaptive_engine_stat_decay,
         "prior_finish_time_seconds": engine_tuning_episode_horizon_prior_seconds(
             max_episode_steps=config.environment.max_episode_steps,

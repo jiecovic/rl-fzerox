@@ -17,6 +17,7 @@ from pydantic import (
 
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, XCupGeneratedCourseKind
+from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS, EngineTunerBackend
 from rl_fzerox.core.runtime_spec.schema.common import TrackSamplingMode
 
 
@@ -157,12 +158,17 @@ class AdaptiveEngineTuningConfig(BaseModel):
     enabled: bool = False
     min_raw_value: NonNegativeInt = Field(default=0, le=100)
     max_raw_value: NonNegativeInt = Field(default=100, le=100)
-    stat_decay: float = Field(default=0.99, gt=0.0, lt=1.0)
-    prior_finish_time_seconds: PositiveFloat = 200.0
-    exploration_scale: NonNegativeFloat = 30.0
-    observation_noise_seconds: NonNegativeFloat = 1.5
-    curve_lengthscale_raw: PositiveFloat = 12.0
-    uniform_exploration: float = Field(default=0.05, ge=0.0, le=1.0)
+    backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
+    stat_decay: float = Field(default=ENGINE_TUNER_DEFAULTS.stat_decay, gt=0.0, lt=1.0)
+    prior_finish_time_seconds: PositiveFloat = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
+    exploration_scale: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.exploration_seconds
+    observation_noise_seconds: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.observation_noise_seconds
+    curve_lengthscale_raw: PositiveFloat = ENGINE_TUNER_DEFAULTS.curve_lengthscale_raw
+    uniform_exploration: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.uniform_exploration,
+        ge=0.0,
+        le=1.0,
+    )
 
     @model_validator(mode="after")
     def _validate_engine_range(self) -> AdaptiveEngineTuningConfig:

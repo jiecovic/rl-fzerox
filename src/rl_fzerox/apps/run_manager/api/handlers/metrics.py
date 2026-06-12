@@ -76,6 +76,7 @@ def _engine_tuner_settings(run: ManagedRun) -> EngineTunerSettings:
     return EngineTunerSettings(
         min_raw_value=vehicle.engine_setting_min_raw_value,
         max_raw_value=vehicle.engine_setting_max_raw_value,
+        backend=vehicle.adaptive_engine_tuner_backend,
         stat_decay=vehicle.adaptive_engine_stat_decay,
         prior_finish_time_seconds=engine_tuning_episode_horizon_prior_seconds(
             max_episode_steps=run.config.environment.max_episode_steps,

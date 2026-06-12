@@ -47,7 +47,11 @@ export function engineSettingSummary(config: ManagedRunConfig["vehicle"]) {
     return String(config.engine_setting_raw_value);
   }
   const range = `${config.engine_setting_min_raw_value}-${config.engine_setting_max_raw_value}`;
-  return config.engine_mode === "adaptive_tuner" ? `adaptive ${range}` : range;
+  if (config.engine_mode !== "adaptive_tuner") {
+    return range;
+  }
+  const backend = config.adaptive_engine_tuner_backend === "mlp_ensemble" ? "MLP" : "GP";
+  return `adaptive ${backend} ${range}`;
 }
 
 export function vehicleSlotLabel(machineSelectSlot: number) {

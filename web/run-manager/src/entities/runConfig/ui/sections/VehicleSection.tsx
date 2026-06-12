@@ -176,6 +176,7 @@ export function VehicleSection({
               adaptive_engine_exploration_scale:
                 defaultConfig.vehicle.adaptive_engine_exploration_scale,
               adaptive_engine_stat_decay: defaultConfig.vehicle.adaptive_engine_stat_decay,
+              adaptive_engine_tuner_backend: defaultConfig.vehicle.adaptive_engine_tuner_backend,
               adaptive_engine_uniform_exploration:
                 defaultConfig.vehicle.adaptive_engine_uniform_exploration,
               engine_mode: defaultConfig.vehicle.engine_mode,
@@ -412,13 +413,37 @@ function AdaptiveEngineControls({
       <div className="grid gap-1">
         <strong className="text-[13px] text-app-text">Adaptive engine tuner</strong>
         <small className="m-0 text-xs leading-snug text-app-muted">
-          Fits a smooth finish-time curve per course and vehicle while preserving uniform
+          Learns reset-time engine settings from successful finish times while preserving uniform
           exploration.
+        </small>
+      </div>
+      <div className="grid gap-2">
+        <strong className="text-[13px] text-app-text">Tuner backend</strong>
+        <SegmentedChoiceStrip
+          ariaLabel="Adaptive engine tuner backend"
+          options={[
+            {
+              active: vehicle.adaptive_engine_tuner_backend === "gaussian_process",
+              key: "gaussian_process",
+              label: "GP",
+              onClick: () => onChange({ adaptive_engine_tuner_backend: "gaussian_process" }),
+            },
+            {
+              active: vehicle.adaptive_engine_tuner_backend === "mlp_ensemble",
+              key: "mlp_ensemble",
+              label: "MLP ensemble",
+              onClick: () => onChange({ adaptive_engine_tuner_backend: "mlp_ensemble" }),
+            },
+          ]}
+        />
+        <small className="m-0 text-xs leading-snug text-app-muted">
+          GP fits a smooth ordered curve from aggregates. MLP ensemble learns a shared course and
+          vehicle surrogate with bootstrapped uncertainty.
         </small>
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
         <RangeNumberField
-          help="Discount factor for old score statistics. Higher values remember longer."
+          help="Discount factor for old successful-finish statistics. Higher values remember longer."
           label="Stat decay"
           max={0.999}
           min={0.001}
