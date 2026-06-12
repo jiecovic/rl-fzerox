@@ -1,5 +1,5 @@
 // web/run-manager/src/widgets/runWorkspace/workspace/ReadonlyConfig.tsx
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { CONFIG_SECTION_TABS, type ConfigSection } from "@/entities/runConfig/model/sections";
 import { ActionSection } from "@/entities/runConfig/ui/sections/ActionSection";
 import { EnvironmentSection } from "@/entities/runConfig/ui/sections/EnvironmentSection";
@@ -96,7 +96,7 @@ const SECTION_RENDERERS: Record<ConfigSection, (props: ReadonlySectionRendererPr
     ),
   };
 
-export function RunReadonlyConfig({
+export const RunReadonlyConfig = memo(function RunReadonlyConfig({
   metadata,
   onSectionChange,
   policyPreview,
@@ -121,5 +121,15 @@ export function RunReadonlyConfig({
         </div>
       </fieldset>
     </>
+  );
+}, sameReadonlyConfigProps);
+
+function sameReadonlyConfigProps(left: RunReadonlyConfigProps, right: RunReadonlyConfigProps) {
+  return (
+    left.metadata === right.metadata &&
+    left.onSectionChange === right.onSectionChange &&
+    left.policyPreview === right.policyPreview &&
+    left.run.config === right.run.config &&
+    left.section === right.section
   );
 }

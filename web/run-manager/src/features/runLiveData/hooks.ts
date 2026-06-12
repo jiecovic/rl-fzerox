@@ -97,6 +97,9 @@ export function useRunTrackSamplingState(
   const commitTrackSamplingState = useCallback(
     (state: TrackSamplingRuntimeState | null) => {
       const key = trackSamplingStateKey(runId, state);
+      if (trackSamplingStateKeyRef.current === key) {
+        return;
+      }
       trackSamplingStateKeyRef.current = key;
       setTrackSamplingState(state);
     },

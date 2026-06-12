@@ -1,5 +1,5 @@
 // web/run-manager/src/app/workspace/Body.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { WorkspaceActions } from "@/app/workspace/actions";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
@@ -60,10 +60,13 @@ export function WorkspaceBody({
       : (runs.find((candidate) => candidate.id === activeRunTab.runId) ?? null);
   const activeRunDetail =
     activeRunTab === null ? null : (runDetailsById[activeRunTab.runId] ?? null);
-  const activeRun =
-    activeRunSummary === null || activeRunDetail === null
-      ? null
-      : mergeRunDetail(activeRunSummary, activeRunDetail);
+  const activeRun = useMemo(
+    () =>
+      activeRunSummary === null || activeRunDetail === null
+        ? null
+        : mergeRunDetail(activeRunSummary, activeRunDetail),
+    [activeRunDetail, activeRunSummary],
+  );
 
   useEffect(() => {
     if (activeRunTab === null || activeRunDetail !== null) {

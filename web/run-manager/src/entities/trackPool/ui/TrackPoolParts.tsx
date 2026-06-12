@@ -1,5 +1,5 @@
 // web/run-manager/src/entities/trackPool/ui/TrackPoolParts.tsx
-import type { KeyboardEvent } from "react";
+import { type KeyboardEvent, memo } from "react";
 import type { TrackPoolCourseView, TrackPoolCupView } from "@/entities/trackPool/model/types";
 import {
   completionSummary,
@@ -23,7 +23,7 @@ interface DistributionBarProps {
   value: number;
 }
 
-export function DistributionBar({
+export const DistributionBar = memo(function DistributionBar({
   completionValue,
   kind,
   label,
@@ -65,7 +65,7 @@ export function DistributionBar({
       </button>
     </AppTooltip>
   );
-}
+});
 
 interface LegendItemProps {
   kind: "sample" | "success" | "episodes" | "steps" | "completion" | "target";
@@ -213,7 +213,7 @@ export function TrackPoolBody({
   );
 }
 
-function TrackPoolColumn({
+const TrackPoolColumn = memo(function TrackPoolColumn({
   entry,
   stepMetricLabel,
   showStepTarget,
@@ -277,6 +277,53 @@ function TrackPoolColumn({
         )}
       </div>
     </div>
+  );
+}, sameTrackPoolColumnProps);
+
+const TRACK_POOL_COURSE_RENDER_KEYS = [
+  "completedEnvSteps",
+  "currentProbability",
+  "emaCompletionFraction",
+  "episodeCount",
+  "episodeShare",
+  "finishedEpisodeCount",
+  "generationEmaCompletionFraction",
+  "generationEpisodeCount",
+  "generationFinishedEpisodeCount",
+  "generationSuccessRate",
+  "generationSuccessSampleCount",
+  "generatedCourseGeneration",
+  "generatedCourseSlot",
+  "id",
+  "label",
+  "stepShare",
+  "targetStepShare",
+  "successRate",
+  "successSampleCount",
+] as const satisfies readonly (keyof TrackPoolCourseView)[];
+
+function sameTrackPoolColumnProps(
+  left: {
+    entry: TrackPoolCourseView;
+    stepMetricLabel: string;
+    showStepTarget: boolean;
+    xCupRegenerationMinEpisodes: number | null;
+    xCupRegenerationThreshold: number | null;
+  },
+  right: {
+    entry: TrackPoolCourseView;
+    stepMetricLabel: string;
+    showStepTarget: boolean;
+    xCupRegenerationMinEpisodes: number | null;
+    xCupRegenerationThreshold: number | null;
+  },
+) {
+  return (
+    left.stepMetricLabel === right.stepMetricLabel &&
+    left.showStepTarget === right.showStepTarget &&
+    left.xCupRegenerationMinEpisodes === right.xCupRegenerationMinEpisodes &&
+    left.xCupRegenerationThreshold === right.xCupRegenerationThreshold &&
+    TRACK_POOL_COURSE_RENDER_KEYS.every((key) => left.entry[key] === right.entry[key])
   );
 }
 
