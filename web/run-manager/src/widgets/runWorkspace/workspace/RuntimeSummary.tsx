@@ -355,7 +355,7 @@ export function RunRuntimeSummary({
       />
       <RunEngineTuningPanel
         artifact={actions.selectedWatchArtifact}
-        enabled={run.config.vehicle.engine_mode === "adaptive_bandit"}
+        enabled={run.config.vehicle.engine_mode === "adaptive_tuner"}
         metadata={metadata}
         state={engineTuningState}
       />

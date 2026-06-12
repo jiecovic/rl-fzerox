@@ -65,8 +65,7 @@ export function GlobalPolicyPanel({
   const [draft, setDraft] = useState<PolicySelectionDraft>(EMPTY_POLICY_SELECTION_DRAFT);
   const [importing, setImporting] = useState(false);
   const selectedRun = assignableRuns.find((run) => run.id === draft.policyRunId) ?? null;
-  const canImportEngines =
-    !updating && selectedRun?.vehicle_setup.engine_mode === "adaptive_bandit";
+  const canImportEngines = !updating && selectedRun?.vehicle_setup.engine_mode === "adaptive_tuner";
   const canApply = !updating && draft.policyRunId !== "";
   const allCourseSetups = courseSetupsForCups(cups);
 

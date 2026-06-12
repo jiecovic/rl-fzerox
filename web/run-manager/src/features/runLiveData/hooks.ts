@@ -8,7 +8,7 @@ import {
   subscribeRunTrackSamplingUpdates,
 } from "@/shared/api/client";
 import type {
-  EngineTuningRuntimeArm,
+  EngineTuningRuntimeCandidate,
   EngineTuningRuntimeState,
   ManagedRun,
   ManagedRunConfig,
@@ -361,21 +361,22 @@ function engineTuningStateKey(runId: string, state: EngineTuningRuntimeState | n
   if (state === null) {
     return `${runId}:none`;
   }
-  return [runId, state.version, state.update_count, ...state.arms.map(engineTuningArmKey)].join(
-    "\0",
-  );
+  return [
+    runId,
+    state.version,
+    state.update_count,
+    ...state.candidates.map(engineTuningCandidateKey),
+  ].join("\0");
 }
 
-function engineTuningArmKey(arm: EngineTuningRuntimeArm) {
+function engineTuningCandidateKey(candidate: EngineTuningRuntimeCandidate) {
   return [
-    arm.context_key,
-    arm.engine_setting_raw_value,
-    arm.attempts,
-    arm.finished_attempts,
-    nullableNumberKey(arm.finish_rate),
-    nullableNumberKey(arm.mean_completion),
-    nullableNumberKey(arm.mean_score),
-    nullableNumberKey(arm.raw_mean_score),
-    nullableNumberKey(arm.best_score),
+    candidate.context_key,
+    candidate.engine_setting_raw_value,
+    candidate.finish_count,
+    nullableNumberKey(candidate.mean_score),
+    nullableNumberKey(candidate.raw_mean_score),
+    nullableNumberKey(candidate.best_score),
+    nullableNumberKey(candidate.best_finish_time_ms),
   ].join("\u0001");
 }

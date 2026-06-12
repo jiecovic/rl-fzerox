@@ -80,7 +80,7 @@ export function RunWorkspace({
     run,
     runName,
   });
-  const engineTuningEnabled = run.config.vehicle.engine_mode === "adaptive_bandit";
+  const engineTuningEnabled = run.config.vehicle.engine_mode === "adaptive_tuner";
   const { engineTuningError, engineTuningState } = useRunEngineTuningState(
     run.id,
     run.status,

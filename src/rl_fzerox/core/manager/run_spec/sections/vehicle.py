@@ -23,20 +23,14 @@ class ManagedVehicleConfig(BaseModel):
     engine_setting_raw_value: NonNegativeInt = Field(default=50, le=100)
     engine_setting_min_raw_value: NonNegativeInt = Field(default=20, le=100)
     engine_setting_max_raw_value: NonNegativeInt = Field(default=80, le=100)
-    adaptive_engine_bin_size: NonNegativeInt = Field(default=5, ge=1, le=100)
     adaptive_engine_stat_decay: float = Field(default=0.99, gt=0.0, lt=1.0)
-    adaptive_engine_prior_mean: float = 0.5
-    adaptive_engine_prior_strength: float = Field(default=2.0, ge=0.0)
-    adaptive_engine_exploration_scale: float = Field(default=0.35, ge=0.0)
+    adaptive_engine_exploration_scale: float = Field(default=30.0, ge=0.0)
     adaptive_engine_uniform_exploration: float = Field(default=0.05, ge=0.0, le=1.0)
-    adaptive_engine_completion_weight: float = Field(default=1.0, ge=0.0)
-    adaptive_engine_finish_bonus: float = Field(default=1.0, ge=0.0)
-    adaptive_engine_position_weight: float = Field(default=0.25, ge=0.0)
 
     @model_validator(mode="before")
     @classmethod
     def _default_adaptive_engine_range(cls, data: object) -> object:
-        if not isinstance(data, dict) or data.get("engine_mode") != "adaptive_bandit":
+        if not isinstance(data, dict) or data.get("engine_mode") != "adaptive_tuner":
             return data
         next_data = dict(data)
         next_data.setdefault("engine_setting_min_raw_value", 0)

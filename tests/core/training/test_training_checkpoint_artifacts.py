@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.engine_tuning import EngineTuningArmState, EngineTuningRuntimeState
+from rl_fzerox.core.engine_tuning import (
+    ENGINE_TUNING_STATE_VERSION,
+    EngineTuningCandidateState,
+    EngineTuningRuntimeState,
+)
 from rl_fzerox.core.training.runs import (
     build_run_paths,
     ensure_run_dirs,
@@ -94,21 +98,20 @@ def test_save_artifacts_atomically_persists_engine_tuning_checkpoint(
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
     state = EngineTuningRuntimeState(
-        version=1,
+        version=ENGINE_TUNING_STATE_VERSION,
         update_count=7,
-        arms=(
-            EngineTuningArmState(
+        candidates=(
+            EngineTuningCandidateState(
                 context_key="mute_city|blue_falcon",
                 course_key="mute_city",
                 vehicle_id="blue_falcon",
                 engine_setting_raw_value=65,
-                attempts=3,
-                finished_attempts=2,
+                finish_count=2,
                 decayed_count=2.5,
                 decayed_score_total=3.75,
-                completion_total=2.4,
                 score_total=4.5,
                 best_score=2.0,
+                best_time_ms=90_000,
             ),
         ),
     )

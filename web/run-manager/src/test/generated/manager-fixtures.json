@@ -1536,13 +1536,7 @@
       "vf_coef": 0.5
     },
     "vehicle": {
-      "adaptive_engine_bin_size": 5,
-      "adaptive_engine_completion_weight": 1.0,
-      "adaptive_engine_exploration_scale": 0.35,
-      "adaptive_engine_finish_bonus": 1.0,
-      "adaptive_engine_position_weight": 0.25,
-      "adaptive_engine_prior_mean": 0.5,
-      "adaptive_engine_prior_strength": 2.0,
+      "adaptive_engine_exploration_scale": 30.0,
       "adaptive_engine_stat_decay": 0.99,
       "adaptive_engine_uniform_exploration": 0.05,
       "engine_mode": "fixed",

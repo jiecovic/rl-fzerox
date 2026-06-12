@@ -12,6 +12,7 @@ license = { file = "LICENSE" }
 authors = [{ name = "Thomas" }]
 dependencies = [
   "fastapi>=0.115,<1",
+  "gpytorch>=1.15,<2",
   "gymnasium>=0.29,<1.1",
   "numpy>=1.26,<3",
   "omegaconf>=2.3,<3",

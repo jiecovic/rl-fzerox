@@ -29,7 +29,7 @@ TrackSamplingMode = Literal[
     "deficit_budget",
 ]
 VehicleSelectionMode = Literal["fixed", "pool"]
-EngineSettingMode = Literal["fixed", "random_range", "adaptive_bandit"]
+EngineSettingMode = Literal["fixed", "random_range", "adaptive_tuner"]
 ActionAxisMode = Literal["continuous", "discrete"]
 ActionDriveMode = Literal["pwm", "on_off"]
 ObservationPreset = ObservationPresetName

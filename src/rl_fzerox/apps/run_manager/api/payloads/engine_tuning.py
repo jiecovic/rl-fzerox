@@ -7,12 +7,12 @@ from collections.abc import Iterable
 from hashlib import blake2b
 
 from rl_fzerox.core.engine_tuning import (
-    AdaptiveEngineBandit,
-    EngineBanditSettings,
-    EngineTuningArmState,
-    EngineTuningBinProbability,
+    EngineTunerSettings,
+    EngineTuningCandidateEstimate,
+    EngineTuningCandidateState,
     EngineTuningContext,
     EngineTuningRuntimeState,
+    OrderedEngineTuner,
 )
 
 ENGINE_TUNING_DISTRIBUTION_DRAWS = 512
@@ -21,72 +21,76 @@ ENGINE_TUNING_DISTRIBUTION_DRAWS = 512
 def engine_tuning_state_payload(
     state: EngineTuningRuntimeState,
     *,
-    settings: EngineBanditSettings | None = None,
+    settings: EngineTunerSettings | None = None,
 ) -> dict[str, object]:
     """Return a JSON-safe adaptive engine-tuning state payload."""
 
     return {
         "version": state.version,
         "update_count": state.update_count,
-        "arms": [_engine_tuning_arm_payload(arm) for arm in state.arms],
+        "candidates": [
+            _engine_tuning_candidate_payload(candidate) for candidate in state.candidates
+        ],
         "contexts": [] if settings is None else _engine_tuning_context_payloads(state, settings),
     }
 
 
-def _engine_tuning_arm_payload(arm: EngineTuningArmState) -> dict[str, object]:
+def _engine_tuning_candidate_payload(
+    candidate: EngineTuningCandidateState,
+) -> dict[str, object]:
     return {
-        "context_key": arm.context_key,
-        "course_key": arm.course_key,
-        "vehicle_id": arm.vehicle_id,
-        "engine_setting_raw_value": arm.engine_setting_raw_value,
-        "attempts": arm.attempts,
-        "finished_attempts": arm.finished_attempts,
-        "finish_rate": arm.finish_rate,
-        "mean_completion": arm.mean_completion,
-        "mean_score": arm.mean_score,
-        "raw_mean_score": arm.raw_mean_score,
-        "best_score": arm.best_score,
+        "context_key": candidate.context_key,
+        "course_key": candidate.course_key,
+        "vehicle_id": candidate.vehicle_id,
+        "engine_setting_raw_value": candidate.engine_setting_raw_value,
+        "finish_count": candidate.finish_count,
+        "mean_score": candidate.mean_score,
+        "raw_mean_score": candidate.raw_mean_score,
+        "best_score": candidate.best_score,
+        "best_finish_time_ms": candidate.best_time_ms,
     }
 
 
 def _engine_tuning_context_payloads(
     state: EngineTuningRuntimeState,
-    settings: EngineBanditSettings,
+    settings: EngineTunerSettings,
 ) -> list[dict[str, object]]:
-    bandit = AdaptiveEngineBandit(settings=settings, state=state)
+    tuner = OrderedEngineTuner(settings=settings, state=state)
     return [
         _engine_tuning_context_payload(
             state=state,
-            bandit=bandit,
+            tuner=tuner,
             context=context,
-            arms=arms,
+            candidates=candidates,
         )
-        for context, arms in _observed_contexts(state)
+        for context, candidates in _observed_contexts(state)
     ]
 
 
 def _engine_tuning_context_payload(
     *,
     state: EngineTuningRuntimeState,
-    bandit: AdaptiveEngineBandit,
+    tuner: OrderedEngineTuner,
     context: EngineTuningContext,
-    arms: tuple[EngineTuningArmState, ...],
+    candidates: tuple[EngineTuningCandidateState, ...],
 ) -> dict[str, object]:
-    arm_map = state.arm_map()
-    recommendation = bandit.recommendation(context)
+    candidate_map = state.candidate_map()
+    recommendation = tuner.recommendation(context)
     return {
         "context_key": context.key,
         "course_key": context.course_key,
         "vehicle_id": context.vehicle_id,
-        "attempts": sum(arm.attempts for arm in arms),
-        "observed_arm_count": sum(1 for arm in arms if arm.attempts > 0),
+        "finish_count": sum(candidate.finish_count for candidate in candidates),
+        "observed_candidate_count": sum(
+            1 for candidate in candidates if candidate.finish_count > 0
+        ),
         "recommended_engine_setting_raw_value": recommendation.engine_setting_raw_value,
-        "bins": [
-            _engine_tuning_bin_payload(
+        "candidates": [
+            _engine_tuning_candidate_estimate_payload(
                 probability,
-                arm_map.get((context.key, probability.engine_setting_raw_value)),
+                candidate_map.get((context.key, probability.engine_setting_raw_value)),
             )
-            for probability in bandit.choice_distribution(
+            for probability in tuner.distribution(
                 context,
                 seed=_distribution_seed(state, context.key),
                 draws=ENGINE_TUNING_DISTRIBUTION_DRAWS,
@@ -95,41 +99,41 @@ def _engine_tuning_context_payload(
     }
 
 
-def _engine_tuning_bin_payload(
-    probability: EngineTuningBinProbability,
-    arm: EngineTuningArmState | None,
+def _engine_tuning_candidate_estimate_payload(
+    probability: EngineTuningCandidateEstimate,
+    candidate: EngineTuningCandidateState | None,
 ) -> dict[str, object]:
     return {
         "engine_setting_raw_value": probability.engine_setting_raw_value,
         "selection_probability": probability.probability,
         "posterior_mean": probability.posterior_mean,
-        "attempts": probability.attempts,
-        "finish_rate": None if arm is None else arm.finish_rate,
-        "mean_completion": None if arm is None else arm.mean_completion,
+        "estimated_finish_time_ms": probability.estimated_finish_time_ms,
+        "best_finish_time_ms": probability.best_finish_time_ms,
+        "finish_count": 0 if candidate is None else candidate.finish_count,
     }
 
 
 def _observed_contexts(
     state: EngineTuningRuntimeState,
-) -> Iterable[tuple[EngineTuningContext, tuple[EngineTuningArmState, ...]]]:
-    grouped: dict[str, list[EngineTuningArmState]] = {}
-    for arm in state.arms:
-        if arm.attempts <= 0:
+) -> Iterable[tuple[EngineTuningContext, tuple[EngineTuningCandidateState, ...]]]:
+    grouped: dict[str, list[EngineTuningCandidateState]] = {}
+    for candidate in state.candidates:
+        if candidate.finish_count <= 0:
             continue
-        grouped.setdefault(arm.context_key, []).append(arm)
+        grouped.setdefault(candidate.context_key, []).append(candidate)
     contexts = []
-    for arms in grouped.values():
-        first = arms[0]
+    for candidates in grouped.values():
+        first = candidates[0]
         contexts.append(
             (
                 EngineTuningContext(course_key=first.course_key, vehicle_id=first.vehicle_id),
-                tuple(sorted(arms, key=lambda arm: arm.engine_setting_raw_value)),
+                tuple(sorted(candidates, key=lambda candidate: candidate.engine_setting_raw_value)),
             )
         )
     return sorted(
         contexts,
         key=lambda item: (
-            -sum(arm.attempts for arm in item[1]),
+            -sum(candidate.finish_count for candidate in item[1]),
             item[0].course_key,
             item[0].vehicle_id,
         ),

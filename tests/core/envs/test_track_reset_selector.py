@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.engine_tuning import EngineTuningArmState, EngineTuningRuntimeState
+from rl_fzerox.core.engine_tuning import (
+    ENGINE_TUNING_STATE_VERSION,
+    EngineTuningCandidateState,
+    EngineTuningRuntimeState,
+)
 from rl_fzerox.core.envs.engine.reset import TrackResetSelector, select_reset_track_by_course_id
 from rl_fzerox.core.runtime_spec.schema import (
     AdaptiveEngineTuningConfig,
@@ -122,9 +126,9 @@ def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
             enabled=True,
             min_raw_value=60,
             max_raw_value=70,
-            bin_size=10,
-            prior_mean=0.0,
-            prior_strength=0.0,
+            prior_finish_time_seconds=200.0,
+            observation_noise_seconds=0.25,
+            curve_lengthscale_raw=1.0,
             exploration_scale=0.0,
             uniform_exploration=0.0,
         ),
@@ -138,17 +142,18 @@ def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
         ),
     )
     state = EngineTuningRuntimeState(
-        version=1,
+        version=ENGINE_TUNING_STATE_VERSION,
         update_count=1,
-        arms=(
-            EngineTuningArmState(
+        candidates=(
+            EngineTuningCandidateState(
                 context_key="mute_city|blue_falcon",
                 course_key="mute_city",
                 vehicle_id="blue_falcon",
                 engine_setting_raw_value=70,
-                attempts=2,
+                finish_count=2,
                 decayed_count=2.0,
-                decayed_score_total=3.0,
+                decayed_score_total=-160.0,
+                best_time_ms=80_000,
             ),
         ),
     )

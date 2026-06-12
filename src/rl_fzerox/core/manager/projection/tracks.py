@@ -8,6 +8,7 @@ from rl_fzerox.core.domain.x_cup import (
     generated_x_cup_course_identity,
     generated_x_cup_slot_key,
 )
+from rl_fzerox.core.engine_tuning import engine_tuning_episode_horizon_prior_seconds
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.track_sampling_identity import track_sampling_entry_id
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
@@ -84,12 +85,12 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                         ),
                         random_engine_min_raw_value=(
                             config.vehicle.engine_setting_min_raw_value
-                            if config.vehicle.engine_mode in {"random_range", "adaptive_bandit"}
+                            if config.vehicle.engine_mode in {"random_range", "adaptive_tuner"}
                             else None
                         ),
                         random_engine_max_raw_value=(
                             config.vehicle.engine_setting_max_raw_value
-                            if config.vehicle.engine_mode in {"random_range", "adaptive_bandit"}
+                            if config.vehicle.engine_mode in {"random_range", "adaptive_tuner"}
                             else None
                         ),
                     )
@@ -120,14 +121,12 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                             ),
                             random_engine_min_raw_value=(
                                 config.vehicle.engine_setting_min_raw_value
-                                if config.vehicle.engine_mode
-                                in {"random_range", "adaptive_bandit"}
+                                if config.vehicle.engine_mode in {"random_range", "adaptive_tuner"}
                                 else None
                             ),
                             random_engine_max_raw_value=(
                                 config.vehicle.engine_setting_max_raw_value
-                                if config.vehicle.engine_mode
-                                in {"random_range", "adaptive_bandit"}
+                                if config.vehicle.engine_mode in {"random_range", "adaptive_tuner"}
                                 else None
                             ),
                             course_index=X_CUP_COURSE.course_index,
@@ -234,18 +233,16 @@ def _source_engine_setting(config: ManagedRunConfig) -> int:
 def _engine_tuning(config: ManagedRunConfig) -> dict[str, object]:
     vehicle = config.vehicle
     return {
-        "enabled": vehicle.engine_mode == "adaptive_bandit",
+        "enabled": vehicle.engine_mode == "adaptive_tuner",
         "min_raw_value": vehicle.engine_setting_min_raw_value,
         "max_raw_value": vehicle.engine_setting_max_raw_value,
-        "bin_size": vehicle.adaptive_engine_bin_size,
         "stat_decay": vehicle.adaptive_engine_stat_decay,
-        "prior_mean": vehicle.adaptive_engine_prior_mean,
-        "prior_strength": vehicle.adaptive_engine_prior_strength,
+        "prior_finish_time_seconds": engine_tuning_episode_horizon_prior_seconds(
+            max_episode_steps=config.environment.max_episode_steps,
+            action_repeat=config.action.action_repeat,
+        ),
         "exploration_scale": vehicle.adaptive_engine_exploration_scale,
         "uniform_exploration": vehicle.adaptive_engine_uniform_exploration,
-        "completion_weight": vehicle.adaptive_engine_completion_weight,
-        "finish_bonus": vehicle.adaptive_engine_finish_bonus,
-        "position_weight": vehicle.adaptive_engine_position_weight,
     }
 
 

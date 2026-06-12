@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { RunEngineTuningPanel } from "@/entities/engineTuning/ui/RunEngineTuningPanel";
 import type {
-  EngineTuningRuntimeArm,
-  EngineTuningRuntimeBin,
+  EngineTuningRuntimeCandidate,
+  EngineTuningRuntimeCandidateEstimate,
   EngineTuningRuntimeContext,
   EngineTuningRuntimeState,
 } from "@/shared/api/contract";
@@ -28,34 +28,17 @@ describe("RunEngineTuningPanel", () => {
     expect(screen.getByText("Big Blue 2 · Blue Falcon")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /X Cup · Blue Falcon/ })).toBeInTheDocument();
     expect(screen.getByText("42.0%")).toBeInTheDocument();
+    expect(screen.getByText("y: probability 0-42.0%")).toBeInTheDocument();
+    expect(screen.getByText("deterministic greedy")).toBeInTheDocument();
     expect(screen.queryByText("big_blue_2 · blue_falcon")).not.toBeInTheDocument();
-  });
-
-  it("reports stale API payloads that still contain only raw arms", () => {
-    render(
-      <RunEngineTuningPanel
-        artifact="latest"
-        enabled={true}
-        metadata={configMetadataFixture}
-        state={{
-          arms: [engineTuningArmFixture()],
-          contexts: [],
-          update_count: 10,
-          version: 1,
-        }}
-      />,
-    );
-
-    expect(screen.getByText(/samples exist/i)).toBeInTheDocument();
-    expect(screen.getByText(/no distribution projection/i)).toBeInTheDocument();
   });
 });
 
 function engineTuningStateFixture(): EngineTuningRuntimeState {
   return {
-    arms: [
-      engineTuningArmFixture({ course_key: "big_blue_2", vehicle_id: "blue_falcon" }),
-      engineTuningArmFixture({
+    candidates: [
+      engineTuningCandidateFixture({ course_key: "big_blue_2", vehicle_id: "blue_falcon" }),
+      engineTuningCandidateFixture({
         context_key: "x_cup|blue_falcon",
         course_key: "x_cup",
         engine_setting_raw_value: 10,
@@ -64,14 +47,20 @@ function engineTuningStateFixture(): EngineTuningRuntimeState {
     ],
     contexts: [
       engineTuningContextFixture({
-        bins: [
-          engineTuningBinFixture({ engine_setting_raw_value: 55, selection_probability: 0.42 }),
-          engineTuningBinFixture({ engine_setting_raw_value: 60, selection_probability: 0.25 }),
+        candidates: [
+          engineTuningCandidateEstimateFixture({
+            engine_setting_raw_value: 55,
+            selection_probability: 0.42,
+          }),
+          engineTuningCandidateEstimateFixture({
+            engine_setting_raw_value: 60,
+            selection_probability: 0.25,
+          }),
         ],
         course_key: "big_blue_2",
       }),
       engineTuningContextFixture({
-        bins: [engineTuningBinFixture({ engine_setting_raw_value: 10 })],
+        candidates: [engineTuningCandidateEstimateFixture({ engine_setting_raw_value: 10 })],
         context_key: "x_cup|blue_falcon",
         course_key: "x_cup",
         recommended_engine_setting_raw_value: 10,
@@ -82,18 +71,16 @@ function engineTuningStateFixture(): EngineTuningRuntimeState {
   };
 }
 
-function engineTuningArmFixture(
-  overrides: Partial<EngineTuningRuntimeArm> = {},
-): EngineTuningRuntimeArm {
+function engineTuningCandidateFixture(
+  overrides: Partial<EngineTuningRuntimeCandidate> = {},
+): EngineTuningRuntimeCandidate {
   return {
-    attempts: 1,
     best_score: 2.25,
+    best_finish_time_ms: 92_000,
     context_key: "big_blue_2|blue_falcon",
     course_key: "big_blue_2",
     engine_setting_raw_value: 55,
-    finished_attempts: 1,
-    finish_rate: 1,
-    mean_completion: 1,
+    finish_count: 1,
     mean_score: 2.25,
     raw_mean_score: 2.25,
     vehicle_id: "blue_falcon",
@@ -105,25 +92,25 @@ function engineTuningContextFixture(
   overrides: Partial<EngineTuningRuntimeContext> = {},
 ): EngineTuningRuntimeContext {
   return {
-    attempts: 1,
-    bins: [engineTuningBinFixture()],
+    candidates: [engineTuningCandidateEstimateFixture()],
     context_key: "big_blue_2|blue_falcon",
     course_key: "big_blue_2",
-    observed_arm_count: 1,
+    finish_count: 1,
+    observed_candidate_count: 1,
     recommended_engine_setting_raw_value: 55,
     vehicle_id: "blue_falcon",
     ...overrides,
   };
 }
 
-function engineTuningBinFixture(
-  overrides: Partial<EngineTuningRuntimeBin> = {},
-): EngineTuningRuntimeBin {
+function engineTuningCandidateEstimateFixture(
+  overrides: Partial<EngineTuningRuntimeCandidateEstimate> = {},
+): EngineTuningRuntimeCandidateEstimate {
   return {
-    attempts: 1,
     engine_setting_raw_value: 55,
-    finish_rate: 1,
-    mean_completion: 1,
+    best_finish_time_ms: 92_000,
+    estimated_finish_time_ms: 95_000,
+    finish_count: 1,
     posterior_mean: 2.25,
     selection_probability: 0.5,
     ...overrides,

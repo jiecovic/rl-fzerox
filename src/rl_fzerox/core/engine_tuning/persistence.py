@@ -9,7 +9,8 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from rl_fzerox.core.engine_tuning.state import (
-    EngineTuningArmState,
+    ENGINE_TUNING_STATE_VERSION,
+    EngineTuningCandidateState,
     EngineTuningRuntimeState,
 )
 
@@ -41,21 +42,20 @@ def engine_tuning_runtime_state_json(state: EngineTuningRuntimeState) -> str:
     data = {
         "version": state.version,
         "update_count": state.update_count,
-        "arms": [
+        "candidates": [
             {
-                "context_key": arm.context_key,
-                "course_key": arm.course_key,
-                "vehicle_id": arm.vehicle_id,
-                "engine_setting_raw_value": arm.engine_setting_raw_value,
-                "attempts": arm.attempts,
-                "finished_attempts": arm.finished_attempts,
-                "decayed_count": arm.decayed_count,
-                "decayed_score_total": arm.decayed_score_total,
-                "completion_total": arm.completion_total,
-                "score_total": arm.score_total,
-                "best_score": arm.best_score,
+                "context_key": candidate.context_key,
+                "course_key": candidate.course_key,
+                "vehicle_id": candidate.vehicle_id,
+                "engine_setting_raw_value": candidate.engine_setting_raw_value,
+                "finish_count": candidate.finish_count,
+                "decayed_count": candidate.decayed_count,
+                "decayed_score_total": candidate.decayed_score_total,
+                "score_total": candidate.score_total,
+                "best_score": candidate.best_score,
+                "best_time_ms": candidate.best_time_ms,
             }
-            for arm in state.arms
+            for candidate in state.candidates
         ],
     }
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
@@ -67,19 +67,22 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
     loaded = json.loads(data)
     if not isinstance(loaded, Mapping):
         return None
-    raw_arms = loaded.get("arms")
-    if not isinstance(raw_arms, list):
+    version = _mapping_int(loaded, "version") or 1
+    if version != ENGINE_TUNING_STATE_VERSION:
         return None
-    arms = tuple(_arm_from_mapping(raw_arm) for raw_arm in raw_arms)
-    arms = tuple(arm for arm in arms if arm is not None)
+    raw_candidates = loaded.get("candidates")
+    if not isinstance(raw_candidates, list):
+        return None
+    candidates = tuple(_candidate_from_mapping(raw_candidate) for raw_candidate in raw_candidates)
+    candidates = tuple(candidate for candidate in candidates if candidate is not None)
     return EngineTuningRuntimeState(
-        version=max(1, _mapping_int(loaded, "version") or 1),
+        version=ENGINE_TUNING_STATE_VERSION,
         update_count=max(0, _mapping_int(loaded, "update_count") or 0),
-        arms=arms,
+        candidates=candidates,
     )
 
 
-def _arm_from_mapping(raw: object) -> EngineTuningArmState | None:
+def _candidate_from_mapping(raw: object) -> EngineTuningCandidateState | None:
     if not isinstance(raw, Mapping):
         return None
     context_key = _mapping_str(raw, "context_key")
@@ -93,18 +96,17 @@ def _arm_from_mapping(raw: object) -> EngineTuningArmState | None:
         or engine_setting_raw_value is None
     ):
         return None
-    return EngineTuningArmState(
+    return EngineTuningCandidateState(
         context_key=context_key,
         course_key=course_key,
         vehicle_id=vehicle_id,
         engine_setting_raw_value=engine_setting_raw_value,
-        attempts=max(0, _mapping_int(raw, "attempts") or 0),
-        finished_attempts=max(0, _mapping_int(raw, "finished_attempts") or 0),
+        finish_count=max(0, _mapping_int(raw, "finish_count") or 0),
         decayed_count=max(0.0, _mapping_float(raw, "decayed_count") or 0.0),
         decayed_score_total=_mapping_float(raw, "decayed_score_total") or 0.0,
-        completion_total=max(0.0, _mapping_float(raw, "completion_total") or 0.0),
         score_total=_mapping_float(raw, "score_total") or 0.0,
         best_score=_mapping_optional_float(raw, "best_score"),
+        best_time_ms=_mapping_optional_int(raw, "best_time_ms"),
     )
 
 
@@ -140,3 +142,10 @@ def _mapping_optional_float(raw: Mapping[object, object], key: str) -> float | N
     if value is None:
         return None
     return _mapping_float(raw, key)
+
+
+def _mapping_optional_int(raw: Mapping[object, object], key: str) -> int | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    return _mapping_int(raw, key)

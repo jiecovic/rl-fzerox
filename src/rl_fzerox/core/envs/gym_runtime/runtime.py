@@ -135,7 +135,7 @@ class FZeroXEnvRuntime:
         self._reset_coordinator.set_engine_tuning_state(state)
 
     def set_engine_tuning_selection(self, selection: EngineTuningSelectionMode) -> None:
-        """Choose whether adaptive engine tuning samples or picks greedy bins."""
+        """Choose whether adaptive engine tuning samples or picks greedy values."""
 
         self._reset_coordinator.set_engine_tuning_selection(selection)
 

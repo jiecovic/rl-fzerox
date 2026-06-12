@@ -15,9 +15,10 @@ from rl_fzerox.apps.run_manager.api.handlers.save_game_status import (
 )
 from rl_fzerox.apps.run_manager.desktop import open_directory
 from rl_fzerox.core.engine_tuning import (
-    AdaptiveEngineBandit,
     EngineTuningContext,
-    engine_bandit_settings,
+    OrderedEngineTuner,
+    engine_tuner_settings,
+    engine_tuning_episode_horizon_prior_seconds,
 )
 from rl_fzerox.core.manager import ManagedRun, ManagerStore
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
@@ -121,7 +122,7 @@ def import_save_engine_tuning_payload(
     run = store.get_run(request.policy_run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="policy run not found")
-    if run.config.vehicle.engine_mode != "adaptive_bandit":
+    if run.config.vehicle.engine_mode != "adaptive_tuner":
         raise HTTPException(status_code=400, detail="policy run has no adaptive engine tuning")
     try:
         policy_path = resolve_policy_artifact_path(
@@ -134,7 +135,7 @@ def import_save_engine_tuning_payload(
             detail=f"policy run has no {request.policy_artifact} artifact",
         ) from error
     state = load_engine_tuning_checkpoint_state(policy_path)
-    if state is None or not state.arms:
+    if state is None or not state.candidates:
         raise HTTPException(status_code=400, detail="policy run has no engine tuning samples")
 
     course_setups = tuple(
@@ -148,14 +149,14 @@ def import_save_engine_tuning_payload(
             detail="save game has no course setups using this policy run",
         )
     cup_setups = store.list_save_cup_setups(save_game_id)
-    bandit = AdaptiveEngineBandit(
-        settings=engine_bandit_settings(_adaptive_engine_config(run)),
+    tuner = OrderedEngineTuner(
+        settings=engine_tuner_settings(_adaptive_engine_config(run)),
         state=state,
     )
     applied = []
     for setup in course_setups:
         vehicle_id = _vehicle_for_course_setup(run, setup, cup_setups)
-        recommendation = bandit.recommendation(
+        recommendation = tuner.recommendation(
             EngineTuningContext(
                 course_key=setup.course_id or "unknown",
                 vehicle_id=vehicle_id,
@@ -179,7 +180,7 @@ def import_save_engine_tuning_payload(
                 "vehicle_id": vehicle_id,
                 "engine_setting_raw_value": recommendation.engine_setting_raw_value,
                 "mean_score": recommendation.mean_score,
-                "attempts": recommendation.attempts,
+                "finish_count": recommendation.finish_count,
             }
         )
     updated = store.get_save_game(save_game_id)
@@ -223,13 +224,11 @@ def _adaptive_engine_config(run: ManagedRun) -> AdaptiveEngineTuningConfig:
         enabled=True,
         min_raw_value=vehicle.engine_setting_min_raw_value,
         max_raw_value=vehicle.engine_setting_max_raw_value,
-        bin_size=vehicle.adaptive_engine_bin_size,
         stat_decay=vehicle.adaptive_engine_stat_decay,
-        prior_mean=vehicle.adaptive_engine_prior_mean,
-        prior_strength=vehicle.adaptive_engine_prior_strength,
+        prior_finish_time_seconds=engine_tuning_episode_horizon_prior_seconds(
+            max_episode_steps=run.config.environment.max_episode_steps,
+            action_repeat=run.config.action.action_repeat,
+        ),
         exploration_scale=vehicle.adaptive_engine_exploration_scale,
         uniform_exploration=vehicle.adaptive_engine_uniform_exploration,
-        completion_weight=vehicle.adaptive_engine_completion_weight,
-        finish_bonus=vehicle.adaptive_engine_finish_bonus,
-        position_weight=vehicle.adaptive_engine_position_weight,
     )

@@ -157,15 +157,12 @@ class AdaptiveEngineTuningConfig(BaseModel):
     enabled: bool = False
     min_raw_value: NonNegativeInt = Field(default=0, le=100)
     max_raw_value: NonNegativeInt = Field(default=100, le=100)
-    bin_size: PositiveInt = Field(default=5, le=100)
     stat_decay: float = Field(default=0.99, gt=0.0, lt=1.0)
-    prior_mean: float = 0.5
-    prior_strength: NonNegativeFloat = 2.0
-    exploration_scale: NonNegativeFloat = 0.35
+    prior_finish_time_seconds: PositiveFloat = 200.0
+    exploration_scale: NonNegativeFloat = 30.0
+    observation_noise_seconds: NonNegativeFloat = 1.5
+    curve_lengthscale_raw: PositiveFloat = 12.0
     uniform_exploration: float = Field(default=0.05, ge=0.0, le=1.0)
-    completion_weight: NonNegativeFloat = 1.0
-    finish_bonus: NonNegativeFloat = 1.0
-    position_weight: NonNegativeFloat = 0.25
 
     @model_validator(mode="after")
     def _validate_engine_range(self) -> AdaptiveEngineTuningConfig:
@@ -196,9 +193,7 @@ class TrackSamplingConfig(BaseModel):
     deficit_budget_weight_update_rollouts: PositiveInt = 20
     step_balance_log_details: bool = False
     x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
-    engine_tuning: AdaptiveEngineTuningConfig = Field(
-        default_factory=AdaptiveEngineTuningConfig
-    )
+    engine_tuning: AdaptiveEngineTuningConfig = Field(default_factory=AdaptiveEngineTuningConfig)
 
     @model_validator(mode="after")
     def _validate_entries_when_enabled(self) -> TrackSamplingConfig:

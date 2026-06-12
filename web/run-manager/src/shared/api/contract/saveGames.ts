@@ -116,7 +116,7 @@ export const importSaveEngineTuningResponseSchema = z.object({
       vehicle_id: z.string(),
       engine_setting_raw_value: z.number().int().min(0).max(100),
       mean_score: z.number().nullable(),
-      attempts: z.number().int().nonnegative(),
+      finish_count: z.number().int().nonnegative(),
     }),
   ),
   save_game: managedSaveGameSchema,

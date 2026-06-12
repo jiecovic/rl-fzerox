@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 
 import type {
   ConfigMetadata,
-  EngineTuningRuntimeBin,
+  EngineTuningRuntimeCandidateEstimate,
   EngineTuningRuntimeContext,
   EngineTuningRuntimeState,
 } from "@/shared/api/contract";
@@ -23,7 +23,7 @@ export function RunEngineTuningPanel({
 }: RunEngineTuningPanelProps) {
   const contextSelectId = useId();
   const labels = useMemo(() => engineTuningLabels(metadata), [metadata]);
-  const contexts = useMemo(() => sortedContexts(state?.contexts ?? []), [state]);
+  const contexts = useMemo(() => sortedContexts(state?.contexts ?? [], labels), [state, labels]);
   const [selectedContextKey, setSelectedContextKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,8 +45,8 @@ export function RunEngineTuningPanel({
 
   const selectedContext =
     contexts.find((context) => context.context_key === selectedContextKey) ?? contexts[0] ?? null;
-  const observedArmCount = state?.arms.filter((arm) => arm.attempts > 0).length ?? 0;
-  const missingContextProjection = state !== null && observedArmCount > 0 && contexts.length === 0;
+  const observedCandidateCount =
+    state?.candidates.filter((candidate) => candidate.finish_count > 0).length ?? 0;
 
   return (
     <section className="grid gap-3 border border-app-border bg-app-surface p-4">
@@ -54,22 +54,20 @@ export function RunEngineTuningPanel({
         <div className="grid gap-1">
           <h3 className="m-0 text-base font-bold text-app-text">Engine tuning</h3>
           <p className="m-0 text-sm text-app-muted">
-            Estimated engine-bin selection distribution from the {artifact} checkpoint.
+            Reset-time engine sampling probabilities from the {artifact} checkpoint.
           </p>
         </div>
         <div className="text-right text-xs tabular-nums text-app-muted">
           {state === null
             ? "no samples"
-            : `${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedArmCount.toLocaleString()} observed arms`}
+            : `${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedCandidateCount.toLocaleString()} observed candidates`}
         </div>
       </div>
       {selectedContext === null ? (
         <p className="m-0 text-sm text-app-muted">
-          {missingContextProjection
-            ? "Engine tuning samples exist, but this API response has no distribution projection. Restart the run manager backend to load the current engine-tuning API."
-            : enabled
-              ? "No engine tuning checkpoint data for this artifact yet. Values appear after a checkpoint save includes adaptive engine samples."
-              : "Adaptive engine tuning is disabled for this run."}
+          {enabled
+            ? "No engine tuning checkpoint data for this artifact yet. Values appear after a checkpoint save includes successful finish samples."
+            : "Adaptive engine tuning is disabled for this run."}
         </p>
       ) : (
         <div className="grid gap-3">
@@ -88,7 +86,7 @@ export function RunEngineTuningPanel({
             >
               {contexts.map((context) => (
                 <option key={context.context_key} value={context.context_key}>
-                  {contextLabel(context, labels)} · {context.attempts} attempts
+                  {contextLabel(context, labels)} · {context.finish_count} finishes
                 </option>
               ))}
             </select>
@@ -100,12 +98,18 @@ export function RunEngineTuningPanel({
               </strong>
               <span className="text-xs tabular-nums text-app-muted">
                 greedy engine {selectedContext.recommended_engine_setting_raw_value} ·{" "}
-                {selectedContext.attempts.toLocaleString()} attempts
+                {selectedContext.finish_count.toLocaleString()} successful finishes
               </span>
             </div>
-            <EngineDistributionChart bins={selectedContext.bins} />
+            <EngineSamplingProbabilityBars candidates={selectedContext.candidates} />
+            <EnginePosteriorMeanBars
+              candidates={selectedContext.candidates}
+              recommendedEngineSettingRawValue={
+                selectedContext.recommended_engine_setting_raw_value
+              }
+            />
           </div>
-          <EngineDistributionTable bins={selectedContext.bins} />
+          <EngineDistributionTable candidates={selectedContext.candidates} />
         </div>
       )}
     </section>
@@ -117,12 +121,13 @@ interface EngineTuningLabels {
   vehicles: ReadonlyMap<string, string>;
 }
 
-function sortedContexts(contexts: readonly EngineTuningRuntimeContext[]) {
+function sortedContexts(
+  contexts: readonly EngineTuningRuntimeContext[],
+  labels: EngineTuningLabels,
+) {
   return [...contexts].sort((left, right) => {
-    if (right.attempts !== left.attempts) {
-      return right.attempts - left.attempts;
-    }
-    return left.context_key.localeCompare(right.context_key);
+    const labelOrder = contextLabel(left, labels).localeCompare(contextLabel(right, labels));
+    return labelOrder === 0 ? left.context_key.localeCompare(right.context_key) : labelOrder;
   });
 }
 
@@ -144,49 +149,157 @@ function contextLabel(context: EngineTuningRuntimeContext, labels: EngineTuningL
   return `${courseLabel} · ${vehicleLabel}`;
 }
 
-function EngineDistributionChart({ bins }: { bins: readonly EngineTuningRuntimeBin[] }) {
-  const maxProbability = Math.max(...bins.map((bin) => bin.selection_probability), 0.000001);
-  const highestProbability = Math.max(...bins.map((bin) => bin.selection_probability), 0);
-  const firstBin = bins[0]?.engine_setting_raw_value ?? 0;
-  const lastBin = bins.at(-1)?.engine_setting_raw_value ?? 100;
+function EngineSamplingProbabilityBars({
+  candidates,
+}: {
+  candidates: readonly EngineTuningRuntimeCandidateEstimate[];
+}) {
+  const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
+  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? 100;
+  const barWidth = 100 / Math.max(1, candidates.length);
+  const maxProbability = Math.max(
+    ...candidates.map((candidate) => candidate.selection_probability),
+    0.000001,
+  );
 
   return (
     <div className="grid gap-1">
-      <div
-        className="grid h-28 items-end gap-px border border-app-border bg-app-surface-muted p-2"
-        style={{ gridTemplateColumns: `repeat(${bins.length}, minmax(2px, 1fr))` }}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-app-muted">
+        <div className="flex flex-wrap gap-3">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
+            successful finish observed
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-3 bg-app-accent/60" aria-hidden="true" />
+            model prediction only
+          </span>
+        </div>
+        <span className="tabular-nums">y: probability 0-{formatPercent(maxProbability)}</span>
+      </div>
+      <svg
+        aria-label="Engine sampling probability by raw engine value"
+        className="h-36 w-full border border-app-border bg-app-surface-muted"
+        preserveAspectRatio="none"
+        role="img"
+        viewBox="0 0 100 100"
       >
-        {bins.map((bin) => {
-          const isPeak = bin.selection_probability === highestProbability;
+        <title>Stochastic engine-selection probability</title>
+        {candidates.map((candidate, index) => {
+          const height = (candidate.selection_probability / maxProbability) * 96;
+          const width = Math.max(0.2, barWidth * 0.86);
+          const x = index * barWidth + (barWidth - width) / 2;
+          const y = 100 - height;
+          const fill =
+            candidate.finish_count > 0
+              ? "var(--accent)"
+              : "color-mix(in srgb, var(--accent) 58%, transparent)";
           return (
-            <div
-              className="flex h-full items-end"
-              key={bin.engine_setting_raw_value}
-              title={`engine ${bin.engine_setting_raw_value} · ${formatPercent(bin.selection_probability)} probability · score ${formatNullable(bin.posterior_mean)} · ${bin.attempts} attempts`}
+            <rect
+              fill={fill}
+              height={height}
+              key={candidate.engine_setting_raw_value}
+              width={width}
+              x={x}
+              y={y}
+              vectorEffect="non-scaling-stroke"
             >
-              <div
-                className={
-                  isPeak ? "w-full bg-app-accent" : "w-full bg-app-accent/45 hover:bg-app-accent/70"
-                }
-                style={{
-                  height: `${Math.max(3, (bin.selection_probability / maxProbability) * 100)}%`,
-                }}
-              />
-            </div>
+              <title>{`engine ${candidate.engine_setting_raw_value} · ${formatPercent(candidate.selection_probability)} probability · estimated ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
+            </rect>
           );
         })}
-      </div>
+      </svg>
       <div className="flex justify-between text-xs tabular-nums text-app-muted">
-        <span>{firstBin}</span>
+        <span>{firstCandidate}</span>
         <span>engine raw value</span>
-        <span>{lastBin}</span>
+        <span>{lastCandidate}</span>
       </div>
     </div>
   );
 }
 
-function EngineDistributionTable({ bins }: { bins: readonly EngineTuningRuntimeBin[] }) {
-  const topBins = [...bins]
+function EnginePosteriorMeanBars({
+  candidates,
+  recommendedEngineSettingRawValue,
+}: {
+  candidates: readonly EngineTuningRuntimeCandidateEstimate[];
+  recommendedEngineSettingRawValue: number;
+}) {
+  const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
+  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? 100;
+  const barWidth = 100 / Math.max(1, candidates.length);
+  const estimatedTimes = candidates.map((candidate) => candidate.estimated_finish_time_ms);
+  const fastestEstimate = Math.min(...estimatedTimes, Number.POSITIVE_INFINITY);
+  const slowestEstimate = Math.max(...estimatedTimes, 1);
+  const timeSpan = Math.max(1, slowestEstimate - fastestEstimate);
+
+  return (
+    <div className="grid gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-app-muted">
+        <div className="flex flex-wrap gap-3">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-3 bg-app-accent/45" aria-hidden="true" />
+            posterior mean performance
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
+            deterministic greedy
+          </span>
+        </div>
+        <span className="tabular-nums">
+          estimated finish time {formatRaceTime(fastestEstimate)}-{formatRaceTime(slowestEstimate)}
+        </span>
+      </div>
+      <svg
+        aria-label="Engine posterior mean performance by raw engine value"
+        className="h-32 w-full border border-app-border bg-app-surface-muted"
+        preserveAspectRatio="none"
+        role="img"
+        viewBox="0 0 100 100"
+      >
+        <title>Posterior mean performance from estimated finish time</title>
+        {candidates.map((candidate, index) => {
+          const isRecommended =
+            candidate.engine_setting_raw_value === recommendedEngineSettingRawValue;
+          const height =
+            3 + ((slowestEstimate - candidate.estimated_finish_time_ms) / timeSpan) * 93;
+          const width = Math.max(0.2, barWidth * 0.86);
+          const x = index * barWidth + (barWidth - width) / 2;
+          const y = 100 - height;
+          return (
+            <rect
+              fill={
+                isRecommended
+                  ? "var(--accent)"
+                  : "color-mix(in srgb, var(--accent) 45%, transparent)"
+              }
+              height={height}
+              key={candidate.engine_setting_raw_value}
+              width={width}
+              x={x}
+              y={y}
+              vectorEffect="non-scaling-stroke"
+            >
+              <title>{`engine ${candidate.engine_setting_raw_value}${isRecommended ? " · deterministic greedy" : ""} · estimated ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <div className="flex justify-between text-xs tabular-nums text-app-muted">
+        <span>{firstCandidate}</span>
+        <span>engine raw value · taller means faster estimated finish</span>
+        <span>{lastCandidate}</span>
+      </div>
+    </div>
+  );
+}
+
+function EngineDistributionTable({
+  candidates,
+}: {
+  candidates: readonly EngineTuningRuntimeCandidateEstimate[];
+}) {
+  const topCandidates = [...candidates]
     .sort((left, right) => {
       if (right.selection_probability !== left.selection_probability) {
         return right.selection_probability - left.selection_probability;
@@ -202,26 +315,28 @@ function EngineDistributionTable({ bins }: { bins: readonly EngineTuningRuntimeB
           <tr className="border-b border-app-border">
             <th className="py-1.5 pr-3 font-semibold">Engine</th>
             <th className="py-1.5 pr-3 font-semibold">Prob</th>
-            <th className="py-1.5 pr-3 font-semibold">Score</th>
-            <th className="py-1.5 pr-3 font-semibold">Finish</th>
-            <th className="py-1.5 pr-3 font-semibold">Comp</th>
-            <th className="py-1.5 font-semibold">Attempts</th>
+            <th className="py-1.5 pr-3 font-semibold">Estimated</th>
+            <th className="py-1.5 pr-3 font-semibold">Best</th>
+            <th className="py-1.5 font-semibold">Finishes</th>
           </tr>
         </thead>
         <tbody>
-          {topBins.map((bin) => (
+          {topCandidates.map((candidate) => (
             <tr
               className="border-b border-app-border/70 last:border-b-0"
-              key={bin.engine_setting_raw_value}
+              key={candidate.engine_setting_raw_value}
             >
-              <td className="py-1.5 pr-3 text-app-text">{bin.engine_setting_raw_value}</td>
+              <td className="py-1.5 pr-3 text-app-text">{candidate.engine_setting_raw_value}</td>
               <td className="py-1.5 pr-3 text-app-text">
-                {formatPercent(bin.selection_probability)}
+                {formatPercent(candidate.selection_probability)}
               </td>
-              <td className="py-1.5 pr-3 text-app-text">{formatNullable(bin.posterior_mean)}</td>
-              <td className="py-1.5 pr-3 text-app-text">{formatPercent(bin.finish_rate)}</td>
-              <td className="py-1.5 pr-3 text-app-text">{formatPercent(bin.mean_completion)}</td>
-              <td className="py-1.5 text-app-text">{bin.attempts}</td>
+              <td className="py-1.5 pr-3 text-app-text">
+                {formatRaceTime(candidate.estimated_finish_time_ms)}
+              </td>
+              <td className="py-1.5 pr-3 text-app-text">
+                {formatOptionalRaceTime(candidate.best_finish_time_ms)}
+              </td>
+              <td className="py-1.5 text-app-text">{candidate.finish_count}</td>
             </tr>
           ))}
         </tbody>
@@ -238,10 +353,18 @@ function humanizeKey(key: string) {
     .join(" ");
 }
 
-function formatNullable(value: number | null) {
-  return value === null ? "-" : value.toFixed(3);
-}
-
 function formatPercent(value: number | null) {
   return value === null ? "-" : `${(value * 100).toFixed(1)}%`;
+}
+
+function formatOptionalRaceTime(value: number | null) {
+  return value === null ? "no time yet" : formatRaceTime(value);
+}
+
+function formatRaceTime(value: number) {
+  const safeValue = Math.max(0, Math.round(value));
+  const minutes = Math.floor(safeValue / 60_000);
+  const seconds = Math.floor((safeValue % 60_000) / 1000);
+  const millis = safeValue % 1000;
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
 }

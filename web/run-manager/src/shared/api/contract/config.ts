@@ -158,15 +158,9 @@ const vehicleConfigSchema = z
     engine_setting_raw_value: z.number().int().min(0).max(100),
     engine_setting_min_raw_value: z.number().int().min(0).max(100),
     engine_setting_max_raw_value: z.number().int().min(0).max(100),
-    adaptive_engine_bin_size: z.number().int().min(1).max(100).default(5),
     adaptive_engine_stat_decay: z.number().gt(0).lt(1).default(0.99),
-    adaptive_engine_prior_mean: z.number().default(0.5),
-    adaptive_engine_prior_strength: z.number().nonnegative().default(2),
-    adaptive_engine_exploration_scale: z.number().nonnegative().default(0.35),
+    adaptive_engine_exploration_scale: z.number().nonnegative().default(30),
     adaptive_engine_uniform_exploration: z.number().min(0).max(1).default(0.05),
-    adaptive_engine_completion_weight: z.number().nonnegative().default(1),
-    adaptive_engine_finish_bonus: z.number().nonnegative().default(1),
-    adaptive_engine_position_weight: z.number().nonnegative().default(0.25),
   })
   .refine(
     (vehicle) => vehicle.engine_setting_min_raw_value <= vehicle.engine_setting_max_raw_value,

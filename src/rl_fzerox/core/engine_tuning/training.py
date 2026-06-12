@@ -6,36 +6,36 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
-from rl_fzerox.core.engine_tuning.bandit import (
-    AdaptiveEngineBandit,
-    EngineTuningContext,
-    EngineTuningEpisodeOutcome,
-)
-from rl_fzerox.core.engine_tuning.config import engine_bandit_settings
+from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
 from rl_fzerox.core.engine_tuning.state import (
     EngineTuningRuntimeState,
     empty_engine_tuning_state,
+)
+from rl_fzerox.core.engine_tuning.tuner import (
+    EngineTuningContext,
+    EngineTuningEpisodeOutcome,
+    OrderedEngineTuner,
 )
 from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
 
 
 @dataclass(slots=True)
 class EngineTuningTrainingController:
-    """Own the mutable adaptive engine bandit used by the trainer callback."""
+    """Own the mutable adaptive engine tuner used by the trainer callback."""
 
     config: AdaptiveEngineTuningConfig
     state: EngineTuningRuntimeState | None = None
-    _bandit: AdaptiveEngineBandit = field(init=False, repr=False)
+    _tuner: OrderedEngineTuner = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._bandit = AdaptiveEngineBandit(
-            settings=engine_bandit_settings(self.config),
+        self._tuner = OrderedEngineTuner(
+            settings=engine_tuner_settings(self.config),
             state=self.state or empty_engine_tuning_state(),
         )
 
     @property
     def runtime_state(self) -> EngineTuningRuntimeState:
-        return self._bandit.state
+        return self._tuner.state
 
     def record_episodes(self, episodes: Sequence[Mapping[str, object]]) -> bool:
         """Record terminal episode dictionaries and return whether state changed."""
@@ -45,22 +45,23 @@ class EngineTuningTrainingController:
             outcome = engine_tuning_outcome_from_episode(episode)
             if outcome is None:
                 continue
-            self._bandit.record(outcome)
-            changed = True
+            previous_state = self._tuner.state
+            if self._tuner.record(outcome) is not previous_state:
+                changed = True
         return changed
 
     def log_values(self) -> dict[str, float]:
-        """Return compact TensorBoard metrics for observed engine arms."""
+        """Return compact TensorBoard metrics for successful engine observations."""
 
         values: dict[str, float] = {}
-        for arm in self.runtime_state.arms:
-            key = _sanitize_log_key(arm.context_key)
-            suffix = f"{key}/engine_{arm.engine_setting_raw_value}"
-            if arm.mean_score is not None:
-                values[f"engine_tuning/{suffix}/mean_score"] = arm.mean_score
-            if arm.finish_rate is not None:
-                values[f"engine_tuning/{suffix}/finish_rate"] = arm.finish_rate
-            values[f"engine_tuning/{suffix}/attempts"] = float(arm.attempts)
+        for candidate in self.runtime_state.candidates:
+            key = _sanitize_log_key(candidate.context_key)
+            suffix = f"{key}/engine_{candidate.engine_setting_raw_value}"
+            if candidate.mean_score is not None:
+                values[f"engine_tuning/{suffix}/mean_score"] = candidate.mean_score
+            if candidate.best_time_ms is not None:
+                values[f"engine_tuning/{suffix}/best_time_ms"] = float(candidate.best_time_ms)
+            values[f"engine_tuning/{suffix}/finishes"] = float(candidate.finish_count)
         values["engine_tuning/update_count"] = float(self.runtime_state.update_count)
         return values
 
@@ -87,6 +88,7 @@ def engine_tuning_outcome_from_episode(
         engine_setting_raw_value=engine_raw,
         completion_fraction=_episode_completion_fraction(episode),
         finished=episode.get("termination_reason") == "finished",
+        race_time_ms=_mapping_optional_int(episode, "race_time_ms"),
         finish_position=_mapping_optional_int(episode, "position"),
         total_racers=_mapping_optional_int(episode, "total_racers"),
     )

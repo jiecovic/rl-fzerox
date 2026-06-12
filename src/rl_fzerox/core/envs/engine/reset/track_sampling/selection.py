@@ -10,11 +10,11 @@ from typing import Literal, TypeVar
 
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.engine_tuning import (
-    AdaptiveEngineBandit,
     EngineTuningChoice,
     EngineTuningContext,
     EngineTuningRuntimeState,
-    engine_bandit_settings,
+    OrderedEngineTuner,
+    engine_tuner_settings,
 )
 from rl_fzerox.core.envs.engine.reset.track_sampling.models import (
     TRACK_SAMPLING_LIMITS,
@@ -375,7 +375,7 @@ def _selected_track_from_entry(
         ),
         engine_tuning_sampled_score=None if engine_choice is None else engine_choice.sampled_score,
         engine_tuning_mean_score=None if engine_choice is None else engine_choice.mean_score,
-        engine_tuning_attempts=None if engine_choice is None else engine_choice.attempts,
+        engine_tuning_finish_count=None if engine_choice is None else engine_choice.finish_count,
         source_vehicle=entry.source_vehicle,
         source_course_index=entry.source_course_index,
         source_gp_difficulty=entry.source_gp_difficulty,
@@ -424,13 +424,13 @@ def _engine_tuning_choice(
     if not config.enabled:
         return None
     context = _engine_tuning_context(entry)
-    bandit = AdaptiveEngineBandit(
-        settings=engine_bandit_settings(config),
+    tuner = OrderedEngineTuner(
+        settings=engine_tuner_settings(config),
         state=state,
     )
     if selection == "greedy":
-        return bandit.recommendation(context)
-    return bandit.choose(context, seed=seed)
+        return tuner.recommendation(context)
+    return tuner.choose(context, seed=seed)
 
 
 def _engine_tuning_context(entry: TrackSamplingEntryConfig) -> EngineTuningContext:
