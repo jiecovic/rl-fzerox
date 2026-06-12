@@ -56,9 +56,12 @@ run-manager-check:
 run-manager-build:
     npm run --prefix web/run-manager build
 
-# Launch the local React run manager with the Python SQLite API.
-run-manager:
+# Launch the main F-Zero X app with the Python SQLite API.
+fzerox:
     @EGL_PLATFORM="${EGL_PLATFORM:-x11}" PYTHONPATH=src "{{python_bin}}" -m rl_fzerox.apps.run_manager
+
+# Compatibility alias for the old run-manager entrypoint.
+run-manager: fzerox
 
 # Aggregate repo-wide quality tasks.
 fmt: rust-fmt py-fmt
