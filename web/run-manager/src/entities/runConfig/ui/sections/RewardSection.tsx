@@ -18,12 +18,18 @@ import { usePersistentDisclosureMap } from "@/shared/ui/config/disclosureState";
 interface ConfigSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
+  disclosureStorageKey?: string;
   setConfig: ConfigSetter;
 }
 
-export function RewardSection({ config, defaultConfig, setConfig }: ConfigSectionProps) {
+export function RewardSection({
+  config,
+  defaultConfig,
+  disclosureStorageKey = "run-manager:reward:sections",
+  setConfig,
+}: ConfigSectionProps) {
   const [openSections, setOpenSections] = usePersistentDisclosureMap<RewardDisclosureState>(
-    "run-manager:reward:sections",
+    disclosureStorageKey,
     allRewardSectionsOpen(false),
   );
   const updateReward = (patch: Partial<ManagedRunConfig["reward"]>) => {

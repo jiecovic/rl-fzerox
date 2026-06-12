@@ -39,6 +39,7 @@ const SECTION_RENDERERS: Record<ConfigSection, (props: ReadonlySectionRendererPr
       <ActionSection
         config={run.config}
         defaultConfig={run.config}
+        disclosureStorageKey="run-manager:readonly:action:sections"
         metadata={metadata}
         setConfig={NOOP_SET_CONFIG}
       />
@@ -73,7 +74,12 @@ const SECTION_RENDERERS: Record<ConfigSection, (props: ReadonlySectionRendererPr
       />
     ),
     reward: ({ run }) => (
-      <RewardSection config={run.config} defaultConfig={run.config} setConfig={NOOP_SET_CONFIG} />
+      <RewardSection
+        config={run.config}
+        defaultConfig={run.config}
+        disclosureStorageKey="run-manager:readonly:reward:sections"
+        setConfig={NOOP_SET_CONFIG}
+      />
     ),
     tracks: ({ metadata, run }) => (
       <TracksSection

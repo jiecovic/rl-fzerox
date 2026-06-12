@@ -7,6 +7,7 @@ export interface ActionSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   checkpointLocked?: boolean;
+  disclosureStorageKey?: string;
   metadata: ConfigMetadata;
   setConfig: ConfigSetter;
 }

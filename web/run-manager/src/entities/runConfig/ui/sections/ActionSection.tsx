@@ -26,13 +26,14 @@ export function ActionSection({
   config,
   defaultConfig,
   checkpointLocked = false,
+  disclosureStorageKey = "run-manager:action:sections",
   metadata,
   setConfig,
 }: ActionSectionProps) {
   const action = config.action;
   const compatibilityNote = actionCompatibilityNote(action);
   const [openSections, setOpenSections] = usePersistentDisclosureMap<ActionDisclosureState>(
-    "run-manager:action:sections",
+    disclosureStorageKey,
     {
       auxiliary: false,
       family: false,

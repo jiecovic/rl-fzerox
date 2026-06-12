@@ -203,4 +203,43 @@ describe("RunsPanel", () => {
       "Recurrent sweep",
     ]);
   });
+
+  it("renders long lineages as root plus recent runs until expanded", async () => {
+    const user = userEvent.setup();
+    const lineageId = "large-lineage";
+    const runs = Array.from({ length: 20 }, (_, index) =>
+      runFixture({
+        id: `large-run-${index}`,
+        lineage_id: lineageId,
+        name: index === 0 ? "lineage root" : `fork ${index}`,
+        parent_run_id: index === 0 ? null : `large-run-${index - 1}`,
+        status: "stopped",
+        created_at: `2026-05-${String(index + 1).padStart(2, "0")}T00:00:00+00:00`,
+      }),
+    );
+
+    render(
+      <RunsPanel
+        drafts={[]}
+        runs={runs}
+        onDeleteLineage={vi.fn().mockResolvedValue(undefined)}
+        onDeleteRun={vi.fn().mockResolvedValue(undefined)}
+        onExportRun={vi.fn().mockResolvedValue(undefined)}
+        onImportRunBundle={vi.fn().mockResolvedValue(undefined)}
+        onOpenRun={vi.fn()}
+        onResumeRun={vi.fn().mockResolvedValue(undefined)}
+        onStopRun={vi.fn().mockResolvedValue(undefined)}
+        onUpdateLineageGroups={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Open run lineage root" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open run fork 1" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open run fork 19" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show all" }));
+
+    expect(screen.getByRole("button", { name: "Open run fork 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show recent" })).toBeInTheDocument();
+  });
 });

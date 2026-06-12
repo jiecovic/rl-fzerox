@@ -10,6 +10,8 @@ import { formatDate, formatRelativeTime } from "@/shared/ui/format";
 import { ChevronIcon, TrashIcon } from "@/shared/ui/icons";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
+const LARGE_LINEAGE_VISIBLE_RECENT_RUNS = 14;
+
 interface LineageCardProps {
   busyActionRunId: string | null;
   isDeleting: boolean;
@@ -47,8 +49,14 @@ export const LineageCard = memo(function LineageCard({
   const [syncedGroupKey, setSyncedGroupKey] = useState(persistedGroupKey);
   const [savingGroup, setSavingGroup] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
+  const [showAllRuns, setShowAllRuns] = useState(false);
   const inputGroupNames = parseLineageGroupInput(groupInput);
   const groupChanged = groupNameKey(inputGroupNames) !== persistedGroupKey;
+  const renderedRuns = showAllRuns
+    ? lineage.runs
+    : compactLineageRuns(lineage.runs, LARGE_LINEAGE_VISIBLE_RECENT_RUNS);
+  const hiddenRunCount = lineage.runs.length - renderedRuns.length;
+  const compacted = hiddenRunCount > 0;
 
   useEffect(() => {
     if (persistedGroupKey === syncedGroupKey) {
@@ -159,7 +167,33 @@ export const LineageCard = memo(function LineageCard({
             <span className="w-[136px] justify-self-end text-right">Actions</span>
           </div>
           <div className="grid border-t border-app-border">
-            {lineage.runs.map((entry) => (
+            {compacted ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-app-border px-3 py-2 text-xs text-app-muted">
+                <span>
+                  Showing root and latest {renderedRuns.length - 1} of{" "}
+                  {lineage.runs.length.toLocaleString()} runs.
+                </span>
+                <Button
+                  className="h-7 px-2 text-xs"
+                  type="button"
+                  onClick={() => setShowAllRuns(true)}
+                >
+                  Show all
+                </Button>
+              </div>
+            ) : showAllRuns && lineage.runs.length > LARGE_LINEAGE_VISIBLE_RECENT_RUNS + 1 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-app-border px-3 py-2 text-xs text-app-muted">
+                <span>{lineage.runs.length.toLocaleString()} runs shown.</span>
+                <Button
+                  className="h-7 px-2 text-xs"
+                  type="button"
+                  onClick={() => setShowAllRuns(false)}
+                >
+                  Show recent
+                </Button>
+              </div>
+            ) : null}
+            {renderedRuns.map((entry) => (
               <RunRow
                 busyActionRunId={busyActionRunId}
                 entry={entry}
@@ -197,6 +231,21 @@ function formatGroupNames(groupNames: readonly string[]) {
 
 function groupNameKey(groupNames: readonly string[]) {
   return [...groupNames].sort((left, right) => left.localeCompare(right)).join("\n");
+}
+
+function compactLineageRuns(runs: readonly RunLineageGroup["runs"][number][], recentCount: number) {
+  if (runs.length <= recentCount + 1) {
+    return runs;
+  }
+  const root = runs[0];
+  const recentRuns = runs.slice(-recentCount);
+  if (root === undefined) {
+    return recentRuns;
+  }
+  if (recentRuns.includes(root)) {
+    return recentRuns;
+  }
+  return [root, ...recentRuns];
 }
 
 function sameLineageCardProps(left: LineageCardProps, right: LineageCardProps) {
