@@ -109,6 +109,53 @@ export function EnvironmentSection({
       </ConfigPanel>
 
       <ConfigPanel
+        title="GP lives"
+        onReset={() =>
+          updateEnvironment({
+            randomize_gp_lives_on_reset: defaultConfig.environment.randomize_gp_lives_on_reset,
+            gp_lives_jitter_min: defaultConfig.environment.gp_lives_jitter_min,
+            gp_lives_jitter_max: defaultConfig.environment.gp_lives_jitter_max,
+          })
+        }
+      >
+        <ConfigFieldGroup>
+          <BooleanField
+            help="On each GP race reset, patch spare machines to the game's difficulty default plus an inclusive random jitter. This affects train and watch reset baselines, not Career Mode menu play."
+            label="Randomize GP lives"
+            resetValue={defaultConfig.environment.randomize_gp_lives_on_reset}
+            value={config.environment.randomize_gp_lives_on_reset}
+            onChange={(value) => updateEnvironment({ randomize_gp_lives_on_reset: value })}
+          />
+          <ConfigFieldset disabled={!config.environment.randomize_gp_lives_on_reset}>
+            <RangeIntegerField
+              help="Inclusive lower jitter added to the game default lives for the selected difficulty. Negative values can start an episode with fewer spare machines."
+              label="Jitter min"
+              max={8}
+              min={-5}
+              rangeStep={1}
+              resetValue={defaultConfig.environment.gp_lives_jitter_min}
+              value={config.environment.gp_lives_jitter_min}
+              onChange={(value) => updateEnvironment({ gp_lives_jitter_min: value })}
+            />
+            <RangeIntegerField
+              help="Inclusive upper jitter added to the game default lives for the selected difficulty. The final value is floored at zero and otherwise not upper-clamped."
+              label="Jitter max"
+              max={12}
+              min={-5}
+              rangeStep={1}
+              resetValue={defaultConfig.environment.gp_lives_jitter_max}
+              value={config.environment.gp_lives_jitter_max}
+              onChange={(value) => updateEnvironment({ gp_lives_jitter_max: value })}
+            />
+            <div className="field-note">
+              Defaults: Novice 5, Standard 4, Expert 3, Master 2 plus signed jitter. Final lives are
+              floored at zero.
+            </div>
+          </ConfigFieldset>
+        </ConfigFieldGroup>
+      </ConfigPanel>
+
+      <ConfigPanel
         title="No-progress truncation"
         onReset={() =>
           updateEnvironment({

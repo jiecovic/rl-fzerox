@@ -1262,9 +1262,12 @@
     },
     "environment": {
       "camera_setting": "close_behind",
+      "gp_lives_jitter_max": 3,
+      "gp_lives_jitter_min": -2,
       "max_episode_steps": 12000,
       "progress_frontier_epsilon": 100.0,
       "progress_frontier_stall_limit_frames": 900,
+      "randomize_gp_lives_on_reset": true,
       "renderer": "gliden64"
     },
     "observation": {

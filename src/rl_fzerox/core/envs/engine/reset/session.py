@@ -15,6 +15,7 @@ from ..info import (
     read_live_telemetry,
 )
 from .camera import CAMERA_SYNC_CONTROLS, sync_camera_setting
+from .lives import randomize_gp_lives_on_reset
 from .race import load_track_baseline, reset_race_state
 from .seeding import EngineResetSeeds
 from .tracks import (
@@ -161,6 +162,7 @@ class EngineResetCoordinator:
 
         uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
+        self._maybe_randomize_gp_lives(seed, telemetry, selected_track, info)
         telemetry = sync_reset_presentation(
             self._backend,
             camera_setting=self._config.camera_setting,
@@ -265,6 +267,25 @@ class EngineResetCoordinator:
         info["rng_seed"] = rng_seed
         info["rng_state"] = rng_state
         return read_live_telemetry(self._backend) or telemetry
+
+    def _maybe_randomize_gp_lives(
+        self,
+        seed: int | None,
+        telemetry: FZeroXTelemetry | None,
+        selected_track: SelectedTrack | None,
+        info: dict[str, object],
+    ) -> None:
+        if not self._config.randomize_gp_lives_on_reset:
+            return
+        randomize_gp_lives_on_reset(
+            backend=self._backend,
+            telemetry=telemetry,
+            target_gp_difficulty=None if selected_track is None else selected_track.gp_difficulty,
+            jitter_min=self._config.gp_lives_jitter_min,
+            jitter_max=self._config.gp_lives_jitter_max,
+            seed=self._reset_seeds.gp_lives_jitter_seed(seed),
+            info=info,
+        )
 
 
 def sync_reset_presentation(

@@ -230,13 +230,21 @@ const actionConfigSchema = z
     },
   );
 
-const environmentConfigSchema = z.object({
-  max_episode_steps: z.number().int().positive(),
-  progress_frontier_stall_limit_frames: z.number().int().positive().nullable(),
-  progress_frontier_epsilon: z.number().nonnegative(),
-  renderer: rendererSchema,
-  camera_setting: cameraSettingSchema,
-});
+const environmentConfigSchema = z
+  .object({
+    max_episode_steps: z.number().int().positive(),
+    progress_frontier_stall_limit_frames: z.number().int().positive().nullable(),
+    progress_frontier_epsilon: z.number().nonnegative(),
+    renderer: rendererSchema,
+    camera_setting: cameraSettingSchema,
+    randomize_gp_lives_on_reset: z.boolean().default(false),
+    gp_lives_jitter_min: z.number().int().default(0),
+    gp_lives_jitter_max: z.number().int().default(4),
+  })
+  .refine((environment) => environment.gp_lives_jitter_min <= environment.gp_lives_jitter_max, {
+    message: "gp_lives_jitter_min must be <= gp_lives_jitter_max",
+    path: ["gp_lives_jitter_min"],
+  });
 
 export const stateComponentConfigSchema = z.object({
   name: stateComponentNameSchema,

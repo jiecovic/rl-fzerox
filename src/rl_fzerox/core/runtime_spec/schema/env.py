@@ -39,6 +39,9 @@ class EnvConfig(BaseModel):
     terminate_on_energy_depleted: bool = False
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
+    randomize_gp_lives_on_reset: bool = True
+    gp_lives_jitter_min: int = -2
+    gp_lives_jitter_max: int = 3
     camera_setting: CameraSettingName | None = None
     reset_to_race: bool = False
     race_intro_target_timer: int | None = Field(default=39, ge=0, le=460)
@@ -58,6 +61,12 @@ class EnvConfig(BaseModel):
                 component.data(),
                 split_lean_history=self.action.runtime().split_lean_history,
             )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_gp_lives_jitter_bounds(self) -> EnvConfig:
+        if self.gp_lives_jitter_min > self.gp_lives_jitter_max:
+            raise ValueError("gp_lives_jitter_min must be <= gp_lives_jitter_max")
         return self
 
 
