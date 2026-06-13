@@ -19,6 +19,7 @@ const createDraftWithSourceMock = vi.fn();
 const createSaveGameMock = vi.fn();
 const updateDraftWithSourceMock = vi.fn();
 const deleteDraftMock = vi.fn();
+const deleteSaveGameMock = vi.fn();
 const deleteRunMock = vi.fn();
 const exportRunBundleMock = vi.fn();
 const fetchRunMock = vi.fn();
@@ -53,6 +54,7 @@ vi.mock("@/shared/api/client", async () => {
     ) => createDraftWithSourceMock(name, config, sourceRunId, sourceArtifact),
     createSaveGame: (name: string) => createSaveGameMock(name),
     deleteDraft: (id: string) => deleteDraftMock(id),
+    deleteSaveGame: (id: string) => deleteSaveGameMock(id),
     deleteRun: (id: string) => deleteRunMock(id),
     exportRunBundle: (run: ReturnType<typeof runFixture>) => exportRunBundleMock(run),
     fetchRun: (runId: string) => fetchRunMock(runId),
@@ -117,6 +119,7 @@ describe("App", () => {
         draftFixture({ config, id, name }),
     );
     deleteDraftMock.mockResolvedValue(undefined);
+    deleteSaveGameMock.mockResolvedValue(undefined);
     createSaveGameMock.mockResolvedValue({
       created_at: "2026-06-02T10:30:00+00:00",
       id: "save-001",

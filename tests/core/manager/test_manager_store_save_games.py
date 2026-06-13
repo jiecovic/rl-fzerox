@@ -14,6 +14,9 @@ from rl_fzerox.core.manager import (
 )
 from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import (
+    SaveGameAttemptModel,
+    SaveGameCourseSetupModel,
+    SaveGameCupSetupModel,
     SaveGameModel,
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
@@ -67,6 +70,63 @@ def test_manager_store_rejects_duplicate_save_game_names_without_directory(
         store.create_save_game(name="unlock run", save_games_root=save_games_root)
 
     assert {path.name for path in save_games_root.iterdir()} == existing_dirs
+
+
+def test_manager_store_deletes_save_game_with_owned_rows_and_files(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Delete Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    save_game.save_path.write_bytes(_logical_sra({}))
+    run = store.create_run(
+        name="Policy Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    course_setup = store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        cup_id="jack",
+        course_id="mute_city",
+        policy_run_id=run.id,
+        policy_artifact="best",
+    )
+    cup_setup = store.upsert_save_cup_setup(
+        save_game_id=save_game.id,
+        cup_id="jack",
+        vehicle_id="blue_falcon",
+    )
+    attempt = store.start_save_attempt(
+        save_game_id=save_game.id,
+        target_kind="clear_gp_cup",
+        difficulty="novice",
+        cup_id="jack",
+    )
+
+    assert store.delete_save_game(save_game.id) is True
+
+    assert store.get_save_game(save_game.id) is None
+    assert not save_game.save_path.parent.exists()
+    with manager_session(store.db_path) as session:
+        assert session.get(SaveGameModel, save_game.id) is None
+        assert session.get(SaveGameCourseSetupModel, course_setup.id) is None
+        assert session.get(SaveGameCupSetupModel, cup_setup.id) is None
+        assert session.get(SaveGameAttemptModel, attempt.id) is None
+
+
+def test_manager_store_rejects_delete_of_running_save_game(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Running Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    updated = store.update_save_game_status(save_game_id=save_game.id, status="running")
+    assert updated is not None
+
+    with pytest.raises(ValueError, match="career runner"):
+        store.delete_save_game(save_game.id)
+
+    assert store.get_save_game(save_game.id) is not None
 
 
 def test_manager_store_upserts_save_course_setups(tmp_path: Path) -> None:

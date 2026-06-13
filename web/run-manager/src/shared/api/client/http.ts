@@ -51,8 +51,16 @@ function isApiErrorPayload(payload: unknown): payload is { error?: unknown } {
   return typeof payload === "object" && payload !== null && "error" in payload;
 }
 
+function isFastApiErrorPayload(payload: unknown): payload is { detail?: unknown } {
+  return typeof payload === "object" && payload !== null && "detail" in payload;
+}
+
 function errorMessageFromPayload(response: Response, payload: unknown) {
-  return isApiErrorPayload(payload) && typeof payload.error === "string"
-    ? payload.error
-    : response.statusText || `request failed with status ${response.status}`;
+  if (isApiErrorPayload(payload) && typeof payload.error === "string") {
+    return payload.error;
+  }
+  if (isFastApiErrorPayload(payload) && typeof payload.detail === "string") {
+    return payload.detail;
+  }
+  return response.statusText || `request failed with status ${response.status}`;
 }

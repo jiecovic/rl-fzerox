@@ -18,6 +18,7 @@ import {
   deleteDraft,
   deleteLineage,
   deleteRun,
+  deleteSaveGame,
   exportRunBundle,
   importRunBundle,
   importSaveEngineTuning,
@@ -105,6 +106,7 @@ export interface WorkspaceActions {
   removeDraft: (id: string) => Promise<void>;
   removeLineage: (lineageId: string) => Promise<void>;
   removeRun: (run: ManagedRun) => Promise<void>;
+  removeSaveGame: (saveGame: ManagedSaveGame) => Promise<void>;
   renameManagedRun: (runId: string, name: string) => Promise<void>;
   renameManagedSaveGame: (saveGameId: string, name: string) => Promise<void>;
   resetManagedRunTrackPool: (runId: string) => Promise<void>;
@@ -262,6 +264,12 @@ export function useWorkspaceActions({
     setRuns((current) => current.filter((candidate) => candidate.id !== run.id));
     sessions.closeRunTabsForRun(run.id);
     sessions.setChartsFocusRunId((current) => (current === run.id ? null : current));
+  }
+
+  async function removeSaveGame(saveGame: ManagedSaveGame) {
+    await deleteSaveGame(saveGame.id);
+    setSaveGames((current) => current.filter((candidate) => candidate.id !== saveGame.id));
+    sessions.closeWorkspaceTab(saveGameSessionId(saveGame.id));
   }
 
   async function removeLineage(lineageId: string) {
@@ -428,6 +436,7 @@ export function useWorkspaceActions({
     removeDraft,
     removeLineage,
     removeRun,
+    removeSaveGame,
     renameManagedRun,
     renameManagedSaveGame,
     resetManagedRunTrackPool,

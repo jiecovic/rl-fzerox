@@ -120,6 +120,10 @@ export const importSaveEngineTuningResponseSchema = z.object({
   recommendations: z.array(saveEngineTuningCourseSetupRecommendationSchema),
 });
 
+export const deleteSaveGameResponseSchema = z.object({
+  deleted: z.boolean(),
+});
+
 export const openSaveGameDirectoryResponseSchema = z.object({
   opened: z.boolean(),
 });

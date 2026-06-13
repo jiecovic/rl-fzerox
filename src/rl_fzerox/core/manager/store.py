@@ -515,6 +515,9 @@ class ManagerStore:
             name=name,
         )
 
+    def delete_save_game(self, save_game_id: str) -> bool:
+        return save_game_registry.delete_save_game(self, save_game_id)
+
     def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
         return save_game_registry.unlock_progress(self, save_game_id)
 

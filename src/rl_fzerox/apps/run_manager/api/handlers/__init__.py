@@ -49,6 +49,7 @@ from rl_fzerox.apps.run_manager.api.handlers.save_game_runner import (
 )
 from rl_fzerox.apps.run_manager.api.handlers.save_games import (
     create_save_game_payload,
+    delete_save_game_payload,
     import_save_engine_tuning_payload,
     open_save_game_dir_payload,
     save_games_payload,
@@ -68,6 +69,7 @@ __all__ = [
     "delete_draft_payload",
     "delete_lineage_payload",
     "delete_run_payload",
+    "delete_save_game_payload",
     "drafts_payload",
     "export_run_bundle_path",
     "fork_run_payload",

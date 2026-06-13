@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from rl_fzerox.core.manager.db.models.runs import RunModel
@@ -122,6 +122,28 @@ def rename_save_game(
     row.name = name
     row.updated_at = updated_at
     return save_game_from_model(row)
+
+
+def delete_save_game(session: Session, save_game_id: str) -> ManagedSaveGame | None:
+    """Delete one save-game identity row and its manager-owned child records."""
+
+    row = session.get(SaveGameModel, save_game_id)
+    if row is None:
+        return None
+    save_game = save_game_from_model(row)
+    session.execute(
+        delete(SaveGameAttemptModel).where(SaveGameAttemptModel.save_game_id == save_game_id)
+    )
+    session.execute(
+        delete(SaveGameCourseSetupModel).where(
+            SaveGameCourseSetupModel.save_game_id == save_game_id
+        )
+    )
+    session.execute(
+        delete(SaveGameCupSetupModel).where(SaveGameCupSetupModel.save_game_id == save_game_id)
+    )
+    session.delete(row)
+    return save_game
 
 
 def touch_save_game(

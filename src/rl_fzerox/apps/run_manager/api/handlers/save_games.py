@@ -63,6 +63,16 @@ def update_save_game_payload(
     return {"save_game": save_game_payload_for_store(store, save_game)}
 
 
+def delete_save_game_payload(store: ManagerStore, save_game_id: str) -> dict[str, bool]:
+    try:
+        deleted = store.delete_save_game(save_game_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not deleted:
+        raise HTTPException(status_code=404, detail="save game not found")
+    return {"deleted": True}
+
+
 def upsert_save_course_setup_payload(
     store: ManagerStore,
     save_game_id: str,

@@ -22,6 +22,7 @@ from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContex
 from rl_fzerox.core.manager.artifacts.paths import predicted_managed_save_game_path
 from rl_fzerox.core.manager.db.repositories import runs as run_repository
 from rl_fzerox.core.manager.db.repositories import save_games as save_game_repository
+from rl_fzerox.core.manager.db.repositories.filesystem import queue_delete_tree
 from rl_fzerox.core.manager.models import (
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
@@ -107,6 +108,25 @@ def rename_save_game(
             name=normalized_name,
             updated_at=utc_now(),
         )
+
+
+def delete_save_game(store: ManagerStore, save_game_id: str) -> bool:
+    """Delete one manager-owned save game and queue its filesystem cleanup."""
+
+    store.initialize()
+    deleted_at = utc_now()
+    with store._orm_session() as session:
+        save_game = save_game_repository.get_save_game(session, save_game_id)
+        if save_game is None:
+            return False
+        if save_game.status == "running":
+            raise ValueError("stop or pause the career runner before deleting this save")
+        save_root = save_game.save_path.parent
+        if save_root.exists():
+            queue_delete_tree(session, path=save_root, created_at=deleted_at)
+        save_game_repository.delete_save_game(session, save_game_id)
+    store._drain_pending_filesystem_operations()
+    return True
 
 
 def unlock_progress(

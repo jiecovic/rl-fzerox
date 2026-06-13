@@ -53,6 +53,12 @@ def create_save_games_router(store: ManagerStore, launcher: RunLauncher) -> APIR
             UpdateSaveGameRequest(name=name),
         )
 
+    @router.delete("/api/save-games/{save_game_id}")
+    async def delete_save_game(
+        save_game_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, bool]:
+        return await run_sync(handlers.delete_save_game_payload, store, save_game_id)
+
     @router.post("/api/save-games/{save_game_id}/runner")
     async def start_career_mode(
         save_game_id: Annotated[str, Path(min_length=1)],

@@ -123,6 +123,7 @@ export function WorkspaceBody({
         <SaveGamesPanel
           saveGames={saveGames}
           onCreateSaveGame={sessions.createNewSaveGame}
+          onDeleteSaveGame={actions.removeSaveGame}
           onOpenSaveGame={sessions.openSaveGame}
         />
       ) : null}

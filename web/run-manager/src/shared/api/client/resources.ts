@@ -28,6 +28,7 @@ export {
 } from "@/shared/api/client/resources/runs";
 export {
   createSaveGame,
+  deleteSaveGame,
   fetchSaveGames,
   importSaveEngineTuning,
   openSaveGameDirectory,

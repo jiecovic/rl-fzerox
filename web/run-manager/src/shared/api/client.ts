@@ -27,6 +27,7 @@ export {
   deleteDraft,
   deleteLineage,
   deleteRun,
+  deleteSaveGame,
   fetchConfigMetadata,
   fetchDrafts,
   fetchPolicyPreview,

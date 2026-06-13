@@ -3,6 +3,7 @@ import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
   type CareerModeRunnerLaunchRequest,
   createSaveGameResponseSchema,
+  deleteSaveGameResponseSchema,
   importSaveEngineTuningResponseSchema,
   type ManagedSaveGame,
   openSaveGameDirectoryResponseSchema,
@@ -36,6 +37,13 @@ export async function renameSaveGame(saveGameId: string, name: string): Promise<
   });
   const payload = parseApiPayload(createSaveGameResponseSchema, await parseJson(response));
   return payload.save_game;
+}
+
+export async function deleteSaveGame(saveGameId: string): Promise<void> {
+  const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}`, {
+    method: "DELETE",
+  });
+  parseApiPayload(deleteSaveGameResponseSchema, await parseJson(response));
 }
 
 export async function openSaveGameDirectory(saveGameId: string): Promise<void> {

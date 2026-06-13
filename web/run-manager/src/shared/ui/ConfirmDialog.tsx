@@ -8,6 +8,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   confirmLabel: string;
   description: string;
+  error?: string | null;
   open: boolean;
   title: string;
   onClose: () => void;
@@ -19,6 +20,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   confirmLabel,
   description,
+  error = null,
   open,
   title,
   onClose,
@@ -52,6 +54,11 @@ export function ConfirmDialog({
           <Dialog.Description className="mt-3 mb-0 leading-normal text-app-muted">
             {description}
           </Dialog.Description>
+          {error !== null ? (
+            <p className="mt-3 mb-0 text-sm text-app-danger" role="alert">
+              {error}
+            </p>
+          ) : null}
           <div className="mt-[22px] flex justify-end gap-2.5">
             <Button disabled={busy} onClick={onClose}>
               {cancelLabel}
