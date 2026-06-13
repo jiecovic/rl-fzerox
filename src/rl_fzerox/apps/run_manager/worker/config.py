@@ -39,7 +39,7 @@ def _track_sampling_runtime_persistence(
             slots=slots,
             updated_at=now_iso(),
         ),
-        load_alt_baselines=lambda: store.get_run_alt_baselines(run_id),
+        load_alt_baselines=lambda: store.active_run_alt_baselines(run_id),
     )
 
 

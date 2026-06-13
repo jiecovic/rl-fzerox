@@ -239,14 +239,11 @@ class ManagerStore:
     def get_run_alt_baselines(
         self,
         run_id: str,
-        *,
-        include_deleted: bool = False,
     ) -> tuple[TrackSamplingAltBaseline, ...]:
-        return run_registry.get_run_alt_baselines(
-            self,
-            run_id,
-            include_deleted=include_deleted,
-        )
+        return run_registry.get_run_alt_baselines(self, run_id)
+
+    def active_run_alt_baselines(self, run_id: str) -> tuple[TrackSamplingAltBaseline, ...]:
+        return run_registry.active_run_alt_baselines(self, run_id)
 
     def upsert_run_alt_baseline(
         self,

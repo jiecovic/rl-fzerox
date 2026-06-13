@@ -101,7 +101,7 @@ class ManagedTrackSamplingRefresh:
             self._last_blocked_signature = None
         refreshed_config = apply_alt_baselines_to_track_sampling(
             refreshed_config,
-            self.store.get_run_alt_baselines(self.run_id),
+            self.store.active_run_alt_baselines(self.run_id),
         )
         if _track_sampling_signature(refreshed_config) == _track_sampling_signature(current_config):
             return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)

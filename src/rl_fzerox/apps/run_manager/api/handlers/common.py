@@ -32,7 +32,7 @@ def require_run(store: ManagerStore, run_id: str) -> ManagedRun:
 
 
 def active_alt_baseline_count(store: ManagerStore, run_id: str) -> int:
-    return sum(1 for baseline in store.get_run_alt_baselines(run_id) if baseline.active)
+    return len(store.active_run_alt_baselines(run_id))
 
 
 def validate_source_fields(

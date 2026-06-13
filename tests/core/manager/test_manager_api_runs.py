@@ -462,7 +462,7 @@ async def test_manager_api_clears_run_alt_baselines_from_database_and_disk(
     payload = response.json()
     assert payload["cleared"] == 2
     assert payload["run"]["active_alt_baseline_count"] == 0
-    assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()
+    assert store.get_run_alt_baselines(run.id) == ()
     assert all(not state_path.exists() for state_path in state_paths)
 
 

@@ -5,6 +5,14 @@ This package owns launched-run CRUD plus the runtime sidecars that hang off a
 run row: metrics events, worker leases, commands, and filesystem cleanup.
 """
 
+from rl_fzerox.core.manager.registry.runs.alt_baselines import (
+    active_run_alt_baselines,
+    clear_run_alt_baselines,
+    clear_run_alt_baselines_for_course,
+    delete_run_alt_baseline,
+    get_run_alt_baselines,
+    upsert_run_alt_baseline,
+)
 from rl_fzerox.core.manager.registry.runs.commands import (
     clear_run_command,
     pending_run_command,
@@ -31,17 +39,12 @@ from rl_fzerox.core.manager.registry.runs.runtime import (
     upsert_run_runtime,
 )
 from rl_fzerox.core.manager.registry.runs.track_sampling import (
-    clear_run_alt_baselines,
-    clear_run_alt_baselines_for_course,
     clear_run_track_sampling_state,
-    delete_run_alt_baseline,
-    get_run_alt_baselines,
     get_run_generated_x_cup_slots,
     get_run_track_sampling_artifacts,
     get_run_track_sampling_state,
     replace_run_generated_x_cup_slots,
     replace_run_track_sampling_artifacts,
-    upsert_run_alt_baseline,
     upsert_run_track_sampling_state,
 )
 from rl_fzerox.core.manager.registry.runs.workers import (
@@ -52,6 +55,7 @@ from rl_fzerox.core.manager.registry.runs.workers import (
 )
 
 __all__ = [
+    "active_run_alt_baselines",
     "append_run_event",
     "clear_run_command",
     "clear_run_alt_baselines",

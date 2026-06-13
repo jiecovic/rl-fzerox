@@ -204,14 +204,42 @@ def test_manager_store_persists_run_alt_baselines(tmp_path: Path) -> None:
 
     store.upsert_run_alt_baseline(baseline=baseline)
 
-    assert ManagerStore(store.db_path).get_run_alt_baselines(run.id) == (baseline,)
+    recovered_store = ManagerStore(store.db_path)
+    assert recovered_store.get_run_alt_baselines(run.id) == (baseline,)
+    assert recovered_store.active_run_alt_baselines(run.id) == (baseline,)
     assert store.delete_run_alt_baseline(
         run_id=run.id,
         baseline_id=baseline.id,
     )
     assert store.get_run_alt_baselines(run.id) == ()
-    assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()
     assert not state_path.exists()
+
+
+def test_manager_store_active_run_alt_baselines_require_state_file(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Missing Alt Baseline Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    baseline = TrackSamplingAltBaseline(
+        id="alt-missing",
+        run_id=run.id,
+        course_key="mute_city",
+        reset_variant_key="gp_race|novice|blue_falcon",
+        source_entry_id="mute_city_gp_race_novice_blue_falcon",
+        label="missing state",
+        state_path=run.run_dir / "baselines" / "alt" / "alt-missing.state",
+        weight=1.0,
+        enabled=True,
+        created_at="2026-06-13T10:00:00+00:00",
+        updated_at="2026-06-13T10:00:00+00:00",
+    )
+
+    store.upsert_run_alt_baseline(baseline=baseline)
+
+    assert store.get_run_alt_baselines(run.id) == (baseline,)
+    assert store.active_run_alt_baselines(run.id) == ()
 
 
 def test_manager_store_clears_run_alt_baselines_from_database_and_disk(tmp_path: Path) -> None:
@@ -246,7 +274,7 @@ def test_manager_store_clears_run_alt_baselines_from_database_and_disk(tmp_path:
 
     assert store.clear_run_alt_baselines(run.id) == 2
 
-    assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()
+    assert store.get_run_alt_baselines(run.id) == ()
     assert all(not state_path.exists() for state_path in state_paths)
 
 
@@ -301,7 +329,7 @@ def test_manager_store_clears_run_alt_baselines_for_one_course(tmp_path: Path) -
         == 1
     )
 
-    remaining = store.get_run_alt_baselines(run.id, include_deleted=True)
+    remaining = store.get_run_alt_baselines(run.id)
     assert len(remaining) == 1
     assert remaining[0].id == "alt-silence"
     assert not mute_city_path.exists()

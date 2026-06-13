@@ -173,9 +173,7 @@ def _copy_alt_baselines_to_fork(
     source_run: ManagedRun,
     child_run: ManagedRun,
 ) -> None:
-    baselines = tuple(
-        baseline for baseline in store.get_run_alt_baselines(source_run.id) if baseline.active
-    )
+    baselines = store.active_run_alt_baselines(source_run.id)
     if not baselines:
         return
 

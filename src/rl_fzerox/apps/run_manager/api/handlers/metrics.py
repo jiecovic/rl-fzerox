@@ -41,9 +41,7 @@ def run_track_sampling_payload(store: ManagerStore, run_id: str) -> dict[str, ob
 
 def run_alt_baselines_payload(store: ManagerStore, run_id: str) -> dict[str, object]:
     require_run(store, run_id)
-    baselines = tuple(
-        baseline for baseline in store.get_run_alt_baselines(run_id) if baseline.active
-    )
+    baselines = store.active_run_alt_baselines(run_id)
     return {
         "baselines": [
             {
