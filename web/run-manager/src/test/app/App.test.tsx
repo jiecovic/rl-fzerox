@@ -565,7 +565,7 @@ describe("App", () => {
     );
   });
 
-  it("anchors watch launch failures to the watch control", async () => {
+  it("shows watch launch failures in run feedback", async () => {
     const user = userEvent.setup();
     const run = runFixture({ id: "run-001", name: "ppo_test_1" });
     loadManagerDataMock.mockResolvedValueOnce({
@@ -598,7 +598,7 @@ describe("App", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Saved train config is not compatible with the current schema");
-    expect(watchButton.closest(".run-watch-control")).toContainElement(alert);
+    expect(alert.closest(".configurator-feedback-stack")).not.toBeNull();
     expect(watchRunMock).toHaveBeenCalledWith(
       "run-001",
       "latest",
@@ -606,6 +606,43 @@ describe("App", () => {
       "gliden64",
       "stochastic",
     );
+  });
+
+  it("shows watch process failure events in run feedback", async () => {
+    const user = userEvent.setup();
+    const run = runFixture({
+      id: "run-001",
+      name: "ppo_test_1",
+      recent_events: [
+        {
+          created_at: "2026-06-13T18:00:00+00:00",
+          kind: "watch_failed",
+          message: "latest watch failed: RuntimeError: CUDA error: out of memory",
+        },
+      ],
+    });
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [run],
+      saveGames: [],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("latest watch failed: RuntimeError: CUDA error: out of memory");
+    expect(alert.closest(".configurator-feedback-stack")).not.toBeNull();
   });
 
   it("derives local wall time from active runtime instead of stale initial launch timestamps", async () => {

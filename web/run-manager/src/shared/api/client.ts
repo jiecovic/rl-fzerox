@@ -13,12 +13,15 @@ export {
 } from "@/shared/api/client/live";
 export {
   clearRunAltBaselines,
+  clearRunCourseAltBaselines,
   fetchFreshRunMetrics,
+  fetchRunAltBaselines,
   fetchRunEngineTuningState,
   fetchRunMetrics,
   fetchRunTrackSamplingState,
   getCachedRunMetrics,
   type RunMetricRangeMode,
+  resetRunEngineTuningState,
   resetRunTrackSamplingState,
 } from "@/shared/api/client/metrics";
 export {

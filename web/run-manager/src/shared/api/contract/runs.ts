@@ -143,6 +143,18 @@ export const trackSamplingRuntimeStateSchema = z.object({
   entries: z.array(trackSamplingRuntimeEntrySchema),
 });
 
+export const runAltBaselineSchema = z.object({
+  id: z.string(),
+  course_key: z.string(),
+  reset_variant_key: z.string(),
+  source_entry_id: z.string(),
+  label: z.string(),
+  state_path: z.string(),
+  weight: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
 export const engineTuningRuntimeCandidateSchema = z.object({
   context_key: z.string(),
   course_key: z.string(),
@@ -249,6 +261,12 @@ export const resetTrackSamplingResponseSchema = z.object({
   reset: z.boolean(),
 });
 
+export const resetEngineTuningResponseSchema = z.object({
+  cleared: z.number().int().nonnegative(),
+  reset: z.boolean(),
+  run: managedRunSchema,
+});
+
 export const clearAltBaselinesResponseSchema = z.object({
   cleared: z.number().int().nonnegative(),
   run: managedRunSchema,
@@ -268,6 +286,10 @@ export const runMetricsResponseSchema = z.object({
 
 export const runTrackSamplingResponseSchema = z.object({
   state: trackSamplingRuntimeStateSchema.nullable(),
+});
+
+export const runAltBaselinesResponseSchema = z.object({
+  baselines: z.array(runAltBaselineSchema),
 });
 
 export const runEngineTuningResponseSchema = z.object({
@@ -298,6 +320,7 @@ export type ManagedDraft = z.infer<typeof managedDraftSchema>;
 export type ManagedRun = z.infer<typeof managedRunSummarySchema>;
 export type ManagedRunDetail = z.infer<typeof managedRunSchema>;
 export type ManagedRunMetricSample = z.infer<typeof managedRunMetricSampleSchema>;
+export type RunAltBaseline = z.infer<typeof runAltBaselineSchema>;
 export type RunsLiveUpdate = z.infer<typeof runsLiveUpdateSchema>;
 export type RunTrackSamplingLiveUpdate = z.infer<typeof runTrackSamplingLiveUpdateSchema>;
 export type EngineTuningRuntimeCandidate = z.infer<typeof engineTuningRuntimeCandidateSchema>;

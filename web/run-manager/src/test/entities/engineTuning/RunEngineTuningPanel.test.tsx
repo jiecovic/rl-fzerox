@@ -8,7 +8,7 @@ import type {
   EngineTuningRuntimeState,
 } from "@/shared/api/contract";
 import { configMetadataFixture } from "@/test/fixtures";
-import { cleanup, render, screen } from "@/test/render";
+import { cleanup, fireEvent, render, screen, within } from "@/test/render";
 
 describe("RunEngineTuningPanel", () => {
   afterEach(() => {
@@ -19,11 +19,14 @@ describe("RunEngineTuningPanel", () => {
     render(
       <RunEngineTuningPanel
         artifact="latest"
+        canReset={true}
         enabled={true}
         expanded={true}
+        isResetting={false}
         metadata={configMetadataFixture}
         state={engineTuningStateFixture()}
         onExpandedChange={() => undefined}
+        onReset={() => undefined}
       />,
     );
 
@@ -40,18 +43,61 @@ describe("RunEngineTuningPanel", () => {
     render(
       <RunEngineTuningPanel
         artifact="latest"
+        canReset={true}
         enabled={true}
         expanded={false}
+        isResetting={false}
         metadata={configMetadataFixture}
         state={engineTuningStateFixture()}
         onExpandedChange={onExpandedChange}
+        onReset={() => undefined}
       />,
     );
 
     expect(screen.getByText("Engine tuning")).toBeInTheDocument();
     expect(screen.queryByText("Big Blue 2 · Blue Falcon")).not.toBeInTheDocument();
-    screen.getByRole("button", { name: "Expand" }).click();
+    const summary = screen.getByText("Engine tuning").closest("summary");
+    if (!(summary instanceof HTMLElement)) {
+      throw new Error("engine tuning summary not found");
+    }
+    const details = summary.closest("details");
+    if (!(details instanceof HTMLDetailsElement)) {
+      throw new Error("engine tuning details not found");
+    }
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
     expect(onExpandedChange).toHaveBeenCalledWith(true);
+  });
+
+  it("confirms before resetting tuner sidecars", () => {
+    const onReset = vi.fn();
+
+    render(
+      <RunEngineTuningPanel
+        artifact="latest"
+        canReset={true}
+        enabled={true}
+        expanded={true}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        state={engineTuningStateFixture()}
+        onExpandedChange={() => undefined}
+        onReset={onReset}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset tuner" }));
+
+    expect(screen.getByRole("dialog", { name: "Reset engine tuner" })).toBeInTheDocument();
+    expect(onReset).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Reset engine tuner" })).getByRole("button", {
+        name: "Reset tuner",
+      }),
+    );
+
+    expect(onReset).toHaveBeenCalledTimes(1);
   });
 });
 

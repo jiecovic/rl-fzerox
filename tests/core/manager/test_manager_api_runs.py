@@ -15,6 +15,7 @@ from rl_fzerox.core.manager import (
     ManagerStore,
     default_managed_run_config,
 )
+from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingAltBaseline,
     TrackSamplingRuntimeEntry,
@@ -463,6 +464,146 @@ async def test_manager_api_clears_run_alt_baselines_from_database_and_disk(
     assert payload["run"]["active_alt_baseline_count"] == 0
     assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()
     assert all(not state_path.exists() for state_path in state_paths)
+
+
+async def test_manager_api_lists_and_clears_course_alt_baselines(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run_dir = tmp_path / "runs" / "run-course-alts"
+    run = store.create_run(
+        run_id="run-course-alts",
+        name="Run Course Alts",
+        config=default_managed_run_config(),
+        explicit_run_dir=run_dir,
+    )
+    mute_city_path = run_dir / "baselines" / "alt" / "alt-mute-city.state"
+    silence_path = run_dir / "baselines" / "alt" / "alt-silence.state"
+    for state_path in (mute_city_path, silence_path):
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_bytes(b"state")
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-mute-city",
+            run_id=run.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="mute city chicane",
+            state_path=mute_city_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:00:00+00:00",
+            updated_at="2026-06-13T10:00:00+00:00",
+        )
+    )
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-silence",
+            run_id=run.id,
+            course_key="silence",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="silence_gp_race_novice_blue_falcon",
+            label="silence jump",
+            state_path=silence_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:01:00+00:00",
+            updated_at="2026-06-13T10:01:00+00:00",
+        )
+    )
+    client = _client(tmp_path, store=store)
+
+    list_response = await client.get(f"/api/runs/{run.id}/track-sampling/alt-baselines")
+
+    assert list_response.status_code == 200
+    assert [baseline["id"] for baseline in list_response.json()["baselines"]] == [
+        "alt-mute-city",
+        "alt-silence",
+    ]
+
+    clear_response = await client.delete(
+        f"/api/runs/{run.id}/track-sampling/alt-baselines/course?course_key=mute_city",
+    )
+
+    assert clear_response.status_code == 200
+    payload = clear_response.json()
+    assert payload["cleared"] == 1
+    assert payload["run"]["active_alt_baseline_count"] == 1
+    assert [baseline.id for baseline in store.get_run_alt_baselines(run.id)] == ["alt-silence"]
+    assert not mute_city_path.exists()
+    assert silence_path.exists()
+
+
+async def test_manager_api_resets_engine_tuning_sidecars_for_paused_run(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    config.vehicle.engine_mode = "adaptive_tuner"
+    run = store.create_run(
+        run_id="run-reset-engine-tuner",
+        name="Run Reset Engine Tuner",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "run-reset-engine-tuner",
+    )
+    paused = store.update_run_status(
+        run_id=run.id,
+        status="paused",
+        started_at="2026-06-13T10:00:00+00:00",
+        stopped_at="2026-06-13T11:00:00+00:00",
+        message="paused",
+    )
+    assert paused is not None
+    checkpoint_dirs = [
+        run.run_dir / RUN_LAYOUT.checkpoints_dirname / "latest",
+        run.run_dir / RUN_LAYOUT.checkpoints_dirname / "best",
+        run.run_dir / RUN_LAYOUT.checkpoints_dirname / "000001000",
+    ]
+    for checkpoint_dir in checkpoint_dirs:
+        checkpoint_dir.mkdir(parents=True)
+        (checkpoint_dir / "policy.zip").write_bytes(b"policy")
+    sidecars = [
+        checkpoint_dirs[0] / RUN_LAYOUT.engine_tuning_state_filename,
+        checkpoint_dirs[0] / RUN_LAYOUT.engine_tuning_model_filename,
+        checkpoint_dirs[1] / RUN_LAYOUT.engine_tuning_state_filename,
+        checkpoint_dirs[2] / RUN_LAYOUT.engine_tuning_model_filename,
+    ]
+    for sidecar in sidecars:
+        sidecar.write_bytes(b"contaminated tuner")
+    client = _client(tmp_path, store=store)
+
+    response = await client.post(f"/api/runs/{run.id}/engine-tuning/reset")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["reset"] is True
+    assert payload["cleared"] == len(sidecars)
+    assert payload["run"]["id"] == run.id
+    assert all(not sidecar.exists() for sidecar in sidecars)
+    assert all((checkpoint_dir / "policy.zip").exists() for checkpoint_dir in checkpoint_dirs)
+    events = store.list_recent_run_events((run.id,))[run.id]
+    assert events[0].kind == "engine_tuning_reset"
+
+
+async def test_manager_api_rejects_engine_tuning_reset_for_running_run(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="run-reset-engine-tuner-running",
+        name="Run Reset Engine Tuner Running",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "run-reset-engine-tuner-running",
+    )
+    running = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at="2026-06-13T10:00:00+00:00",
+        stopped_at=None,
+        message="running",
+    )
+    assert running is not None
+    client = _client(tmp_path, store=store)
+
+    response = await client.post(f"/api/runs/{run.id}/engine-tuning/reset")
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "engine tuner can only be reset while the run is not running"
 
 
 async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:

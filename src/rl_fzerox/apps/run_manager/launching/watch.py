@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import threading
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
-from rl_fzerox.apps.run_manager.launching.processes import (
-    fresh_process_log,
-    reap_child_when_done,
-)
+from rl_fzerox.apps.run_manager.launching.processes import fresh_process_log
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.watch import resolve_watch_app_config
 from rl_fzerox.core.manager.registry.viewers import viewer_lease_is_fresh
@@ -18,6 +16,13 @@ from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
 WatchLaunchStatus = Literal["started", "already_running"]
 WatchRenderer = Literal["angrylion", "gliden64"]
+WATCH_STARTUP_TIMEOUT_SECONDS = 8.0
+
+
+class _WatchProcess(Protocol):
+    pid: int
+
+    def wait(self, timeout: float | None = None) -> int: ...
 
 
 def launch_watch_artifact(
@@ -99,10 +104,22 @@ def launch_watch_artifact(
     )
     try:
         raise_if_watch_exited_early(process=process, log_path=log_path)
-    except RuntimeError:
+    except RuntimeError as error:
         store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
+        store.append_run_event(
+            run_id=run.id,
+            kind="watch_failed",
+            message=f"{artifact} watch failed: {error}",
+        )
         raise
-    reap_child_when_done(process)
+    reap_watch_when_done(
+        db_path=store.db_path,
+        process=process,
+        lease_id=lease_id,
+        run_id=run.id,
+        artifact=artifact,
+        log_path=log_path,
+    )
     return "started"
 
 
@@ -129,11 +146,11 @@ def manager_watch_log_path(run_id: str, *, artifact: str) -> Path:
 
 def raise_if_watch_exited_early(
     *,
-    process: subprocess.Popen[bytes],
+    process: _WatchProcess,
     log_path: Path,
 ) -> None:
     try:
-        return_code = process.wait(timeout=0.35)
+        return_code = process.wait(timeout=WATCH_STARTUP_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         return
 
@@ -141,6 +158,70 @@ def raise_if_watch_exited_early(
     if detail is None:
         raise RuntimeError(f"watch exited immediately with code {return_code}; see {log_path}")
     raise RuntimeError(f"watch exited immediately with code {return_code}: {detail}")
+
+
+def reap_watch_when_done(
+    *,
+    db_path: Path,
+    process: _WatchProcess,
+    lease_id: str,
+    run_id: str,
+    artifact: str,
+    log_path: Path,
+) -> None:
+    """Reap a watch process and persist abnormal exits for the run UI."""
+
+    thread = threading.Thread(
+        target=_watch_reaper,
+        kwargs={
+            "db_path": db_path,
+            "process": process,
+            "lease_id": lease_id,
+            "run_id": run_id,
+            "artifact": artifact,
+            "log_path": log_path,
+        },
+        name=f"run-manager-reap-watch-{process.pid}",
+        daemon=True,
+    )
+    thread.start()
+
+
+def _watch_reaper(
+    *,
+    db_path: Path,
+    process: _WatchProcess,
+    lease_id: str,
+    run_id: str,
+    artifact: str,
+    log_path: Path,
+) -> None:
+    return_code = process.wait()
+    if return_code == 0:
+        return
+    store = ManagerStore(db_path)
+    store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
+    store.append_run_event(
+        run_id=run_id,
+        kind="watch_failed",
+        message=_watch_failure_event_message(
+            artifact=artifact,
+            return_code=return_code,
+            log_path=log_path,
+        ),
+    )
+
+
+def _watch_failure_event_message(
+    *,
+    artifact: str,
+    return_code: int,
+    log_path: Path,
+) -> str:
+    detail = watch_failure_detail(log_path)
+    if detail is None:
+        return f"{artifact} watch exited with code {return_code}; see {log_path}"
+    return f"{artifact} watch failed: {detail}"
 
 
 def watch_failure_detail(log_path: Path) -> str | None:

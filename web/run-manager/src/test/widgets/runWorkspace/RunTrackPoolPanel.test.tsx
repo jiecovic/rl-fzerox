@@ -30,6 +30,7 @@ const emptyGenerationStats = {
 describe("RunTrackPoolPanel", () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   it("resets the selected cup when the opened run changes", async () => {
@@ -322,6 +323,15 @@ describe("RunTrackPoolPanel", () => {
     }
     const selectedCourseIds = [firstCup.course_ids[0], firstCup.course_ids[1]];
     const onClearAltBaselines = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ baselines: [] }), {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        }),
+      ),
+    );
 
     render(
       <RunTrackPoolPanel
@@ -340,7 +350,8 @@ describe("RunTrackPoolPanel", () => {
     );
 
     expect(screen.getByText(/2 alt baselines/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Clear alt baselines" }));
+    await user.click(screen.getByText("Alt baselines (2)"));
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
 
     expect(screen.getByRole("dialog", { name: "Clear alt baselines" })).toBeInTheDocument();
     expect(onClearAltBaselines).not.toHaveBeenCalled();
@@ -352,6 +363,76 @@ describe("RunTrackPoolPanel", () => {
     );
 
     expect(onClearAltBaselines).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders compact alt-baseline course rows with difficulty labels", async () => {
+    const user = userEvent.setup();
+    const firstCup = configMetadataFixture.track_cups[0];
+    if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
+      throw new Error("fixture cup must provide at least two courses");
+    }
+    const selectedCourseIds = [firstCup.course_ids[0], firstCup.course_ids[1]];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            baselines: [
+              {
+                id: "alt-001",
+                course_key: firstCup.course_ids[0],
+                reset_variant_key: "mode=gp_race|gp_difficulty=novice|vehicle=blue_falcon",
+                source_entry_id: `${firstCup.course_ids[0]}_gp_race_novice_blue_falcon`,
+                label: "frame 1200",
+                state_path: "/tmp/alt-001.state",
+                weight: 1,
+                created_at: "2026-06-13T17:00:00+00:00",
+                updated_at: "2026-06-13T17:00:00+00:00",
+              },
+              {
+                id: "alt-002",
+                course_key: firstCup.course_ids[1],
+                reset_variant_key: "mode=gp_race|gp_difficulty=master|vehicle=blue_falcon",
+                source_entry_id: `${firstCup.course_ids[1]}_gp_race_master_blue_falcon`,
+                label: "frame 2400",
+                state_path: "/tmp/alt-002.state",
+                weight: 1,
+                created_at: "2026-06-13T17:05:00+00:00",
+                updated_at: "2026-06-13T17:05:00+00:00",
+              },
+            ],
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+            status: 200,
+          },
+        ),
+      ),
+    );
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isClearingAltBaselines={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
+        onReset={() => undefined}
+        run={runFixture({
+          active_alt_baseline_count: 2,
+          config: runConfigWithSelectedCourses(selectedCourseIds),
+        })}
+        state={trackSamplingStateForCourses(selectedCourseIds)}
+      />,
+    );
+
+    await user.click(screen.getByText("Alt baselines (2)"));
+
+    expect(screen.queryByRole("button", { name: /refresh/i })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Novice · frame 1200 · 2026-06-13 17:00:00 UTC"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Master · frame 2400 · 2026-06-13 17:05:00 UTC")).toBeInTheDocument();
   });
 
   it("renders the adaptive step-balanced mode label", () => {

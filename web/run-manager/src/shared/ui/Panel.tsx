@@ -35,6 +35,7 @@ export function Notice({
         "rounded-lg border border-app-border bg-app-surface p-4 text-app-muted",
         tone === "error" ? "text-app-danger" : undefined,
       )}
+      role={tone === "error" ? "alert" : undefined}
     >
       {children}
     </div>

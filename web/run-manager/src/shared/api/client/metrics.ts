@@ -6,7 +6,10 @@ import {
   type EngineTuningRuntimeState,
   type ManagedRunDetail,
   type ManagedRunMetricSample,
+  type RunAltBaseline,
+  resetEngineTuningResponseSchema,
   resetTrackSamplingResponseSchema,
+  runAltBaselinesResponseSchema,
   runEngineTuningResponseSchema,
   runMetricsResponseSchema,
   runTrackSamplingResponseSchema,
@@ -40,6 +43,17 @@ export async function fetchRunTrackSamplingState(
   return payload.state;
 }
 
+export async function fetchRunAltBaselines(
+  runId: string,
+  options: RequestOptions = {},
+): Promise<RunAltBaseline[]> {
+  const payload = parseApiPayload(
+    runAltBaselinesResponseSchema,
+    await getJson(`/api/runs/${encodeURIComponent(runId)}/track-sampling/alt-baselines`, options),
+  );
+  return payload.baselines;
+}
+
 export async function fetchRunEngineTuningState(
   runId: string,
   artifact: "latest" | "best" | "final" = "latest",
@@ -62,9 +76,30 @@ export async function resetRunTrackSamplingState(runId: string): Promise<void> {
   parseApiPayload(resetTrackSamplingResponseSchema, await parseJson(response));
 }
 
+export async function resetRunEngineTuningState(runId: string): Promise<ManagedRunDetail> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/engine-tuning/reset`, {
+    method: "POST",
+  });
+  const payload = parseApiPayload(resetEngineTuningResponseSchema, await parseJson(response));
+  return payload.run;
+}
+
 export async function clearRunAltBaselines(runId: string): Promise<ManagedRunDetail> {
   const response = await fetch(
     `/api/runs/${encodeURIComponent(runId)}/track-sampling/alt-baselines`,
+    { method: "DELETE" },
+  );
+  const payload = parseApiPayload(clearAltBaselinesResponseSchema, await parseJson(response));
+  return payload.run;
+}
+
+export async function clearRunCourseAltBaselines(
+  runId: string,
+  courseKey: string,
+): Promise<ManagedRunDetail> {
+  const query = new URLSearchParams({ course_key: courseKey });
+  const response = await fetch(
+    `/api/runs/${encodeURIComponent(runId)}/track-sampling/alt-baselines/course?${query.toString()}`,
     { method: "DELETE" },
   );
   const payload = parseApiPayload(clearAltBaselinesResponseSchema, await parseJson(response));

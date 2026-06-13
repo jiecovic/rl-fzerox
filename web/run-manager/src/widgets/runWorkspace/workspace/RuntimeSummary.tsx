@@ -46,24 +46,30 @@ import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 interface RunRuntimeSummaryProps {
   actions: RunWorkspaceActionState;
   allRuns: ManagedRun[];
+  canResetEngineTuning: boolean;
   metadata: ConfigMetadata;
   onShowCharts: (runId: string) => void;
   run: ManagedRunDetail;
   engineTuningExpanded: boolean;
   engineTuningState: EngineTuningRuntimeState | null;
+  isResettingEngineTuning: boolean;
   onEngineTuningExpandedChange: (expanded: boolean) => void;
+  onResetEngineTuning: () => void;
   trackSamplingState: TrackSamplingRuntimeState | null;
 }
 
 export function RunRuntimeSummary({
   actions,
   allRuns,
+  canResetEngineTuning,
   metadata,
   onShowCharts,
   run,
   engineTuningExpanded,
   engineTuningState,
+  isResettingEngineTuning,
   onEngineTuningExpandedChange,
+  onResetEngineTuning,
   trackSamplingState,
 }: RunRuntimeSummaryProps) {
   const nowMs = useRunClock(run.status);
@@ -249,17 +255,8 @@ export function RunRuntimeSummary({
           </div>
         </fieldset>
 
-        <fieldset className={cn(toolbarPanelClass(), "run-watch-control relative")}>
+        <fieldset className={toolbarPanelClass()}>
           <legend className={toolbarPanelTitleClass()}>Watch launch</legend>
-          {actions.watchToast !== null ? (
-            <div
-              aria-live="polite"
-              className={watchToastClass(actions.watchToast.tone)}
-              role={actions.watchToast.tone === "error" ? "alert" : "status"}
-            >
-              {actions.watchToast.message}
-            </div>
-          ) : null}
           <div className="flex min-w-0 flex-wrap items-end gap-2">
             <ToolbarSelect label="Checkpoint">
               <FieldSelect
@@ -351,21 +348,26 @@ export function RunRuntimeSummary({
 
       <RunTrackPoolPanel
         canReset={run.status === "stopped"}
+        clearingAltBaselineCourseKey={actions.clearingAltBaselineCourseKey}
         isClearingAltBaselines={actions.isClearingAltBaselines}
         isResetting={actions.isResettingTrackPool}
         metadata={metadata}
-        onClearAltBaselines={() => void actions.clearAltBaselines()}
+        onClearAltBaselines={actions.clearAltBaselines}
+        onClearCourseAltBaselines={actions.clearCourseAltBaselines}
         onReset={() => void actions.resetTrackPoolState()}
         run={run}
         state={trackSamplingState}
       />
       <RunEngineTuningPanel
         artifact={actions.selectedWatchArtifact}
+        canReset={canResetEngineTuning}
         enabled={run.config.vehicle.engine_mode === "adaptive_tuner"}
         expanded={engineTuningExpanded}
+        isResetting={isResettingEngineTuning}
         metadata={metadata}
         state={engineTuningState}
         onExpandedChange={onEngineTuningExpandedChange}
+        onReset={onResetEngineTuning}
       />
     </div>
   );
@@ -407,15 +409,6 @@ function toolbarSelectClass(widthClass: string) {
   return cn(
     "h-10 px-2.5 pr-[30px] text-xs lowercase hover:border-app-border-strong hover:bg-app-surface",
     widthClass,
-  );
-}
-
-function watchToastClass(tone: "error" | "info") {
-  return cn(
-    "absolute bottom-[calc(100%+8px)] left-0 z-[2] w-max max-w-[min(44ch,calc(100vw-48px))] [overflow-wrap:anywhere] border border-app-border-strong bg-[color-mix(in_srgb,var(--surface)_94%,var(--accent)_6%)] px-2.5 py-2 text-xs leading-normal whitespace-normal text-app-text shadow-[var(--shadow-md)]",
-    tone === "error"
-      ? "border-[var(--danger-border)] bg-[color-mix(in_srgb,var(--surface)_90%,var(--danger)_10%)]"
-      : undefined,
   );
 }
 

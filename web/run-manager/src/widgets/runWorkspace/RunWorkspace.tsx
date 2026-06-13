@@ -30,10 +30,12 @@ interface RunWorkspaceProps {
   allRuns: ManagedRun[];
   metadata: ConfigMetadata;
   onClearAltBaselines: (runId: string) => Promise<void>;
+  onClearCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
   onFork: (runId: string, artifact: "latest" | "best", copyAltBaselines: boolean) => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
   onRename: (runId: string, name: string) => Promise<void>;
+  onResetEngineTuning: (runId: string) => Promise<void>;
   onResume: (runId: string) => Promise<void>;
   onResetTrackPool: (runId: string) => Promise<void>;
   onShowCharts: (runId: string) => void;
@@ -52,10 +54,12 @@ export function RunWorkspace({
   allRuns,
   metadata,
   onClearAltBaselines,
+  onClearCourseAltBaselines,
   onCreateDraftFromRun,
   onFork,
   onOpenDirectory,
   onRename,
+  onResetEngineTuning,
   onResume,
   onResetTrackPool,
   onShowCharts,
@@ -66,6 +70,8 @@ export function RunWorkspace({
   const [runName, setRunName] = useState(run.name);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [configSection, setConfigSection] = useState<ConfigSection>("training");
+  const [engineTuningResetError, setEngineTuningResetError] = useState<string | null>(null);
+  const [isResettingEngineTuning, setIsResettingEngineTuning] = useState(false);
   const [engineTuningExpansion, setEngineTuningExpansion] = useState({
     expanded: false,
     runId: run.id,
@@ -82,6 +88,7 @@ export function RunWorkspace({
   const actions = useRunWorkspaceActions({
     clearTrackSamplingState: setTrackSamplingState,
     onClearAltBaselines,
+    onClearCourseAltBaselines,
     onCreateDraftFromRun,
     onFork,
     onOpenDirectory,
@@ -94,15 +101,18 @@ export function RunWorkspace({
     runName,
   });
   const engineTuningEnabled = run.config.vehicle.engine_mode === "adaptive_tuner";
-  const { engineTuningError, engineTuningState } = useRunEngineTuningState(
+  const { engineTuningError, engineTuningState, setEngineTuningState } = useRunEngineTuningState(
     run.id,
     run.status,
     engineTuningEnabled && engineTuningExpanded,
     actions.selectedWatchArtifact,
   );
+  const watchFailureMessage = actions.controlError === null ? latestWatchFailureMessage(run) : null;
   const hasFeedback =
     actions.controlError !== null ||
+    watchFailureMessage !== null ||
     engineTuningError !== null ||
+    engineTuningResetError !== null ||
     trackSamplingError !== null ||
     (previewEnabled && previewError !== null);
 
@@ -115,6 +125,21 @@ export function RunWorkspace({
     const renamed = await actions.renameRunLabel(name);
     if (renamed) {
       setRenameDialogOpen(false);
+    }
+  }
+
+  async function resetEngineTuning() {
+    setIsResettingEngineTuning(true);
+    setEngineTuningResetError(null);
+    try {
+      await onResetEngineTuning(run.id);
+      setEngineTuningState(null);
+    } catch (caught) {
+      setEngineTuningResetError(
+        caught instanceof Error ? caught.message : "failed to reset engine tuner",
+      );
+    } finally {
+      setIsResettingEngineTuning(false);
     }
   }
 
@@ -155,6 +180,25 @@ export function RunWorkspace({
         onSelect={(copyAltBaselines) => void actions.confirmForkAltBaselineChoice(copyAltBaselines)}
       />
 
+      {hasFeedback ? (
+        <div className="configurator-feedback-stack">
+          {actions.controlError !== null ? (
+            <Notice tone="error">{actions.controlError}</Notice>
+          ) : null}
+          {watchFailureMessage !== null ? (
+            <Notice tone="error">{watchFailureMessage}</Notice>
+          ) : null}
+          {engineTuningError !== null ? <Notice tone="error">{engineTuningError}</Notice> : null}
+          {engineTuningResetError !== null ? (
+            <Notice tone="error">{engineTuningResetError}</Notice>
+          ) : null}
+          {trackSamplingError !== null ? <Notice tone="error">{trackSamplingError}</Notice> : null}
+          {previewEnabled && previewError !== null ? (
+            <Notice tone="error">{previewError}</Notice>
+          ) : null}
+        </div>
+      ) : null}
+
       <RunRuntimeSummary
         actions={actions}
         allRuns={allRuns}
@@ -162,23 +206,13 @@ export function RunWorkspace({
         onShowCharts={onShowCharts}
         run={run}
         engineTuningExpanded={engineTuningExpanded}
+        canResetEngineTuning={run.status !== "running"}
         engineTuningState={engineTuningState}
+        isResettingEngineTuning={isResettingEngineTuning}
         trackSamplingState={trackSamplingState}
         onEngineTuningExpandedChange={setEngineTuningExpanded}
+        onResetEngineTuning={() => void resetEngineTuning()}
       />
-
-      {hasFeedback ? (
-        <div className="configurator-feedback-stack">
-          {actions.controlError !== null ? (
-            <Notice tone="error">{actions.controlError}</Notice>
-          ) : null}
-          {engineTuningError !== null ? <Notice tone="error">{engineTuningError}</Notice> : null}
-          {trackSamplingError !== null ? <Notice tone="error">{trackSamplingError}</Notice> : null}
-          {previewEnabled && previewError !== null ? (
-            <Notice tone="error">{previewError}</Notice>
-          ) : null}
-        </div>
-      ) : null}
 
       <RunReadonlyConfig
         metadata={metadata}
@@ -189,4 +223,9 @@ export function RunWorkspace({
       />
     </Panel>
   );
+}
+
+function latestWatchFailureMessage(run: ManagedRunDetail): string | null {
+  const event = run.recent_events.find((candidate) => candidate.kind === "watch_failed");
+  return event?.message ?? null;
 }

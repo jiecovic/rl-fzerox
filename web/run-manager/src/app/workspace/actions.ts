@@ -14,6 +14,7 @@ import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import type { DraftEditorSession } from "@/app/workspace/types";
 import {
   clearRunAltBaselines,
+  clearRunCourseAltBaselines,
   createDraftWithSource,
   createSaveGame,
   deleteDraft,
@@ -28,6 +29,7 @@ import {
   openSaveGameDirectory,
   renameRun,
   renameSaveGame,
+  resetRunEngineTuningState,
   resetRunTrackSamplingState,
   resumeRun,
   startCareerModeRunner,
@@ -115,6 +117,8 @@ export interface WorkspaceActions {
   renameManagedRun: (runId: string, name: string) => Promise<void>;
   renameManagedSaveGame: (saveGameId: string, name: string) => Promise<void>;
   clearManagedRunAltBaselines: (runId: string) => Promise<void>;
+  clearManagedRunCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
+  resetManagedRunEngineTuning: (runId: string) => Promise<void>;
   resetManagedRunTrackPool: (runId: string) => Promise<void>;
   resumeManagedRun: (runId: string) => Promise<void>;
   saveDraft: (
@@ -425,8 +429,22 @@ export function useWorkspaceActions({
     await resetRunTrackSamplingState(runId);
   }
 
+  async function resetManagedRunEngineTuning(runId: string) {
+    const run = await resetRunEngineTuningState(runId);
+    upsertRunDetail(run);
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    await reloadManagerData({ showLoading: false });
+  }
+
   async function clearManagedRunAltBaselines(runId: string) {
     const run = await clearRunAltBaselines(runId);
+    upsertRunDetail(run);
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    await reloadManagerData({ showLoading: false });
+  }
+
+  async function clearManagedRunCourseAltBaselines(runId: string, courseKey: string) {
+    const run = await clearRunCourseAltBaselines(runId, courseKey);
     upsertRunDetail(run);
     setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
     await reloadManagerData({ showLoading: false });
@@ -463,6 +481,8 @@ export function useWorkspaceActions({
     renameManagedRun,
     renameManagedSaveGame,
     clearManagedRunAltBaselines,
+    clearManagedRunCourseAltBaselines,
+    resetManagedRunEngineTuning,
     resetManagedRunTrackPool,
     resumeManagedRun,
     saveDraft,

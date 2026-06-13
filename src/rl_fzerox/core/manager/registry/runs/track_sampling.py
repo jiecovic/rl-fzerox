@@ -134,6 +134,31 @@ def clear_run_alt_baselines(store: ManagerStore, run_id: str) -> int:
     return len(baselines)
 
 
+def clear_run_alt_baselines_for_course(
+    store: ManagerStore,
+    *,
+    run_id: str,
+    course_key: str,
+) -> int:
+    store._ensure_schema_initialized()
+    with store._orm_session() as session:
+        baselines = tuple(
+            session.scalars(
+                select(RunAltBaselineModel).where(
+                    RunAltBaselineModel.run_id == run_id,
+                    RunAltBaselineModel.course_key == course_key,
+                )
+            )
+        )
+        state_paths = tuple(Path(baseline.state_path) for baseline in baselines)
+        for baseline in baselines:
+            session.delete(baseline)
+
+    for state_path in state_paths:
+        state_path.unlink(missing_ok=True)
+    return len(baselines)
+
+
 def get_run_track_sampling_state(
     store: ManagerStore,
     run_id: str,

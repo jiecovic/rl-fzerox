@@ -163,10 +163,12 @@ export function WorkspaceBody({
             allRuns={runs}
             metadata={metadata}
             onClearAltBaselines={actions.clearManagedRunAltBaselines}
+            onClearCourseAltBaselines={actions.clearManagedRunCourseAltBaselines}
             onCreateDraftFromRun={actions.createDraftFromManagedRun}
             onFork={actions.forkManagedRun}
             onOpenDirectory={actions.openManagedRunDirectory}
             onRename={actions.renameManagedRun}
+            onResetEngineTuning={actions.resetManagedRunEngineTuning}
             onResetTrackPool={actions.resetManagedRunTrackPool}
             onResume={actions.resumeManagedRun}
             onShowCharts={sessions.showRunCharts}

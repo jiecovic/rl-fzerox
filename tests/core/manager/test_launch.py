@@ -12,7 +12,11 @@ import pytest
 
 from rl_fzerox.apps.run_manager.launch import ManagerRunLauncher
 from rl_fzerox.apps.run_manager.launching.save_games import active_career_mode_runner_pid
-from rl_fzerox.apps.run_manager.launching.watch import active_watch_pid, watch_failure_detail
+from rl_fzerox.apps.run_manager.launching.watch import (
+    _watch_reaper,
+    active_watch_pid,
+    watch_failure_detail,
+)
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_managed_run_config
 from rl_fzerox.core.training.runs import RUN_LAYOUT
@@ -611,6 +615,53 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
     assert "# launched_at=" in log_text
     assert "# command=" in log_text
     assert "watch started" in log_text
+
+
+def test_watch_reaper_records_abnormal_exit(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="watch-run",
+        name="Watch Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "watch-run",
+    )
+    lease_id = store.viewer_lease_id(
+        kind="run_watch",
+        owner_id=run.id,
+        qualifier="latest",
+    )
+    store.upsert_viewer_lease(
+        lease_id=lease_id,
+        kind="run_watch",
+        owner_id=run.id,
+        pid=4321,
+        qualifier="latest",
+    )
+    log_path = tmp_path / "watch.log"
+    log_path.write_text("RuntimeError: CUDA error: out of memory\n", encoding="utf-8")
+
+    class _ExitedProcess:
+        pid = 4321
+
+        def wait(self, timeout: float | None = None) -> int:
+            del timeout
+            return 1
+
+    _watch_reaper(
+        db_path=store.db_path,
+        process=_ExitedProcess(),
+        lease_id=lease_id,
+        run_id=run.id,
+        artifact="latest",
+        log_path=log_path,
+    )
+
+    assert store.get_viewer_lease(lease_id) is None
+    events = store.list_recent_run_events((run.id,))[run.id]
+    assert events[0].kind == "watch_failed"
+    assert events[0].message == "latest watch failed: RuntimeError: CUDA error: out of memory"
 
 
 def test_watch_failure_detail_ignores_launch_log_headers(tmp_path: Path) -> None:

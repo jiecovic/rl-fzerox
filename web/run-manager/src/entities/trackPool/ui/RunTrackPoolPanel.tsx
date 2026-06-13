@@ -9,16 +9,19 @@ import {
   trackSamplingModeLabel,
   trackSamplingUpdatedLabel,
 } from "@/entities/trackPool/model/view";
+import { RunAltBaselinesPanel } from "@/entities/trackPool/ui/RunAltBaselinesPanel";
 import { CupTabs, TrackPoolBody } from "@/entities/trackPool/ui/TrackPoolParts";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 
 export function RunTrackPoolPanel({
   canReset,
+  clearingAltBaselineCourseKey,
   isClearingAltBaselines,
   isResetting,
   metadata,
   onClearAltBaselines,
+  onClearCourseAltBaselines,
   onReset,
   run,
   state,
@@ -31,7 +34,6 @@ export function RunTrackPoolPanel({
   const poolSelectionKey = `${run.id}:${run.config.tracks.selected_course_ids.join("\0")}`;
   const firstCupId = poolView.cups[0]?.id ?? null;
   const [cupSelection, setCupSelection] = useState<{ cupId: string; poolKey: string } | null>(null);
-  const [confirmClearAltOpen, setConfirmClearAltOpen] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const activeAltBaselineCount = run.active_alt_baseline_count;
   const altBaselineLabel =
@@ -55,8 +57,8 @@ export function RunTrackPoolPanel({
   const activeCup = poolView.cups.find((cup) => cup.id === selectedCupId) ?? null;
 
   return (
-    <div className="col-span-full border border-app-border bg-app-surface">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 border-b border-app-border px-3.5 py-3 max-[900px]:grid-cols-1">
+    <div className="col-span-full grid gap-3 border border-app-border bg-app-surface">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-app-border px-3.5 py-3 max-[900px]:grid-cols-1">
         <div>
           <strong>Track pool</strong>
           <div className="text-xs text-app-muted">
@@ -73,41 +75,46 @@ export function RunTrackPoolPanel({
         <Button
           className="h-8 justify-self-end px-3 text-xs max-[900px]:justify-self-start"
           type="button"
-          tone="danger"
-          disabled={activeAltBaselineCount === 0 || isClearingAltBaselines}
-          onClick={() => setConfirmClearAltOpen(true)}
-        >
-          {isClearingAltBaselines ? "Clearing..." : "Clear alt baselines"}
-        </Button>
-        <Button
-          className="h-8 justify-self-end px-3 text-xs max-[900px]:justify-self-start"
-          type="button"
           disabled={!canReset || isResetting}
           onClick={() => setConfirmResetOpen(true)}
         >
           {isResetting ? "Resetting..." : "Reset stats"}
         </Button>
       </div>
-      <CupTabs activeCup={activeCup} cups={poolView.cups} onSelectCup={selectCup} />
-      {visibleState === null ? (
-        <div className="px-3.5 py-3 text-sm text-app-muted">{trackPoolEmptyMessage(run)}</div>
-      ) : activeCup === null ? null : (
-        <TrackPoolBody
-          activeCup={activeCup}
-          stepMetricLabel={poolView.stepMetricLabel}
-          showStepTarget={poolView.showStepTarget}
-          xCupRegenerationMinEpisodes={
-            run.config.tracks.x_cup_auto_regeneration.enabled
-              ? run.config.tracks.x_cup_auto_regeneration.min_episodes
-              : null
-          }
-          xCupRegenerationThreshold={
-            run.config.tracks.x_cup_auto_regeneration.enabled
-              ? run.config.tracks.x_cup_auto_regeneration.completion_threshold
-              : null
-          }
-        />
-      )}
+      <div className="grid gap-3">
+        <div>
+          <CupTabs activeCup={activeCup} cups={poolView.cups} onSelectCup={selectCup} />
+          {visibleState === null ? (
+            <div className="px-3.5 py-3 text-sm text-app-muted">{trackPoolEmptyMessage(run)}</div>
+          ) : activeCup === null ? null : (
+            <TrackPoolBody
+              activeCup={activeCup}
+              stepMetricLabel={poolView.stepMetricLabel}
+              showStepTarget={poolView.showStepTarget}
+              xCupRegenerationMinEpisodes={
+                run.config.tracks.x_cup_auto_regeneration.enabled
+                  ? run.config.tracks.x_cup_auto_regeneration.min_episodes
+                  : null
+              }
+              xCupRegenerationThreshold={
+                run.config.tracks.x_cup_auto_regeneration.enabled
+                  ? run.config.tracks.x_cup_auto_regeneration.completion_threshold
+                  : null
+              }
+            />
+          )}
+        </div>
+        <div className="px-3.5 pb-3">
+          <RunAltBaselinesPanel
+            clearingCourseKey={clearingAltBaselineCourseKey}
+            isClearingAll={isClearingAltBaselines}
+            metadata={metadata}
+            onClearAll={onClearAltBaselines}
+            onClearCourse={onClearCourseAltBaselines}
+            run={run}
+          />
+        </div>
+      </div>
       <ConfirmDialog
         confirmLabel="Reset stats"
         description={`Reset the course distribution history for "${run.name}"? This clears the tracked episode, finish, and env-step counts for this run.`}
@@ -117,18 +124,6 @@ export function RunTrackPoolPanel({
         onConfirm={() => {
           setConfirmResetOpen(false);
           onReset();
-        }}
-      />
-      <ConfirmDialog
-        busy={isClearingAltBaselines}
-        confirmLabel="Clear alt baselines"
-        description={`Delete ${altBaselineLabel} for "${run.name}"? This removes the recorded state files from disk.`}
-        open={confirmClearAltOpen}
-        title="Clear alt baselines"
-        onClose={() => setConfirmClearAltOpen(false)}
-        onConfirm={() => {
-          onClearAltBaselines();
-          setConfirmClearAltOpen(false);
         }}
       />
     </div>

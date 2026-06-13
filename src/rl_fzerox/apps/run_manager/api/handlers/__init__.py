@@ -23,7 +23,10 @@ from rl_fzerox.apps.run_manager.api.handlers.lineages import (
 )
 from rl_fzerox.apps.run_manager.api.handlers.metrics import (
     clear_run_alt_baselines_payload,
+    clear_run_course_alt_baselines_payload,
+    reset_run_engine_tuning_payload,
     reset_run_track_sampling_payload,
+    run_alt_baselines_payload,
     run_engine_tuning_payload,
     run_metrics_payload,
     run_track_sampling_payload,
@@ -66,6 +69,7 @@ from rl_fzerox.apps.run_manager.api.handlers.transfer import (
 __all__ = [
     "config_metadata_payload",
     "clear_run_alt_baselines_payload",
+    "clear_run_course_alt_baselines_payload",
     "create_draft_payload",
     "create_save_game_payload",
     "delete_draft_payload",
@@ -82,7 +86,9 @@ __all__ = [
     "pause_run_payload",
     "policy_preview_payload",
     "rebuild_tensorboard_views_payload",
+    "reset_run_engine_tuning_payload",
     "reset_run_track_sampling_payload",
+    "run_alt_baselines_payload",
     "run_engine_tuning_payload",
     "resume_run_payload",
     "run_metrics_payload",

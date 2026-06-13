@@ -230,11 +230,19 @@ export function useRunEngineTuningState(
 ): {
   engineTuningError: string | null;
   engineTuningState: EngineTuningRuntimeState | null;
+  setEngineTuningState: (state: EngineTuningRuntimeState | null) => void;
 } {
   const [engineTuningState, setEngineTuningState] = useState<EngineTuningRuntimeState | null>(null);
   const [engineTuningError, setEngineTuningError] = useState<string | null>(null);
   const engineTuningStateKeyRef = useRef<string | null>(null);
   const documentVisible = useDocumentVisible();
+  const commitEngineTuningState = useCallback(
+    (state: EngineTuningRuntimeState | null) => {
+      engineTuningStateKeyRef.current = engineTuningStateKey(runId, state);
+      setEngineTuningState(state);
+    },
+    [runId],
+  );
 
   useEffect(() => {
     if (!enabled) {
@@ -302,7 +310,11 @@ export function useRunEngineTuningState(
     };
   }, [artifact, documentVisible, enabled, runId, status]);
 
-  return { engineTuningError, engineTuningState };
+  return {
+    engineTuningError,
+    engineTuningState,
+    setEngineTuningState: commitEngineTuningState,
+  };
 }
 
 function trackSamplingStateKey(runId: string, state: TrackSamplingRuntimeState | null) {

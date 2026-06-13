@@ -9,16 +9,11 @@ import type {
 } from "@/shared/api/contract";
 
 export type CheckpointArtifact = "latest" | "best";
-export type WatchToastTone = "info" | "error";
-
-export interface WatchToastState {
-  message: string;
-  tone: WatchToastTone;
-}
 
 export interface RunWorkspaceActionsProps {
   clearTrackSamplingState: (state: TrackSamplingRuntimeState | null) => void;
   onClearAltBaselines: (runId: string) => Promise<void>;
+  onClearCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
   onFork: (runId: string, artifact: CheckpointArtifact, copyAltBaselines: boolean) => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
@@ -46,11 +41,13 @@ export interface RunWorkspaceActionState {
   copyRunId: () => Promise<void>;
   createDraftFromRun: () => Promise<void>;
   clearAltBaselines: () => Promise<void>;
+  clearCourseAltBaselines: (courseKey: string) => Promise<void>;
   cancelForkAltBaselineChoice: () => void;
   confirmForkAltBaselineChoice: (copyAltBaselines: boolean) => Promise<void>;
   forkRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
   isCreatingDraftFromRun: boolean;
   isClearingAltBaselines: boolean;
+  clearingAltBaselineCourseKey: string | null;
   isForking: boolean;
   isOpeningDirectory: boolean;
   isRenaming: boolean;
@@ -73,7 +70,6 @@ export interface RunWorkspaceActionState {
   selectedWatchRenderer: WatchRenderer;
   setSelectedWatchRenderer: (renderer: WatchRenderer) => void;
   stopRun: () => Promise<void>;
-  watchToast: WatchToastState | null;
   watchRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
   watchingArtifact: CheckpointArtifact | null;
 }
@@ -86,6 +82,7 @@ export interface PendingForkAltBaselineChoice {
 export function useRunWorkspaceActions({
   clearTrackSamplingState,
   onClearAltBaselines,
+  onClearCourseAltBaselines,
   onCreateDraftFromRun,
   onFork,
   onOpenDirectory,
@@ -98,7 +95,6 @@ export function useRunWorkspaceActions({
   runName,
 }: RunWorkspaceActionsProps): RunWorkspaceActionState {
   const [controlError, setControlError] = useState<string | null>(null);
-  const [watchToast, setWatchToast] = useState<WatchToastState | null>(null);
   const [copiedRunId, setCopiedRunId] = useState(false);
   const [isOpeningDirectory, setIsOpeningDirectory] = useState(false);
   const [isCreatingDraftFromRun, setIsCreatingDraftFromRun] = useState(false);
@@ -120,6 +116,9 @@ export function useRunWorkspaceActions({
   });
   const [watchingArtifact, setWatchingArtifact] = useState<CheckpointArtifact | null>(null);
   const [isClearingAltBaselines, setIsClearingAltBaselines] = useState(false);
+  const [clearingAltBaselineCourseKey, setClearingAltBaselineCourseKey] = useState<string | null>(
+    null,
+  );
   const [isResettingTrackPool, setIsResettingTrackPool] = useState(false);
   const [pendingForkAltBaselineChoice, setPendingForkAltBaselineChoice] =
     useState<PendingForkAltBaselineChoice | null>(null);
@@ -143,22 +142,9 @@ export function useRunWorkspaceActions({
     };
   }, [copiedRunId]);
 
-  useEffect(() => {
-    if (watchToast === null) {
-      return undefined;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setWatchToast(null);
-    }, 3_200);
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [watchToast]);
-
   async function resumeRun() {
     setIsResuming(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onResume(run.id);
     } catch (caught) {
@@ -171,7 +157,6 @@ export function useRunWorkspaceActions({
   async function stopRun() {
     setIsStopping(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onStop(run.id);
     } catch (caught) {
@@ -189,7 +174,6 @@ export function useRunWorkspaceActions({
     }
     setIsRenaming(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onRename(run.id, nextName);
       return true;
@@ -204,7 +188,6 @@ export function useRunWorkspaceActions({
   async function openRunDirectoryInBrowser() {
     setIsOpeningDirectory(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onOpenDirectory(run.id);
     } catch (caught) {
@@ -217,7 +200,6 @@ export function useRunWorkspaceActions({
   async function forkRunArtifact(artifact: CheckpointArtifact) {
     if (run.active_alt_baseline_count > 0) {
       setControlError(null);
-      setWatchToast(null);
       setPendingForkAltBaselineChoice({
         artifact,
         count: run.active_alt_baseline_count,
@@ -243,7 +225,6 @@ export function useRunWorkspaceActions({
   async function executeForkRunArtifact(artifact: CheckpointArtifact, copyAltBaselines: boolean) {
     setIsForking(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onFork(run.id, artifact, copyAltBaselines);
     } catch (caught) {
@@ -256,7 +237,6 @@ export function useRunWorkspaceActions({
   async function createDraftFromRun() {
     setIsCreatingDraftFromRun(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onCreateDraftFromRun(run.id);
     } catch (caught) {
@@ -269,7 +249,6 @@ export function useRunWorkspaceActions({
   async function watchRunArtifact(artifact: CheckpointArtifact) {
     setWatchingArtifact(artifact);
     setControlError(null);
-    setWatchToast(null);
     try {
       const status = await onWatch(
         run.id,
@@ -279,16 +258,11 @@ export function useRunWorkspaceActions({
         selectedWatchPolicyMode,
       );
       if (status === "already_running") {
-        setWatchToast({
-          message: `${artifact} watch is already running`,
-          tone: "info",
-        });
+        setControlError(`${artifact} watch is already running`);
+        return;
       }
     } catch (caught) {
-      setWatchToast({
-        message: caught instanceof Error ? caught.message : `failed to watch ${artifact}`,
-        tone: "error",
-      });
+      setControlError(caught instanceof Error ? caught.message : `failed to watch ${artifact}`);
     } finally {
       setWatchingArtifact((current) => (current === artifact ? null : current));
     }
@@ -297,7 +271,6 @@ export function useRunWorkspaceActions({
   async function resetTrackPoolState() {
     setIsResettingTrackPool(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onResetTrackPool(run.id);
       clearTrackSamplingState(null);
@@ -313,7 +286,6 @@ export function useRunWorkspaceActions({
   async function clearAltBaselines() {
     setIsClearingAltBaselines(true);
     setControlError(null);
-    setWatchToast(null);
     try {
       await onClearAltBaselines(run.id);
     } catch (caught) {
@@ -323,12 +295,25 @@ export function useRunWorkspaceActions({
     }
   }
 
+  async function clearCourseAltBaselines(courseKey: string) {
+    setClearingAltBaselineCourseKey(courseKey);
+    setControlError(null);
+    try {
+      await onClearCourseAltBaselines(run.id, courseKey);
+    } catch (caught) {
+      setControlError(
+        caught instanceof Error ? caught.message : `failed to clear alt baselines for ${courseKey}`,
+      );
+    } finally {
+      setClearingAltBaselineCourseKey((current) => (current === courseKey ? null : current));
+    }
+  }
+
   async function copyRunId() {
     try {
       await navigator.clipboard.writeText(run.id);
       setCopiedRunId(true);
       setControlError(null);
-      setWatchToast(null);
     } catch {
       setControlError("failed to copy run id");
     }
@@ -352,7 +337,9 @@ export function useRunWorkspaceActions({
     controlError,
     copiedRunId,
     copyRunId,
+    clearingAltBaselineCourseKey,
     clearAltBaselines,
+    clearCourseAltBaselines,
     cancelForkAltBaselineChoice,
     confirmForkAltBaselineChoice,
     createDraftFromRun,
@@ -381,7 +368,6 @@ export function useRunWorkspaceActions({
     selectedWatchRenderer,
     setSelectedWatchRenderer,
     stopRun,
-    watchToast,
     watchRunArtifact,
     watchingArtifact,
   };

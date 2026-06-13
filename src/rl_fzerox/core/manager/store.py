@@ -272,6 +272,13 @@ class ManagerStore:
     def clear_run_alt_baselines(self, run_id: str) -> int:
         return run_registry.clear_run_alt_baselines(self, run_id)
 
+    def clear_run_alt_baselines_for_course(self, *, run_id: str, course_key: str) -> int:
+        return run_registry.clear_run_alt_baselines_for_course(
+            self,
+            run_id=run_id,
+            course_key=course_key,
+        )
+
     def get_run_track_sampling_state(
         self,
         run_id: str,

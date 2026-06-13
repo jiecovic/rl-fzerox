@@ -7,10 +7,12 @@ import type {
 
 export interface RunTrackPoolPanelProps {
   canReset: boolean;
+  clearingAltBaselineCourseKey?: string | null;
   isClearingAltBaselines: boolean;
   isResetting: boolean;
   metadata: ConfigMetadata;
-  onClearAltBaselines: () => void;
+  onClearAltBaselines: () => void | Promise<void>;
+  onClearCourseAltBaselines?: (courseKey: string) => void | Promise<void>;
   onReset: () => void;
   run: ManagedRunDetail;
   state: TrackSamplingRuntimeState | null;

@@ -251,6 +251,64 @@ def test_manager_store_clears_run_alt_baselines_from_database_and_disk(tmp_path:
     assert all(not state_path.exists() for state_path in state_paths)
 
 
+def test_manager_store_clears_run_alt_baselines_for_one_course(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Alt Baseline Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    mute_city_path = run.run_dir / "baselines" / "alt" / "alt-mute-city.state"
+    silence_path = run.run_dir / "baselines" / "alt" / "alt-silence.state"
+    for state_path in (mute_city_path, silence_path):
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_bytes(b"state")
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-mute-city",
+            run_id=run.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="mute city chicane",
+            state_path=mute_city_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:00:00+00:00",
+            updated_at="2026-06-13T10:00:00+00:00",
+        )
+    )
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-silence",
+            run_id=run.id,
+            course_key="silence",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="silence_gp_race_novice_blue_falcon",
+            label="silence jump",
+            state_path=silence_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:01:00+00:00",
+            updated_at="2026-06-13T10:01:00+00:00",
+        )
+    )
+
+    assert (
+        store.clear_run_alt_baselines_for_course(
+            run_id=run.id,
+            course_key="mute_city",
+        )
+        == 1
+    )
+
+    remaining = store.get_run_alt_baselines(run.id, include_deleted=True)
+    assert len(remaining) == 1
+    assert remaining[0].id == "alt-silence"
+    assert not mute_city_path.exists()
+    assert silence_path.exists()
+
+
 def test_manager_store_replaces_track_sampling_artifact_rows(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(

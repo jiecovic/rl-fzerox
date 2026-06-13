@@ -5,6 +5,7 @@ import { Button } from "@/shared/ui/Button";
 
 interface ConfirmDialogProps {
   busy?: boolean;
+  busyLabel?: string;
   cancelLabel?: string;
   confirmLabel: string;
   description: string;
@@ -17,6 +18,7 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   busy = false,
+  busyLabel = "Deleting...",
   cancelLabel = "Cancel",
   confirmLabel,
   description,
@@ -64,7 +66,7 @@ export function ConfirmDialog({
               {cancelLabel}
             </Button>
             <Button tone="danger" disabled={busy} onClick={onConfirm}>
-              {busy ? "Deleting..." : confirmLabel}
+              {busy ? busyLabel : confirmLabel}
             </Button>
           </div>
         </Dialog.Content>
