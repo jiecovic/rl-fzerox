@@ -2,7 +2,9 @@
 
 import { getJson, parseApiPayload, parseJson, type RequestOptions } from "@/shared/api/client/http";
 import {
+  clearAltBaselinesResponseSchema,
   type EngineTuningRuntimeState,
+  type ManagedRunDetail,
   type ManagedRunMetricSample,
   resetTrackSamplingResponseSchema,
   runEngineTuningResponseSchema,
@@ -58,6 +60,15 @@ export async function resetRunTrackSamplingState(runId: string): Promise<void> {
     method: "POST",
   });
   parseApiPayload(resetTrackSamplingResponseSchema, await parseJson(response));
+}
+
+export async function clearRunAltBaselines(runId: string): Promise<ManagedRunDetail> {
+  const response = await fetch(
+    `/api/runs/${encodeURIComponent(runId)}/track-sampling/alt-baselines`,
+    { method: "DELETE" },
+  );
+  const payload = parseApiPayload(clearAltBaselinesResponseSchema, await parseJson(response));
+  return payload.run;
 }
 
 export function getCachedRunMetrics(

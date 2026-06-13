@@ -56,8 +56,10 @@ describe("RunTrackPoolPanel", () => {
     const { rerender } = render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           id: "run-before",
@@ -73,8 +75,10 @@ describe("RunTrackPoolPanel", () => {
     rerender(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           id: "run-after",
@@ -143,8 +147,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           config: {
@@ -196,8 +202,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           config: runConfigWithSelectedCourses(selectedCourseIds as string[]),
@@ -265,8 +273,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={onReset}
         run={runFixture({
           config: {
@@ -304,6 +314,46 @@ describe("RunTrackPoolPanel", () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
+  it("requires confirmation before clearing alt baselines", async () => {
+    const user = userEvent.setup();
+    const firstCup = configMetadataFixture.track_cups[0];
+    if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
+      throw new Error("fixture cup must provide at least two courses");
+    }
+    const selectedCourseIds = [firstCup.course_ids[0], firstCup.course_ids[1]];
+    const onClearAltBaselines = vi.fn();
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isClearingAltBaselines={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onClearAltBaselines={onClearAltBaselines}
+        onReset={() => undefined}
+        run={runFixture({
+          active_alt_baseline_count: 2,
+          config: runConfigWithSelectedCourses(selectedCourseIds),
+        })}
+        state={trackSamplingStateForCourses(selectedCourseIds)}
+      />,
+    );
+
+    expect(screen.getByText(/2 alt baselines/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear alt baselines" }));
+
+    expect(screen.getByRole("dialog", { name: "Clear alt baselines" })).toBeInTheDocument();
+    expect(onClearAltBaselines).not.toHaveBeenCalled();
+
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Clear alt baselines" })).getByRole("button", {
+        name: "Clear alt baselines",
+      }),
+    );
+
+    expect(onClearAltBaselines).toHaveBeenCalledTimes(1);
+  });
+
   it("renders the adaptive step-balanced mode label", () => {
     const firstCup = configMetadataFixture.track_cups[0];
     if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
@@ -314,8 +364,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           config: {
@@ -341,8 +393,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           config: {
@@ -379,8 +433,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           config: {
@@ -419,8 +475,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           config: {
@@ -456,8 +514,10 @@ describe("RunTrackPoolPanel", () => {
     render(
       <RunTrackPoolPanel
         canReset={false}
+        isClearingAltBaselines={false}
         isResetting={false}
         metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
         onReset={() => undefined}
         run={runFixture({
           config: {

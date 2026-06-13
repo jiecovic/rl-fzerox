@@ -269,6 +269,9 @@ class ManagerStore:
             deleted_at=deleted_at,
         )
 
+    def clear_run_alt_baselines(self, run_id: str) -> int:
+        return run_registry.clear_run_alt_baselines(self, run_id)
+
     def get_run_track_sampling_state(
         self,
         run_id: str,

@@ -18,6 +18,7 @@ export interface WatchToastState {
 
 export interface RunWorkspaceActionsProps {
   clearTrackSamplingState: (state: TrackSamplingRuntimeState | null) => void;
+  onClearAltBaselines: (runId: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
   onFork: (runId: string, artifact: CheckpointArtifact, copyAltBaselines: boolean) => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
@@ -44,10 +45,12 @@ export interface RunWorkspaceActionState {
   copiedRunId: boolean;
   copyRunId: () => Promise<void>;
   createDraftFromRun: () => Promise<void>;
+  clearAltBaselines: () => Promise<void>;
   cancelForkAltBaselineChoice: () => void;
   confirmForkAltBaselineChoice: (copyAltBaselines: boolean) => Promise<void>;
   forkRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
   isCreatingDraftFromRun: boolean;
+  isClearingAltBaselines: boolean;
   isForking: boolean;
   isOpeningDirectory: boolean;
   isRenaming: boolean;
@@ -82,6 +85,7 @@ export interface PendingForkAltBaselineChoice {
 
 export function useRunWorkspaceActions({
   clearTrackSamplingState,
+  onClearAltBaselines,
   onCreateDraftFromRun,
   onFork,
   onOpenDirectory,
@@ -115,6 +119,7 @@ export function useRunWorkspaceActions({
     runId: run.id,
   });
   const [watchingArtifact, setWatchingArtifact] = useState<CheckpointArtifact | null>(null);
+  const [isClearingAltBaselines, setIsClearingAltBaselines] = useState(false);
   const [isResettingTrackPool, setIsResettingTrackPool] = useState(false);
   const [pendingForkAltBaselineChoice, setPendingForkAltBaselineChoice] =
     useState<PendingForkAltBaselineChoice | null>(null);
@@ -305,6 +310,19 @@ export function useRunWorkspaceActions({
     }
   }
 
+  async function clearAltBaselines() {
+    setIsClearingAltBaselines(true);
+    setControlError(null);
+    setWatchToast(null);
+    try {
+      await onClearAltBaselines(run.id);
+    } catch (caught) {
+      setControlError(caught instanceof Error ? caught.message : "failed to clear alt baselines");
+    } finally {
+      setIsClearingAltBaselines(false);
+    }
+  }
+
   async function copyRunId() {
     try {
       await navigator.clipboard.writeText(run.id);
@@ -334,11 +352,13 @@ export function useRunWorkspaceActions({
     controlError,
     copiedRunId,
     copyRunId,
+    clearAltBaselines,
     cancelForkAltBaselineChoice,
     confirmForkAltBaselineChoice,
     createDraftFromRun,
     forkRunArtifact,
     isCreatingDraftFromRun,
+    isClearingAltBaselines,
     isForking,
     isOpeningDirectory,
     isRenaming,

@@ -50,6 +50,12 @@ def create_metrics_router(store: ManagerStore) -> APIRouter:
     ) -> dict[str, bool]:
         return await run_sync(handlers.reset_run_track_sampling_payload, store, run_id)
 
+    @router.delete("/api/runs/{run_id}/track-sampling/alt-baselines")
+    async def clear_run_alt_baselines(
+        run_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, object]:
+        return await run_sync(handlers.clear_run_alt_baselines_payload, store, run_id)
+
     @router.post("/api/tensorboard-views/rebuild")
     async def rebuild_tensorboard_views_endpoint() -> dict[str, object]:
         return await run_sync(handlers.rebuild_tensorboard_views_payload, store)

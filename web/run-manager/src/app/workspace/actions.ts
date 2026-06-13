@@ -13,6 +13,7 @@ import {
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import type { DraftEditorSession } from "@/app/workspace/types";
 import {
+  clearRunAltBaselines,
   createDraftWithSource,
   createSaveGame,
   deleteDraft,
@@ -54,7 +55,7 @@ import type {
 interface UseWorkspaceActionsOptions {
   drafts: ManagedDraft[];
   loadRunDetail: (runId: string) => Promise<ManagedRunDetail>;
-  reloadManagerData: () => Promise<void>;
+  reloadManagerData: (options?: { showLoading?: boolean }) => Promise<void>;
   runs: ManagedRun[];
   sessions: WorkspaceSessions;
   setDrafts: Dispatch<SetStateAction<ManagedDraft[]>>;
@@ -113,6 +114,7 @@ export interface WorkspaceActions {
   removeSaveGame: (saveGame: ManagedSaveGame) => Promise<void>;
   renameManagedRun: (runId: string, name: string) => Promise<void>;
   renameManagedSaveGame: (saveGameId: string, name: string) => Promise<void>;
+  clearManagedRunAltBaselines: (runId: string) => Promise<void>;
   resetManagedRunTrackPool: (runId: string) => Promise<void>;
   resumeManagedRun: (runId: string) => Promise<void>;
   saveDraft: (
@@ -423,6 +425,13 @@ export function useWorkspaceActions({
     await resetRunTrackSamplingState(runId);
   }
 
+  async function clearManagedRunAltBaselines(runId: string) {
+    const run = await clearRunAltBaselines(runId);
+    upsertRunDetail(run);
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    await reloadManagerData({ showLoading: false });
+  }
+
   function allKnownNames() {
     const names = new Set<string>();
     for (const draft of _drafts) {
@@ -453,6 +462,7 @@ export function useWorkspaceActions({
     removeSaveGame,
     renameManagedRun,
     renameManagedSaveGame,
+    clearManagedRunAltBaselines,
     resetManagedRunTrackPool,
     resumeManagedRun,
     saveDraft,

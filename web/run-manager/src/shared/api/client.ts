@@ -12,6 +12,7 @@ export {
   subscribeRunTrackSamplingUpdates,
 } from "@/shared/api/client/live";
 export {
+  clearRunAltBaselines,
   fetchFreshRunMetrics,
   fetchRunEngineTuningState,
   fetchRunMetrics,

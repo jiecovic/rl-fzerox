@@ -162,6 +162,7 @@ export function WorkspaceBody({
           <RunWorkspace
             allRuns={runs}
             metadata={metadata}
+            onClearAltBaselines={actions.clearManagedRunAltBaselines}
             onCreateDraftFromRun={actions.createDraftFromManagedRun}
             onFork={actions.forkManagedRun}
             onOpenDirectory={actions.openManagedRunDirectory}

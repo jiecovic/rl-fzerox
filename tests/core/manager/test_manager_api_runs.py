@@ -423,6 +423,48 @@ async def test_manager_api_reports_only_active_alt_baseline_count(tmp_path: Path
     assert payload["runs"][0]["active_alt_baseline_count"] == 1
 
 
+async def test_manager_api_clears_run_alt_baselines_from_database_and_disk(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run_dir = tmp_path / "runs" / "run-clear-alts"
+    run = store.create_run(
+        run_id="run-clear-alts",
+        name="Run Clear Alts",
+        config=default_managed_run_config(),
+        explicit_run_dir=run_dir,
+    )
+    state_paths = tuple(run_dir / "baselines" / "alt" / f"alt-{index}.state" for index in range(2))
+    for index, state_path in enumerate(state_paths):
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_bytes(b"state")
+        store.upsert_run_alt_baseline(
+            baseline=TrackSamplingAltBaseline(
+                id=f"alt-{index}",
+                run_id=run.id,
+                course_key="mute_city",
+                reset_variant_key="gp_race|novice|blue_falcon",
+                source_entry_id="mute_city_gp_race_novice_blue_falcon",
+                label=f"active {index}",
+                state_path=state_path,
+                weight=1.0,
+                enabled=True,
+                created_at=f"2026-06-13T10:0{index}:00+00:00",
+                updated_at=f"2026-06-13T10:0{index}:00+00:00",
+            )
+        )
+
+    client = _client(tmp_path, store=store)
+    response = await client.delete(f"/api/runs/{run.id}/track-sampling/alt-baselines")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["cleared"] == 2
+    assert payload["run"]["active_alt_baseline_count"] == 0
+    assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()
+    assert all(not state_path.exists() for state_path in state_paths)
+
+
 async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(

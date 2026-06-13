@@ -22,6 +22,7 @@ from rl_fzerox.apps.run_manager.api.handlers.lineages import (
     update_lineage_groups_payload,
 )
 from rl_fzerox.apps.run_manager.api.handlers.metrics import (
+    clear_run_alt_baselines_payload,
     reset_run_track_sampling_payload,
     run_engine_tuning_payload,
     run_metrics_payload,
@@ -64,6 +65,7 @@ from rl_fzerox.apps.run_manager.api.handlers.transfer import (
 
 __all__ = [
     "config_metadata_payload",
+    "clear_run_alt_baselines_payload",
     "create_draft_payload",
     "create_save_game_payload",
     "delete_draft_payload",

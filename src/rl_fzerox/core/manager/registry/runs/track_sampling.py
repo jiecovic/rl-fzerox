@@ -106,16 +106,32 @@ def delete_run_alt_baseline(
     baseline_id: str,
     deleted_at: str | None = None,
 ) -> bool:
+    del deleted_at
     store._ensure_schema_initialized()
-    removed_at = deleted_at or utc_now()
     with store._orm_session() as session:
         baseline = session.get(RunAltBaselineModel, baseline_id)
-        if baseline is None or baseline.run_id != run_id or baseline.deleted_at is not None:
+        if baseline is None or baseline.run_id != run_id:
             return False
-        baseline.enabled = False
-        baseline.deleted_at = removed_at
-        baseline.updated_at = removed_at
-        return True
+        state_path = Path(baseline.state_path)
+        session.delete(baseline)
+
+    state_path.unlink(missing_ok=True)
+    return True
+
+
+def clear_run_alt_baselines(store: ManagerStore, run_id: str) -> int:
+    store._ensure_schema_initialized()
+    with store._orm_session() as session:
+        baselines = tuple(
+            session.scalars(select(RunAltBaselineModel).where(RunAltBaselineModel.run_id == run_id))
+        )
+        state_paths = tuple(Path(baseline.state_path) for baseline in baselines)
+        for baseline in baselines:
+            session.delete(baseline)
+
+    for state_path in state_paths:
+        state_path.unlink(missing_ok=True)
+    return len(baselines)
 
 
 def get_run_track_sampling_state(

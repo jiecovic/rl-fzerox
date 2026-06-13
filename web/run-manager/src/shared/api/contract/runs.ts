@@ -249,6 +249,11 @@ export const resetTrackSamplingResponseSchema = z.object({
   reset: z.boolean(),
 });
 
+export const clearAltBaselinesResponseSchema = z.object({
+  cleared: z.number().int().nonnegative(),
+  run: managedRunSchema,
+});
+
 export const openRunDirectoryResponseSchema = z.object({
   opened: z.boolean(),
 });

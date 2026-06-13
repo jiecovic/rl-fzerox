@@ -15,8 +15,10 @@ import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 
 export function RunTrackPoolPanel({
   canReset,
+  isClearingAltBaselines,
   isResetting,
   metadata,
+  onClearAltBaselines,
   onReset,
   run,
   state,
@@ -29,7 +31,13 @@ export function RunTrackPoolPanel({
   const poolSelectionKey = `${run.id}:${run.config.tracks.selected_course_ids.join("\0")}`;
   const firstCupId = poolView.cups[0]?.id ?? null;
   const [cupSelection, setCupSelection] = useState<{ cupId: string; poolKey: string } | null>(null);
+  const [confirmClearAltOpen, setConfirmClearAltOpen] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const activeAltBaselineCount = run.active_alt_baseline_count;
+  const altBaselineLabel =
+    activeAltBaselineCount === 1
+      ? "1 alt baseline"
+      : `${activeAltBaselineCount.toLocaleString()} alt baselines`;
   const selectedCupId =
     cupSelection?.poolKey === poolSelectionKey &&
     poolView.cups.some((cup) => cup.id === cupSelection.cupId)
@@ -48,7 +56,7 @@ export function RunTrackPoolPanel({
 
   return (
     <div className="col-span-full border border-app-border bg-app-surface">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-app-border px-3.5 py-3 max-[760px]:grid-cols-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 border-b border-app-border px-3.5 py-3 max-[900px]:grid-cols-1">
         <div>
           <strong>Track pool</strong>
           <div className="text-xs text-app-muted">
@@ -59,11 +67,20 @@ export function RunTrackPoolPanel({
         </div>
         <div className="text-xs text-app-muted">
           {visibleState === null
-            ? `${poolView.totalCourses} courses`
-            : `${poolView.totalEpisodes.toLocaleString()} episodes · ${poolView.totalEnvSteps.toLocaleString()} env steps`}
+            ? `${poolView.totalCourses} courses · ${altBaselineLabel}`
+            : `${poolView.totalEpisodes.toLocaleString()} episodes · ${poolView.totalEnvSteps.toLocaleString()} env steps · ${altBaselineLabel}`}
         </div>
         <Button
-          className="h-8 justify-self-end px-3 text-xs max-[760px]:justify-self-start"
+          className="h-8 justify-self-end px-3 text-xs max-[900px]:justify-self-start"
+          type="button"
+          tone="danger"
+          disabled={activeAltBaselineCount === 0 || isClearingAltBaselines}
+          onClick={() => setConfirmClearAltOpen(true)}
+        >
+          {isClearingAltBaselines ? "Clearing..." : "Clear alt baselines"}
+        </Button>
+        <Button
+          className="h-8 justify-self-end px-3 text-xs max-[900px]:justify-self-start"
           type="button"
           disabled={!canReset || isResetting}
           onClick={() => setConfirmResetOpen(true)}
@@ -100,6 +117,18 @@ export function RunTrackPoolPanel({
         onConfirm={() => {
           setConfirmResetOpen(false);
           onReset();
+        }}
+      />
+      <ConfirmDialog
+        busy={isClearingAltBaselines}
+        confirmLabel="Clear alt baselines"
+        description={`Delete ${altBaselineLabel} for "${run.name}"? This removes the recorded state files from disk.`}
+        open={confirmClearAltOpen}
+        title="Clear alt baselines"
+        onClose={() => setConfirmClearAltOpen(false)}
+        onConfirm={() => {
+          onClearAltBaselines();
+          setConfirmClearAltOpen(false);
         }}
       />
     </div>

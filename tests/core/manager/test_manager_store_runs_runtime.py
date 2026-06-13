@@ -211,10 +211,44 @@ def test_manager_store_persists_run_alt_baselines(tmp_path: Path) -> None:
         deleted_at="2026-06-13T11:00:00+00:00",
     )
     assert store.get_run_alt_baselines(run.id) == ()
-    deleted = store.get_run_alt_baselines(run.id, include_deleted=True)
-    assert len(deleted) == 1
-    assert deleted[0].enabled is False
-    assert deleted[0].deleted_at == "2026-06-13T11:00:00+00:00"
+    assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()
+    assert not state_path.exists()
+
+
+def test_manager_store_clears_run_alt_baselines_from_database_and_disk(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Alt Baseline Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    state_paths = tuple(
+        run.run_dir / "baselines" / "alt" / f"alt-{index}.state" for index in range(2)
+    )
+    for state_path in state_paths:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_bytes(b"state")
+    for index, state_path in enumerate(state_paths):
+        store.upsert_run_alt_baseline(
+            baseline=TrackSamplingAltBaseline(
+                id=f"alt-{index}",
+                run_id=run.id,
+                course_key="mute_city",
+                reset_variant_key="gp_race|novice|blue_falcon",
+                source_entry_id="mute_city_gp_race_novice_blue_falcon",
+                label=f"alt {index}",
+                state_path=state_path,
+                weight=1.0,
+                enabled=True,
+                created_at=f"2026-06-13T10:0{index}:00+00:00",
+                updated_at=f"2026-06-13T10:0{index}:00+00:00",
+            )
+        )
+
+    assert store.clear_run_alt_baselines(run.id) == 2
+
+    assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()
+    assert all(not state_path.exists() for state_path in state_paths)
 
 
 def test_manager_store_replaces_track_sampling_artifact_rows(tmp_path: Path) -> None:

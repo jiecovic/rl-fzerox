@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
-from rl_fzerox.apps.run_manager.api.handlers.common import require_run
+from rl_fzerox.apps.run_manager.api.handlers.common import require_run, run_response
 from rl_fzerox.apps.run_manager.api.payloads.engine_tuning import (
     engine_tuning_state_payload,
 )
@@ -85,6 +85,18 @@ def reset_run_track_sampling_payload(store: ManagerStore, run_id: str) -> dict[s
         )
     _reset_track_sampling_state(store, run)
     return {"reset": True}
+
+
+def clear_run_alt_baselines_payload(store: ManagerStore, run_id: str) -> dict[str, object]:
+    run = require_run(store, run_id)
+    cleared = store.clear_run_alt_baselines(run.id)
+    if cleared > 0:
+        store.append_run_event(
+            run_id=run.id,
+            kind="alt_baselines_cleared",
+            message=f"cleared {cleared} alt baseline{'s' if cleared != 1 else ''} from manager",
+        )
+    return {"cleared": cleared, **run_response(store, run)}
 
 
 def _reset_track_sampling_state(store: ManagerStore, run: ManagedRun) -> None:

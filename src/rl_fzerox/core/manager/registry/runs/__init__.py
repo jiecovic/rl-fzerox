@@ -31,6 +31,7 @@ from rl_fzerox.core.manager.registry.runs.runtime import (
     upsert_run_runtime,
 )
 from rl_fzerox.core.manager.registry.runs.track_sampling import (
+    clear_run_alt_baselines,
     clear_run_track_sampling_state,
     delete_run_alt_baseline,
     get_run_alt_baselines,
@@ -52,6 +53,7 @@ from rl_fzerox.core.manager.registry.runs.workers import (
 __all__ = [
     "append_run_event",
     "clear_run_command",
+    "clear_run_alt_baselines",
     "clear_run_runtime",
     "clear_run_track_sampling_state",
     "clear_run_worker",

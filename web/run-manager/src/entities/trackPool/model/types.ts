@@ -7,8 +7,10 @@ import type {
 
 export interface RunTrackPoolPanelProps {
   canReset: boolean;
+  isClearingAltBaselines: boolean;
   isResetting: boolean;
   metadata: ConfigMetadata;
+  onClearAltBaselines: () => void;
   onReset: () => void;
   run: ManagedRunDetail;
   state: TrackSamplingRuntimeState | null;
