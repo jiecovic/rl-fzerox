@@ -25,6 +25,7 @@ import type {
   ManagedRun,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
+  SaveEngineTuningCourseSetupRecommendation,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
 import { rendererNames } from "@/shared/api/renderers";
@@ -40,10 +41,16 @@ interface SaveGameWorkspaceProps {
   onCreateSaveGame: (name: string) => Promise<ManagedSaveGame>;
   onOpenSaveGameDirectory: (saveGameId: string) => Promise<void>;
   onImportEngineTuning: (request: {
+    courseSetups: readonly {
+      courseId: string;
+      cupId: string;
+      difficulty?: string | null;
+      vehicleId: string;
+    }[];
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-  }) => Promise<ManagedSaveGame>;
+  }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   onPatchSession: (
     sessionId: SaveGameSession["sessionId"],
     patch: Partial<Omit<SaveGameSession, "sessionId">>,
@@ -194,6 +201,12 @@ export function SaveGameWorkspace({
   }
 
   async function importEngineTuning(request: {
+    courseSetups: readonly {
+      courseId: string;
+      cupId: string;
+      difficulty?: string | null;
+      vehicleId: string;
+    }[];
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
@@ -201,9 +214,7 @@ export function SaveGameWorkspace({
     setError(null);
     setUpdatingSaveGameId(request.saveGameId);
     try {
-      const saveGame = await onImportEngineTuning(request);
-      await onRefresh();
-      return saveGame;
+      return await onImportEngineTuning(request);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to import engine tuning");
       throw caught;
@@ -246,7 +257,7 @@ export function SaveGameWorkspace({
       setError("choose a policy for the selected cup");
       return;
     }
-    if (resolveSavedCupSetup(target.cup_setups, launchTarget) === null) {
+    if (resolveLaunchCupVehicleId(target, launchTarget) === null) {
       setError("choose a vehicle for the selected cup");
       return;
     }
@@ -332,6 +343,8 @@ export function SaveGameWorkspace({
         );
   const nextCupSetup =
     nextTarget === null ? null : resolveSavedCupSetup(activeSaveGame.cup_setups, nextTarget);
+  const nextCupVehicleId =
+    nextTarget === null ? null : resolveLaunchCupVehicleId(activeSaveGame, nextTarget);
   function canStartUnlockTarget(target: ManagedSaveUnlockTarget): boolean {
     return (
       startingRunnerSaveGameId === null &&
@@ -343,7 +356,7 @@ export function SaveGameWorkspace({
         target,
         activeMetadata.built_in_courses,
       ) !== null &&
-      resolveSavedCupSetup(activeSaveGame.cup_setups, target) !== null
+      resolveLaunchCupVehicleId(activeSaveGame, target) !== null
     );
   }
   const canStartRunner = nextTarget !== null && canStartUnlockTarget(nextTarget);
@@ -360,7 +373,7 @@ export function SaveGameWorkspace({
         ? "All unlock targets are complete."
         : nextSetup === null
           ? "Choose a policy for the next cup."
-          : nextCupSetup === null
+          : nextCupSetup === null && nextCupVehicleId === null
             ? "Choose a vehicle for the next cup."
             : `${nextTarget.label} is ready.`;
   const runnerLabel = saveGame.runner_active
@@ -468,5 +481,16 @@ export function SaveGameWorkspace({
         />
       </article>
     </Panel>
+  );
+}
+
+function resolveLaunchCupVehicleId(
+  saveGame: ManagedSaveGame,
+  target: ManagedSaveUnlockTarget,
+): string | null {
+  return (
+    resolveSavedCupSetup(saveGame.cup_setups, target)?.vehicle_id ??
+    saveGame.unlock_progress?.unlocked_vehicle_ids[0] ??
+    null
   );
 }

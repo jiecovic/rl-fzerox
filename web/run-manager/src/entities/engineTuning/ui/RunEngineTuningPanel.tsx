@@ -3,10 +3,13 @@ import { useEffect, useId, useMemo, useState } from "react";
 
 import type {
   ConfigMetadata,
+  EngineTuningRuntimeCandidate,
   EngineTuningRuntimeCandidateEstimate,
   EngineTuningRuntimeContext,
   EngineTuningRuntimeState,
 } from "@/shared/api/contract";
+
+const ENGINE_TUNING_TABLE_ROW_LIMIT = 12;
 
 interface RunEngineTuningPanelProps {
   artifact: "latest" | "best" | "final";
@@ -115,11 +118,16 @@ export function RunEngineTuningPanel({
               }
             />
           </div>
-          {selectedContext.model_ready ? (
-            <EngineDistributionTable
-              candidates={selectedContext.candidates}
-              showObservedColumns={backend === "gaussian_process"}
+          {backend === "gaussian_process" ? (
+            <EngineMeasuredCandidateTable
+              estimates={selectedContext.candidates}
+              measuredCandidates={measuredCandidatesForContext(
+                state?.candidates ?? [],
+                selectedContext.context_key,
+              )}
             />
+          ) : selectedContext.model_ready ? (
+            <EngineModelCandidateTable candidates={selectedContext.candidates} />
           ) : null}
         </div>
       )}
@@ -328,21 +336,77 @@ function EngineMeanPerformanceBars({
   );
 }
 
-function EngineDistributionTable({
+function EngineMeasuredCandidateTable({
+  estimates,
+  measuredCandidates,
+}: {
+  estimates: readonly EngineTuningRuntimeCandidateEstimate[];
+  measuredCandidates: readonly EngineTuningRuntimeCandidate[];
+}) {
+  if (measuredCandidates.length === 0) {
+    return null;
+  }
+  const estimateByEngine = new Map(
+    estimates.map((estimate) => [estimate.engine_setting_raw_value, estimate]),
+  );
+  const rows = [...measuredCandidates]
+    .sort(compareMeasuredCandidates)
+    .slice(0, ENGINE_TUNING_TABLE_ROW_LIMIT);
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-collapse text-left text-xs tabular-nums">
+        <caption className="sr-only">Measured successful engine finishes</caption>
+        <thead className="text-app-muted">
+          <tr className="border-b border-app-border">
+            <th className="py-1.5 pr-3 font-semibold">Engine</th>
+            <th className="py-1.5 pr-3 font-semibold">Best</th>
+            <th className="py-1.5 pr-3 font-semibold">Estimated</th>
+            <th className="py-1.5 pr-3 font-semibold">Prob</th>
+            <th className="py-1.5 font-semibold">Finishes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((candidate) => {
+            const estimate = estimateByEngine.get(candidate.engine_setting_raw_value);
+            return (
+              <tr
+                className="border-b border-app-border/70 last:border-b-0"
+                key={candidate.engine_setting_raw_value}
+              >
+                <td className="py-1.5 pr-3 text-app-text">{candidate.engine_setting_raw_value}</td>
+                <td className="py-1.5 pr-3 text-app-text">
+                  {formatOptionalRaceTime(candidate.best_finish_time_ms)}
+                </td>
+                <td className="py-1.5 pr-3 text-app-text">
+                  {estimate === undefined ? "-" : formatRaceTime(estimate.estimated_finish_time_ms)}
+                </td>
+                <td className="py-1.5 pr-3 text-app-text">
+                  {estimate === undefined ? "-" : formatPercent(estimate.selection_probability)}
+                </td>
+                <td className="py-1.5 text-app-text">{candidate.finish_count}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function EngineModelCandidateTable({
   candidates,
-  showObservedColumns,
 }: {
   candidates: readonly EngineTuningRuntimeCandidateEstimate[];
-  showObservedColumns: boolean;
 }) {
   const topCandidates = [...candidates]
     .sort((left, right) => {
-      if (right.selection_probability !== left.selection_probability) {
-        return right.selection_probability - left.selection_probability;
+      if (left.estimated_finish_time_ms !== right.estimated_finish_time_ms) {
+        return left.estimated_finish_time_ms - right.estimated_finish_time_ms;
       }
-      return right.mean_score - left.mean_score;
+      return right.selection_probability - left.selection_probability;
     })
-    .slice(0, 8);
+    .slice(0, ENGINE_TUNING_TABLE_ROW_LIMIT);
 
   return (
     <div className="overflow-x-auto">
@@ -352,12 +416,6 @@ function EngineDistributionTable({
             <th className="py-1.5 pr-3 font-semibold">Engine</th>
             <th className="py-1.5 pr-3 font-semibold">Prob</th>
             <th className="py-1.5 pr-3 font-semibold">Estimated</th>
-            {showObservedColumns ? (
-              <>
-                <th className="py-1.5 pr-3 font-semibold">Best</th>
-                <th className="py-1.5 font-semibold">Finishes</th>
-              </>
-            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -373,20 +431,36 @@ function EngineDistributionTable({
               <td className="py-1.5 pr-3 text-app-text">
                 {formatRaceTime(candidate.estimated_finish_time_ms)}
               </td>
-              {showObservedColumns ? (
-                <>
-                  <td className="py-1.5 pr-3 text-app-text">
-                    {formatOptionalRaceTime(candidate.best_finish_time_ms)}
-                  </td>
-                  <td className="py-1.5 text-app-text">{candidate.finish_count}</td>
-                </>
-              ) : null}
             </tr>
           ))}
         </tbody>
       </table>
     </div>
   );
+}
+
+function measuredCandidatesForContext(
+  candidates: readonly EngineTuningRuntimeCandidate[],
+  contextKey: string,
+) {
+  return candidates.filter(
+    (candidate) => candidate.context_key === contextKey && candidate.finish_count > 0,
+  );
+}
+
+function compareMeasuredCandidates(
+  left: EngineTuningRuntimeCandidate,
+  right: EngineTuningRuntimeCandidate,
+) {
+  const leftBest = left.best_finish_time_ms ?? Number.POSITIVE_INFINITY;
+  const rightBest = right.best_finish_time_ms ?? Number.POSITIVE_INFINITY;
+  if (leftBest !== rightBest) {
+    return leftBest - rightBest;
+  }
+  if (right.finish_count !== left.finish_count) {
+    return right.finish_count - left.finish_count;
+  }
+  return left.engine_setting_raw_value - right.engine_setting_raw_value;
 }
 
 function humanizeKey(key: string) {

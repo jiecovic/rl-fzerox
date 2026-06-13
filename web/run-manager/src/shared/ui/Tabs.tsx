@@ -4,6 +4,7 @@ import { cn } from "@/shared/ui/cn";
 import { CareerTabIcon, ChartIcon, CloseIcon, DraftTabIcon, RunTabIcon } from "@/shared/ui/icons";
 
 export interface TabItem<T extends string> {
+  activity?: "running";
   id: T;
   label: string;
   closable?: boolean;
@@ -41,6 +42,7 @@ export function Tabs<T extends string>({
           >
             <span className={tabContentClass(variant)}>
               <TabIcon icon={item.icon} />
+              <TabActivity activity={item.activity} />
               <span>{variant === "sidebar" ? (item.shortLabel ?? item.label) : item.label}</span>
             </span>
           </button>
@@ -80,6 +82,21 @@ function TabIcon({ icon }: { icon: TabItem<string>["icon"] }) {
     default:
       return null;
   }
+}
+
+function TabActivity({ activity }: { activity: TabItem<string>["activity"] }) {
+  if (activity !== "running") {
+    return null;
+  }
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className="h-2 w-2 shrink-0 rounded-full bg-app-accent shadow-[0_0_8px_color-mix(in_srgb,var(--accent)_72%,transparent)]"
+      />
+      <span className="sr-only">running</span>
+    </>
+  );
 }
 
 function tabContentClass(variant: TabsProps<string>["variant"]) {

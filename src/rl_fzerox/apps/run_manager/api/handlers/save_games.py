@@ -21,7 +21,6 @@ from rl_fzerox.core.engine_tuning import (
 from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
 from rl_fzerox.core.manager import ManagedRun, ManagerStore
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
-from rl_fzerox.core.manager.models import ManagedSaveCourseSetup, ManagedSaveCupSetup
 from rl_fzerox.core.manager.projection.engine_tuning import adaptive_engine_tuning_config
 from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
@@ -135,61 +134,37 @@ def import_save_engine_tuning_payload(
             detail=f"policy run has no {request.policy_artifact} artifact",
         ) from error
     state = load_engine_tuning_checkpoint_state(policy_path)
-    if state is None or not state.candidates:
+    if state is None or (not state.candidates and state.model_state is None):
         raise HTTPException(status_code=400, detail="policy run has no engine tuning samples")
-
-    course_setups = tuple(
-        setup
-        for setup in store.list_save_course_setups(save_game_id)
-        if setup.policy_run_id == run.id
-    )
-    if not course_setups:
+    if not request.course_setups:
         raise HTTPException(
             status_code=400,
-            detail="save game has no course setups using this policy run",
+            detail="no course setup drafts use this policy run",
         )
-    cup_setups = store.list_save_cup_setups(save_game_id)
     tuner = OrderedEngineTuner(
         settings=engine_tuner_settings(_adaptive_engine_config(run)),
         state=state,
     )
-    applied = []
-    for setup in course_setups:
-        vehicle_id = _vehicle_for_course_setup(run, setup, cup_setups)
+    recommendations: list[dict[str, object]] = []
+    for setup in request.course_setups:
         recommendation = tuner.recommendation(
             EngineTuningContext(
-                course_key=setup.course_id or "unknown",
-                vehicle_id=vehicle_id,
+                course_key=setup.course_id,
+                vehicle_id=setup.vehicle_id,
             )
         )
-        store.upsert_save_course_setup(
-            save_game_id=save_game_id,
-            difficulty=setup.difficulty,
-            cup_id=setup.cup_id,
-            course_id=setup.course_id,
-            policy_run_id=setup.policy_run_id,
-            policy_artifact=request.policy_artifact,
-            engine_setting_raw_value=recommendation.engine_setting_raw_value,
-        )
-        applied.append(
+        recommendations.append(
             {
-                "setup_id": setup.id,
                 "difficulty": setup.difficulty,
                 "cup_id": setup.cup_id,
                 "course_id": setup.course_id,
-                "vehicle_id": vehicle_id,
+                "vehicle_id": setup.vehicle_id,
                 "engine_setting_raw_value": recommendation.engine_setting_raw_value,
                 "mean_score": recommendation.mean_score,
                 "finish_count": recommendation.finish_count,
             }
         )
-    updated = store.get_save_game(save_game_id)
-    if updated is None:
-        raise HTTPException(status_code=404, detail="save game not found")
-    return {
-        "applied": applied,
-        "save_game": save_game_payload_for_store(store, updated),
-    }
+    return {"recommendations": recommendations}
 
 
 def open_save_game_dir_payload(store: ManagerStore, save_game_id: str) -> dict[str, bool]:
@@ -201,21 +176,6 @@ def open_save_game_dir_payload(store: ManagerStore, save_game_id: str) -> dict[s
     except RuntimeError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"opened": True}
-
-
-def _vehicle_for_course_setup(
-    run: ManagedRun,
-    setup: ManagedSaveCourseSetup,
-    cup_setups: tuple[ManagedSaveCupSetup, ...],
-) -> str:
-    for cup_setup in cup_setups:
-        if cup_setup.cup_id != setup.cup_id:
-            continue
-        if cup_setup.difficulty != setup.difficulty:
-            continue
-        return cup_setup.vehicle_id
-    selected = getattr(run.config.vehicle, "selected_vehicle_ids", ())
-    return selected[0] if selected else "blue_falcon"
 
 
 def _adaptive_engine_config(run: ManagedRun) -> AdaptiveEngineTuningConfig:

@@ -27,6 +27,7 @@ class EngineTunerDefaults:
     observation_noise_seconds: float = 1.5
     curve_lengthscale_raw: float = 12.0
     uniform_exploration: float = 0.05
+    greedy_plateau_tolerance_seconds: float = 1.0
 
 
 ENGINE_TUNER_DEFAULTS = EngineTunerDefaults()
@@ -40,6 +41,7 @@ class EngineTunerCommonSettings:
     max_raw_value: int = 100
     prior_finish_time_seconds: float = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     uniform_exploration: float = ENGINE_TUNER_DEFAULTS.uniform_exploration
+    greedy_plateau_tolerance_seconds: float = ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,9 +69,7 @@ class MlpEnsembleEngineTunerSettings(EngineTunerCommonSettings):
     warmup_successes: int = ENGINE_TUNER_DEFAULTS.mlp_warmup_successes
 
 
-EngineTunerSettings: TypeAlias = (
-    GaussianProcessEngineTunerSettings | MlpEnsembleEngineTunerSettings
-)
+EngineTunerSettings: TypeAlias = GaussianProcessEngineTunerSettings | MlpEnsembleEngineTunerSettings
 
 
 @dataclass(frozen=True, slots=True)

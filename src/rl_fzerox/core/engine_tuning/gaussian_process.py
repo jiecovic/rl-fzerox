@@ -10,6 +10,10 @@ from random import Random
 import gpytorch
 import torch
 
+from rl_fzerox.core.engine_tuning.sampling import (
+    StableGreedySelection,
+    stable_greedy_engine_setting,
+)
 from rl_fzerox.core.engine_tuning.state import (
     EngineTuningCandidateState,
     EngineTuningRuntimeState,
@@ -86,25 +90,25 @@ class GaussianProcessEngineTuner:
     def recommendation(self, context: EngineTuningContext) -> EngineTuningChoice:
         """Return the lowest predicted finish-time value without random exploration."""
 
-        best: EngineTuningChoice | None = None
         candidates = engine_candidates(
             minimum=self._settings.min_raw_value,
             maximum=self._settings.max_raw_value,
         )
-        estimates = self._context_projection(context, candidates).estimates
-        for engine_raw in candidates:
-            estimate = estimates[engine_raw]
-            choice = self._choice_for(
-                context,
-                engine_raw,
-                estimate=estimate,
-                sampled_score=None,
-            )
-            if best is None or _better_choice(choice, best, candidates=candidates):
-                best = choice
-        if best is None:
+        projection = self._context_projection(context, candidates)
+        engine_raw = stable_greedy_engine_setting(
+            _projection_candidate_estimates(projection, candidates),
+            selection=StableGreedySelection(
+                plateau_tolerance_seconds=(self._settings.greedy_plateau_tolerance_seconds)
+            ),
+        )
+        if engine_raw is None:
             raise ValueError("adaptive engine tuning has no engine candidates")
-        return best
+        return self._choice_for(
+            context,
+            engine_raw,
+            estimate=projection.estimates[engine_raw],
+            sampled_score=None,
+        )
 
     def distribution(
         self,
@@ -126,20 +130,13 @@ class GaussianProcessEngineTuner:
         counts = dict.fromkeys(candidates, 0)
         rng = Random(seed)
         projection = self._context_projection(context, candidates)
-        for _ in range(draw_count):
-            best_raw: int | None = None
-            best_score: float | None = None
-            sampled_scores = _sample_posterior_scores(
-                projection=projection,
-                candidates=candidates,
-                rng=rng,
-            )
-            for engine_raw, sampled_score in zip(candidates, sampled_scores, strict=True):
-                if best_score is None or sampled_score > best_score:
-                    best_raw = engine_raw
-                    best_score = sampled_score
-            if best_raw is not None:
-                counts[best_raw] += 1
+        for engine_raw in _sampled_best_raw_values(
+            projection=projection,
+            candidates=candidates,
+            draw_count=draw_count,
+            rng=rng,
+        ):
+            counts[engine_raw] += 1
 
         uniform_probability = max(0.0, min(1.0, self._settings.uniform_exploration)) / len(
             candidates
@@ -415,23 +412,94 @@ def _sample_posterior_scores(
     candidates: tuple[int, ...],
     rng: Random,
 ) -> tuple[float, ...]:
+    sample_matrix = _sample_posterior_score_matrix(
+        projection=projection,
+        candidates=candidates,
+        draw_count=1,
+        rng=rng,
+    )
+    return tuple(float(value) for value in sample_matrix[:, 0].tolist())
+
+
+def _projection_candidate_estimates(
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+) -> tuple[EngineTuningCandidateEstimate, ...]:
+    return tuple(
+        EngineTuningCandidateEstimate(
+            engine_setting_raw_value=engine_raw,
+            probability=0.0,
+            mean_score=projection.estimates[engine_raw].mean_score,
+            uncertainty_score=projection.estimates[engine_raw].uncertainty_score,
+            estimated_finish_time_ms=finish_time_ms_from_score(
+                projection.estimates[engine_raw].mean_score
+            ),
+            finish_count=projection.estimates[engine_raw].exact_finish_count,
+            best_finish_time_ms=projection.estimates[engine_raw].best_finish_time_ms,
+        )
+        for engine_raw in candidates
+    )
+
+
+def _sampled_best_raw_values(
+    *,
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+    draw_count: int,
+    rng: Random,
+) -> tuple[int, ...]:
+    sample_matrix = _sample_posterior_score_matrix(
+        projection=projection,
+        candidates=candidates,
+        draw_count=draw_count,
+        rng=rng,
+    )
+    best_indices = torch.argmax(sample_matrix, dim=0).tolist()
+    return tuple(candidates[int(index)] for index in best_indices)
+
+
+def _sample_posterior_score_matrix(
+    *,
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+    draw_count: int,
+    rng: Random,
+) -> torch.Tensor:
     means = torch.as_tensor(
         [projection.estimates[engine_raw].mean_score for engine_raw in candidates],
         dtype=torch.float64,
+    ).unsqueeze(1)
+    normal_samples = _standard_normal_matrix(
+        row_count=len(candidates),
+        column_count=max(1, int(draw_count)),
+        rng=rng,
     )
     if projection.covariance is None:
-        stds = [projection.estimates[engine_raw].uncertainty_score for engine_raw in candidates]
-        return tuple(rng.gauss(mean, std) for mean, std in zip(means.tolist(), stds, strict=True))
+        stds = torch.as_tensor(
+            [projection.estimates[engine_raw].uncertainty_score for engine_raw in candidates],
+            dtype=torch.float64,
+        ).unsqueeze(1)
+        return means + stds * normal_samples
 
-    covariance = projection.covariance.to(dtype=torch.float64)
-    jitter = torch.eye(covariance.shape[0], dtype=torch.float64) * 1e-9
-    cholesky = torch.linalg.cholesky(covariance + jitter)
-    standard_normals = torch.as_tensor(
-        [rng.gauss(0.0, 1.0) for _ in candidates],
+    return means + _posterior_cholesky(projection.covariance) @ normal_samples
+
+
+def _standard_normal_matrix(
+    *,
+    row_count: int,
+    column_count: int,
+    rng: Random,
+) -> torch.Tensor:
+    return torch.as_tensor(
+        [rng.gauss(0.0, 1.0) for _ in range(row_count * column_count)],
         dtype=torch.float64,
-    )
-    sample = means + cholesky @ standard_normals
-    return tuple(float(value) for value in sample.tolist())
+    ).reshape(row_count, column_count)
+
+
+def _posterior_cholesky(covariance: torch.Tensor) -> torch.Tensor:
+    normalized = covariance.to(dtype=torch.float64)
+    jitter = torch.eye(normalized.shape[0], dtype=torch.float64) * 1e-9
+    return torch.linalg.cholesky(normalized + jitter)
 
 
 def _better_choice(

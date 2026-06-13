@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from hashlib import blake2b
 
 from rl_fzerox.core.engine_tuning import (
+    EngineTunerBackend,
     EngineTunerSettings,
     EngineTuningCandidateEstimate,
     EngineTuningCandidateState,
@@ -15,8 +16,12 @@ from rl_fzerox.core.engine_tuning import (
     MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
+from rl_fzerox.core.engine_tuning.sampling import (
+    StableGreedySelection,
+    stable_greedy_engine_setting,
+)
 
-ENGINE_TUNING_DISTRIBUTION_DRAWS = 512
+ENGINE_TUNING_DISTRIBUTION_DRAWS = 128
 
 
 def engine_tuning_state_payload(
@@ -29,12 +34,23 @@ def engine_tuning_state_payload(
     return {
         "version": state.version,
         "update_count": state.update_count,
-        "model_backend": None if state.model_state is None else state.model_state.backend,
+        "model_backend": _model_backend(state, settings),
         "candidates": [
             _engine_tuning_candidate_payload(candidate) for candidate in state.candidates
         ],
         "contexts": [] if settings is None else _engine_tuning_context_payloads(state, settings),
     }
+
+
+def _model_backend(
+    state: EngineTuningRuntimeState,
+    settings: EngineTunerSettings | None,
+) -> EngineTunerBackend | None:
+    if settings is not None:
+        return settings.backend
+    if state.model_state is None:
+        return None
+    return state.model_state.backend
 
 
 def _engine_tuning_candidate_payload(
@@ -71,9 +87,7 @@ def _engine_tuning_context_payloads(
                 finish_count=context.finish_count,
                 observed_candidate_count=0,
             )
-            for context in (
-                () if state.model_state is None else state.model_state.contexts
-            )
+            for context in (() if state.model_state is None else state.model_state.contexts)
         ]
     return [
         _engine_tuning_context_payload(
@@ -100,8 +114,20 @@ def _engine_tuning_context_payload(
     observed_candidate_count: int,
 ) -> dict[str, object]:
     candidate_map = state.candidate_map()
-    recommendation = tuner.recommendation(context)
     warmup_successes, model_ready = _model_readiness(settings, finish_count)
+    estimates = tuner.distribution(
+        context,
+        seed=_distribution_seed(state, context.key),
+        draws=ENGINE_TUNING_DISTRIBUTION_DRAWS,
+    )
+    recommended_engine_raw = stable_greedy_engine_setting(
+        estimates,
+        selection=StableGreedySelection(
+            plateau_tolerance_seconds=settings.greedy_plateau_tolerance_seconds
+        ),
+    )
+    if recommended_engine_raw is None:
+        recommended_engine_raw = settings.min_raw_value
     return {
         "context_key": context.key,
         "course_key": context.course_key,
@@ -111,17 +137,13 @@ def _engine_tuning_context_payload(
         "model_ready": model_ready,
         "warmup_successes": warmup_successes,
         "warmup_remaining": max(0, warmup_successes - finish_count),
-        "recommended_engine_setting_raw_value": recommendation.engine_setting_raw_value,
+        "recommended_engine_setting_raw_value": recommended_engine_raw,
         "candidates": [
             _engine_tuning_candidate_estimate_payload(
                 probability,
                 candidate_map.get((context.key, probability.engine_setting_raw_value)),
             )
-            for probability in tuner.distribution(
-                context,
-                seed=_distribution_seed(state, context.key),
-                draws=ENGINE_TUNING_DISTRIBUTION_DRAWS,
-            )
+            for probability in estimates
         ],
     }
 

@@ -188,6 +188,8 @@ export function VehicleSection({
               adaptive_engine_tuner_backend: defaultConfig.vehicle.adaptive_engine_tuner_backend,
               adaptive_engine_uniform_exploration:
                 defaultConfig.vehicle.adaptive_engine_uniform_exploration,
+              adaptive_engine_greedy_plateau_seconds:
+                defaultConfig.vehicle.adaptive_engine_greedy_plateau_seconds,
               engine_mode: defaultConfig.vehicle.engine_mode,
               engine_setting_raw_value: defaultConfig.vehicle.engine_setting_raw_value,
               engine_setting_min_raw_value: defaultConfig.vehicle.engine_setting_min_raw_value,
@@ -544,6 +546,16 @@ function AdaptiveEngineControls({
           value={vehicle.adaptive_engine_uniform_exploration}
           onChange={(adaptive_engine_uniform_exploration) =>
             onChange({ adaptive_engine_uniform_exploration })
+          }
+        />
+        <NumberField
+          help="Deterministic watch and career import treat predicted finish times within this many seconds of best as practically equal, then choose the soft plateau center."
+          label="Greedy plateau seconds"
+          resetValue={defaultVehicle.adaptive_engine_greedy_plateau_seconds}
+          step="0.1"
+          value={vehicle.adaptive_engine_greedy_plateau_seconds}
+          onChange={(adaptive_engine_greedy_plateau_seconds) =>
+            onChange({ adaptive_engine_greedy_plateau_seconds })
           }
         />
       </div>

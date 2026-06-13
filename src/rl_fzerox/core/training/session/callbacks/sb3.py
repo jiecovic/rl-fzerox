@@ -525,6 +525,7 @@ def build_callbacks(
             super().__init__(verbose=0)
             self._controller = controller
             self._contexts = tuple(contexts)
+            self._sampler_dirty = False
 
         def _on_training_start(self) -> None:
             self._publish_sampler()
@@ -537,12 +538,14 @@ def build_callbacks(
             if not episodes:
                 return True
             if self._controller.record_episodes(episodes):
-                self._publish_sampler()
+                self._sampler_dirty = True
             return True
 
         def _on_rollout_end(self) -> None:
-            if self._controller.record_rollout_episodes():
+            rollout_changed = self._controller.record_rollout_episodes()
+            if self._sampler_dirty or rollout_changed:
                 self._publish_sampler()
+                self._sampler_dirty = False
             for key, value in self._controller.log_values().items():
                 self.logger.record(key, value)
 

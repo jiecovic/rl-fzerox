@@ -106,20 +106,18 @@ export const upsertSaveCourseSetupResponseSchema = z.object({
   save_game: managedSaveGameSchema,
 });
 
+export const saveEngineTuningCourseSetupRecommendationSchema = z.object({
+  difficulty: z.string().nullable(),
+  cup_id: z.string(),
+  course_id: z.string(),
+  vehicle_id: z.string(),
+  engine_setting_raw_value: z.number().int().min(0).max(100),
+  mean_score: z.number().nullable(),
+  finish_count: z.number().int().nonnegative(),
+});
+
 export const importSaveEngineTuningResponseSchema = z.object({
-  applied: z.array(
-    z.object({
-      setup_id: z.string(),
-      difficulty: z.string().nullable(),
-      cup_id: z.string().nullable(),
-      course_id: z.string().nullable(),
-      vehicle_id: z.string(),
-      engine_setting_raw_value: z.number().int().min(0).max(100),
-      mean_score: z.number().nullable(),
-      finish_count: z.number().int().nonnegative(),
-    }),
-  ),
-  save_game: managedSaveGameSchema,
+  recommendations: z.array(saveEngineTuningCourseSetupRecommendationSchema),
 });
 
 export const openSaveGameDirectoryResponseSchema = z.object({
@@ -133,6 +131,9 @@ export type ManagedSaveCupSetup = z.infer<typeof managedSaveCupSetupSchema>;
 export type ManagedSaveUnlockProgress = z.infer<typeof managedSaveUnlockProgressSchema>;
 export type ManagedSaveUnlockTarget = z.infer<typeof managedSaveUnlockTargetSchema>;
 export type PolicyPlaybackMode = z.infer<typeof policyPlaybackModeSchema>;
+export type SaveEngineTuningCourseSetupRecommendation = z.infer<
+  typeof saveEngineTuningCourseSetupRecommendationSchema
+>;
 export type SaveAttemptStatus = z.infer<typeof saveAttemptStatusSchema>;
 export type SavePolicyArtifact = z.infer<typeof savePolicyArtifactSchema>;
 export type SaveUnlockTargetStatus = z.infer<typeof saveUnlockTargetStatusSchema>;

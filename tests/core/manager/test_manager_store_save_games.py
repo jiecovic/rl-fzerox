@@ -163,6 +163,36 @@ def test_manager_store_starts_next_save_attempt_from_course_setup(
     assert attempt.status == "running"
 
 
+def test_manager_store_starts_next_save_attempt_with_default_vehicle(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Default Vehicle Attempt Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    run = store.create_run(
+        name="Unlock Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    _write_policy_artifact(run.run_dir, "best")
+    _configure_gp_cup(
+        store,
+        save_game_id=save_game.id,
+        run_id=run.id,
+        cup_id="jack",
+        include_cup_setup=False,
+    )
+
+    attempt = store.start_next_save_attempt(save_game.id)
+    context = store.get_save_attempt_execution_context(attempt.id)
+
+    assert attempt.status == "running"
+    assert context is not None
+    assert context.cup_setup.vehicle_id == "blue_falcon"
+
+
 def test_manager_store_starts_selected_save_attempt_from_course_setup(
     tmp_path: Path,
 ) -> None:
@@ -251,12 +281,14 @@ def _configure_gp_cup(
     save_game_id: str,
     run_id: str,
     cup_id: str,
+    include_cup_setup: bool = True,
 ) -> None:
-    store.upsert_save_cup_setup(
-        save_game_id=save_game_id,
-        cup_id=cup_id,
-        vehicle_id="blue_falcon",
-    )
+    if include_cup_setup:
+        store.upsert_save_cup_setup(
+            save_game_id=save_game_id,
+            cup_id=cup_id,
+            vehicle_id="blue_falcon",
+        )
     for course in sorted(BUILT_IN_COURSES, key=lambda item: item.course_index):
         if course.cup != cup_id:
             continue

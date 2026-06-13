@@ -22,7 +22,7 @@ const TRACK_SAMPLING_LIVE = {
   fallbackPollMs: 5_000,
 } as const;
 
-const ENGINE_TUNING_POLL_MS = 10_000;
+const ENGINE_TUNING_POLL_MS = 30_000;
 
 export function useRunClock(status: ManagedRun["status"]): number {
   const [nowMs, setNowMs] = useState(() => Date.now());

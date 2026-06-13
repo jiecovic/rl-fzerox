@@ -104,6 +104,85 @@ describe("SaveGameWorkspace", () => {
     expect(onUpsertCupSetup).not.toHaveBeenCalled();
   });
 
+  it("imports learned engines into staged course setups without saving", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture({
+      cup_setups: [cupSetupFixture({ cup_id: "jack", vehicle_id: "fire_stingray" })],
+    });
+    const run = runFixture({
+      id: "run-adaptive",
+      name: "adaptive policy",
+      status: "finished",
+      vehicle_setup: {
+        engine_mode: "adaptive_tuner",
+        engine_setting_max_raw_value: 100,
+        engine_setting_min_raw_value: 0,
+        engine_setting_raw_value: 50,
+        selected_vehicle_ids: ["blue_falcon"],
+        selection_mode: "fixed",
+      },
+    });
+    const onImportEngineTuning = vi.fn().mockResolvedValue([
+      {
+        cup_id: "jack",
+        course_id: "mute_city",
+        difficulty: null,
+        engine_setting_raw_value: 73,
+        finish_count: 6,
+        mean_score: -92_100,
+        vehicle_id: "fire_stingray",
+      },
+      {
+        cup_id: "jack",
+        course_id: "silence",
+        difficulty: null,
+        engine_setting_raw_value: 88,
+        finish_count: 4,
+        mean_score: -90_400,
+        vehicle_id: "fire_stingray",
+      },
+    ]);
+    const onRefresh = vi.fn();
+    const onUpsertCourseSetup = vi.fn().mockResolvedValue(saveGame);
+
+    renderSaveGameWorkspace({
+      runs: [run],
+      saveGame,
+      onImportEngineTuning,
+      onRefresh,
+      onUpsertCourseSetup,
+    });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), run.id);
+    await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
+    await user.click(screen.getByRole("button", { name: "Import learned engines" }));
+
+    expect(onImportEngineTuning).toHaveBeenCalledWith({
+      courseSetups: expect.arrayContaining([
+        {
+          courseId: "mute_city",
+          cupId: "jack",
+          difficulty: null,
+          vehicleId: "fire_stingray",
+        },
+        {
+          courseId: "silence",
+          cupId: "jack",
+          difficulty: null,
+          vehicleId: "fire_stingray",
+        },
+      ]),
+      policyArtifact: "best",
+      policyRunId: "run-adaptive",
+      saveGameId: "save-001",
+    });
+    expect(onUpsertCourseSetup).not.toHaveBeenCalled();
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(await screen.findByRole("textbox", { name: "Mute City engine" })).toHaveValue("73");
+    expect(screen.getByRole("textbox", { name: "Silence engine" })).toHaveValue("88");
+    expect(screen.getByRole("button", { name: "Save 24 changes" })).toBeEnabled();
+  });
+
   it("counts one dirty change for one course engine override", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
@@ -171,6 +250,25 @@ describe("SaveGameWorkspace", () => {
     });
     expect(onRefresh).toHaveBeenCalled();
     expect(await screen.findByText("Runner started.")).toBeInTheDocument();
+  });
+
+  it("starts with the default unlocked vehicle when no cup setup is saved", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture({
+      course_setups: courseSetupsForCup("jack"),
+      cup_setups: [],
+    });
+    const onStartCareerMode = vi.fn().mockResolvedValue("started");
+
+    renderSaveGameWorkspace({
+      saveGame,
+      onStartCareerMode,
+    });
+
+    expect(screen.queryByText("Choose a vehicle for the next cup.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onStartCareerMode).toHaveBeenCalled();
   });
 
   it("starts the career runner with MKV recording enabled", async () => {

@@ -74,6 +74,11 @@ class ManagedVehicleConfig(BaseModel):
         ge=0.0,
         le=1.0,
     )
+    adaptive_engine_greedy_plateau_seconds: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds,
+        ge=0.0,
+        le=30.0,
+    )
 
     @model_serializer(mode="wrap")
     def _serialize_vehicle(self, handler: SerializerFunctionWrapHandler) -> object:

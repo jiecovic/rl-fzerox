@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Literal
 
 from rl_fzerox.core.career_mode.course_setup import (
     CourseSetupTarget,
-    has_cup_setup,
     missing_course_setup_targets,
     required_course_setup_targets,
     resolve_course_setup,
@@ -203,6 +202,7 @@ def start_next_save_attempt(
         return _insert_policy_backed_save_attempt(
             session,
             save_game_id=save_game_id,
+            progress=progress,
             target=progress.next_target,
             started_at=started_at,
             error_subject="next unlock target",
@@ -244,6 +244,7 @@ def start_target_save_attempt(
         return _insert_policy_backed_save_attempt(
             session,
             save_game_id=save_game_id,
+            progress=progress,
             target=target,
             started_at=started_at,
             error_subject="selected unlock target",
@@ -352,8 +353,16 @@ def get_save_attempt_execution_context(
             cup_id=attempt.cup_id,
             course_id=attempt.course_id,
         )
+        attempts = save_game_repository.list_save_attempts(session, attempt.save_game_id)
+        progress = build_unlock_progress(save_game.save_path, attempts=attempts)
         cup_setups = save_game_repository.list_cup_setups(session, attempt.save_game_id)
-        cup_setup = resolve_cup_setup(cup_setups, course_setup_target)
+        cup_setup = _resolve_cup_setup_or_default(
+            cup_setups,
+            course_setup_target,
+            progress=progress,
+            save_game_id=save_game.id,
+            timestamp=save_game.updated_at,
+        )
         if cup_setup is None:
             raise ValueError("save attempt is missing a resolved cup vehicle setup")
         missing_targets = missing_course_setup_targets(
@@ -535,6 +544,7 @@ def _insert_policy_backed_save_attempt(
     session: Session,
     *,
     save_game_id: str,
+    progress: ManagedSaveUnlockProgress,
     target: ManagedSaveUnlockTarget,
     started_at: str,
     error_subject: str,
@@ -546,7 +556,14 @@ def _insert_policy_backed_save_attempt(
         cup_id=target.cup_id,
         course_id=target.course_id,
     )
-    if not has_cup_setup(cup_setups, course_setup_target):
+    cup_setup = _resolve_cup_setup_or_default(
+        cup_setups,
+        course_setup_target,
+        progress=progress,
+        save_game_id=save_game_id,
+        timestamp=started_at,
+    )
+    if cup_setup is None:
         raise ValueError(f"{error_subject} has no matching cup vehicle setup")
     missing_targets = missing_course_setup_targets(course_setups, course_setup_target)
     if missing_targets:
@@ -579,6 +596,31 @@ def _insert_policy_backed_save_attempt(
         updated_at=started_at,
     )
     return attempt
+
+
+def _resolve_cup_setup_or_default(
+    cup_setups: tuple[ManagedSaveCupSetup, ...],
+    target: CourseSetupTarget,
+    *,
+    progress: ManagedSaveUnlockProgress,
+    save_game_id: str,
+    timestamp: str,
+) -> ManagedSaveCupSetup | None:
+    cup_setup = resolve_cup_setup(cup_setups, target)
+    if cup_setup is not None or target.cup_id is None:
+        return cup_setup
+    default_vehicle_id = progress.unlocked_vehicle_ids[0] if progress.unlocked_vehicle_ids else None
+    if default_vehicle_id is None:
+        return None
+    return ManagedSaveCupSetup(
+        id=f"{save_game_id}:default-cup-setup:{target.difficulty or 'all'}:{target.cup_id}",
+        save_game_id=save_game_id,
+        cup_id=target.cup_id,
+        vehicle_id=default_vehicle_id,
+        created_at=timestamp,
+        updated_at=timestamp,
+        difficulty=target.difficulty,
+    )
 
 
 def _progress_target(

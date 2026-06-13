@@ -58,6 +58,7 @@ export interface SaveGameSession {
 }
 
 export interface WorkspaceTab {
+  activity?: "running";
   closable?: boolean;
   id: WorkspaceTabId;
   icon?: "career" | "charts" | "draft" | "run";

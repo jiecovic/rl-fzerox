@@ -15,8 +15,10 @@ import {
   countDirtyCupSetups,
   courseSetupDraftsFromSavedSetups,
   courseSetupKey,
+  courseSetupValues,
   cupSetupDraftsFromSavedSetups,
   cupSetupKey,
+  cupSetupValues,
   cupsWithCourses,
   dirtyCourseSetupDrafts,
   dirtyCupSetupDrafts,
@@ -31,6 +33,7 @@ import type {
   ManagedRun,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
+  SaveEngineTuningCourseSetupRecommendation,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
 
@@ -47,10 +50,16 @@ interface UnlockPathPanelProps {
     saveGameId: string;
   }) => Promise<ManagedSaveGame>;
   onImportEngineTuning: (request: {
+    courseSetups: readonly {
+      courseId: string;
+      cupId: string;
+      difficulty?: string | null;
+      vehicleId: string;
+    }[];
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-  }) => Promise<ManagedSaveGame>;
+  }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   onUpsertCupSetup: (request: {
     cupId: string;
     difficulty?: string | null;
@@ -178,6 +187,31 @@ export function UnlockPathPanel({
     });
   }
 
+  async function importEngineTuningForDraft(draft: PolicySelectionDraft) {
+    if (draft.policyRunId === "") {
+      return;
+    }
+    const courseSetups = courseSetupRecommendationRequests({
+      courseSetupDrafts,
+      cupSetupDrafts,
+      cups,
+      draft,
+    });
+    const recommendations = await onImportEngineTuning({
+      courseSetups,
+      policyArtifact: draft.policyArtifact,
+      policyRunId: draft.policyRunId,
+      saveGameId: saveGame.id,
+    });
+    setCourseSetupDrafts((current) =>
+      applyEngineRecommendationsToDrafts({
+        current,
+        draft,
+        recommendations,
+      }),
+    );
+  }
+
   async function saveCourseSetups() {
     if (dirtySetupCount === 0 || savingCourseSetups) {
       return;
@@ -229,9 +263,8 @@ export function UnlockPathPanel({
       <GlobalPolicyPanel
         assignableRuns={assignableRuns}
         cups={cups}
-        saveGameId={saveGame.id}
         updating={updating || savingCourseSetups}
-        onImportEngineTuning={onImportEngineTuning}
+        onImportEngineTuning={importEngineTuningForDraft}
         onApplySetups={applyCourseSetupDrafts}
       />
       <CourseSetupPanel
@@ -337,4 +370,88 @@ function targetCompletionPercent(target: ManagedSaveUnlockTarget | undefined): n
     return 0;
   }
   return target.status === "succeeded" ? 100 : 0;
+}
+
+function courseSetupRecommendationRequests({
+  courseSetupDrafts,
+  cupSetupDrafts,
+  cups,
+  draft,
+}: {
+  courseSetupDrafts: CourseSetupDraftMap;
+  cupSetupDrafts: CupSetupDraftMap;
+  cups: readonly CupView[];
+  draft: PolicySelectionDraft;
+}): {
+  courseId: string;
+  cupId: string;
+  difficulty?: string | null;
+  vehicleId: string;
+}[] {
+  const requests: {
+    courseId: string;
+    cupId: string;
+    difficulty?: string | null;
+    vehicleId: string;
+  }[] = [];
+  for (const cup of cups) {
+    const cupDraft = cupSetupDrafts[cupSetupKey(cupSetupValues(cup))] ?? null;
+    for (const course of cup.courses) {
+      const values = courseSetupValues(cup, course.id);
+      const currentDraft = courseSetupDrafts[courseSetupKey(values)] ?? {
+        ...values,
+        ...EMPTY_COURSE_SETUP_DRAFT,
+      };
+      if (
+        currentDraft.policyRunId !== draft.policyRunId ||
+        currentDraft.policyArtifact !== draft.policyArtifact
+      ) {
+        continue;
+      }
+      requests.push({
+        courseId: values.courseId,
+        cupId: values.cupId,
+        difficulty: values.difficulty ?? null,
+        vehicleId: cupDraft?.vehicleId ?? currentDraft.vehicleId,
+      });
+    }
+  }
+  return requests;
+}
+
+function applyEngineRecommendationsToDrafts({
+  current,
+  draft,
+  recommendations,
+}: {
+  current: CourseSetupDraftMap;
+  draft: PolicySelectionDraft;
+  recommendations: readonly SaveEngineTuningCourseSetupRecommendation[];
+}): CourseSetupDraftMap {
+  const next = { ...current };
+  for (const recommendation of recommendations) {
+    const values: CourseSetupValues = {
+      courseId: recommendation.course_id,
+      cupId: recommendation.cup_id,
+      difficulty: recommendation.difficulty,
+    };
+    const key = courseSetupKey(values);
+    const currentDraft = current[key] ?? {
+      ...values,
+      ...EMPTY_COURSE_SETUP_DRAFT,
+    };
+    if (
+      currentDraft.policyRunId !== draft.policyRunId ||
+      currentDraft.policyArtifact !== draft.policyArtifact
+    ) {
+      continue;
+    }
+    next[key] = {
+      ...currentDraft,
+      ...values,
+      engineSettingRawValue: recommendation.engine_setting_raw_value,
+      vehicleId: recommendation.vehicle_id,
+    };
+  }
+  return next;
 }

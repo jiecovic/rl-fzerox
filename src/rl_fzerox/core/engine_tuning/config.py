@@ -37,6 +37,7 @@ def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSett
             max_raw_value=config.max_raw_value,
             prior_finish_time_seconds=config.prior_finish_time_seconds,
             uniform_exploration=config.uniform_exploration,
+            greedy_plateau_tolerance_seconds=config.greedy_plateau_tolerance_seconds,
             ensemble_members=config.ensemble_members,
             randomized_prior_seconds=config.randomized_prior_seconds,
             hidden_dim=config.hidden_dim,
@@ -54,6 +55,7 @@ def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSett
         observation_noise_seconds=config.observation_noise_seconds,
         curve_lengthscale_raw=config.curve_lengthscale_raw,
         uniform_exploration=config.uniform_exploration,
+        greedy_plateau_tolerance_seconds=config.greedy_plateau_tolerance_seconds,
     )
 
 

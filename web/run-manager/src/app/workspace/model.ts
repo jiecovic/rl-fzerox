@@ -221,13 +221,17 @@ export function buildWorkspaceSessionTabs(
   saveGameSessions: readonly SaveGameSession[],
 ): WorkspaceTab[] {
   return [
-    ...runTabs.map((session) => ({
-      id: session.sessionId,
-      icon: "run" as const,
-      label: `Run · ${runs.find((run) => run.id === session.runId)?.name ?? session.title}`,
-      closable: true,
-      tone: "run" as const,
-    })),
+    ...runTabs.map((session) => {
+      const run = runs.find((candidate) => candidate.id === session.runId);
+      return {
+        id: session.sessionId,
+        icon: "run" as const,
+        label: `Run · ${run?.name ?? session.title}`,
+        activity: run?.status === "running" ? ("running" as const) : undefined,
+        closable: true,
+        tone: "run" as const,
+      };
+    }),
     ...draftEditors.map((session) => ({
       id: session.sessionId,
       icon: "draft" as const,

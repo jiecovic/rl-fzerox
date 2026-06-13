@@ -165,9 +165,7 @@ class AdaptiveEngineTuningConfig(BaseModel):
     prior_finish_time_seconds: PositiveFloat = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     exploration_scale: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.exploration_seconds
     ensemble_members: PositiveInt = ENGINE_TUNER_DEFAULTS.mlp_ensemble_members
-    randomized_prior_seconds: NonNegativeFloat = (
-        ENGINE_TUNER_DEFAULTS.mlp_randomized_prior_seconds
-    )
+    randomized_prior_seconds: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.mlp_randomized_prior_seconds
     hidden_dim: PositiveInt = ENGINE_TUNER_DEFAULTS.mlp_hidden_dim
     training_steps: PositiveInt = ENGINE_TUNER_DEFAULTS.mlp_training_steps
     learning_rate: PositiveFloat = ENGINE_TUNER_DEFAULTS.mlp_learning_rate
@@ -183,6 +181,9 @@ class AdaptiveEngineTuningConfig(BaseModel):
         default=ENGINE_TUNER_DEFAULTS.uniform_exploration,
         ge=0.0,
         le=1.0,
+    )
+    greedy_plateau_tolerance_seconds: NonNegativeFloat = (
+        ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
     )
 
     @model_serializer(mode="wrap")

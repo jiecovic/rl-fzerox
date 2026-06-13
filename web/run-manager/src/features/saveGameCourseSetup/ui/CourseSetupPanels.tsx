@@ -24,12 +24,7 @@ import {
   preferredVehicleSetup,
   sharedCourseDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
-import type {
-  ConfigMetadata,
-  ManagedRun,
-  ManagedSaveGame,
-  SavePolicyArtifact,
-} from "@/shared/api/contract";
+import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
 import { IntegerTextInput } from "@/shared/ui/configFields";
@@ -48,18 +43,12 @@ export function GlobalPolicyPanel({
   cups,
   onImportEngineTuning,
   onApplySetups,
-  saveGameId,
   updating,
 }: {
   assignableRuns: readonly ManagedRun[];
   cups: readonly CupView[];
-  onImportEngineTuning: (request: {
-    policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
-    saveGameId: string;
-  }) => Promise<ManagedSaveGame>;
+  onImportEngineTuning: (draft: PolicySelectionDraft) => Promise<void>;
   onApplySetups: (setups: readonly CourseSetupValues[], draft: PolicySelectionDraft) => void;
-  saveGameId: string;
   updating: boolean;
 }) {
   const [draft, setDraft] = useState<PolicySelectionDraft>(EMPTY_POLICY_SELECTION_DRAFT);
@@ -75,11 +64,7 @@ export function GlobalPolicyPanel({
     }
     setImporting(true);
     try {
-      await onImportEngineTuning({
-        policyArtifact: draft.policyArtifact,
-        policyRunId: draft.policyRunId,
-        saveGameId,
-      });
+      await onImportEngineTuning(draft);
     } finally {
       setImporting(false);
     }

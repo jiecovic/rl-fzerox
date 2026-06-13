@@ -5,6 +5,7 @@ import pytest
 
 from rl_fzerox.core.engine_tuning import (
     ENGINE_TUNING_STATE_VERSION,
+    EngineTuningCandidateEstimate,
     EngineTuningCandidateState,
     EngineTuningContext,
     EngineTuningEpisodeOutcome,
@@ -12,6 +13,10 @@ from rl_fzerox.core.engine_tuning import (
     GaussianProcessEngineTunerSettings,
     MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
+)
+from rl_fzerox.core.engine_tuning.sampling import (
+    StableGreedySelection,
+    stable_greedy_engine_setting,
 )
 from rl_fzerox.core.engine_tuning.tuner import engine_candidates
 
@@ -24,6 +29,31 @@ def test_engine_candidates_are_inclusive_and_clamped() -> None:
 def test_engine_candidates_reject_inverted_range() -> None:
     with pytest.raises(ValueError, match="exceeds"):
         engine_candidates(minimum=80, maximum=20)
+
+
+def test_stable_greedy_uses_soft_plateau_center() -> None:
+    estimates = tuple(
+        EngineTuningCandidateEstimate(
+            engine_setting_raw_value=engine_raw,
+            probability=0.0,
+            mean_score=-90.0 if engine_raw != 58 else -89.95,
+            uncertainty_score=0.0,
+            estimated_finish_time_ms=90_000,
+            finish_count=1,
+            best_finish_time_ms=90_000,
+        )
+        for engine_raw in range(40, 61)
+    )
+
+    choice = stable_greedy_engine_setting(
+        estimates,
+        selection=StableGreedySelection(
+            plateau_tolerance_seconds=1.0,
+            boundary_softness_fraction=0.1,
+        ),
+    )
+
+    assert choice in range(49, 52)
 
 
 def test_ordered_tuner_recommends_lower_finish_time() -> None:

@@ -44,6 +44,7 @@ import type {
   ManagedRunDetail,
   ManagedSaveGame,
   PolicyPlaybackMode,
+  SaveEngineTuningCourseSetupRecommendation,
   SavePolicyArtifact,
   WatchDevice,
   WatchRenderer,
@@ -89,10 +90,16 @@ export interface WorkspaceActions {
     difficulty?: string | null;
   }) => Promise<ManagedSaveGame>;
   importManagedSaveEngineTuning: (request: {
+    courseSetups: readonly {
+      courseId: string;
+      cupId: string;
+      difficulty?: string | null;
+      vehicleId: string;
+    }[];
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
-  }) => Promise<ManagedSaveGame>;
+  }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   exportManagedRun: (run: ManagedRun) => Promise<void>;
   importManagedRunBundle: (file: File) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
@@ -175,13 +182,17 @@ export function useWorkspaceActions({
   }
 
   async function importManagedSaveEngineTuning(request: {
+    courseSetups: readonly {
+      courseId: string;
+      cupId: string;
+      difficulty?: string | null;
+      vehicleId: string;
+    }[];
     policyArtifact: SavePolicyArtifact;
     policyRunId: string;
     saveGameId: string;
   }) {
-    const saveGame = await importSaveEngineTuning(request);
-    setSaveGames((current) => upsertSaveGame(current, saveGame));
-    return saveGame;
+    return await importSaveEngineTuning(request);
   }
 
   async function saveDraft(

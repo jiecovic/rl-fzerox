@@ -6,6 +6,7 @@ import {
   importSaveEngineTuningResponseSchema,
   type ManagedSaveGame,
   openSaveGameDirectoryResponseSchema,
+  type SaveEngineTuningCourseSetupRecommendation,
   type SavePolicyArtifact,
   saveGamesResponseSchema,
   upsertSaveCourseSetupResponseSchema,
@@ -113,27 +114,40 @@ export async function upsertSaveCourseSetup({
 }
 
 export async function importSaveEngineTuning({
+  courseSetups,
   policyArtifact,
   policyRunId,
   saveGameId,
 }: {
+  courseSetups: readonly {
+    courseId: string;
+    cupId: string;
+    difficulty?: string | null;
+    vehicleId: string;
+  }[];
   policyArtifact: SavePolicyArtifact;
   policyRunId: string;
   saveGameId: string;
-}): Promise<ManagedSaveGame> {
+}): Promise<readonly SaveEngineTuningCourseSetupRecommendation[]> {
   const response = await fetch(
     `/api/save-games/${encodeURIComponent(saveGameId)}/course-setups/import-engine-tuning`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        course_setups: courseSetups.map((setup) => ({
+          difficulty: setup.difficulty ?? null,
+          cup_id: setup.cupId,
+          course_id: setup.courseId,
+          vehicle_id: setup.vehicleId,
+        })),
         policy_artifact: policyArtifact,
         policy_run_id: policyRunId,
       }),
     },
   );
   const payload = parseApiPayload(importSaveEngineTuningResponseSchema, await parseJson(response));
-  return payload.save_game;
+  return payload.recommendations;
 }
 
 export async function upsertSaveCupSetup({

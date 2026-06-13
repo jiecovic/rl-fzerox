@@ -29,6 +29,7 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
         "backend": vehicle.adaptive_engine_tuner_backend,
         "prior_finish_time_seconds": prior_finish_time_seconds,
         "uniform_exploration": vehicle.adaptive_engine_uniform_exploration,
+        "greedy_plateau_tolerance_seconds": (vehicle.adaptive_engine_greedy_plateau_seconds),
     }
     if vehicle.adaptive_engine_tuner_backend == "gaussian_process":
         payload.update(

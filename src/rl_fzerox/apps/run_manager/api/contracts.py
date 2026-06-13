@@ -91,11 +91,23 @@ class UpsertSaveCupSetupRequest(BaseModel):
     difficulty: str | None = None
 
 
-class ImportSaveEngineTuningRequest(BaseModel):
-    """Request body for importing learned engine settings into course setups."""
+class ImportSaveEngineTuningCourseSetupRequest(BaseModel):
+    """One draft course setup that should receive an engine recommendation."""
 
     model_config = ConfigDict(extra="forbid")
 
+    difficulty: str | None = None
+    cup_id: str
+    course_id: str
+    vehicle_id: str
+
+
+class ImportSaveEngineTuningRequest(BaseModel):
+    """Request body for learned engine-setting recommendations."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    course_setups: tuple[ImportSaveEngineTuningCourseSetupRequest, ...] = ()
     policy_run_id: str
     policy_artifact: Literal["latest", "best"] = "latest"
 

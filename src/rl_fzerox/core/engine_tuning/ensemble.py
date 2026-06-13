@@ -10,6 +10,10 @@ from random import Random
 
 import torch
 
+from rl_fzerox.core.engine_tuning.sampling import (
+    StableGreedySelection,
+    stable_greedy_engine_setting,
+)
 from rl_fzerox.core.engine_tuning.state import (
     EngineTuningEnsembleMemberState,
     EngineTuningModelContextState,
@@ -122,20 +126,20 @@ class MlpEnsembleEngineTuner:
                 estimate=projection.estimates[engine_raw],
                 sampled_score=None,
             )
-        best: EngineTuningChoice | None = None
-        for engine_raw in candidates:
-            estimate = projection.estimates[engine_raw]
-            choice = self._choice_for(
-                context,
-                engine_raw,
-                estimate=estimate,
-                sampled_score=None,
-            )
-            if best is None or _better_choice(choice, best, candidates=candidates):
-                best = choice
-        if best is None:
+        engine_raw = stable_greedy_engine_setting(
+            _projection_candidate_estimates(projection, candidates),
+            selection=StableGreedySelection(
+                plateau_tolerance_seconds=(self._settings.greedy_plateau_tolerance_seconds)
+            ),
+        )
+        if engine_raw is None:
             raise ValueError("adaptive engine tuning has no engine candidates")
-        return best
+        return self._choice_for(
+            context,
+            engine_raw,
+            estimate=projection.estimates[engine_raw],
+            sampled_score=None,
+        )
 
     def distribution(
         self,
@@ -223,9 +227,7 @@ class MlpEnsembleEngineTuner:
             estimate = projection.estimates[engine_raw]
             scores = projection.member_scores.get(engine_raw, ())
             sampled_score = (
-                estimate.mean_score
-                if not scores
-                else scores[min(member_index, len(scores) - 1)]
+                estimate.mean_score if not scores else scores[min(member_index, len(scores) - 1)]
             )
             choice = self._choice_for(
                 context,
@@ -348,9 +350,7 @@ class _EngineTuningMember(torch.nn.Module):
         self.course_embedding = torch.nn.Embedding(course_count, shape.course_embedding_dim)
         self.vehicle_embedding = torch.nn.Embedding(vehicle_count, shape.vehicle_embedding_dim)
         input_dim = (
-            shape.course_embedding_dim
-            + shape.vehicle_embedding_dim
-            + shape.engine_basis_count
+            shape.course_embedding_dim + shape.vehicle_embedding_dim + shape.engine_basis_count
         )
         self.residual_net = torch.nn.Sequential(
             torch.nn.Linear(input_dim, shape.hidden_dim),
@@ -696,10 +696,7 @@ def _sampling_probabilities(
     return {
         candidate: exploration * uniform_probability
         + (1.0 - exploration)
-        * (
-            (1.0 - model_weight) * uniform_probability
-            + model_weight * model_probabilities[index]
-        )
+        * ((1.0 - model_weight) * uniform_probability + model_weight * model_probabilities[index])
         for index, candidate in enumerate(candidates)
     }
 
@@ -714,6 +711,26 @@ def _softmax_probabilities(scores: tuple[float, ...], *, temperature: float) -> 
     if total <= 0.0:
         return tuple(1.0 / len(scores) for _ in scores)
     return tuple(weight / total for weight in weights)
+
+
+def _projection_candidate_estimates(
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+) -> tuple[EngineTuningCandidateEstimate, ...]:
+    return tuple(
+        EngineTuningCandidateEstimate(
+            engine_setting_raw_value=engine_raw,
+            probability=0.0,
+            mean_score=projection.estimates[engine_raw].mean_score,
+            uncertainty_score=projection.estimates[engine_raw].uncertainty_score,
+            estimated_finish_time_ms=finish_time_ms_from_score(
+                projection.estimates[engine_raw].mean_score
+            ),
+            finish_count=projection.estimates[engine_raw].exact_finish_count,
+            best_finish_time_ms=projection.estimates[engine_raw].best_finish_time_ms,
+        )
+        for engine_raw in candidates
+    )
 
 
 def _sample_candidate(

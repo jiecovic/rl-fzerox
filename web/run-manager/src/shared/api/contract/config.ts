@@ -168,6 +168,7 @@ const vehicleConfigSchema = z
     adaptive_engine_mlp_bootstrap_keep_probability: z.number().gt(0).max(1).default(0.8),
     adaptive_engine_mlp_warmup_successes: z.number().int().min(1).max(4096).default(32),
     adaptive_engine_uniform_exploration: z.number().min(0).max(1).default(0.05),
+    adaptive_engine_greedy_plateau_seconds: z.number().min(0).max(30).default(1),
   })
   .refine(
     (vehicle) => vehicle.engine_setting_min_raw_value <= vehicle.engine_setting_max_raw_value,
