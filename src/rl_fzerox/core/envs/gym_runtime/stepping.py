@@ -228,6 +228,7 @@ class GymStepRuntime:
                 action_drive_axis=action_drive_axis,
                 spin_request=spin_request,
                 capture_display_frames=capture_display_frames,
+                capture_audio=False,
                 active_track=components.episode.active_track,
                 episode_frame_count=components.episode.frame_count,
                 episode_stalled_steps=components.episode.stalled_steps,

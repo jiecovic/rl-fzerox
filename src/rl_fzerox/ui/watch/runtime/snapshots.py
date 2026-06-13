@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState, stacked_observation_channels
-from fzerox_emulator.arrays import ControllerMaskBatch, DisplayFrames, RgbFrame, StateVector
+from fzerox_emulator.arrays import (
+    AudioFrameCounts,
+    ControllerMaskBatch,
+    DisplayFrames,
+    Pcm16Samples,
+    RgbFrame,
+    StateVector,
+)
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -58,7 +65,13 @@ class _SnapshotEnv(Protocol):
 
 
 class _FrameRecorder(Protocol):
-    def record_frame(self, frame: RgbFrame, *, info: dict[str, object]) -> None: ...
+    def record_frame(
+        self,
+        frame: RgbFrame,
+        *,
+        info: dict[str, object],
+        audio_samples: Pcm16Samples = (),
+    ) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +92,8 @@ def _publish_step_snapshots(
     snapshot_queue: WorkerMessageQueue,
     display_frames: DisplayFrames,
     display_controller_masks: ControllerMaskBatch = (),
+    audio_samples: Pcm16Samples = (),
+    audio_frame_counts: AudioFrameCounts = (),
     previous_observation: ObservationValue,
     previous_info: dict[str, object],
     previous_episode_reward: float,
@@ -162,13 +177,22 @@ def _publish_step_snapshots(
         fallback_previous=previous_control_state,
         fallback_final=final_control_state,
     )
+    audio_chunks = _audio_chunks_for_frames(
+        audio_samples,
+        audio_frame_counts,
+        frame_count=len(frames),
+    )
     if frame_interval_seconds is None and target_control_seconds is not None:
         frame_interval_seconds = target_control_seconds / len(frames)
     for index, frame in enumerate(frames):
         is_final_frame = index == len(frames) - 1
         frame_info = final_info if is_final_frame else previous_info
         if frame_recorder is not None:
-            frame_recorder.record_frame(frame, info=frame_info)
+            frame_recorder.record_frame(
+                frame,
+                info=frame_info,
+                audio_samples=audio_chunks[index],
+            )
         publish_worker_message(
             snapshot_queue,
             _build_snapshot(
@@ -262,6 +286,29 @@ def _display_controller_states(
         ),
         True,
     )
+
+
+def _audio_chunks_for_frames(
+    audio_samples: Pcm16Samples,
+    audio_frame_counts: AudioFrameCounts,
+    *,
+    frame_count: int,
+) -> tuple[Pcm16Samples, ...]:
+    empty = tuple(() for _ in range(frame_count))
+    if len(audio_samples) == 0:
+        return empty
+    counts = tuple(int(count) for count in audio_frame_counts)
+    if len(counts) != frame_count or any(count < 0 for count in counts):
+        return empty
+    chunks: list[Pcm16Samples] = []
+    offset = 0
+    for count in counts:
+        sample_count = count * 2
+        chunks.append(audio_samples[offset : offset + sample_count])
+        offset += sample_count
+    if offset != len(audio_samples):
+        return empty
+    return tuple(chunks)
 
 
 def _build_snapshot(

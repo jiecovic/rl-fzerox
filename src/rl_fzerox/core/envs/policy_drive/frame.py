@@ -5,7 +5,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator.arrays import ControllerMaskBatch, DisplayFrames
+from fzerox_emulator.arrays import (
+    AudioFrameCounts,
+    ControllerMaskBatch,
+    DisplayFrames,
+    Pcm16Samples,
+)
 from rl_fzerox.core.envs.engine.stepping import WatchEnvStep
 from rl_fzerox.core.envs.observations import ObservationValue
 
@@ -28,6 +33,8 @@ class PolicyDriveStep:
     info: dict[str, object]
     display_frames: DisplayFrames
     display_controller_masks: ControllerMaskBatch = ()
+    audio_samples: Pcm16Samples = ()
+    audio_frame_counts: AudioFrameCounts = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +46,8 @@ class PolicyDriveFrame:
     info: dict[str, object]
     display_frames: DisplayFrames
     display_controller_masks: ControllerMaskBatch
+    audio_samples: Pcm16Samples = ()
+    audio_frame_counts: AudioFrameCounts = ()
 
 
 def policy_drive_info(info: dict[str, object]) -> dict[str, object]:
@@ -60,4 +69,6 @@ def policy_drive_step(step: WatchEnvStep) -> PolicyDriveStep:
         info=policy_drive_info(step.info),
         display_frames=step.display_frames,
         display_controller_masks=step.display_controller_masks,
+        audio_samples=step.audio_samples,
+        audio_frame_counts=step.audio_frame_counts,
     )

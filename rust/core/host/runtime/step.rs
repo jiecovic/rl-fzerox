@@ -329,6 +329,26 @@ impl DisplayFrameBatch {
     }
 }
 
+/// Flat signed 16-bit stereo audio samples captured beside watch frames.
+///
+/// `samples` contains interleaved left/right sample values. `frame_counts`
+/// stores how many stereo audio frames were emitted during each matching video
+/// frame, so Python can split the flat buffer without copying ragged vectors
+/// through the native boundary.
+#[derive(Clone, Debug, Default)]
+pub struct AudioFrameBatch {
+    pub samples: Vec<i16>,
+    pub frame_counts: Vec<u32>,
+}
+
+impl AudioFrameBatch {
+    pub fn push_frame_samples(&mut self, samples: Vec<i16>) {
+        debug_assert!(samples.len().is_multiple_of(2));
+        self.frame_counts.push((samples.len() / 2) as u32);
+        self.samples.extend(samples);
+    }
+}
+
 /// Watch-mode repeated-step payload.
 ///
 /// This extends the normal repeated-step result with display frames captured
@@ -343,6 +363,8 @@ pub struct NativeWatchStepResult<'a> {
     pub display_frames: DisplayFrameBatch,
     /// Joypad masks applied for each captured display frame.
     pub display_controller_masks: Vec<u16>,
+    /// Interleaved stereo PCM samples captured for each display frame.
+    pub audio_frames: AudioFrameBatch,
     /// Aggregated step features spanning the internal repeated frames.
     pub summary: StepSummary,
     /// Native counter/stop state after the repeated env step completed.

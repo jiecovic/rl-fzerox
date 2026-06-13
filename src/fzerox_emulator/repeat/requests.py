@@ -73,13 +73,18 @@ def native_repeat_observation_request(
     config: RepeatStepConfig,
     control_state: RaceControlState,
     recipe: ObservationImageRecipe,
+    *,
+    capture_audio: bool = False,
 ) -> RepeatObservationStepRequestDict:
     """Build the native request for one repeated step with one observation view."""
 
-    return {
+    payload: RepeatObservationStepRequestDict = {
         "step": native_repeat_step_request(config, control_state),
         "observation": native_observation_recipe(recipe),
     }
+    if capture_audio:
+        payload["capture_audio"] = True
+    return payload
 
 
 def native_repeat_multi_observation_request(

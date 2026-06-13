@@ -283,6 +283,8 @@ class Emulator:
     @property
     def native_fps(self) -> float: ...
     @property
+    def native_sample_rate(self) -> float: ...
+    @property
     def display_aspect_ratio(self) -> float: ...
     @property
     def frame_shape(self) -> tuple[int, int, int]: ...
@@ -294,6 +296,11 @@ class Emulator:
     def baseline_kind(self) -> str: ...
     def reset(self) -> None: ...
     def step_frames(self, count: int = 1, capture_video: bool = True) -> None: ...
+    def step_frames_with_audio(
+        self,
+        count: int = 1,
+        capture_video: bool = True,
+    ) -> npt.NDArray[np.int16]: ...
     def step_repeat_raw(
         self,
         request: RepeatObservationStepRequestDict,
@@ -309,6 +316,8 @@ class Emulator:
         npt.NDArray[np.uint8],
         npt.NDArray[np.uint8],
         npt.NDArray[np.uint16],
+        npt.NDArray[np.int16],
+        npt.NDArray[np.uint32],
         StepSummary,
         StepStatus,
         FZeroXTelemetry,

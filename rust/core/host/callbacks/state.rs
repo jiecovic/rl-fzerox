@@ -19,6 +19,7 @@ use crate::core::video::{
     VideoCrop, VideoFrame, VideoResizeFilter, decode_frame,
 };
 
+mod audio;
 mod environment;
 mod hardware;
 mod render;
@@ -46,6 +47,8 @@ pub struct CallbackState {
     pub(super) stacked_observation_buffers: Vec<StackedObservationCacheEntry>,
     pub(super) render_plans: Vec<RenderPlanCacheEntry>,
     pub(super) capture_video: bool,
+    pub(super) capture_audio: bool,
+    pub(super) audio_samples: Vec<i16>,
     pub(super) frame_serial: u64,
     pub(super) pixel_format: PixelLayout,
     pub(super) hardware_render: Option<HardwareRenderContext>,
@@ -111,6 +114,8 @@ impl CallbackState {
             stacked_observation_buffers: Vec::new(),
             render_plans: Vec::new(),
             capture_video: true,
+            capture_audio: false,
+            audio_samples: Vec::new(),
             frame_serial: 0,
             pixel_format: PixelLayout::Argb1555,
             hardware_render: None,

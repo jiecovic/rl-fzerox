@@ -61,9 +61,7 @@ def test_career_policy_runtime_disables_training_dropouts(tmp_path: Path) -> Non
     assert train_config.env.action.lean_episode_mask_probability == 0.0
     assert train_config.train.state_feature_dropout_groups == ()
     assert config.action.lean_episode_mask_probability == 1.0
-    assert all(
-        feature.dropout_prob == 1.0 for feature in config.observation.state_feature_dropouts
-    )
+    assert all(feature.dropout_prob == 1.0 for feature in config.observation.state_feature_dropouts)
 
 
 class _PolicyStub:

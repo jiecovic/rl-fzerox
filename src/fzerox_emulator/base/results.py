@@ -7,9 +7,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from fzerox_emulator.arrays import (
+    AudioFrameCounts,
     ControllerMaskBatch,
     DisplayFrames,
     ObservationFrame,
+    Pcm16Samples,
     RgbFrame,
 )
 
@@ -46,6 +48,8 @@ class BackendStepResult:
     telemetry: FZeroXTelemetry | None
     display_frames: DisplayFrames = ()
     display_controller_masks: ControllerMaskBatch = ()
+    audio_samples: Pcm16Samples = ()
+    audio_frame_counts: AudioFrameCounts = ()
 
 
 @dataclass(frozen=True)

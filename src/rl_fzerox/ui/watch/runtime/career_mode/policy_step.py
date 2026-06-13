@@ -124,6 +124,7 @@ def step_policy_or_manual(
         race_step = session.step_manual_race(
             current_control_state,
             spin_request=spin_request,
+            capture_audio=frame_recorder is not None,
         )
         raw_observation = race_step.observation
         raw_info = race_step.info
@@ -151,7 +152,7 @@ def step_policy_or_manual(
             observation=observation,
             normalization=cnn_normalization,
         )
-        race_step = session.step_policy(action)
+        race_step = session.step_policy(action, capture_audio=frame_recorder is not None)
         raw_observation = race_step.observation
         raw_info = race_step.info
 
@@ -227,6 +228,8 @@ def step_policy_or_manual(
         snapshot_queue=snapshot_queue,
         display_frames=race_step.display_frames,
         display_controller_masks=race_step.display_controller_masks,
+        audio_samples=race_step.audio_samples,
+        audio_frame_counts=race_step.audio_frame_counts,
         previous_observation=previous_observation,
         previous_info=previous_info,
         previous_episode_reward=previous_episode_reward,

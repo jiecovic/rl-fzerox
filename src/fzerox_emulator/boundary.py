@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 from fzerox_emulator.control.spin import SpinRequest
 
@@ -108,6 +108,7 @@ class RepeatObservationStepRequestDict(TypedDict):
 
     step: RepeatStepRequestDict
     observation: ObservationImageRequestDict
+    capture_audio: NotRequired[bool]
 
 
 class RepeatMultiObservationStepRequestDict(TypedDict):

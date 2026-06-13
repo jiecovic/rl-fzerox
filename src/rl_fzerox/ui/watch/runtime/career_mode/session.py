@@ -30,6 +30,7 @@ class CareerModeRuntimeSession:
     config: WatchAppConfig
     emulator: Emulator
     native_fps: float
+    native_sample_rate: float
     native_control_fps: float
     target_control_fps: float | None
     target_control_seconds: float | None
@@ -90,18 +91,25 @@ class CareerModeRuntimeSession:
         self._ensure_policy_race(policy_control)
         return self._require_policy_race().begin(seed=seed, course_id=course_id)
 
-    def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
-        return self._require_policy_race().step_policy(action)
+    def step_policy(
+        self,
+        action: ActionValue,
+        *,
+        capture_audio: bool = False,
+    ) -> PolicyDriveFrame:
+        return self._require_policy_race().step_policy(action, capture_audio=capture_audio)
 
     def step_manual_race(
         self,
         control_state: RaceControlState,
         *,
         spin_request: SpinRequest = "none",
+        capture_audio: bool = False,
     ) -> PolicyDriveFrame:
         return self._require_policy_race().step_manual(
             control_state,
             spin_request=spin_request,
+            capture_audio=capture_audio,
         )
 
     def sync_policy_curriculum_stage(self, stage_index: int | None) -> None:
@@ -174,6 +182,7 @@ def open_career_mode_runtime_session(config: WatchAppConfig) -> CareerModeRuntim
         renderer=config.emulator.renderer,
     )
     native_fps = emulator.native_fps
+    native_sample_rate = emulator.native_sample_rate
     native_control_fps = native_fps
     target_control_fps = _resolve_control_fps(
         config.watch.control_fps,
@@ -183,6 +192,7 @@ def open_career_mode_runtime_session(config: WatchAppConfig) -> CareerModeRuntim
         config=config,
         emulator=emulator,
         native_fps=native_fps,
+        native_sample_rate=native_sample_rate,
         native_control_fps=native_control_fps,
         target_control_fps=target_control_fps,
         target_control_seconds=_target_seconds(target_control_fps),

@@ -26,10 +26,12 @@ pub extern "C" fn video_refresh_callback(
     });
 }
 
-pub extern "C" fn audio_sample_callback(_left: i16, _right: i16) {}
+pub extern "C" fn audio_sample_callback(left: i16, right: i16) {
+    let _ = with_state_mut(|state| state.store_audio_sample(left, right));
+}
 
-pub extern "C" fn audio_sample_batch_callback(_data: *const i16, frames: usize) -> usize {
-    frames
+pub extern "C" fn audio_sample_batch_callback(data: *const i16, frames: usize) -> usize {
+    with_state_mut(|state| state.store_audio_sample_batch(data, frames)).unwrap_or(frames)
 }
 
 pub extern "C" fn input_poll_callback() {}

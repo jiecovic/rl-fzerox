@@ -76,16 +76,26 @@ class CareerPolicyRaceDriver:
         )
         return observation, info
 
-    def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
-        return self._runtime.step_policy(action)
+    def step_policy(
+        self,
+        action: ActionValue,
+        *,
+        capture_audio: bool = False,
+    ) -> PolicyDriveFrame:
+        return self._runtime.step_policy(action, capture_audio=capture_audio)
 
     def step_manual(
         self,
         control_state: RaceControlState,
         *,
         spin_request: SpinRequest = "none",
+        capture_audio: bool = False,
     ) -> PolicyDriveFrame:
-        return self._runtime.step_manual(control_state, spin_request=spin_request)
+        return self._runtime.step_manual(
+            control_state,
+            spin_request=spin_request,
+            capture_audio=capture_audio,
+        )
 
     def action_mask_branches(self) -> ActionMaskBranches:
         return self._runtime.action_mask_branches()

@@ -37,6 +37,7 @@ class EnvStepRequest:
     action_drive_axis: float | None
     spin_request: SpinRequest
     capture_display_frames: bool
+    capture_audio: bool
     active_track: SelectedTrack | None
     episode_frame_count: int
     episode_stalled_steps: int
@@ -286,6 +287,8 @@ class EngineStepAssembler:
                 info=info,
                 display_frames=step_result.display_frames,
                 display_controller_masks=step_result.display_controller_masks,
+                audio_samples=step_result.audio_samples,
+                audio_frame_counts=step_result.audio_frame_counts,
             ),
             telemetry=telemetry,
             requested_control_state=requested_control_state,
@@ -326,6 +329,7 @@ class EngineStepAssembler:
                 lean_timer_assist=lean_timer_assist,
                 spin_request=request.spin_request,
                 spin_cooldown_frames=self.action_config.spin_cooldown_frames,
+                capture_audio=request.capture_audio,
                 **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
             )
         return self.backend.step_repeat_raw(

@@ -3,6 +3,7 @@
 
 use std::path::Path;
 
+use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 
@@ -30,6 +31,18 @@ pub(in crate::bindings::emulator) fn step_frames(
 ) -> PyResult<()> {
     py.detach(|| emulator.host.step_frames(count, capture_video))
         .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn step_frames_with_audio<'py>(
+    emulator: &mut PyEmulator,
+    py: Python<'py>,
+    count: usize,
+    capture_video: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let samples = py
+        .detach(|| emulator.host.step_frames_with_audio(count, capture_video))
+        .map_err(map_core_error)?;
+    Ok(PyArray1::<i16>::from_vec(py, samples).into_any())
 }
 
 pub(in crate::bindings::emulator) fn set_controller_state(

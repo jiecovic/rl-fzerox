@@ -5,7 +5,9 @@ use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
-use crate::bindings::emulator::frame::{frame_batch_to_pyarray, frame_to_pyarray};
+use crate::bindings::emulator::frame::{
+    audio_batch_to_pyarrays, frame_batch_to_pyarray, frame_to_pyarray,
+};
 use crate::bindings::emulator::step::{step_status_to_py, step_summary_to_py};
 use crate::bindings::emulator::telemetry::telemetry_to_py;
 use crate::bindings::emulator::{
@@ -65,9 +67,11 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
     let prepared = prepare_observation_render(emulator, &request.observation)?;
     let result = py
         .detach(|| {
-            emulator
-                .host
-                .step_repeat_watch_raw(request.step_config, prepared.config)
+            emulator.host.step_repeat_watch_raw(
+                request.step_config,
+                prepared.config,
+                request.capture_audio,
+            )
         })
         .map_err(map_core_error)?;
     let observation = frame_to_pyarray(
@@ -85,6 +89,7 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
         3,
     )?;
     let display_controller_masks = PyArray1::<u16>::from_vec(py, result.display_controller_masks);
+    let (audio_samples, audio_frame_counts) = audio_batch_to_pyarrays(py, result.audio_frames)?;
     let summary = step_summary_to_py(py, &result.summary)?;
     let status = step_status_to_py(py, &result.status)?;
     let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
@@ -94,6 +99,8 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
             observation,
             display_frames.into_any(),
             display_controller_masks.into_any(),
+            audio_samples,
+            audio_frame_counts,
             summary.into_bound(py).into_any(),
             status.into_bound(py).into_any(),
             telemetry.into_bound(py).into_any(),
@@ -154,6 +161,7 @@ pub(in crate::bindings::emulator) fn step_repeat_multi_observation_raw<'py>(
 struct RepeatObservationBindingRequest {
     step_config: RepeatedStepConfig,
     observation: ObservationImageRequest,
+    capture_audio: bool,
 }
 
 struct RepeatMultiObservationBindingRequest {
@@ -176,9 +184,11 @@ impl RepeatObservationBindingRequest {
         let observation_request = required_dict(request, REPEAT_PAYLOAD, "observation")?;
         let step_config = repeated_step_config(&step_request)?;
         let observation = observation_request_from_dict(&observation_request)?;
+        let capture_audio = optional_item(request, "capture_audio", false)?;
         Ok(Self {
             step_config,
             observation,
+            capture_audio,
         })
     }
 }

@@ -21,6 +21,7 @@ def run_repeat_watch_step(
     *,
     config: RepeatStepConfig,
     recipe: ObservationImageRecipe,
+    capture_audio: bool = False,
 ) -> BackendStepResult:
     """Run the native watch repeated-step API and wrap observation/display frames."""
 
@@ -28,11 +29,18 @@ def run_repeat_watch_step(
         observation,
         display_frames,
         display_controller_masks,
+        audio_samples,
+        audio_frame_counts,
         summary,
         status,
         telemetry,
     ) = native.step_repeat_watch_raw(
-        native_repeat_observation_request(config, control_state, recipe)
+        native_repeat_observation_request(
+            config,
+            control_state,
+            recipe,
+            capture_audio=capture_audio,
+        )
     )
     return BackendStepResult(
         observation=observation,
@@ -41,4 +49,6 @@ def run_repeat_watch_step(
         telemetry=telemetry,
         display_frames=display_frames,
         display_controller_masks=display_controller_masks,
+        audio_samples=audio_samples,
+        audio_frame_counts=audio_frame_counts,
     )

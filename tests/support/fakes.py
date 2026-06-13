@@ -24,7 +24,7 @@ from fzerox_emulator import (
     StepSummary,
     display_size,
 )
-from fzerox_emulator.arrays import ObservationFrame, RgbFrame
+from fzerox_emulator.arrays import ObservationFrame, Pcm16Samples, RgbFrame
 from rl_fzerox.core.domain.observation_image import ObservationPresetName, preset_geometry
 from tests.support.native_objects import make_telemetry
 
@@ -77,6 +77,10 @@ class SyntheticBackend:
     @property
     def native_fps(self) -> float:
         return 60.0
+
+    @property
+    def native_sample_rate(self) -> float:
+        return 48_000.0
 
     @property
     def display_aspect_ratio(self) -> float:
@@ -261,6 +265,15 @@ class SyntheticBackend:
         for _ in range(count):
             self.step_frame()
 
+    def step_frames_with_audio(
+        self,
+        count: int,
+        *,
+        capture_video: bool = True,
+    ) -> Pcm16Samples:
+        self.step_frames(count, capture_video=capture_video)
+        return np.zeros(count * 2, dtype=np.int16)
+
     def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]:
         self.randomized_rng_seeds.append(seed)
         return (
@@ -405,6 +418,7 @@ class SyntheticBackend:
         lean_timer_assist: bool = False,
         spin_request: object = "none",
         spin_cooldown_frames: int = 120,
+        capture_audio: bool = False,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -456,6 +470,8 @@ class SyntheticBackend:
             and self._state.progress_frontier_stalled_frames >= progress_frontier_stall_limit_frames
         ):
             truncation_reason = "progress_stalled"
+        audio_samples = np.zeros(action_repeat * 2, dtype=np.int16) if capture_audio else ()
+        audio_frame_counts = np.ones(action_repeat, dtype=np.uint32) if capture_audio else ()
         return BackendStepResult(
             observation=observation,
             summary=StepSummary(
@@ -492,6 +508,8 @@ class SyntheticBackend:
                 control_state.control_mask,
                 dtype=np.uint16,
             ),
+            audio_samples=audio_samples,
+            audio_frame_counts=audio_frame_counts,
         )
 
     def step_repeat_multi_observation_raw(

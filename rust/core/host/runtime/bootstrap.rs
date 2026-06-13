@@ -74,6 +74,7 @@ impl Host {
             av_info.geometry.aspect_ratio as f64,
         );
         self.native_fps = av_info.timing.fps;
+        self.native_sample_rate = av_info.timing.sample_rate;
         self.frame_shape = (
             av_info.geometry.base_height as usize,
             av_info.geometry.base_width as usize,

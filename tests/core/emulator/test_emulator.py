@@ -79,6 +79,24 @@ def test_try_read_telemetry_returns_native_snapshot_object() -> None:
     assert emulator.try_read_telemetry() is telemetry
 
 
+def test_missing_native_audio_api_falls_back_without_crashing() -> None:
+    emulator = object.__new__(Emulator)
+
+    class NativeStub:
+        def __init__(self) -> None:
+            self.step_frames_calls: list[tuple[int, bool]] = []
+
+        def step_frames(self, count: int, capture_video: bool) -> None:
+            self.step_frames_calls.append((count, capture_video))
+
+    native = NativeStub()
+    emulator.__dict__["_native"] = native
+
+    assert emulator.native_sample_rate == 0.0
+    assert emulator.step_frames_with_audio(3, capture_video=False) == ()
+    assert native.step_frames_calls == [(3, False)]
+
+
 def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     emulator = object.__new__(Emulator)
     emulator._observation_specs = {}
@@ -203,10 +221,21 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
                 ),
             )
             display_controller_masks = np.array([1, 2], dtype=np.uint16)
+            audio_samples = np.array([10, -10, 20, -20], dtype=np.int16)
+            audio_frame_counts = np.array([1, 1], dtype=np.uint32)
             summary = make_step_summary(frames_run=2, max_race_distance=42.0)
             status = make_step_status(step_count=2, stalled_steps=0)
             telemetry = make_telemetry(race_distance=42.0)
-            return observation, display_frames, display_controller_masks, summary, status, telemetry
+            return (
+                observation,
+                display_frames,
+                display_controller_masks,
+                audio_samples,
+                audio_frame_counts,
+                summary,
+                status,
+                telemetry,
+            )
 
     emulator.__dict__["_native"] = NativeStub()
 
@@ -229,6 +258,10 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     assert result.display_frames[1][0, 0, 0] == 2
     assert not isinstance(result.display_controller_masks, tuple)
     assert result.display_controller_masks.tolist() == [1, 2]
+    assert not isinstance(result.audio_samples, tuple)
+    assert result.audio_samples.tolist() == [10, -10, 20, -20]
+    assert not isinstance(result.audio_frame_counts, tuple)
+    assert result.audio_frame_counts.tolist() == [1, 1]
 
 
 def test_step_repeat_multi_observation_raw_returns_multiple_validated_views() -> None:

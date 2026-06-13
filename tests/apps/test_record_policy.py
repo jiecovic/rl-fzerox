@@ -30,7 +30,9 @@ from rl_fzerox.apps.recording.runner import (
 )
 from rl_fzerox.apps.recording.video import (
     VideoSettings,
+    _ffmpeg_audio_mux_command,
     _ffmpeg_command,
+    as_pcm16_samples,
 )
 from rl_fzerox.apps.recording.video import (
     attempt_output_path as _attempt_output_path,
@@ -108,6 +110,36 @@ def test_ffmpeg_command_streams_raw_rgb_to_h264_mp4() -> None:
     assert "-i" in command
     assert command[command.index("-i") + 1] == "-"
     assert command[-1] == ".race.attempt-007.mp4"
+
+
+def test_ffmpeg_audio_mux_command_combines_video_and_pcm_sidecar() -> None:
+    command = _ffmpeg_audio_mux_command(
+        ffmpeg_path="ffmpeg",
+        video_path=Path("race.video.mkv"),
+        audio_path=Path("race.audio.s16le"),
+        output_path=Path("race.mkv"),
+        audio_sample_rate=48_000,
+    )
+
+    assert "race.video.mkv" in command
+    assert "race.audio.s16le" in command
+    assert "-ar" in command
+    assert command[command.index("-ar") + 1] == "48000"
+    assert "-c:v" in command
+    assert command[command.index("-c:v") + 1] == "copy"
+    assert "-c:a" in command
+    assert command[command.index("-c:a") + 1] == "aac"
+
+
+def test_as_pcm16_samples_requires_flat_stereo_pairs() -> None:
+    samples = as_pcm16_samples((1, -1, 2, -2))
+
+    assert samples.dtype == np.int16
+    assert samples.tolist() == [1, -1, 2, -2]
+    with pytest.raises(ValueError, match="even number"):
+        as_pcm16_samples((1, 2, 3))
+    with pytest.raises(ValueError, match="flat PCM"):
+        as_pcm16_samples(np.zeros((1, 2), dtype=np.int16))
 
 
 def test_resolve_ffmpeg_path_prefers_system_binary(monkeypatch: pytest.MonkeyPatch) -> None:

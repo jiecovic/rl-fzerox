@@ -23,8 +23,8 @@ mod telemetry;
 pub use host::Host;
 pub use spin::SpinRequest;
 pub use step::{
-    DisplayFrameBatch, ObservationRenderConfig, RepeatedStepConfig, StepCounters, StepStatus,
-    StepSummary,
+    AudioFrameBatch, DisplayFrameBatch, ObservationRenderConfig, RepeatedStepConfig, StepCounters,
+    StepStatus, StepSummary,
 };
 
 #[cfg(test)]

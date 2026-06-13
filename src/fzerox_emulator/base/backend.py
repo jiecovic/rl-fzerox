@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from fzerox_emulator.arrays import ObservationFrame, RgbFrame
+from fzerox_emulator.arrays import ObservationFrame, Pcm16Samples, RgbFrame
 from fzerox_emulator.base.observations import (
     ObservationImageRecipe,
     ObservationResizeFilter,
@@ -37,6 +37,9 @@ class EmulatorBackend(Protocol):
     def native_fps(self) -> float: ...
 
     @property
+    def native_sample_rate(self) -> float: ...
+
+    @property
     def display_aspect_ratio(self) -> float: ...
 
     @property
@@ -50,6 +53,13 @@ class EmulatorBackend(Protocol):
     def step_frame(self) -> FrameStep: ...
 
     def step_frames(self, count: int, *, capture_video: bool = True) -> None: ...
+
+    def step_frames_with_audio(
+        self,
+        count: int,
+        *,
+        capture_video: bool = True,
+    ) -> Pcm16Samples: ...
 
     def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]: ...
 
@@ -105,6 +115,7 @@ class EmulatorBackend(Protocol):
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
         spin_cooldown_frames: int = DEFAULT_SPIN_COOLDOWN_FRAMES,
+        capture_audio: bool = False,
     ) -> BackendStepResult: ...
 
     def step_repeat_multi_observation_raw(

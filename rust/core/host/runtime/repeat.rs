@@ -6,8 +6,9 @@ use crate::core::stdio::with_silenced_stdio;
 
 use super::host::Host;
 use super::step::{
-    DisplayFrameBatch, NativeMultiObservationStepResult, NativeStepResult, NativeWatchStepResult,
-    ObservationFrameBatch, ObservationRenderConfig, RepeatedStepConfig, StepStatus, StepSummary,
+    AudioFrameBatch, DisplayFrameBatch, NativeMultiObservationStepResult, NativeStepResult,
+    NativeWatchStepResult, ObservationFrameBatch, ObservationRenderConfig, RepeatedStepConfig,
+    StepStatus, StepSummary,
 };
 use super::step_accumulator::StepAccumulator;
 
@@ -69,6 +70,7 @@ impl Host {
         &mut self,
         config: RepeatedStepConfig,
         observation_config: ObservationRenderConfig,
+        capture_audio: bool,
     ) -> Result<NativeWatchStepResult<'_>, CoreError> {
         self.ensure_open()?;
         if config.action_repeat == 0 {
@@ -88,9 +90,14 @@ impl Host {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
             let mut display_frames = DisplayFrameBatch::default();
             let mut display_controller_masks = Vec::with_capacity(config.action_repeat);
+            let mut audio_frames = AudioFrameBatch::default();
+            self.callbacks.set_capture_audio(capture_audio);
 
             for _ in 0..config.action_repeat {
                 self.callbacks.set_capture_video(true);
+                if capture_audio {
+                    self.callbacks.clear_audio_samples();
+                }
                 let controller_state = self.controller_for_repeated_frame(
                     base_controller_state,
                     spin_controls_active,
@@ -104,6 +111,9 @@ impl Host {
                 self.call_core(|core| unsafe {
                     core.run();
                 });
+                if capture_audio {
+                    audio_frames.push_frame_samples(self.callbacks.drain_audio_samples());
+                }
                 self.frame_index += 1;
 
                 let telemetry = self.telemetry_sample()?;
@@ -117,12 +127,14 @@ impl Host {
                 self.finish_repeated_step(accumulator, spin_stats),
                 display_frames,
                 display_controller_masks,
+                audio_frames,
             ))
         });
+        self.callbacks.set_capture_audio(false);
         self.callbacks.set_capture_video(true);
         self.refresh_shape_from_frame();
 
-        let (summary, display_frames, display_controller_masks) = step_result?;
+        let (summary, display_frames, display_controller_masks, audio_frames) = step_result?;
         if !self.callbacks.has_frame() {
             return Err(CoreError::NoFrameAvailable);
         }
@@ -133,6 +145,7 @@ impl Host {
             observation,
             display_frames,
             display_controller_masks,
+            audio_frames,
             summary,
             status,
             final_telemetry,

@@ -37,6 +37,7 @@ pub struct Host {
     pub(super) display_aspect_ratio: f64,
     pub(super) observation_crop_profile: ObservationCropProfile,
     pub(super) native_fps: f64,
+    pub(super) native_sample_rate: f64,
     pub(super) frame_shape: (usize, usize, usize),
     pub(super) frame_index: usize,
     pub(super) system_ram_size: usize,
@@ -86,6 +87,7 @@ impl Host {
             display_aspect_ratio: 0.0,
             observation_crop_profile: ObservationCropProfile::from_renderer_name(renderer),
             native_fps: 0.0,
+            native_sample_rate: 0.0,
             frame_shape: (0, 0, 3),
             frame_index: 0,
             system_ram_size: 0,
@@ -112,6 +114,10 @@ impl Host {
 
     pub fn native_fps(&self) -> f64 {
         self.native_fps
+    }
+
+    pub fn native_sample_rate(&self) -> f64 {
+        self.native_sample_rate
     }
 
     pub fn display_aspect_ratio(&self) -> f64 {

@@ -159,7 +159,11 @@ def _run_loaded_career_mode_loop(
         session=session,
         controller=controller,
     )
-    recorder = open_career_mode_recorder(config=config, native_fps=session.native_fps)
+    recorder = open_career_mode_recorder(
+        config=config,
+        native_fps=session.native_fps,
+        native_sample_rate=session.native_sample_rate,
+    )
 
     try:
         _publish_initial_career_snapshot(
@@ -863,6 +867,7 @@ def _fresh_menu_runtime_state(
     info = dict(raw_info)
     telemetry = _read_live_telemetry(session.emulator)
     return raw_info, info, telemetry
+
 
 def _close_career_mode(
     config: WatchAppConfig,

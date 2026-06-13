@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator.arrays import ControllerMaskBatch, DisplayFrames
+from fzerox_emulator.arrays import (
+    AudioFrameCounts,
+    ControllerMaskBatch,
+    DisplayFrames,
+    Pcm16Samples,
+)
 from rl_fzerox.core.envs.observations import ObservationValue
 
 
@@ -18,6 +23,8 @@ class WatchEnvStep:
     info: dict[str, object]
     display_frames: DisplayFrames
     display_controller_masks: ControllerMaskBatch = ()
+    audio_samples: Pcm16Samples = ()
+    audio_frame_counts: AudioFrameCounts = ()
 
     def gym_result(self) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self.observation, self.reward, self.terminated, self.truncated, self.info

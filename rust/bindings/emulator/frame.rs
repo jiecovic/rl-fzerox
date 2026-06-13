@@ -5,7 +5,7 @@ use numpy::{PyArray1, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::core::host::DisplayFrameBatch;
+use crate::core::host::{AudioFrameBatch, DisplayFrameBatch};
 
 /// Materialize a Python-owned NumPy array view of a frame buffer.
 ///
@@ -53,4 +53,28 @@ pub(super) fn frame_batch_to_pyarray<'py>(
     Ok(array
         .reshape([frame_count, height, width, channels])?
         .into_any())
+}
+
+pub(super) fn audio_batch_to_pyarrays<'py>(
+    py: Python<'py>,
+    audio: AudioFrameBatch,
+) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+    let counted_samples = audio
+        .frame_counts
+        .iter()
+        .try_fold(0usize, |total, frame_count| {
+            let frame_samples = (*frame_count as usize).checked_mul(2)?;
+            total.checked_add(frame_samples)
+        })
+        .ok_or_else(|| PyValueError::new_err("audio frame counts overflow sample count"))?;
+    if counted_samples != audio.samples.len() {
+        return Err(PyValueError::new_err(format!(
+            "audio sample count {} does not match frame counts {}",
+            audio.samples.len(),
+            counted_samples,
+        )));
+    }
+    let samples = PyArray1::<i16>::from_vec(py, audio.samples);
+    let frame_counts = PyArray1::<u32>::from_vec(py, audio.frame_counts);
+    Ok((samples.into_any(), frame_counts.into_any()))
 }

@@ -202,6 +202,11 @@ impl PyEmulator {
     }
 
     #[getter]
+    fn native_sample_rate(&self) -> f64 {
+        self.host.native_sample_rate()
+    }
+
+    #[getter]
     fn display_aspect_ratio(&self) -> f64 {
         self.host.display_aspect_ratio()
     }
@@ -234,6 +239,16 @@ impl PyEmulator {
     #[pyo3(signature = (count=1, capture_video=true))]
     fn step_frames(&mut self, py: Python<'_>, count: usize, capture_video: bool) -> PyResult<()> {
         methods::control::step_frames(self, py, count, capture_video)
+    }
+
+    #[pyo3(signature = (count=1, capture_video=true))]
+    fn step_frames_with_audio<'py>(
+        &mut self,
+        py: Python<'py>,
+        count: usize,
+        capture_video: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        methods::control::step_frames_with_audio(self, py, count, capture_video)
     }
 
     #[pyo3(signature = (request))]

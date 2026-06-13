@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
 
 from fzerox_emulator import MENU_BUTTON_MASKS, ControllerState, RaceControlState
+from fzerox_emulator.arrays import Pcm16Samples
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.core.envs.engine.reset.camera import CAMERA_SYNC_CONTROLS
@@ -138,7 +139,15 @@ def step_menu(
     controller_step = controller_step_from_menu_step(step)
     session.emulator.set_controller_state(controller_step.controller_state)
     for frame_index in range(controller_step.frames):
-        session.emulator.step_frames(1, capture_video=True)
+        audio_samples: Pcm16Samples = ()
+        if (
+            frame_recorder is not None
+            and session.native_sample_rate > 0.0
+            and hasattr(session.emulator, "step_frames_with_audio")
+        ):
+            audio_samples = session.emulator.step_frames_with_audio(1, capture_video=True)
+        else:
+            session.emulator.step_frames(1, capture_video=True)
         info = controller.viewer_info(
             info=menu_viewer_info(session),
             active_policy_control=None,
@@ -164,7 +173,7 @@ def step_menu(
         )
         raw_frame = session.render()
         if frame_recorder is not None:
-            frame_recorder.record_frame(raw_frame, info=info)
+            frame_recorder.record_frame(raw_frame, info=info, audio_samples=audio_samples)
         publish_worker_message(
             snapshot_queue,
             _build_snapshot(

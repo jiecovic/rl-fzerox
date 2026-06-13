@@ -149,7 +149,12 @@ class PolicyDriveRuntime:
         self._reset_seeds.advance_reset_count()
         return observation, info
 
-    def step_policy(self, action: ActionValue) -> PolicyDriveFrame:
+    def step_policy(
+        self,
+        action: ActionValue,
+        *,
+        capture_audio: bool = False,
+    ) -> PolicyDriveFrame:
         return _policy_drive_frame(
             self._step_decoded_action(
                 self._action_adapter.decode_request(action),
@@ -158,6 +163,7 @@ class PolicyDriveRuntime:
                     self._action_adapter.action_space,
                     drive_axis_index=self._action_config.continuous_drive_axis_index(),
                 ),
+                capture_audio=capture_audio,
             )
         )
 
@@ -166,12 +172,14 @@ class PolicyDriveRuntime:
         control_state: RaceControlState,
         *,
         spin_request: SpinRequest = "none",
+        capture_audio: bool = False,
     ) -> PolicyDriveFrame:
         return _policy_drive_frame(
             self._step_control_state(
                 control_state,
                 action_drive_axis=None,
                 spin_request=spin_request,
+                capture_audio=capture_audio,
             )
         )
 
@@ -190,6 +198,7 @@ class PolicyDriveRuntime:
         *,
         action_drive_axis: float | None,
         spin_request: SpinRequest = "none",
+        capture_audio: bool = False,
     ) -> PolicyDriveStep:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
@@ -199,6 +208,7 @@ class PolicyDriveRuntime:
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
             spin_request=spin_request,
+            capture_audio=capture_audio,
         )
 
     def _step_decoded_action(
@@ -206,6 +216,7 @@ class PolicyDriveRuntime:
         decoded_action: DecodedAction,
         *,
         action_drive_axis: float | None,
+        capture_audio: bool = False,
     ) -> PolicyDriveStep:
         requested_control_state = decoded_action.control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
@@ -216,6 +227,7 @@ class PolicyDriveRuntime:
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
             spin_request=spin_request,
+            capture_audio=capture_audio,
         )
 
     def _run_step(
@@ -225,6 +237,7 @@ class PolicyDriveRuntime:
         requested_control_state: RaceControlState,
         action_drive_axis: float | None,
         spin_request: SpinRequest,
+        capture_audio: bool,
     ) -> PolicyDriveStep:
         assembly = self._step_assembler.run_live_race(
             EnvStepRequest(
@@ -234,6 +247,7 @@ class PolicyDriveRuntime:
                 action_drive_axis=action_drive_axis,
                 spin_request=spin_request,
                 capture_display_frames=True,
+                capture_audio=capture_audio,
                 active_track=None,
                 episode_frame_count=self._episode.frame_count,
                 episode_stalled_steps=self._episode.stalled_steps,
@@ -289,4 +303,6 @@ def _policy_drive_frame(step: PolicyDriveStep) -> PolicyDriveFrame:
         info=dict(step.info),
         display_frames=step.display_frames,
         display_controller_masks=step.display_controller_masks,
+        audio_samples=step.audio_samples,
+        audio_frame_counts=step.audio_frame_counts,
     )

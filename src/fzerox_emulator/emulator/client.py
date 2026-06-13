@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fzerox_emulator._native import Emulator as NativeEmulator
 from fzerox_emulator._native import FZeroXTelemetry
+from fzerox_emulator.arrays import Pcm16Samples
 from fzerox_emulator.base.observations import (
     ObservationImageRecipe,
     ObservationResizeFilter,
@@ -78,6 +79,10 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         return float(self._native.native_fps)
 
     @property
+    def native_sample_rate(self) -> float:
+        return float(getattr(self._native, "native_sample_rate", 0.0))
+
+    @property
     def display_aspect_ratio(self) -> float:
         return float(self._native.display_aspect_ratio)
 
@@ -123,6 +128,20 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         """Advance the emulator by a fixed number of frames."""
 
         self._native.step_frames(count, capture_video)
+
+    def step_frames_with_audio(
+        self,
+        count: int,
+        *,
+        capture_video: bool = True,
+    ) -> Pcm16Samples:
+        """Advance fixed frames and return emitted signed 16-bit stereo samples."""
+
+        step_frames_with_audio = getattr(self._native, "step_frames_with_audio", None)
+        if step_frames_with_audio is None:
+            self.step_frames(count, capture_video=capture_video)
+            return ()
+        return step_frames_with_audio(count, capture_video)
 
     def game_rng_state(self) -> tuple[int, int, int, int]:
         """Return the live F-Zero X RNG globals from system RAM."""
@@ -238,6 +257,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         lean_timer_assist: bool = False,
         spin_request: SpinRequest = "none",
         spin_cooldown_frames: int = DEFAULT_SPIN_COOLDOWN_FRAMES,
+        capture_audio: bool = False,
     ) -> BackendStepResult:
         """Execute one repeated watch step and return batched display images."""
 
@@ -268,6 +288,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
             control_state,
             config=config,
             recipe=recipe,
+            capture_audio=capture_audio,
         )
 
     def step_repeat_multi_observation_raw(

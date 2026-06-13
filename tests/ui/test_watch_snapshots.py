@@ -10,7 +10,11 @@ from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
-from rl_fzerox.ui.watch.runtime.snapshots import _build_snapshot, _publish_step_snapshots
+from rl_fzerox.ui.watch.runtime.snapshots import (
+    _audio_chunks_for_frames,
+    _build_snapshot,
+    _publish_step_snapshots,
+)
 from tests.ui.viewer_support import record_book, record_entry
 
 
@@ -23,6 +27,26 @@ class _SnapshotQueue:
 
     def get_nowait(self) -> object:
         return self.messages.pop(0)
+
+
+def test_audio_chunks_for_frames_splits_interleaved_pcm() -> None:
+    chunks = _audio_chunks_for_frames(
+        np.array([1, -1, 2, -2, 3, -3], dtype=np.int16),
+        np.array([1, 2], dtype=np.uint32),
+        frame_count=2,
+    )
+
+    assert [np.asarray(chunk).tolist() for chunk in chunks] == [[1, -1], [2, -2, 3, -3]]
+
+
+def test_audio_chunks_for_frames_returns_silence_for_mismatched_counts() -> None:
+    chunks = _audio_chunks_for_frames(
+        np.array([1, -1], dtype=np.int16),
+        np.array([1], dtype=np.uint32),
+        frame_count=2,
+    )
+
+    assert chunks == ((), ())
 
 
 def race_control_state(

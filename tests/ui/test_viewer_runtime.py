@@ -227,6 +227,7 @@ def test_viewer_state_feature_names_fall_back_to_image_state_config(tmp_path: Pa
 def test_career_mode_session_renders_display_without_policy_crop(tmp_path: Path) -> None:
     class _Emulator:
         native_fps = 60.0
+        native_sample_rate = 48_000
 
         def __init__(self) -> None:
             self.render_count = 0
@@ -263,6 +264,7 @@ def test_career_mode_session_renders_display_without_policy_crop(tmp_path: Path)
         ),
         emulator=emulator,
         native_fps=60.0,
+        native_sample_rate=48_000.0,
         native_control_fps=30.0,
         target_control_fps=30.0,
         target_control_seconds=1.0 / 30.0,
@@ -282,6 +284,7 @@ def test_career_mode_session_seeds_only_from_runtime_attempt_seed(
 ) -> None:
     class _Emulator:
         native_fps = 60.0
+        native_sample_rate = 48_000
 
         def __init__(self, **kwargs: object) -> None:
             self.kwargs = kwargs
@@ -324,6 +327,7 @@ def test_career_mode_session_uses_native_menu_cadence(
 ) -> None:
     class _Emulator:
         native_fps = 60.0
+        native_sample_rate = 48_000
 
         def __init__(self, **kwargs: object) -> None:
             self.kwargs = kwargs
