@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from typing import TypeAlias, TypedDict, Unpack
 
 import torch
 from gymnasium import spaces
@@ -9,6 +10,7 @@ from sb3_contrib.common.recurrent.type_aliases import RNNStates
 from sb3x.common.auxiliary_losses import (
     PolicyActionEvaluation,
 )
+from sb3x.common.hybrid_action import ContinuousLogStdMode
 from sb3x.common.maskable import MaybeMasks
 from sb3x.common.recurrent import (
     require_linear,
@@ -21,9 +23,12 @@ from sb3x.ppo_mask_hybrid_action.policies import (
 from sb3x.ppo_mask_hybrid_recurrent.policies import (
     MaskableHybridRecurrentMultiInputActorCriticPolicy,
 )
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
+from torch import nn
+from torch.optim import Optimizer
 
-from fzerox_emulator.arrays import BoolArray, PolicyState
+from fzerox_emulator.arrays import BoolArray, NumpyArray, PolicyState
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.policy.auxiliary_state.mixin import _AuxiliaryStatePolicyMixin
 from rl_fzerox.core.policy.auxiliary_state.recurrent import _recurrent_tensor_state
@@ -33,6 +38,38 @@ __all__ = [
     "AuxiliaryStateMaskableHybridActionMultiInputPolicy",
     "AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy",
 ]
+
+
+_Sb3Observation: TypeAlias = NumpyArray | dict[str, NumpyArray]
+
+
+class _HybridPolicyKwargs(TypedDict, total=False):
+    net_arch: list[int] | dict[str, list[int]] | None
+    activation_fn: type[nn.Module]
+    ortho_init: bool
+    use_sde: bool
+    log_std_init: float
+    full_std: bool
+    use_expln: bool
+    squash_output: bool
+    features_extractor_class: type[BaseFeaturesExtractor]
+    features_extractor_kwargs: dict[str, object] | None
+    share_features_extractor: bool
+    normalize_images: bool
+    optimizer_class: type[Optimizer]
+    optimizer_kwargs: dict[str, object] | None
+    hybrid_action_space: spaces.Dict | None
+    hybrid_action_group_names: Mapping[str, Sequence[str]] | None
+    continuous_log_std_mode: ContinuousLogStdMode
+    continuous_log_std_bounds: tuple[float, float]
+
+
+class _HybridRecurrentPolicyKwargs(_HybridPolicyKwargs, total=False):
+    lstm_hidden_size: int
+    n_lstm_layers: int
+    shared_lstm: bool
+    enable_critic_lstm: bool
+    lstm_kwargs: dict[str, object] | None
 
 
 class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
@@ -50,7 +87,7 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
         continuous_action_group_names: Sequence[str] = (),
         discrete_action_group_names: Sequence[str] = (),
         pitch_bucket_count: int = 5,
-        **kwargs: object,
+        **kwargs: Unpack[_HybridPolicyKwargs],
     ) -> None:
         MaskableHybridActionMultiInputActorCriticPolicy.__init__(
             self,
@@ -121,7 +158,7 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
     ) -> dict[str, object]:
         del state, episode_start
         self.set_training_mode(False)
-        obs_tensor, _ = self.obs_to_tensor(observation)
+        obs_tensor, _ = self.obs_to_tensor(_sb3_observation(observation))
         with torch.no_grad():
             features = self.extract_features(obs_tensor)
             if self.share_features_extractor:
@@ -150,7 +187,7 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         continuous_action_group_names: Sequence[str] = (),
         discrete_action_group_names: Sequence[str] = (),
         pitch_bucket_count: int = 5,
-        **kwargs: object,
+        **kwargs: Unpack[_HybridRecurrentPolicyKwargs],
     ) -> None:
         MaskableHybridRecurrentMultiInputActorCriticPolicy.__init__(
             self,
@@ -234,7 +271,7 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         target_names: Sequence[AuxiliaryStateTargetName] | None = None,
     ) -> dict[str, object]:
         self.set_training_mode(False)
-        obs_tensor, _ = self.obs_to_tensor(observation)
+        obs_tensor, _ = self.obs_to_tensor(_sb3_observation(observation))
         tensor_states, tensor_episode_starts = _recurrent_tensor_state(
             policy=self,
             state=state,
@@ -254,3 +291,18 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
                 self.lstm_actor,
             )
         return self._auxiliary_state_predictions(latent_pi_source, names=target_names)
+
+
+def _sb3_observation(observation: ObservationValue) -> _Sb3Observation:
+    """Convert project observation values to the observation shape SB3 accepts."""
+
+    if not isinstance(observation, dict):
+        return observation
+    converted: dict[str, NumpyArray] = {
+        "image": observation["image"],
+        "state": observation["state"],
+    }
+    auxiliary_targets = observation.get("auxiliary_state_targets")
+    if auxiliary_targets is not None:
+        converted["auxiliary_state_targets"] = auxiliary_targets
+    return converted

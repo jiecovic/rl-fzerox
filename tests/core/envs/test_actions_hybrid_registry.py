@@ -1,5 +1,6 @@
 # tests/core/envs/test_actions_hybrid_registry.py
 import numpy as np
+from gymnasium.spaces import MultiDiscrete
 
 from rl_fzerox.core.envs.actions import (
     ACTION_ADAPTER_REGISTRY,
@@ -36,7 +37,9 @@ def test_build_action_adapter_supports_configured_hybrid_layout() -> None:
 
     assert isinstance(adapter, ConfiguredHybridActionAdapter)
     assert adapter.action_space.spaces["continuous"].shape == (2,)
-    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 3]
+    discrete_space = adapter.action_space.spaces["discrete"]
+    assert isinstance(discrete_space, MultiDiscrete)
+    assert discrete_space.nvec.tolist() == [2, 3]
 
 
 def test_configured_hybrid_four_way_lean_branch_exposes_four_values() -> None:
@@ -49,7 +52,9 @@ def test_configured_hybrid_four_way_lean_branch_exposes_four_values() -> None:
     )
 
     assert isinstance(adapter, ConfiguredHybridActionAdapter)
-    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [4]
+    discrete_space = adapter.action_space.spaces["discrete"]
+    assert isinstance(discrete_space, MultiDiscrete)
+    assert discrete_space.nvec.tolist() == [4]
     assert np.array_equal(adapter.idle_action["discrete"], np.array([0], dtype=np.int64))
 
 
@@ -63,7 +68,9 @@ def test_configured_hybrid_independent_lean_exposes_two_binary_branches() -> Non
     )
 
     assert isinstance(adapter, ConfiguredHybridActionAdapter)
-    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 2]
+    discrete_space = adapter.action_space.spaces["discrete"]
+    assert isinstance(discrete_space, MultiDiscrete)
+    assert discrete_space.nvec.tolist() == [2, 2]
     assert np.array_equal(
         adapter.idle_action["discrete"],
         np.array([0, 0], dtype=np.int64),

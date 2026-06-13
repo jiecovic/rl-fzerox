@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import pytest
 from gymnasium import spaces
@@ -42,6 +43,16 @@ from tests.support.action_configs import (
 from tests.support.fakes import SyntheticBackend, vec_env_fns
 
 _VEHICLE_STATE_COMPONENT = (ObservationStateComponentConfig(name="vehicle_state"),)
+
+
+@runtime_checkable
+class _HybridActionSpec(Protocol):
+    continuous_dim: int
+
+
+@runtime_checkable
+class _HybridPolicy(Protocol):
+    hybrid_action_spec: _HybridActionSpec
 
 
 def _emulator_config(tmp_path: Path) -> EmulatorConfig:
@@ -984,4 +995,5 @@ def test_build_ppo_model_can_construct_recurrent_discrete_only_hybrid_ppo() -> N
         env.close()
 
     assert isinstance(model, MaskableHybridRecurrentPPO)
+    assert isinstance(model.policy, _HybridPolicy)
     assert model.policy.hybrid_action_spec.continuous_dim == 0

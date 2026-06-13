@@ -382,7 +382,9 @@ def test_configured_hybrid_steer_drive_action_space_uses_dict_branches() -> None
     assert isinstance(adapter, ConfiguredHybridActionAdapter)
     assert isinstance(adapter.action_space, Dict)
     assert adapter.action_space.spaces["continuous"].shape == (2,)
-    assert adapter.action_space.spaces["discrete"].nvec.tolist() == []
+    discrete_space = adapter.action_space.spaces["discrete"]
+    assert isinstance(discrete_space, MultiDiscrete)
+    assert discrete_space.nvec.tolist() == []
 
 
 def test_configured_hybrid_steer_drive_decodes_accelerate_and_coast() -> None:

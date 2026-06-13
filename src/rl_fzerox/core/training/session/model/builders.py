@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/training/session/model/builders.py
 from __future__ import annotations
 
+from typing import Any
+
 import torch as th
 from stable_baselines3.common.vec_env import VecEnv
 
@@ -120,7 +122,7 @@ def _build_ppo_family_model(
             }
         )
 
-    model_kwargs: dict[str, object] = {
+    model_kwargs: dict[str, Any] = {
         "policy": policy_entry,
         "env": train_env,
         "learning_rate": train_config.learning_rate,
