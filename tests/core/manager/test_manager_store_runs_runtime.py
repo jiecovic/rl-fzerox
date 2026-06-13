@@ -208,7 +208,6 @@ def test_manager_store_persists_run_alt_baselines(tmp_path: Path) -> None:
     assert store.delete_run_alt_baseline(
         run_id=run.id,
         baseline_id=baseline.id,
-        deleted_at="2026-06-13T11:00:00+00:00",
     )
     assert store.get_run_alt_baselines(run.id) == ()
     assert store.get_run_alt_baselines(run.id, include_deleted=True) == ()

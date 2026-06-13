@@ -260,13 +260,11 @@ class ManagerStore:
         *,
         run_id: str,
         baseline_id: str,
-        deleted_at: str | None = None,
     ) -> bool:
         return run_registry.delete_run_alt_baseline(
             self,
             run_id=run_id,
             baseline_id=baseline_id,
-            deleted_at=deleted_at,
         )
 
     def clear_run_alt_baselines(self, run_id: str) -> int:

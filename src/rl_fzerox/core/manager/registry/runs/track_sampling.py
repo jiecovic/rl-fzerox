@@ -104,9 +104,7 @@ def delete_run_alt_baseline(
     *,
     run_id: str,
     baseline_id: str,
-    deleted_at: str | None = None,
 ) -> bool:
-    del deleted_at
     store._ensure_schema_initialized()
     with store._orm_session() as session:
         baseline = session.get(RunAltBaselineModel, baseline_id)
