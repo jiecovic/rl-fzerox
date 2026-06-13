@@ -143,6 +143,8 @@ def engine_tuning_outcome_from_episode(
 ) -> EngineTuningEpisodeOutcome | None:
     """Build one engine-tuning outcome from an SB3 Monitor episode dictionary."""
 
+    if _uses_alt_baseline_sample(episode):
+        return None
     context_key = _mapping_str(episode, "engine_tuning_context_key")
     course_key = _mapping_str(episode, "engine_tuning_course_key")
     vehicle_id = _mapping_str(episode, "engine_tuning_vehicle_id")
@@ -171,6 +173,11 @@ def _episode_completion_fraction(episode: Mapping[str, object]) -> float:
     if value is not None:
         return max(0.0, min(1.0, value))
     return 1.0 if episode.get("termination_reason") == "finished" else 0.0
+
+
+def _uses_alt_baseline_sample(episode: Mapping[str, object]) -> bool:
+    value = episode.get("track_alt_baseline_id")
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _mapping_str(raw: Mapping[str, object], key: str) -> str | None:
