@@ -55,7 +55,10 @@ class CareerModeRuntimeSession:
         return self.emulator
 
     def render(self) -> RgbFrame:
-        return self.emulator.render()
+        # The display renderer applies the native crop/aspect policy. The
+        # custom dimensions only satisfy the binding's layout argument; display
+        # output still uses the crop-correct natural preview size.
+        return self.emulator.render_display(height=1, width=1)
 
     def action_mask_branches(self) -> ActionMaskBranches:
         if self._policy_race is None:

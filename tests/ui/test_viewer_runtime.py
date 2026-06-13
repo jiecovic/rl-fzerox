@@ -230,9 +230,21 @@ def test_career_mode_session_renders_display_without_policy_crop(tmp_path: Path)
 
         def __init__(self) -> None:
             self.render_count = 0
+            self.render_display_count = 0
 
         def render(self) -> UInt8Array:
             self.render_count += 1
+            return np.zeros((2, 2, 3), dtype=np.uint8)
+
+        def render_display(
+            self,
+            *,
+            preset: str | None = None,
+            height: int | None = None,
+            width: int | None = None,
+        ) -> UInt8Array:
+            _ = (preset, height, width)
+            self.render_display_count += 1
             return np.zeros((2, 2, 3), dtype=np.uint8)
 
     core_path = tmp_path / "core.so"
@@ -260,7 +272,8 @@ def test_career_mode_session_renders_display_without_policy_crop(tmp_path: Path)
 
     session.render()
 
-    assert emulator.render_count == 1
+    assert emulator.render_count == 0
+    assert emulator.render_display_count == 1
 
 
 def test_career_mode_session_seeds_only_from_runtime_attempt_seed(
