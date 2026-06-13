@@ -293,7 +293,7 @@ describe("App", () => {
     const dialog = await screen.findByRole("dialog", { name: "Fork alt baselines" });
     expect(within(dialog).getByText(/2 active alt baselines/i)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Do not copy" }));
-    expect(await screen.findByText(/alt baselines skipped/i)).toBeInTheDocument();
+    expect(await screen.findByText(/0 alt baselines/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Train" }));
 

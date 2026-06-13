@@ -41,6 +41,7 @@ interface ConfiguratorProps {
   active?: boolean;
   baseConfig: ManagedRunConfig;
   existingNames: string[];
+  forkAltBaselineCount?: number | null;
   forkCopyAltBaselines?: boolean | null;
   forkSourceArtifact?: "latest" | "best" | null;
   forkSourceRunLabel?: string | null;
@@ -67,6 +68,7 @@ export function Configurator({
   active = true,
   baseConfig,
   existingNames,
+  forkAltBaselineCount = null,
   forkCopyAltBaselines = null,
   forkSourceArtifact = null,
   forkSourceRunLabel = null,
@@ -403,9 +405,9 @@ export function Configurator({
               <span className="inline-flex h-6 items-center border border-app-border bg-app-surface px-2 text-xs font-bold text-app-muted lowercase">
                 {forkSourceArtifact} checkpoint
               </span>
-              {forkCopyAltBaselines !== null ? (
+              {forkAltBaselineCount !== null ? (
                 <span className="inline-flex h-6 items-center border border-app-border bg-app-surface px-2 text-xs font-bold text-app-muted">
-                  alt baselines {forkCopyAltBaselines ? "copied" : "skipped"}
+                  {formatAltBaselineCount(forkAltBaselineCount)}
                 </span>
               ) : null}
             </div>
@@ -511,6 +513,11 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   }, [delayMs, value]);
 
   return debouncedValue;
+}
+
+function formatAltBaselineCount(count: number) {
+  const normalizedCount = Math.max(0, Math.floor(count));
+  return `${normalizedCount.toLocaleString()} alt baseline${normalizedCount === 1 ? "" : "s"}`;
 }
 
 function stableJson(value: unknown): string {

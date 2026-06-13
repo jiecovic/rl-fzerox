@@ -182,6 +182,7 @@ export function WorkspaceBody({
             active
             baseConfig={defaultConfig}
             existingNames={sessions.reservedNamesForSession(activeDraftEditor.sessionId)}
+            forkAltBaselineCount={forkDraftAltBaselineCount(activeDraftEditor.forkSource, runs)}
             forkCopyAltBaselines={activeDraftEditor.forkSource?.copyAltBaselines ?? null}
             forkSourceArtifact={activeDraftEditor.forkSource?.artifact ?? null}
             forkSourceRunLabel={sessions.forkSourceRunLabel(activeDraftEditor.forkSource)}
@@ -226,4 +227,17 @@ function mergeRunDetail(summary: ManagedRun, detail: ManagedRunDetail): ManagedR
     ...summary,
     config: detail.config,
   };
+}
+
+function forkDraftAltBaselineCount(
+  forkSource: { copyAltBaselines: boolean; runId: string } | null,
+  runs: readonly ManagedRun[],
+) {
+  if (forkSource === null) {
+    return null;
+  }
+  if (!forkSource.copyAltBaselines) {
+    return 0;
+  }
+  return runs.find((run) => run.id === forkSource.runId)?.active_alt_baseline_count ?? null;
 }
