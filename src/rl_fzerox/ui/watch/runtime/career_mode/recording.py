@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -13,6 +14,7 @@ from rl_fzerox.apps.recording.video import (
     as_rgb_frame,
     resolve_ffmpeg_path,
     resolve_video_fps,
+    upscale_recording_to_mp4,
 )
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
@@ -39,7 +41,14 @@ class _RgbVideoWriter(Protocol):
     def close(self) -> None: ...
 
 
+class _RecordingFinalizer(Protocol):
+    def finalize(self, path: Path) -> None: ...
+
+    def close(self) -> None: ...
+
+
 _WriterFactory = Callable[[Path], _RgbVideoWriter]
+_FinalizerFactory = Callable[[], _RecordingFinalizer]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,11 +68,15 @@ class CareerModeFrameRecorder:
         native_fps: float,
         native_sample_rate: float | None = None,
         writer_factory: _WriterFactory | None = None,
+        finalizer_factory: _FinalizerFactory | None = None,
     ) -> None:
         self._path = path.expanduser()
         self._fps = resolve_video_fps(native_fps=native_fps, override=None)
         self._sample_rate = _resolve_audio_sample_rate(native_sample_rate)
         self._writer_factory = writer_factory or self._default_writer
+        self._finalizer = (
+            finalizer_factory() if finalizer_factory is not None else _Mp4RecordingFinalizer()
+        )
         self._full_writer = self._open_writer(self._path)
         self._segment_writer: _RgbVideoWriter | None = None
         self._segment_key: str | None = None
@@ -89,6 +102,7 @@ class CareerModeFrameRecorder:
         if segment.key != self._segment_key:
             self._start_segment(segment)
         self._update_segment_status(info)
+        self._close_finished_segment(info)
         if self._segment_writer is not None:
             self._segment_writer.write(normalized_frame)
             self._segment_writer.write_audio(audio_samples)
@@ -101,6 +115,12 @@ class CareerModeFrameRecorder:
             errors.append(exc)
         try:
             self._full_writer.close()
+        except Exception as exc:  # pragma: no cover - defensive close aggregation
+            errors.append(exc)
+        else:
+            self._finalizer.finalize(self._path)
+        try:
+            self._finalizer.close()
         except Exception as exc:  # pragma: no cover - defensive close aggregation
             errors.append(exc)
         if errors:
@@ -126,6 +146,8 @@ class CareerModeFrameRecorder:
         self._segment_writer.close()
         self._segment_writer = None
         self._rename_failed_segment()
+        if self._segment_path is not None:
+            self._finalizer.finalize(self._segment_path)
 
     def _rename_failed_segment(self) -> None:
         if (
@@ -168,6 +190,16 @@ class CareerModeFrameRecorder:
                 label=self._segment_label,
                 attempt_id=self._segment_attempt_id,
             )
+        if (
+            self._current_segment_attempt_finished(info)
+            and self._segment_key is not None
+            and self._segment_label is not None
+        ):
+            return _SegmentIdentity(
+                key=self._segment_key,
+                label=self._segment_label,
+                attempt_id=self._segment_attempt_id,
+            )
         label = _segment_label(info)
         if label is None:
             return None
@@ -183,6 +215,51 @@ class CareerModeFrameRecorder:
         status = _last_finished_attempt_status(info)
         if status is not None:
             self._segment_status = status
+
+    def _current_segment_attempt_finished(self, info: Mapping[str, object]) -> bool:
+        if self._segment_attempt_id is None:
+            return False
+        return (
+            _last_finished_attempt_id(info) == self._segment_attempt_id
+            and _last_finished_attempt_status(info) is not None
+        )
+
+    def _close_finished_segment(self, info: Mapping[str, object]) -> None:
+        if self._segment_writer is None:
+            return
+        if self._segment_status not in {"succeeded", "failed"}:
+            return
+        if _continuing_race_result(info):
+            return
+        self._close_segment_writer()
+
+
+class _Mp4RecordingFinalizer:
+    """Encode closed live Matroska recordings to YouTube-friendly MP4 in the background."""
+
+    def __init__(self) -> None:
+        self._ffmpeg_path = resolve_ffmpeg_path()
+        self._executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="career-recording-remux",
+        )
+        self._futures: list[Future[Path]] = []
+
+    def finalize(self, path: Path) -> None:
+        if path.suffix.lower() != ".mkv":
+            return
+        self._futures.append(
+            self._executor.submit(
+                upscale_recording_to_mp4,
+                path,
+                ffmpeg_path=self._ffmpeg_path,
+            )
+        )
+
+    def close(self) -> None:
+        self._executor.shutdown(wait=True)
+        for future in self._futures:
+            future.result()
 
 
 def open_career_mode_recorder(
