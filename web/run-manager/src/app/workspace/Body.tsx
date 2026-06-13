@@ -182,6 +182,7 @@ export function WorkspaceBody({
             active
             baseConfig={defaultConfig}
             existingNames={sessions.reservedNamesForSession(activeDraftEditor.sessionId)}
+            forkCopyAltBaselines={activeDraftEditor.forkSource?.copyAltBaselines ?? null}
             forkSourceArtifact={activeDraftEditor.forkSource?.artifact ?? null}
             forkSourceRunLabel={sessions.forkSourceRunLabel(activeDraftEditor.forkSource)}
             initialConfig={activeDraftEditor.initialConfig}

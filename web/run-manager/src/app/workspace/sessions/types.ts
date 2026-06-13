@@ -34,6 +34,7 @@ export interface WorkspaceSessions {
   createNewSaveGame: () => void;
   createForkDraft: (options: {
     artifact: ForkSource["artifact"];
+    copyAltBaselines: boolean;
     initialConfig: DraftEditorSession["initialConfig"];
     initialDraftName: string;
     runId: string;

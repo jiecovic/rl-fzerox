@@ -41,6 +41,7 @@ interface ConfiguratorProps {
   active?: boolean;
   baseConfig: ManagedRunConfig;
   existingNames: string[];
+  forkCopyAltBaselines?: boolean | null;
   forkSourceArtifact?: "latest" | "best" | null;
   forkSourceRunLabel?: string | null;
   initialDraftName?: string;
@@ -66,6 +67,7 @@ export function Configurator({
   active = true,
   baseConfig,
   existingNames,
+  forkCopyAltBaselines = null,
   forkSourceArtifact = null,
   forkSourceRunLabel = null,
   initialDraftName,
@@ -147,6 +149,7 @@ export function Configurator({
       initialDraftName ?? baselineDraftName,
       forkSourceRunLabel ?? "",
       forkSourceArtifact ?? "",
+      forkCopyAltBaselines === null ? "" : String(forkCopyAltBaselines),
     ].join(":");
   const checkpointLocked =
     (loadedDraft !== null &&
@@ -400,6 +403,11 @@ export function Configurator({
               <span className="inline-flex h-6 items-center border border-app-border bg-app-surface px-2 text-xs font-bold text-app-muted lowercase">
                 {forkSourceArtifact} checkpoint
               </span>
+              {forkCopyAltBaselines !== null ? (
+                <span className="inline-flex h-6 items-center border border-app-border bg-app-surface px-2 text-xs font-bold text-app-muted">
+                  alt baselines {forkCopyAltBaselines ? "copied" : "skipped"}
+                </span>
+              ) : null}
             </div>
             {forkedAtLabel !== null || forkSourceStepCount !== null ? (
               <div className="flex flex-wrap gap-2.5 text-xs text-app-muted">

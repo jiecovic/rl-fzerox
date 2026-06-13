@@ -16,6 +16,7 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     episode_frame_count,
     episode_track_id,
     runtime_track_sampling_configs,
+    uses_alt_baseline_sample,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
@@ -145,6 +146,7 @@ class DeficitBudgetTrackSamplingController:
 
     def record_step_infos(self, infos: Sequence[Mapping[str, object]]) -> None:
         for info in infos:
+            uses_alt_baseline = uses_alt_baseline_sample(info)
             track_id = info.get("track_id")
             if not isinstance(track_id, str):
                 continue
@@ -153,10 +155,13 @@ class DeficitBudgetTrackSamplingController:
                 continue
             self._deficit_steps[course_key] -= 1.0
             self._rollout_steps[course_key] += 1
-            self._accounted_env_steps[course_key] += 1
+            if not uses_alt_baseline:
+                self._accounted_env_steps[course_key] += 1
 
     def record_episodes(self, episodes: Sequence[Mapping[str, object]]) -> None:
         for episode in episodes:
+            if uses_alt_baseline_sample(episode):
+                continue
             track_id = episode_track_id(episode)
             if track_id is None:
                 continue

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import time
+from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -17,7 +18,10 @@ from rl_fzerox.ui.watch.live_series import (
     EpisodeLiveSeriesTracker,
 )
 from rl_fzerox.ui.watch.records import TrackRecordBook
-from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
+from rl_fzerox.ui.watch.runtime.baseline import (
+    _save_baseline_state,
+    _save_managed_alt_baseline,
+)
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationSampler,
@@ -87,6 +91,26 @@ class _SequentialResetEnv(Protocol):
     def set_next_sequential_reset_course(self, course_id: str | None) -> None: ...
 
 
+_WATCH_SAVE_NOTICE_SECONDS = 3.0
+
+
+@dataclass(slots=True)
+class _TimedWatchNotice:
+    message: str | None = None
+    expires_at: float = 0.0
+
+    def show(self, message: str, *, now: float) -> None:
+        self.message = message
+        self.expires_at = now + _WATCH_SAVE_NOTICE_SECONDS
+
+    def apply(self, info: dict[str, object], *, now: float) -> dict[str, object]:
+        if self.message is None or now >= self.expires_at:
+            return info
+        with_notice = dict(info)
+        with_notice["watch_save_notice"] = self.message
+        return with_notice
+
+
 def run_simulation_worker(
     config: WatchAppConfig,
     command_queue: ProcessQueue,
@@ -144,6 +168,7 @@ def _run_simulation_loop(
         watch_zeroed_state_features = session.watch_zeroed_state_features
         live_series = EpisodeLiveSeriesTracker()
         last_live_series_publish_time = 0.0
+        save_notice = _TimedWatchNotice()
         auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (
             session.auxiliary_target_names
         )
@@ -168,7 +193,7 @@ def _run_simulation_loop(
                     env=env,
                     emulator=emulator,
                     observation=observation,
-                    info=info,
+                    info=save_notice.apply(info, now=time.perf_counter()),
                     reset_info=reset_info,
                     episode=episode,
                     episode_reward=episode_reward,
@@ -380,10 +405,30 @@ def _run_simulation_loop(
                     control_rate.trim_to_recent()
                     next_step_time = time.perf_counter()
                 if commands.save_requests:
-                    _save_baseline_state(
+                    alt_save = _save_managed_alt_baseline(
                         emulator=emulator,
-                        baseline_state_path=config.emulator.baseline_state_path,
+                        manager_db_path=config.watch.manager_db_path,
+                        run_id=config.watch.managed_run_id,
+                        info=info,
                     )
+                    if alt_save.saved:
+                        save_notice.show("alt baseline saved", now=time.perf_counter())
+                        if alt_save.baseline_id is not None:
+                            info["watch_alt_baseline_id"] = alt_save.baseline_id
+                        if alt_save.state_path is not None:
+                            info["watch_alt_baseline_state_path"] = str(alt_save.state_path)
+                        refresh_track_sampling(force=True)
+                        publish_snapshot()
+                    elif alt_save.handled:
+                        save_notice.show("alt baseline skipped", now=time.perf_counter())
+                        publish_snapshot()
+                    elif not alt_save.handled:
+                        _save_baseline_state(
+                            emulator=emulator,
+                            baseline_state_path=config.emulator.baseline_state_path,
+                        )
+                        save_notice.show("baseline saved", now=time.perf_counter())
+                        publish_snapshot()
                 if commands.toggle_deterministic_policy and policy_runner is not None:
                     deterministic_policy = not deterministic_policy
                     env.set_engine_tuning_selection("greedy" if deterministic_policy else "sample")
@@ -563,11 +608,11 @@ def _run_simulation_loop(
                     display_frames=display_frames,
                     display_controller_masks=display_controller_masks,
                     previous_observation=previous_observation,
-                    previous_info=previous_info,
+                    previous_info=save_notice.apply(previous_info, now=time.perf_counter()),
                     previous_episode_reward=previous_episode_reward,
                     previous_telemetry=previous_telemetry,
                     final_observation=observation,
-                    final_info=info,
+                    final_info=save_notice.apply(info, now=time.perf_counter()),
                     final_episode_reward=episode_reward,
                     final_telemetry=live_telemetry,
                     previous_control_state=previous_control_state,

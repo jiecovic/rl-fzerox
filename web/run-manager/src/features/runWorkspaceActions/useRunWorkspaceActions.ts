@@ -19,7 +19,7 @@ export interface WatchToastState {
 export interface RunWorkspaceActionsProps {
   clearTrackSamplingState: (state: TrackSamplingRuntimeState | null) => void;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
-  onFork: (runId: string, artifact: CheckpointArtifact) => Promise<void>;
+  onFork: (runId: string, artifact: CheckpointArtifact, copyAltBaselines: boolean) => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
   onRename: (runId: string, name: string) => Promise<void>;
   onResume: (runId: string) => Promise<void>;
@@ -44,6 +44,8 @@ export interface RunWorkspaceActionState {
   copiedRunId: boolean;
   copyRunId: () => Promise<void>;
   createDraftFromRun: () => Promise<void>;
+  cancelForkAltBaselineChoice: () => void;
+  confirmForkAltBaselineChoice: (copyAltBaselines: boolean) => Promise<void>;
   forkRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
   isCreatingDraftFromRun: boolean;
   isForking: boolean;
@@ -53,6 +55,7 @@ export interface RunWorkspaceActionState {
   isResuming: boolean;
   isStopping: boolean;
   openRunDirectoryInBrowser: () => Promise<void>;
+  pendingForkAltBaselineChoice: PendingForkAltBaselineChoice | null;
   renameRunLabel: (name?: string) => Promise<boolean>;
   resetTrackPoolState: () => Promise<void>;
   resumeRun: () => Promise<void>;
@@ -70,6 +73,11 @@ export interface RunWorkspaceActionState {
   watchToast: WatchToastState | null;
   watchRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
   watchingArtifact: CheckpointArtifact | null;
+}
+
+export interface PendingForkAltBaselineChoice {
+  artifact: CheckpointArtifact;
+  count: number;
 }
 
 export function useRunWorkspaceActions({
@@ -108,6 +116,8 @@ export function useRunWorkspaceActions({
   });
   const [watchingArtifact, setWatchingArtifact] = useState<CheckpointArtifact | null>(null);
   const [isResettingTrackPool, setIsResettingTrackPool] = useState(false);
+  const [pendingForkAltBaselineChoice, setPendingForkAltBaselineChoice] =
+    useState<PendingForkAltBaselineChoice | null>(null);
   const selectedWatchRenderer =
     watchRendererSelection.runId === run.id
       ? watchRendererSelection.renderer
@@ -200,11 +210,37 @@ export function useRunWorkspaceActions({
   }
 
   async function forkRunArtifact(artifact: CheckpointArtifact) {
+    if (run.active_alt_baseline_count > 0) {
+      setControlError(null);
+      setWatchToast(null);
+      setPendingForkAltBaselineChoice({
+        artifact,
+        count: run.active_alt_baseline_count,
+      });
+      return;
+    }
+    await executeForkRunArtifact(artifact, true);
+  }
+
+  async function confirmForkAltBaselineChoice(copyAltBaselines: boolean) {
+    const pending = pendingForkAltBaselineChoice;
+    if (pending === null) {
+      return;
+    }
+    setPendingForkAltBaselineChoice(null);
+    await executeForkRunArtifact(pending.artifact, copyAltBaselines);
+  }
+
+  function cancelForkAltBaselineChoice() {
+    setPendingForkAltBaselineChoice(null);
+  }
+
+  async function executeForkRunArtifact(artifact: CheckpointArtifact, copyAltBaselines: boolean) {
     setIsForking(true);
     setControlError(null);
     setWatchToast(null);
     try {
-      await onFork(run.id, artifact);
+      await onFork(run.id, artifact, copyAltBaselines);
     } catch (caught) {
       setControlError(caught instanceof Error ? caught.message : `failed to fork ${artifact}`);
     } finally {
@@ -298,6 +334,8 @@ export function useRunWorkspaceActions({
     controlError,
     copiedRunId,
     copyRunId,
+    cancelForkAltBaselineChoice,
+    confirmForkAltBaselineChoice,
     createDraftFromRun,
     forkRunArtifact,
     isCreatingDraftFromRun,
@@ -308,6 +346,7 @@ export function useRunWorkspaceActions({
     isResuming,
     isStopping,
     openRunDirectoryInBrowser,
+    pendingForkAltBaselineChoice,
     renameRunLabel,
     resetTrackPoolState,
     resumeRun,

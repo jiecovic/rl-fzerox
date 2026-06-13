@@ -151,11 +151,13 @@ export function useWorkspaceSessions({
 
   function createForkDraft({
     artifact,
+    copyAltBaselines,
     initialConfig,
     initialDraftName,
     runId,
   }: {
     artifact: ForkSource["artifact"];
+    copyAltBaselines: boolean;
     initialConfig: DraftEditorSession["initialConfig"];
     initialDraftName: string;
     runId: string;
@@ -163,7 +165,7 @@ export function useWorkspaceSessions({
     const sessionId = editorSessionId(crypto.randomUUID());
     setDraftEditors((current) =>
       createDraftSession(current, {
-        forkSource: { artifact, runId },
+        forkSource: { artifact, copyAltBaselines, runId },
         initialConfig,
         initialDraftName,
         sessionId,

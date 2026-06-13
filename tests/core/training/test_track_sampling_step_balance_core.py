@@ -123,3 +123,36 @@ def test_step_balance_controller_tracks_finished_episode_counts() -> None:
         "mute": 1,
         "silence": 0,
     }
+
+
+def test_step_balance_controller_ignores_alt_baseline_episodes_for_stats() -> None:
+    controller = StepBalancedTrackSamplingController(
+        resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
+        action_repeat=1,
+        update_episodes=1,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+    )
+
+    weights = controller.record_episodes(
+        (
+            {
+                "track_id": "mute",
+                "track_alt_baseline_id": "alt-a",
+                "episode_step": 12,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+        )
+    )
+
+    runtime = controller.runtime_state()
+    assert weights is None
+    assert {entry.track_id: entry.completed_frames for entry in runtime.entries} == {
+        "mute": 0,
+        "silence": 0,
+    }
+    assert {entry.track_id: entry.episode_count for entry in runtime.entries} == {
+        "mute": 0,
+        "silence": 0,
+    }

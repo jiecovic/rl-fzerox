@@ -27,6 +27,7 @@ from rl_fzerox.core.manager.db.models.save_games import (
     SaveGameModel,
 )
 from rl_fzerox.core.manager.db.models.track_sampling import (
+    RunAltBaselineModel,
     RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
     RunTrackSamplingGeneratedSlotModel,
@@ -39,6 +40,7 @@ __all__ = [
     "LineageGroupModel",
     "ManagerBase",
     "RunCommandModel",
+    "RunAltBaselineModel",
     "RunDraftModel",
     "RunEventModel",
     "RunModel",

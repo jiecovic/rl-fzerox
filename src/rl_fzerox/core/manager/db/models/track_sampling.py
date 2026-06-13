@@ -101,3 +101,22 @@ class RunTrackSamplingGeneratedSlotModel(ManagerBase):
     segment_count: Mapped[int | None]
     course_length: Mapped[float | None]
     updated_at: Mapped[str]
+
+
+class RunAltBaselineModel(ManagerBase):
+    """User-created extra reset baseline for one stable course variant."""
+
+    __tablename__ = "run_alt_baselines"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    course_key: Mapped[str] = mapped_column(index=True)
+    reset_variant_key: Mapped[str]
+    source_entry_id: Mapped[str]
+    label: Mapped[str]
+    state_path: Mapped[str]
+    weight: Mapped[float]
+    enabled: Mapped[bool]
+    created_at: Mapped[str]
+    updated_at: Mapped[str]
+    deleted_at: Mapped[str | None] = mapped_column(default=None)

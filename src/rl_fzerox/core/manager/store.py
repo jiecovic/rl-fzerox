@@ -56,6 +56,7 @@ from rl_fzerox.core.manager.storage.schema import (
 if TYPE_CHECKING:
     from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
     from rl_fzerox.core.training.session.callbacks.track_sampling import (
+        TrackSamplingAltBaseline,
         TrackSamplingMaterializedArtifact,
         TrackSamplingRuntimeState,
     )
@@ -234,6 +235,39 @@ class ManagerStore:
 
     def clear_run_track_sampling_state(self, run_id: str) -> None:
         run_registry.clear_run_track_sampling_state(self, run_id)
+
+    def get_run_alt_baselines(
+        self,
+        run_id: str,
+        *,
+        include_deleted: bool = False,
+    ) -> tuple[TrackSamplingAltBaseline, ...]:
+        return run_registry.get_run_alt_baselines(
+            self,
+            run_id,
+            include_deleted=include_deleted,
+        )
+
+    def upsert_run_alt_baseline(
+        self,
+        *,
+        baseline: TrackSamplingAltBaseline,
+    ) -> None:
+        run_registry.upsert_run_alt_baseline(self, baseline=baseline)
+
+    def delete_run_alt_baseline(
+        self,
+        *,
+        run_id: str,
+        baseline_id: str,
+        deleted_at: str | None = None,
+    ) -> bool:
+        return run_registry.delete_run_alt_baseline(
+            self,
+            run_id=run_id,
+            baseline_id=baseline_id,
+            deleted_at=deleted_at,
+        )
 
     def get_run_track_sampling_state(
         self,

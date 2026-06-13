@@ -48,9 +48,7 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
     store.initialize()
     now = datetime.now(UTC)
     with store._orm_session() as session:
-        run_ids = tuple(
-            session.scalars(select(RunModel.id).where(RunModel.status == "running"))
-        )
+        run_ids = tuple(session.scalars(select(RunModel.id).where(RunModel.status == "running")))
         worker_by_run_id = {
             worker.run_id: _run_worker_lease_from_model(worker)
             for worker in session.scalars(select(RunWorkerModel))

@@ -13,6 +13,7 @@ from sqlalchemy.orm import DeclarativeBase, Session
 from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import (
     ManagerBase,
+    RunAltBaselineModel,
     RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
     RunTrackSamplingGeneratedSlotModel,
@@ -27,7 +28,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -36,6 +37,7 @@ SAVE_GAME_CHILD_TABLES = (
     "save_game_cup_setups",
 )
 RUN_CHILD_TABLES = (
+    "run_alt_baselines",
     "run_commands",
     "run_events",
     "run_runtime",
@@ -149,6 +151,7 @@ def _assert_current_schema(
     _assert_save_game_child_columns(inspector=inspector)
     _assert_run_foreign_keys(inspector=inspector, table_names=table_names)
     _assert_track_sampling_artifact_columns(inspector=inspector)
+    _assert_alt_baseline_columns(inspector=inspector)
     _assert_track_sampling_entry_columns(inspector=inspector)
     _assert_track_sampling_generated_slot_columns(inspector=inspector)
 
@@ -165,9 +168,7 @@ def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
             raise RuntimeError(
                 f"manager DB is not current: save_game_course_setups is missing {column_name}"
             )
-    cup_setup_columns = {
-        column["name"] for column in inspector.get_columns("save_game_cup_setups")
-    }
+    cup_setup_columns = {column["name"] for column in inspector.get_columns("save_game_cup_setups")}
     for column_name in _required_column_names(SaveGameCupSetupModel):
         if column_name not in cup_setup_columns:
             raise RuntimeError(
@@ -210,6 +211,17 @@ def _assert_track_sampling_artifact_columns(*, inspector: Inspector) -> None:
         joined_columns = ", ".join(sorted(missing_columns))
         raise RuntimeError(
             f"manager DB is not current: run_track_sampling_artifacts is missing {joined_columns}"
+        )
+
+
+def _assert_alt_baseline_columns(*, inspector: Inspector) -> None:
+    columns = {column["name"] for column in inspector.get_columns("run_alt_baselines")}
+    required_columns = {column.name for column in RunAltBaselineModel.__table__.columns}
+    missing_columns = required_columns.difference(columns)
+    if missing_columns:
+        joined_columns = ", ".join(sorted(missing_columns))
+        raise RuntimeError(
+            f"manager DB is not current: run_alt_baselines is missing {joined_columns}"
         )
 
 

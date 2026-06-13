@@ -20,6 +20,7 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingMaterializedArtifact,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import reset_variant_key
+from rl_fzerox.ui.watch.runtime.baseline import _save_managed_alt_baseline
 from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
 
 
@@ -235,6 +236,68 @@ def test_managed_watch_track_sampling_refresh_repairs_missing_current_baseline(
     assert refreshed.entries[0].baseline_state_path == baseline_path.resolve()
 
 
+def test_managed_watch_save_creates_alt_baseline(tmp_path: Path) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="run",
+        name="Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+
+    result = _save_managed_alt_baseline(
+        emulator=_FakeStateSavingEmulator(),
+        manager_db_path=db_path,
+        run_id=run.id,
+        info={
+            "track_course_key": "mute_city",
+            "track_entry_id": "mute_city_gp_race_novice_blue_falcon",
+            "track_mode": "gp_race",
+            "track_gp_difficulty": "novice",
+            "track_vehicle": "blue_falcon",
+            "frame_index": 1234,
+        },
+    )
+
+    assert result.handled
+    assert result.saved
+    assert result.state_path is not None
+    assert result.state_path.read_bytes() == b"state"
+    baseline = store.get_run_alt_baselines(run.id)[0]
+    assert baseline.id == result.baseline_id
+    assert baseline.course_key == "mute_city"
+    assert baseline.source_entry_id == "mute_city_gp_race_novice_blue_falcon"
+    assert baseline.label == "frame 1234"
+    assert baseline.state_path == result.state_path.resolve()
+
+
+def test_managed_watch_save_is_noop_for_generated_x_cup(tmp_path: Path) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="run",
+        name="Run",
+        config=_managed_x_cup_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+
+    result = _save_managed_alt_baseline(
+        emulator=_FakeStateSavingEmulator(),
+        manager_db_path=db_path,
+        run_id=run.id,
+        info={
+            "track_generated_course_kind": X_CUP_COURSE.generated_kind,
+            "track_course_key": "x_cup_slot_1",
+            "track_entry_id": "x_cup_slot_1_gp_race_novice_blue_falcon",
+        },
+    )
+
+    assert result.handled
+    assert not result.saved
+    assert store.get_run_alt_baselines(run.id) == ()
+
+
 def _track_sampling_config(
     *,
     entry_id: str = "x_cup_old",
@@ -327,3 +390,8 @@ def _touched(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch()
     return path
+
+
+class _FakeStateSavingEmulator:
+    def save_state(self, path: Path) -> None:
+        path.write_bytes(b"state")

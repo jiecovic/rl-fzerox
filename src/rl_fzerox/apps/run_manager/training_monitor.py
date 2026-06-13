@@ -158,9 +158,7 @@ def build_manager_training_callback(
                 model_path=run_paths.latest_model_path,
                 policy_path=run_paths.latest_policy_path,
                 engine_tuning_state=(
-                    None
-                    if engine_tuning_state_provider is None
-                    else engine_tuning_state_provider()
+                    None if engine_tuning_state_provider is None else engine_tuning_state_provider()
                 ),
                 policy_metadata=current_policy_artifact_metadata(
                     self.training_env,

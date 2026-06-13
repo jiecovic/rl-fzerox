@@ -59,6 +59,12 @@ _SPEED_BADGE_STYLE = _ViewportBadgeStyle(
     fixed_size=(42, 42),
     radius=21,
 )
+_STATUS_BADGE_STYLE = _ViewportBadgeStyle(
+    text=(181, 213, 255),
+    border=(124, 171, 255),
+    fill=(8, 18, 36, 202),
+    font="body",
+)
 _GLASS_OVERLAY_CACHE: dict[tuple[int, int, int], PygameSurface] = {}
 _GLASS_MASK_CACHE: dict[tuple[int, int, int], PygameSurface] = {}
 
@@ -72,6 +78,7 @@ def _draw_glass_game_view(
     outer_size: tuple[int, int],
     course_label: str | None = None,
     speed_label: str | None = None,
+    status_label: str | None = None,
 ) -> None:
     style = _GLASS_VIEW_STYLE
     outer_rect = pygame.Rect(0, 0, *outer_size)
@@ -139,6 +146,17 @@ def _draw_glass_game_view(
             placement="bottom_left",
             stack_index=1 if course_label else 0,
             style=_SPEED_BADGE_STYLE,
+        )
+    if status_label:
+        _draw_viewport_badge(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            viewport_rect=viewport_rect,
+            label=status_label,
+            placement="top_right",
+            stack_index=0,
+            style=_STATUS_BADGE_STYLE,
         )
 
     pygame.draw.rect(

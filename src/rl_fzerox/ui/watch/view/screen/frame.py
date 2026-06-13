@@ -288,6 +288,7 @@ def _draw_frame(
         outer_size=game_display_size,
         course_label=_game_course_overlay_label(data.info, reset_info=data.reset_info),
         speed_label=_game_speed_overlay_label(data.info, action_repeat=data.action_repeat),
+        status_label=_game_status_overlay_label(data.info),
     )
     control_viz = _control_viz(
         data.control_state,
@@ -533,6 +534,13 @@ def _game_speed_overlay_label(info: dict[str, object], *, action_repeat: int) ->
 
     speedup = min(99.9, max(0.0, actual_game_fps / native_fps))
     return f"{speedup:.1f}x"
+
+
+def _game_status_overlay_label(info: dict[str, object]) -> str | None:
+    value = info.get("watch_save_notice")
+    if not isinstance(value, str):
+        return None
+    return value.strip() or None
 
 
 def _finite_float_info(info: dict[str, object], key: str) -> float | None:

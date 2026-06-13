@@ -66,7 +66,11 @@ interface UseWorkspaceActionsOptions {
 export interface WorkspaceActions {
   createDraftFromManagedRun: (runId: string) => Promise<void>;
   createManagedSaveGame: (name: string) => Promise<ManagedSaveGame>;
-  forkManagedRun: (runId: string, artifact: "latest" | "best") => Promise<void>;
+  forkManagedRun: (
+    runId: string,
+    artifact: "latest" | "best",
+    copyAltBaselines: boolean,
+  ) => Promise<void>;
   launchTrainingRun: (
     sessionId: DraftEditorSession["sessionId"],
     name: string,
@@ -215,7 +219,7 @@ export function useWorkspaceActions({
       currentConfig: draft.config,
       currentDraftName: draft.name,
       draftId: draft.id,
-      forkSource: draftForkSource(draft),
+      forkSource: mergeForkSourceCopyChoice(draftForkSource(draft), session?.forkSource),
       initialDraftName: draft.name,
       initialConfig: null,
       loadedDraft: draft,
@@ -244,7 +248,7 @@ export function useWorkspaceActions({
       currentConfig: draft.config,
       currentDraftName: draft.name,
       draftId: draft.id,
-      forkSource: draftForkSource(draft),
+      forkSource: mergeForkSourceCopyChoice(draftForkSource(draft), session?.forkSource),
       initialDraftName: draft.name,
       initialConfig: null,
       loadedDraft: draft,
@@ -293,12 +297,17 @@ export function useWorkspaceActions({
   ) {
     const session =
       sessions.draftEditors.find((current) => current.sessionId === sessionId) ?? null;
+    const sourceRunId = session?.forkSource?.runId ?? null;
+    const sourceArtifact = session?.forkSource?.artifact ?? null;
     const run = await launchRun(
       name,
       config,
       draftId,
-      session?.forkSource?.runId ?? null,
-      session?.forkSource?.artifact ?? null,
+      sourceRunId,
+      sourceArtifact,
+      sourceRunId === null || sourceArtifact === null
+        ? true
+        : (session?.forkSource?.copyAltBaselines ?? true),
     );
     setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
     upsertRunDetail(run);
@@ -306,7 +315,11 @@ export function useWorkspaceActions({
     return run;
   }
 
-  async function forkManagedRun(runId: string, artifact: "latest" | "best") {
+  async function forkManagedRun(
+    runId: string,
+    artifact: "latest" | "best",
+    copyAltBaselines: boolean,
+  ) {
     const sourceRun = runs.find((candidate) => candidate.id === runId) ?? null;
     const sourceDetail = await loadRunDetail(runId);
     const initialDraftName =
@@ -315,6 +328,7 @@ export function useWorkspaceActions({
         : nextForkDraftName(sourceRun, runs, allKnownNames());
     sessions.createForkDraft({
       artifact,
+      copyAltBaselines,
       initialConfig: sourceDetail.config,
       initialDraftName,
       runId,
@@ -450,4 +464,25 @@ export function useWorkspaceActions({
     watchManagedRun,
     startManagedCareerMode,
   };
+}
+
+function mergeForkSourceCopyChoice(
+  nextSource: DraftEditorSession["forkSource"],
+  previousSource: DraftEditorSession["forkSource"] | undefined,
+): DraftEditorSession["forkSource"] {
+  if (nextSource === null) {
+    return null;
+  }
+  if (
+    previousSource !== undefined &&
+    previousSource !== null &&
+    previousSource.runId === nextSource.runId &&
+    previousSource.artifact === nextSource.artifact
+  ) {
+    return {
+      ...nextSource,
+      copyAltBaselines: previousSource.copyAltBaselines,
+    };
+  }
+  return nextSource;
 }

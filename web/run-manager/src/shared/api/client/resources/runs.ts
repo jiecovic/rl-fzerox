@@ -35,6 +35,7 @@ export async function launchRun(
   draftId: string | null,
   sourceRunId: string | null = null,
   sourceArtifact: "latest" | "best" | null = null,
+  copyAltBaselines = true,
 ): Promise<ManagedRunDetail> {
   const response = await fetch("/api/runs", {
     method: "POST",
@@ -45,6 +46,7 @@ export async function launchRun(
       draft_id: draftId,
       source_run_id: sourceRunId,
       source_artifact: sourceArtifact,
+      copy_alt_baselines: copyAltBaselines,
     }),
   });
   const payload = parseApiPayload(createRunResponseSchema, await parseJson(response));
@@ -56,6 +58,7 @@ export async function forkRun(
   artifact: "latest" | "best",
   name?: string,
   config?: ManagedRunConfig,
+  copyAltBaselines = true,
 ): Promise<ManagedRunDetail> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/fork`, {
     method: "POST",
@@ -64,6 +67,7 @@ export async function forkRun(
       artifact,
       ...(name === undefined ? {} : { name }),
       ...(config === undefined ? {} : { config }),
+      copy_alt_baselines: copyAltBaselines,
     }),
   });
   const payload = parseApiPayload(forkRunResponseSchema, await parseJson(response));

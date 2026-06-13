@@ -468,9 +468,7 @@ def _vehicle_summary_from_config_json(config_json: str) -> ManagedRunVehicleSumm
 def _required_lineage_id(run: RunModel) -> str:
     if run.lineage_id:
         return run.lineage_id
-    raise RuntimeError(
-        f"manager DB is not current: run {run.id} is missing lineage_id"
-    )
+    raise RuntimeError(f"manager DB is not current: run {run.id} is missing lineage_id")
 
 
 def _string_value(value: object, *, fallback: str) -> str:

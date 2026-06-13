@@ -11,7 +11,12 @@ from rl_fzerox.core.engine_tuning import (
     EngineTuningResetSampler,
     EngineTuningSelectionMode,
 )
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    CurriculumConfig,
+    EnvConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+)
 
 from ..info import (
     backend_step_info,
@@ -230,11 +235,9 @@ class EngineResetCoordinator:
             or not self._track_sampling_weight_overrides
         ):
             return config
-        entries = tuple(
-            entry.model_copy(
-                update={"weight": self._track_sampling_weight_overrides.get(entry.id, entry.weight)}
-            )
-            for entry in config.entries
+        entries = _track_sampling_entries_with_weight_overrides(
+            config.entries,
+            weights_by_track_id=self._track_sampling_weight_overrides,
         )
         return config.model_copy(update={"entries": entries})
 
@@ -343,6 +346,54 @@ def sync_reset_presentation(
     )
     info.update(race_intro_info)
     return telemetry
+
+
+def _track_sampling_entries_with_weight_overrides(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+    *,
+    weights_by_track_id: dict[str, float],
+) -> tuple[TrackSamplingEntryConfig, ...]:
+    grouped_entries: dict[str, list[TrackSamplingEntryConfig]] = {}
+    for entry in entries:
+        if entry.baseline_group_id is None:
+            continue
+        grouped_entries.setdefault(entry.baseline_group_id, []).append(entry)
+
+    adjusted: list[TrackSamplingEntryConfig] = []
+    for entry in entries:
+        group_id = entry.baseline_group_id
+        if group_id is None:
+            adjusted.append(
+                entry.model_copy(update={"weight": weights_by_track_id.get(entry.id, entry.weight)})
+            )
+            continue
+        if group_id != entry.id:
+            # The group is emitted when the base entry is visited.
+            continue
+        group = tuple(grouped_entries.get(group_id, (entry,)))
+        override_weight = weights_by_track_id.get(
+            group_id,
+            sum(float(item.weight) for item in group),
+        )
+        ratio_total = sum(_baseline_group_ratio(item) for item in group)
+        if ratio_total <= 0.0:
+            adjusted.extend(group)
+            continue
+        adjusted.extend(
+            item.model_copy(
+                update={
+                    "weight": float(override_weight) * _baseline_group_ratio(item) / ratio_total
+                }
+            )
+            for item in group
+        )
+    return tuple(adjusted)
+
+
+def _baseline_group_ratio(entry: TrackSamplingEntryConfig) -> float:
+    if entry.baseline_group_weight is None:
+        return 1.0
+    return max(0.0, float(entry.baseline_group_weight))
 
 
 def _camera_ready_intro_timer(

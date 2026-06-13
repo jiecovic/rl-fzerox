@@ -473,9 +473,7 @@ def _active_x_cup_artifact_groups(
     artifacts: Sequence[TrackSamplingMaterializedArtifact],
 ) -> frozenset[tuple[object, ...]]:
     return frozenset(
-        key
-        for artifact in artifacts
-        if (key := _x_cup_artifact_group_key(artifact)) is not None
+        key for artifact in artifacts if (key := _x_cup_artifact_group_key(artifact)) is not None
     )
 
 

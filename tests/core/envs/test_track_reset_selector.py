@@ -9,7 +9,11 @@ from rl_fzerox.core.engine_tuning import (
     EngineTuningResetContext,
     EngineTuningResetSampler,
 )
-from rl_fzerox.core.envs.engine.reset import TrackResetSelector, select_reset_track_by_course_id
+from rl_fzerox.core.envs.engine.reset import (
+    TrackResetSelector,
+    select_reset_track,
+    select_reset_track_by_course_id,
+)
 from rl_fzerox.core.runtime_spec.schema import (
     AdaptiveEngineTuningConfig,
     TrackSamplingConfig,
@@ -82,6 +86,62 @@ def test_select_reset_track_by_course_id_returns_none_without_match() -> None:
     )
 
     assert select_reset_track_by_course_id(config, course_id="silence") is None
+
+
+def test_alt_baseline_selection_reports_base_track_id(tmp_path: Path) -> None:
+    alt_state_path = tmp_path / "mute-alt.state"
+    alt_state_path.write_bytes(b"state")
+    config = TrackSamplingConfig(
+        enabled=True,
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute_city_gp_race_novice_blue_falcon__alt_alt-a",
+                course_id="mute_city",
+                baseline_state_path=alt_state_path,
+                alt_baseline_id="alt-a",
+                alt_baseline_label="chicane approach",
+                alt_baseline_source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            ),
+        ),
+    )
+
+    selected = select_reset_track(config, seed=123)
+
+    assert selected is not None
+    info = selected.info()
+    assert info["track_entry_id"] == "mute_city_gp_race_novice_blue_falcon__alt_alt-a"
+    assert info["track_id"] == "mute_city_gp_race_novice_blue_falcon"
+    assert info["track_course_key"] == "mute_city"
+    assert info["track_alt_baseline_id"] == "alt-a"
+
+
+def test_reset_selector_skips_missing_alt_baseline_entries(tmp_path: Path) -> None:
+    base_state_path = tmp_path / "mute.state"
+    base_state_path.write_bytes(b"state")
+    config = TrackSamplingConfig(
+        enabled=True,
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute_city_gp_race_novice_blue_falcon",
+                course_id="mute_city",
+                baseline_state_path=base_state_path,
+                weight=1.0,
+            ),
+            TrackSamplingEntryConfig(
+                id="mute_city_gp_race_novice_blue_falcon__alt_missing",
+                course_id="mute_city",
+                baseline_state_path=tmp_path / "missing.state",
+                weight=100.0,
+                alt_baseline_id="missing",
+                alt_baseline_source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            ),
+        ),
+    )
+
+    selected = select_reset_track(config, seed=123)
+
+    assert selected is not None
+    assert selected.id == "mute_city_gp_race_novice_blue_falcon"
 
 
 def test_track_reset_selector_resyncs_when_entry_metadata_changes() -> None:

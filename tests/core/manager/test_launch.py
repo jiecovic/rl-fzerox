@@ -16,6 +16,7 @@ from rl_fzerox.apps.run_manager.launching.watch import active_watch_pid, watch_f
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_managed_run_config
 from rl_fzerox.core.training.runs import RUN_LAYOUT
+from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingAltBaseline
 
 
 class _RecordingLauncher(ManagerRunLauncher):
@@ -40,7 +41,7 @@ def test_launch_allows_unsaved_fork_source(tmp_path: Path) -> None:
     class _ForkRecordingLauncher(ManagerRunLauncher):
         def __init__(self, store: ManagerStore) -> None:
             super().__init__(store)
-            self.fork_calls: list[tuple[str, str, str | None, object | None]] = []
+            self.fork_calls: list[tuple[str, str, str | None, object | None, bool]] = []
 
         def fork(
             self,
@@ -52,9 +53,10 @@ def test_launch_allows_unsaved_fork_source(tmp_path: Path) -> None:
             exclude_draft_id: str | None = None,
             source_snapshot_dir: Path | None = None,
             source_num_timesteps: int | None = None,
+            copy_alt_baselines: bool = True,
         ) -> ManagedRun:
             del exclude_draft_id, source_num_timesteps, source_snapshot_dir
-            self.fork_calls.append((run_id, artifact, name, config))
+            self.fork_calls.append((run_id, artifact, name, config, copy_alt_baselines))
             return source_run
 
     launcher = _ForkRecordingLauncher(store)
@@ -68,7 +70,7 @@ def test_launch_allows_unsaved_fork_source(tmp_path: Path) -> None:
     )
 
     assert launched == source_run
-    assert launcher.fork_calls == [(source_run.id, "best", "Forked Child", config)]
+    assert launcher.fork_calls == [(source_run.id, "best", "Forked Child", config, True)]
 
 
 def test_resume_relaunches_fork_without_local_checkpoint(tmp_path: Path) -> None:
@@ -126,6 +128,108 @@ def test_resume_relaunches_fork_without_local_checkpoint(tmp_path: Path) -> None
     assert resumed.status == "running"
     assert resumed.started_at is not None
     assert "pinned fork source" in events[run.id][0].message
+
+
+def test_fork_copies_active_alt_baselines(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        explicit_run_dir=parent_dir,
+    )
+    _write_latest_checkpoint(parent_dir)
+    source_state_path = parent_dir / "baselines" / "alt" / "alt-a.state"
+    source_state_path.parent.mkdir(parents=True)
+    source_state_path.write_bytes(b"alt-state")
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-a",
+            run_id=parent.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="chicane approach",
+            state_path=source_state_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:00:00+00:00",
+            updated_at="2026-06-13T10:00:00+00:00",
+        )
+    )
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-missing",
+            run_id=parent.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="deleted local file",
+            state_path=parent_dir / "baselines" / "alt" / "missing.state",
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:01:00+00:00",
+            updated_at="2026-06-13T10:01:00+00:00",
+        )
+    )
+    launcher = _RecordingLauncher(store)
+
+    child = launcher.fork(run_id=parent.id, artifact="latest", name="Child Run")
+
+    child_baselines = store.get_run_alt_baselines(child.id)
+    assert launcher.spawn_calls == [(child.id, False)]
+    assert len(child_baselines) == 1
+    child_baseline = child_baselines[0]
+    assert child_baseline.id.startswith("alt-a-fork-")
+    assert child_baseline.course_key == "mute_city"
+    assert child_baseline.source_entry_id == "mute_city_gp_race_novice_blue_falcon"
+    assert child_baseline.label == "chicane approach"
+    assert child_baseline.state_path.parent == child.run_dir / RUN_LAYOUT.baselines_dirname / "alt"
+    assert child_baseline.state_path.read_bytes() == b"alt-state"
+
+
+def test_fork_can_skip_active_alt_baselines(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        explicit_run_dir=parent_dir,
+    )
+    _write_latest_checkpoint(parent_dir)
+    source_state_path = parent_dir / "baselines" / "alt" / "alt-a.state"
+    source_state_path.parent.mkdir(parents=True)
+    source_state_path.write_bytes(b"alt-state")
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-a",
+            run_id=parent.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="chicane approach",
+            state_path=source_state_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:00:00+00:00",
+            updated_at="2026-06-13T10:00:00+00:00",
+        )
+    )
+    launcher = _RecordingLauncher(store)
+
+    child = launcher.fork(
+        run_id=parent.id,
+        artifact="latest",
+        name="Child Run",
+        copy_alt_baselines=False,
+    )
+
+    assert launcher.spawn_calls == [(child.id, False)]
+    assert store.get_run_alt_baselines(child.id) == ()
 
 
 def test_resume_rebuilds_missing_fork_source_snapshot(tmp_path: Path) -> None:
@@ -669,6 +773,23 @@ def test_active_career_mode_runner_pid_clears_stale_viewer_lease(
 
 def _stale_heartbeat_at() -> str:
     return (datetime.now(UTC) - timedelta(minutes=1)).isoformat(timespec="seconds")
+
+
+def _write_latest_checkpoint(run_dir: Path) -> None:
+    latest_model_path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    latest_policy_path = run_dir / RUN_LAYOUT.policy_artifacts.latest
+    latest_model_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_model_path.write_bytes(b"model")
+    latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_policy_path.write_bytes(b"policy")
+    (run_dir / RUN_LAYOUT.config_filename).write_text(
+        "train:\n  algorithm: maskable_hybrid_recurrent_ppo\n",
+        encoding="utf-8",
+    )
+    latest_policy_path.with_name("policy.metadata.json").write_text(
+        '{"num_timesteps": 816040}\n',
+        encoding="utf-8",
+    )
 
 
 def _configure_gp_cup(

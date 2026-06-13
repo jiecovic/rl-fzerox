@@ -62,6 +62,11 @@ class SelectedTrack:
     source_course_index: int | None
     source_gp_difficulty: RaceDifficultyName | None
     source_engine_setting_raw_value: int | None
+    baseline_group_id: str | None
+    baseline_group_weight: float | None
+    alt_baseline_id: str | None
+    alt_baseline_label: str | None
+    alt_baseline_source_entry_id: str | None
     generated_course_kind: str | None
     generated_course_seed: int | None
     generated_course_hash: str | None
@@ -75,8 +80,9 @@ class SelectedTrack:
     cycle_position: int | None = None
 
     def info(self) -> dict[str, object]:
+        source_entry_id = self.alt_baseline_source_entry_id or self.id
         course_key = track_sampling_course_key(
-            entry_id=self.id,
+            entry_id=source_entry_id,
             course_id=self.course_id,
             runtime_course_key=self.runtime_course_key,
             course_ref=self.course_ref,
@@ -86,7 +92,7 @@ class SelectedTrack:
             "track_sampling_enabled": True,
             "track_sampling_mode": self.sampling_mode,
             "track_entry_id": self.id,
-            "track_id": self.id,
+            "track_id": source_entry_id,
             "track_course_key": course_key,
             "track_display_name": self.display_name,
             "track_course_ref": self.course_ref,
@@ -94,7 +100,7 @@ class SelectedTrack:
             "track_runtime_course_key": self.runtime_course_key,
             "track_reset_course_key": self.runtime_course_key or self.course_id,
             "track_reset_target_key": track_sampling_reset_target_key(
-                entry_id=self.id,
+                entry_id=source_entry_id,
                 course_id=self.course_id,
                 runtime_course_key=self.runtime_course_key,
                 course_ref=self.course_ref,
@@ -117,6 +123,11 @@ class SelectedTrack:
             "engine_tuning_mean_score": self.engine_tuning_mean_score,
             "engine_tuning_finish_count": self.engine_tuning_finish_count,
             "track_sampling_cycle_position": self.cycle_position,
+            "track_baseline_group_id": self.baseline_group_id,
+            "track_baseline_group_weight": self.baseline_group_weight,
+            "track_alt_baseline_id": self.alt_baseline_id,
+            "track_alt_baseline_label": self.alt_baseline_label,
+            "track_alt_baseline_source_entry_id": self.alt_baseline_source_entry_id,
             "track_generated_course_kind": self.generated_course_kind,
             "track_generated_course_seed": self.generated_course_seed,
             "track_generated_course_hash": self.generated_course_hash,

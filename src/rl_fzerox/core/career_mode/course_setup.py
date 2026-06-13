@@ -43,8 +43,7 @@ def resolve_cup_setup(
     matching = tuple(
         setup
         for setup in setups
-        if setup.cup_id == target.cup_id
-        and _optional_match(setup.difficulty, target.difficulty)
+        if setup.cup_id == target.cup_id and _optional_match(setup.difficulty, target.difficulty)
     )
     if not matching:
         return None

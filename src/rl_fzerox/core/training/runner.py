@@ -193,10 +193,7 @@ def run_training(
             track_sampling_runtime_persistence=track_sampling_runtime_persistence,
             extra_callbacks=(
                 *extra_callbacks,
-                *(
-                    factory(engine_tuning_controller)
-                    for factory in extra_callback_factories
-                ),
+                *(factory(engine_tuning_controller) for factory in extra_callback_factories),
             ),
         )
         masking_required = training_requires_action_masks(run_config)

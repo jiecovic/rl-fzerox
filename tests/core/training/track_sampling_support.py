@@ -56,9 +56,7 @@ def _resolved_entry(
         log_key=_mapped_value(log_keys, track_id, course_key),
         label=_mapped_value(labels, track_id, course_key) or course_key,
         log_enabled=_mapped_bool(log_enabled, track_id, course_key, default=True),
-        generated=(
-            _mapped_generated(generated, track_id, course_key) or GeneratedCourseMetadata()
-        ),
+        generated=(_mapped_generated(generated, track_id, course_key) or GeneratedCourseMetadata()),
     )
 
 

@@ -6,6 +6,7 @@ import {
   useRunPolicyPreview,
   useRunTrackSamplingState,
 } from "@/features/runLiveData/hooks";
+import { ForkAltBaselinesDialog } from "@/features/runWorkspaceActions/ForkAltBaselinesDialog";
 import { useRunWorkspaceActions } from "@/features/runWorkspaceActions/useRunWorkspaceActions";
 import type {
   ConfigMetadata,
@@ -29,7 +30,7 @@ interface RunWorkspaceProps {
   allRuns: ManagedRun[];
   metadata: ConfigMetadata;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
-  onFork: (runId: string, artifact: "latest" | "best") => Promise<void>;
+  onFork: (runId: string, artifact: "latest" | "best", copyAltBaselines: boolean) => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
   onRename: (runId: string, name: string) => Promise<void>;
   onResume: (runId: string) => Promise<void>;
@@ -134,6 +135,12 @@ export function RunWorkspace({
         title="Rename run"
         onClose={() => setRenameDialogOpen(false)}
         onSubmit={(name) => void submitRunRename(name)}
+      />
+      <ForkAltBaselinesDialog
+        altBaselineCount={actions.pendingForkAltBaselineChoice?.count ?? 0}
+        open={actions.pendingForkAltBaselineChoice !== null}
+        onClose={actions.cancelForkAltBaselineChoice}
+        onSelect={(copyAltBaselines) => void actions.confirmForkAltBaselineChoice(copyAltBaselines)}
       />
 
       <RunRuntimeSummary

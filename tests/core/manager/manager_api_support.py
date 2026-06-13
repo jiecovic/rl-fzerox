@@ -30,8 +30,9 @@ class _LauncherStub:
         draft_id: str | None,
         source_run_id: str | None,
         source_artifact: Literal["latest", "best"] | None,
+        copy_alt_baselines: bool,
     ) -> ManagedRun:
-        del name, config, draft_id, source_run_id, source_artifact
+        del name, config, draft_id, source_run_id, source_artifact, copy_alt_baselines
         raise AssertionError("launch should not be called")
 
     def fork(
@@ -41,8 +42,9 @@ class _LauncherStub:
         artifact: Literal["latest", "best"],
         name: str | None,
         config: ManagedRunConfig | None,
+        copy_alt_baselines: bool,
     ) -> ManagedRun:
-        del run_id, artifact, name, config
+        del run_id, artifact, name, config, copy_alt_baselines
         raise AssertionError("fork should not be called")
 
     def request_pause(self, *, run_id: str) -> ManagedRun:

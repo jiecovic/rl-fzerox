@@ -14,15 +14,11 @@ from rl_fzerox.core.manager import (
     ManagerStore,
     default_managed_run_config,
 )
-from rl_fzerox.core.manager.db import manager_engine, manager_session
+from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import (
     RunTemplateModel,
 )
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json, load_config_json
-from rl_fzerox.core.training.session.callbacks.track_sampling import (
-    TrackSamplingRuntimeEntry,
-    TrackSamplingRuntimeState,
-)
 from tests.core.manager.manager_store_support import (
     _config_snapshot_json,
     _insert_config_snapshot,
@@ -228,6 +224,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "updated_at",
     }
 
+
 def test_manager_store_rejects_removed_observation_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
@@ -347,75 +344,3 @@ def test_manager_store_rejects_removed_progress_suspend_field(tmp_path: Path) ->
 
     with pytest.raises(ValidationError):
         store.list_drafts()
-
-
-def test_manager_store_rejects_legacy_track_sampling_identity_columns(
-    tmp_path: Path,
-) -> None:
-    store = ManagerStore(tmp_path / "manager" / "runs.db")
-    run = store.create_run(
-        name="Legacy Track Pool State Run",
-        config=default_managed_run_config(),
-        managed_runs_root=tmp_path / "runs",
-    )
-    state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
-        action_repeat=2,
-        update_episodes=5,
-        ema_alpha=0.1,
-        max_weight_scale=5.0,
-        adaptive_completion_weight=0.8,
-        adaptive_target_completion=0.5,
-        adaptive_min_confidence_episodes=12,
-        adaptive_confidence_scale=3.0,
-        update_count=7,
-        episodes_since_update=2,
-        entries=(
-            TrackSamplingRuntimeEntry(
-                track_id="x_cup_slot_1",
-                course_key="x_cup_slot_1",
-                label="X Cup 1234abcd",
-                base_weight=1.0,
-                current_weight=2.0,
-                completed_frames=1000,
-                episode_count=4,
-                finished_episode_count=1,
-                success_sample_count=4,
-                ema_episode_frames=250.0,
-                ema_completion_fraction=0.75,
-                generation_episode_count=2,
-                generation_finished_episode_count=1,
-                generation_success_sample_count=2,
-                generation_ema_completion_fraction=0.8,
-                generated_course_slot=1,
-                generated_course_generation=3,
-                generated_course_id="x_cup_1234abcd",
-                generated_course_name="X Cup 1234abcd",
-                generated_course_hash="1234abcd",
-                generated_course_seed=12_647_406_722_013_964_192,
-                generated_course_segment_count=128,
-                generated_course_length=12345.0,
-            ),
-        ),
-    )
-    store.upsert_run_track_sampling_state(run_id=run.id, state=state)
-    legacy_engine = manager_engine(store.db_path)
-    try:
-        with legacy_engine.begin() as connection:
-            connection.exec_driver_sql(
-                "ALTER TABLE run_track_sampling_entries ADD COLUMN generated_entry_id TEXT"
-            )
-            connection.exec_driver_sql(
-                "ALTER TABLE run_track_sampling_entries "
-                "ADD COLUMN generated_baseline_state_path TEXT"
-            )
-            connection.exec_driver_sql(
-                "UPDATE run_track_sampling_entries "
-                "SET generated_entry_id = 'x_cup_1234abcd_gp_race_novice', "
-                "generated_baseline_state_path = '/tmp/stale.state'"
-            )
-    finally:
-        legacy_engine.dispose()
-
-    with pytest.raises(RuntimeError, match="legacy columns"):
-        ManagerStore(store.db_path).get_run_track_sampling_state(run.id)

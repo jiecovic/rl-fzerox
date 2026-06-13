@@ -14,6 +14,7 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     episode_frame_count,
     episode_track_id,
     runtime_track_sampling_configs,
+    uses_alt_baseline_sample,
     uses_step_balance_scheduler,
     uses_track_sampling_runtime_mode,
 )
@@ -124,6 +125,8 @@ class StepBalancedTrackSamplingController:
     def record_episodes(self, episodes: Sequence[Mapping[str, object]]) -> dict[str, float] | None:
         recorded_count = 0
         for episode in episodes:
+            if uses_alt_baseline_sample(episode):
+                continue
             track_id = episode_track_id(episode)
             if track_id is None:
                 continue

@@ -21,6 +21,7 @@ from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.screen.frame import (
     _game_course_overlay_label,
     _game_speed_overlay_label,
+    _game_status_overlay_label,
 )
 from rl_fzerox.ui.watch.view.screen.render import _with_viewer_rates
 from tests.ui.viewer_support import (
@@ -101,6 +102,13 @@ def test_game_speed_overlay_label_formats_actual_speedup() -> None:
         )
         == "12.0x"
     )
+
+
+def test_game_status_overlay_label_uses_watch_save_notice() -> None:
+    assert _game_status_overlay_label({"watch_save_notice": "alt baseline saved"}) == (
+        "alt baseline saved"
+    )
+    assert _game_status_overlay_label({"watch_save_notice": "   "}) is None
 
 
 def test_viewer_rates_preserve_runtime_game_fps() -> None:

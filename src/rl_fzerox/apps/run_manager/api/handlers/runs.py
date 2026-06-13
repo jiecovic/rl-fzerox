@@ -11,7 +11,11 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     RunLauncher,
     WatchRenderer,
 )
-from rl_fzerox.apps.run_manager.api.handlers.common import require_run, run_response
+from rl_fzerox.apps.run_manager.api.handlers.common import (
+    active_alt_baseline_count,
+    require_run,
+    run_response,
+)
 from rl_fzerox.apps.run_manager.api.payloads.runs import run_summary_payload
 from rl_fzerox.apps.run_manager.desktop import open_directory
 from rl_fzerox.core.manager import ManagerStore
@@ -24,9 +28,14 @@ def runs_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
         tuple(run.id for run in visible_runs),
         limit_per_run=6,
     )
+    alt_baseline_counts = {run.id: active_alt_baseline_count(store, run.id) for run in visible_runs}
     return {
         "runs": [
-            run_summary_payload(item, recent_events=recent_events.get(item.id, ()))
+            run_summary_payload(
+                item,
+                recent_events=recent_events.get(item.id, ()),
+                active_alt_baseline_count=alt_baseline_counts.get(item.id, 0),
+            )
             for item in visible_runs
         ]
     }
@@ -60,6 +69,7 @@ def launch_run_payload(
             draft_id=request.draft_id,
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
+            copy_alt_baselines=request.copy_alt_baselines,
         )
     except ManagerNameConflictError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
@@ -81,6 +91,7 @@ def fork_run_payload(
             artifact=request.artifact,
             name=request.name,
             config=request.config,
+            copy_alt_baselines=request.copy_alt_baselines,
         )
     except ManagerNameConflictError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

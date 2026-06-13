@@ -78,9 +78,7 @@ def generated_x_cup_slot_from_entry(
             else int(entry.generated_course_segment_count)
         ),
         course_length=(
-            None
-            if entry.generated_course_length is None
-            else float(entry.generated_course_length)
+            None if entry.generated_course_length is None else float(entry.generated_course_length)
         ),
     )
 

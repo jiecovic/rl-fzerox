@@ -14,6 +14,9 @@ from rl_fzerox.core.manager.projection.x_cup_runtime import (
 )
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackSamplingEntryConfig
+from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    apply_alt_baselines_to_track_sampling,
+)
 
 TrackSamplingSignature = tuple[tuple[object, ...], ...]
 LOGGER = logging.getLogger(__name__)
@@ -75,24 +78,33 @@ class ManagedTrackSamplingRefresh:
         )
         projected_signature = _generated_x_cup_signature(projected_config)
         has_materialized_x_cup_entries = not unmaterialized_generated_x_cup_entries(current_config)
+        refreshed_config = projected_config
         if (
             projected_signature == _generated_x_cup_signature(current_config)
             and has_materialized_x_cup_entries
             and not missing_generated_x_cup_baseline_paths(current_config)
         ):
             self._last_blocked_signature = None
+        else:
+            materialized_config = self._with_materialized_x_cup_artifacts(projected_config)
+            if materialized_config is None:
+                if projected_signature != self._last_blocked_signature:
+                    LOGGER.warning(
+                        "skipping managed watch track-sampling refresh for run_id=%s: "
+                        "generated X Cup state changed but run-local baseline artifacts "
+                        "are not ready",
+                        self.run_id,
+                    )
+                    self._last_blocked_signature = projected_signature
+                return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=False)
+            refreshed_config = materialized_config
+            self._last_blocked_signature = None
+        refreshed_config = apply_alt_baselines_to_track_sampling(
+            refreshed_config,
+            self.store.get_run_alt_baselines(self.run_id),
+        )
+        if _track_sampling_signature(refreshed_config) == _track_sampling_signature(current_config):
             return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)
-        refreshed_config = self._with_materialized_x_cup_artifacts(projected_config)
-        if refreshed_config is None:
-            if projected_signature != self._last_blocked_signature:
-                LOGGER.warning(
-                    "skipping managed watch track-sampling refresh for run_id=%s: "
-                    "generated X Cup state changed but run-local baseline artifacts "
-                    "are not ready",
-                    self.run_id,
-                )
-                self._last_blocked_signature = projected_signature
-            return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=False)
         self._last_blocked_signature = None
         return TrackSamplingRefreshStatus(refreshed_config=refreshed_config, ready_for_reset=True)
 
@@ -151,6 +163,25 @@ def _generated_x_cup_signature(config: TrackSamplingConfig) -> TrackSamplingSign
         )
         for entry in config.entries
         if entry.generated_course_kind == X_CUP_COURSE.generated_kind
+    )
+
+
+def _track_sampling_signature(config: TrackSamplingConfig) -> TrackSamplingSignature:
+    return tuple(
+        (
+            entry.id,
+            entry.baseline_state_path,
+            float(entry.weight),
+            entry.baseline_group_id,
+            entry.baseline_group_weight,
+            entry.alt_baseline_id,
+            entry.alt_baseline_label,
+            entry.alt_baseline_source_entry_id,
+            entry.generated_course_slot,
+            entry.generated_course_generation,
+            entry.generated_course_hash,
+        )
+        for entry in config.entries
     )
 
 

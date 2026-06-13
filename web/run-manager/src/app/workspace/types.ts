@@ -23,6 +23,7 @@ export type PrimaryWorkspaceTabId = Extract<
 
 export interface ForkSource {
   artifact: "latest" | "best";
+  copyAltBaselines: boolean;
   runId: string;
 }
 

@@ -95,9 +95,7 @@ def delete_lineage(store: ManagerStore, lineage_id: str) -> bool:
                 raise ValueError("stop all runs in this lineage before deleting it")
         if (
             session.scalar(
-                select(RunCommandModel.run_id)
-                .where(RunCommandModel.run_id.in_(run_ids))
-                .limit(1)
+                select(RunCommandModel.run_id).where(RunCommandModel.run_id.in_(run_ids)).limit(1)
             )
             is not None
         ):
@@ -144,9 +142,7 @@ def delete_lineage(store: ManagerStore, lineage_id: str) -> bool:
 
 def _delete_run_sidecars(session: Session, run_id: str) -> None:
     session.execute(
-        delete(RunTrackSamplingArtifactModel).where(
-            RunTrackSamplingArtifactModel.run_id == run_id
-        )
+        delete(RunTrackSamplingArtifactModel).where(RunTrackSamplingArtifactModel.run_id == run_id)
     )
     session.execute(
         delete(RunTrackSamplingEntryModel).where(RunTrackSamplingEntryModel.run_id == run_id)
@@ -157,9 +153,7 @@ def _delete_run_sidecars(session: Session, run_id: str) -> None:
         )
     )
     session.execute(
-        delete(RunTrackSamplingRuntimeModel).where(
-            RunTrackSamplingRuntimeModel.run_id == run_id
-        )
+        delete(RunTrackSamplingRuntimeModel).where(RunTrackSamplingRuntimeModel.run_id == run_id)
     )
     session.execute(delete(RunRuntimeModel).where(RunRuntimeModel.run_id == run_id))
     session.execute(delete(RunCommandModel).where(RunCommandModel.run_id == run_id))

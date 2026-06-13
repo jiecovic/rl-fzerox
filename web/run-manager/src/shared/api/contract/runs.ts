@@ -54,6 +54,7 @@ export const managedRunSummarySchema = z.object({
   source_run_id: z.string().nullable(),
   source_artifact: z.enum(["latest", "best"]).nullable(),
   source_num_timesteps: z.number().int().nonnegative().nullable(),
+  active_alt_baseline_count: z.number().int().nonnegative().default(0),
   pending_command: runCommandSchema.nullable(),
   worker_heartbeat_at: z.string().nullable(),
   runtime: z

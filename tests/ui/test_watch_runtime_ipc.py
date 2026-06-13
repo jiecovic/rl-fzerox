@@ -23,6 +23,7 @@ from rl_fzerox.ui.watch.runtime.ipc import (
 )
 from rl_fzerox.ui.watch.runtime.worker import (
     _sync_next_watch_reset_after_episode,
+    _TimedWatchNotice,
     run_simulation_worker,
 )
 
@@ -87,6 +88,22 @@ class _SequentialResetEnv:
 
     def set_next_sequential_reset_course(self, course_id: str | None) -> None:
         self.next_courses.append(course_id)
+
+
+def test_timed_watch_notice_persists_until_expiry_without_mutating_source() -> None:
+    notice = _TimedWatchNotice()
+    source: dict[str, object] = {"track_id": "mute_city"}
+
+    notice.show("alt baseline saved", now=10.0)
+    active_info = notice.apply(source, now=12.0)
+    expired_info = notice.apply(source, now=14.0)
+
+    assert active_info == {
+        "track_id": "mute_city",
+        "watch_save_notice": "alt baseline saved",
+    }
+    assert source == {"track_id": "mute_city"}
+    assert expired_info is source
 
 
 def _sample_rotation() -> WatchCourseRotation:

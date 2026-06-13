@@ -32,9 +32,7 @@ def test_adaptive_step_balance_controller_tilts_weight_toward_lower_completion()
 
 def test_adaptive_step_balance_controller_uses_finish_rate_when_completion_is_similar() -> None:
     controller = StepBalancedTrackSamplingController(
-        resolved_courses=resolved_track_sampling_courses(
-            {"sector_alpha": 1.0, "white_land": 1.0}
-        ),
+        resolved_courses=resolved_track_sampling_courses({"sector_alpha": 1.0, "white_land": 1.0}),
         sampling_mode="adaptive_step_balanced",
         action_repeat=2,
         update_episodes=2,
@@ -155,9 +153,7 @@ def test_adaptive_step_balance_prioritizes_low_confidence_courses() -> None:
 
 def test_adaptive_step_balance_converts_frame_target_to_reset_weight() -> None:
     controller = StepBalancedTrackSamplingController(
-        resolved_courses=resolved_track_sampling_courses(
-            {"easy_short": 1.0, "hard_long": 1.0}
-        ),
+        resolved_courses=resolved_track_sampling_courses({"easy_short": 1.0, "hard_long": 1.0}),
         sampling_mode="adaptive_step_balanced",
         action_repeat=2,
         update_episodes=2,

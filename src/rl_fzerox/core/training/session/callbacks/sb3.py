@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3.py
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from rl_fzerox.core.engine_tuning import EngineTuningContext, EngineTuningRuntimeState
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
@@ -9,6 +9,7 @@ from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_contex
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
+    TrackSamplingConfig,
     TrainAppConfig,
     TrainConfig,
 )
@@ -28,12 +29,16 @@ from .track_sampling import (
     DEFICIT_QUEUE_SETTINGS,
     DeficitBudgetTrackSamplingController,
     StepBalancedTrackSamplingController,
+    TrackSamplingAltBaseline,
     TrackSamplingMaterializedArtifact,
     TrackSamplingRuntimePersistence,
     TrackSamplingRuntimeState,
     XCupRotationManager,
+    alt_baseline_signature,
+    apply_alt_baselines_to_track_sampling,
     file_track_sampling_runtime_persistence,
     replace_runtime_generation,
+    strip_alt_baselines,
 )
 from .tuning import apply_stage_train_overrides, record_stage_train_overrides
 
@@ -249,6 +254,49 @@ def build_callbacks(
                 overrides=self._controller.stage_train_overrides,
             )
 
+    class AltBaselineProjectionState:
+        """Project manager-owned alt baselines onto the latest base reset config."""
+
+        def __init__(
+            self,
+            *,
+            env_config: EnvConfig,
+            load_alt_baselines: Callable[[], tuple[TrackSamplingAltBaseline, ...]],
+        ) -> None:
+            self._base_track_sampling = strip_alt_baselines(env_config.track_sampling)
+            self._load_alt_baselines = load_alt_baselines
+            self._last_baseline_signature: tuple[tuple[object, ...], ...] | None = None
+            self._last_base_signature: tuple[tuple[object, ...], ...] | None = None
+
+        def set_base_track_sampling(self, track_sampling: TrackSamplingConfig) -> None:
+            self._base_track_sampling = strip_alt_baselines(track_sampling)
+
+        def refreshed_track_sampling(self) -> TrackSamplingConfig | None:
+            baselines = self._load_alt_baselines()
+            baseline_signature = alt_baseline_signature(baselines)
+            base_signature = _track_sampling_config_signature(self._base_track_sampling)
+            if (
+                baseline_signature == self._last_baseline_signature
+                and base_signature == self._last_base_signature
+            ):
+                return None
+            self._last_baseline_signature = baseline_signature
+            self._last_base_signature = base_signature
+            return apply_alt_baselines_to_track_sampling(
+                self._base_track_sampling,
+                baselines,
+            )
+
+        def project_fresh(self, track_sampling: TrackSamplingConfig) -> TrackSamplingConfig:
+            self.set_base_track_sampling(track_sampling)
+            baselines = self._load_alt_baselines()
+            self._last_baseline_signature = alt_baseline_signature(baselines)
+            self._last_base_signature = _track_sampling_config_signature(self._base_track_sampling)
+            return apply_alt_baselines_to_track_sampling(
+                self._base_track_sampling,
+                baselines,
+            )
+
     class StepBalancedTrackSamplingCallback(BaseCallback):
         """Refresh track sampling weights from completed-episode frame counts."""
 
@@ -260,6 +308,7 @@ def build_callbacks(
             curriculum_config: CurriculumConfig,
             rotation_manager: XCupRotationManager | None,
             runtime_persistence: TrackSamplingRuntimePersistence,
+            alt_baseline_projection: AltBaselineProjectionState | None,
         ) -> None:
             super().__init__(verbose=0)
             self._controller = controller
@@ -267,6 +316,7 @@ def build_callbacks(
             self._curriculum_config = curriculum_config
             self._rotation_manager = rotation_manager
             self._runtime_persistence = runtime_persistence
+            self._alt_baseline_projection = alt_baseline_projection
             self._runtime_state_dirty = False
 
         def _on_training_start(self) -> None:
@@ -311,10 +361,7 @@ def build_callbacks(
                     generated_course_length=rotation_update.generated_course_length,
                 )
                 self._env_config = rotation_update.env_config
-                self.training_env.env_method(
-                    "set_track_sampling_config",
-                    self._env_config.track_sampling,
-                )
+                self._publish_track_sampling_config(self._env_config.track_sampling)
                 self._controller = _rebuild_track_sampling_controller(
                     env_config=self._env_config,
                     curriculum_config=self._curriculum_config,
@@ -361,6 +408,11 @@ def build_callbacks(
             if persist is not None:
                 persist(slots)
 
+        def _publish_track_sampling_config(self, config: TrackSamplingConfig) -> None:
+            if self._alt_baseline_projection is not None:
+                config = self._alt_baseline_projection.project_fresh(config)
+            self.training_env.env_method("set_track_sampling_config", config)
+
     class DeficitBudgetTrackSamplingCallback(BaseCallback):
         """Schedule reset queues from deterministic per-course step deficits."""
 
@@ -372,6 +424,7 @@ def build_callbacks(
             curriculum_config: CurriculumConfig,
             rotation_manager: XCupRotationManager | None,
             runtime_persistence: TrackSamplingRuntimePersistence,
+            alt_baseline_projection: AltBaselineProjectionState | None,
         ) -> None:
             super().__init__(verbose=0)
             self._controller = controller
@@ -379,6 +432,7 @@ def build_callbacks(
             self._curriculum_config = curriculum_config
             self._rotation_manager = rotation_manager
             self._runtime_persistence = runtime_persistence
+            self._alt_baseline_projection = alt_baseline_projection
             self._runtime_state_dirty = False
 
         def _on_training_start(self) -> None:
@@ -448,10 +502,7 @@ def build_callbacks(
                 generated_course_length=rotation_update.generated_course_length,
             )
             self._env_config = rotation_update.env_config
-            self.training_env.env_method(
-                "set_track_sampling_config",
-                self._env_config.track_sampling,
-            )
+            self._publish_track_sampling_config(self._env_config.track_sampling)
             self._controller = _rebuild_deficit_budget_track_sampling_controller(
                 env_config=self._env_config,
                 curriculum_config=self._curriculum_config,
@@ -513,6 +564,11 @@ def build_callbacks(
             if persist is not None:
                 persist(slots)
 
+        def _publish_track_sampling_config(self, config: TrackSamplingConfig) -> None:
+            if self._alt_baseline_projection is not None:
+                config = self._alt_baseline_projection.project_fresh(config)
+            self.training_env.env_method("set_track_sampling_config", config)
+
     class EngineTuningCallback(BaseCallback):
         """Update adaptive engine-setting stats from completed episodes."""
 
@@ -555,6 +611,32 @@ def build_callbacks(
                 self._controller.reset_sampler_snapshot(self._contexts),
             )
 
+    class AltBaselineSyncCallback(BaseCallback):
+        """Publish manager-owned alt baselines to env workers at rollout boundaries."""
+
+        def __init__(
+            self,
+            *,
+            projection: AltBaselineProjectionState,
+        ) -> None:
+            super().__init__(verbose=0)
+            self._projection = projection
+
+        def _on_training_start(self) -> None:
+            self._sync()
+
+        def _on_rollout_start(self) -> None:
+            self._sync()
+
+        def _on_step(self) -> bool:
+            return True
+
+        def _sync(self) -> None:
+            next_track_sampling = self._projection.refreshed_track_sampling()
+            if next_track_sampling is None:
+                return
+            self.training_env.env_method("set_track_sampling_config", next_track_sampling)
+
     checkpoint_policy = resolve_checkpoint_policy(train_config)
     if (
         engine_tuning_controller is None
@@ -589,6 +671,17 @@ def build_callbacks(
             runtime_persistence = file_track_sampling_runtime_persistence(
                 run_paths.track_sampling_state_path
             )
+        alt_baseline_projection: AltBaselineProjectionState | None = None
+        if runtime_persistence.load_alt_baselines is not None:
+            alt_baseline_projection = AltBaselineProjectionState(
+                env_config=env_config,
+                load_alt_baselines=runtime_persistence.load_alt_baselines,
+            )
+            callbacks.append(
+                AltBaselineSyncCallback(
+                    projection=alt_baseline_projection,
+                )
+            )
         deficit_controller = DeficitBudgetTrackSamplingController.from_configs(
             env_config=env_config,
             curriculum_config=curriculum_config,
@@ -606,6 +699,7 @@ def build_callbacks(
                         persist_manifest_on_commit=track_sampling_runtime_persistence is None,
                     ),
                     runtime_persistence=runtime_persistence,
+                    alt_baseline_projection=alt_baseline_projection,
                 )
             )
 
@@ -627,6 +721,7 @@ def build_callbacks(
                             persist_manifest_on_commit=track_sampling_runtime_persistence is None,
                         ),
                         runtime_persistence=runtime_persistence,
+                        alt_baseline_projection=alt_baseline_projection,
                     )
                 )
     if curriculum_config.enabled:
@@ -679,6 +774,26 @@ def _engine_tuning_contexts(env_config: EnvConfig) -> tuple[EngineTuningContext,
         context = engine_tuning_context_for_entry(entry)
         contexts.setdefault(context.key, context)
     return tuple(contexts[key] for key in sorted(contexts))
+
+
+def _track_sampling_config_signature(config: TrackSamplingConfig) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (
+            entry.id,
+            entry.baseline_state_path,
+            float(entry.weight),
+            entry.course_id,
+            entry.runtime_course_key,
+            entry.mode,
+            entry.gp_difficulty,
+            entry.vehicle,
+            entry.generated_course_kind,
+            entry.generated_course_slot,
+            entry.generated_course_generation,
+            entry.generated_course_hash,
+        )
+        for entry in config.entries
+    )
 
 
 def _x_cup_rotation_manager(

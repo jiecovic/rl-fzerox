@@ -37,6 +37,11 @@ def episode_track_id(episode: Mapping[str, object]) -> str | None:
     return None
 
 
+def uses_alt_baseline_sample(info: Mapping[str, object]) -> bool:
+    value = info.get("track_alt_baseline_id")
+    return isinstance(value, str) and bool(value.strip())
+
+
 def episode_frame_count(
     episode: Mapping[str, object],
     *,

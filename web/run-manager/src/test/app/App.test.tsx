@@ -258,6 +258,52 @@ describe("App", () => {
       "ppo_test_1 2",
       "run-001",
       "latest",
+      true,
+    );
+  });
+
+  it("asks whether to copy alt baselines when opening a fork draft", async () => {
+    const user = userEvent.setup();
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [
+        runFixture({
+          active_alt_baseline_count: 2,
+          id: "run-001",
+          name: "ppo_test_1",
+        }),
+      ],
+      saveGames: [],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+    await user.click(await screen.findByRole("button", { name: "Fork latest checkpoint" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Fork alt baselines" });
+    expect(within(dialog).getByText(/2 active alt baselines/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Do not copy" }));
+    expect(await screen.findByText(/alt baselines skipped/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Train" }));
+
+    expect(launchRunMock).toHaveBeenCalledWith(
+      "ppo_test_1 2",
+      managedRunConfigFixture,
+      null,
+      "run-001",
+      "latest",
+      false,
     );
   });
 
@@ -299,6 +345,7 @@ describe("App", () => {
       null,
       "run-001",
       "latest",
+      true,
     );
   });
 
@@ -387,6 +434,7 @@ describe("App", () => {
       "ppo_allcups_recurrent",
       null,
       null,
+      true,
     );
   });
 

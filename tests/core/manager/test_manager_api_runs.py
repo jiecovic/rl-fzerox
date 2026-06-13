@@ -16,6 +16,7 @@ from rl_fzerox.core.manager import (
     default_managed_run_config,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingAltBaseline,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
@@ -41,8 +42,9 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
             draft_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
+            copy_alt_baselines: bool,
         ):
-            del draft_id, source_artifact, source_run_id
+            del copy_alt_baselines, draft_id, source_artifact, source_run_id
             run = store.create_run(
                 name=name,
                 config=config,
@@ -150,8 +152,9 @@ async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Pat
             draft_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
+            copy_alt_baselines: bool,
         ):
-            del draft_id, source_artifact, source_run_id
+            del copy_alt_baselines, draft_id, source_artifact, source_run_id
             run = store.create_run(
                 name=name,
                 config=config,
@@ -185,7 +188,7 @@ async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Pat
 
 async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
-    seen_source: list[tuple[str | None, str | None, str | None]] = []
+    seen_source: list[tuple[str | None, str | None, str | None, bool]] = []
     source_run = store.create_run(
         run_id="run-parent",
         name="Parent Run",
@@ -202,8 +205,9 @@ async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
             draft_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
+            copy_alt_baselines: bool,
         ):
-            seen_source.append((draft_id, source_run_id, source_artifact))
+            seen_source.append((draft_id, source_run_id, source_artifact, copy_alt_baselines))
             run = store.create_run(
                 name=name,
                 config=config,
@@ -232,6 +236,7 @@ async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
             "config": config,
             "source_run_id": source_run.id,
             "source_artifact": "best",
+            "copy_alt_baselines": False,
         },
     )
 
@@ -240,7 +245,7 @@ async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
     assert payload["run"]["name"] == "Launch Fork"
     assert payload["run"]["source_run_id"] == source_run.id
     assert payload["run"]["source_artifact"] == "best"
-    assert seen_source == [(None, source_run.id, "best")]
+    assert seen_source == [(None, source_run.id, "best", False)]
 
 
 async def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> None:
@@ -255,8 +260,9 @@ async def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Pat
             draft_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
+            copy_alt_baselines: bool,
         ):
-            del source_artifact, source_run_id
+            del copy_alt_baselines, source_artifact, source_run_id
             run = store.create_run(
                 name=name,
                 config=config,
@@ -306,8 +312,9 @@ async def test_manager_api_forks_run(tmp_path: Path) -> None:
             draft_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
+            copy_alt_baselines: bool,
         ):
-            del config, draft_id, name, source_artifact, source_run_id
+            del copy_alt_baselines, config, draft_id, name, source_artifact, source_run_id
             raise AssertionError("launch should not be called")
 
         def fork(
@@ -317,10 +324,12 @@ async def test_manager_api_forks_run(tmp_path: Path) -> None:
             artifact: str,
             name: str | None,
             config: ManagedRunConfig | None,
+            copy_alt_baselines: bool,
         ):
             del config
             assert run_id == parent.id
             assert artifact == "best"
+            assert copy_alt_baselines is True
             child = store.create_run(
                 run_id="child-run",
                 name=name or "Parent Run best fork",
@@ -353,6 +362,65 @@ async def test_manager_api_forks_run(tmp_path: Path) -> None:
     assert payload["run"]["source_run_id"] == parent.id
     assert payload["run"]["source_artifact"] == "best"
     assert payload["run"]["source_num_timesteps"] == 816040
+
+
+async def test_manager_api_reports_only_active_alt_baseline_count(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run_dir = tmp_path / "runs" / "run-with-alts"
+    run = store.create_run(
+        run_id="run-with-alts",
+        name="Run With Alts",
+        config=default_managed_run_config(),
+        explicit_run_dir=run_dir,
+    )
+    store.update_run_status(
+        run_id=run.id,
+        status="paused",
+        started_at="2026-06-13T10:00:00+00:00",
+        stopped_at="2026-06-13T10:01:00+00:00",
+        message="paused",
+    )
+    state_path = run_dir / "baselines" / "alt" / "alt-a.state"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_bytes(b"state")
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-a",
+            run_id=run.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="active",
+            state_path=state_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:00:00+00:00",
+            updated_at="2026-06-13T10:00:00+00:00",
+        )
+    )
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-missing",
+            run_id=run.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="missing",
+            state_path=run_dir / "baselines" / "alt" / "missing.state",
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:01:00+00:00",
+            updated_at="2026-06-13T10:01:00+00:00",
+        )
+    )
+
+    client = _ApiClient(create_manager_api_app(store, run_launcher=_LauncherStub()))
+
+    response = await client.get("/api/runs")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["runs"][0]["active_alt_baseline_count"] == 1
 
 
 async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:

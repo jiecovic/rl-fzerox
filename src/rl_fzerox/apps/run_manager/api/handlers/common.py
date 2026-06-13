@@ -11,7 +11,13 @@ from rl_fzerox.core.manager import ManagedRun, ManagerStore
 
 def run_response(store: ManagerStore, run: ManagedRun) -> dict[str, dict[str, object]]:
     recent_events = store.list_recent_run_events((run.id,), limit_per_run=6)
-    return {"run": run_payload(run, recent_events=recent_events.get(run.id, ()))}
+    return {
+        "run": run_payload(
+            run,
+            recent_events=recent_events.get(run.id, ()),
+            active_alt_baseline_count=active_alt_baseline_count(store, run.id),
+        )
+    }
 
 
 def run_response_for_id(store: ManagerStore, run_id: str) -> dict[str, dict[str, object]]:
@@ -23,6 +29,10 @@ def require_run(store: ManagerStore, run_id: str) -> ManagedRun:
     if run is None:
         raise HTTPException(status_code=404, detail="run not found")
     return run
+
+
+def active_alt_baseline_count(store: ManagerStore, run_id: str) -> int:
+    return sum(1 for baseline in store.get_run_alt_baselines(run_id) if baseline.active)
 
 
 def validate_source_fields(

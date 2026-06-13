@@ -32,11 +32,14 @@ from rl_fzerox.core.manager.registry.runs.runtime import (
 )
 from rl_fzerox.core.manager.registry.runs.track_sampling import (
     clear_run_track_sampling_state,
+    delete_run_alt_baseline,
+    get_run_alt_baselines,
     get_run_generated_x_cup_slots,
     get_run_track_sampling_artifacts,
     get_run_track_sampling_state,
     replace_run_generated_x_cup_slots,
     replace_run_track_sampling_artifacts,
+    upsert_run_alt_baseline,
     upsert_run_track_sampling_state,
 )
 from rl_fzerox.core.manager.registry.runs.workers import (
@@ -53,8 +56,10 @@ __all__ = [
     "clear_run_track_sampling_state",
     "clear_run_worker",
     "create_run",
+    "delete_run_alt_baseline",
     "drain_pending_filesystem_operations",
     "get_run",
+    "get_run_alt_baselines",
     "get_run_generated_x_cup_slots",
     "get_run_track_sampling_artifacts",
     "get_run_track_sampling_state",
@@ -70,6 +75,7 @@ __all__ = [
     "request_run_command",
     "replace_run_generated_x_cup_slots",
     "replace_run_track_sampling_artifacts",
+    "upsert_run_alt_baseline",
     "update_run_fork_source",
     "update_run_name",
     "update_run_status",

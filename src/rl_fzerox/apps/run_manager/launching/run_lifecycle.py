@@ -17,6 +17,7 @@ from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig, ManagerStore, n
 from rl_fzerox.core.manager.artifacts.fork_source import (
     clone_fork_source,
     is_complete_fork_source,
+    link_or_copy_file,
     run_fork_source_dir,
     snapshot_fork_source,
 )
@@ -27,7 +28,8 @@ from rl_fzerox.core.manager.training import (
     build_managed_fork_train_app_config,
     build_managed_train_app_config,
 )
-from rl_fzerox.core.training.runs import resolve_model_artifact_path
+from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path
+from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingAltBaseline
 
 
 class WorkerSpawner(Protocol):
@@ -85,6 +87,7 @@ def fork_run(
     exclude_draft_id: str | None = None,
     source_snapshot_dir: Path | None = None,
     source_num_timesteps: int | None = None,
+    copy_alt_baselines: bool = True,
     spawn_worker: WorkerSpawner = spawn_manager_worker,
 ) -> ManagedRun:
     """Launch one child run warm-started from a parent run checkpoint."""
@@ -141,6 +144,12 @@ def fork_run(
         source_num_timesteps=source_num_timesteps,
         exclude_draft_id=exclude_draft_id,
     )
+    if copy_alt_baselines:
+        _copy_alt_baselines_to_fork(
+            store=store,
+            source_run=source_run,
+            child_run=child_run,
+        )
     persist_launch_manifest(run_dir=child_run.run_dir, train_config=train_config)
     spawn_worker(store=store, run_id=child_run.id, resume=False)
     launched = store.update_run_status(
@@ -156,6 +165,49 @@ def fork_run(
     if launched is None:
         raise RuntimeError(f"managed child run disappeared during launch: {child_run.id}")
     return launched
+
+
+def _copy_alt_baselines_to_fork(
+    *,
+    store: ManagerStore,
+    source_run: ManagedRun,
+    child_run: ManagedRun,
+) -> None:
+    baselines = tuple(
+        baseline for baseline in store.get_run_alt_baselines(source_run.id) if baseline.active
+    )
+    if not baselines:
+        return
+
+    copied_at = utc_now()
+    for baseline in baselines:
+        child_baseline_id = _forked_alt_baseline_id(
+            baseline_id=baseline.id,
+            child_run_id=child_run.id,
+        )
+        child_state_path = (
+            child_run.run_dir / RUN_LAYOUT.baselines_dirname / "alt" / f"{child_baseline_id}.state"
+        )
+        link_or_copy_file(baseline.state_path, child_state_path)
+        store.upsert_run_alt_baseline(
+            baseline=TrackSamplingAltBaseline(
+                id=child_baseline_id,
+                run_id=child_run.id,
+                course_key=baseline.course_key,
+                reset_variant_key=baseline.reset_variant_key,
+                source_entry_id=baseline.source_entry_id,
+                label=baseline.label,
+                state_path=child_state_path,
+                weight=baseline.weight,
+                enabled=baseline.enabled,
+                created_at=copied_at,
+                updated_at=copied_at,
+            )
+        )
+
+
+def _forked_alt_baseline_id(*, baseline_id: str, child_run_id: str) -> str:
+    return f"{baseline_id}-fork-{child_run_id[:8]}"
 
 
 def resume_run(
@@ -179,8 +231,7 @@ def resume_run(
     except FileNotFoundError:
         if run.source_snapshot_dir is None and run.source_run_id is None:
             raise ValueError(
-                "no resumable checkpoint exists for this run yet; "
-                "resume cannot continue it safely"
+                "no resumable checkpoint exists for this run yet; resume cannot continue it safely"
             ) from None
         run, restored = _ensure_fork_source_snapshot(store, run)
         reset_local_clock = True

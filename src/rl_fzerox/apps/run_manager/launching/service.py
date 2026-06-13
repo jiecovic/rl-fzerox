@@ -30,6 +30,7 @@ class ManagerRunLauncher:
         draft_id: str | None = None,
         source_run_id: str | None = None,
         source_artifact: Literal["latest", "best"] | None = None,
+        copy_alt_baselines: bool = True,
     ) -> ManagedRun:
         normalized_name = name.strip()
         if not normalized_name:
@@ -41,6 +42,7 @@ class ManagerRunLauncher:
                 draft_id=draft_id,
                 source_run_id=source_run_id,
                 source_artifact=source_artifact,
+                copy_alt_baselines=copy_alt_baselines,
             )
         return launch_run(
             self._store,
@@ -60,6 +62,7 @@ class ManagerRunLauncher:
         exclude_draft_id: str | None = None,
         source_snapshot_dir: Path | None = None,
         source_num_timesteps: int | None = None,
+        copy_alt_baselines: bool = True,
     ) -> ManagedRun:
         return fork_run(
             self._store,
@@ -70,6 +73,7 @@ class ManagerRunLauncher:
             exclude_draft_id=exclude_draft_id,
             source_snapshot_dir=source_snapshot_dir,
             source_num_timesteps=source_num_timesteps,
+            copy_alt_baselines=copy_alt_baselines,
             spawn_worker=self._spawn_worker_for_lifecycle,
         )
 
@@ -159,6 +163,7 @@ class ManagerRunLauncher:
         draft_id: str | None,
         source_run_id: str,
         source_artifact: Literal["latest", "best"],
+        copy_alt_baselines: bool,
     ) -> ManagedRun:
         if draft_id is None:
             return self.fork(
@@ -166,6 +171,7 @@ class ManagerRunLauncher:
                 artifact=source_artifact,
                 name=name,
                 config=config,
+                copy_alt_baselines=copy_alt_baselines,
             )
         draft = self._store.get_draft(draft_id)
         if draft is None:
@@ -184,4 +190,5 @@ class ManagerRunLauncher:
             exclude_draft_id=draft_id,
             source_snapshot_dir=draft.source_snapshot_dir,
             source_num_timesteps=draft.source_num_timesteps,
+            copy_alt_baselines=copy_alt_baselines,
         )

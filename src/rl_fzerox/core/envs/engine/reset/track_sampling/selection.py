@@ -95,9 +95,10 @@ class TrackResetSelector:
 
         if not config.enabled:
             return None
-        if not config.entries:
+        selectable_entries = _selectable_entries(config.entries)
+        if not selectable_entries:
             raise ValueError("track sampling is enabled but has no entries")
-        self._sync_sequential_cycle(config)
+        self._sync_sequential_cycle(config.model_copy(update={"entries": selectable_entries}))
         position = self._cursor % len(self._sequential_course_buckets)
         entry = _pick_track_entry(
             self._sequential_course_buckets[position],
@@ -142,9 +143,10 @@ class TrackResetSelector:
     ) -> SelectedTrack | None:
         if not config.enabled:
             return None
-        if not config.entries:
+        selectable_entries = _selectable_entries(config.entries)
+        if not selectable_entries:
             raise ValueError("track sampling is enabled but has no entries")
-        self._sync_balanced_cycle(config)
+        self._sync_balanced_cycle(config.model_copy(update={"entries": selectable_entries}))
         position = self._cursor % len(self._cycle)
         entry = self._cycle[position]
         self._cursor += 1
@@ -185,9 +187,12 @@ class TrackResetSelector:
     ) -> SelectedTrack | None:
         if not config.enabled:
             return None
-        if not config.entries:
+        selectable_entries = _selectable_entries(config.entries)
+        if not selectable_entries:
             raise ValueError("track sampling is enabled but has no entries")
-        course_buckets = tuple(entries for _, entries in _group_entries_by_course(config.entries))
+        course_buckets = tuple(
+            entries for _, entries in _group_entries_by_course(selectable_entries)
+        )
         position = self._env_index % len(course_buckets)
         entry = _pick_track_entry(course_buckets[position], seed=seed)
         return _selected_track_from_entry(
@@ -215,7 +220,9 @@ def select_reset_track_by_course_id(
     if not config.enabled:
         return None
     matching_entries = tuple(
-        entry for entry in config.entries if _entry_matches_course_request(entry, course_id)
+        entry
+        for entry in _selectable_entries(config.entries)
+        if _entry_matches_course_request(entry, course_id)
     )
     if matching_entries:
         return _selected_track_from_entry(
@@ -241,15 +248,16 @@ def select_reset_track(
 
     if not config.enabled:
         return None
-    if not config.entries:
+    entries = _selectable_entries(config.entries)
+    if not entries:
         raise ValueError("track sampling is enabled but has no entries")
 
-    total_weight = sum(float(entry.weight) for entry in config.entries)
+    total_weight = sum(float(entry.weight) for entry in entries)
     if total_weight <= 0.0:
         raise ValueError("track sampling requires at least one positive entry weight")
     sample = (Random(seed).random() if seed is not None else random()) * total_weight
     return _selected_track_from_entry(
-        _weighted_entry(config.entries, sample=sample),
+        _weighted_entry(entries, sample=sample),
         sampling_mode=sampling_mode,
         seed=seed,
         engine_tuning_config=config.engine_tuning,
@@ -270,10 +278,11 @@ def select_reset_track_by_course_weight(
 
     if not config.enabled:
         return None
-    if not config.entries:
+    entries = _selectable_entries(config.entries)
+    if not entries:
         raise ValueError("track sampling is enabled but has no entries")
 
-    course_buckets = _group_entries_by_course(config.entries)
+    course_buckets = _group_entries_by_course(entries)
     course_weights = tuple(_entries_weight(entries) for _, entries in course_buckets)
     total_course_weight = sum(course_weights)
     if total_course_weight <= 0.0:
@@ -321,6 +330,20 @@ def _pick_track_entry(
     if seed is not None:
         return Random(seed).choice(entries)
     return choice(entries)
+
+
+def _selectable_entries(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+) -> tuple[TrackSamplingEntryConfig, ...]:
+    return tuple(
+        entry
+        for entry in entries
+        if not (
+            entry.alt_baseline_id is not None
+            and entry.baseline_state_path is not None
+            and not entry.baseline_state_path.expanduser().is_file()
+        )
+    )
 
 
 def _selected_track_from_entry(
@@ -378,6 +401,13 @@ def _selected_track_from_entry(
         source_course_index=entry.source_course_index,
         source_gp_difficulty=entry.source_gp_difficulty,
         source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
+        baseline_group_id=entry.baseline_group_id,
+        baseline_group_weight=(
+            None if entry.baseline_group_weight is None else float(entry.baseline_group_weight)
+        ),
+        alt_baseline_id=entry.alt_baseline_id,
+        alt_baseline_label=entry.alt_baseline_label,
+        alt_baseline_source_entry_id=entry.alt_baseline_source_entry_id,
         generated_course_kind=entry.generated_course_kind,
         generated_course_seed=entry.generated_course_seed,
         generated_course_hash=entry.generated_course_hash,
@@ -563,6 +593,11 @@ def _entry_fingerprint(
         entry.source_course_index,
         entry.source_gp_difficulty,
         entry.source_engine_setting_raw_value,
+        entry.baseline_group_id,
+        entry.baseline_group_weight,
+        entry.alt_baseline_id,
+        entry.alt_baseline_label,
+        entry.alt_baseline_source_entry_id,
         entry.generated_course_kind,
         entry.generated_course_seed,
         entry.generated_course_hash,

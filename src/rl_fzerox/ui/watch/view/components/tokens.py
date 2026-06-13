@@ -1,15 +1,17 @@
 # src/rl_fzerox/ui/watch/view/components/tokens.py
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
-from rl_fzerox.ui.watch.view.screen.types import FlagViz, ViewerFonts
-
-if TYPE_CHECKING:
-    from pygame import Rect, Surface
-    from pygame.font import Font
+from rl_fzerox.ui.watch.view.screen.types import (
+    FlagViz,
+    PygameRect,
+    PygameSurface,
+    RenderFont,
+    ViewerFonts,
+)
 
 PygameModule = Any
 
@@ -17,7 +19,7 @@ PygameModule = Any
 def _draw_flag_viz(
     *,
     pygame: PygameModule,
-    screen: Surface,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     x: int,
     y: int,
@@ -50,13 +52,13 @@ def _draw_flag_viz(
     return y
 
 
-def _pill_width(font: Font, label: str) -> int:
+def _pill_width(font: RenderFont, label: str) -> int:
     return font.render(label, True, PALETTE.text_primary).get_width() + (
         2 * LAYOUT.flag_token_pad_x
     )
 
 
-def _pill_height(font: Font) -> int:
+def _pill_height(font: RenderFont) -> int:
     return font.render("Ag", True, PALETTE.text_primary).get_height() + (
         2 * LAYOUT.flag_token_pad_y
     )
@@ -65,8 +67,8 @@ def _pill_height(font: Font) -> int:
 def _draw_pill(
     *,
     pygame: PygameModule,
-    screen: Surface,
-    font: Font,
+    screen: PygameSurface,
+    font: RenderFont,
     x: int,
     y: int,
     label: str,
@@ -74,7 +76,7 @@ def _draw_pill(
     active_text_color: Color,
     active_fill_color: Color,
     active_border_color: Color,
-) -> Rect:
+) -> PygameRect:
     text_color = active_text_color if active else PALETTE.text_muted
     fill_color = active_fill_color if active else PALETTE.flag_inactive_background
     border_color = active_border_color if active else PALETTE.flag_inactive_border

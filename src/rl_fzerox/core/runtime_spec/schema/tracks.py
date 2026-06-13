@@ -94,6 +94,11 @@ class TrackSamplingEntryConfig(BaseModel):
     source_course_index: NonNegativeInt | None = None
     source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
+    baseline_group_id: str | None = None
+    baseline_group_weight: PositiveFloat | None = None
+    alt_baseline_id: str | None = None
+    alt_baseline_label: str | None = None
+    alt_baseline_source_entry_id: str | None = None
     generated_course_kind: XCupGeneratedCourseKind | None = None
     generated_course_seed: NonNegativeInt | None = None
     generated_course_hash: str | None = None

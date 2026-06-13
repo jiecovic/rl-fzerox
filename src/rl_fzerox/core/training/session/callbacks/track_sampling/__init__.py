@@ -3,6 +3,13 @@
 
 from __future__ import annotations
 
+from rl_fzerox.core.training.session.callbacks.track_sampling.alt_baselines import (
+    TrackSamplingAltBaseline,
+    alt_baseline_signature,
+    apply_alt_baselines_to_track_sampling,
+    stable_entry_alt_baseline_key,
+    strip_alt_baselines,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
     TrackSamplingMaterializedArtifact,
     materialized_track_sampling_artifacts,
@@ -49,6 +56,7 @@ __all__ = (
     "TrackSamplingRuntimeEntry",
     "GeneratedCourseMetadata",
     "TrackSamplingMaterializedArtifact",
+    "TrackSamplingAltBaseline",
     "TrackSamplingCourseEntry",
     "TrackSamplingRuntimePersistence",
     "TrackSamplingRuntimeState",
@@ -57,6 +65,8 @@ __all__ = (
     "adaptive_confidence_bonus",
     "adaptive_difficulty_bonus",
     "adaptive_target_bonus",
+    "alt_baseline_signature",
+    "apply_alt_baselines_to_track_sampling",
     "file_track_sampling_runtime_persistence",
     "load_track_sampling_runtime_state",
     "load_track_sampling_runtime_state_json",
@@ -64,5 +74,7 @@ __all__ = (
     "replace_runtime_generation",
     "resolve_track_sampling_courses_from_entries",
     "save_track_sampling_runtime_state",
+    "stable_entry_alt_baseline_key",
+    "strip_alt_baselines",
     "track_sampling_runtime_state_json",
 )

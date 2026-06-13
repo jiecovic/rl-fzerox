@@ -211,6 +211,7 @@ export function draftForkSource(draft: ManagedDraft): ForkSource | null {
   return {
     runId: draft.source_run_id,
     artifact: draft.source_artifact,
+    copyAltBaselines: true,
   };
 }
 

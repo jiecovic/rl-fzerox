@@ -217,6 +217,52 @@ def test_deficit_budget_controller_prefers_courses_with_positive_step_debt() -> 
     assert controller.next_course_key(fallback_assignment_steps=1.0) == "silence"
 
 
+def test_deficit_budget_controller_keeps_alt_baselines_out_of_runtime_stats() -> None:
+    controller = DeficitBudgetTrackSamplingController(
+        resolved_courses=resolved_track_sampling_courses(
+            {"mute": 1.0, "silence": 1.0},
+            course_keys={"mute": "mute", "silence": "silence"},
+            log_keys={"mute": "mute", "silence": "silence"},
+            labels={"mute": "Mute City", "silence": "Silence"},
+            log_enabled={"mute": True, "silence": True},
+        ),
+        action_repeat=2,
+        settings=DeficitBudgetSettings(
+            uniform_fraction=1.0,
+            min_weight=1.0,
+            max_weight=3.0,
+            ema_alpha=1.0,
+            weight_update_rollouts=20,
+        ),
+        seed=7,
+    )
+
+    controller.add_rollout_budget(total_steps=200)
+    controller.record_step_infos(({"track_id": "mute", "track_alt_baseline_id": "alt-a"},) * 40)
+    controller.record_episodes(
+        (
+            {
+                "track_id": "mute",
+                "track_alt_baseline_id": "alt-a",
+                "episode_step": 12,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+        )
+    )
+
+    runtime = controller.runtime_state()
+    assert {entry.course_key: entry.completed_frames for entry in runtime.entries} == {
+        "mute": 0,
+        "silence": 0,
+    }
+    assert {entry.course_key: entry.episode_count for entry in runtime.entries} == {
+        "mute": 0,
+        "silence": 0,
+    }
+    assert controller.next_course_key(fallback_assignment_steps=1.0) == "silence"
+
+
 def test_deficit_budget_controller_restores_historical_step_debt() -> None:
     restored = TrackSamplingRuntimeState(
         sampling_mode="deficit_budget",

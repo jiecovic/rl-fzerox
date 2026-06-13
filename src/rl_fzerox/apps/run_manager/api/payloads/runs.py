@@ -8,8 +8,13 @@ def run_payload(
     run: ManagedRun,
     *,
     recent_events: tuple[ManagedRunEvent, ...] = (),
+    active_alt_baseline_count: int = 0,
 ) -> dict[str, object]:
-    payload = run_summary_payload(run, recent_events=recent_events)
+    payload = run_summary_payload(
+        run,
+        recent_events=recent_events,
+        active_alt_baseline_count=active_alt_baseline_count,
+    )
     payload["config"] = run.config.model_dump(mode="json")
     return payload
 
@@ -19,6 +24,7 @@ def run_summary_payload(
     *,
     recent_events: tuple[ManagedRunEvent, ...] = (),
     action_repeat: int | None = None,
+    active_alt_baseline_count: int = 0,
 ) -> dict[str, object]:
     resolved_action_repeat = (
         action_repeat
@@ -44,6 +50,7 @@ def run_summary_payload(
         "source_run_id": run.source_run_id,
         "source_artifact": run.source_artifact,
         "source_num_timesteps": run.source_num_timesteps,
+        "active_alt_baseline_count": max(0, int(active_alt_baseline_count)),
         "pending_command": run.pending_command,
         "worker_heartbeat_at": run.worker_heartbeat_at,
         "runtime": None

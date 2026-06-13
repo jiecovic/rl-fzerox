@@ -159,6 +159,7 @@ class LaunchRunRequest(BaseModel):
     draft_id: str | None = None
     source_run_id: str | None = None
     source_artifact: Literal["latest", "best"] | None = None
+    copy_alt_baselines: bool = True
 
 
 class ForkRunRequest(BaseModel):
@@ -169,6 +170,7 @@ class ForkRunRequest(BaseModel):
     artifact: Literal["latest", "best"]
     name: str | None = None
     config: ManagedRunConfig | None = None
+    copy_alt_baselines: bool = True
 
 
 class RunLauncher(Protocol):
@@ -180,6 +182,7 @@ class RunLauncher(Protocol):
         draft_id: str | None,
         source_run_id: str | None,
         source_artifact: Literal["latest", "best"] | None,
+        copy_alt_baselines: bool,
     ) -> ManagedRun: ...
 
     def fork(
@@ -189,6 +192,7 @@ class RunLauncher(Protocol):
         artifact: Literal["latest", "best"],
         name: str | None,
         config: ManagedRunConfig | None,
+        copy_alt_baselines: bool,
     ) -> ManagedRun: ...
 
     def request_pause(self, *, run_id: str) -> ManagedRun: ...
