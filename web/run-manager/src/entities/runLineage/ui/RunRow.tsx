@@ -99,17 +99,23 @@ export const RunRow = memo(function RunRow({
                   <span className="run-branch-source-text">lineage root</span>
                 </span>
               ) : (
-                <span className="run-branch-source-row">
-                  <span aria-hidden="true" className="run-branch-source-icon">
-                    <BranchSourceIcon />
+                <span className="run-branch-source-stack">
+                  <span className="run-branch-source-row">
+                    <span aria-hidden="true" className="run-branch-source-icon">
+                      <BranchSourceIcon />
+                    </span>
+                    <span className="run-branch-source-kicker">forked from</span>
+                    <span className="run-branch-source-text">{entry.source.parentName}</span>
+                    {entry.source.artifactLabel !== null ? (
+                      <span className="run-branch-source-chip">{entry.source.artifactLabel}</span>
+                    ) : null}
                   </span>
-                  <span className="run-branch-source-kicker">forked from</span>
-                  <span className="run-branch-source-text">{entry.source.parentName}</span>
-                  {entry.source.artifactLabel !== null ? (
-                    <span className="run-branch-source-chip">{entry.source.artifactLabel}</span>
-                  ) : null}
                   {entry.source.stepLabel !== null ? (
-                    <span className="run-branch-source-chip">{entry.source.stepLabel}</span>
+                    <span className="run-branch-source-step-row">
+                      <span className="run-branch-source-chip run-branch-source-step-chip">
+                        {entry.source.stepLabel}
+                      </span>
+                    </span>
                   ) : null}
                 </span>
               )}
