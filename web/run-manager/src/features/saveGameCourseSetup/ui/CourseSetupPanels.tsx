@@ -72,33 +72,15 @@ export function GlobalPolicyPanel({
 
   return (
     <div className="grid content-start gap-3 border border-app-border bg-app-surface-muted p-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="grid gap-1">
-          <h4 className="m-0 text-sm font-bold tracking-[0.04em] text-app-muted uppercase">
-            Bulk policy
-          </h4>
-          <p className="m-0 text-sm text-app-muted">
-            Copy a trained policy artifact into course rows without changing engines.
-          </p>
-        </div>
-        <Button
-          className="min-w-[160px]"
-          disabled={!canApply}
-          type="button"
-          onClick={() => onApplySetups(allCourseSetups, draft)}
-        >
-          Apply to all courses
-        </Button>
-        <Button
-          className="min-w-[180px]"
-          disabled={!canImportEngines || importing}
-          type="button"
-          onClick={() => void importEngineTuning()}
-        >
-          {importing ? "Importing engines" : "Import learned engines"}
-        </Button>
+      <div className="grid gap-1">
+        <h4 className="m-0 text-sm font-bold tracking-[0.04em] text-app-muted uppercase">
+          Bulk policy
+        </h4>
+        <p className="m-0 text-sm text-app-muted">
+          Copy a trained policy artifact into course rows without changing engines.
+        </p>
       </div>
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_140px_auto] lg:items-end">
         <PolicySelectionSelect
           assignableRuns={assignableRuns}
           disabled={updating}
@@ -112,6 +94,24 @@ export function GlobalPolicyPanel({
           label="Artifact"
           onDraftChange={setDraft}
         />
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          <Button
+            className="min-w-[160px]"
+            disabled={!canApply}
+            type="button"
+            onClick={() => onApplySetups(allCourseSetups, draft)}
+          >
+            Apply to all courses
+          </Button>
+          <Button
+            className="min-w-[180px]"
+            disabled={!canImportEngines || importing}
+            type="button"
+            onClick={() => void importEngineTuning()}
+          >
+            {importing ? "Importing engines" : "Import learned engines"}
+          </Button>
+        </div>
       </div>
     </div>
   );
