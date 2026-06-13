@@ -57,15 +57,13 @@ def snapshot_fork_source(
 
     reset_fork_source_dir(resolved_destination_dir)
     resolved_destination_dir.mkdir(parents=True, exist_ok=True)
-    destination_model_path = resolved_destination_dir / _artifact_model_filename(artifact)
-    destination_policy_path = resolved_destination_dir / _artifact_policy_filename(artifact)
-    destination_model_path.parent.mkdir(parents=True, exist_ok=True)
-    destination_policy_path.parent.mkdir(parents=True, exist_ok=True)
     source_config_path = resolve_train_run_config_path(resolved_source_run_dir)
     destination_config_path = resolved_destination_dir / RUN_LAYOUT.config_filename
-    _link_or_copy_file(model_path, destination_model_path)
-    _link_or_copy_file(policy_path, destination_policy_path)
-    _link_or_copy_file(source_config_path, destination_config_path)
+    _copy_checkpoint_artifact_dir(
+        source_dirs=(model_path.parent, policy_path.parent),
+        destination_dir=resolved_destination_dir / RUN_LAYOUT.checkpoints_dirname / artifact,
+    )
+    link_or_copy_file(source_config_path, destination_config_path)
     return metadata.num_timesteps
 
 
@@ -92,9 +90,12 @@ def is_complete_fork_source(*, source_dir: Path, artifact: ForkArtifact) -> bool
         return False
     try:
         resolve_model_artifact_path(resolved_source_dir, artifact=artifact)
-        resolve_policy_artifact_path(resolved_source_dir, artifact=artifact)
+        policy_path = resolve_policy_artifact_path(resolved_source_dir, artifact=artifact)
         resolve_train_run_config_path(resolved_source_dir)
     except FileNotFoundError:
+        return False
+    metadata = load_policy_artifact_metadata(policy_path)
+    if metadata is None or metadata.num_timesteps is None:
         return False
     return True
 
@@ -107,19 +108,26 @@ def reset_fork_source_dir(path: Path) -> None:
         shutil.rmtree(resolved_path)
 
 
-def _artifact_model_filename(artifact: ForkArtifact) -> str:
-    if artifact == "latest":
-        return RUN_LAYOUT.model_artifacts.latest
-    return RUN_LAYOUT.model_artifacts.best
+def _copy_checkpoint_artifact_dir(
+    *,
+    source_dirs: tuple[Path, ...],
+    destination_dir: Path,
+) -> None:
+    copied_sources: set[Path] = set()
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    for source_dir in source_dirs:
+        resolved_source_dir = source_dir.expanduser().resolve()
+        if resolved_source_dir in copied_sources:
+            continue
+        copied_sources.add(resolved_source_dir)
+        for source_path in sorted(resolved_source_dir.iterdir()):
+            if source_path.is_file():
+                link_or_copy_file(source_path, destination_dir / source_path.name)
 
 
-def _artifact_policy_filename(artifact: ForkArtifact) -> str:
-    if artifact == "latest":
-        return RUN_LAYOUT.policy_artifacts.latest
-    return RUN_LAYOUT.policy_artifacts.best
+def link_or_copy_file(source: Path, destination: Path) -> Path:
+    """Hardlink one file when possible, falling back to a metadata-preserving copy."""
 
-
-def _link_or_copy_file(source: Path, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         destination.unlink()
@@ -131,4 +139,4 @@ def _link_or_copy_file(source: Path, destination: Path) -> Path:
 
 
 def _link_or_copy_file_str(source: str, destination: str) -> object:
-    return _link_or_copy_file(Path(source), Path(destination))
+    return link_or_copy_file(Path(source), Path(destination))

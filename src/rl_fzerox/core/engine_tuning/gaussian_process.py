@@ -9,6 +9,7 @@ from random import Random
 
 import gpytorch
 import torch
+from linear_operator import LinearOperator
 
 from rl_fzerox.core.engine_tuning.sampling import (
     StableGreedySelection,
@@ -317,8 +318,8 @@ class _EngineGPModel(gpytorch.models.ExactGP):
             parameter.requires_grad_(False)
 
     def forward(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
-        mean = self.mean_module(x)
-        covariance = self.covar_module(x)
+        mean = _call_gpytorch_mean(self.mean_module, x)
+        covariance = _call_gpytorch_covariance(self.covar_module, x)
         return gpytorch.distributions.MultivariateNormal(mean, covariance)
 
 
@@ -398,7 +399,7 @@ def _gp_posterior(
         dtype=torch.float64,
     )
     with torch.no_grad(), gpytorch.settings.fast_pred_var(), gpytorch.settings.debug(False):
-        posterior = model(test_x)
+        posterior = _predict_gp_posterior(model, test_x)
     means = tuple(float(value) for value in posterior.mean.detach().cpu().tolist())
     variances = posterior.variance.detach().clamp_min(1e-9).cpu().tolist()
     stds = tuple(sqrt(float(value)) for value in variances)
@@ -419,6 +420,43 @@ def _sample_posterior_scores(
         rng=rng,
     )
     return tuple(float(value) for value in sample_matrix[:, 0].tolist())
+
+
+def _call_gpytorch_mean(module: object, x: torch.Tensor) -> torch.Tensor:
+    """Call a GPyTorch mean module through a checked narrow boundary."""
+
+    if not callable(module):
+        raise TypeError("Expected GPyTorch mean module to be callable")
+    result = module(x)
+    if not isinstance(result, torch.Tensor):
+        raise TypeError("Expected GPyTorch mean module to return a tensor")
+    return result
+
+
+def _call_gpytorch_covariance(
+    module: object,
+    x: torch.Tensor,
+) -> torch.Tensor | LinearOperator:
+    """Call a GPyTorch covariance module through a checked narrow boundary."""
+
+    if not callable(module):
+        raise TypeError("Expected GPyTorch covariance module to be callable")
+    result = module(x)
+    if not isinstance(result, torch.Tensor | LinearOperator):
+        raise TypeError("Expected GPyTorch covariance module to return a covariance object")
+    return result
+
+
+def _predict_gp_posterior(
+    model: object,
+    x: torch.Tensor,
+) -> gpytorch.distributions.MultivariateNormal:
+    if not callable(model):
+        raise TypeError("Expected GPyTorch model to be callable")
+    posterior = model(x)
+    if not isinstance(posterior, gpytorch.distributions.MultivariateNormal):
+        raise TypeError("Expected GPyTorch model to return a posterior distribution")
+    return posterior
 
 
 def _projection_candidate_estimates(
