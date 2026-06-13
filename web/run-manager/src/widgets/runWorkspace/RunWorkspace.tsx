@@ -29,6 +29,7 @@ import {
 interface RunWorkspaceProps {
   allRuns: ManagedRun[];
   metadata: ConfigMetadata;
+  onClearAltBaselines: (runId: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
   onFork: (runId: string, artifact: "latest" | "best", copyAltBaselines: boolean) => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
@@ -50,6 +51,7 @@ interface RunWorkspaceProps {
 export function RunWorkspace({
   allRuns,
   metadata,
+  onClearAltBaselines,
   onCreateDraftFromRun,
   onFork,
   onOpenDirectory,
@@ -64,12 +66,22 @@ export function RunWorkspace({
   const [runName, setRunName] = useState(run.name);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [configSection, setConfigSection] = useState<ConfigSection>("training");
+  const [engineTuningExpansion, setEngineTuningExpansion] = useState({
+    expanded: false,
+    runId: run.id,
+  });
+  const engineTuningExpanded =
+    engineTuningExpansion.runId === run.id ? engineTuningExpansion.expanded : false;
+  const setEngineTuningExpanded = (expanded: boolean) => {
+    setEngineTuningExpansion({ expanded, runId: run.id });
+  };
   const previewEnabled = configSection === "observation" || configSection === "policy";
   const { policyPreview, previewError } = useRunPolicyPreview(run.config, previewEnabled);
   const { setTrackSamplingState, trackSamplingError, trackSamplingState } =
     useRunTrackSamplingState(run.id, run.status);
   const actions = useRunWorkspaceActions({
     clearTrackSamplingState: setTrackSamplingState,
+    onClearAltBaselines,
     onCreateDraftFromRun,
     onFork,
     onOpenDirectory,
@@ -85,7 +97,7 @@ export function RunWorkspace({
   const { engineTuningError, engineTuningState } = useRunEngineTuningState(
     run.id,
     run.status,
-    engineTuningEnabled,
+    engineTuningEnabled && engineTuningExpanded,
     actions.selectedWatchArtifact,
   );
   const hasFeedback =
@@ -149,8 +161,10 @@ export function RunWorkspace({
         metadata={metadata}
         onShowCharts={onShowCharts}
         run={run}
+        engineTuningExpanded={engineTuningExpanded}
         engineTuningState={engineTuningState}
         trackSamplingState={trackSamplingState}
+        onEngineTuningExpandedChange={setEngineTuningExpanded}
       />
 
       {hasFeedback ? (

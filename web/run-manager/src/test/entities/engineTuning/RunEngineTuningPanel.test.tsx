@@ -1,5 +1,5 @@
 // web/run-manager/src/test/entities/engineTuning/RunEngineTuningPanel.test.tsx
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RunEngineTuningPanel } from "@/entities/engineTuning/ui/RunEngineTuningPanel";
 import type {
   EngineTuningRuntimeCandidate,
@@ -20,8 +20,10 @@ describe("RunEngineTuningPanel", () => {
       <RunEngineTuningPanel
         artifact="latest"
         enabled={true}
+        expanded={true}
         metadata={configMetadataFixture}
         state={engineTuningStateFixture()}
+        onExpandedChange={() => undefined}
       />,
     );
 
@@ -30,6 +32,26 @@ describe("RunEngineTuningPanel", () => {
     expect(screen.getByText(hasExactText("y: probability 0-42.0%"))).toBeInTheDocument();
     expect(screen.getByText("deterministic greedy")).toBeInTheDocument();
     expect(screen.queryByText("big_blue_2 · blue_falcon")).not.toBeInTheDocument();
+  });
+
+  it("hides chart details while collapsed", () => {
+    const onExpandedChange = vi.fn();
+
+    render(
+      <RunEngineTuningPanel
+        artifact="latest"
+        enabled={true}
+        expanded={false}
+        metadata={configMetadataFixture}
+        state={engineTuningStateFixture()}
+        onExpandedChange={onExpandedChange}
+      />,
+    );
+
+    expect(screen.getByText("Engine tuning")).toBeInTheDocument();
+    expect(screen.queryByText("Big Blue 2 · Blue Falcon")).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "Expand" }).click();
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
   });
 });
 

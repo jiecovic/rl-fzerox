@@ -8,21 +8,28 @@ import type {
   EngineTuningRuntimeContext,
   EngineTuningRuntimeState,
 } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
+import { cn } from "@/shared/ui/cn";
+import { ChevronIcon } from "@/shared/ui/icons";
 
 const ENGINE_TUNING_TABLE_ROW_LIMIT = 12;
 
 interface RunEngineTuningPanelProps {
   artifact: "latest" | "best" | "final";
   enabled: boolean;
+  expanded: boolean;
   metadata: ConfigMetadata;
   state: EngineTuningRuntimeState | null;
+  onExpandedChange: (expanded: boolean) => void;
 }
 
 export function RunEngineTuningPanel({
   artifact,
   enabled,
+  expanded,
   metadata,
   state,
+  onExpandedChange,
 }: RunEngineTuningPanelProps) {
   const contextSelectId = useId();
   const labels = useMemo(() => engineTuningLabels(metadata), [metadata]);
@@ -50,6 +57,14 @@ export function RunEngineTuningPanel({
     contexts.find((context) => context.context_key === selectedContextKey) ?? contexts[0] ?? null;
   const backend = state?.model_backend ?? null;
   const observedCandidateCount = state?.candidates.length ?? 0;
+  const statusText =
+    state === null
+      ? expanded
+        ? "loading"
+        : "collapsed"
+      : state.model_backend === "mlp_ensemble"
+        ? `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts`
+        : `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedCandidateCount.toLocaleString()} aggregate candidates`;
 
   return (
     <section className="grid gap-3 border border-app-border bg-app-surface p-4">
@@ -60,15 +75,25 @@ export function RunEngineTuningPanel({
             Reset-time engine sampling probabilities from the {artifact} checkpoint.
           </p>
         </div>
-        <div className="text-right text-xs tabular-nums text-app-muted">
-          {state === null
-            ? "no samples"
-            : state.model_backend === "mlp_ensemble"
-              ? `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts`
-              : `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedCandidateCount.toLocaleString()} aggregate candidates`}
+        <div className="flex flex-wrap items-center justify-end gap-3 text-right text-xs tabular-nums text-app-muted">
+          <span>{statusText}</span>
+          <Button
+            aria-expanded={expanded}
+            className="h-8 gap-1.5 px-3 text-xs"
+            type="button"
+            onClick={() => onExpandedChange(!expanded)}
+          >
+            <span
+              className={cn("transition-transform", expanded ? "rotate-90" : undefined)}
+              aria-hidden="true"
+            >
+              <ChevronIcon />
+            </span>
+            {expanded ? "Collapse" : "Expand"}
+          </Button>
         </div>
       </div>
-      {selectedContext === null ? (
+      {!expanded ? null : selectedContext === null ? (
         <p className="m-0 text-sm text-app-muted">
           {enabled
             ? "No engine tuning checkpoint data for this artifact yet. Values appear after a checkpoint save includes successful finish samples."

@@ -49,7 +49,9 @@ interface RunRuntimeSummaryProps {
   metadata: ConfigMetadata;
   onShowCharts: (runId: string) => void;
   run: ManagedRunDetail;
+  engineTuningExpanded: boolean;
   engineTuningState: EngineTuningRuntimeState | null;
+  onEngineTuningExpandedChange: (expanded: boolean) => void;
   trackSamplingState: TrackSamplingRuntimeState | null;
 }
 
@@ -59,7 +61,9 @@ export function RunRuntimeSummary({
   metadata,
   onShowCharts,
   run,
+  engineTuningExpanded,
   engineTuningState,
+  onEngineTuningExpandedChange,
   trackSamplingState,
 }: RunRuntimeSummaryProps) {
   const nowMs = useRunClock(run.status);
@@ -347,8 +351,10 @@ export function RunRuntimeSummary({
 
       <RunTrackPoolPanel
         canReset={run.status === "stopped"}
+        isClearingAltBaselines={actions.isClearingAltBaselines}
         isResetting={actions.isResettingTrackPool}
         metadata={metadata}
+        onClearAltBaselines={() => void actions.clearAltBaselines()}
         onReset={() => void actions.resetTrackPoolState()}
         run={run}
         state={trackSamplingState}
@@ -356,8 +362,10 @@ export function RunRuntimeSummary({
       <RunEngineTuningPanel
         artifact={actions.selectedWatchArtifact}
         enabled={run.config.vehicle.engine_mode === "adaptive_tuner"}
+        expanded={engineTuningExpanded}
         metadata={metadata}
         state={engineTuningState}
+        onExpandedChange={onEngineTuningExpandedChange}
       />
     </div>
   );
