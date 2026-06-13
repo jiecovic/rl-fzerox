@@ -130,7 +130,6 @@ def step_policy_or_manual(
         current_policy_action = None
         cnn_activations = None
     else:
-        policy_runner.refresh_if_due(interval_seconds=10.0)
         session.sync_policy_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
         decision_action_mask = session.action_mask_snapshot()
         policy_action_mask = decision_action_mask if policy_runner.supports_action_masks else None

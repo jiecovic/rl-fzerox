@@ -54,6 +54,7 @@ class CareerPolicyResolver:
         self._device = device
         self._policy_cache: dict[tuple[str, str], _LoadedPolicy] = {}
         self._active_policy_key: tuple[str, str] | None = None
+        self._preload_policy_cache(self._course_setups)
 
     def update_context(
         self,
@@ -64,6 +65,7 @@ class CareerPolicyResolver:
         self._setup = setup
         self._course_setups = tuple(course_setups)
         self._active_policy_key = None
+        self._preload_policy_cache(self._course_setups)
 
     def resolve(self, info: dict[str, object]) -> CareerPolicyResolution | None:
         course_setup = self.resolve_course_setup(info)
@@ -71,17 +73,7 @@ class CareerPolicyResolver:
             return None
 
         key = (course_setup.policy_run_id, course_setup.policy_artifact)
-        loaded_policy = self._policy_cache.get(key)
-        if loaded_policy is None:
-            policy_run = self._required_policy_run(course_setup.policy_run_id)
-            runner = load_policy_runner(
-                policy_run.run_dir,
-                artifact=course_setup.policy_artifact,
-                device=self._device,
-                algorithm=effective_train_algorithm(policy_run.config),
-            )
-            loaded_policy = _LoadedPolicy(run=policy_run, runner=runner)
-            self._policy_cache[key] = loaded_policy
+        loaded_policy = self._load_policy(course_setup)
 
         activated_new_policy = key != self._active_policy_key
         if activated_new_policy:
@@ -122,6 +114,27 @@ class CareerPolicyResolver:
         if policy_run is None:
             raise RuntimeError(f"Career Mode policy run not found: {run_id}")
         return policy_run
+
+    def _preload_policy_cache(self, course_setups: Sequence[ManagedSaveCourseSetup]) -> None:
+        for course_setup in course_setups:
+            self._load_policy(course_setup)
+
+    def _load_policy(self, course_setup: ManagedSaveCourseSetup) -> _LoadedPolicy:
+        key = (course_setup.policy_run_id, course_setup.policy_artifact)
+        loaded_policy = self._policy_cache.get(key)
+        if loaded_policy is not None:
+            return loaded_policy
+
+        policy_run = self._required_policy_run(course_setup.policy_run_id)
+        runner = load_policy_runner(
+            policy_run.run_dir,
+            artifact=course_setup.policy_artifact,
+            device=self._device,
+            algorithm=effective_train_algorithm(policy_run.config),
+        )
+        loaded_policy = _LoadedPolicy(run=policy_run, runner=runner)
+        self._policy_cache[key] = loaded_policy
+        return loaded_policy
 
 
 def validated_camera_setting(value: str | None) -> CameraSettingName | None:
