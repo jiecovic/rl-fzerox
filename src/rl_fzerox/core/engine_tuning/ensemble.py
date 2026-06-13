@@ -391,13 +391,12 @@ class _EngineTuningMember(torch.nn.Module):
         engine_values: torch.Tensor,
     ) -> torch.Tensor:
         basis = _engine_basis(engine_values, self.shape)
-        features = torch.cat(
+        features = _concat_last_dim(
             (
                 self.course_embedding(course_indices),
                 self.vehicle_embedding(vehicle_indices),
                 basis,
-            ),
-            dim=-1,
+            )
         )
         return features
 
@@ -487,20 +486,17 @@ def _training_tensors(
     vehicle_index: dict[str, int],
 ) -> _TrainingTensors:
     return _TrainingTensors(
-        course_indices=torch.as_tensor(
-            [course_index[outcome.context.course_key] for outcome, _, _ in successful],
-            dtype=torch.long,
+        course_indices=torch.Tensor(
+            [course_index[outcome.context.course_key] for outcome, _, _ in successful]
+        ).long(),
+        vehicle_indices=torch.Tensor(
+            [vehicle_index[outcome.context.vehicle_id] for outcome, _, _ in successful]
+        ).long(),
+        engine_values=torch.Tensor(
+            [outcome.engine_setting_raw_value / 100.0 for outcome, _, _ in successful]
         ),
-        vehicle_indices=torch.as_tensor(
-            [vehicle_index[outcome.context.vehicle_id] for outcome, _, _ in successful],
-            dtype=torch.long,
-        ),
-        engine_values=torch.as_tensor(
-            [outcome.engine_setting_raw_value / 100.0 for outcome, _, _ in successful],
-            dtype=torch.float32,
-        ),
-        targets=torch.as_tensor([score for _, score, _ in successful], dtype=torch.float32),
-        weights=torch.ones((len(successful),), dtype=torch.float32),
+        targets=torch.Tensor([score for _, score, _ in successful]),
+        weights=torch.Tensor(len(successful)).fill_(1.0),
     )
 
 
@@ -538,24 +534,25 @@ def _train_member(
         (parameter for parameter in model.parameters() if parameter.requires_grad),
         lr=shape.learning_rate,
     )
-    generator = torch.Generator().manual_seed(int(seed))
-    for _ in range(shape.training_steps):
-        optimizer.zero_grad()
-        predictions = model(
-            train_data.course_indices,
-            train_data.vehicle_indices,
-            train_data.engine_values,
-        )
-        bootstrap = (
-            torch.rand(train_data.weights.shape, generator=generator)
-            < shape.bootstrap_keep_probability
-        ).to(dtype=torch.float32)
-        if float(bootstrap.sum()) <= 0.0:
-            bootstrap = torch.ones_like(train_data.weights)
-        weights = train_data.weights * bootstrap
-        loss = (weights * (predictions - train_data.targets).pow(2)).sum() / weights.sum()
-        loss.backward()
-        optimizer.step()
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(int(seed))
+        for _ in range(shape.training_steps):
+            optimizer.zero_grad()
+            predictions = model(
+                train_data.course_indices,
+                train_data.vehicle_indices,
+                train_data.engine_values,
+            )
+            bootstrap = (
+                train_data.weights.new_empty(train_data.weights.shape).uniform_()
+                < shape.bootstrap_keep_probability
+            ).float()
+            if float(bootstrap.sum()) <= 0.0:
+                bootstrap = train_data.weights.new_empty(train_data.weights.shape).fill_(1.0)
+            weights = train_data.weights * bootstrap
+            loss = (weights * (predictions - train_data.targets).pow(2)).sum() / weights.sum()
+            loss.backward()
+            optimizer.step()
     model.eval()
 
 
@@ -571,12 +568,9 @@ def _predict_member_scores(
         return {}
     course_index = state.course_keys.index(context.course_key)
     vehicle_index = state.vehicle_ids.index(context.vehicle_id)
-    course_indices = torch.full((len(candidates),), course_index, dtype=torch.long)
-    vehicle_indices = torch.full((len(candidates),), vehicle_index, dtype=torch.long)
-    engine_values = torch.as_tensor(
-        [candidate / 100.0 for candidate in candidates],
-        dtype=torch.float32,
-    )
+    course_indices = torch.Tensor(len(candidates)).fill_(course_index).long()
+    vehicle_indices = torch.Tensor(len(candidates)).fill_(vehicle_index).long()
+    engine_values = torch.Tensor([candidate / 100.0 for candidate in candidates])
     scores_by_engine = {candidate: [] for candidate in candidates}
     for member_index, member_state in enumerate(state.members):
         model = _EngineTuningMember(
@@ -606,7 +600,7 @@ def _predict_member_scores(
 def _member_state(model: _EngineTuningMember) -> EngineTuningEnsembleMemberState:
     tensors: list[EngineTuningTensorState] = []
     for name, tensor in model.state_dict().items():
-        cpu_tensor = tensor.detach().to(dtype=torch.float32).cpu()
+        cpu_tensor = tensor.detach().float().cpu()
         tensors.append(
             EngineTuningTensorState(
                 name=name,
@@ -817,17 +811,27 @@ def _std(values: tuple[float, ...]) -> float:
 
 
 def _engine_basis(engine_values: torch.Tensor, shape: EngineTuningEnsembleShape) -> torch.Tensor:
-    centers = torch.linspace(
-        0.0,
-        1.0,
-        max(2, int(shape.engine_basis_count)),
-        dtype=engine_values.dtype,
-        device=engine_values.device,
+    center_count = max(2, int(shape.engine_basis_count))
+    centers = engine_values.new_tensor(
+        [index / (center_count - 1) for index in range(center_count)]
     )
     width = max(0.001, float(shape.engine_basis_width_raw) / 100.0)
     distances = (engine_values.unsqueeze(-1) - centers) / width
-    basis = torch.exp(-0.5 * distances.pow(2))
+    basis = (-0.5 * distances.pow(2)).exp()
     return basis / basis.sum(dim=-1, keepdim=True).clamp_min(1.0e-6)
+
+
+def _concat_last_dim(tensors: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    if not tensors:
+        raise ValueError("expected at least one tensor to concatenate")
+    total_width = sum(int(tensor.shape[-1]) for tensor in tensors)
+    output = tensors[0].new_empty(*tensors[0].shape[:-1], total_width)
+    offset = 0
+    for tensor in tensors:
+        width = int(tensor.shape[-1])
+        output[..., offset : offset + width] = tensor
+        offset += width
+    return output
 
 
 def _member_seed(member_index: int) -> int:

@@ -230,14 +230,14 @@ def _training_memory_summary(
     observation_space: spaces.Space[object],
     batch_size: int,
 ) -> _TrainingMemorySummary:
-    device = _torch_device(_model_device(model))
+    device = _model_device(model)
     parameter_summary = _model_parameter_summary(model)
     minibatch_observation_bytes = _minibatch_observation_bytes(
         observation_space=observation_space,
         batch_size=batch_size,
     )
     cuda_estimate = None
-    if device.type == "cuda":
+    if _device_type(device) == "cuda":
         estimated_total = (
             parameter_summary.total_bytes
             + parameter_summary.trainable_bytes
@@ -260,12 +260,13 @@ def _training_memory_summary(
     )
 
 
-def _cuda_now_summary(device: th.device) -> str | None:
-    if device.type != "cuda":
+def _cuda_now_summary(device: object) -> str | None:
+    device_text = str(device)
+    if _device_type(device) != "cuda":
         return None
-    allocated = th.cuda.memory_allocated(device)
-    reserved = th.cuda.memory_reserved(device)
-    free, total = th.cuda.mem_get_info(device)
+    allocated = th.cuda.memory_allocated(device_text)
+    reserved = th.cuda.memory_reserved(device_text)
+    free, total = th.cuda.mem_get_info(device_text)
     return " ".join(
         [
             f"alloc={_format_bytes(allocated)}",
@@ -358,10 +359,11 @@ def _minibatch_box_bytes(space: spaces.Box, *, batch_size: int) -> int:
     return value_count * tensor_element_size
 
 
-def _torch_device(device: object) -> th.device:
-    if isinstance(device, th.device):
-        return device
-    return th.device(str(device))
+def _device_type(device: object) -> str:
+    raw_type = getattr(device, "type", None)
+    if isinstance(raw_type, str):
+        return raw_type
+    return str(device).split(":", 1)[0]
 
 
 def _format_bytes(byte_count: int) -> str:

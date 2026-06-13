@@ -109,7 +109,7 @@ class _ActorRegularizationMixin:
 
             aux_targets = _optional_auxiliary_targets(obs)
             if aux_targets is not None:
-                pitch_sample = self._pitch_action_sample(actions, dtype=pitch_mean.dtype)
+                pitch_sample = self._pitch_action_sample(actions, reference=pitch_mean)
                 metrics.update(
                     _pitch_sample_metrics(
                         pitch_mean=pitch_mean,
@@ -212,18 +212,18 @@ class _ActorRegularizationMixin:
         self,
         actions: torch.Tensor,
         *,
-        dtype: torch.dtype,
+        reference: torch.Tensor,
     ) -> torch.Tensor:
         continuous_pitch_index = self._continuous_pitch_index
         if continuous_pitch_index is not None:
-            return actions[:, continuous_pitch_index].to(dtype=dtype)
+            return actions[:, continuous_pitch_index].to(dtype=reference.dtype)
 
         discrete_pitch_index = self._discrete_pitch_index
         if discrete_pitch_index is None:
             raise RuntimeError("pitch action group was not initialized")
         action_index = self._continuous_action_group_count + discrete_pitch_index
         pitch_bucket_indices = actions[:, action_index].long()
-        bucket_values = actions.new_tensor(self._pitch_bucket_values, dtype=dtype)
+        bucket_values = actions.new_tensor(self._pitch_bucket_values, dtype=reference.dtype)
         return bucket_values[pitch_bucket_indices]
 
     def _pitch_std_cap_loss(
@@ -423,7 +423,7 @@ def _discrete_pitch_distribution_stats(
     bucket_tensor = probs.new_tensor(bucket_values).unsqueeze(0)
     mean = (probs * bucket_tensor).sum(dim=1)
     variance = (probs * (bucket_tensor - mean.unsqueeze(1)).square()).sum(dim=1)
-    std = torch.sqrt(torch.clamp(variance, min=0.0))
+    std = variance.clamp(min=0.0).sqrt()
 
     entropy_fn = getattr(branch_distribution, "entropy", None)
     if not callable(entropy_fn):
@@ -519,7 +519,7 @@ def _signed_balance_loss(
     bias, has_active_samples = _masked_mean(values, sample_mask)
     if not has_active_samples:
         return None
-    loss_value = torch.relu(bias.abs() - values.new_tensor(deadzone)).square()
+    loss_value = (bias.abs() - values.new_tensor(deadzone)).relu().square()
     return _SignedBalanceLoss(
         bias=bias,
         loss_value=loss_value,
@@ -543,7 +543,7 @@ def _pitch_sample_metrics(
     sample_mask: torch.Tensor | None,
 ) -> dict[str, float]:
     airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
-    airborne = (aux_targets[:, airborne_index] >= 0.5).to(dtype=torch.bool)
+    airborne = (aux_targets[:, airborne_index] >= 0.5).bool()
     grounded = ~airborne
     near_saturation = (pitch_sample.abs() > 0.95).to(dtype=pitch_mean.dtype)
     metrics: dict[str, float] = {
@@ -576,7 +576,7 @@ def _std_cap_loss(
     cap: float,
     sample_mask: torch.Tensor | None,
 ) -> torch.Tensor | None:
-    per_sample = torch.relu(values - values.new_tensor(cap)).square()
+    per_sample = (values - values.new_tensor(cap)).relu().square()
     loss_value, has_active_samples = _masked_mean(per_sample, sample_mask)
     if not has_active_samples:
         return None
@@ -588,8 +588,8 @@ def _combined_mask(
     sample_mask: torch.Tensor | None,
 ) -> torch.Tensor:
     if sample_mask is None:
-        return scope_mask.to(dtype=torch.bool)
-    return scope_mask.to(dtype=torch.bool) & sample_mask.to(dtype=torch.bool)
+        return scope_mask.bool()
+    return scope_mask.bool() & sample_mask.bool()
 
 
 def _masked_mean(

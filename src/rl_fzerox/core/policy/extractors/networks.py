@@ -57,7 +57,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         cnn = nn.Sequential(*cnn_layers, nn.Flatten())
 
         with torch.no_grad():
-            sample = torch.zeros(1, self._channels, self._height, self._width)
+            sample = torch.Tensor(1, self._channels, self._height, self._width).zero_()
             n_flatten = int(cnn(sample).shape[1])
 
         resolved_features_dim = n_flatten if features_dim == "auto" else int(features_dim)
@@ -262,16 +262,15 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         if image is None or state is None:
             raise ValueError(f"{type(self).__name__} expects observation keys 'image' and 'state'")
 
-        state_flat = torch.flatten(state.float(), start_dim=1)
+        state_flat = state.float().flatten(start_dim=1)
         if state_flat.shape[1] != self._state_dim:
             raise ValueError(
                 f"Unexpected state vector width for {type(self).__name__}: "
                 f"got {state_flat.shape[1]}, expected {self._state_dim}"
             )
 
-        combined_features = torch.cat(
-            [self._image_extractor(image), self._state_mlp(state_flat)],
-            dim=1,
+        combined_features = _concat_features(
+            self._image_extractor(image), self._state_mlp(state_flat)
         )
         return self._layer_norm_activation(self._layer_norm(self._fusion_mlp(combined_features)))
 
@@ -284,6 +283,13 @@ def _layer_norm_activation_layer(
     if not layer_norm or activation is None:
         return nn.Identity()
     return resolve_policy_activation_fn(activation)()
+
+
+def _concat_features(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
+    output = left.new_empty(left.shape[0], left.shape[1] + right.shape[1])
+    output[:, : left.shape[1]] = left
+    output[:, left.shape[1] :] = right
+    return output
 
 
 def _state_branch_mlp(

@@ -12,13 +12,21 @@ from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCn
 from rl_fzerox.core.policy.extractors import PreActivationResidualConvBlock
 
 
+def _zeros(*shape: int) -> torch.Tensor:
+    return torch.Tensor(*shape).zero_()
+
+
+def _ones(*shape: int) -> torch.Tensor:
+    return torch.Tensor(*shape).fill_(1.0)
+
+
 def test_observation_extractor_accepts_channels_last_observations() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(84, 116, 12), dtype=np.uint8),
         features_dim=512,
     )
 
-    observations = torch.zeros((2, 84, 116, 12), dtype=torch.float32)
+    observations = _zeros(2, 84, 116, 12)
     features = extractor(observations)
 
     assert tuple(features.shape) == (2, 512)
@@ -30,7 +38,7 @@ def test_observation_extractor_accepts_channels_first_observations() -> None:
         features_dim=512,
     )
 
-    observations = torch.zeros((2, 12, 84, 116), dtype=torch.float32)
+    observations = _zeros(2, 12, 84, 116)
     features = extractor(observations)
 
     assert tuple(features.shape) == (2, 512)
@@ -42,7 +50,7 @@ def test_observation_extractor_auto_features_dim_uses_flatten_without_projection
         features_dim="auto",
     )
 
-    observations = torch.zeros((2, 84, 116, 12), dtype=torch.float32)
+    observations = _zeros(2, 84, 116, 12)
     features = extractor(observations)
 
     assert extractor.features_dim == extractor._flatten_dim
@@ -57,7 +65,7 @@ def test_observation_extractor_accepts_larger_aspect_correct_preset() -> None:
         features_dim=512,
     )
 
-    observations = torch.zeros((2, 92, 124, 12), dtype=torch.float32)
+    observations = _zeros(2, 92, 124, 12)
     features = extractor(observations)
 
     assert tuple(features.shape) == (2, 512)
@@ -80,7 +88,7 @@ def test_observation_extractor_auto_features_dim_uses_medium_flatten() -> None:
         features_dim="auto",
     )
 
-    observations = torch.zeros((2, 92, 124, 12), dtype=torch.float32)
+    observations = _zeros(2, 92, 124, 12)
     features = extractor(observations)
 
     assert extractor.features_dim == extractor._flatten_dim
@@ -95,7 +103,7 @@ def test_observation_extractor_accepts_large_preset() -> None:
         features_dim=512,
     )
 
-    observations = torch.zeros((2, 116, 164, 12), dtype=torch.float32)
+    observations = _zeros(2, 116, 164, 12)
     features = extractor(observations)
 
     assert tuple(features.shape) == (2, 512)
@@ -107,7 +115,7 @@ def test_observation_extractor_auto_features_dim_uses_large_nature_flatten() -> 
         features_dim="auto",
     )
 
-    observations = torch.zeros((2, 116, 164, 12), dtype=torch.float32)
+    observations = _zeros(2, 116, 164, 12)
     features = extractor(observations)
 
     assert extractor.features_dim == extractor._flatten_dim
@@ -122,7 +130,7 @@ def test_observation_extractor_auto_features_dim_uses_wide_nature_flatten() -> N
         features_dim="auto",
     )
 
-    observations = torch.zeros((2, 98, 130, 9), dtype=torch.float32)
+    observations = _zeros(2, 98, 130, 9)
     features = extractor(observations)
 
     assert extractor.features_dim == extractor._flatten_dim
@@ -138,7 +146,7 @@ def test_observation_extractor_nature_profile_supports_wide_68x108_geometry() ->
         conv_profile="nature",
     )
 
-    observations = torch.zeros((2, 68, 108, 9), dtype=torch.float32)
+    observations = _zeros(2, 68, 108, 9)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 3_200
@@ -152,7 +160,7 @@ def test_observation_extractor_nature_profile_supports_square_dqn_geometry() -> 
         conv_profile="nature",
     )
 
-    observations = torch.zeros((2, 84, 84, 9), dtype=torch.float32)
+    observations = _zeros(2, 84, 84, 9)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 3_136
@@ -166,7 +174,7 @@ def test_observation_extractor_impala_small_profile_uses_shallow_paper_stack() -
         conv_profile="impala_small",
     )
 
-    observations = torch.zeros((2, 72, 96, 6), dtype=torch.float32)
+    observations = _zeros(2, 72, 96, 6)
     features = extractor(observations)
     activations = extractor.convolution_activations(observations[:1])
 
@@ -185,7 +193,7 @@ def test_observation_extractor_impala_large_profile_uses_residual_conv_sequences
         conv_profile="impala_large",
     )
 
-    observations = torch.zeros((2, 72, 96, 6), dtype=torch.float32)
+    observations = _zeros(2, 72, 96, 6)
     features = extractor(observations)
     activations = extractor.convolution_activations(observations[:1])
 
@@ -221,7 +229,7 @@ def test_observation_extractor_nature_profile_supports_compact_aspect_geometry()
         conv_profile="nature",
     )
 
-    observations = torch.zeros((2, 76, 100, 9), dtype=torch.float32)
+    observations = _zeros(2, 76, 100, 9)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 3_456
@@ -240,7 +248,7 @@ def test_observation_extractor_custom_profile_uses_configured_layers() -> None:
         ),
     )
 
-    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    observations = _zeros(2, 60, 76, 6)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 2_592
@@ -263,7 +271,7 @@ def test_observation_extractor_custom_profile_supports_padding() -> None:
         ),
     )
 
-    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    observations = _zeros(2, 60, 76, 6)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 6_840
@@ -291,7 +299,7 @@ def test_observation_extractor_custom_profile_supports_residual_blocks() -> None
         ),
     )
 
-    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    observations = _zeros(2, 60, 76, 6)
     features = extractor(observations)
     activations = extractor.convolution_activations(observations[:1])
 
@@ -328,7 +336,7 @@ def test_observation_extractor_custom_profile_supports_pooling_layers(
         ),
     )
 
-    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    observations = _zeros(2, 60, 76, 6)
     features = extractor(observations)
     activations = extractor.convolution_activations(observations[:1])
 
@@ -381,9 +389,7 @@ def test_observation_extractor_reports_convolution_activations() -> None:
         conv_profile="nature",
     )
 
-    activations = extractor.convolution_activations(
-        torch.zeros((1, 60, 76, 5), dtype=torch.float32)
-    )
+    activations = extractor.convolution_activations(_zeros(1, 60, 76, 5))
 
     assert [(name, tuple(values.shape)) for name, values in activations] == [
         ("conv1", (1, 32, 14, 18)),
@@ -398,7 +404,7 @@ def test_observation_extractor_nature_profile_supports_66x82_geometry() -> None:
         features_dim="auto",
     )
 
-    observations = torch.zeros((2, 66, 82, 6), dtype=torch.float32)
+    observations = _zeros(2, 66, 82, 6)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 1_536
@@ -411,7 +417,7 @@ def test_observation_extractor_nature_profile_supports_clean_compact_aspect_geom
         features_dim="auto",
     )
 
-    observations = torch.zeros((2, 60, 76, 5), dtype=torch.float32)
+    observations = _zeros(2, 60, 76, 5)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 1_536
@@ -424,7 +430,7 @@ def test_observation_extractor_nature_profile_supports_clean_square_geometry() -
         features_dim="auto",
     )
 
-    observations = torch.zeros((2, 68, 68, 5), dtype=torch.float32)
+    observations = _zeros(2, 68, 68, 5)
     features = extractor(observations)
 
     assert extractor._flatten_dim == 1_600
@@ -445,8 +451,8 @@ def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
 
     features = extractor(
         {
-            "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
-            "state": torch.zeros((2, 11), dtype=torch.float32),
+            "image": _zeros(2, 116, 164, 12),
+            "state": _zeros(2, 11),
         }
     )
 
@@ -471,8 +477,8 @@ def test_image_state_extractor_can_fuse_concatenated_features() -> None:
 
     features = extractor(
         {
-            "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
-            "state": torch.zeros((2, 11), dtype=torch.float32),
+            "image": _zeros(2, 116, 164, 12),
+            "state": _zeros(2, 11),
         }
     )
 
@@ -500,8 +506,8 @@ def test_image_state_extractor_can_layer_norm_fused_features() -> None:
 
     features = extractor(
         {
-            "image": torch.ones((2, 66, 82, 6), dtype=torch.float32),
-            "state": torch.ones((2, 11), dtype=torch.float32),
+            "image": _ones(2, 66, 82, 6),
+            "state": _ones(2, 11),
         }
     )
 
@@ -525,8 +531,8 @@ def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_b
 
     features = extractor(
         {
-            "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
-            "state": torch.zeros((2, 11), dtype=torch.float32),
+            "image": _zeros(2, 116, 164, 12),
+            "state": _zeros(2, 11),
         }
     )
 
@@ -548,8 +554,8 @@ def test_image_state_extractor_auto_features_dim_supports_68x108_geometry() -> N
 
     features = extractor(
         {
-            "image": torch.zeros((2, 68, 108, 9), dtype=torch.float32),
-            "state": torch.zeros((2, 14), dtype=torch.float32),
+            "image": _zeros(2, 68, 108, 9),
+            "state": _zeros(2, 14),
         }
     )
 

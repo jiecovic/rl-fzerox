@@ -19,7 +19,7 @@ def _require_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor:
     if not isinstance(aux_targets, torch.Tensor):
         raise TypeError(f"Auxiliary-state policies require tensor observation key {field_name!r}")
     aux_target_tensor: torch.Tensor = aux_targets
-    return torch.flatten(aux_target_tensor.float(), start_dim=1)
+    return aux_target_tensor.float().flatten(start_dim=1)
 
 
 def _optional_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor | None:
@@ -30,4 +30,4 @@ def _optional_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor | None:
     if not isinstance(aux_targets, torch.Tensor):
         return None
     aux_target_tensor: torch.Tensor = aux_targets
-    return torch.flatten(aux_target_tensor.float(), start_dim=1)
+    return aux_target_tensor.float().flatten(start_dim=1)

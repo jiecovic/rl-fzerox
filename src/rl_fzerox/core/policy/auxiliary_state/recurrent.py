@@ -31,12 +31,8 @@ def _recurrent_tensor_state(
 
     return (
         (
-            torch.tensor(state[0], dtype=torch.float32, device=policy.device),
-            torch.tensor(state[1], dtype=torch.float32, device=policy.device),
+            torch.Tensor(state[0]).to(device=policy.device),
+            torch.Tensor(state[1]).to(device=policy.device),
         ),
-        torch.tensor(
-            episode_start,
-            dtype=torch.float32,
-            device=policy.device,
-        ),
+        torch.Tensor(episode_start).to(device=policy.device),
     )

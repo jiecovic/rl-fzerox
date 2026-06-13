@@ -34,6 +34,18 @@ from rl_fzerox.core.training.session.auxiliary_state import (
 from tests.support.native_objects import make_telemetry
 
 
+def _tensor(values: object) -> torch.Tensor:
+    return torch.Tensor(values)
+
+
+def _bool_tensor(values: object) -> torch.Tensor:
+    return torch.Tensor(values).bool()
+
+
+def _zeros(*shape: int) -> torch.Tensor:
+    return torch.Tensor(*shape).zero_()
+
+
 class _PitchStdCapHarness(_AuxiliaryStatePolicyMixin):
     def __init__(self) -> None:
         self._pitch_std_cap_loss_weight = 1.0
@@ -63,9 +75,9 @@ def _auxiliary_target_observation(
     *,
     airborne_flags: tuple[float, ...],
 ) -> dict[str, torch.Tensor]:
-    targets = torch.zeros((len(airborne_flags), auxiliary_state_target_spec().count))
+    targets = _zeros(len(airborne_flags), auxiliary_state_target_spec().count)
     airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
-    targets[:, airborne_index] = torch.tensor(airborne_flags)
+    targets[:, airborne_index] = _tensor(airborne_flags)
     return {auxiliary_state_targets_field(): targets}
 
 
@@ -95,7 +107,7 @@ def test_auxiliary_state_target_vector_matches_expected_slots() -> None:
 
 
 def test_pitch_std_cap_loss_caps_existing_pitch_std_per_sample() -> None:
-    pitch_std = torch.tensor([0.6, 0.2])
+    pitch_std = _tensor([0.6, 0.2])
 
     loss = _std_cap_loss(pitch_std, cap=0.5, sample_mask=None)
 
@@ -104,8 +116,8 @@ def test_pitch_std_cap_loss_caps_existing_pitch_std_per_sample() -> None:
 
 
 def test_pitch_std_cap_loss_ignores_inactive_samples() -> None:
-    values = torch.tensor([0.6, 0.2, 100.0])
-    mask = torch.tensor([True, True, False])
+    values = _tensor([0.6, 0.2, 100.0])
+    mask = _bool_tensor([True, True, False])
 
     loss = _std_cap_loss(values, cap=0.5, sample_mask=mask)
 
@@ -115,9 +127,9 @@ def test_pitch_std_cap_loss_ignores_inactive_samples() -> None:
 
 def test_discrete_pitch_std_cap_loss_skips_airborne_scope() -> None:
     stats = _AxisDistributionStats(
-        mean=torch.zeros(2),
-        std=torch.tensor([0.8, 0.8]),
-        entropy=torch.zeros(2),
+        mean=_zeros(2),
+        std=_tensor([0.8, 0.8]),
+        entropy=_zeros(2),
         source="discrete",
     )
 
@@ -134,11 +146,11 @@ def test_discrete_pitch_std_cap_loss_skips_airborne_scope() -> None:
 
 def test_continuous_pitch_std_cap_loss_keeps_airborne_scope() -> None:
     stats = _AxisDistributionStats(
-        mean=torch.zeros(2),
-        std=torch.tensor([0.8, 0.8]),
-        entropy=torch.zeros(2),
+        mean=_zeros(2),
+        std=_tensor([0.8, 0.8]),
+        entropy=_zeros(2),
         source="continuous",
-        log_std=torch.zeros(2),
+        log_std=_zeros(2),
     )
 
     loss = _PitchStdCapHarness().pitch_std_cap_loss(
@@ -153,7 +165,7 @@ def test_continuous_pitch_std_cap_loss_keeps_airborne_scope() -> None:
 
 
 def test_categorical_lean_signed_balance_treats_both_as_neutral() -> None:
-    distribution = _hybrid_discrete_distribution(torch.tensor([[0.0, 0.7, 0.2, 0.1]]))
+    distribution = _hybrid_discrete_distribution(_tensor([[0.0, 0.7, 0.2, 0.1]]))
 
     expected = _categorical_lean_expected_signed_values(distribution, branch_index=0)
 
@@ -162,8 +174,8 @@ def test_categorical_lean_signed_balance_treats_both_as_neutral() -> None:
 
 def test_split_lean_signed_balance_uses_right_minus_left_probability() -> None:
     distribution = _hybrid_discrete_distribution(
-        torch.tensor([[0.2, 0.8]]),
-        torch.tensor([[0.9, 0.1]]),
+        _tensor([[0.2, 0.8]]),
+        _tensor([[0.9, 0.1]]),
     )
 
     expected = _split_lean_expected_signed_values(
@@ -177,7 +189,7 @@ def test_split_lean_signed_balance_uses_right_minus_left_probability() -> None:
 
 def test_signed_balance_loss_penalizes_batch_bias_outside_deadzone() -> None:
     loss = _signed_balance_loss(
-        torch.tensor([0.25, 0.35]),
+        _tensor([0.25, 0.35]),
         deadzone=0.1,
         loss_weight=2.0,
         sample_mask=None,
@@ -191,10 +203,10 @@ def test_signed_balance_loss_penalizes_batch_bias_outside_deadzone() -> None:
 
 def test_signed_balance_loss_respects_sample_mask() -> None:
     loss = _signed_balance_loss(
-        torch.tensor([0.25, 0.9]),
+        _tensor([0.25, 0.9]),
         deadzone=0.1,
         loss_weight=2.0,
-        sample_mask=torch.tensor([True, False]),
+        sample_mask=_bool_tensor([True, False]),
     )
 
     assert loss is not None

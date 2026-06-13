@@ -227,14 +227,14 @@ class AuxiliaryStateHeadBank(nn.Module):
                 continue
             if binary_logits is None:
                 raise RuntimeError("Binary auxiliary prediction head is unavailable")
-            probability = torch.sigmoid(binary_logits[sample_index, _BINARY_HEAD_INDEX[name]])
+            probability = binary_logits[sample_index, _BINARY_HEAD_INDEX[name]].sigmoid()
             values[name] = float(probability.detach().cpu().item())
 
         if "course_context.builtin_course_id" in requested_names:
             if course_logits is None:
                 raise RuntimeError("Categorical auxiliary prediction head is unavailable")
-            course_probabilities = torch.softmax(course_logits[sample_index], dim=0)
-            course_confidence, course_index = torch.max(course_probabilities, dim=0)
+            course_probabilities = course_logits[sample_index].softmax(dim=0)
+            course_confidence, course_index = course_probabilities.max(dim=0)
             values["course_context.builtin_course_id"] = {
                 "index": int(course_index.detach().cpu().item()),
                 "confidence": float(course_confidence.detach().cpu().item()),

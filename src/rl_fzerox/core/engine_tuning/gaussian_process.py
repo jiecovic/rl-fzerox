@@ -308,12 +308,9 @@ class _EngineGPModel(gpytorch.models.ExactGP):
         super().__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
-        self.mean_module.constant = torch.as_tensor(prior_score, dtype=train_x.dtype)
-        self.covar_module.base_kernel.lengthscale = torch.as_tensor(
-            lengthscale,
-            dtype=train_x.dtype,
-        )
-        self.covar_module.outputscale = torch.as_tensor(outputscale, dtype=train_x.dtype)
+        self.mean_module.constant = train_x.new_tensor(prior_score)
+        self.covar_module.base_kernel.lengthscale = train_x.new_tensor(lengthscale)
+        self.covar_module.outputscale = train_x.new_tensor(outputscale)
         for parameter in self.parameters():
             parameter.requires_grad_(False)
 
@@ -359,27 +356,24 @@ def _gp_posterior(
     prior_score: float,
     settings: GaussianProcessEngineTunerSettings,
 ) -> _EnginePosterior:
-    train_x = torch.as_tensor(
+    train_x = torch.Tensor(
         [
             [_normalize_engine_raw(candidate.engine_setting_raw_value)]
             for candidate in observed_candidates
-        ],
-        dtype=torch.float64,
-    )
-    train_y = torch.as_tensor(
+        ]
+    ).double()
+    train_y = torch.Tensor(
         [
             candidate.mean_score if candidate.mean_score is not None else prior_score
             for candidate in observed_candidates
-        ],
-        dtype=torch.float64,
-    )
-    train_noise = torch.as_tensor(
+        ]
+    ).double()
+    train_noise = torch.Tensor(
         [
             _observation_noise_variance(candidate, settings=settings)
             for candidate in observed_candidates
-        ],
-        dtype=torch.float64,
-    )
+        ]
+    ).double()
     likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
         noise=train_noise,
         learn_additional_noise=False,
@@ -394,10 +388,9 @@ def _gp_posterior(
     )
     model.eval()
     likelihood.eval()
-    test_x = torch.as_tensor(
-        [[_normalize_engine_raw(raw_value)] for raw_value in candidate_raw_values],
-        dtype=torch.float64,
-    )
+    test_x = torch.Tensor(
+        [[_normalize_engine_raw(raw_value)] for raw_value in candidate_raw_values]
+    ).double()
     with torch.no_grad(), gpytorch.settings.fast_pred_var(), gpytorch.settings.debug(False):
         posterior = _predict_gp_posterior(model, test_x)
     means = tuple(float(value) for value in posterior.mean.detach().cpu().tolist())
@@ -492,7 +485,7 @@ def _sampled_best_raw_values(
         draw_count=draw_count,
         rng=rng,
     )
-    best_indices = torch.argmax(sample_matrix, dim=0).tolist()
+    best_indices = sample_matrix.argmax(dim=0).tolist()
     return tuple(candidates[int(index)] for index in best_indices)
 
 
@@ -503,20 +496,24 @@ def _sample_posterior_score_matrix(
     draw_count: int,
     rng: Random,
 ) -> torch.Tensor:
-    means = torch.as_tensor(
-        [projection.estimates[engine_raw].mean_score for engine_raw in candidates],
-        dtype=torch.float64,
-    ).unsqueeze(1)
+    means = (
+        torch.Tensor([projection.estimates[engine_raw].mean_score for engine_raw in candidates])
+        .double()
+        .unsqueeze(1)
+    )
     normal_samples = _standard_normal_matrix(
         row_count=len(candidates),
         column_count=max(1, int(draw_count)),
         rng=rng,
     )
     if projection.covariance is None:
-        stds = torch.as_tensor(
-            [projection.estimates[engine_raw].uncertainty_score for engine_raw in candidates],
-            dtype=torch.float64,
-        ).unsqueeze(1)
+        stds = (
+            torch.Tensor(
+                [projection.estimates[engine_raw].uncertainty_score for engine_raw in candidates]
+            )
+            .double()
+            .unsqueeze(1)
+        )
         return means + stds * normal_samples
 
     return means + _posterior_cholesky(projection.covariance) @ normal_samples
@@ -528,15 +525,19 @@ def _standard_normal_matrix(
     column_count: int,
     rng: Random,
 ) -> torch.Tensor:
-    return torch.as_tensor(
-        [rng.gauss(0.0, 1.0) for _ in range(row_count * column_count)],
-        dtype=torch.float64,
-    ).reshape(row_count, column_count)
+    return (
+        torch.Tensor(
+            [rng.gauss(0.0, 1.0) for _ in range(row_count * column_count)],
+        )
+        .double()
+        .reshape(row_count, column_count)
+    )
 
 
 def _posterior_cholesky(covariance: torch.Tensor) -> torch.Tensor:
-    normalized = covariance.to(dtype=torch.float64)
-    jitter = torch.eye(normalized.shape[0], dtype=torch.float64) * 1e-9
+    normalized = covariance.double()
+    jitter = normalized.new_zeros((normalized.shape[0], normalized.shape[0]))
+    jitter.fill_diagonal_(1e-9)
     return torch.linalg.cholesky(normalized + jitter)
 
 
