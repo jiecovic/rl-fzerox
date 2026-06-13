@@ -90,6 +90,17 @@ def track_record_pool_lines(
             label_color=PALETTE.text_accent if is_current_track else None,
             click_course_id=record_course_id(record),
         ),
+    ]
+    alt_baseline_count = optional_int_info(record, "track_alt_baseline_count")
+    if alt_baseline_count is not None:
+        lines.append(
+            panel_line(
+                "Alt baselines",
+                _alt_baseline_count_text(alt_baseline_count),
+                PALETTE.text_accent if alt_baseline_count > 0 else PALETTE.text_muted,
+            )
+        )
+    lines.append(
         panel_line(
             "Best time",
             format_best_time(
@@ -98,8 +109,8 @@ def track_record_pool_lines(
                 setup=watch_best_time_setup,
             ),
             status_color if watch_best is not None else PALETTE.text_muted,
-        ),
-    ]
+        )
+    )
     if _shows_finish_rank(record, current_info):
         lines.append(
             panel_line(
@@ -150,3 +161,9 @@ def track_record_pool_lines(
 
 def _shows_finish_rank(record: RecordInfo, current_info: RecordInfo) -> bool:
     return record.get("track_mode") == "gp_race" or current_info.get("track_mode") == "gp_race"
+
+
+def _alt_baseline_count_text(count: int) -> str:
+    if count == 1:
+        return "1 in memory"
+    return f"{max(0, count)} in memory"

@@ -218,7 +218,7 @@ def _track_pool_records(
         policy_stage_name=policy_stage_name,
     )
     if track_sampling.enabled and track_sampling.entries:
-        return tuple(_track_sampling_record(entry) for entry in track_sampling.entries)
+        return _track_sampling_records(track_sampling.entries)
     track_record = _track_config_record(config.track)
     return (track_record,) if track_record else ()
 
@@ -279,7 +279,36 @@ def _curriculum_stage_name(info: dict[str, object] | None) -> str | None:
     return value
 
 
-def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]:
+def _track_sampling_records(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+) -> tuple[dict[str, object], ...]:
+    alt_counts_by_source_entry: dict[str, int] = {}
+    for entry in entries:
+        source_entry_id = entry.alt_baseline_source_entry_id
+        if entry.alt_baseline_id is None or source_entry_id is None:
+            continue
+        alt_counts_by_source_entry[source_entry_id] = (
+            alt_counts_by_source_entry.get(
+                source_entry_id,
+                0,
+            )
+            + 1
+        )
+
+    return tuple(
+        _track_sampling_record(
+            entry,
+            alt_baseline_count=alt_counts_by_source_entry.get(entry.id, 0),
+        )
+        for entry in entries
+    )
+
+
+def _track_sampling_record(
+    entry: TrackSamplingEntryConfig,
+    *,
+    alt_baseline_count: int,
+) -> dict[str, object]:
     course_key = track_sampling_course_key(
         entry_id=entry.id,
         course_id=entry.course_id,
@@ -301,6 +330,7 @@ def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]
         ),
         "track_baseline_state_path": str(entry.baseline_state_path),
         "track_sampling_weight": float(entry.weight),
+        "track_alt_baseline_count": int(alt_baseline_count),
     }
     if entry.runtime_course_key is not None:
         info["track_runtime_course_key"] = entry.runtime_course_key
@@ -328,6 +358,12 @@ def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]
         info["track_vehicle_name"] = entry.vehicle_name
     if entry.engine_setting_raw_value is not None:
         info["track_engine_setting_raw_value"] = int(entry.engine_setting_raw_value)
+    if entry.alt_baseline_id is not None:
+        info["track_alt_baseline_id"] = entry.alt_baseline_id
+    if entry.alt_baseline_label is not None:
+        info["track_alt_baseline_label"] = entry.alt_baseline_label
+    if entry.alt_baseline_source_entry_id is not None:
+        info["track_alt_baseline_source_entry_id"] = entry.alt_baseline_source_entry_id
     if entry.generated_course_kind is not None:
         info["track_generated_course_kind"] = entry.generated_course_kind
     if entry.generated_course_slot is not None:

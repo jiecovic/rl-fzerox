@@ -903,6 +903,59 @@ def test_track_sampling_records_prefer_refreshed_watch_snapshot_state(tmp_path: 
     assert records[0]["track_generated_course_generation"] == 2
 
 
+def test_track_sampling_records_count_in_memory_alt_baselines(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    base_path = tmp_path / "base.state"
+    alt_a_path = tmp_path / "alt-a.state"
+    alt_b_path = tmp_path / "alt-b.state"
+    core_path.touch()
+    rom_path.touch()
+    base_path.write_bytes(b"base")
+    alt_a_path.write_bytes(b"alt-a")
+    alt_b_path.write_bytes(b"alt-b")
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city",
+                        display_name="Mute City",
+                        course_id="mute_city",
+                        baseline_state_path=base_path,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="mute_city__alt_alt-a",
+                        display_name="Mute City alt A",
+                        course_id="mute_city",
+                        baseline_state_path=alt_a_path,
+                        alt_baseline_id="alt-a",
+                        alt_baseline_label="frame 100",
+                        alt_baseline_source_entry_id="mute_city",
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="mute_city__alt_alt-b",
+                        display_name="Mute City alt B",
+                        course_id="mute_city",
+                        baseline_state_path=alt_b_path,
+                        alt_baseline_id="alt-b",
+                        alt_baseline_label="frame 200",
+                        alt_baseline_source_entry_id="mute_city",
+                    ),
+                ),
+            )
+        ),
+    )
+
+    records = _track_pool_records(config)
+
+    assert records[0]["track_alt_baseline_count"] == 2
+    assert records[1]["track_alt_baseline_count"] == 0
+    assert records[1]["track_alt_baseline_id"] == "alt-a"
+
+
 def test_record_rows_click_stable_runtime_course_key() -> None:
     section = track_record_sections(
         current_info={},

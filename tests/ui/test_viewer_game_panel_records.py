@@ -55,6 +55,38 @@ def test_records_section_shows_non_agg_reference_records() -> None:
     assert wr_line.value == "48.035 - 1:15.846"
 
 
+def test_records_section_shows_alt_baselines_in_memory() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        track_pool_records=(
+            {
+                "track_display_name": "Mute City",
+                "track_course_id": "mute_city",
+                "track_alt_baseline_count": 2,
+            },
+        ),
+    )
+
+    records_section = next(section for section in columns.records if section.title == "Records")
+    alt_line = next(line for line in records_section.lines if line.label == "Alt baselines")
+    assert alt_line.value == "2 in memory"
+    assert alt_line.color == PALETTE.text_accent
+
+
 def test_records_section_shows_watch_best_for_track_pool() -> None:
     columns = _build_panel_columns(
         episode=0,
