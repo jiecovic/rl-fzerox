@@ -5,9 +5,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import ceil
+from typing import TYPE_CHECKING
 
-from rl_fzerox.core.engine_tuning.tuner import EngineTunerSettings
-from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
+from rl_fzerox.core.engine_tuning.types import (
+    EngineTunerSettings,
+    GaussianProcessEngineTunerSettings,
+    MlpEnsembleEngineTunerSettings,
+)
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +22,7 @@ class EngineTuningTimebase:
     """Timing constants needed to derive timeout priors from emulator frames."""
 
     native_fps: float = 60.0
+    uncertainty_horizon_fraction: float = 0.15
 
 
 ENGINE_TUNING_TIMEBASE = EngineTuningTimebase()
@@ -23,10 +31,23 @@ ENGINE_TUNING_TIMEBASE = EngineTuningTimebase()
 def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSettings:
     """Convert runtime schema into ordered tuner settings."""
 
-    return EngineTunerSettings(
+    if config.backend == "mlp_ensemble":
+        return MlpEnsembleEngineTunerSettings(
+            min_raw_value=config.min_raw_value,
+            max_raw_value=config.max_raw_value,
+            prior_finish_time_seconds=config.prior_finish_time_seconds,
+            uniform_exploration=config.uniform_exploration,
+            ensemble_members=config.ensemble_members,
+            randomized_prior_seconds=config.randomized_prior_seconds,
+            hidden_dim=config.hidden_dim,
+            training_steps=config.training_steps,
+            learning_rate=config.learning_rate,
+            bootstrap_keep_probability=config.bootstrap_keep_probability,
+            warmup_successes=config.warmup_successes,
+        )
+    return GaussianProcessEngineTunerSettings(
         min_raw_value=config.min_raw_value,
         max_raw_value=config.max_raw_value,
-        backend=config.backend,
         stat_decay=config.stat_decay,
         prior_finish_time_seconds=config.prior_finish_time_seconds,
         exploration_seconds=float(config.exploration_scale),
@@ -47,3 +68,12 @@ def engine_tuning_episode_horizon_prior_seconds(
     policy_decision_cap = ceil(max(1, int(max_episode_steps)) / repeat)
     horizon_frames = policy_decision_cap * repeat
     return horizon_frames / ENGINE_TUNING_TIMEBASE.native_fps
+
+
+def engine_tuning_uncertainty_scale_seconds(*, prior_finish_time_seconds: float) -> float:
+    """Return an internal uncertainty scale from the episode timeout horizon."""
+
+    return max(
+        1.0,
+        float(prior_finish_time_seconds) * ENGINE_TUNING_TIMEBASE.uncertainty_horizon_fraction,
+    )

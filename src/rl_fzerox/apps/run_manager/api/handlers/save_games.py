@@ -18,13 +18,11 @@ from rl_fzerox.core.engine_tuning import (
     EngineTuningContext,
     OrderedEngineTuner,
 )
-from rl_fzerox.core.engine_tuning.config import (
-    engine_tuner_settings,
-    engine_tuning_episode_horizon_prior_seconds,
-)
+from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
 from rl_fzerox.core.manager import ManagedRun, ManagerStore
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.models import ManagedSaveCourseSetup, ManagedSaveCupSetup
+from rl_fzerox.core.manager.projection.engine_tuning import adaptive_engine_tuning_config
 from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 from rl_fzerox.core.training.session.artifacts import load_engine_tuning_checkpoint_state
@@ -221,17 +219,4 @@ def _vehicle_for_course_setup(
 
 
 def _adaptive_engine_config(run: ManagedRun) -> AdaptiveEngineTuningConfig:
-    vehicle = run.config.vehicle
-    return AdaptiveEngineTuningConfig(
-        enabled=True,
-        min_raw_value=vehicle.engine_setting_min_raw_value,
-        max_raw_value=vehicle.engine_setting_max_raw_value,
-        backend=vehicle.adaptive_engine_tuner_backend,
-        stat_decay=vehicle.adaptive_engine_stat_decay,
-        prior_finish_time_seconds=engine_tuning_episode_horizon_prior_seconds(
-            max_episode_steps=run.config.environment.max_episode_steps,
-            action_repeat=run.config.action.action_repeat,
-        ),
-        exploration_scale=vehicle.adaptive_engine_exploration_scale,
-        uniform_exploration=vehicle.adaptive_engine_uniform_exploration,
-    )
+    return adaptive_engine_tuning_config(run.config)

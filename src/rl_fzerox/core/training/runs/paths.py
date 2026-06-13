@@ -29,6 +29,7 @@ class RunLayout:
     checkpoints_dirname: str
     track_sampling_state_filename: str
     engine_tuning_state_filename: str
+    engine_tuning_model_filename: str
     model_artifacts: ArtifactFilenames
     policy_artifacts: ArtifactFilenames
 
@@ -43,6 +44,7 @@ RUN_LAYOUT = RunLayout(
     checkpoints_dirname="checkpoints",
     track_sampling_state_filename="track_sampling_state.json",
     engine_tuning_state_filename="engine_tuning_state.json",
+    engine_tuning_model_filename="engine_tuning_model.pt",
     model_artifacts=ArtifactFilenames(
         latest="checkpoints/latest/model.zip",
         best="checkpoints/best/model.zip",

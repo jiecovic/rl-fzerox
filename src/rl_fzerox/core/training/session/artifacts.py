@@ -151,6 +151,7 @@ def save_artifacts_atomically(
         save_engine_tuning_runtime_state(
             engine_tuning_checkpoint_path(policy_path),
             engine_tuning_state,
+            model_path=engine_tuning_model_path(policy_path),
         )
     if policy_metadata is not None:
         _atomic_write_json(policy_artifact_metadata_path(policy_path), asdict(policy_metadata))
@@ -189,16 +190,10 @@ def load_engine_tuning_checkpoint_state(
 ) -> EngineTuningRuntimeState | None:
     """Load the optional engine-tuning state stored beside one policy artifact."""
 
-    return load_engine_tuning_runtime_state(engine_tuning_checkpoint_path(policy_path))
-
-
-def current_engine_tuning_checkpoint_state(
-    train_env: TrainingEnvAttrReader,
-) -> EngineTuningRuntimeState | None:
-    """Read the current engine-tuning state from the first vector env."""
-
-    value = _first_env_attr(train_env, "engine_tuning_state")
-    return value if isinstance(value, EngineTuningRuntimeState) else None
+    return load_engine_tuning_runtime_state(
+        engine_tuning_checkpoint_path(policy_path),
+        model_path=engine_tuning_model_path(policy_path),
+    )
 
 
 def current_policy_artifact_metadata(
@@ -242,6 +237,12 @@ def engine_tuning_checkpoint_path(policy_path: Path) -> Path:
     """Return the engine-tuning sidecar path stored in one checkpoint directory."""
 
     return policy_path.with_name(RUN_LAYOUT.engine_tuning_state_filename)
+
+
+def engine_tuning_model_path(policy_path: Path) -> Path:
+    """Return the engine-tuning model path stored in one checkpoint directory."""
+
+    return policy_path.with_name(RUN_LAYOUT.engine_tuning_model_filename)
 
 
 def recent_checkpoint_dir(run_paths: RunPaths, *, num_timesteps: int) -> Path:

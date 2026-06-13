@@ -12,6 +12,7 @@ from rl_fzerox.core.engine_tuning import (
     EngineTuningCandidateState,
     EngineTuningContext,
     EngineTuningRuntimeState,
+    MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
 
@@ -57,12 +58,33 @@ def _engine_tuning_context_payloads(
     settings: EngineTunerSettings,
 ) -> list[dict[str, object]]:
     tuner = OrderedEngineTuner(settings=settings, state=state)
+    if isinstance(settings, MlpEnsembleEngineTunerSettings):
+        return [
+            _engine_tuning_context_payload(
+                state=state,
+                settings=settings,
+                tuner=tuner,
+                context=EngineTuningContext(
+                    course_key=context.course_key,
+                    vehicle_id=context.vehicle_id,
+                ),
+                finish_count=context.finish_count,
+                observed_candidate_count=0,
+            )
+            for context in (
+                () if state.model_state is None else state.model_state.contexts
+            )
+        ]
     return [
         _engine_tuning_context_payload(
             state=state,
+            settings=settings,
             tuner=tuner,
             context=context,
-            candidates=candidates,
+            finish_count=sum(candidate.finish_count for candidate in candidates),
+            observed_candidate_count=sum(
+                1 for candidate in candidates if candidate.finish_count > 0
+            ),
         )
         for context, candidates in _observed_contexts(state)
     ]
@@ -71,20 +93,24 @@ def _engine_tuning_context_payloads(
 def _engine_tuning_context_payload(
     *,
     state: EngineTuningRuntimeState,
+    settings: EngineTunerSettings,
     tuner: OrderedEngineTuner,
     context: EngineTuningContext,
-    candidates: tuple[EngineTuningCandidateState, ...],
+    finish_count: int,
+    observed_candidate_count: int,
 ) -> dict[str, object]:
     candidate_map = state.candidate_map()
     recommendation = tuner.recommendation(context)
+    warmup_successes, model_ready = _model_readiness(settings, finish_count)
     return {
         "context_key": context.key,
         "course_key": context.course_key,
         "vehicle_id": context.vehicle_id,
-        "finish_count": sum(candidate.finish_count for candidate in candidates),
-        "observed_candidate_count": sum(
-            1 for candidate in candidates if candidate.finish_count > 0
-        ),
+        "finish_count": finish_count,
+        "observed_candidate_count": observed_candidate_count,
+        "model_ready": model_ready,
+        "warmup_successes": warmup_successes,
+        "warmup_remaining": max(0, warmup_successes - finish_count),
         "recommended_engine_setting_raw_value": recommendation.engine_setting_raw_value,
         "candidates": [
             _engine_tuning_candidate_estimate_payload(
@@ -98,6 +124,16 @@ def _engine_tuning_context_payload(
             )
         ],
     }
+
+
+def _model_readiness(
+    settings: EngineTunerSettings,
+    finish_count: int,
+) -> tuple[int, bool]:
+    if isinstance(settings, MlpEnsembleEngineTunerSettings):
+        warmup_successes = max(1, int(settings.warmup_successes))
+        return warmup_successes, finish_count >= warmup_successes
+    return 0, True
 
 
 def _engine_tuning_candidate_estimate_payload(

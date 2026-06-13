@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
+from rl_fzerox.core.engine_tuning import EngineTuningContext, EngineTuningRuntimeState
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
+from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -14,7 +15,6 @@ from rl_fzerox.core.runtime_spec.schema import (
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
-    current_engine_tuning_checkpoint_state,
     current_policy_artifact_metadata,
     save_artifacts_atomically,
     save_recent_checkpoint_artifacts,
@@ -47,6 +47,7 @@ def build_callbacks(
     run_paths: RunPaths,
     initial_curriculum_stage_index: int | None = None,
     initial_engine_tuning_state: EngineTuningRuntimeState | None = None,
+    engine_tuning_controller: EngineTuningTrainingController | None = None,
     track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None = None,
     extra_callbacks: Sequence[object] = (),
 ):
@@ -87,12 +88,12 @@ def build_callbacks(
         def __init__(
             self,
             *,
-            engine_tuning_enabled: bool,
+            engine_tuning_controller: EngineTuningTrainingController | None,
             policy: CheckpointPolicy,
             run_paths: RunPaths,
         ) -> None:
             super().__init__(verbose=0)
-            self._engine_tuning_enabled = engine_tuning_enabled
+            self._engine_tuning_controller = engine_tuning_controller
             self._policy = policy
             self._run_paths = run_paths
             self._best_episode_return: float | None = None
@@ -193,9 +194,9 @@ def build_callbacks(
                 self._save_periodic()
 
         def _engine_tuning_state(self) -> EngineTuningRuntimeState | None:
-            if not self._engine_tuning_enabled:
+            if self._engine_tuning_controller is None:
                 return None
-            return current_engine_tuning_checkpoint_state(self.training_env)
+            return self._engine_tuning_controller.runtime_state
 
     class CurriculumCallback(BaseCallback):
         """Promote curriculum stages and apply their rollout-time overrides."""
@@ -519,15 +520,14 @@ def build_callbacks(
             self,
             *,
             controller: EngineTuningTrainingController,
+            contexts: Sequence[EngineTuningContext],
         ) -> None:
             super().__init__(verbose=0)
             self._controller = controller
+            self._contexts = tuple(contexts)
 
         def _on_training_start(self) -> None:
-            self.training_env.env_method(
-                "set_engine_tuning_state",
-                self._controller.runtime_state,
-            )
+            self._publish_sampler()
 
         def _on_step(self) -> bool:
             infos = info_sequence(self.locals.get("infos"))
@@ -537,39 +537,43 @@ def build_callbacks(
             if not episodes:
                 return True
             if self._controller.record_episodes(episodes):
-                self.training_env.env_method(
-                    "set_engine_tuning_state",
-                    self._controller.runtime_state,
-                )
+                self._publish_sampler()
             return True
 
         def _on_rollout_end(self) -> None:
             if self._controller.record_rollout_episodes():
-                self.training_env.env_method(
-                    "set_engine_tuning_state",
-                    self._controller.runtime_state,
-                )
+                self._publish_sampler()
             for key, value in self._controller.log_values().items():
                 self.logger.record(key, value)
 
+        def _publish_sampler(self) -> None:
+            self.training_env.env_method(
+                "set_engine_tuning_sampler",
+                self._controller.reset_sampler_snapshot(self._contexts),
+            )
+
     checkpoint_policy = resolve_checkpoint_policy(train_config)
-    engine_tuning_enabled = bool(
-        env_config is not None and env_config.track_sampling.engine_tuning.enabled
-    )
+    if (
+        engine_tuning_controller is None
+        and env_config is not None
+        and env_config.track_sampling.engine_tuning.enabled
+    ):
+        engine_tuning_controller = EngineTuningTrainingController(
+            env_config.track_sampling.engine_tuning,
+            state=initial_engine_tuning_state,
+        )
     callbacks: list[BaseCallback] = []
-    if env_config is not None and env_config.track_sampling.engine_tuning.enabled:
+    if engine_tuning_controller is not None and env_config is not None:
         callbacks.append(
             EngineTuningCallback(
-                controller=EngineTuningTrainingController(
-                    env_config.track_sampling.engine_tuning,
-                    state=initial_engine_tuning_state,
-                ),
+                controller=engine_tuning_controller,
+                contexts=_engine_tuning_contexts(env_config),
             )
         )
     callbacks.extend(
         (
             RollingArtifactCallback(
-                engine_tuning_enabled=engine_tuning_enabled,
+                engine_tuning_controller=engine_tuning_controller,
                 policy=checkpoint_policy,
                 run_paths=run_paths,
             ),
@@ -664,6 +668,14 @@ def _rebuild_deficit_budget_track_sampling_controller(
     if controller is None:
         raise RuntimeError("X Cup rotation removed the deficit-budget track-sampling controller")
     return controller
+
+
+def _engine_tuning_contexts(env_config: EnvConfig) -> tuple[EngineTuningContext, ...]:
+    contexts: dict[str, EngineTuningContext] = {}
+    for entry in env_config.track_sampling.entries:
+        context = engine_tuning_context_for_entry(entry)
+        contexts.setdefault(context.key, context)
+    return tuple(contexts[key] for key in sorted(contexts))
 
 
 def _x_cup_rotation_manager(

@@ -1,6 +1,7 @@
 # tests/core/manager/test_manager_store_schema.py
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -105,6 +106,29 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
 
     assert draft.config.reward.manual_boost_reward == 0.5
     assert draft.config.reward.time_penalty_per_frame == 0.0
+
+
+def test_mlp_engine_tuner_snapshot_omits_gp_only_fields() -> None:
+    base_config = default_managed_run_config()
+    config = base_config.model_copy(
+        update={
+            "vehicle": base_config.vehicle.model_copy(
+                update={
+                    "engine_mode": "adaptive_tuner",
+                    "adaptive_engine_tuner_backend": "mlp_ensemble",
+                }
+            )
+        }
+    )
+
+    vehicle = json.loads(config_json(config))["vehicle"]
+
+    assert vehicle["adaptive_engine_tuner_backend"] == "mlp_ensemble"
+    assert "adaptive_engine_uniform_exploration" in vehicle
+    assert "adaptive_engine_stat_decay" not in vehicle
+    assert "adaptive_engine_ensemble_members" in vehicle
+    assert "adaptive_engine_exploration_scale" not in vehicle
+    assert "adaptive_engine_randomized_prior_seconds" not in vehicle
 
 
 def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:

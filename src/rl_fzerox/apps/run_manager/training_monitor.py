@@ -1,15 +1,16 @@
 # src/rl_fzerox/apps/run_manager/training_monitor.py
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
 
+from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.models import RunCommand
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session import (
-    current_engine_tuning_checkpoint_state,
     current_policy_artifact_metadata,
     save_artifacts_atomically,
 )
@@ -47,6 +48,7 @@ def build_manager_training_callback(
     run_paths: RunPaths,
     total_timesteps: int,
     lineage_step_offset: int = 0,
+    engine_tuning_state_provider: Callable[[], EngineTuningRuntimeState | None] | None = None,
 ):
     """Construct one SB3 callback that publishes manager runtime state."""
 
@@ -155,8 +157,10 @@ def build_manager_training_callback(
                 model=self.model,
                 model_path=run_paths.latest_model_path,
                 policy_path=run_paths.latest_policy_path,
-                engine_tuning_state=current_engine_tuning_checkpoint_state(
-                    self.training_env
+                engine_tuning_state=(
+                    None
+                    if engine_tuning_state_provider is None
+                    else engine_tuning_state_provider()
                 ),
                 policy_metadata=current_policy_artifact_metadata(
                     self.training_env,

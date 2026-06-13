@@ -4,7 +4,6 @@ from __future__ import annotations
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
     cleanup_failed_run,
-    current_engine_tuning_checkpoint_state,
     current_policy_artifact_metadata,
     engine_tuning_checkpoint_path,
     load_engine_tuning_checkpoint_state,
@@ -33,7 +32,6 @@ __all__ = [
     "build_training_env",
     "build_training_model",
     "cleanup_failed_run",
-    "current_engine_tuning_checkpoint_state",
     "current_policy_artifact_metadata",
     "engine_tuning_checkpoint_path",
     "load_engine_tuning_checkpoint_state",

@@ -8,10 +8,13 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
+import torch
+
 from rl_fzerox.core.engine_tuning.state import (
     ENGINE_TUNING_STATE_VERSION,
     EngineTuningCandidateState,
     EngineTuningEnsembleMemberState,
+    EngineTuningModelContextState,
     EngineTuningModelState,
     EngineTuningRuntimeState,
     EngineTuningTensorState,
@@ -19,7 +22,12 @@ from rl_fzerox.core.engine_tuning.state import (
 from rl_fzerox.core.engine_tuning.types import EngineTunerBackend
 
 
-def save_engine_tuning_runtime_state(path: Path, state: EngineTuningRuntimeState) -> None:
+def save_engine_tuning_runtime_state(
+    path: Path,
+    state: EngineTuningRuntimeState,
+    *,
+    model_path: Path | None = None,
+) -> None:
     """Persist one engine-tuning checkpoint atomically."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -30,14 +38,28 @@ def save_engine_tuning_runtime_state(path: Path, state: EngineTuningRuntimeState
     finally:
         if tmp_path.exists():
             tmp_path.unlink()
+    if model_path is not None:
+        _save_engine_tuning_model_state(model_path, state.model_state)
 
 
-def load_engine_tuning_runtime_state(path: Path) -> EngineTuningRuntimeState | None:
+def load_engine_tuning_runtime_state(
+    path: Path,
+    *,
+    model_path: Path | None = None,
+) -> EngineTuningRuntimeState | None:
     """Load one engine-tuning checkpoint, if present."""
 
     if not path.is_file():
         return None
-    return load_engine_tuning_runtime_state_json(path.read_text(encoding="utf-8"))
+    state = load_engine_tuning_runtime_state_json(path.read_text(encoding="utf-8"))
+    if state is None or state.model_state is None:
+        return state
+    if state.model_state.backend != "mlp_ensemble":
+        return state
+    if model_path is None:
+        return state.with_model_state(None)
+    model_state = _load_engine_tuning_model_state(model_path, metadata=state.model_state)
+    return state.with_model_state(model_state)
 
 
 def engine_tuning_runtime_state_json(state: EngineTuningRuntimeState) -> str:
@@ -95,18 +117,14 @@ def _model_state_payload(state: EngineTuningModelState | None) -> dict[str, obje
         "backend": state.backend,
         "course_keys": list(state.course_keys),
         "vehicle_ids": list(state.vehicle_ids),
-        "members": [
+        "contexts": [
             {
-                "tensors": [
-                    {
-                        "name": tensor.name,
-                        "shape": list(tensor.shape),
-                        "values": list(tensor.values),
-                    }
-                    for tensor in member.tensors
-                ]
+                "context_key": context.context_key,
+                "course_key": context.course_key,
+                "vehicle_id": context.vehicle_id,
+                "finish_count": context.finish_count,
             }
-            for member in state.members
+            for context in state.contexts
         ],
     }
 
@@ -147,45 +165,124 @@ def _model_state_from_mapping(raw: object) -> EngineTuningModelState | None:
         return None
     course_keys = _string_tuple(raw.get("course_keys"))
     vehicle_ids = _string_tuple(raw.get("vehicle_ids"))
-    members = _members_from_raw(raw.get("members"))
-    if course_keys is None or vehicle_ids is None or members is None:
+    contexts = _model_contexts_from_raw(raw.get("contexts"))
+    if course_keys is None or vehicle_ids is None or contexts is None:
         return None
     return EngineTuningModelState(
         backend=backend,
         course_keys=course_keys,
         vehicle_ids=vehicle_ids,
-        members=members,
+        members=(),
+        contexts=contexts,
     )
 
 
-def _members_from_raw(raw: object) -> tuple[EngineTuningEnsembleMemberState, ...] | None:
+def _model_contexts_from_raw(raw: object) -> tuple[EngineTuningModelContextState, ...] | None:
+    if not isinstance(raw, list):
+        return None
+    contexts: list[EngineTuningModelContextState] = []
+    for item in raw:
+        if not isinstance(item, Mapping):
+            return None
+        context_key = _mapping_str(item, "context_key")
+        course_key = _mapping_str(item, "course_key")
+        vehicle_id = _mapping_str(item, "vehicle_id")
+        if context_key is None or course_key is None or vehicle_id is None:
+            return None
+        contexts.append(
+            EngineTuningModelContextState(
+                context_key=context_key,
+                course_key=course_key,
+                vehicle_id=vehicle_id,
+                finish_count=max(0, _mapping_int(item, "finish_count") or 0),
+            )
+        )
+    return tuple(contexts)
+
+
+def _save_engine_tuning_model_state(
+    path: Path,
+    state: EngineTuningModelState | None,
+) -> None:
+    if state is None or state.backend != "mlp_ensemble" or not state.members:
+        if path.exists():
+            path.unlink()
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": ENGINE_TUNING_STATE_VERSION,
+        "backend": state.backend,
+        "course_keys": list(state.course_keys),
+        "vehicle_ids": list(state.vehicle_ids),
+        "members": [
+            {tensor.name: tensor.value.detach().cpu() for tensor in member.tensors}
+            for member in state.members
+        ],
+    }
+    tmp_path = path.with_name(f".{path.stem}.{os.getpid()}.tmp{path.suffix}")
+    try:
+        torch.save(payload, tmp_path)
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def _load_engine_tuning_model_state(
+    path: Path,
+    *,
+    metadata: EngineTuningModelState,
+) -> EngineTuningModelState | None:
+    if not path.is_file():
+        return None
+    loaded = _torch_load(path)
+    if not isinstance(loaded, Mapping):
+        return None
+    if _mapping_int(loaded, "version") != ENGINE_TUNING_STATE_VERSION:
+        return None
+    if loaded.get("backend") != metadata.backend:
+        return None
+    course_keys = _string_tuple(loaded.get("course_keys"))
+    vehicle_ids = _string_tuple(loaded.get("vehicle_ids"))
+    if course_keys != metadata.course_keys or vehicle_ids != metadata.vehicle_ids:
+        return None
+    members = _members_from_model_payload(loaded.get("members"))
+    if members is None:
+        return None
+    return EngineTuningModelState(
+        backend=metadata.backend,
+        course_keys=metadata.course_keys,
+        vehicle_ids=metadata.vehicle_ids,
+        members=members,
+        contexts=metadata.contexts,
+    )
+
+
+def _torch_load(path: Path) -> object:
+    try:
+        return torch.load(path, map_location="cpu", weights_only=True)
+    except TypeError:
+        return torch.load(path, map_location="cpu")
+
+
+def _members_from_model_payload(raw: object) -> tuple[EngineTuningEnsembleMemberState, ...] | None:
     if not isinstance(raw, list):
         return None
     members: list[EngineTuningEnsembleMemberState] = []
     for raw_member in raw:
         if not isinstance(raw_member, Mapping):
             return None
-        tensors = _tensors_from_raw(raw_member.get("tensors"))
-        if tensors is None:
-            return None
-        members.append(EngineTuningEnsembleMemberState(tensors=tensors))
+        tensors: list[EngineTuningTensorState] = []
+        for name, value in raw_member.items():
+            if not isinstance(name, str) or not isinstance(value, torch.Tensor):
+                return None
+            tensors.append(EngineTuningTensorState(name=name, value=value.detach().cpu()))
+        members.append(
+            EngineTuningEnsembleMemberState(
+                tensors=tuple(sorted(tensors, key=lambda tensor: tensor.name))
+            )
+        )
     return tuple(members)
-
-
-def _tensors_from_raw(raw: object) -> tuple[EngineTuningTensorState, ...] | None:
-    if not isinstance(raw, list):
-        return None
-    tensors: list[EngineTuningTensorState] = []
-    for raw_tensor in raw:
-        if not isinstance(raw_tensor, Mapping):
-            return None
-        name = _mapping_str(raw_tensor, "name")
-        shape = _int_tuple(raw_tensor.get("shape"))
-        values = _float_tuple(raw_tensor.get("values"))
-        if name is None or shape is None or values is None:
-            return None
-        tensors.append(EngineTuningTensorState(name=name, shape=shape, values=values))
-    return tuple(tensors)
 
 
 def _backend(raw: object) -> EngineTunerBackend | None:
@@ -204,28 +301,6 @@ def _string_tuple(raw: object) -> tuple[str, ...] | None:
         if not isinstance(item, str):
             return None
         values.append(item)
-    return tuple(values)
-
-
-def _int_tuple(raw: object) -> tuple[int, ...] | None:
-    if not isinstance(raw, list):
-        return None
-    values: list[int] = []
-    for item in raw:
-        if isinstance(item, bool) or not isinstance(item, int | float):
-            return None
-        values.append(int(item))
-    return tuple(values)
-
-
-def _float_tuple(raw: object) -> tuple[float, ...] | None:
-    if not isinstance(raw, list):
-        return None
-    values: list[float] = []
-    for item in raw:
-        if isinstance(item, bool) or not isinstance(item, int | float):
-            return None
-        values.append(float(item))
     return tuple(values)
 
 

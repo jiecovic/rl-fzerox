@@ -45,8 +45,8 @@ export function RunEngineTuningPanel({
 
   const selectedContext =
     contexts.find((context) => context.context_key === selectedContextKey) ?? contexts[0] ?? null;
-  const observedCandidateCount =
-    state?.candidates.filter((candidate) => candidate.finish_count > 0).length ?? 0;
+  const backend = state?.model_backend ?? null;
+  const observedCandidateCount = state?.candidates.length ?? 0;
 
   return (
     <section className="grid gap-3 border border-app-border bg-app-surface p-4">
@@ -60,7 +60,9 @@ export function RunEngineTuningPanel({
         <div className="text-right text-xs tabular-nums text-app-muted">
           {state === null
             ? "no samples"
-            : `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedCandidateCount.toLocaleString()} observed candidates`}
+            : state.model_backend === "mlp_ensemble"
+              ? `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts`
+              : `${backendLabel(state.model_backend)} · ${state.update_count.toLocaleString()} updates · ${contexts.length.toLocaleString()} contexts · ${observedCandidateCount.toLocaleString()} aggregate candidates`}
         </div>
       </div>
       {selectedContext === null ? (
@@ -97,11 +99,15 @@ export function RunEngineTuningPanel({
                 {contextLabel(selectedContext, labels)}
               </strong>
               <span className="text-xs tabular-nums text-app-muted">
-                greedy engine {selectedContext.recommended_engine_setting_raw_value} ·{" "}
+                {selectedContext.model_ready ? "greedy engine" : "warmup engine"}{" "}
+                {selectedContext.recommended_engine_setting_raw_value} ·{" "}
                 {selectedContext.finish_count.toLocaleString()} successful finishes
               </span>
             </div>
-            <EngineSamplingProbabilityBars candidates={selectedContext.candidates} />
+            <EngineSamplingProbabilityBars
+              candidates={selectedContext.candidates}
+              variant={backend === "gaussian_process" ? "aggregate" : "model"}
+            />
             <EngineMeanPerformanceBars
               candidates={selectedContext.candidates}
               recommendedEngineSettingRawValue={
@@ -109,7 +115,12 @@ export function RunEngineTuningPanel({
               }
             />
           </div>
-          <EngineDistributionTable candidates={selectedContext.candidates} />
+          {selectedContext.model_ready ? (
+            <EngineDistributionTable
+              candidates={selectedContext.candidates}
+              showObservedColumns={backend === "gaussian_process"}
+            />
+          ) : null}
         </div>
       )}
     </section>
@@ -161,8 +172,10 @@ function backendLabel(backend: EngineTuningRuntimeState["model_backend"]) {
 
 function EngineSamplingProbabilityBars({
   candidates,
+  variant,
 }: {
   candidates: readonly EngineTuningRuntimeCandidateEstimate[];
+  variant: "aggregate" | "model";
 }) {
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
   const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? 100;
@@ -176,13 +189,22 @@ function EngineSamplingProbabilityBars({
     <div className="grid gap-1">
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-app-muted">
         <div className="flex flex-wrap gap-3">
+          {variant === "aggregate" ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
+              successful finish aggregate
+            </span>
+          ) : null}
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
-            successful finish observed
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-3 bg-app-accent/60" aria-hidden="true" />
-            model prediction only
+            <span
+              className={
+                variant === "aggregate"
+                  ? "h-2.5 w-3 bg-app-accent/60"
+                  : "h-2.5 w-3 bg-app-accent/70"
+              }
+              aria-hidden="true"
+            />
+            reset sampler probability
           </span>
         </div>
         <span className="tabular-nums">y: probability 0-{formatPercent(maxProbability)}</span>
@@ -201,9 +223,11 @@ function EngineSamplingProbabilityBars({
           const x = index * barWidth + (barWidth - width) / 2;
           const y = 100 - height;
           const fill =
-            candidate.finish_count > 0
+            variant === "aggregate" && candidate.finish_count > 0
               ? "var(--accent)"
-              : "color-mix(in srgb, var(--accent) 58%, transparent)";
+              : variant === "aggregate"
+                ? "color-mix(in srgb, var(--accent) 58%, transparent)"
+                : "color-mix(in srgb, var(--accent) 70%, transparent)";
           return (
             <rect
               fill={fill}
@@ -306,8 +330,10 @@ function EngineMeanPerformanceBars({
 
 function EngineDistributionTable({
   candidates,
+  showObservedColumns,
 }: {
   candidates: readonly EngineTuningRuntimeCandidateEstimate[];
+  showObservedColumns: boolean;
 }) {
   const topCandidates = [...candidates]
     .sort((left, right) => {
@@ -326,8 +352,12 @@ function EngineDistributionTable({
             <th className="py-1.5 pr-3 font-semibold">Engine</th>
             <th className="py-1.5 pr-3 font-semibold">Prob</th>
             <th className="py-1.5 pr-3 font-semibold">Estimated</th>
-            <th className="py-1.5 pr-3 font-semibold">Best</th>
-            <th className="py-1.5 font-semibold">Finishes</th>
+            {showObservedColumns ? (
+              <>
+                <th className="py-1.5 pr-3 font-semibold">Best</th>
+                <th className="py-1.5 font-semibold">Finishes</th>
+              </>
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -343,10 +373,14 @@ function EngineDistributionTable({
               <td className="py-1.5 pr-3 text-app-text">
                 {formatRaceTime(candidate.estimated_finish_time_ms)}
               </td>
-              <td className="py-1.5 pr-3 text-app-text">
-                {formatOptionalRaceTime(candidate.best_finish_time_ms)}
-              </td>
-              <td className="py-1.5 text-app-text">{candidate.finish_count}</td>
+              {showObservedColumns ? (
+                <>
+                  <td className="py-1.5 pr-3 text-app-text">
+                    {formatOptionalRaceTime(candidate.best_finish_time_ms)}
+                  </td>
+                  <td className="py-1.5 text-app-text">{candidate.finish_count}</td>
+                </>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -364,7 +398,11 @@ function humanizeKey(key: string) {
 }
 
 function formatPercent(value: number | null) {
-  return value === null ? "-" : `${(value * 100).toFixed(1)}%`;
+  if (value === null) {
+    return "-";
+  }
+  const percent = value * 100;
+  return `${percent.toFixed(Math.abs(percent) < 1 ? 2 : 1)}%`;
 }
 
 function formatOptionalRaceTime(value: number | null) {

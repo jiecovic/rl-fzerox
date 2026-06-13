@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypeAlias
 
 EngineTunerBackend = Literal["gaussian_process", "mlp_ensemble"]
 
@@ -17,6 +17,13 @@ class EngineTunerDefaults:
     stat_decay: float = 0.995
     prior_finish_time_seconds: float = 200.0
     exploration_seconds: float = 30.0
+    mlp_ensemble_members: int = 5
+    mlp_randomized_prior_seconds: float = 30.0
+    mlp_hidden_dim: int = 32
+    mlp_training_steps: int = 48
+    mlp_learning_rate: float = 0.004
+    mlp_bootstrap_keep_probability: float = 0.8
+    mlp_warmup_successes: int = 32
     observation_noise_seconds: float = 1.5
     curve_lengthscale_raw: float = 12.0
     uniform_exploration: float = 0.05
@@ -26,18 +33,43 @@ ENGINE_TUNER_DEFAULTS = EngineTunerDefaults()
 
 
 @dataclass(frozen=True, slots=True)
-class EngineTunerSettings:
-    """Static knobs for one adaptive engine-tuning run."""
+class EngineTunerCommonSettings:
+    """Backend-independent knobs for one adaptive engine-tuning run."""
 
     min_raw_value: int = 0
     max_raw_value: int = 100
-    backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
-    stat_decay: float = ENGINE_TUNER_DEFAULTS.stat_decay
     prior_finish_time_seconds: float = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
+    uniform_exploration: float = ENGINE_TUNER_DEFAULTS.uniform_exploration
+
+
+@dataclass(frozen=True, slots=True)
+class GaussianProcessEngineTunerSettings(EngineTunerCommonSettings):
+    """Static knobs used only by the Gaussian-process backend."""
+
+    backend: Literal["gaussian_process"] = "gaussian_process"
+    stat_decay: float = ENGINE_TUNER_DEFAULTS.stat_decay
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
     observation_noise_seconds: float = ENGINE_TUNER_DEFAULTS.observation_noise_seconds
     curve_lengthscale_raw: float = ENGINE_TUNER_DEFAULTS.curve_lengthscale_raw
-    uniform_exploration: float = ENGINE_TUNER_DEFAULTS.uniform_exploration
+
+
+@dataclass(frozen=True, slots=True)
+class MlpEnsembleEngineTunerSettings(EngineTunerCommonSettings):
+    """Static knobs used only by the MLP ensemble backend."""
+
+    backend: Literal["mlp_ensemble"] = "mlp_ensemble"
+    ensemble_members: int = ENGINE_TUNER_DEFAULTS.mlp_ensemble_members
+    randomized_prior_seconds: float = ENGINE_TUNER_DEFAULTS.mlp_randomized_prior_seconds
+    hidden_dim: int = ENGINE_TUNER_DEFAULTS.mlp_hidden_dim
+    training_steps: int = ENGINE_TUNER_DEFAULTS.mlp_training_steps
+    learning_rate: float = ENGINE_TUNER_DEFAULTS.mlp_learning_rate
+    bootstrap_keep_probability: float = ENGINE_TUNER_DEFAULTS.mlp_bootstrap_keep_probability
+    warmup_successes: int = ENGINE_TUNER_DEFAULTS.mlp_warmup_successes
+
+
+EngineTunerSettings: TypeAlias = (
+    GaussianProcessEngineTunerSettings | MlpEnsembleEngineTunerSettings
+)
 
 
 @dataclass(frozen=True, slots=True)

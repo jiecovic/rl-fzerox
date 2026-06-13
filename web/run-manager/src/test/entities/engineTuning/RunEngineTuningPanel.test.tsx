@@ -27,12 +27,15 @@ describe("RunEngineTuningPanel", () => {
 
     expect(screen.getByText("Big Blue 2 · Blue Falcon")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /X Cup · Blue Falcon/ })).toBeInTheDocument();
-    expect(screen.getByText("42.0%")).toBeInTheDocument();
-    expect(screen.getByText("y: probability 0-42.0%")).toBeInTheDocument();
+    expect(screen.getByText(hasExactText("y: probability 0-42.0%"))).toBeInTheDocument();
     expect(screen.getByText("deterministic greedy")).toBeInTheDocument();
     expect(screen.queryByText("big_blue_2 · blue_falcon")).not.toBeInTheDocument();
   });
 });
+
+function hasExactText(expected: string) {
+  return (_content: string, element: Element | null) => element?.textContent === expected;
+}
 
 function engineTuningStateFixture(): EngineTuningRuntimeState {
   return {
@@ -97,8 +100,11 @@ function engineTuningContextFixture(
     context_key: "big_blue_2|blue_falcon",
     course_key: "big_blue_2",
     finish_count: 1,
+    model_ready: true,
     observed_candidate_count: 1,
     recommended_engine_setting_raw_value: 55,
+    warmup_remaining: 0,
+    warmup_successes: 0,
     vehicle_id: "blue_falcon",
     ...overrides,
   };

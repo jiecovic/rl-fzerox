@@ -16,6 +16,8 @@ from rl_fzerox.core.engine_tuning.types import (
     EngineTuningChoice,
     EngineTuningContext,
     EngineTuningEpisodeOutcome,
+    GaussianProcessEngineTunerSettings,
+    MlpEnsembleEngineTunerSettings,
     engine_candidates,
     finish_time_ms_from_score,
     finish_time_score,
@@ -84,9 +86,11 @@ def _backend_for(
     state: EngineTuningRuntimeState | None,
 ) -> GaussianProcessEngineTuner | MlpEnsembleEngineTuner:
     runtime_state = state or empty_engine_tuning_state()
-    if settings.backend == "mlp_ensemble":
+    if isinstance(settings, MlpEnsembleEngineTunerSettings):
         return MlpEnsembleEngineTuner(settings=settings, state=runtime_state)
-    return GaussianProcessEngineTuner(settings=settings, state=runtime_state)
+    if isinstance(settings, GaussianProcessEngineTunerSettings):
+        return GaussianProcessEngineTuner(settings=settings, state=runtime_state)
+    raise TypeError(f"unsupported engine tuner settings: {type(settings).__name__}")
 
 
 __all__ = (
@@ -96,6 +100,8 @@ __all__ = (
     "EngineTuningChoice",
     "EngineTuningContext",
     "EngineTuningEpisodeOutcome",
+    "GaussianProcessEngineTunerSettings",
+    "MlpEnsembleEngineTunerSettings",
     "OrderedEngineTuner",
     "engine_candidates",
     "finish_time_ms_from_score",

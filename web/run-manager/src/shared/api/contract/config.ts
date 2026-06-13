@@ -161,7 +161,12 @@ const vehicleConfigSchema = z
     engine_setting_max_raw_value: z.number().int().min(0).max(100),
     adaptive_engine_tuner_backend: engineTunerBackendSchema.default("gaussian_process"),
     adaptive_engine_stat_decay: z.number().gt(0).lt(1).default(0.995),
-    adaptive_engine_exploration_scale: z.number().nonnegative().default(30),
+    adaptive_engine_ensemble_members: z.number().int().min(1).max(32).default(5),
+    adaptive_engine_mlp_hidden_dim: z.number().int().min(4).max(512).default(32),
+    adaptive_engine_mlp_training_steps: z.number().int().min(1).max(2048).default(48),
+    adaptive_engine_mlp_learning_rate: z.number().gt(0).max(1).default(0.004),
+    adaptive_engine_mlp_bootstrap_keep_probability: z.number().gt(0).max(1).default(0.8),
+    adaptive_engine_mlp_warmup_successes: z.number().int().min(1).max(4096).default(32),
     adaptive_engine_uniform_exploration: z.number().min(0).max(1).default(0.05),
   })
   .refine(

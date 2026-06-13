@@ -7,7 +7,10 @@ from gymnasium import spaces
 
 from fzerox_emulator import EmulatorBackend, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
-from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
+from rl_fzerox.core.engine_tuning import (
+    EngineTuningResetSampler,
+    EngineTuningSelectionMode,
+)
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine.components import build_engine_runtime_components
 from rl_fzerox.core.envs.engine.controls import (
@@ -15,9 +18,6 @@ from rl_fzerox.core.envs.engine.controls import (
     ActionMaskSnapshot,
 )
 from rl_fzerox.core.envs.engine.reset import EngineResetCoordinator
-from rl_fzerox.core.envs.engine.reset.track_sampling.selection import (
-    EngineTuningSelectionMode,
-)
 from rl_fzerox.core.envs.engine.stepping import WatchEnvStep
 from rl_fzerox.core.envs.gym_runtime.reset import reset_gym_episode
 from rl_fzerox.core.envs.gym_runtime.stepping import GymStepRuntime
@@ -129,21 +129,15 @@ class FZeroXEnvRuntime:
 
         self._reset_coordinator.set_track_sampling_config(config)
 
-    def set_engine_tuning_state(self, state: EngineTuningRuntimeState | None) -> None:
-        """Replace adaptive engine-tuning stats used at future resets."""
+    def set_engine_tuning_sampler(self, sampler: EngineTuningResetSampler | None) -> None:
+        """Replace adaptive engine choices used at future resets."""
 
-        self._reset_coordinator.set_engine_tuning_state(state)
+        self._reset_coordinator.set_engine_tuning_sampler(sampler)
 
     def set_engine_tuning_selection(self, selection: EngineTuningSelectionMode) -> None:
         """Choose whether adaptive engine tuning samples or picks greedy values."""
 
         self._reset_coordinator.set_engine_tuning_selection(selection)
-
-    @property
-    def engine_tuning_state(self) -> EngineTuningRuntimeState | None:
-        """Return adaptive engine-tuning stats used at future resets."""
-
-        return self._reset_coordinator.engine_tuning_state
 
     def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
         """Append externally scheduled course ids for deficit-budget resets."""

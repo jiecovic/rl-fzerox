@@ -5,7 +5,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fzerox_emulator import Emulator
+from rl_fzerox.core.engine_tuning import EngineTuningContext
+from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
@@ -94,15 +97,31 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
 def load_watch_engine_tuning_state(config: WatchAppConfig, env: FZeroXEnv) -> None:
     if not config.env.track_sampling.engine_tuning.enabled:
         return
+    state = None
     if config.watch.policy_run_dir is None:
-        env.set_engine_tuning_state(None)
-        return
-    try:
-        policy_path = resolve_policy_artifact_path(
-            config.watch.policy_run_dir,
-            artifact=config.watch.policy_artifact,
-        )
-    except FileNotFoundError:
-        env.set_engine_tuning_state(None)
-        return
-    env.set_engine_tuning_state(load_engine_tuning_checkpoint_state(policy_path))
+        policy_path = None
+    else:
+        try:
+            policy_path = resolve_policy_artifact_path(
+                config.watch.policy_run_dir,
+                artifact=config.watch.policy_artifact,
+            )
+        except FileNotFoundError:
+            policy_path = None
+    if policy_path is not None:
+        state = load_engine_tuning_checkpoint_state(policy_path)
+    controller = EngineTuningTrainingController(
+        config.env.track_sampling.engine_tuning,
+        state=state,
+    )
+    env.set_engine_tuning_sampler(
+        controller.reset_sampler_snapshot(_watch_engine_tuning_contexts(config))
+    )
+
+
+def _watch_engine_tuning_contexts(config: WatchAppConfig) -> tuple[EngineTuningContext, ...]:
+    contexts: dict[str, EngineTuningContext] = {}
+    for entry in config.env.track_sampling.entries:
+        context = engine_tuning_context_for_entry(entry)
+        contexts.setdefault(context.key, context)
+    return tuple(contexts[key] for key in sorted(contexts))

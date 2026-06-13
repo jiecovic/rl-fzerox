@@ -7,12 +7,12 @@ import gymnasium as gym
 
 from fzerox_emulator import EmulatorBackend, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
-from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
-from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
-from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
-from rl_fzerox.core.envs.engine.reset.track_sampling.selection import (
+from rl_fzerox.core.engine_tuning import (
+    EngineTuningResetSampler,
     EngineTuningSelectionMode,
 )
+from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
+from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.gym_runtime import FZeroXEnvRuntime
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.runtime_spec.schema import (
@@ -121,21 +121,15 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         self._runtime.set_track_sampling_config(config)
 
-    def set_engine_tuning_state(self, state: EngineTuningRuntimeState | None) -> None:
-        """Replace adaptive engine-tuning stats used at future resets."""
+    def set_engine_tuning_sampler(self, sampler: EngineTuningResetSampler | None) -> None:
+        """Replace adaptive engine choices used at future resets."""
 
-        self._runtime.set_engine_tuning_state(state)
+        self._runtime.set_engine_tuning_sampler(sampler)
 
     def set_engine_tuning_selection(self, selection: EngineTuningSelectionMode) -> None:
         """Choose whether adaptive engine tuning samples or picks greedy values."""
 
         self._runtime.set_engine_tuning_selection(selection)
-
-    @property
-    def engine_tuning_state(self) -> EngineTuningRuntimeState | None:
-        """Return adaptive engine-tuning stats used at future resets."""
-
-        return self._runtime.engine_tuning_state
 
     def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
         """Append externally scheduled course ids for deficit-budget resets."""

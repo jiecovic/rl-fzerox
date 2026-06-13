@@ -16,11 +16,11 @@ from rl_fzerox.core.engine_tuning.state import (
     empty_engine_tuning_state,
 )
 from rl_fzerox.core.engine_tuning.types import (
-    EngineTunerSettings,
     EngineTuningCandidateEstimate,
     EngineTuningChoice,
     EngineTuningContext,
     EngineTuningEpisodeOutcome,
+    GaussianProcessEngineTunerSettings,
     engine_candidates,
     finish_time_ms_from_score,
     finish_time_score,
@@ -34,7 +34,7 @@ class GaussianProcessEngineTuner:
     def __init__(
         self,
         *,
-        settings: EngineTunerSettings,
+        settings: GaussianProcessEngineTunerSettings,
         state: EngineTuningRuntimeState | None = None,
     ) -> None:
         self._settings = settings
@@ -350,7 +350,7 @@ def _successful_score(
     return outcome, finish_time_score(finish_time_ms), finish_time_ms
 
 
-def _smoothing_bandwidth(settings: EngineTunerSettings) -> float:
+def _smoothing_bandwidth(settings: GaussianProcessEngineTunerSettings) -> float:
     return max(1.0, float(settings.curve_lengthscale_raw))
 
 
@@ -359,7 +359,7 @@ def _gp_posterior(
     observed_candidates: tuple[EngineTuningCandidateState, ...],
     candidate_raw_values: tuple[int, ...],
     prior_score: float,
-    settings: EngineTunerSettings,
+    settings: GaussianProcessEngineTunerSettings,
 ) -> _EnginePosterior:
     train_x = torch.as_tensor(
         [
@@ -457,7 +457,7 @@ def _normalize_engine_raw(raw_value: int) -> float:
 def _observation_noise_variance(
     candidate: EngineTuningCandidateState,
     *,
-    settings: EngineTunerSettings,
+    settings: GaussianProcessEngineTunerSettings,
 ) -> float:
     base_std = max(0.25, float(settings.observation_noise_seconds))
     effective_count = max(1e-6, float(candidate.decayed_count))

@@ -5,11 +5,12 @@ import pytest
 
 from rl_fzerox.core.engine_tuning import (
     ENGINE_TUNING_STATE_VERSION,
-    EngineTunerSettings,
     EngineTuningCandidateState,
     EngineTuningContext,
     EngineTuningEpisodeOutcome,
     EngineTuningRuntimeState,
+    GaussianProcessEngineTunerSettings,
+    MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
 from rl_fzerox.core.engine_tuning.tuner import engine_candidates
@@ -31,7 +32,7 @@ def test_ordered_tuner_recommends_lower_finish_time() -> None:
         vehicle_id="blue_falcon",
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=GaussianProcessEngineTunerSettings(
             min_raw_value=40,
             max_raw_value=60,
             prior_finish_time_seconds=200.0,
@@ -78,10 +79,9 @@ def test_mlp_ensemble_backend_records_model_state() -> None:
         vehicle_id="blue_falcon",
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=MlpEnsembleEngineTunerSettings(
             min_raw_value=40,
             max_raw_value=60,
-            backend="mlp_ensemble",
             prior_finish_time_seconds=200.0,
             uniform_exploration=0.0,
         ),
@@ -109,6 +109,9 @@ def test_mlp_ensemble_backend_records_model_state() -> None:
 
     assert state.model_state is not None
     assert state.model_state.backend == "mlp_ensemble"
+    assert state.candidates == ()
+    assert state.model_state.contexts[0].context_key == context.key
+    assert state.model_state.contexts[0].finish_count == 2
     assert len(estimates) == 21
     assert tuner.recommendation(context).engine_setting_raw_value in range(40, 61)
 
@@ -137,10 +140,9 @@ def test_mlp_ensemble_backend_does_not_warm_start_from_aggregate_candidates() ->
         ),
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=MlpEnsembleEngineTunerSettings(
             min_raw_value=40,
             max_raw_value=60,
-            backend="mlp_ensemble",
             prior_finish_time_seconds=200.0,
             uniform_exploration=0.0,
         ),
@@ -154,13 +156,111 @@ def test_mlp_ensemble_backend_does_not_warm_start_from_aggregate_candidates() ->
     assert choice.mean_score == pytest.approx(-200.0)
 
 
+def test_mlp_ensemble_backend_uses_configured_member_count() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=MlpEnsembleEngineTunerSettings(
+            min_raw_value=40,
+            max_raw_value=60,
+            prior_finish_time_seconds=200.0,
+            ensemble_members=7,
+        ),
+    )
+
+    state = tuner.record_many(
+        (
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=40,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=110_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=60,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=90_000,
+            ),
+        )
+    )
+
+    assert state.model_state is not None
+    assert len(state.model_state.members) == 7
+
+
+def test_mlp_ensemble_backend_keeps_model_state_separate_from_gp_aggregates() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=MlpEnsembleEngineTunerSettings(
+            min_raw_value=40,
+            max_raw_value=60,
+            prior_finish_time_seconds=200.0,
+        ),
+    )
+
+    state = tuner.record(
+        EngineTuningEpisodeOutcome(
+            context=context,
+            engine_setting_raw_value=40,
+            completion_fraction=1.0,
+            finished=True,
+            race_time_ms=110_000,
+        )
+    )
+
+    assert state.candidates == ()
+    assert state.model_state is not None
+    assert state.model_state.contexts[0].finish_count == 1
+
+
+def test_mlp_ensemble_starts_near_uniform_after_one_success() -> None:
+    context = EngineTuningContext(
+        course_key="big_blue_2",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=MlpEnsembleEngineTunerSettings(
+            min_raw_value=0,
+            max_raw_value=100,
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+    )
+
+    tuner.record(
+        EngineTuningEpisodeOutcome(
+            context=context,
+            engine_setting_raw_value=70,
+            completion_fraction=1.0,
+            finished=True,
+            race_time_ms=75_000,
+        )
+    )
+
+    probabilities = tuple(
+        estimate.probability for estimate in tuner.distribution(context, seed=123, draws=512)
+    )
+
+    assert max(probabilities) < 0.011
+    assert min(probabilities) > 0.009
+    assert sum(probabilities) == pytest.approx(1.0)
+
+
 def test_ordered_tuner_ignores_failed_engine_samples() -> None:
     context = EngineTuningContext(
         course_key="silence",
         vehicle_id="deep_claw",
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=GaussianProcessEngineTunerSettings(
             min_raw_value=50,
             max_raw_value=50,
             prior_finish_time_seconds=200.0,
@@ -190,7 +290,7 @@ def test_discounted_state_prefers_recent_observations() -> None:
         vehicle_id="deep_claw",
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=GaussianProcessEngineTunerSettings(
             min_raw_value=50,
             max_raw_value=50,
             stat_decay=0.5,
@@ -229,7 +329,7 @@ def test_discounting_applies_to_all_candidates_on_new_success() -> None:
         vehicle_id="deep_claw",
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=GaussianProcessEngineTunerSettings(
             min_raw_value=40,
             max_raw_value=60,
             stat_decay=0.5,
@@ -268,7 +368,7 @@ def test_ordered_tuner_shares_information_with_nearby_candidates() -> None:
         vehicle_id="deep_claw",
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=GaussianProcessEngineTunerSettings(
             min_raw_value=50,
             max_raw_value=90,
             prior_finish_time_seconds=200.0,
@@ -303,7 +403,7 @@ def test_distribution_samples_correlated_posterior_functions() -> None:
         vehicle_id="blue_falcon",
     )
     tuner = OrderedEngineTuner(
-        settings=EngineTunerSettings(
+        settings=GaussianProcessEngineTunerSettings(
             min_raw_value=60,
             max_raw_value=80,
             prior_finish_time_seconds=200.0,

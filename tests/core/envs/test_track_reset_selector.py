@@ -4,9 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from rl_fzerox.core.engine_tuning import (
-    ENGINE_TUNING_STATE_VERSION,
-    EngineTuningCandidateState,
-    EngineTuningRuntimeState,
+    EngineTuningContext,
+    EngineTuningResetCandidate,
+    EngineTuningResetContext,
+    EngineTuningResetSampler,
 )
 from rl_fzerox.core.envs.engine.reset import TrackResetSelector, select_reset_track_by_course_id
 from rl_fzerox.core.runtime_spec.schema import (
@@ -141,24 +142,28 @@ def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
             ),
         ),
     )
-    state = EngineTuningRuntimeState(
-        version=ENGINE_TUNING_STATE_VERSION,
-        update_count=1,
-        candidates=(
-            EngineTuningCandidateState(
-                context_key="mute_city|blue_falcon",
-                course_key="mute_city",
-                vehicle_id="blue_falcon",
-                engine_setting_raw_value=70,
-                finish_count=2,
-                decayed_count=2.0,
-                decayed_score_total=-160.0,
-                best_time_ms=80_000,
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    sampler = EngineTuningResetSampler(
+        contexts=(
+            EngineTuningResetContext(
+                context=context,
+                candidates=(
+                    EngineTuningResetCandidate(
+                        engine_setting_raw_value=70,
+                        probability=1.0,
+                        mean_score=-80.0,
+                        sampled_score=-80.0,
+                        finish_count=2,
+                        estimated_finish_time_ms=80_000,
+                        best_finish_time_ms=80_000,
+                    ),
+                ),
+                greedy_engine_setting_raw_value=70,
             ),
         ),
     )
 
-    selected = TrackResetSelector().select(config, seed=123, engine_tuning_state=state)
+    selected = TrackResetSelector().select(config, seed=123, engine_tuning_sampler=sampler)
 
     assert selected is not None
     assert selected.engine_setting_raw_value == 70

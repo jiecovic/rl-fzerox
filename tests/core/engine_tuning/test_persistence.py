@@ -2,9 +2,20 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
-from rl_fzerox.core.engine_tuning import ENGINE_TUNING_STATE_VERSION
-from rl_fzerox.core.engine_tuning.persistence import load_engine_tuning_runtime_state_json
+from rl_fzerox.core.engine_tuning import (
+    ENGINE_TUNING_STATE_VERSION,
+    EngineTuningContext,
+    EngineTuningEpisodeOutcome,
+    MlpEnsembleEngineTunerSettings,
+    OrderedEngineTuner,
+)
+from rl_fzerox.core.engine_tuning.persistence import (
+    load_engine_tuning_runtime_state,
+    load_engine_tuning_runtime_state_json,
+    save_engine_tuning_runtime_state,
+)
 
 
 def test_loader_rejects_previous_completion_scored_state_version() -> None:
@@ -32,3 +43,39 @@ def test_loader_rejects_previous_completion_scored_state_version() -> None:
     )
 
     assert load_engine_tuning_runtime_state_json(data) is None
+
+
+def test_mlp_model_weights_round_trip_through_pt_sidecar(tmp_path: Path) -> None:
+    context = EngineTuningContext(
+        course_key="big_blue_2",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=MlpEnsembleEngineTunerSettings(
+            min_raw_value=0,
+            max_raw_value=100,
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+    )
+    state = tuner.record(
+        EngineTuningEpisodeOutcome(
+            context=context,
+            engine_setting_raw_value=70,
+            completion_fraction=1.0,
+            finished=True,
+            race_time_ms=75_000,
+        )
+    )
+    state_path = tmp_path / "engine_tuning_state.json"
+    model_path = tmp_path / "engine_tuning_model.pt"
+
+    save_engine_tuning_runtime_state(state_path, state, model_path=model_path)
+    loaded = load_engine_tuning_runtime_state(state_path, model_path=model_path)
+
+    assert model_path.is_file()
+    assert loaded is not None
+    assert loaded.model_state is not None
+    assert loaded.model_state.backend == "mlp_ensemble"
+    assert loaded.model_state.members
+    assert loaded.model_state.contexts[0].finish_count == 1

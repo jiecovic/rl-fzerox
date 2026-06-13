@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+import torch
+
 from rl_fzerox.core.engine_tuning.types import EngineTunerBackend
 
 ENGINE_TUNING_STATE_VERSION = 5
@@ -77,11 +79,10 @@ class EngineTuningCandidateState:
 
 @dataclass(frozen=True, slots=True)
 class EngineTuningTensorState:
-    """One flattened tensor stored in the engine-tuner checkpoint."""
+    """One tensor stored in the engine-tuner model checkpoint."""
 
     name: str
-    shape: tuple[int, ...]
-    values: tuple[float, ...]
+    value: torch.Tensor
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,13 +93,24 @@ class EngineTuningEnsembleMemberState:
 
 
 @dataclass(frozen=True, slots=True)
+class EngineTuningModelContextState:
+    """Observed context metadata for model-backed tuners."""
+
+    context_key: str
+    course_key: str
+    vehicle_id: str
+    finish_count: int = 0
+
+
+@dataclass(frozen=True, slots=True)
 class EngineTuningModelState:
     """Optional learned model state for non-aggregate tuner backends."""
 
     backend: EngineTunerBackend
     course_keys: tuple[str, ...]
     vehicle_ids: tuple[str, ...]
-    members: tuple[EngineTuningEnsembleMemberState, ...]
+    members: tuple[EngineTuningEnsembleMemberState, ...] = ()
+    contexts: tuple[EngineTuningModelContextState, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,10 +167,16 @@ class EngineTuningRuntimeState:
     def with_model_state(
         self,
         model_state: EngineTuningModelState | None,
+        *,
+        increment_update_count: bool = False,
     ) -> EngineTuningRuntimeState:
         """Return state with updated learned model weights."""
 
-        return replace(self, model_state=model_state)
+        return replace(
+            self,
+            update_count=self.update_count + (1 if increment_update_count else 0),
+            model_state=model_state,
+        )
 
 
 def empty_engine_tuning_state() -> EngineTuningRuntimeState:

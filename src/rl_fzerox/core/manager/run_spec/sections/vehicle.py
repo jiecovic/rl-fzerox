@@ -3,7 +3,15 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+    model_validator,
+)
 
 from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS
 from rl_fzerox.core.manager.run_spec.common import (
@@ -31,15 +39,55 @@ class ManagedVehicleConfig(BaseModel):
         gt=0.0,
         lt=1.0,
     )
-    adaptive_engine_exploration_scale: float = Field(
-        default=ENGINE_TUNER_DEFAULTS.exploration_seconds,
-        ge=0.0,
+    adaptive_engine_ensemble_members: int = Field(
+        default=ENGINE_TUNER_DEFAULTS.mlp_ensemble_members,
+        ge=1,
+        le=32,
+    )
+    adaptive_engine_mlp_hidden_dim: int = Field(
+        default=ENGINE_TUNER_DEFAULTS.mlp_hidden_dim,
+        ge=4,
+        le=512,
+    )
+    adaptive_engine_mlp_training_steps: int = Field(
+        default=ENGINE_TUNER_DEFAULTS.mlp_training_steps,
+        ge=1,
+        le=2048,
+    )
+    adaptive_engine_mlp_learning_rate: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.mlp_learning_rate,
+        gt=0.0,
+        le=1.0,
+    )
+    adaptive_engine_mlp_bootstrap_keep_probability: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.mlp_bootstrap_keep_probability,
+        gt=0.0,
+        le=1.0,
+    )
+    adaptive_engine_mlp_warmup_successes: int = Field(
+        default=ENGINE_TUNER_DEFAULTS.mlp_warmup_successes,
+        ge=1,
+        le=4096,
     )
     adaptive_engine_uniform_exploration: float = Field(
         default=ENGINE_TUNER_DEFAULTS.uniform_exploration,
         ge=0.0,
         le=1.0,
     )
+
+    @model_serializer(mode="wrap")
+    def _serialize_vehicle(self, handler: SerializerFunctionWrapHandler) -> object:
+        data = handler(self)
+        if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "gaussian_process":
+            data.pop("adaptive_engine_stat_decay", None)
+        if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "mlp_ensemble":
+            data.pop("adaptive_engine_ensemble_members", None)
+            data.pop("adaptive_engine_mlp_hidden_dim", None)
+            data.pop("adaptive_engine_mlp_training_steps", None)
+            data.pop("adaptive_engine_mlp_learning_rate", None)
+            data.pop("adaptive_engine_mlp_bootstrap_keep_probability", None)
+            data.pop("adaptive_engine_mlp_warmup_successes", None)
+        return data
 
     @model_validator(mode="before")
     @classmethod

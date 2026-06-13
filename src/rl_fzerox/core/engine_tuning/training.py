@@ -5,8 +5,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from zlib import crc32
 
 from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
+from rl_fzerox.core.engine_tuning.sampling import (
+    EngineTuningResetCandidate,
+    EngineTuningResetContext,
+    EngineTuningResetSampler,
+)
 from rl_fzerox.core.engine_tuning.state import (
     EngineTuningRuntimeState,
     empty_engine_tuning_state,
@@ -41,6 +47,43 @@ class EngineTuningTrainingController:
     @property
     def runtime_state(self) -> EngineTuningRuntimeState:
         return self._tuner.state
+
+    def reset_sampler_snapshot(
+        self,
+        contexts: Sequence[EngineTuningContext],
+    ) -> EngineTuningResetSampler:
+        """Build the plain engine-choice table sent to reset workers."""
+
+        reset_contexts: list[EngineTuningResetContext] = []
+        for context in _unique_contexts(contexts):
+            estimates = self._tuner.distribution(
+                context,
+                seed=_distribution_seed(self.runtime_state.update_count, context),
+            )
+            if not estimates:
+                continue
+            recommendation = self._tuner.recommendation(context)
+            reset_contexts.append(
+                EngineTuningResetContext(
+                    context=context,
+                    candidates=tuple(
+                        EngineTuningResetCandidate(
+                            engine_setting_raw_value=estimate.engine_setting_raw_value,
+                            probability=estimate.probability,
+                            mean_score=estimate.mean_score,
+                            sampled_score=estimate.uncertainty_score,
+                            finish_count=estimate.finish_count,
+                            estimated_finish_time_ms=estimate.estimated_finish_time_ms,
+                            best_finish_time_ms=estimate.best_finish_time_ms,
+                        )
+                        for estimate in estimates
+                    ),
+                    greedy_engine_setting_raw_value=(
+                        recommendation.engine_setting_raw_value
+                    ),
+                )
+            )
+        return EngineTuningResetSampler(contexts=tuple(reset_contexts))
 
     def record_episodes(self, episodes: Sequence[Mapping[str, object]]) -> bool:
         """Record terminal episode dictionaries and return whether state changed."""
@@ -151,3 +194,17 @@ def _mapping_float(raw: Mapping[str, object], key: str) -> float | None:
 def _sanitize_log_key(value: str) -> str:
     sanitized = "".join(char if char.isalnum() else "_" for char in value.strip().lower())
     return sanitized.strip("_") or "unknown"
+
+
+def _unique_contexts(
+    contexts: Sequence[EngineTuningContext],
+) -> tuple[EngineTuningContext, ...]:
+    by_key: dict[str, EngineTuningContext] = {}
+    for context in contexts:
+        by_key.setdefault(context.key, context)
+    return tuple(by_key[key] for key in sorted(by_key))
+
+
+def _distribution_seed(update_count: int, context: EngineTuningContext) -> int:
+    data = f"{int(update_count)}|{context.key}".encode()
+    return crc32(data) & 0xFFFF_FFFF

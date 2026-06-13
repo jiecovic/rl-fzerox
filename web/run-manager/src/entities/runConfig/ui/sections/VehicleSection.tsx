@@ -173,8 +173,17 @@ export function VehicleSection({
         <ConfigPanel
           onReset={() =>
             updateVehicle({
-              adaptive_engine_exploration_scale:
-                defaultConfig.vehicle.adaptive_engine_exploration_scale,
+              adaptive_engine_ensemble_members:
+                defaultConfig.vehicle.adaptive_engine_ensemble_members,
+              adaptive_engine_mlp_hidden_dim: defaultConfig.vehicle.adaptive_engine_mlp_hidden_dim,
+              adaptive_engine_mlp_training_steps:
+                defaultConfig.vehicle.adaptive_engine_mlp_training_steps,
+              adaptive_engine_mlp_learning_rate:
+                defaultConfig.vehicle.adaptive_engine_mlp_learning_rate,
+              adaptive_engine_mlp_bootstrap_keep_probability:
+                defaultConfig.vehicle.adaptive_engine_mlp_bootstrap_keep_probability,
+              adaptive_engine_mlp_warmup_successes:
+                defaultConfig.vehicle.adaptive_engine_mlp_warmup_successes,
               adaptive_engine_stat_decay: defaultConfig.vehicle.adaptive_engine_stat_decay,
               adaptive_engine_tuner_backend: defaultConfig.vehicle.adaptive_engine_tuner_backend,
               adaptive_engine_uniform_exploration:
@@ -408,6 +417,7 @@ function AdaptiveEngineControls({
 }) {
   const vehicle = config.vehicle;
   const defaultVehicle = defaultConfig.vehicle;
+  const isGaussianProcessBackend = vehicle.adaptive_engine_tuner_backend === "gaussian_process";
   return (
     <div className="grid gap-3 border-t border-app-border pt-3">
       <div className="grid gap-1">
@@ -438,21 +448,91 @@ function AdaptiveEngineControls({
         />
         <small className="m-0 text-xs leading-snug text-app-muted">
           GP fits a smooth ordered curve from aggregates. MLP ensemble learns a shared course and
-          vehicle surrogate with bootstrapped uncertainty.
+          vehicle surrogate with bootstrapped uncertainty. Backend uncertainty scales are derived
+          from the episode horizon.
         </small>
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
-        <RangeNumberField
-          help="Discount factor for old successful-finish statistics. Higher values remember longer."
-          label="Stat decay"
-          max={0.999}
-          min={0.001}
-          numberStep="0.001"
-          rangeStep={0.001}
-          resetValue={defaultVehicle.adaptive_engine_stat_decay}
-          value={vehicle.adaptive_engine_stat_decay}
-          onChange={(adaptive_engine_stat_decay) => onChange({ adaptive_engine_stat_decay })}
-        />
+        {isGaussianProcessBackend ? (
+          <RangeNumberField
+            help="GP-only discount factor for old successful-finish aggregates. Higher values remember longer."
+            label="Stat decay"
+            max={0.999}
+            min={0.001}
+            numberStep="0.001"
+            rangeStep={0.001}
+            resetValue={defaultVehicle.adaptive_engine_stat_decay}
+            value={vehicle.adaptive_engine_stat_decay}
+            onChange={(adaptive_engine_stat_decay) => onChange({ adaptive_engine_stat_decay })}
+          />
+        ) : null}
+        {!isGaussianProcessBackend ? (
+          <>
+            <NumberField
+              help="Number of bootstrapped MLP members used for Thompson-style engine selection. More members improve uncertainty estimates but cost more CPU."
+              label="Ensemble members"
+              resetValue={defaultVehicle.adaptive_engine_ensemble_members}
+              step="1"
+              value={vehicle.adaptive_engine_ensemble_members}
+              onChange={(adaptive_engine_ensemble_members) =>
+                onChange({ adaptive_engine_ensemble_members })
+              }
+            />
+            <NumberField
+              help="Hidden width of each MLP ensemble member."
+              label="Hidden size"
+              resetValue={defaultVehicle.adaptive_engine_mlp_hidden_dim}
+              step="1"
+              value={vehicle.adaptive_engine_mlp_hidden_dim}
+              onChange={(adaptive_engine_mlp_hidden_dim) =>
+                onChange({ adaptive_engine_mlp_hidden_dim })
+              }
+            />
+            <NumberField
+              help="Adam optimization steps applied to each ensemble member after one PPO rollout."
+              label="Training steps"
+              resetValue={defaultVehicle.adaptive_engine_mlp_training_steps}
+              step="1"
+              value={vehicle.adaptive_engine_mlp_training_steps}
+              onChange={(adaptive_engine_mlp_training_steps) =>
+                onChange({ adaptive_engine_mlp_training_steps })
+              }
+            />
+            <NumberField
+              help="Adam learning rate for the MLP ensemble update."
+              label="Learning rate"
+              resetValue={defaultVehicle.adaptive_engine_mlp_learning_rate}
+              step="0.0005"
+              value={vehicle.adaptive_engine_mlp_learning_rate}
+              onChange={(adaptive_engine_mlp_learning_rate) =>
+                onChange({ adaptive_engine_mlp_learning_rate })
+              }
+            />
+            <RangeNumberField
+              help="Bootstrap probability that each successful rollout sample trains each member."
+              label="Bootstrap keep"
+              max={1}
+              min={0.01}
+              numberStep="0.01"
+              rangeStep={0.01}
+              resetValue={defaultVehicle.adaptive_engine_mlp_bootstrap_keep_probability}
+              value={vehicle.adaptive_engine_mlp_bootstrap_keep_probability}
+              onChange={(adaptive_engine_mlp_bootstrap_keep_probability) =>
+                onChange({ adaptive_engine_mlp_bootstrap_keep_probability })
+              }
+            />
+            <NumberField
+              help="Successful finishes required for one course and vehicle before the MLP sampler leaves uniform cold-start exploration."
+              label="Warmup finishes"
+              resetValue={defaultVehicle.adaptive_engine_mlp_warmup_successes}
+              step="1"
+              value={vehicle.adaptive_engine_mlp_warmup_successes}
+              onChange={(adaptive_engine_mlp_warmup_successes) =>
+                onChange({ adaptive_engine_mlp_warmup_successes })
+              }
+            />
+          </>
+        ) : null}
         <RangeNumberField
           help="Probability of taking a uniformly random engine value."
           label="Uniform exploration"
@@ -464,16 +544,6 @@ function AdaptiveEngineControls({
           value={vehicle.adaptive_engine_uniform_exploration}
           onChange={(adaptive_engine_uniform_exploration) =>
             onChange({ adaptive_engine_uniform_exploration })
-          }
-        />
-        <NumberField
-          help="Posterior uncertainty scale in seconds. Higher values explore longer."
-          label="Exploration seconds"
-          resetValue={defaultVehicle.adaptive_engine_exploration_scale}
-          step="0.01"
-          value={vehicle.adaptive_engine_exploration_scale}
-          onChange={(adaptive_engine_exploration_scale) =>
-            onChange({ adaptive_engine_exploration_scale })
           }
         />
       </div>

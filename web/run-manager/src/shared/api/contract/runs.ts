@@ -170,6 +170,9 @@ export const engineTuningRuntimeContextSchema = z.object({
   vehicle_id: z.string(),
   finish_count: z.number().int().nonnegative(),
   observed_candidate_count: z.number().int().nonnegative(),
+  model_ready: z.boolean().default(true),
+  warmup_successes: z.number().int().nonnegative().default(0),
+  warmup_remaining: z.number().int().nonnegative().default(0),
   recommended_engine_setting_raw_value: z.number().int().min(0).max(100),
   candidates: z.array(engineTuningRuntimeCandidateEstimateSchema),
 });

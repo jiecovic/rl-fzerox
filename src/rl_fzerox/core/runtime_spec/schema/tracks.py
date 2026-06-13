@@ -12,6 +12,8 @@ from pydantic import (
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    SerializerFunctionWrapHandler,
+    model_serializer,
     model_validator,
 )
 
@@ -162,6 +164,19 @@ class AdaptiveEngineTuningConfig(BaseModel):
     stat_decay: float = Field(default=ENGINE_TUNER_DEFAULTS.stat_decay, gt=0.0, lt=1.0)
     prior_finish_time_seconds: PositiveFloat = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     exploration_scale: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.exploration_seconds
+    ensemble_members: PositiveInt = ENGINE_TUNER_DEFAULTS.mlp_ensemble_members
+    randomized_prior_seconds: NonNegativeFloat = (
+        ENGINE_TUNER_DEFAULTS.mlp_randomized_prior_seconds
+    )
+    hidden_dim: PositiveInt = ENGINE_TUNER_DEFAULTS.mlp_hidden_dim
+    training_steps: PositiveInt = ENGINE_TUNER_DEFAULTS.mlp_training_steps
+    learning_rate: PositiveFloat = ENGINE_TUNER_DEFAULTS.mlp_learning_rate
+    bootstrap_keep_probability: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.mlp_bootstrap_keep_probability,
+        gt=0.0,
+        le=1.0,
+    )
+    warmup_successes: PositiveInt = ENGINE_TUNER_DEFAULTS.mlp_warmup_successes
     observation_noise_seconds: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.observation_noise_seconds
     curve_lengthscale_raw: PositiveFloat = ENGINE_TUNER_DEFAULTS.curve_lengthscale_raw
     uniform_exploration: float = Field(
@@ -169,6 +184,24 @@ class AdaptiveEngineTuningConfig(BaseModel):
         ge=0.0,
         le=1.0,
     )
+
+    @model_serializer(mode="wrap")
+    def _serialize_engine_tuning(self, handler: SerializerFunctionWrapHandler) -> object:
+        data = handler(self)
+        if isinstance(data, dict) and self.backend != "gaussian_process":
+            data.pop("stat_decay", None)
+            data.pop("exploration_scale", None)
+            data.pop("observation_noise_seconds", None)
+            data.pop("curve_lengthscale_raw", None)
+        if isinstance(data, dict) and self.backend != "mlp_ensemble":
+            data.pop("ensemble_members", None)
+            data.pop("randomized_prior_seconds", None)
+            data.pop("hidden_dim", None)
+            data.pop("training_steps", None)
+            data.pop("learning_rate", None)
+            data.pop("bootstrap_keep_probability", None)
+            data.pop("warmup_successes", None)
+        return data
 
     @model_validator(mode="after")
     def _validate_engine_range(self) -> AdaptiveEngineTuningConfig:

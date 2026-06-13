@@ -101,14 +101,19 @@ def main(argv: list[str] | None = None) -> None:
                 store=store,
                 run_id=run.id,
             ),
-            extra_callbacks=(
-                build_manager_training_callback(
+            extra_callback_factories=(
+                lambda engine_tuning_controller: build_manager_training_callback(
                     store=store,
                     run_id=run.id,
                     launch_token=args.launch_token,
                     run_paths=run_paths,
                     total_timesteps=train_config.train.total_timesteps,
                     lineage_step_offset=run.lineage_step_offset,
+                    engine_tuning_state_provider=(
+                        None
+                        if engine_tuning_controller is None
+                        else lambda: engine_tuning_controller.runtime_state
+                    ),
                 ),
             ),
             startup_reporter=_startup_reporter(
