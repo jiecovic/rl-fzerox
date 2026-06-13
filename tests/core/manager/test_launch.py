@@ -629,6 +629,20 @@ def test_watch_failure_detail_ignores_launch_log_headers(tmp_path: Path) -> None
 
     assert watch_failure_detail(log_path) == "RuntimeError: failed for real"
 
+    log_path.write_text(
+        "\n".join(
+            (
+                "# launched_at=2026-06-13T18:00:00+00:00",
+                "RuntimeError: CUDA error: out of memory",
+                "Search for `cudaErrorMemoryAllocation' in CUDA docs.",
+                "Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    assert watch_failure_detail(log_path) == "RuntimeError: CUDA error: out of memory"
+
 
 def test_start_career_mode_passes_viewer_lease_and_runtime_options(
     tmp_path: Path,

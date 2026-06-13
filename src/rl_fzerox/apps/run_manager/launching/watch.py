@@ -150,9 +150,24 @@ def watch_failure_detail(log_path: Path) -> str | None:
         return None
     for line in reversed(lines):
         detail = line.strip()
+        if _is_traceback_exception_line(detail):
+            return detail
+    for line in reversed(lines):
+        detail = line.strip()
         if detail and not detail.startswith("#"):
             return detail
     return None
+
+
+def _is_traceback_exception_line(detail: str) -> bool:
+    return detail.startswith(
+        (
+            "RuntimeError:",
+            "ValueError:",
+            "FileNotFoundError:",
+            "torch.OutOfMemoryError:",
+        )
+    )
 
 
 def active_watch_pid(
