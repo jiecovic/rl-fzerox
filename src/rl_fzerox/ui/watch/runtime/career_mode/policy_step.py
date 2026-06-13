@@ -21,6 +21,7 @@ from rl_fzerox.ui.watch.live_series import (
     EpisodeLiveSeriesTracker,
 )
 from rl_fzerox.ui.watch.records import TrackRecordBook
+from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
 from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
 from rl_fzerox.ui.watch.runtime.career_mode.timing import (
     measured_game_fps,
@@ -96,6 +97,7 @@ def step_policy_or_manual(
     live_visualization_enabled: bool,
     live_series: EpisodeLiveSeriesTracker,
     last_live_series_publish_time: float,
+    frame_recorder: FrameRecorder | None = None,
 ) -> CareerPolicyStepResult:
     previous_observation = observation
     previous_info = controller.viewer_info(
@@ -260,6 +262,7 @@ def step_policy_or_manual(
         track_record_book=TrackRecordBook(),
         manual_control_enabled=manual_control_enabled,
         live_episode_series=live_episode_series,
+        frame_recorder=frame_recorder,
     )
     return CareerPolicyStepResult(
         raw_observation=raw_observation,

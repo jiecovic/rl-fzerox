@@ -13,6 +13,7 @@ from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.core.envs.engine.reset.camera import CAMERA_SYNC_CONTROLS
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.records import TrackRecordBook
+from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
 from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
 from rl_fzerox.ui.watch.runtime.career_mode.timing import (
     measured_game_fps,
@@ -126,6 +127,7 @@ def step_menu(
     target_control_fps: float | None,
     native_frame_seconds: float | None,
     deterministic_policy: bool,
+    frame_recorder: FrameRecorder | None = None,
 ) -> None:
     if step is None:
         step = RawMenuStep(
@@ -160,12 +162,16 @@ def step_menu(
                 action_repeat=1,
             ),
         )
+        raw_frame = session.render()
+        if frame_recorder is not None:
+            frame_recorder.record_frame(raw_frame, info=info)
         publish_worker_message(
             snapshot_queue,
             _build_snapshot(
                 config=config,
                 env=session,
                 emulator=session.emulator,
+                raw_frame=raw_frame,
                 observation=None,
                 info=info,
                 reset_info=reset_info,

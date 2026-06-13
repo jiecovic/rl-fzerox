@@ -57,6 +57,10 @@ class _SnapshotEnv(Protocol):
     def action_mask_branches(self) -> ActionMaskBranches: ...
 
 
+class _FrameRecorder(Protocol):
+    def record_frame(self, frame: RgbFrame, *, info: dict[str, object]) -> None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class _BoostLampConfig:
     active_level: float = 0.55
@@ -114,6 +118,7 @@ def _publish_step_snapshots(
     final_auxiliary_targets: dict[str, object] | None = None,
     live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
     frame_interval_seconds: float | None = None,
+    frame_recorder: _FrameRecorder | None = None,
 ) -> None:
     resolved_control_state = control_state
     if previous_control_state is None:
@@ -161,6 +166,9 @@ def _publish_step_snapshots(
         frame_interval_seconds = target_control_seconds / len(frames)
     for index, frame in enumerate(frames):
         is_final_frame = index == len(frames) - 1
+        frame_info = final_info if is_final_frame else previous_info
+        if frame_recorder is not None:
+            frame_recorder.record_frame(frame, info=frame_info)
         publish_worker_message(
             snapshot_queue,
             _build_snapshot(
@@ -169,7 +177,7 @@ def _publish_step_snapshots(
                 emulator=emulator,
                 raw_frame=frame,
                 observation=final_observation if is_final_frame else previous_observation,
-                info=final_info if is_final_frame else previous_info,
+                info=frame_info,
                 reset_info=reset_info,
                 episode=episode,
                 episode_reward=(

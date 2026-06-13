@@ -40,7 +40,7 @@ class CareerModeRaceSetupConfig(BaseModel):
 
 
 class WatchRecordingConfig(BaseModel):
-    """Optional recording output for the visible watch window."""
+    """Optional recording output for watch or Career Mode playback."""
 
     model_config = ConfigDict(extra="forbid")
 

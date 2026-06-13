@@ -40,6 +40,10 @@ from rl_fzerox.ui.watch.runtime.career_mode.policy_step import (
     required_episode_return,
     step_policy_or_manual,
 )
+from rl_fzerox.ui.watch.runtime.career_mode.recording import (
+    FrameRecorder,
+    open_career_mode_recorder,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
     open_career_mode_runtime_session,
@@ -155,14 +159,16 @@ def _run_loaded_career_mode_loop(
         session=session,
         controller=controller,
     )
-    _publish_initial_career_snapshot(
-        config=config,
-        session=session,
-        snapshot_queue=snapshot_queue,
-        state=state,
-    )
+    recorder = open_career_mode_recorder(config=config, native_fps=session.native_fps)
 
     try:
+        _publish_initial_career_snapshot(
+            config=config,
+            session=session,
+            snapshot_queue=snapshot_queue,
+            state=state,
+            frame_recorder=recorder,
+        )
         _run_career_mode_loop_body(
             config=config,
             session=session,
@@ -170,9 +176,13 @@ def _run_loaded_career_mode_loop(
             command_queue=command_queue,
             snapshot_queue=snapshot_queue,
             state=state,
+            frame_recorder=recorder,
         )
     except _CareerModeWorkerQuit:
         return
+    finally:
+        if recorder is not None:
+            recorder.close()
 
 
 @dataclass(slots=True)
@@ -275,13 +285,18 @@ def _publish_initial_career_snapshot(
     session: CareerModeRuntimeSession,
     snapshot_queue: ProcessQueue,
     state: _CareerModeLoopState,
+    frame_recorder: FrameRecorder | None = None,
 ) -> None:
+    raw_frame = session.render()
+    if frame_recorder is not None:
+        frame_recorder.record_frame(raw_frame, info=state.info)
     publish_worker_message(
         snapshot_queue,
         _build_snapshot(
             config=config,
             env=session,
             emulator=session.emulator,
+            raw_frame=raw_frame,
             observation=None,
             info=state.info,
             reset_info=state.reset_info,
@@ -321,6 +336,7 @@ def _run_career_mode_loop_body(
     command_queue: ProcessQueue,
     snapshot_queue: ProcessQueue,
     state: _CareerModeLoopState,
+    frame_recorder: FrameRecorder | None = None,
 ) -> None:
     control_rate = state.control_rate
     native_control_fps = state.native_control_fps
@@ -630,6 +646,7 @@ def _run_career_mode_loop_body(
                     target_control_fps=target_control_fps,
                     native_frame_seconds=native_frame_seconds,
                     deterministic_policy=deterministic_policy,
+                    frame_recorder=frame_recorder,
                 )
                 current_step_seconds = None
                 raw_observation = None
@@ -668,6 +685,7 @@ def _run_career_mode_loop_body(
                         target_control_fps=target_control_fps,
                         native_frame_seconds=native_frame_seconds,
                         deterministic_policy=deterministic_policy,
+                        frame_recorder=frame_recorder,
                     )
                     current_step_seconds = None
                     raw_observation = None
@@ -746,6 +764,7 @@ def _run_career_mode_loop_body(
                     target_policy_control_fps=policy_timing.target_fps,
                     target_control_seconds=policy_timing.target_seconds,
                     deterministic_policy=deterministic_policy,
+                    frame_recorder=frame_recorder,
                     manual_control_enabled=manual_control_enabled,
                     current_control_state=current_control_state,
                     spin_request=manual_spin_request if manual_control_enabled else "none",

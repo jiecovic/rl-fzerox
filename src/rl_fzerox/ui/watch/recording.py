@@ -55,6 +55,8 @@ def open_viewer_recorder(
 ) -> ViewerRecorder | None:
     if not config.watch.recording.enabled:
         return None
+    if config.watch.managed_save_game_id is not None:
+        return None
     return ViewerRecorder(config=config, native_fps=native_fps, render_fps=render_fps)
 
 
