@@ -13,7 +13,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
 )
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.domain.camera import CameraSettingName
-from rl_fzerox.core.manager.models import ManagedSaveUnlockProgress
+from rl_fzerox.core.manager.models import ManagedSaveUnlockProgress, SaveAttemptStatus
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
@@ -30,6 +30,9 @@ class CareerControllerViewState:
     awaiting_new_race_after_terminal: bool
     continuing_race_result: bool
     fresh_race_ready_frames: int
+    last_finished_attempt_id: str | None
+    last_finished_attempt_status: SaveAttemptStatus | None
+    last_finished_attempt_failure_reason: str | None
 
 
 def career_viewer_info(
@@ -58,6 +61,11 @@ def career_viewer_info(
             "career_mode_phase": state.phase.value,
             "career_mode_policy_active": active_policy_control is not None,
             "career_mode_target_label": current_target_label,
+            "career_mode_last_finished_attempt_id": state.last_finished_attempt_id,
+            "career_mode_last_finished_attempt_status": state.last_finished_attempt_status,
+            "career_mode_last_finished_attempt_failure_reason": (
+                state.last_finished_attempt_failure_reason
+            ),
         }
     )
     viewer_info.update(

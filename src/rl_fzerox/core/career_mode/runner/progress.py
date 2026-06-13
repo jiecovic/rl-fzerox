@@ -69,6 +69,9 @@ class CareerModeStore(Protocol):
 class CareerProgressTransition:
     attempt_finished: bool
     next_plan: SaveRaceExecutionPlan | None = None
+    finished_attempt_id: str | None = None
+    finished_status: SaveAttemptStatus | None = None
+    finished_failure_reason: str | None = None
 
 
 class CareerAttemptProgress:
@@ -159,8 +162,13 @@ class CareerAttemptProgress:
         status: SaveAttemptStatus,
         failure_reason: str | None,
     ) -> CareerProgressTransition:
+        finished_attempt_id = self._attempt_id
         self._finish_attempt(info=info, status=status, failure_reason=failure_reason)
-        return self._advance_after_finished_attempt()
+        return self._advance_after_finished_attempt(
+            finished_attempt_id=finished_attempt_id,
+            finished_status=status,
+            finished_failure_reason=failure_reason,
+        )
 
     def _finish_attempt(
         self,
@@ -180,7 +188,13 @@ class CareerAttemptProgress:
             failure_reason=failure_reason,
         )
 
-    def _advance_after_finished_attempt(self) -> CareerProgressTransition:
+    def _advance_after_finished_attempt(
+        self,
+        *,
+        finished_attempt_id: str | None,
+        finished_status: SaveAttemptStatus,
+        finished_failure_reason: str | None,
+    ) -> CareerProgressTransition:
         progress = self._refresh_unlock_progress()
         if progress.next_target is None:
             self._store.update_save_game_status(
@@ -188,7 +202,12 @@ class CareerAttemptProgress:
                 status="finished",
             )
             self._attempt_id = None
-            return CareerProgressTransition(attempt_finished=True)
+            return CareerProgressTransition(
+                attempt_finished=True,
+                finished_attempt_id=finished_attempt_id,
+                finished_status=finished_status,
+                finished_failure_reason=finished_failure_reason,
+            )
 
         next_attempt = self._store.start_next_save_attempt(self._save_game_id)
         context = self._store.get_save_attempt_execution_context(next_attempt.id)
@@ -199,6 +218,9 @@ class CareerAttemptProgress:
         return CareerProgressTransition(
             attempt_finished=True,
             next_plan=build_save_race_execution_plan(context),
+            finished_attempt_id=finished_attempt_id,
+            finished_status=finished_status,
+            finished_failure_reason=finished_failure_reason,
         )
 
     def _refresh_unlock_progress(self) -> ManagedSaveUnlockProgress:

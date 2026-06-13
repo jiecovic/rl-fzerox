@@ -50,6 +50,7 @@ from rl_fzerox.core.envs.engine.reset.camera import (
     CameraSyncBackend,
 )
 from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager.models import SaveAttemptStatus
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchAppConfig
 
 
@@ -100,6 +101,9 @@ class CareerModeController:
         self._continue_after_race_pulses = 0
         self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
+        self._last_finished_attempt_id: str | None = None
+        self._last_finished_attempt_status: SaveAttemptStatus | None = None
+        self._last_finished_attempt_failure_reason: str | None = None
         self._policy_resolver = CareerPolicyResolver(
             store=store,
             setup=self._setup,
@@ -405,6 +409,9 @@ class CareerModeController:
             awaiting_new_race_after_terminal=self._awaiting_new_race_after_terminal,
             continuing_race_result=self._continuing_race_result,
             fresh_race_ready_frames=self._fresh_race_ready_frames,
+            last_finished_attempt_id=self._last_finished_attempt_id,
+            last_finished_attempt_status=self._last_finished_attempt_status,
+            last_finished_attempt_failure_reason=self._last_finished_attempt_failure_reason,
         )
 
     def _observed_menu_screen(self, facts: MenuFacts) -> ObservedMenuScreen:
@@ -615,10 +622,7 @@ class CareerModeController:
         target = course_setup.engine_setting_raw_value
         if current == target:
             self._engine_adjust_taps = 0
-            if (
-                self._engine_ready_course_id == course_id
-                and self._engine_ready_target == target
-            ):
+            if self._engine_ready_course_id == course_id and self._engine_ready_target == target:
                 self._engine_ready_frames += 1
             else:
                 self._engine_ready_course_id = course_id
@@ -714,6 +718,7 @@ class CareerModeController:
             setup=self._setup,
             info=terminal_info,
         )
+        self._remember_finished_attempt(transition)
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         if self._progress.attempt_id is None:
@@ -722,6 +727,21 @@ class CareerModeController:
             return True
         self._enter_continue_after_race()
         return True
+
+    def _remember_finished_attempt(self, transition: object) -> None:
+        finished_attempt_id = getattr(transition, "finished_attempt_id", None)
+        finished_status = getattr(transition, "finished_status", None)
+        if not isinstance(finished_attempt_id, str) or finished_status not in {
+            "succeeded",
+            "failed",
+        }:
+            return
+        self._last_finished_attempt_id = finished_attempt_id
+        self._last_finished_attempt_status = finished_status
+        failure_reason = getattr(transition, "finished_failure_reason", None)
+        self._last_finished_attempt_failure_reason = (
+            failure_reason if isinstance(failure_reason, str) else None
+        )
 
     def _apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:
         self._progress.apply_execution_plan(plan)
@@ -805,6 +825,7 @@ class CareerModeController:
             setup=self._setup,
             info=info,
         )
+        self._remember_finished_attempt(transition)
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         return transition.attempt_finished
