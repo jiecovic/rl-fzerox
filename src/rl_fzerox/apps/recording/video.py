@@ -41,8 +41,7 @@ class FfmpegRgbWriter:
         self._audio_sample_rate = audio_sample_rate
         self._process: subprocess.Popen[bytes] | None = None
         self._stdin: IO[bytes] | None = None
-        self._audio_file: IO[bytes] | None = None
-        self._audio_path: Path | None = None
+        self._audio_stdin: IO[bytes] | None = None
         self._shape: tuple[int, int, int] | None = None
 
     def __enter__(self) -> FfmpegRgbWriter:
@@ -82,17 +81,23 @@ class FfmpegRgbWriter:
         copied_samples = as_pcm16_samples(samples)
         if copied_samples.size == 0:
             return
-        if self._audio_file is None:
+        if self._audio_stdin is None:
             raise RuntimeError("ffmpeg audio writer is not open")
-        self._audio_file.write(copied_samples.tobytes())
+        self._audio_stdin.write(copied_samples.tobytes())
 
     def _open_process(self, *, width: int, height: int) -> None:
+        audio_read_fd: int | None = None
+        audio_write_fd: int | None = None
+        if self._audio_sample_rate is not None:
+            audio_read_fd, audio_write_fd = os.pipe()
         command = _ffmpeg_command(
             ffmpeg_path=self._ffmpeg_path,
             output_path=self._path,
             width=width,
             height=height,
             fps=self._fps,
+            audio_sample_rate=self._audio_sample_rate,
+            audio_pipe_fd=audio_read_fd,
         )
         try:
             self._process = subprocess.Popen(  # noqa: S603
@@ -100,35 +105,39 @@ class FfmpegRgbWriter:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
+                pass_fds=() if audio_read_fd is None else (audio_read_fd,),
             )
+            if audio_read_fd is not None:
+                os.close(audio_read_fd)
+                audio_read_fd = None
             if self._process.stdin is None:
                 raise RuntimeError("failed to open ffmpeg stdin")
             self._stdin = self._process.stdin
-            if self._audio_sample_rate is not None:
-                self._audio_path = _audio_sidecar_path(self._path)
-                self._audio_file = self._audio_path.open("wb")
+            if audio_write_fd is not None:
+                self._audio_stdin = os.fdopen(audio_write_fd, "wb")
+                audio_write_fd = None
         except Exception:
             if self._process is not None:
                 self._process.kill()
                 self._process = None
             self._stdin = None
-            if self._audio_file is not None:
-                self._audio_file.close()
-                self._audio_file = None
-            if self._audio_path is not None:
-                self._audio_path.unlink(missing_ok=True)
-                self._audio_path = None
+            if self._audio_stdin is not None:
+                self._audio_stdin.close()
+                self._audio_stdin = None
+            if audio_read_fd is not None:
+                os.close(audio_read_fd)
+            if audio_write_fd is not None:
+                os.close(audio_write_fd)
             raise
 
     def close(self) -> None:
         if self._stdin is not None:
             self._stdin.close()
             self._stdin = None
-        if self._audio_file is not None:
-            self._audio_file.close()
-            self._audio_file = None
+        if self._audio_stdin is not None:
+            self._audio_stdin.close()
+            self._audio_stdin = None
         if self._process is None:
-            self._discard_audio_sidecar()
             return
         stderr = b""
         if self._process.stderr is not None:
@@ -138,45 +147,7 @@ class FfmpegRgbWriter:
         if return_code != 0:
             detail = stderr.decode(errors="replace").strip()
             suffix = f": {detail}" if detail else ""
-            self._discard_audio_sidecar()
             raise RuntimeError(f"ffmpeg failed with exit code {return_code}{suffix}")
-        try:
-            self._mux_audio_sidecar()
-        finally:
-            self._discard_audio_sidecar()
-
-    def _mux_audio_sidecar(self) -> None:
-        if self._audio_sample_rate is None or self._audio_path is None:
-            return
-        if not self._audio_path.exists() or self._audio_path.stat().st_size == 0:
-            return
-        mux_path = _audio_mux_path(self._path)
-        command = _ffmpeg_audio_mux_command(
-            ffmpeg_path=self._ffmpeg_path,
-            video_path=self._path,
-            audio_path=self._audio_path,
-            output_path=mux_path,
-            audio_sample_rate=self._audio_sample_rate,
-        )
-        completed = subprocess.run(  # noqa: S603
-            command,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
-        if completed.returncode != 0:
-            mux_path.unlink(missing_ok=True)
-            detail = completed.stderr.decode(errors="replace").strip()
-            suffix = f": {detail}" if detail else ""
-            raise RuntimeError(
-                f"ffmpeg audio mux failed with exit code {completed.returncode}{suffix}"
-            )
-        mux_path.replace(self._path)
-
-    def _discard_audio_sidecar(self) -> None:
-        if self._audio_path is not None:
-            self._audio_path.unlink(missing_ok=True)
-            self._audio_path = None
 
 
 def resolve_ffmpeg_path() -> str:
@@ -249,8 +220,10 @@ def _ffmpeg_command(
     width: int,
     height: int,
     fps: float,
+    audio_sample_rate: int | None = None,
+    audio_pipe_fd: int | None = None,
 ) -> list[str]:
-    return [
+    command = [
         ffmpeg_path,
         "-y",
         "-loglevel",
@@ -265,66 +238,82 @@ def _ffmpeg_command(
         f"{fps:.6f}",
         "-i",
         "-",
-        "-an",
-        "-map",
-        "0:v:0",
-        "-vcodec",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "18",
-        "-pix_fmt",
-        "yuv420p",
-        str(output_path),
     ]
+    if audio_sample_rate is not None:
+        if audio_pipe_fd is None:
+            raise ValueError("audio_pipe_fd is required when audio_sample_rate is set")
+        command.extend(
+            [
+                "-f",
+                "s16le",
+                "-ar",
+                str(audio_sample_rate),
+                "-ac",
+                "2",
+                "-i",
+                f"pipe:{audio_pipe_fd}",
+            ]
+        )
+    else:
+        command.append("-an")
+    command.extend(
+        [
+            "-fflags",
+            "+genpts",
+            "-flush_packets",
+            "1",
+            "-max_interleave_delta",
+            "0",
+        ]
+    )
+    command.extend(
+        [
+            "-map",
+            "0:v:0",
+        ]
+    )
+    if audio_sample_rate is not None:
+        command.extend(["-map", "1:a:0"])
+    command.extend(
+        [
+            "-vcodec",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-tune",
+            "zerolatency",
+            "-g",
+            f"{max(1, round(fps))}",
+            "-keyint_min",
+            f"{max(1, round(fps))}",
+            "-sc_threshold",
+            "0",
+            "-bf",
+            "0",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+        ]
+    )
+    if audio_sample_rate is not None:
+        command.extend(["-c:a", "aac", "-b:a", "192k", "-shortest"])
+    command.extend(_ffmpeg_output_args(output_path))
+    return command
 
 
-def _ffmpeg_audio_mux_command(
-    *,
-    ffmpeg_path: str,
-    video_path: Path,
-    audio_path: Path,
-    output_path: Path,
-    audio_sample_rate: int,
-) -> list[str]:
-    return [
-        ffmpeg_path,
-        "-y",
-        "-loglevel",
-        "error",
-        "-i",
-        str(video_path),
-        "-f",
-        "s16le",
-        "-ar",
-        str(audio_sample_rate),
-        "-ac",
-        "2",
-        "-i",
-        str(audio_path),
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
-        "-c:v",
-        "copy",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-shortest",
-        str(output_path),
-    ]
-
-
-def _audio_sidecar_path(path: Path) -> Path:
-    return path.with_name(f".{path.stem}.{temp_session_id()}.audio.s16le")
-
-
-def _audio_mux_path(path: Path) -> Path:
-    suffix = path.suffix or ".mkv"
-    return path.with_name(f".{path.stem}.{temp_session_id()}.audio-mux{suffix}")
+def _ffmpeg_output_args(output_path: Path) -> list[str]:
+    if output_path.suffix.lower() == ".mkv":
+        return [
+            "-f",
+            "matroska",
+            "-live",
+            "1",
+            "-cluster_time_limit",
+            "1000",
+            str(output_path),
+        ]
+    return [str(output_path)]
 
 
 def _imageio_ffmpeg_path() -> str | None:
