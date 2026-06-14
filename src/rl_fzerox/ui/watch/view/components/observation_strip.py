@@ -70,53 +70,6 @@ def _draw_control_viz_below_game(
     return ViewerHitboxes(deterministic_toggle=deterministic_toggle_rect), bottom
 
 
-def _native_observation_preview_width(
-    *,
-    observation_shape: tuple[int, ...],
-    info: dict[str, object],
-) -> int:
-    style = _OBSERVATION_GLASS_STYLE
-    preview_width, _ = _observation_preview_size(observation_shape, info=info)
-    return preview_width + (2 * style.padding)
-
-
-def _native_observation_preview_height(
-    *,
-    fonts: ViewerFonts,
-    observation_shape: tuple[int, ...],
-    info: dict[str, object],
-    width: int,
-) -> int:
-    if width <= 0:
-        return 0
-
-    style = _OBSERVATION_GLASS_STYLE
-    _, preview_height = _observation_preview_size(observation_shape, info=info)
-    title_height = fonts.section.render("Policy Obs", True, PALETTE.text_primary).get_height()
-    subtitle_height = fonts.small.render(
-        _format_observation_summary(observation_shape, info=info),
-        True,
-        PALETTE.text_muted,
-    ).get_height()
-    labels = _observation_tile_label_texts(observation_shape, info=info)
-    label_gap = style.label_gap if labels else 0
-    label_row_height = _observation_label_row_height(font=fonts.body, labels=labels)
-    legend_height = _macro_legend_height(fonts=fonts, width=width)
-    legend_gap = LAYOUT.preview_gap if legend_height > 0 else 0
-    return (
-        title_height
-        + LAYOUT.preview_title_gap
-        + subtitle_height
-        + LAYOUT.section_rule_gap
-        + (2 * style.padding)
-        + preview_height
-        + label_gap
-        + label_row_height
-        + legend_gap
-        + legend_height
-    )
-
-
 def _draw_observation_preview_in_rect(
     *,
     pygame: PygameModule,
@@ -130,6 +83,7 @@ def _draw_observation_preview_in_rect(
     observation_shape: tuple[int, ...] | None,
     layout_shape: tuple[int, ...],
     info: dict[str, object],
+    show_hotkeys: bool = True,
 ) -> None:
     if width <= 0 or height <= 0:
         return
@@ -161,7 +115,7 @@ def _draw_observation_preview_in_rect(
     )
     label_gap = style.label_gap if labels else 0
     label_row_height = _observation_label_row_height(font=fonts.body, labels=labels)
-    legend_height = _macro_legend_height(fonts=fonts, width=width)
+    legend_height = _macro_legend_height(fonts=fonts, width=width) if show_hotkeys else 0
     legend_gap = LAYOUT.preview_gap if legend_height > 0 else 0
     max_preview_width = width - (2 * glass_padding)
     max_preview_height = (
@@ -227,7 +181,7 @@ def _draw_observation_preview_in_rect(
             info=info,
         )
     legend_y = glass_rect.bottom + legend_gap
-    if legend_y + legend_height <= bottom:
+    if show_hotkeys and legend_y + legend_height <= bottom:
         _draw_macro_legend(
             pygame=pygame,
             screen=screen,

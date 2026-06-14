@@ -17,17 +17,14 @@ from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
+from rl_fzerox.ui.watch.view.components.macro_legend import (
+    _draw_macro_legend,
+    _macro_legend_height,
+)
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_control_viz_below_game,
-    _draw_observation_preview_in_rect,
-    _native_observation_preview_height,
-    _native_observation_preview_width,
 )
-from rl_fzerox.ui.watch.view.panels.core.model import (
-    _observation_preview_size,
-    _preview_frame,
-    _window_size,
-)
+from rl_fzerox.ui.watch.view.panels.core.model import _window_size
 from rl_fzerox.ui.watch.view.panels.core.tabs import PanelTabRegistry
 from rl_fzerox.ui.watch.view.panels.rendering.draw import SidePanelData, _draw_side_panel
 from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz, _control_viz_height
@@ -76,6 +73,7 @@ class FrameRenderData:
     reset_info: dict[str, object]
     episode_reward: float
     paused: bool
+    recording_active: bool
     control_state: RaceControlState
     gas_level: float
     thrust_warning_threshold: float | None
@@ -231,11 +229,8 @@ def _watch_left_column_width(
     *,
     info: dict[str, object],
 ) -> int:
-    native_preview_width = _native_observation_preview_width(
-        observation_shape=observation_shape,
-        info=info,
-    )
-    return max(game_display_size[0], native_preview_width + (2 * LAYOUT.preview_padding))
+    del observation_shape, info
+    return game_display_size[0]
 
 
 def _watch_window_size(
@@ -246,17 +241,16 @@ def _watch_window_size(
     info: dict[str, object],
     panel_tab_index: int = 0,
 ) -> tuple[int, int]:
+    del info
     left_column_width = _watch_left_column_width(
         game_display_size,
         observation_shape,
-        info=info,
+        info={},
     )
     left_content_width = left_column_width - (2 * LAYOUT.preview_padding)
     left_column_height = game_display_size[1] + LAYOUT.preview_gap + _control_viz_height(fonts)
-    left_column_height += LAYOUT.preview_gap + _native_observation_preview_height(
+    left_column_height += LAYOUT.preview_gap + _macro_legend_height(
         fonts=fonts,
-        observation_shape=observation_shape,
-        info=info,
         width=left_content_width,
     )
     left_column_height += LAYOUT.preview_padding
@@ -297,6 +291,7 @@ def _draw_frame(
         course_label=_game_course_overlay_label(data.info, reset_info=data.reset_info),
         speed_label=_game_speed_overlay_label(data.info, action_repeat=data.action_repeat),
         status_label=_game_status_overlay_label(data.info),
+        recording_active=data.recording_active,
     )
     control_viz = _control_viz(
         data.control_state,
@@ -334,36 +329,13 @@ def _draw_frame(
         left_column_size=(left_column_width, game_display_size[1]),
         control_viz=control_viz,
     )
-    observation_surface = None
-    active_observation_shape = data.policy_observation_shape
-    if data.policy_observation_image is not None:
-        if active_observation_shape is None:
-            active_observation_shape = tuple(
-                int(value) for value in data.policy_observation_image.shape
-            )
-        preview_frame = _preview_frame(data.policy_observation_image, info=data.info)
-        observation_display_size = _observation_preview_size(
-            active_observation_shape,
-            info=data.info,
-        )
-        observation_surface = _rgb_surface(pygame, preview_frame)
-        if observation_surface.get_size() != observation_display_size:
-            raise RuntimeError(
-                "Native observation preview size did not match the expected preview size: "
-                f"frame={observation_surface.get_size()}, expected={observation_display_size}"
-            )
-    _draw_observation_preview_in_rect(
+    _draw_macro_legend(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        surface=observation_surface,
         x=LAYOUT.preview_padding,
         y=control_bottom + LAYOUT.preview_gap,
         width=left_column_width - (2 * LAYOUT.preview_padding),
-        height=screen.get_height() - control_bottom - LAYOUT.preview_gap - LAYOUT.preview_padding,
-        observation_shape=active_observation_shape,
-        layout_shape=observation_layout_shape,
-        info=data.info,
     )
     panel_rect = pygame.Rect(
         left_column_width + LAYOUT.preview_gap,
@@ -388,6 +360,10 @@ def _draw_frame(
             reset_info=data.reset_info,
             episode_reward=data.episode_reward,
             paused=data.paused,
+            policy_observation_image=data.policy_observation_image,
+            policy_observation_shape=data.policy_observation_shape,
+            policy_observation_layout_shape=data.policy_observation_layout_shape,
+            policy_observation_layout_info=data.policy_observation_layout_info,
             control_state=data.control_state,
             gas_level=data.gas_level,
             thrust_warning_threshold=data.thrust_warning_threshold,

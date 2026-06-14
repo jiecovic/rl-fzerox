@@ -64,6 +64,7 @@ class _FakePygame:
     K_6 = 34
     K_7 = 45
     K_8 = 46
+    K_9 = 52
     K_q = 47
     K_w = 48
     K_g = 51
@@ -295,6 +296,7 @@ def test_poll_viewer_input_selects_panel_tabs_with_number_keys() -> None:
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_6,))).panel_tab_index == 5
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_7,))).panel_tab_index == 6
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_8,))).panel_tab_index == 7
+    assert _poll_viewer_input(_FakePygame((_FakePygame.K_9,))).panel_tab_index == 8
 
 
 def test_poll_viewer_input_selects_panel_tab_with_mouse_click() -> None:

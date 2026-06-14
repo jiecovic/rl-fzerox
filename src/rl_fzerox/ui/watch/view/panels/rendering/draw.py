@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+
 from fzerox_emulator import FZeroXTelemetry, RaceControlState
-from fzerox_emulator.arrays import StateVector
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
@@ -12,7 +14,12 @@ from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
-from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.components.observation_strip import _draw_observation_preview_in_rect
+from rl_fzerox.ui.watch.view.panels.core.model import (
+    _build_panel_columns,
+    _observation_preview_size,
+    _preview_frame,
+)
 from rl_fzerox.ui.watch.view.panels.core.tabs import PanelTabRegistry
 from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import _draw_column
 from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
@@ -45,6 +52,10 @@ class SidePanelData:
     reset_info: dict[str, object]
     episode_reward: float
     paused: bool
+    policy_observation_image: ObservationFrame | None
+    policy_observation_shape: tuple[int, ...] | None
+    policy_observation_layout_shape: tuple[int, ...]
+    policy_observation_layout_info: dict[str, object]
     control_state: RaceControlState
     gas_level: float
     thrust_warning_threshold: float | None
@@ -218,6 +229,17 @@ def _draw_side_panel(
             info=data.info,
             live_series=data.live_episode_series,
         )
+    elif selected_tab_key == "obs":
+        _draw_policy_observation_tab(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=y,
+            width=panel_width,
+            height=panel_rect.bottom - y - LAYOUT.panel_padding,
+            data=data,
+        )
     elif selected_tab_key == "records":
         record_sections = columns.records
         if len(record_sections) > 1:
@@ -265,6 +287,60 @@ def _draw_side_panel(
         record_courses=record_course_hitboxes,
         state_features=state_feature_hitboxes,
     )
+
+
+def _draw_policy_observation_tab(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    fonts: ViewerFonts,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    data: SidePanelData,
+) -> None:
+    observation_surface = None
+    active_shape = data.policy_observation_shape
+    preview_info = data.info if active_shape is not None else data.policy_observation_layout_info
+    if data.policy_observation_image is not None:
+        if active_shape is None:
+            active_shape = tuple(int(value) for value in data.policy_observation_image.shape)
+            preview_info = data.info
+        preview_frame = _preview_frame(
+            data.policy_observation_image,
+            info=data.info,
+        )
+        expected_size = _observation_preview_size(active_shape, info=data.info)
+        observation_surface = _rgb_surface(pygame, preview_frame)
+        if observation_surface.get_size() != expected_size:
+            raise RuntimeError(
+                "Native observation preview size did not match the expected preview size: "
+                f"frame={observation_surface.get_size()}, expected={expected_size}"
+            )
+
+    _draw_observation_preview_in_rect(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        surface=observation_surface,
+        x=x,
+        y=y,
+        width=width,
+        height=height,
+        observation_shape=active_shape,
+        layout_shape=data.policy_observation_layout_shape,
+        info=preview_info,
+        show_hotkeys=False,
+    )
+
+
+def _rgb_surface(pygame: PygameModule, frame: RgbFrame) -> PygameSurface:
+    rgb_frame = np.ascontiguousarray(frame)
+    height, width, channels = rgb_frame.shape
+    if channels != 3:
+        raise ValueError(f"Expected an RGB frame for display, got shape {frame.shape!r}")
+    return pygame.image.frombuffer(rgb_frame.tobytes(), (width, height), "RGB")
 
 
 def _panel_subtitle(policy_label: str | None, *, manual_control_enabled: bool) -> str:

@@ -14,6 +14,7 @@ from rl_fzerox.ui.watch.app import (
     _policy_observation_layout_info,
 )
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
+from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_observation_preview_in_rect,
 )
@@ -137,7 +138,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 def test_next_panel_tab_index_cycles_tabs() -> None:
     assert _next_panel_tab_index(0, ViewerInput(panel_tab_delta=1)) == 1
-    assert _next_panel_tab_index(7, ViewerInput(panel_tab_delta=1)) == 0
+    assert _next_panel_tab_index(8, ViewerInput(panel_tab_delta=1)) == 0
 
 
 def test_next_panel_tab_index_honors_direct_selection() -> None:
@@ -217,27 +218,29 @@ def test_policy_observation_layout_shape_hint_stabilizes_menu_layout(
                 fonts=fonts,
                 info=live_policy_info,
             )
-            != stable_size
+            == stable_size
         )
     finally:
         pygame.quit()
 
 
 def test_panel_tab_hint_shows_active_tab_position() -> None:
-    assert _panel_tab_hint(0) == "Tab 1/8"
-    assert _panel_tab_hint(2) == "Tab 3/8"
-    assert _panel_tab_hint(3) == "Tab 4/8"
-    assert _panel_tab_hint(4) == "Tab 5/8"
-    assert _panel_tab_hint(5) == "Tab 6/8"
-    assert _panel_tab_hint(6) == "Tab 7/8"
-    assert _panel_tab_hint(7) == "Tab 8/8"
-    assert _panel_tab_hint(8) == "Tab 1/8"
+    assert _panel_tab_hint(0) == "Tab 1/9"
+    assert _panel_tab_hint(2) == "Tab 3/9"
+    assert _panel_tab_hint(3) == "Tab 4/9"
+    assert _panel_tab_hint(4) == "Tab 5/9"
+    assert _panel_tab_hint(5) == "Tab 6/9"
+    assert _panel_tab_hint(6) == "Tab 7/9"
+    assert _panel_tab_hint(7) == "Tab 8/9"
+    assert _panel_tab_hint(8) == "Tab 9/9"
+    assert _panel_tab_hint(9) == "Tab 1/9"
 
 
 def test_career_panel_tabs_replace_records_with_career() -> None:
     assert CAREER_PANEL_TABS.labels == (
         "Run",
         "Live",
+        "Obs",
         "Details",
         "State",
         "Aux",
@@ -246,8 +249,8 @@ def test_career_panel_tabs_replace_records_with_career() -> None:
         "Train",
     )
     assert CAREER_PANEL_TABS.records_index is None
-    assert CAREER_PANEL_TABS.career_index == 6
-    assert _panel_tab_hint(6, panel_tabs=CAREER_PANEL_TABS) == "Tab 7/8"
+    assert CAREER_PANEL_TABS.career_index == 7
+    assert _panel_tab_hint(7, panel_tabs=CAREER_PANEL_TABS) == "Tab 8/9"
 
 
 def test_panel_tabs_fit_side_panel_content_width() -> None:
@@ -284,23 +287,30 @@ def test_window_size_adds_sidebar_width() -> None:
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1204, 980)
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=6) == (1204, 980)
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=7) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=8) == (1204, 980)
 
 
-def test_watch_window_size_fits_native_observation_preview() -> None:
+def test_watch_window_size_ignores_policy_observation_preview_size() -> None:
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     pygame.init()
 
     try:
         fonts = _create_fonts(pygame)
-        size = _watch_window_size(
+        default_size = _watch_window_size(
+            (592, 444),
+            (72, 96, 3),
+            fonts=fonts,
+            info={},
+        )
+        wide_policy_size = _watch_window_size(
             (592, 444),
             (180, 240, 6),
             fonts=fonts,
             info={"observation_stack": 2, "observation_stack_mode": "rgb"},
         )
 
-        assert size[0] >= 240 * 2 + (2 * LAYOUT.preview_padding) + LAYOUT.preview_gap
-        assert size[1] > 980
+        assert wide_policy_size == default_size
+        assert default_size[0] == 592 + LAYOUT.preview_gap + LAYOUT.panel_width
     finally:
         pygame.quit()
 
@@ -364,6 +374,33 @@ def test_observation_preview_draws_blank_panel_without_policy_image() -> None:
 
         after = pygame.surfarray.array3d(screen)
         assert np.any(after != before)
+    finally:
+        pygame.quit()
+
+
+def test_game_view_draws_recording_dot_when_active() -> None:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+
+    try:
+        fonts = _create_fonts(pygame)
+        screen = pygame.Surface((160, 120))
+        game_surface = pygame.Surface((132, 96))
+        game_surface.fill((20, 20, 20))
+
+        _draw_glass_game_view(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            surface=game_surface,
+            outer_size=(160, 120),
+            recording_active=True,
+        )
+
+        red, green, blue, _ = screen.get_at((33, 31))
+        assert red > 200
+        assert green < 100
+        assert blue < 100
     finally:
         pygame.quit()
 

@@ -45,7 +45,19 @@ class _ViewportBadgeStyle:
     radius: int = 7
 
 
+@dataclass(frozen=True)
+class _RecordingDotStyle:
+    """Compact indicator for active video recording."""
+
+    fill: Color = (236, 63, 63)
+    edge: Color = (255, 176, 176)
+    shadow: Color = (3, 5, 6)
+    margin: int = 13
+    radius: int = 6
+
+
 _GLASS_VIEW_STYLE = _GlassViewStyle()
+_RECORDING_DOT_STYLE = _RecordingDotStyle()
 _COURSE_BADGE_STYLE = _ViewportBadgeStyle(
     text=(108, 255, 178),
     border=(62, 224, 154),
@@ -79,6 +91,7 @@ def _draw_glass_game_view(
     course_label: str | None = None,
     speed_label: str | None = None,
     status_label: str | None = None,
+    recording_active: bool = False,
 ) -> None:
     style = _GLASS_VIEW_STYLE
     outer_rect = pygame.Rect(0, 0, *outer_size)
@@ -158,6 +171,8 @@ def _draw_glass_game_view(
             stack_index=0,
             style=_STATUS_BADGE_STYLE,
         )
+    if recording_active:
+        _draw_recording_dot(pygame=pygame, screen=screen, viewport_rect=viewport_rect)
 
     pygame.draw.rect(
         screen,
@@ -185,6 +200,22 @@ def _draw_glass_game_view(
         (outer_rect.left + 20, outer_rect.bottom - 8),
         (outer_rect.right - 26, outer_rect.bottom - 8),
     )
+
+
+def _draw_recording_dot(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    viewport_rect: PygameRect,
+) -> None:
+    style = _RECORDING_DOT_STYLE
+    center = (
+        viewport_rect.left + style.margin + style.radius,
+        viewport_rect.top + style.margin + style.radius,
+    )
+    pygame.draw.circle(screen, style.shadow, (center[0], center[1] + 1), style.radius + 2)
+    pygame.draw.circle(screen, style.fill, center, style.radius)
+    pygame.draw.circle(screen, style.edge, center, style.radius, width=1)
 
 
 def _draw_viewport_badge(

@@ -75,6 +75,7 @@ WATCH_PANEL_TABS = PanelTabRegistry(
     tabs=(
         PanelTab(key="run", label="Run"),
         PanelTab(key="live", label="Live"),
+        PanelTab(key="obs", label="Obs"),
         PanelTab(key="details", label="Details"),
         PanelTab(key="state", label="State"),
         PanelTab(key="aux", label="Aux"),
@@ -88,6 +89,7 @@ CAREER_PANEL_TABS = PanelTabRegistry(
     tabs=(
         PanelTab(key="run", label="Run"),
         PanelTab(key="live", label="Live"),
+        PanelTab(key="obs", label="Obs"),
         PanelTab(key="details", label="Details"),
         PanelTab(key="state", label="State"),
         PanelTab(key="aux", label="Aux"),

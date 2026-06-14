@@ -109,6 +109,7 @@ def draw_watch_frame(
             reset_info=snapshot.reset_info,
             episode_reward=snapshot.episode_reward,
             paused=paused,
+            recording_active=config.watch.recording.enabled,
             control_state=snapshot.control_state,
             gas_level=snapshot.gas_level,
             thrust_warning_threshold=_thrust_warning_threshold(config),
