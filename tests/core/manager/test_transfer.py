@@ -26,7 +26,7 @@ def test_run_bundle_export_import_rewrites_paths(tmp_path: Path) -> None:
     source_run_dir.mkdir(parents=True)
     (source_run_dir / "checkpoints" / "latest").mkdir(parents=True)
     (source_run_dir / "checkpoints" / "latest" / "model.zip").write_bytes(b"model")
-    (source_run_dir / "train_config.yaml").write_text(
+    (source_run_dir / "train_manifest.yaml").write_text(
         "\n".join(
             (
                 f"runtime_dir: {source_run_dir / 'runtime'}",
@@ -83,13 +83,13 @@ def test_run_bundle_export_import_rewrites_paths(tmp_path: Path) -> None:
     assert imported.runtime.num_timesteps == 2_000
     assert imported.lineage_groups == ("portable",)
     assert (imported.run_dir / "checkpoints" / "latest" / "model.zip").read_bytes() == b"model"
-    assert str(source_run_dir) not in (imported.run_dir / "train_config.yaml").read_text(
+    assert str(source_run_dir) not in (imported.run_dir / "train_manifest.yaml").read_text(
         encoding="utf-8"
     )
-    assert str(imported.run_dir) in (imported.run_dir / "train_config.yaml").read_text(
+    assert str(imported.run_dir) in (imported.run_dir / "train_manifest.yaml").read_text(
         encoding="utf-8"
     )
-    assert "run_name: imported-run" in (imported.run_dir / "train_config.yaml").read_text(
+    assert "run_name: imported-run" in (imported.run_dir / "train_manifest.yaml").read_text(
         encoding="utf-8"
     )
     imported_paths = json.loads((imported.run_dir / "path_manifest.json").read_text())
@@ -183,7 +183,7 @@ def test_run_bundle_import_does_not_delete_existing_target_dir(tmp_path: Path) -
         explicit_run_dir=source_run_dir,
     )
     source_run_dir.mkdir(parents=True)
-    (source_run_dir / "train_config.yaml").write_text("run_name: run-a\n", encoding="utf-8")
+    (source_run_dir / "train_manifest.yaml").write_text("run_name: run-a\n", encoding="utf-8")
     source_store.update_run_status(run_id=run.id, status="stopped", message="stopped")
     bundle_path = export_run_bundle(
         store=source_store,

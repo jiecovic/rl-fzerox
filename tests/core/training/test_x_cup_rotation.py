@@ -661,7 +661,7 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
 
     manager.commit(update)
 
-    assert not (run_paths.run_dir / "train_config.yaml").exists()
+    assert not (run_paths.run_dir / "train_manifest.yaml").exists()
 
 
 def _write_x_cup_state_group(

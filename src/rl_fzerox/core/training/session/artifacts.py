@@ -48,7 +48,7 @@ def resolve_train_run_config(
     run_paths: RunPaths,
     startup_reporter: Callable[[str, str], None] | None = None,
 ) -> TrainAppConfig:
-    """Resolve one train config snapshot with a run-local runtime root."""
+    """Resolve one train manifest with a run-local runtime root."""
 
     return materialize_train_run_config(
         config,

@@ -292,7 +292,7 @@ def test_materialize_train_run_config_does_not_copy_init_run_baseline(
     rom_path.touch()
     init_baseline_path.parent.mkdir(parents=True)
     init_baseline_path.write_bytes(b"init-run-baseline")
-    (init_baseline_path.parent.parent / "train_config.yaml").write_text(
+    (init_baseline_path.parent.parent / "train_manifest.yaml").write_text(
         "\n".join(
             [
                 "seed: 7",

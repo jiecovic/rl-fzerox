@@ -28,7 +28,7 @@ def continue_saved_run_config(
 
     train_data = data.setdefault("train", {})
     if not isinstance(train_data, dict):
-        raise ValueError("Saved train config must contain a train mapping")
+        raise ValueError("Saved train manifest must contain a train mapping")
     train_data.update(
         {
             "continue_run_dir": continue_run_dir,

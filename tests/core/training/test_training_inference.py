@@ -527,7 +527,7 @@ def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
+    config_path = tmp_path / "train_manifest.yaml"
     OmegaConf.save(
         config=OmegaConf.create(
             {
@@ -567,7 +567,7 @@ def test_load_saved_policy_algorithm_recognizes_discrete_only_hybrid_recurrent_p
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
+    config_path = tmp_path / "train_manifest.yaml"
     OmegaConf.save(
         config=OmegaConf.create(
             {
@@ -606,7 +606,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
+    config_path = tmp_path / "train_manifest.yaml"
     OmegaConf.save(
         config=OmegaConf.create(
             {
@@ -641,7 +641,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
+    config_path = tmp_path / "train_manifest.yaml"
     OmegaConf.save(
         config=OmegaConf.create(
             {
@@ -681,7 +681,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_discrete_only_recurrent_
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
+    config_path = tmp_path / "train_manifest.yaml"
     OmegaConf.save(
         config=OmegaConf.create(
             {
@@ -755,7 +755,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
+    config_path = tmp_path / "train_manifest.yaml"
     OmegaConf.save(
         config=OmegaConf.create(
             {
@@ -825,7 +825,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
     rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
+    config_path = tmp_path / "train_manifest.yaml"
     OmegaConf.save(
         config=OmegaConf.create(
             {

@@ -35,7 +35,7 @@ class RunLayout:
 
 
 RUN_LAYOUT = RunLayout(
-    config_filename="train_config.yaml",
+    config_filename="train_manifest.yaml",
     baseline_filename="baseline.state",
     baselines_dirname="baselines",
     watch_rootname="watch",
@@ -207,13 +207,13 @@ def ensure_watch_session_dirs(paths: WatchSessionPaths) -> None:
 
 
 def resolve_train_run_config_path(run_dir: Path) -> Path:
-    """Resolve the saved train config snapshot path for one run directory."""
+    """Resolve the saved train manifest path for one run directory."""
 
     resolved_run_dir = run_dir.expanduser().resolve()
     config_path = resolved_run_dir / RUN_LAYOUT.config_filename
     if not config_path.is_file():
         raise FileNotFoundError(
-            f"No saved train config could be found under run directory {resolved_run_dir}"
+            f"No saved train manifest could be found under run directory {resolved_run_dir}"
         )
     return config_path
 

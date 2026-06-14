@@ -88,7 +88,7 @@ def materialize_train_run_config(
 
 
 def save_train_run_config(*, config: TrainAppConfig, run_dir: Path) -> Path:
-    """Persist one resolved train config snapshot next to a training run."""
+    """Persist one resolved train manifest next to a training run."""
 
     config_path = run_dir / RUN_LAYOUT.config_filename
     # Managed run-manager flows must rebuild from SQLite; this file is a
@@ -99,7 +99,7 @@ def save_train_run_config(*, config: TrainAppConfig, run_dir: Path) -> Path:
 
 
 def load_train_run_config(run_dir: Path) -> TrainAppConfig:
-    """Load one previously saved resolved train config snapshot."""
+    """Load one previously saved resolved train manifest."""
 
     config_path = resolve_train_run_config_path(run_dir)
     loaded = _load_train_config_mapping(config_path)
@@ -112,31 +112,31 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
 
 
 def load_train_run_config_for_watch(run_dir: Path) -> TrainAppConfig:
-    """Load a saved train config for watch and explain stale-manifest failures."""
+    """Load a saved train manifest for watch and explain stale-manifest failures."""
 
     try:
         return load_train_run_config(run_dir)
     except ValidationError as exc:
         resolved_run_dir = run_dir.expanduser().resolve()
         raise RuntimeError(
-            "Saved train config is not compatible with the current schema: "
+            "Saved train manifest is not compatible with the current schema: "
             f"{resolved_run_dir}. Restart the run with the current config schema."
         ) from exc
 
 
 def load_train_run_train_config(run_dir: Path) -> TrainConfig:
-    """Load only the train section from a saved run config."""
+    """Load only the train section from a saved run manifest."""
 
     config_path = resolve_train_run_config_path(run_dir)
     loaded = _load_train_config_mapping(config_path)
     train_data = loaded.get("train")
     if not isinstance(train_data, dict):
-        raise ValueError(f"Train run config is missing a train mapping: {config_path}")
+        raise ValueError(f"Train manifest is missing a train mapping: {config_path}")
 
     train_section: dict[str, object] = {}
     for key, value in train_data.items():
         if not isinstance(key, str):
-            raise ValueError(f"Train run config train keys must be strings: {config_path}")
+            raise ValueError(f"Train manifest train keys must be strings: {config_path}")
         train_section[key] = value
     _resolve_train_config_paths({"train": train_section}, config_dir=config_path.parent)
     return TrainConfig.model_validate(train_section)
@@ -145,12 +145,12 @@ def load_train_run_train_config(run_dir: Path) -> TrainConfig:
 def _load_train_config_mapping(config_path: Path) -> dict[str, object]:
     loaded = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
     if not isinstance(loaded, dict):
-        raise ValueError(f"Train run config must resolve to a mapping: {config_path}")
+        raise ValueError(f"Train manifest must resolve to a mapping: {config_path}")
 
     normalized: dict[str, object] = {}
     for key, value in loaded.items():
         if not isinstance(key, str):
-            raise ValueError(f"Train run config keys must be strings: {config_path}")
+            raise ValueError(f"Train manifest keys must be strings: {config_path}")
         normalized[key] = value
     return normalized
 

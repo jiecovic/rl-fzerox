@@ -30,7 +30,7 @@ def test_manager_api_exports_run_bundle(tmp_path: Path) -> None:
         explicit_run_dir=tmp_path / "runs" / "run-a" / "run-a",
     )
     run.run_dir.mkdir(parents=True)
-    (run.run_dir / "train_config.yaml").write_text("run_name: run-a\n", encoding="utf-8")
+    (run.run_dir / "train_manifest.yaml").write_text("run_name: run-a\n", encoding="utf-8")
     store.update_run_status(run_id=run.id, status="stopped", message="stopped")
 
     with TestClient(create_manager_api_app(store, run_launcher=_LauncherStub())) as client:
@@ -42,7 +42,7 @@ def test_manager_api_exports_run_bundle(tmp_path: Path) -> None:
     bundle_path.write_bytes(response.content)
     with zipfile.ZipFile(bundle_path) as archive:
         assert "run_export.json" in archive.namelist()
-        assert "run/train_config.yaml" in archive.namelist()
+        assert "run/train_manifest.yaml" in archive.namelist()
 
 
 def test_manager_api_imports_run_bundle(
@@ -58,7 +58,7 @@ def test_manager_api_imports_run_bundle(
         explicit_run_dir=source_run_dir,
     )
     source_run_dir.mkdir(parents=True)
-    (source_run_dir / "train_config.yaml").write_text(
+    (source_run_dir / "train_manifest.yaml").write_text(
         f"explicit_run_dir: {source_run_dir}\n",
         encoding="utf-8",
     )
@@ -88,7 +88,7 @@ def test_manager_api_imports_run_bundle(
     assert imported_run is not None
     assert payload["run"]["id"] == "run-a"
     assert imported_run.run_dir == tmp_path / "target" / "runs" / "run-a" / "run-a"
-    imported_manifest = (imported_run.run_dir / "train_config.yaml").read_text(encoding="utf-8")
+    imported_manifest = (imported_run.run_dir / "train_manifest.yaml").read_text(encoding="utf-8")
     assert str(source_run_dir) not in imported_manifest
     assert str(imported_run.run_dir) in imported_manifest
 
