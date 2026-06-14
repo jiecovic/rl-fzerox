@@ -38,8 +38,10 @@ export type CourseSetupDraftMap = Record<string, CourseSetupDraft>;
 export type CupSetupDraft = CupSetupValues & Pick<PolicyArtifactDraft, "vehicleId">;
 export type CupSetupDraftMap = Record<string, CupSetupDraft>;
 
+export const NEUTRAL_ENGINE_SETTING_RAW_VALUE = 50;
+
 export const EMPTY_COURSE_SETUP_DRAFT: PolicyArtifactDraft = {
-  engineSettingRawValue: 50,
+  engineSettingRawValue: NEUTRAL_ENGINE_SETTING_RAW_VALUE,
   policyArtifact: "best",
   policyRunId: "",
   vehicleId: "blue_falcon",
@@ -156,6 +158,26 @@ export function dirtyCourseSetupDrafts(
         savedDraft.engineSettingRawValue !== draft.engineSettingRawValue)
     );
   });
+}
+
+export function resetCourseEngineDrafts(
+  current: CourseSetupDraftMap,
+  setups: readonly CourseSetupValues[],
+): CourseSetupDraftMap {
+  const next = { ...current };
+  for (const setup of setups) {
+    const key = courseSetupKey(setup);
+    const currentDraft = current[key] ?? {
+      ...setup,
+      ...EMPTY_COURSE_SETUP_DRAFT,
+    };
+    next[key] = {
+      ...currentDraft,
+      ...setup,
+      engineSettingRawValue: NEUTRAL_ENGINE_SETTING_RAW_VALUE,
+    };
+  }
+  return next;
 }
 
 export function countDirtyCupSetups(current: CupSetupDraftMap, saved: CupSetupDraftMap): number {

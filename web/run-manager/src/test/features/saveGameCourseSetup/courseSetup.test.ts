@@ -1,0 +1,56 @@
+// web/run-manager/src/test/features/saveGameCourseSetup/courseSetup.test.ts
+import { describe, expect, it } from "vitest";
+
+import {
+  type CourseSetupDraftMap,
+  courseSetupKey,
+  resetCourseEngineDrafts,
+} from "@/features/saveGameCourseSetup/model/courseSetup";
+
+describe("resetCourseEngineDrafts", () => {
+  it("resets selected course engines while preserving policy setup", () => {
+    const muteCity = { cupId: "jack", courseId: "mute_city" };
+    const silence = { cupId: "jack", courseId: "silence" };
+    const current: CourseSetupDraftMap = {
+      [courseSetupKey(muteCity)]: {
+        ...muteCity,
+        engineSettingRawValue: 83,
+        policyArtifact: "latest",
+        policyRunId: "run-a",
+        vehicleId: "blue_falcon",
+      },
+      [courseSetupKey(silence)]: {
+        ...silence,
+        engineSettingRawValue: 12,
+        policyArtifact: "best",
+        policyRunId: "run-b",
+        vehicleId: "wild_goose",
+      },
+    };
+
+    const next = resetCourseEngineDrafts(current, [muteCity]);
+
+    expect(next[courseSetupKey(muteCity)]).toEqual({
+      ...muteCity,
+      engineSettingRawValue: 50,
+      policyArtifact: "latest",
+      policyRunId: "run-a",
+      vehicleId: "blue_falcon",
+    });
+    expect(next[courseSetupKey(silence)]).toBe(current[courseSetupKey(silence)]);
+  });
+
+  it("creates neutral empty drafts for previously untouched courses", () => {
+    const portTown = { cupId: "queen", courseId: "port_town" };
+
+    const next = resetCourseEngineDrafts({}, [portTown]);
+
+    expect(next[courseSetupKey(portTown)]).toEqual({
+      ...portTown,
+      engineSettingRawValue: 50,
+      policyArtifact: "best",
+      policyRunId: "",
+      vehicleId: "blue_falcon",
+    });
+  });
+});

@@ -23,6 +23,7 @@ import {
   dirtyCourseSetupDrafts,
   dirtyCupSetupDrafts,
   EMPTY_COURSE_SETUP_DRAFT,
+  resetCourseEngineDrafts,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   CourseSetupPanel,
@@ -187,6 +188,10 @@ export function UnlockPathPanel({
     });
   }
 
+  function resetEngineSetups(setups: readonly CourseSetupValues[]) {
+    setCourseSetupDrafts((current) => resetCourseEngineDrafts(current, setups));
+  }
+
   async function importEngineTuningForDraft(draft: PolicySelectionDraft) {
     if (draft.policyRunId === "") {
       return;
@@ -279,6 +284,7 @@ export function UnlockPathPanel({
         unlockedVehicleIds={saveGame.unlock_progress?.unlocked_vehicle_ids ?? []}
         onCourseSetupDraftChange={updateCourseSetupDraft}
         onCupSetupDraftChange={updateCupSetupDraft}
+        onResetEngineSetups={resetEngineSetups}
         onSaveSetups={() => void saveCourseSetups()}
       />
     </section>

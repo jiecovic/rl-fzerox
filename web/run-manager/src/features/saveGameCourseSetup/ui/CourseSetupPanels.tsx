@@ -29,7 +29,7 @@ import { Button } from "@/shared/ui/Button";
 import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
 import { IntegerTextInput } from "@/shared/ui/configFields";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
-import { SaveDraftIcon } from "@/shared/ui/icons";
+import { ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
 
 type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
 
@@ -124,6 +124,7 @@ export function CourseSetupPanel({
   metadata,
   onCourseSetupDraftChange,
   onCupSetupDraftChange,
+  onResetEngineSetups,
   onSaveSetups,
   courseSetupDrafts,
   cupSetupDrafts,
@@ -137,6 +138,7 @@ export function CourseSetupPanel({
   metadata: ConfigMetadata;
   onCourseSetupDraftChange: (values: CourseSetupValues, draft: PolicyArtifactDraft) => void;
   onCupSetupDraftChange: (values: CupSetupValues, vehicleId: string) => void;
+  onResetEngineSetups: (setups: readonly CourseSetupValues[]) => void;
   onSaveSetups: () => void;
   courseSetupDrafts: CourseSetupDraftMap;
   cupSetupDrafts: CupSetupDraftMap;
@@ -147,6 +149,7 @@ export function CourseSetupPanel({
   const [collapsedCupIds, setCollapsedCupIds] = useState<readonly string[]>([]);
   const collapsedCupIdSet = new Set(collapsedCupIds);
   const saveDisabled = dirtySetupCount === 0 || savingCourseSetups || updating;
+  const allCourseSetups = courseSetupsForCups(cups);
 
   function setCupCollapsed(cupId: string, collapsed: boolean) {
     setCollapsedCupIds((current) =>
@@ -176,6 +179,15 @@ export function CourseSetupPanel({
             onCollapseAll={() => setCollapsedCupIds(cups.map((cup) => cup.id))}
             onExpandAll={() => setCollapsedCupIds([])}
           />
+          <Button
+            className="gap-2"
+            disabled={updating || savingCourseSetups}
+            type="button"
+            onClick={() => onResetEngineSetups(allCourseSetups)}
+          >
+            <ResetIcon />
+            <span>Reset all engines to 50</span>
+          </Button>
           <Button
             className="gap-2"
             disabled={saveDisabled}
@@ -209,6 +221,7 @@ export function CourseSetupPanel({
             onCollapsedChange={setCupCollapsed}
             onCourseSetupDraftChange={onCourseSetupDraftChange}
             onCupSetupDraftChange={onCupSetupDraftChange}
+            onResetEngineSetups={onResetEngineSetups}
           />
         ))}
       </div>
@@ -225,6 +238,7 @@ function CupSetupBlock({
   onCollapsedChange,
   onCourseSetupDraftChange,
   onCupSetupDraftChange,
+  onResetEngineSetups,
   courseSetupDrafts,
   updating,
   unlockedVehicleIds,
@@ -237,6 +251,7 @@ function CupSetupBlock({
   onCollapsedChange: (cupId: string, collapsed: boolean) => void;
   onCourseSetupDraftChange: (values: CourseSetupValues, draft: PolicyArtifactDraft) => void;
   onCupSetupDraftChange: (values: CupSetupValues, vehicleId: string) => void;
+  onResetEngineSetups: (setups: readonly CourseSetupValues[]) => void;
   courseSetupDrafts: CourseSetupDraftMap;
   updating: boolean;
   unlockedVehicleIds: readonly string[];
@@ -315,6 +330,17 @@ function CupSetupBlock({
               visibleLabel="Vehicle"
               onDraftChange={(nextDraft) => onCupSetupDraftChange(cupValues, nextDraft.vehicleId)}
             />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              className="gap-2"
+              disabled={updating}
+              type="button"
+              onClick={() => onResetEngineSetups(courseValuesList)}
+            >
+              <ResetIcon />
+              <span>Reset {cup.label} engines to 50</span>
+            </Button>
           </div>
           <div className="grid grid-cols-1 gap-3 border-t border-app-border pt-3 xl:grid-cols-2 2xl:grid-cols-3">
             {cup.courses.map((course, courseIndex) => {
