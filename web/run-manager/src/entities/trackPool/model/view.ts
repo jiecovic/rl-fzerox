@@ -91,10 +91,12 @@ export function buildTrackPoolView(
   const sortedCups = [...cups.values()].sort(
     (left, right) => cupIndex(cupOrder, left.id) - cupIndex(cupOrder, right.id),
   );
+  const samplingMode = state?.sampling_mode ?? run.config.tracks.sampling_mode;
   return {
     cups: sortedCups,
+    sampleBarUsesTargetShare: samplingMode === "deficit_budget",
     stepMetricLabel:
-      state?.sampling_mode === "deficit_budget"
+      samplingMode === "deficit_budget"
         ? "tracked scheduler env steps"
         : "completed episode env steps",
     showStepTarget: run.config.tracks.sampling_mode !== "fixed_env",

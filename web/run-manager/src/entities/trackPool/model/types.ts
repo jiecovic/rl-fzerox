@@ -56,6 +56,7 @@ export type TrackPoolCupView = {
 
 export type TrackPoolView = {
   cups: TrackPoolCupView[];
+  sampleBarUsesTargetShare: boolean;
   stepMetricLabel: string;
   showStepTarget: boolean;
   totalCourses: number;

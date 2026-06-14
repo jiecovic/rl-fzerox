@@ -152,17 +152,20 @@ export function CupTabs({
 
 export function TrackPoolBody({
   activeCup,
+  sampleBarUsesTargetShare,
   stepMetricLabel,
   showStepTarget,
   xCupRegenerationMinEpisodes,
   xCupRegenerationThreshold,
 }: {
   activeCup: TrackPoolCupView;
+  sampleBarUsesTargetShare: boolean;
   stepMetricLabel: string;
   showStepTarget: boolean;
   xCupRegenerationMinEpisodes: number | null;
   xCupRegenerationThreshold: number | null;
 }) {
+  const shareLabel = sampleBarUsesTargetShare ? "Target" : "Sample";
   return (
     <div className="px-3.5 py-3">
       <div className="mb-3 flex items-baseline justify-between gap-3 max-[760px]:grid">
@@ -173,14 +176,16 @@ export function TrackPoolBody({
           </span>
         </div>
         <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs tabular-nums text-app-muted max-[760px]:justify-start">
-          <span>Sample {formatPercent(activeCup.currentProbability)}</span>
+          <span>
+            {shareLabel} {formatPercent(effectiveCupShare(activeCup, sampleBarUsesTargetShare))}
+          </span>
           <span>Finish {formatOptionalPercent(activeCup.successRate)}</span>
           <span>Episodes {formatPercent(activeCup.episodeShare)}</span>
           <span>Env steps {formatPercent(activeCup.stepShare)}</span>
         </div>
       </div>
       <div className="mb-3 flex flex-wrap gap-3">
-        <LegendItem kind="sample" label="Sample" />
+        <LegendItem kind="sample" label={shareLabel} />
         <LegendItem kind="success" label="Finish" />
         <LegendItem kind="episodes" label="Episodes" />
         <LegendItem kind="steps" label="Env steps" />
@@ -201,6 +206,7 @@ export function TrackPoolBody({
             <TrackPoolColumn
               entry={entry}
               key={entry.id}
+              sampleBarUsesTargetShare={sampleBarUsesTargetShare}
               stepMetricLabel={stepMetricLabel}
               showStepTarget={showStepTarget}
               xCupRegenerationMinEpisodes={xCupRegenerationMinEpisodes}
@@ -215,12 +221,14 @@ export function TrackPoolBody({
 
 const TrackPoolColumn = memo(function TrackPoolColumn({
   entry,
+  sampleBarUsesTargetShare,
   stepMetricLabel,
   showStepTarget,
   xCupRegenerationMinEpisodes,
   xCupRegenerationThreshold,
 }: {
   entry: TrackPoolCourseView;
+  sampleBarUsesTargetShare: boolean;
   stepMetricLabel: string;
   showStepTarget: boolean;
   xCupRegenerationMinEpisodes: number | null;
@@ -233,13 +241,15 @@ const TrackPoolColumn = memo(function TrackPoolColumn({
     xCupRegenerationThreshold,
     xCupRegenerationMinEpisodes,
   );
+  const shareLabel = sampleBarUsesTargetShare ? "Target" : "Sample";
+  const shareValue = effectiveCourseShare(entry, sampleBarUsesTargetShare);
   return (
     <div className="grid min-w-0 gap-2">
       <div className="grid h-44 grid-cols-4 items-center gap-1.5">
         <DistributionBar
           kind="sample"
-          label={`Sample ${formatPercent(entry.currentProbability ?? 0)}`}
-          value={entry.currentProbability ?? 0}
+          label={`${shareLabel} ${formatPercent(shareValue)}`}
+          value={shareValue}
         />
         <DistributionBar
           completionValue={entry.emaCompletionFraction}
@@ -280,6 +290,23 @@ const TrackPoolColumn = memo(function TrackPoolColumn({
   );
 }, sameTrackPoolColumnProps);
 
+function effectiveCupShare(cup: TrackPoolCupView, sampleBarUsesTargetShare: boolean) {
+  if (!sampleBarUsesTargetShare) {
+    return cup.currentProbability;
+  }
+  return cup.entries.reduce(
+    (total, entry) => total + effectiveCourseShare(entry, sampleBarUsesTargetShare),
+    0,
+  );
+}
+
+function effectiveCourseShare(entry: TrackPoolCourseView, sampleBarUsesTargetShare: boolean) {
+  if (!sampleBarUsesTargetShare) {
+    return entry.currentProbability ?? 0;
+  }
+  return entry.targetStepShare ?? entry.currentProbability ?? 0;
+}
+
 const TRACK_POOL_COURSE_RENDER_KEYS = [
   "completedEnvSteps",
   "currentProbability",
@@ -305,6 +332,7 @@ const TRACK_POOL_COURSE_RENDER_KEYS = [
 function sameTrackPoolColumnProps(
   left: {
     entry: TrackPoolCourseView;
+    sampleBarUsesTargetShare: boolean;
     stepMetricLabel: string;
     showStepTarget: boolean;
     xCupRegenerationMinEpisodes: number | null;
@@ -312,6 +340,7 @@ function sameTrackPoolColumnProps(
   },
   right: {
     entry: TrackPoolCourseView;
+    sampleBarUsesTargetShare: boolean;
     stepMetricLabel: string;
     showStepTarget: boolean;
     xCupRegenerationMinEpisodes: number | null;
@@ -319,6 +348,7 @@ function sameTrackPoolColumnProps(
   },
 ) {
   return (
+    left.sampleBarUsesTargetShare === right.sampleBarUsesTargetShare &&
     left.stepMetricLabel === right.stepMetricLabel &&
     left.showStepTarget === right.showStepTarget &&
     left.xCupRegenerationMinEpisodes === right.xCupRegenerationMinEpisodes &&

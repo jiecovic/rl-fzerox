@@ -613,12 +613,20 @@ describe("RunTrackPoolPanel", () => {
         state={{
           ...trackSamplingStateForCourses(selectedCourseIds),
           sampling_mode: "deficit_budget",
+          entries: trackSamplingStateForCourses(selectedCourseIds).entries.map((entry, index) => ({
+            ...entry,
+            current_probability: index === 0 ? 0 : 1,
+            target_step_share: 0.5,
+          })),
         }}
       />,
     );
 
     expect(screen.getByText("Track pool")).toBeInTheDocument();
     expect(screen.getByText(/deficit budget/i)).toBeInTheDocument();
+    expect(screen.getByText("Target")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Target 50.0%" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Sample 0.0%" })).not.toBeInTheDocument();
     expect(screen.getByText(/step target/i)).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /tracked scheduler env steps/i }).length,
