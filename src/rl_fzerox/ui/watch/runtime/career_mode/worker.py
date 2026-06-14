@@ -617,7 +617,12 @@ def _run_career_mode_loop_body(
                     active_policy_control=active_policy_control,
                 )
                 reset_info = dict(info)
-            if active_policy_started and controller.policy_owns_control():
+            policy_owns_control = controller.policy_owns_control()
+            if _should_observe_policy_transition(
+                policy_owns_control=policy_owns_control,
+                active_policy_started=active_policy_started,
+                info=info,
+            ):
                 terminal_handled = controller.observe_step(
                     session=session,
                     info=info,
@@ -897,6 +902,19 @@ def _drain_recording_notices(frame_recorder: FrameRecorder | None) -> tuple[str,
     if frame_recorder is None:
         return ()
     return frame_recorder.drain_notices()
+
+
+def _should_observe_policy_transition(
+    *,
+    policy_owns_control: bool,
+    active_policy_started: bool,
+    info: dict[str, object],
+) -> bool:
+    if not policy_owns_control:
+        return False
+    if active_policy_started:
+        return True
+    return not in_gp_race(info)
 
 
 def _close_career_mode(

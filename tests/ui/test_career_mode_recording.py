@@ -333,3 +333,34 @@ def test_career_mp4_finalizer_remuxes_mkv_segments(
     finalizer.close()
 
     assert calls == [(mkv_path, "ffmpeg")]
+
+
+def test_career_mp4_finalizer_reports_close_time_remux_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_resolve_ffmpeg_path() -> str:
+        return "ffmpeg"
+
+    def fake_remux_recording_to_mp4(
+        path: Path,
+        *,
+        ffmpeg_path: str,
+    ) -> Path:
+        del path, ffmpeg_path
+        raise RuntimeError("remux failed")
+
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.resolve_ffmpeg_path",
+        fake_resolve_ffmpeg_path,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.remux_recording_to_mp4",
+        fake_remux_recording_to_mp4,
+    )
+    finalizer = _Mp4RecordingFinalizer()
+
+    finalizer.finalize(tmp_path / "segment.mkv")
+    finalizer.close()
+
+    assert finalizer.drain_notices() == ("MP4 conversion failed: remux failed",)

@@ -270,6 +270,7 @@ class _Mp4RecordingFinalizer:
             thread_name_prefix="career-recording-remux",
         )
         self._jobs: list[_FinalizerJob] = []
+        self._notices: list[str] = []
 
     def finalize(self, path: Path) -> None:
         if path.suffix.lower() != ".mkv":
@@ -287,24 +288,20 @@ class _Mp4RecordingFinalizer:
 
     def drain_notices(self) -> tuple[str, ...]:
         pending: list[_FinalizerJob] = []
-        notices: list[str] = []
+        notices = self._notices
+        self._notices = []
         for job in self._jobs:
             if not job.future.done():
                 pending.append(job)
                 continue
-            try:
-                output_path = job.future.result()
-            except Exception as exc:  # pragma: no cover - defensive async error reporting
-                notices.append(f"MP4 conversion failed: {exc}")
-            else:
-                notices.append(f"MP4 ready: {output_path.name}")
+            notices.append(_finalizer_job_notice(job))
         self._jobs = pending
         return tuple(notices)
 
     def close(self) -> None:
         self._executor.shutdown(wait=True)
         for job in self._jobs:
-            job.future.result()
+            self._notices.append(_finalizer_job_notice(job))
         self._jobs.clear()
 
 
@@ -370,6 +367,14 @@ def _last_finished_attempt_status(info: Mapping[str, object]) -> str | None:
 
 def _continuing_race_result(info: Mapping[str, object]) -> bool:
     return info.get("career_mode_fsm_continuing_result") is True
+
+
+def _finalizer_job_notice(job: _FinalizerJob) -> str:
+    try:
+        output_path = job.future.result()
+    except Exception as exc:  # pragma: no cover - defensive async error reporting
+        return f"MP4 conversion failed: {exc}"
+    return f"MP4 ready: {output_path.name}"
 
 
 def _slug(label: str) -> str:
