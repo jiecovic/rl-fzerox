@@ -68,15 +68,24 @@ export interface RunWorkspaceActionState {
   selectedWatchPolicyMode: PolicyPlaybackMode;
   setSelectedWatchPolicyMode: (mode: PolicyPlaybackMode) => void;
   selectedWatchRenderer: WatchRenderer;
+  saveWatchLaunchSettings: () => void;
   setSelectedWatchRenderer: (renderer: WatchRenderer) => void;
   stopRun: () => Promise<void>;
   watchRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
+  watchLaunchSettingsSaved: boolean;
   watchingArtifact: CheckpointArtifact | null;
 }
 
 export interface PendingForkAltBaselineChoice {
   artifact: CheckpointArtifact;
   count: number;
+}
+
+interface WatchLaunchPreference {
+  artifact: CheckpointArtifact;
+  device: WatchDevice;
+  policyMode: PolicyPlaybackMode;
+  renderer: WatchRenderer;
 }
 
 export function useRunWorkspaceActions({
@@ -102,16 +111,24 @@ export function useRunWorkspaceActions({
   const [isRenaming, setIsRenaming] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
+  const [savedWatchPreference, setSavedWatchPreference] = useState<WatchLaunchPreference>(() =>
+    readWatchLaunchPreference(run.config.environment.renderer),
+  );
   const [selectedForkArtifact, setSelectedForkArtifact] = useState<CheckpointArtifact>("latest");
-  const [selectedWatchArtifact, setSelectedWatchArtifact] = useState<CheckpointArtifact>("latest");
-  const [selectedWatchDevice, setSelectedWatchDevice] = useState<WatchDevice>("cuda");
-  const [selectedWatchPolicyMode, setSelectedWatchPolicyMode] =
-    useState<PolicyPlaybackMode>("deterministic");
+  const [selectedWatchArtifact, setSelectedWatchArtifact] = useState<CheckpointArtifact>(
+    savedWatchPreference.artifact,
+  );
+  const [selectedWatchDevice, setSelectedWatchDevice] = useState<WatchDevice>(
+    savedWatchPreference.device,
+  );
+  const [selectedWatchPolicyMode, setSelectedWatchPolicyMode] = useState<PolicyPlaybackMode>(
+    savedWatchPreference.policyMode,
+  );
   const [watchRendererSelection, setWatchRendererSelection] = useState<{
     renderer: WatchRenderer;
     runId: string;
   }>({
-    renderer: run.config.environment.renderer,
+    renderer: savedWatchPreference.renderer,
     runId: run.id,
   });
   const [watchingArtifact, setWatchingArtifact] = useState<CheckpointArtifact | null>(null);
@@ -129,6 +146,16 @@ export function useRunWorkspaceActions({
   const setSelectedWatchRenderer = (renderer: WatchRenderer) => {
     setWatchRendererSelection({ renderer, runId: run.id });
   };
+  const selectedWatchPreference: WatchLaunchPreference = {
+    artifact: selectedWatchArtifact,
+    device: selectedWatchDevice,
+    policyMode: selectedWatchPolicyMode,
+    renderer: selectedWatchRenderer,
+  };
+  const watchLaunchSettingsSaved = watchLaunchPreferencesEqual(
+    selectedWatchPreference,
+    savedWatchPreference,
+  );
 
   useEffect(() => {
     if (!copiedRunId) {
@@ -268,6 +295,12 @@ export function useRunWorkspaceActions({
     }
   }
 
+  function saveWatchLaunchSettings() {
+    writeWatchLaunchPreference(selectedWatchPreference);
+    setSavedWatchPreference(selectedWatchPreference);
+    setControlError(null);
+  }
+
   async function resetTrackPoolState() {
     setIsResettingTrackPool(true);
     setControlError(null);
@@ -366,9 +399,69 @@ export function useRunWorkspaceActions({
     selectedWatchPolicyMode,
     setSelectedWatchPolicyMode,
     selectedWatchRenderer,
+    saveWatchLaunchSettings,
     setSelectedWatchRenderer,
     stopRun,
     watchRunArtifact,
+    watchLaunchSettingsSaved,
     watchingArtifact,
   };
+}
+
+const WATCH_LAUNCH_PREFERENCE_STORAGE_KEY = "run-watch-launch-preference";
+
+function readWatchLaunchPreference(defaultRenderer: WatchRenderer): WatchLaunchPreference {
+  if (typeof window === "undefined") {
+    return defaultWatchLaunchPreference(defaultRenderer);
+  }
+  try {
+    const raw = window.localStorage.getItem(WATCH_LAUNCH_PREFERENCE_STORAGE_KEY);
+    if (raw === null) {
+      return defaultWatchLaunchPreference(defaultRenderer);
+    }
+    const value = JSON.parse(raw) as Partial<Record<keyof WatchLaunchPreference, unknown>>;
+    return {
+      artifact: value.artifact === "best" ? "best" : "latest",
+      device: value.device === "cpu" ? "cpu" : "cuda",
+      policyMode: value.policyMode === "stochastic" ? "stochastic" : "deterministic",
+      renderer:
+        value.renderer === "angrylion" || value.renderer === "gliden64"
+          ? value.renderer
+          : defaultRenderer,
+    };
+  } catch {
+    return defaultWatchLaunchPreference(defaultRenderer);
+  }
+}
+
+function writeWatchLaunchPreference(preference: WatchLaunchPreference) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(WATCH_LAUNCH_PREFERENCE_STORAGE_KEY, JSON.stringify(preference));
+  } catch {
+    // Browser storage may be unavailable in private or restricted contexts.
+  }
+}
+
+function defaultWatchLaunchPreference(defaultRenderer: WatchRenderer): WatchLaunchPreference {
+  return {
+    artifact: "latest",
+    device: "cuda",
+    policyMode: "deterministic",
+    renderer: defaultRenderer,
+  };
+}
+
+function watchLaunchPreferencesEqual(
+  left: WatchLaunchPreference,
+  right: WatchLaunchPreference,
+): boolean {
+  return (
+    left.artifact === right.artifact &&
+    left.device === right.device &&
+    left.policyMode === right.policyMode &&
+    left.renderer === right.renderer
+  );
 }

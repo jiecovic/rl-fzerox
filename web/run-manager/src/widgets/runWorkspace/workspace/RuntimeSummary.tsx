@@ -327,6 +327,18 @@ export function RunRuntimeSummary({
               </FieldSelect>
             </ToolbarSelect>
             <TooltipIconButton
+              aria-label="Save watch launch settings"
+              disabled={actions.watchingArtifact !== null || actions.watchLaunchSettingsSaved}
+              tooltip={
+                actions.watchLaunchSettingsSaved
+                  ? "Watch launch settings saved"
+                  : "Save watch launch settings"
+              }
+              onClick={actions.saveWatchLaunchSettings}
+            >
+              <SaveDraftIcon />
+            </TooltipIconButton>
+            <TooltipIconButton
               aria-label={
                 actions.watchingArtifact === actions.selectedWatchArtifact
                   ? `Opening ${actions.selectedWatchArtifact} checkpoint watch`

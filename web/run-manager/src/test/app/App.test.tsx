@@ -259,6 +259,7 @@ describe("App", () => {
       "run-001",
       "latest",
       true,
+      undefined,
     );
   });
 
@@ -304,6 +305,7 @@ describe("App", () => {
       "run-001",
       "latest",
       false,
+      undefined,
     );
   });
 
@@ -346,6 +348,7 @@ describe("App", () => {
       "run-001",
       "latest",
       true,
+      undefined,
     );
   });
 
@@ -435,6 +438,7 @@ describe("App", () => {
       null,
       null,
       true,
+      undefined,
     );
   });
 
@@ -605,6 +609,63 @@ describe("App", () => {
       "cuda",
       "gliden64",
       "stochastic",
+    );
+  });
+
+  it("persists watch launch settings locally", async () => {
+    const user = userEvent.setup();
+    const run = runFixture({ id: "run-001", name: "ppo_test_1" });
+    loadManagerDataMock.mockResolvedValue({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [run],
+      saveGames: [],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+
+    await user.selectOptions(await screen.findByLabelText("Watch policy device"), "cpu");
+    const saveButton = await screen.findByRole("button", {
+      name: "Save watch launch settings",
+    });
+    await user.click(saveButton);
+    expect(saveButton).toBeDisabled();
+
+    cleanup();
+    watchRunMock.mockClear();
+
+    render(<App />);
+
+    const nextWorkspaceTabs = await screen.findByRole("navigation", {
+      name: "Run manager sections",
+    });
+    await user.click(within(nextWorkspaceTabs).getByRole("button", { name: "Runs" }));
+    const nextRunOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const nextOpenRunButton = nextRunOpenButtons.at(-1);
+    if (nextOpenRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(nextOpenRunButton);
+
+    expect(await screen.findByLabelText("Watch policy device")).toHaveValue("cpu");
+    await user.click(await screen.findByRole("button", { name: "Watch latest checkpoint" }));
+
+    expect(watchRunMock).toHaveBeenCalledWith(
+      "run-001",
+      "latest",
+      "cpu",
+      "gliden64",
+      "deterministic",
     );
   });
 
