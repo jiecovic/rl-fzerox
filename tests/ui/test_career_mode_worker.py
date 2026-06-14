@@ -45,6 +45,11 @@ def test_career_worker_observes_terminal_result_before_policy_start() -> None:
     assert _should_observe_policy_transition(
         policy_owns_control=True,
         active_policy_started=False,
+        info={"game_mode": "gp_race", "termination_reason": "finished"},
+    ) is True
+    assert _should_observe_policy_transition(
+        policy_owns_control=True,
+        active_policy_started=False,
         info={"game_mode": "gp_race_next_course", "termination_reason": "crashed"},
     ) is True
     assert _should_observe_policy_transition(

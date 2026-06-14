@@ -8,6 +8,7 @@ from multiprocessing.queues import Queue as ProcessQueue
 from fzerox_emulator import FZeroXTelemetry, RaceControlState, SpinRequest
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.menu import (
+    MenuFacts,
     MenuInput,
     RawMenuStep,
     course_id_from_info,
@@ -914,7 +915,8 @@ def _should_observe_policy_transition(
         return False
     if active_policy_started:
         return True
-    return not in_gp_race(info)
+    facts = MenuFacts.from_info(info)
+    return facts.terminal_race_result or not facts.in_gp_race
 
 
 def _close_career_mode(
