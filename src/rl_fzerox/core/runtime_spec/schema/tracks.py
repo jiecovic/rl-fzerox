@@ -19,7 +19,11 @@ from pydantic import (
 
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, XCupGeneratedCourseKind
-from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS, EngineTunerBackend
+from rl_fzerox.core.engine_tuning.types import (
+    ENGINE_TUNER_DEFAULTS,
+    EngineTunerBackend,
+    engine_bucket_candidates,
+)
 from rl_fzerox.core.runtime_spec.schema.common import TrackSamplingMode
 
 
@@ -219,6 +223,12 @@ class AdaptiveEngineTuningConfig(BaseModel):
     def _validate_engine_range(self) -> AdaptiveEngineTuningConfig:
         if self.min_raw_value > self.max_raw_value:
             raise ValueError("engine_tuning.min_raw_value must be <= max_raw_value")
+        if self.enabled and self.backend == "bandit":
+            engine_bucket_candidates(
+                minimum=self.min_raw_value,
+                maximum=self.max_raw_value,
+                bucket_size=self.bucket_size,
+            )
         return self
 
 

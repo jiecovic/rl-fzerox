@@ -28,7 +28,7 @@ def test_engine_candidates_are_inclusive_and_clamped() -> None:
     assert engine_candidates(minimum=98, maximum=120) == (98, 99, 100)
 
 
-def test_engine_bucket_candidates_are_inclusive_and_bucketed() -> None:
+def test_engine_bucket_candidates_are_inclusive_centered_and_bucketed() -> None:
     assert engine_bucket_candidates(minimum=0, maximum=100, bucket_size=10) == (
         0,
         10,
@@ -42,7 +42,34 @@ def test_engine_bucket_candidates_are_inclusive_and_bucketed() -> None:
         90,
         100,
     )
-    assert engine_bucket_candidates(minimum=35, maximum=65, bucket_size=10) == (35, 45, 55, 65)
+    assert engine_bucket_candidates(minimum=0, maximum=100, bucket_size=20) == (
+        10,
+        30,
+        50,
+        70,
+        90,
+    )
+    assert engine_bucket_candidates(minimum=0, maximum=100, bucket_size=15) == (
+        5,
+        20,
+        35,
+        50,
+        65,
+        80,
+        95,
+    )
+    assert engine_bucket_candidates(minimum=35, maximum=65, bucket_size=10) == (
+        40,
+        50,
+        60,
+    )
+    assert engine_bucket_candidates(minimum=20, maximum=80, bucket_size=25) == (
+        25,
+        50,
+        75,
+    )
+    with pytest.raises(ValueError, match="bucket grid"):
+        engine_bucket_candidates(minimum=51, maximum=55, bucket_size=10)
 
 
 def test_engine_candidates_reject_inverted_range() -> None:

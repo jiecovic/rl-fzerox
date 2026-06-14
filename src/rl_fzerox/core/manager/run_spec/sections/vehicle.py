@@ -13,7 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS
+from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS, engine_bucket_candidates
 from rl_fzerox.core.manager.run_spec.common import (
     EngineSettingMode,
     EngineTunerBackend,
@@ -130,5 +130,11 @@ class ManagedVehicleConfig(BaseModel):
             raise ValueError(
                 "vehicle.engine_setting_min_raw_value must be <= "
                 "vehicle.engine_setting_max_raw_value"
+            )
+        if self.engine_mode == "adaptive_tuner" and self.adaptive_engine_tuner_backend == "bandit":
+            engine_bucket_candidates(
+                minimum=self.engine_setting_min_raw_value,
+                maximum=self.engine_setting_max_raw_value,
+                bucket_size=self.adaptive_engine_bandit_bucket_size,
             )
         return self

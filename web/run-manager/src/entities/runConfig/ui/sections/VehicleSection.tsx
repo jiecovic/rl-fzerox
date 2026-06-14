@@ -10,6 +10,7 @@ import {
   vehicleSlotLabel,
 } from "@/entities/runConfig/ui/sections/vehicle/model";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
+import { centeredEngineBuckets } from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
 import { cn } from "@/shared/ui/cn";
 import { ConfigGrid, ConfigStack } from "@/shared/ui/config/ConfigLayout";
@@ -422,6 +423,19 @@ function AdaptiveEngineControls({
   const isBanditBackend = vehicle.adaptive_engine_tuner_backend === "bandit";
   const isGaussianProcessBackend = vehicle.adaptive_engine_tuner_backend === "gaussian_process";
   const isMlpEnsembleBackend = vehicle.adaptive_engine_tuner_backend === "mlp_ensemble";
+  const banditBuckets = useMemo(
+    () =>
+      centeredEngineBuckets({
+        bucketSize: vehicle.adaptive_engine_bandit_bucket_size,
+        minimum: vehicle.engine_setting_min_raw_value,
+        maximum: vehicle.engine_setting_max_raw_value,
+      }),
+    [
+      vehicle.adaptive_engine_bandit_bucket_size,
+      vehicle.engine_setting_max_raw_value,
+      vehicle.engine_setting_min_raw_value,
+    ],
+  );
   return (
     <div className="grid gap-3 border-t border-app-border pt-3">
       <div className="grid gap-1">
@@ -464,7 +478,7 @@ function AdaptiveEngineControls({
       <div className="grid gap-3 lg:grid-cols-3">
         {isBanditBackend ? (
           <NumberField
-            help="Bandit-only raw engine stride. The default 10 samples 0, 10, 20, ..., 100."
+            help="Bandit-only raw engine spacing, mirrored around 50 and including the configured range boundaries."
             label="Bucket size"
             resetValue={defaultVehicle.adaptive_engine_bandit_bucket_size}
             step="1"
@@ -580,6 +594,35 @@ function AdaptiveEngineControls({
           />
         ) : null}
       </div>
+      {isBanditBackend ? <BanditBucketPreview buckets={banditBuckets} /> : null}
+    </div>
+  );
+}
+
+function BanditBucketPreview({ buckets }: { buckets: readonly number[] }) {
+  const hasBuckets = buckets.length > 0;
+  return (
+    <div className="grid gap-2 border border-app-border bg-app-surface-muted p-3">
+      <div className="flex items-center justify-between gap-3">
+        <strong className="text-[13px] text-app-text">Bandit buckets</strong>
+        <span className="text-xs tabular-nums text-app-muted">{buckets.length} values</span>
+      </div>
+      {hasBuckets ? (
+        <div className="flex flex-wrap gap-1.5">
+          {buckets.map((bucket) => (
+            <span
+              className="min-w-8 border border-app-border bg-app-surface px-2 py-1 text-center text-xs tabular-nums text-app-text"
+              key={bucket}
+            >
+              {bucket}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-xs text-app-danger">
+          No centered bucket falls inside the selected engine range.
+        </span>
+      )}
     </div>
   );
 }

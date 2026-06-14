@@ -21,6 +21,7 @@ import {
   trackSamplingModeSchema,
   vehicleSelectionModeSchema,
 } from "@/shared/api/contract/enums";
+import { centeredEngineBuckets } from "@/shared/domain/engineBuckets";
 
 export const customCnnLayerKindSchema = z.preprocess(
   (value) => (value === "residual" ? "residual_post" : value),
@@ -176,6 +177,20 @@ const vehicleConfigSchema = z
     {
       message: "engine_setting_min_raw_value must be <= engine_setting_max_raw_value",
       path: ["engine_setting_min_raw_value"],
+    },
+  )
+  .refine(
+    (vehicle) =>
+      vehicle.engine_mode !== "adaptive_tuner" ||
+      vehicle.adaptive_engine_tuner_backend !== "bandit" ||
+      centeredEngineBuckets({
+        bucketSize: vehicle.adaptive_engine_bandit_bucket_size,
+        minimum: vehicle.engine_setting_min_raw_value,
+        maximum: vehicle.engine_setting_max_raw_value,
+      }).length > 0,
+    {
+      message: "bandit bucket grid has no values inside the engine range",
+      path: ["adaptive_engine_bandit_bucket_size"],
     },
   );
 

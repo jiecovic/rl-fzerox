@@ -156,17 +156,32 @@ def engine_bucket_candidates(
     maximum: int,
     bucket_size: int,
 ) -> tuple[int, ...]:
-    """Return inclusive engine values separated by the configured bucket size."""
+    """Return engine buckets mirrored around neutral 50 and clipped to range."""
 
     lower = max(0, min(100, int(minimum)))
     upper = max(0, min(100, int(maximum)))
     if lower > upper:
         raise ValueError(f"engine tuning min_raw_value exceeds max_raw_value: {lower} > {upper}")
     step = max(1, int(bucket_size))
-    values = list(range(lower, upper + 1, step))
-    if not values or values[-1] != upper:
-        values.append(upper)
-    return tuple(values)
+    center = 50
+    values: set[int] = set()
+    offset = 0
+    while True:
+        low = center - offset
+        high = center + offset
+        if lower <= low <= upper:
+            values.add(low)
+        if offset != 0 and lower <= high <= upper:
+            values.add(high)
+        if low < lower and high > upper:
+            break
+        offset += step
+    if not values:
+        raise ValueError(
+            "engine tuning bucket grid contains no values; adjust min_raw_value, "
+            "max_raw_value, or bucket_size"
+        )
+    return tuple(sorted(values))
 
 
 def finish_time_score(race_time_ms: int) -> float:
