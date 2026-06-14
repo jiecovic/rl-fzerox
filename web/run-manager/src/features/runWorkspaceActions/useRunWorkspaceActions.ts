@@ -12,6 +12,7 @@ export type CheckpointArtifact = "latest" | "best";
 
 export interface RunWorkspaceActionsProps {
   clearTrackSamplingState: (state: TrackSamplingRuntimeState | null) => void;
+  onGlobalError: (message: string | null) => void;
   onClearAltBaselines: (runId: string) => Promise<void>;
   onClearCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
@@ -36,7 +37,6 @@ export interface RunWorkspaceActionState {
   canRename: boolean;
   canResume: boolean;
   canStop: boolean;
-  controlError: string | null;
   copiedRunId: boolean;
   copyRunId: () => Promise<void>;
   createDraftFromRun: () => Promise<void>;
@@ -90,6 +90,7 @@ interface WatchLaunchPreference {
 
 export function useRunWorkspaceActions({
   clearTrackSamplingState,
+  onGlobalError,
   onClearAltBaselines,
   onClearCourseAltBaselines,
   onCreateDraftFromRun,
@@ -103,7 +104,6 @@ export function useRunWorkspaceActions({
   run,
   runName,
 }: RunWorkspaceActionsProps): RunWorkspaceActionState {
-  const [controlError, setControlError] = useState<string | null>(null);
   const [copiedRunId, setCopiedRunId] = useState(false);
   const [isOpeningDirectory, setIsOpeningDirectory] = useState(false);
   const [isCreatingDraftFromRun, setIsCreatingDraftFromRun] = useState(false);
@@ -171,11 +171,11 @@ export function useRunWorkspaceActions({
 
   async function resumeRun() {
     setIsResuming(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onResume(run.id);
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : "failed to resume run");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to resume run");
     } finally {
       setIsResuming(false);
     }
@@ -183,11 +183,11 @@ export function useRunWorkspaceActions({
 
   async function stopRun() {
     setIsStopping(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onStop(run.id);
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : "failed to stop run");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to stop run");
     } finally {
       setIsStopping(false);
     }
@@ -196,16 +196,16 @@ export function useRunWorkspaceActions({
   async function renameRunLabel(name?: string) {
     const nextName = (name ?? runName).trim();
     if (nextName.length === 0) {
-      setControlError("run name is required");
+      onGlobalError("run name is required");
       return false;
     }
     setIsRenaming(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onRename(run.id, nextName);
       return true;
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : "failed to rename run");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to rename run");
       return false;
     } finally {
       setIsRenaming(false);
@@ -214,11 +214,11 @@ export function useRunWorkspaceActions({
 
   async function openRunDirectoryInBrowser() {
     setIsOpeningDirectory(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onOpenDirectory(run.id);
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : "failed to open run directory");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to open run directory");
     } finally {
       setIsOpeningDirectory(false);
     }
@@ -226,7 +226,7 @@ export function useRunWorkspaceActions({
 
   async function forkRunArtifact(artifact: CheckpointArtifact) {
     if (run.active_alt_baseline_count > 0) {
-      setControlError(null);
+      onGlobalError(null);
       setPendingForkAltBaselineChoice({
         artifact,
         count: run.active_alt_baseline_count,
@@ -251,11 +251,11 @@ export function useRunWorkspaceActions({
 
   async function executeForkRunArtifact(artifact: CheckpointArtifact, copyAltBaselines: boolean) {
     setIsForking(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onFork(run.id, artifact, copyAltBaselines);
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : `failed to fork ${artifact}`);
+      onGlobalError(caught instanceof Error ? caught.message : `failed to fork ${artifact}`);
     } finally {
       setIsForking(false);
     }
@@ -263,11 +263,11 @@ export function useRunWorkspaceActions({
 
   async function createDraftFromRun() {
     setIsCreatingDraftFromRun(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onCreateDraftFromRun(run.id);
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : "failed to create draft from run");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to create draft from run");
     } finally {
       setIsCreatingDraftFromRun(false);
     }
@@ -275,7 +275,7 @@ export function useRunWorkspaceActions({
 
   async function watchRunArtifact(artifact: CheckpointArtifact) {
     setWatchingArtifact(artifact);
-    setControlError(null);
+    onGlobalError(null);
     try {
       const status = await onWatch(
         run.id,
@@ -285,11 +285,11 @@ export function useRunWorkspaceActions({
         selectedWatchPolicyMode,
       );
       if (status === "already_running") {
-        setControlError(`${artifact} watch is already running`);
+        onGlobalError(`${artifact} watch is already running`);
         return;
       }
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : `failed to watch ${artifact}`);
+      onGlobalError(caught instanceof Error ? caught.message : `failed to watch ${artifact}`);
     } finally {
       setWatchingArtifact((current) => (current === artifact ? null : current));
     }
@@ -298,19 +298,17 @@ export function useRunWorkspaceActions({
   function saveWatchLaunchSettings() {
     writeWatchLaunchPreference(selectedWatchPreference);
     setSavedWatchPreference(selectedWatchPreference);
-    setControlError(null);
+    onGlobalError(null);
   }
 
   async function resetTrackPoolState() {
     setIsResettingTrackPool(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onResetTrackPool(run.id);
       clearTrackSamplingState(null);
     } catch (caught) {
-      setControlError(
-        caught instanceof Error ? caught.message : "failed to reset track-pool stats",
-      );
+      onGlobalError(caught instanceof Error ? caught.message : "failed to reset track-pool stats");
     } finally {
       setIsResettingTrackPool(false);
     }
@@ -318,11 +316,11 @@ export function useRunWorkspaceActions({
 
   async function clearAltBaselines() {
     setIsClearingAltBaselines(true);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onClearAltBaselines(run.id);
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : "failed to clear alt baselines");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to clear alt baselines");
     } finally {
       setIsClearingAltBaselines(false);
     }
@@ -330,11 +328,11 @@ export function useRunWorkspaceActions({
 
   async function clearCourseAltBaselines(courseKey: string) {
     setClearingAltBaselineCourseKey(courseKey);
-    setControlError(null);
+    onGlobalError(null);
     try {
       await onClearCourseAltBaselines(run.id, courseKey);
     } catch (caught) {
-      setControlError(
+      onGlobalError(
         caught instanceof Error ? caught.message : `failed to clear alt baselines for ${courseKey}`,
       );
     } finally {
@@ -346,9 +344,9 @@ export function useRunWorkspaceActions({
     try {
       await navigator.clipboard.writeText(run.id);
       setCopiedRunId(true);
-      setControlError(null);
+      onGlobalError(null);
     } catch {
-      setControlError("failed to copy run id");
+      onGlobalError("failed to copy run id");
     }
   }
 
@@ -367,7 +365,6 @@ export function useRunWorkspaceActions({
     canRename,
     canResume,
     canStop,
-    controlError,
     copiedRunId,
     copyRunId,
     clearingAltBaselineCourseKey,

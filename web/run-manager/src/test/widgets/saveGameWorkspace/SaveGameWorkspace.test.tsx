@@ -712,6 +712,7 @@ function StatefulNewSaveGameWorkspace({
       saveGame={null}
       session={session}
       onCreateSaveGame={onCreateSaveGame}
+      onGlobalError={vi.fn()}
       onImportEngineTuning={vi.fn()}
       onOpenSaveGameDirectory={vi.fn()}
       onPatchSession={(sessionId, patch) => {
@@ -759,6 +760,7 @@ function StatefulExistingSaveGameWorkspace({
       saveGame={saveGame}
       session={session}
       onCreateSaveGame={vi.fn()}
+      onGlobalError={vi.fn()}
       onImportEngineTuning={onImportEngineTuning}
       onOpenSaveGameDirectory={onOpenSaveGameDirectory}
       onPatchSession={(sessionId, patch) => {

@@ -1,5 +1,5 @@
 // web/run-manager/src/widgets/runWorkspace/RunWorkspace.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ConfigSection } from "@/entities/runConfig/model/sections";
 import {
   useRunEngineTuningState,
@@ -17,7 +17,7 @@ import type {
   WatchRenderer,
 } from "@/shared/api/contract";
 import { RenameIcon } from "@/shared/ui/icons";
-import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
+import { Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 import { RunReadonlyConfig } from "@/widgets/runWorkspace/workspace/ReadonlyConfig";
@@ -33,6 +33,7 @@ interface RunWorkspaceProps {
   onClearCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
   onFork: (runId: string, artifact: "latest" | "best", copyAltBaselines: boolean) => Promise<void>;
+  onGlobalError: (message: string | null) => void;
   onOpenDirectory: (runId: string) => Promise<void>;
   onRename: (runId: string, name: string) => Promise<void>;
   onResetEngineTuning: (runId: string) => Promise<void>;
@@ -57,6 +58,7 @@ export function RunWorkspace({
   onClearCourseAltBaselines,
   onCreateDraftFromRun,
   onFork,
+  onGlobalError,
   onOpenDirectory,
   onRename,
   onResetEngineTuning,
@@ -68,9 +70,9 @@ export function RunWorkspace({
   run,
 }: RunWorkspaceProps) {
   const [runName, setRunName] = useState(run.name);
+  const lastObservedWatchFailureRef = useRef<{ key: string | null; runId: string } | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [configSection, setConfigSection] = useState<ConfigSection>("training");
-  const [engineTuningResetError, setEngineTuningResetError] = useState<string | null>(null);
   const [isResettingEngineTuning, setIsResettingEngineTuning] = useState(false);
   const [engineTuningExpansion, setEngineTuningExpansion] = useState({
     expanded: false,
@@ -87,6 +89,7 @@ export function RunWorkspace({
     useRunTrackSamplingState(run.id, run.status);
   const actions = useRunWorkspaceActions({
     clearTrackSamplingState: setTrackSamplingState,
+    onGlobalError,
     onClearAltBaselines,
     onClearCourseAltBaselines,
     onCreateDraftFromRun,
@@ -107,18 +110,33 @@ export function RunWorkspace({
     engineTuningEnabled && engineTuningExpanded,
     actions.selectedWatchArtifact,
   );
-  const watchFailureMessage = actions.controlError === null ? latestWatchFailureMessage(run) : null;
-  const hasFeedback =
-    actions.controlError !== null ||
-    watchFailureMessage !== null ||
-    engineTuningError !== null ||
-    engineTuningResetError !== null ||
-    trackSamplingError !== null ||
-    (previewEnabled && previewError !== null);
-
+  const watchFailure = latestWatchFailure(run);
+  const watchFailureKeyValue = watchFailureKey(watchFailure);
+  const watchFailureMessage = watchFailure?.message ?? null;
   useEffect(() => {
     setRunName(run.name);
   }, [run.name]);
+
+  useEffect(() => {
+    const previous = lastObservedWatchFailureRef.current;
+    if (previous === null || previous.runId !== run.id) {
+      lastObservedWatchFailureRef.current = { key: watchFailureKeyValue, runId: run.id };
+      return;
+    }
+    if (watchFailureKeyValue !== previous.key) {
+      lastObservedWatchFailureRef.current = { key: watchFailureKeyValue, runId: run.id };
+      if (watchFailureMessage !== null) {
+        onGlobalError(watchFailureMessage);
+      }
+    }
+  }, [onGlobalError, run.id, watchFailureKeyValue, watchFailureMessage]);
+
+  useEffect(() => {
+    const message = engineTuningError ?? trackSamplingError ?? previewError ?? null;
+    if (message !== null) {
+      onGlobalError(message);
+    }
+  }, [engineTuningError, onGlobalError, previewError, trackSamplingError]);
 
   async function submitRunRename(name: string) {
     setRunName(name);
@@ -130,14 +148,13 @@ export function RunWorkspace({
 
   async function resetEngineTuning() {
     setIsResettingEngineTuning(true);
-    setEngineTuningResetError(null);
+    onGlobalError(null);
     try {
       await onResetEngineTuning(run.id);
       setEngineTuningState(null);
     } catch (caught) {
-      setEngineTuningResetError(
-        caught instanceof Error ? caught.message : "failed to reset engine tuner",
-      );
+      const message = caught instanceof Error ? caught.message : "failed to reset engine tuner";
+      onGlobalError(message);
     } finally {
       setIsResettingEngineTuning(false);
     }
@@ -180,25 +197,6 @@ export function RunWorkspace({
         onSelect={(copyAltBaselines) => void actions.confirmForkAltBaselineChoice(copyAltBaselines)}
       />
 
-      {hasFeedback ? (
-        <div className="configurator-feedback-stack">
-          {actions.controlError !== null ? (
-            <Notice tone="error">{actions.controlError}</Notice>
-          ) : null}
-          {watchFailureMessage !== null ? (
-            <Notice tone="error">{watchFailureMessage}</Notice>
-          ) : null}
-          {engineTuningError !== null ? <Notice tone="error">{engineTuningError}</Notice> : null}
-          {engineTuningResetError !== null ? (
-            <Notice tone="error">{engineTuningResetError}</Notice>
-          ) : null}
-          {trackSamplingError !== null ? <Notice tone="error">{trackSamplingError}</Notice> : null}
-          {previewEnabled && previewError !== null ? (
-            <Notice tone="error">{previewError}</Notice>
-          ) : null}
-        </div>
-      ) : null}
-
       <RunRuntimeSummary
         actions={actions}
         allRuns={allRuns}
@@ -225,7 +223,20 @@ export function RunWorkspace({
   );
 }
 
-function latestWatchFailureMessage(run: ManagedRunDetail): string | null {
+function latestWatchFailure(run: ManagedRunDetail): { created_at: string; message: string } | null {
   const event = run.recent_events.find((candidate) => candidate.kind === "watch_failed");
-  return event?.message ?? null;
+  if (event === undefined) {
+    return null;
+  }
+  return {
+    created_at: event.created_at,
+    message: event.message,
+  };
+}
+
+function watchFailureKey(event: { created_at: string; message: string } | null): string | null {
+  if (event === null) {
+    return null;
+  }
+  return `${event.created_at}\n${event.message}`;
 }

@@ -12,6 +12,7 @@ import { AppTooltipProvider } from "@/shared/ui/Tooltip";
 
 export function App() {
   const [theme, setTheme] = useState<Theme>("dark");
+  const [globalError, setGlobalError] = useState<string | null>(null);
   const managerData = useManagerData();
   const sessions = useWorkspaceSessions({
     drafts: managerData.drafts,
@@ -24,6 +25,7 @@ export function App() {
     reloadManagerData: () => managerData.reloadManagerData(),
     runs: managerData.runs,
     sessions,
+    setGlobalError,
     setDrafts: managerData.setDrafts,
     setRuns: managerData.setRuns,
     setSaveGames: managerData.setSaveGames,
@@ -80,7 +82,7 @@ export function App() {
               actions={actions}
               defaultConfig={managerData.defaultConfig}
               drafts={managerData.drafts}
-              error={managerData.error}
+              error={globalError ?? managerData.error}
               isLoading={managerData.isLoading}
               loadRunDetail={managerData.loadRunDetail}
               metadata={managerData.metadata}

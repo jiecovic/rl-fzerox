@@ -45,7 +45,11 @@ describe("ChartsPanel", () => {
     });
 
     const { rerender } = render(
-      <ChartsPanel focusedRunId={focusedRun.id} runs={[focusedRun, selectedRun]} />,
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={focusedRun.id}
+        runs={[focusedRun, selectedRun]}
+      />,
     );
 
     const focusedRow = rowForRun(focusedRun.name);
@@ -57,7 +61,11 @@ describe("ChartsPanel", () => {
     expect(selectedLegendNames()).toEqual([selectedRun.name]);
 
     rerender(
-      <ChartsPanel focusedRunId={focusedRun.id} runs={[{ ...focusedRun }, { ...selectedRun }]} />,
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={focusedRun.id}
+        runs={[{ ...focusedRun }, { ...selectedRun }]}
+      />,
     );
 
     expect(selectedLegendNames()).toEqual([selectedRun.name]);
@@ -90,13 +98,23 @@ describe("ChartsPanel", () => {
     window.localStorage.setItem("run-chart-selected-runs", JSON.stringify([forkRun.id]));
 
     const firstRender = render(
-      <ChartsPanel focusedRunId={null} runs={[secondForkRun, forkRun, rootRun]} />,
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[secondForkRun, forkRun, rootRun]}
+      />,
     );
 
     firstRender.unmount();
     cleanup();
 
-    render(<ChartsPanel focusedRunId={null} runs={[secondForkRun, forkRun, rootRun]} />);
+    render(
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[secondForkRun, forkRun, rootRun]}
+      />,
+    );
 
     await waitFor(() => {
       expect(selectedLegendNames()).toEqual([forkRun.name]);
@@ -132,7 +150,13 @@ describe("ChartsPanel", () => {
       status: "stopped",
     });
 
-    render(<ChartsPanel focusedRunId={null} runs={[forkRun, secondRootRun, rootRun]} />);
+    render(
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[forkRun, secondRootRun, rootRun]}
+      />,
+    );
 
     expect(screen.getByLabelText("ppo_test_1 lineage runs")).toBeInTheDocument();
     expect(screen.getByLabelText("ppo_masked_lidar lineage runs")).toBeInTheDocument();
@@ -161,7 +185,7 @@ describe("ChartsPanel", () => {
       status: "stopped",
     });
 
-    render(<ChartsPanel focusedRunId={null} runs={[oldRun, sweepRun]} />);
+    render(<ChartsPanel onGlobalError={vi.fn()} focusedRunId={null} runs={[oldRun, sweepRun]} />);
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Chart lineage group" }), [
       "cnn-sweep",
@@ -199,7 +223,7 @@ describe("ChartsPanel", () => {
       status: "stopped",
     });
 
-    render(<ChartsPanel focusedRunId={null} runs={[forkRun, rootRun]} />);
+    render(<ChartsPanel onGlobalError={vi.fn()} focusedRunId={null} runs={[forkRun, rootRun]} />);
 
     expect(legendSwatchStyle(forkRun.name)).not.toBe(legendSwatchStyle(rootRun.name));
     expect(selectedLegendNames()).toEqual([forkRun.name, rootRun.name]);
@@ -235,7 +259,13 @@ describe("ChartsPanel", () => {
       status: "stopped",
     });
 
-    render(<ChartsPanel focusedRunId={null} runs={[forkRun, secondRootRun, rootRun]} />);
+    render(
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[forkRun, secondRootRun, rootRun]}
+      />,
+    );
 
     await user.click(within(rowForRun(rootRun.name)).getByRole("checkbox"));
 
@@ -276,7 +306,13 @@ describe("ChartsPanel", () => {
       status: "stopped",
     });
 
-    render(<ChartsPanel focusedRunId={null} runs={[forkRun, secondRootRun, rootRun]} />);
+    render(
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[forkRun, secondRootRun, rootRun]}
+      />,
+    );
 
     const lineageSection = screen.getByLabelText("ppo_test_1 lineage runs");
     if (!(lineageSection instanceof HTMLElement)) {
@@ -322,7 +358,7 @@ describe("ChartsPanel", () => {
       status: "stopped",
     });
 
-    render(<ChartsPanel focusedRunId={null} runs={[forkRun, rootRun]} />);
+    render(<ChartsPanel onGlobalError={vi.fn()} focusedRunId={null} runs={[forkRun, rootRun]} />);
 
     const lineageSection = screen.getByLabelText("ppo_test_1 lineage runs");
     expect(within(lineageSection).getByText("ppo_test_1 fork")).toBeInTheDocument();
@@ -351,7 +387,13 @@ describe("ChartsPanel", () => {
     ]);
     getCachedRunMetricsMock.mockReturnValue(null);
 
-    render(<ChartsPanel focusedRunId={null} runs={[runFixture({ status: "stopped" })]} />);
+    render(
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[runFixture({ status: "stopped" })]}
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Episode reward")).toBeInTheDocument();

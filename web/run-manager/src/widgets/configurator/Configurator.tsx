@@ -57,6 +57,7 @@ interface ConfiguratorProps {
   resumeDraftName?: string | null;
   onConfigChange?: (config: ManagedRunConfig) => void;
   onDraftNameChange?: (name: string) => void;
+  onGlobalError: (message: string | null) => void;
   onLaunchRun: (
     name: string,
     config: ManagedRunConfig,
@@ -92,6 +93,7 @@ export function Configurator({
   resumeDraftName = null,
   onConfigChange,
   onDraftNameChange,
+  onGlobalError,
   onLaunchRun,
   onSaveDraft,
   onUpdateDraft,
@@ -102,11 +104,9 @@ export function Configurator({
   const [config, setConfig] = useState(resumeConfig ?? baselineConfig);
   const [section, setSection] = useState<ConfigSection>("tracks");
   const [policyPreview, setPolicyPreview] = useState<PolicyArchitecturePreview | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [pendingEngineTuningLaunch, setPendingEngineTuningLaunch] =
     useState<PendingEngineTuningLaunch | null>(null);
   const configRef = useRef(config);
@@ -182,20 +182,16 @@ export function Configurator({
     setDraftName(baselineDraftName);
     setConfig(baselineConfig);
     setSection("tracks");
-    setError(null);
-    setPreviewError(null);
   }, [baselineConfig, baselineDraftName, resetSourceKey]);
 
   const previewConfig = useDebouncedValue(config, POLICY_PREVIEW_DEBOUNCE_MS);
 
   useEffect(() => {
     if (!active) {
-      setPreviewError(null);
       return undefined;
     }
     let ignore = false;
     const controller = new AbortController();
-    setPreviewError(null);
     void fetchPolicyPreview(previewConfig, { signal: controller.signal })
       .then((preview) => {
         if (!ignore) {
@@ -205,16 +201,16 @@ export function Configurator({
       .catch((caught) => {
         if (!ignore) {
           setPolicyPreview(null);
-          setPreviewError(
-            caught instanceof Error ? caught.message : "failed to compute policy preview",
-          );
+          const message =
+            caught instanceof Error ? caught.message : "failed to compute policy preview";
+          onGlobalError(message);
         }
       });
     return () => {
       ignore = true;
       controller.abort();
     };
-  }, [active, previewConfig]);
+  }, [active, onGlobalError, previewConfig]);
 
   useEffect(() => {
     notifyDraftNameChange(draftName);
@@ -246,13 +242,13 @@ export function Configurator({
     }
     const committedConfig = committedConfigSnapshot();
     setIsSaving(true);
-    setError(null);
+    onGlobalError(null);
     try {
       const savedDraft = await onSaveDraft(normalizedDraftName, committedConfig);
       setDraftName(savedDraft.name);
       setConfig(savedDraft.config);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to save draft");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to save draft");
     } finally {
       setIsSaving(false);
     }
@@ -267,13 +263,13 @@ export function Configurator({
     }
     const committedConfig = committedConfigSnapshot();
     setIsUpdating(true);
-    setError(null);
+    onGlobalError(null);
     try {
       const savedDraft = await onUpdateDraft(loadedDraft.id, normalizedDraftName, committedConfig);
       setDraftName(savedDraft.name);
       setConfig(savedDraft.config);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to update draft");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to update draft");
     } finally {
       setIsUpdating(false);
     }
@@ -285,7 +281,7 @@ export function Configurator({
     }
     const committedConfig = committedConfigSnapshot();
     if (requiresEngineTuningSourceChoice(committedConfig)) {
-      setError(null);
+      onGlobalError(null);
       setPendingEngineTuningLaunch({
         config: committedConfig,
         draftId: loadedDraft?.id ?? null,
@@ -312,7 +308,7 @@ export function Configurator({
     engineTuningSourceAction?: EngineTuningSourceAction,
   ) {
     setIsTraining(true);
-    setError(null);
+    onGlobalError(null);
     try {
       if (engineTuningSourceAction === undefined) {
         await onLaunchRun(name, launchConfig, draftId);
@@ -320,7 +316,7 @@ export function Configurator({
         await onLaunchRun(name, launchConfig, draftId, engineTuningSourceAction);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to launch training run");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to launch training run");
     } finally {
       setIsTraining(false);
     }
@@ -347,8 +343,7 @@ export function Configurator({
 
   function resetToDefault() {
     setConfig(baseConfig);
-    setError(null);
-    setPreviewError(null);
+    onGlobalError(null);
   }
 
   function resetToDraft() {
@@ -357,8 +352,7 @@ export function Configurator({
     }
     setDraftName(loadedDraft.name);
     setConfig(loadedDraft.config);
-    setError(null);
-    setPreviewError(null);
+    onGlobalError(null);
   }
 
   const forkedAtLabel = loadedDraft === null ? null : formatDate(loadedDraft.created_at);
@@ -411,12 +405,6 @@ export function Configurator({
         onSelect={(action) => void confirmEngineTuningSourceAction(action)}
       />
 
-      {error !== null || previewError !== null ? (
-        <div className="configurator-feedback-stack">
-          {error !== null ? <Notice tone="error">{error}</Notice> : null}
-          {previewError !== null ? <Notice tone="error">{previewError}</Notice> : null}
-        </div>
-      ) : null}
       {configIssue !== null ? (
         <div className="configurator-feedback-stack">
           <Notice tone="error">{configIssue}</Notice>

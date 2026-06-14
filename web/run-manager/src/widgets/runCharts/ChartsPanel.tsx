@@ -32,11 +32,17 @@ import { RunComparisonChart } from "@/widgets/runCharts/chartsPanel/RunCompariso
 
 interface ChartsPanelProps {
   focusedRunId?: string | null;
+  onGlobalError: (message: string | null) => void;
   onOpenRun?: (run: ManagedRun) => void;
   runs: ManagedRun[];
 }
 
-export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPanelProps) {
+export function ChartsPanel({
+  focusedRunId = null,
+  onGlobalError,
+  onOpenRun,
+  runs,
+}: ChartsPanelProps) {
   const [groupOpen, setGroupOpen] = usePersistentDisclosureMap(
     "run-chart-groups",
     INITIAL_GROUP_OPEN,
@@ -148,6 +154,11 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     rangeMode,
     refreshingRunIds,
   );
+  useEffect(() => {
+    if (loadError !== null) {
+      onGlobalError(loadError);
+    }
+  }, [loadError, onGlobalError]);
   const colorByRunId = useMemo(
     () => buildChartColorByRunId(visibleRuns, selectedRuns),
     [selectedRuns, visibleRuns],
@@ -276,8 +287,6 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
         onToggleLineage={toggleSelectedLineage}
         onToggleRun={toggleSelectedRun}
       />
-
-      {loadError !== null ? <Notice tone="error">{loadError}</Notice> : null}
 
       {selectedRuns.length === 0 ? (
         <Notice>Select at least one run to render comparison plots.</Notice>

@@ -26,6 +26,7 @@ interface RunsPanelProps {
   onDeleteLineage: (lineageId: string) => Promise<void>;
   onDeleteRun: (run: ManagedRun) => Promise<void>;
   onExportRun: (run: ManagedRun) => Promise<void>;
+  onGlobalError: (message: string | null) => void;
   onImportRunBundle: (file: File) => Promise<void>;
   onOpenRun: (run: ManagedRun) => void;
   onResumeRun: (run: ManagedRun) => Promise<void>;
@@ -39,6 +40,7 @@ export function RunsPanel({
   onDeleteLineage,
   onDeleteRun,
   onExportRun,
+  onGlobalError,
   onImportRunBundle,
   onOpenRun,
   onResumeRun,
@@ -48,7 +50,6 @@ export function RunsPanel({
 }: RunsPanelProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
   const lineageGroups = useMemo(() => buildLineageGroups(runs, drafts), [drafts, runs]);
   const lineageBuckets = useMemo(() => buildLineageBuckets(lineageGroups), [lineageGroups]);
   const bucketDisclosureDefaults = useMemo<Record<string, boolean>>(
@@ -68,7 +69,6 @@ export function RunsPanel({
     lineageDisclosureDefaults,
   );
   const {
-    actionError,
     busyActionRunId,
     closePendingDelete,
     confirmDelete,
@@ -80,6 +80,7 @@ export function RunsPanel({
   } = useRunsPanelActions({
     onDeleteLineage,
     onDeleteRun,
+    onGlobalError,
   });
   const activeRunEntries = useMemo(
     () =>
@@ -88,12 +89,12 @@ export function RunsPanel({
   );
 
   async function importSelectedBundle(file: File) {
-    setImportError(null);
+    onGlobalError(null);
     setIsImporting(true);
     try {
       await onImportRunBundle(file);
     } catch (caught) {
-      setImportError(caught instanceof Error ? caught.message : "run import failed");
+      onGlobalError(caught instanceof Error ? caught.message : "run import failed");
     } finally {
       setIsImporting(false);
     }
@@ -138,8 +139,6 @@ export function RunsPanel({
             ) : null}
           </div>
         </div>
-        {actionError !== null ? <Notice tone="error">{actionError}</Notice> : null}
-        {importError !== null ? <Notice tone="error">{importError}</Notice> : null}
         {runs.length === 0 ? (
           <Notice>No launched runs yet.</Notice>
         ) : (

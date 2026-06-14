@@ -12,7 +12,7 @@ import {
   runFixture,
   runMetricSampleFixture,
 } from "@/test/fixtures";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@/test/render";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@/test/render";
 
 const loadManagerDataMock = vi.fn();
 const createDraftWithSourceMock = vi.fn();
@@ -581,7 +581,7 @@ describe("App", () => {
     });
     watchRunMock.mockRejectedValueOnce(
       new Error(
-        "Saved train config is not compatible with the current schema: /tmp/run. Restart the run with the current config schema.",
+        "Saved train manifest is not compatible with the current schema: /tmp/run. Restart the run with the current config schema.",
       ),
     );
 
@@ -601,8 +601,10 @@ describe("App", () => {
     await user.click(watchButton);
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Saved train config is not compatible with the current schema");
-    expect(alert.closest(".configurator-feedback-stack")).not.toBeNull();
+    expect(alert).toHaveTextContent(
+      "Saved train manifest is not compatible with the current schema",
+    );
+    expect(alert.closest(".configurator-feedback-stack")).toBeNull();
     expect(watchRunMock).toHaveBeenCalledWith(
       "run-001",
       "latest",
@@ -669,7 +671,56 @@ describe("App", () => {
     );
   });
 
-  it("shows watch process failure events in run feedback", async () => {
+  it("shows newly observed watch process failure events globally", async () => {
+    const user = userEvent.setup();
+    const run = runFixture({ id: "run-001", name: "ppo_test_1" });
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [run],
+      saveGames: [],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+
+    const liveOptions = subscribeRunLiveUpdatesMock.mock.calls.at(-1)?.[0] as
+      | { onRuns: (runs: ReturnType<typeof runFixture>[]) => void }
+      | undefined;
+    if (liveOptions === undefined) {
+      throw new Error("expected live run subscription options");
+    }
+    act(() => {
+      liveOptions.onRuns([
+        runFixture({
+          id: "run-001",
+          name: "ppo_test_1",
+          recent_events: [
+            {
+              created_at: "2026-06-13T18:00:00+00:00",
+              kind: "watch_failed",
+              message: "latest watch failed: RuntimeError: CUDA error: out of memory",
+            },
+          ],
+        }),
+      ]);
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("latest watch failed: RuntimeError: CUDA error: out of memory");
+    expect(alert.closest(".configurator-feedback-stack")).toBeNull();
+  });
+
+  it("does not replay historical watch failures globally", async () => {
     const user = userEvent.setup();
     const run = runFixture({
       id: "run-001",
@@ -701,9 +752,7 @@ describe("App", () => {
     }
     await user.click(openRunButton);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("latest watch failed: RuntimeError: CUDA error: out of memory");
-    expect(alert.closest(".configurator-feedback-stack")).not.toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("derives local wall time from active runtime instead of stale initial launch timestamps", async () => {

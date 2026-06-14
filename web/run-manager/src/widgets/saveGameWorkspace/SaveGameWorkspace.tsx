@@ -31,7 +31,6 @@ import type {
 } from "@/shared/api/contract";
 import { rendererNames } from "@/shared/api/renderers";
 import { Button } from "@/shared/ui/Button";
-import { FloatingNotice } from "@/shared/ui/FloatingNotice";
 import { FolderIcon, RenameIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
@@ -39,6 +38,7 @@ import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface SaveGameWorkspaceProps {
   metadata: ConfigMetadata | null;
+  onGlobalError: (message: string | null) => void;
   onCreateSaveGame: (name: string) => Promise<ManagedSaveGame>;
   onOpenSaveGameDirectory: (saveGameId: string) => Promise<void>;
   onImportEngineTuning: (request: {
@@ -86,6 +86,7 @@ interface SaveGameWorkspaceProps {
 
 export function SaveGameWorkspace({
   metadata,
+  onGlobalError,
   onCreateSaveGame,
   onOpenSaveGameDirectory,
   onImportEngineTuning,
@@ -100,7 +101,6 @@ export function SaveGameWorkspace({
   saveGame,
   session,
 }: SaveGameWorkspaceProps) {
-  const [error, setError] = useState<string | null>(null);
   const [copiedDetail, setCopiedDetail] = useState<"id" | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [openingSaveGameId, setOpeningSaveGameId] = useState<string | null>(null);
@@ -120,10 +120,10 @@ export function SaveGameWorkspace({
   async function createSaveGame() {
     const name = session.nameText.trim();
     if (name.length === 0) {
-      setError("career name is required");
+      onGlobalError("career name is required");
       return;
     }
-    setError(null);
+    onGlobalError(null);
     setIsCreating(true);
     try {
       const created = await onCreateSaveGame(name);
@@ -134,26 +134,26 @@ export function SaveGameWorkspace({
         title: created.name,
       });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to create career save");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to create career save");
     } finally {
       setIsCreating(false);
     }
   }
 
   async function openSaveDirectory(target: ManagedSaveGame) {
-    setError(null);
+    onGlobalError(null);
     setOpeningSaveGameId(target.id);
     try {
       await onOpenSaveGameDirectory(target.id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to open career folder");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to open career folder");
     } finally {
       setOpeningSaveGameId(null);
     }
   }
 
   async function renameSaveGame(target: ManagedSaveGame, name: string) {
-    setError(null);
+    onGlobalError(null);
     setRenamingSaveGameId(target.id);
     try {
       await onRenameSaveGame(target.id, name);
@@ -163,7 +163,7 @@ export function SaveGameWorkspace({
       });
       setRenameDialogOpen(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to rename career save");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to rename career save");
     } finally {
       setRenamingSaveGameId(null);
     }
@@ -178,12 +178,12 @@ export function SaveGameWorkspace({
     policyRunId: string;
     saveGameId: string;
   }) {
-    setError(null);
+    onGlobalError(null);
     setUpdatingSaveGameId(request.saveGameId);
     try {
       return await onUpsertCourseSetup(request);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to save course setup");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to save course setup");
       throw caught;
     } finally {
       setUpdatingSaveGameId(null);
@@ -196,12 +196,12 @@ export function SaveGameWorkspace({
     saveGameId: string;
     vehicleId: string;
   }) {
-    setError(null);
+    onGlobalError(null);
     setUpdatingSaveGameId(request.saveGameId);
     try {
       return await onUpsertCupSetup(request);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to save cup setup");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to save cup setup");
       throw caught;
     } finally {
       setUpdatingSaveGameId(null);
@@ -219,12 +219,12 @@ export function SaveGameWorkspace({
     policyRunId: string;
     saveGameId: string;
   }) {
-    setError(null);
+    onGlobalError(null);
     setUpdatingSaveGameId(request.saveGameId);
     try {
       return await onImportEngineTuning(request);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to import engine tuning");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to import engine tuning");
       throw caught;
     } finally {
       setUpdatingSaveGameId(null);
@@ -236,13 +236,13 @@ export function SaveGameWorkspace({
   ): SaveGameRunnerSettingsUpdateRequest | null {
     const attemptSeed = parseAttemptSeed(session.attemptSeedText);
     if (attemptSeed === "invalid") {
-      setError("runtime seed must be an integer from 0 to 4294967295");
+      onGlobalError("runtime seed must be an integer from 0 to 4294967295");
       return null;
     }
     const trimmedRecordingPath = session.recordingPathText.trim();
     const recordingPath = trimmedRecordingPath.length === 0 ? null : trimmedRecordingPath;
     if (session.recordingEnabled && recordingPath === null) {
-      setError("recording path is required");
+      onGlobalError("recording path is required");
       return null;
     }
     return {
@@ -264,7 +264,7 @@ export function SaveGameWorkspace({
     if (request === null) {
       return null;
     }
-    setError(null);
+    onGlobalError(null);
     setSavingRunnerSettingsSaveGameId(target.id);
     try {
       const updated = await onUpdateRunnerSettings(request);
@@ -274,7 +274,7 @@ export function SaveGameWorkspace({
       }
       return updated;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to save runner settings");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to save runner settings");
       return null;
     } finally {
       setSavingRunnerSettingsSaveGameId(null);
@@ -303,29 +303,29 @@ export function SaveGameWorkspace({
     }
     const launchTarget = requestedTarget ?? nextUnlockTarget(target);
     if (launchTarget === null) {
-      setError("career save has no pending unlock target");
+      onGlobalError("career save has no pending unlock target");
       return;
     }
     if (!launchableTargetStatus(launchTarget)) {
-      setError("selected unlock target is not playable");
+      onGlobalError("selected unlock target is not playable");
       return;
     }
     if (metadata === null) {
-      setError("run manager metadata is missing");
+      onGlobalError("run manager metadata is missing");
       return;
     }
     if (
       resolveSavedCourseSetup(target.course_setups, launchTarget, metadata.built_in_courses) ===
       null
     ) {
-      setError("choose a policy for the selected cup");
+      onGlobalError("choose a policy for the selected cup");
       return;
     }
     if (resolveLaunchCupVehicleId(target, launchTarget) === null) {
-      setError("choose a vehicle for the selected cup");
+      onGlobalError("choose a vehicle for the selected cup");
       return;
     }
-    setError(null);
+    onGlobalError(null);
     setRunnerStatus(null);
     setStartingRunnerSaveGameId(target.id);
     try {
@@ -345,7 +345,7 @@ export function SaveGameWorkspace({
       setRunnerStatus(status === "started" ? "Runner started." : "Runner is already open.");
       await onRefreshStatus(target.id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "failed to start runner");
+      onGlobalError(caught instanceof Error ? caught.message : "failed to start runner");
     } finally {
       setStartingRunnerSaveGameId(null);
     }
@@ -355,9 +355,9 @@ export function SaveGameWorkspace({
     try {
       await navigator.clipboard.writeText(value);
       setCopiedDetail(detail);
-      setError(null);
+      onGlobalError(null);
     } catch {
-      setError("failed to copy value");
+      onGlobalError("failed to copy value");
     }
   }
 
@@ -369,7 +369,6 @@ export function SaveGameWorkspace({
           subtitle="Create a local game save before configuring the unlock path."
         />
         <CreateSaveGameForm
-          error={error}
           isCreating={isCreating}
           session={session}
           onCreateSaveGame={() => void createSaveGame()}
@@ -484,8 +483,7 @@ export function SaveGameWorkspace({
           <span>{openingSaveGameId === saveGame.id ? "Opening" : "Open folder"}</span>
         </Button>
       </div>
-      {error !== null ? <FloatingNotice tone="error">{error}</FloatingNotice> : null}
-      {runnerStatus !== null ? <FloatingNotice>{runnerStatus}</FloatingNotice> : null}
+      {runnerStatus !== null ? <Notice>{runnerStatus}</Notice> : null}
       <RenameDialog
         busy={renamingSaveGameId === saveGame.id}
         initialName={saveGame.name}

@@ -2,16 +2,13 @@
 import type { SaveGameSession } from "@/app/workspace/types";
 import { Button } from "@/shared/ui/Button";
 import { FieldInput, FieldShell } from "@/shared/ui/Field";
-import { FloatingNotice } from "@/shared/ui/FloatingNotice";
 
 export function CreateSaveGameForm({
-  error,
   isCreating,
   onCreateSaveGame,
   onPatchSession,
   session,
 }: {
-  error: string | null;
   isCreating: boolean;
   onCreateSaveGame: () => void;
   onPatchSession: (
@@ -22,7 +19,6 @@ export function CreateSaveGameForm({
 }) {
   return (
     <section className="grid gap-4 border border-app-border bg-app-surface p-5">
-      {error !== null ? <FloatingNotice tone="error">{error}</FloatingNotice> : null}
       <div className="grid gap-4 md:grid-cols-[minmax(280px,1fr)_auto] md:items-end">
         <FieldShell>
           <span>Name</span>

@@ -51,6 +51,7 @@ export function WorkspaceBody({
   onRefreshSaveGameStatus,
 }: WorkspaceBodyProps) {
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
+  const setGlobalError = actions.setGlobalError;
   const activeRunTab = sessions.activeRunTab;
   const activeDraftEditor = sessions.activeDraftEditor;
   const activeSaveGameSession = sessions.activeSaveGameSession;
@@ -77,13 +78,15 @@ export function WorkspaceBody({
     setRunDetailError(null);
     void loadRunDetail(activeRunTab.runId).catch((caught) => {
       if (!ignore) {
-        setRunDetailError(caught instanceof Error ? caught.message : "failed to load run details");
+        const message = caught instanceof Error ? caught.message : "failed to load run details";
+        setRunDetailError(message);
+        setGlobalError(message);
       }
     });
     return () => {
       ignore = true;
     };
-  }, [activeRunDetail, activeRunTab, loadRunDetail]);
+  }, [activeRunDetail, activeRunTab, loadRunDetail, setGlobalError]);
 
   return (
     <div className="workspace">
@@ -105,6 +108,7 @@ export function WorkspaceBody({
           onDeleteLineage={actions.removeLineage}
           onDeleteRun={actions.removeRun}
           onExportRun={actions.exportManagedRun}
+          onGlobalError={actions.setGlobalError}
           onImportRunBundle={actions.importManagedRunBundle}
           onOpenRun={sessions.openRun}
           onResumeRun={(run) => actions.resumeManagedRun(run.id)}
@@ -115,6 +119,7 @@ export function WorkspaceBody({
       {!isLoading && sessions.activeTabId === "charts" ? (
         <ChartsPanel
           focusedRunId={sessions.chartsFocusRunId}
+          onGlobalError={actions.setGlobalError}
           onOpenRun={sessions.openRun}
           runs={runs}
         />
@@ -139,6 +144,7 @@ export function WorkspaceBody({
           }
           session={activeSaveGameSession}
           onCreateSaveGame={actions.createManagedSaveGame}
+          onGlobalError={actions.setGlobalError}
           onOpenSaveGameDirectory={actions.openManagedSaveGameDirectory}
           onPatchSession={sessions.patchSaveGameSession}
           onImportEngineTuning={actions.importManagedSaveEngineTuning}
@@ -156,8 +162,8 @@ export function WorkspaceBody({
         ) : activeRunSummary === null ? (
           <Notice tone="error">This run is no longer available.</Notice>
         ) : activeRun === null ? (
-          <Notice tone={runDetailError === null ? undefined : "error"}>
-            {runDetailError ?? "Loading run details..."}
+          <Notice>
+            {runDetailError === null ? "Loading run details..." : "Run details unavailable."}
           </Notice>
         ) : (
           <RunWorkspace
@@ -167,6 +173,7 @@ export function WorkspaceBody({
             onClearCourseAltBaselines={actions.clearManagedRunCourseAltBaselines}
             onCreateDraftFromRun={actions.createDraftFromManagedRun}
             onFork={actions.forkManagedRun}
+            onGlobalError={actions.setGlobalError}
             onOpenDirectory={actions.openManagedRunDirectory}
             onRename={actions.renameManagedRun}
             onResetEngineTuning={actions.resetManagedRunEngineTuning}
@@ -210,6 +217,7 @@ export function WorkspaceBody({
                 currentDraftName: name,
               });
             }}
+            onGlobalError={actions.setGlobalError}
             onLaunchRun={(name, config, draftId, engineTuningSourceAction) =>
               actions.launchTrainingRun(
                 activeDraftEditor.sessionId,

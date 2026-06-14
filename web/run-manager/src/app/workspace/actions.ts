@@ -63,6 +63,7 @@ interface UseWorkspaceActionsOptions {
   reloadManagerData: (options?: { showLoading?: boolean }) => Promise<void>;
   runs: ManagedRun[];
   sessions: WorkspaceSessions;
+  setGlobalError: Dispatch<SetStateAction<string | null>>;
   setDrafts: Dispatch<SetStateAction<ManagedDraft[]>>;
   setRuns: Dispatch<SetStateAction<ManagedRun[]>>;
   setSaveGames: Dispatch<SetStateAction<ManagedSaveGame[]>>;
@@ -151,6 +152,7 @@ export interface WorkspaceActions {
   startManagedCareerMode: (
     request: CareerModeRunnerLaunchRequest,
   ) => Promise<"started" | "already_running">;
+  setGlobalError: Dispatch<SetStateAction<string | null>>;
 }
 
 export function useWorkspaceActions({
@@ -159,6 +161,7 @@ export function useWorkspaceActions({
   reloadManagerData,
   runs,
   sessions,
+  setGlobalError,
   setDrafts,
   setRuns,
   setSaveGames,
@@ -510,6 +513,7 @@ export function useWorkspaceActions({
     upsertManagedSaveCupSetup,
     watchManagedRun,
     startManagedCareerMode,
+    setGlobalError,
   };
 }
 

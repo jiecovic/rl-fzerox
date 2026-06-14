@@ -6,21 +6,25 @@ import type { ManagedRun } from "@/shared/api/contract";
 interface RunsPanelActionOptions {
   onDeleteLineage: (lineageId: string) => Promise<void>;
   onDeleteRun: (run: ManagedRun) => Promise<void>;
+  onGlobalError: (message: string | null) => void;
 }
 
-export function useRunsPanelActions({ onDeleteLineage, onDeleteRun }: RunsPanelActionOptions) {
+export function useRunsPanelActions({
+  onDeleteLineage,
+  onDeleteRun,
+  onGlobalError,
+}: RunsPanelActionOptions) {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [busyActionRunId, setBusyActionRunId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   async function runAction(runId: string, callback: () => Promise<void>) {
-    setActionError(null);
+    onGlobalError(null);
     setBusyActionRunId(runId);
     try {
       await callback();
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "run action failed");
+      onGlobalError(caught instanceof Error ? caught.message : "run action failed");
     } finally {
       setBusyActionRunId((current) => (current === runId ? null : current));
     }
@@ -30,7 +34,7 @@ export function useRunsPanelActions({ onDeleteLineage, onDeleteRun }: RunsPanelA
     if (pendingDelete === null) {
       return;
     }
-    setActionError(null);
+    onGlobalError(null);
     setIsDeleting(true);
     try {
       if (pendingDelete.kind === "lineage") {
@@ -40,19 +44,19 @@ export function useRunsPanelActions({ onDeleteLineage, onDeleteRun }: RunsPanelA
       }
       setPendingDelete(null);
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "delete failed");
+      onGlobalError(caught instanceof Error ? caught.message : "delete failed");
     } finally {
       setIsDeleting(false);
     }
   }
 
   function requestLineageDelete(lineage: RunLineageGroup) {
-    setActionError(null);
+    onGlobalError(null);
     setPendingDelete({ kind: "lineage", lineage });
   }
 
   function requestRunDelete(run: ManagedRun) {
-    setActionError(null);
+    onGlobalError(null);
     setPendingDelete({ kind: "run", run });
   }
 
@@ -63,7 +67,6 @@ export function useRunsPanelActions({ onDeleteLineage, onDeleteRun }: RunsPanelA
   }
 
   return {
-    actionError,
     busyActionRunId,
     closePendingDelete,
     confirmDelete,
