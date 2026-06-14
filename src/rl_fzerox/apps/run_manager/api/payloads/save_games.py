@@ -61,6 +61,19 @@ def save_attempt_payload(attempt: ManagedSaveAttempt) -> dict[str, object]:
     }
 
 
+def save_game_runner_settings_payload(save_game: ManagedSaveGame) -> dict[str, object]:
+    return {
+        "device": save_game.runner_device,
+        "renderer": save_game.runner_renderer,
+        "policy_mode": save_game.runner_policy_mode,
+        "attempt_seed": save_game.runner_attempt_seed,
+        "recording_enabled": save_game.runner_recording_enabled,
+        "recording_path": None
+        if save_game.runner_recording_path is None
+        else str(save_game.runner_recording_path),
+    }
+
+
 def save_attempt_execution_context_payload(
     context: SaveAttemptExecutionContext,
 ) -> dict[str, object]:
@@ -128,6 +141,7 @@ def save_game_payload(
         "updated_at": save_game.updated_at,
         "last_finished_at": save_game.last_finished_at,
         "runner_active": runner_active,
+        "runner_settings": save_game_runner_settings_payload(save_game),
         "unlock_progress": None
         if unlock_progress is None
         else save_unlock_progress_payload(unlock_progress),
@@ -152,6 +166,7 @@ def save_game_status_payload(
         "updated_at": save_game.updated_at,
         "last_finished_at": save_game.last_finished_at,
         "runner_active": runner_active,
+        "runner_settings": save_game_runner_settings_payload(save_game),
         "unlock_progress": None
         if unlock_progress is None
         else save_unlock_progress_payload(unlock_progress),

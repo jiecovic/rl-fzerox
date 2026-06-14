@@ -193,7 +193,7 @@ export const engineTuningRuntimeContextSchema = z.object({
 export const engineTuningRuntimeStateSchema = z.object({
   version: z.number().int().positive(),
   update_count: z.number().int().nonnegative(),
-  model_backend: z.enum(["gaussian_process", "mlp_ensemble"]).nullable().default(null),
+  model_backend: z.enum(["bandit", "gaussian_process", "mlp_ensemble"]).nullable().default(null),
   candidates: z.array(engineTuningRuntimeCandidateSchema),
   contexts: z.array(engineTuningRuntimeContextSchema).default([]),
 });

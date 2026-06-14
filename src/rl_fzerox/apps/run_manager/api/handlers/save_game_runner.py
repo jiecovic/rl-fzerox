@@ -24,6 +24,7 @@ def start_career_mode_payload(
             difficulty=request.difficulty,
             cup_id=request.cup_id,
             course_id=request.course_id,
+            single_target=request.single_target,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

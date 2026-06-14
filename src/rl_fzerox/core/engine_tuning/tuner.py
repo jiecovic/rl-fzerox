@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from rl_fzerox.core.engine_tuning.bandit import BanditEngineTuner
 from rl_fzerox.core.engine_tuning.ensemble import MlpEnsembleEngineTuner
 from rl_fzerox.core.engine_tuning.gaussian_process import GaussianProcessEngineTuner
 from rl_fzerox.core.engine_tuning.state import (
@@ -10,6 +11,7 @@ from rl_fzerox.core.engine_tuning.state import (
     empty_engine_tuning_state,
 )
 from rl_fzerox.core.engine_tuning.types import (
+    BanditEngineTunerSettings,
     EngineTunerBackend,
     EngineTunerSettings,
     EngineTuningCandidateEstimate,
@@ -84,8 +86,10 @@ def _backend_for(
     *,
     settings: EngineTunerSettings,
     state: EngineTuningRuntimeState | None,
-) -> GaussianProcessEngineTuner | MlpEnsembleEngineTuner:
+) -> BanditEngineTuner | GaussianProcessEngineTuner | MlpEnsembleEngineTuner:
     runtime_state = state or empty_engine_tuning_state()
+    if isinstance(settings, BanditEngineTunerSettings):
+        return BanditEngineTuner(settings=settings, state=runtime_state)
     if isinstance(settings, MlpEnsembleEngineTunerSettings):
         return MlpEnsembleEngineTuner(settings=settings, state=runtime_state)
     if isinstance(settings, GaussianProcessEngineTunerSettings):
@@ -100,6 +104,7 @@ __all__ = (
     "EngineTuningChoice",
     "EngineTuningContext",
     "EngineTuningEpisodeOutcome",
+    "BanditEngineTunerSettings",
     "GaussianProcessEngineTunerSettings",
     "MlpEnsembleEngineTunerSettings",
     "OrderedEngineTuner",

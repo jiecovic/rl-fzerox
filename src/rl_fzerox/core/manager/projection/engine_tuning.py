@@ -29,12 +29,21 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
         "backend": vehicle.adaptive_engine_tuner_backend,
         "prior_finish_time_seconds": prior_finish_time_seconds,
         "uniform_exploration": vehicle.adaptive_engine_uniform_exploration,
-        "greedy_plateau_tolerance_seconds": (vehicle.adaptive_engine_greedy_plateau_seconds),
     }
     if vehicle.adaptive_engine_tuner_backend == "gaussian_process":
         payload.update(
             {
                 "stat_decay": vehicle.adaptive_engine_stat_decay,
+                "exploration_scale": uncertainty_scale_seconds,
+                "greedy_plateau_tolerance_seconds": (
+                    vehicle.adaptive_engine_greedy_plateau_seconds
+                ),
+            }
+        )
+    if vehicle.adaptive_engine_tuner_backend == "bandit":
+        payload.update(
+            {
+                "bucket_size": vehicle.adaptive_engine_bandit_bucket_size,
                 "exploration_scale": uncertainty_scale_seconds,
             }
         )
@@ -50,6 +59,9 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
                     vehicle.adaptive_engine_mlp_bootstrap_keep_probability
                 ),
                 "warmup_successes": vehicle.adaptive_engine_mlp_warmup_successes,
+                "greedy_plateau_tolerance_seconds": (
+                    vehicle.adaptive_engine_greedy_plateau_seconds
+                ),
             }
         )
     return AdaptiveEngineTuningConfig.model_validate(payload)

@@ -163,6 +163,31 @@ def test_crashed_race_keeps_current_gp_attempt(tmp_path: Path) -> None:
     assert store.save_game.save_path.read_bytes() == b"save-ram"
 
 
+def test_single_target_success_pauses_without_starting_next_attempt(tmp_path: Path) -> None:
+    store = _SingleTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+    )
+
+    transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+
+    assert transition.attempt_finished is True
+    assert transition.next_plan is None
+    assert transition.finished_attempt_id == "attempt-1"
+    assert transition.finished_status == "succeeded"
+    assert progress.attempt_id is None
+    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert store.status_updates == ["paused"]
+    assert store.started_next_attempt_count == 0
+
+
 def _logical_sra(cup_progress: dict[str, int]) -> bytes:
     payload = bytearray(FZEROX_SAVE_LAYOUT.raw_sra_size)
     payload[: len(FZEROX_SAVE_LAYOUT.title)] = FZEROX_SAVE_LAYOUT.title
@@ -263,6 +288,79 @@ class _Store:
         attempt_id: str,
     ) -> SaveAttemptExecutionContext | None:
         raise AssertionError("no execution context should be requested")
+
+
+class _SingleTargetStore(_Store):
+    def __init__(self, tmp_path: Path) -> None:
+        super().__init__(tmp_path)
+        self.status_updates: list[SaveGameStatus] = []
+
+    def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
+        return ManagedSaveUnlockProgress(
+            inspection_status="inspected",
+            completed_count=1,
+            total_count=2,
+            unlocked_vehicle_count=0,
+            unlocked_vehicle_ids=(),
+            next_target=ManagedSaveUnlockTarget(
+                sequence_index=1,
+                kind="clear_gp_cup",
+                status="pending",
+                label="Expert Queen Cup",
+                difficulty="expert",
+                cup_id="queen",
+            ),
+            targets=(
+                ManagedSaveUnlockTarget(
+                    sequence_index=0,
+                    kind="clear_gp_cup",
+                    status="succeeded",
+                    label="Expert Jack Cup",
+                    difficulty="expert",
+                    cup_id="jack",
+                ),
+                ManagedSaveUnlockTarget(
+                    sequence_index=1,
+                    kind="clear_gp_cup",
+                    status="pending",
+                    label="Expert Queen Cup",
+                    difficulty="expert",
+                    cup_id="queen",
+                ),
+            ),
+        )
+
+    def finish_save_attempt(
+        self,
+        *,
+        attempt_id: str,
+        status: SaveAttemptStatus,
+        finish_position: int | None = None,
+        finish_time_s: float | None = None,
+        failure_reason: str | None = None,
+    ) -> ManagedSaveAttempt | None:
+        del finish_position, finish_time_s
+        self.finished_attempts.append((attempt_id, status, failure_reason))
+        return None
+
+    def update_save_game_status(
+        self,
+        *,
+        save_game_id: str,
+        status: SaveGameStatus,
+    ) -> object | None:
+        self.status_updates.append(status)
+        return None
+
+    def start_next_save_attempt(self, save_game_id: str) -> ManagedSaveAttempt:
+        self.started_next_attempt_count += 1
+        raise AssertionError("single-target success must not start the next attempt")
+
+    def get_save_attempt_execution_context(
+        self,
+        attempt_id: str,
+    ) -> SaveAttemptExecutionContext | None:
+        raise AssertionError("single-target success must not request the next context")
 
 
 def _race_setup() -> CareerModeRaceSetupConfig:

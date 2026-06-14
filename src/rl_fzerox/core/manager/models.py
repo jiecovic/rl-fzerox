@@ -178,6 +178,12 @@ class ManagedSaveGame:
     created_at: str
     updated_at: str
     last_finished_at: str | None = None
+    runner_device: Literal["cpu", "cuda"] = "cuda"
+    runner_renderer: Literal["angrylion", "gliden64"] = "gliden64"
+    runner_policy_mode: Literal["deterministic", "stochastic"] = "deterministic"
+    runner_attempt_seed: int | None = None
+    runner_recording_enabled: bool = False
+    runner_recording_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)

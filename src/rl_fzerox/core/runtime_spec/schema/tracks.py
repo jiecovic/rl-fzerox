@@ -166,6 +166,7 @@ class AdaptiveEngineTuningConfig(BaseModel):
     min_raw_value: NonNegativeInt = Field(default=0, le=100)
     max_raw_value: NonNegativeInt = Field(default=100, le=100)
     backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
+    bucket_size: PositiveInt = Field(default=ENGINE_TUNER_DEFAULTS.bandit_bucket_size, le=100)
     stat_decay: float = Field(default=ENGINE_TUNER_DEFAULTS.stat_decay, gt=0.0, lt=1.0)
     prior_finish_time_seconds: PositiveFloat = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     exploration_scale: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.exploration_seconds
@@ -194,11 +195,16 @@ class AdaptiveEngineTuningConfig(BaseModel):
     @model_serializer(mode="wrap")
     def _serialize_engine_tuning(self, handler: SerializerFunctionWrapHandler) -> object:
         data = handler(self)
+        if isinstance(data, dict) and self.backend != "bandit":
+            data.pop("bucket_size", None)
+        if isinstance(data, dict) and self.backend == "bandit":
+            data.pop("greedy_plateau_tolerance_seconds", None)
         if isinstance(data, dict) and self.backend != "gaussian_process":
             data.pop("stat_decay", None)
-            data.pop("exploration_scale", None)
             data.pop("observation_noise_seconds", None)
             data.pop("curve_lengthscale_raw", None)
+        if isinstance(data, dict) and self.backend not in {"bandit", "gaussian_process"}:
+            data.pop("exploration_scale", None)
         if isinstance(data, dict) and self.backend != "mlp_ensemble":
             data.pop("ensemble_members", None)
             data.pop("randomized_prior_seconds", None)

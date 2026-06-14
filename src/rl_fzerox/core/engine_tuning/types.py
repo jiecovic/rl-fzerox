@@ -6,14 +6,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
-EngineTunerBackend = Literal["gaussian_process", "mlp_ensemble"]
+EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
 
 
 @dataclass(frozen=True, slots=True)
 class EngineTunerDefaults:
     """Default scale values for adaptive engine tuning."""
 
-    backend: EngineTunerBackend = "gaussian_process"
+    backend: EngineTunerBackend = "bandit"
+    bandit_bucket_size: int = 10
     stat_decay: float = 0.995
     prior_finish_time_seconds: float = 200.0
     exploration_seconds: float = 30.0
@@ -41,7 +42,15 @@ class EngineTunerCommonSettings:
     max_raw_value: int = 100
     prior_finish_time_seconds: float = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     uniform_exploration: float = ENGINE_TUNER_DEFAULTS.uniform_exploration
-    greedy_plateau_tolerance_seconds: float = ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
+
+
+@dataclass(frozen=True, slots=True)
+class BanditEngineTunerSettings(EngineTunerCommonSettings):
+    """Static knobs used by the aggregate bandit backend."""
+
+    backend: Literal["bandit"] = "bandit"
+    bucket_size: int = ENGINE_TUNER_DEFAULTS.bandit_bucket_size
+    exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +58,9 @@ class GaussianProcessEngineTunerSettings(EngineTunerCommonSettings):
     """Static knobs used only by the Gaussian-process backend."""
 
     backend: Literal["gaussian_process"] = "gaussian_process"
+    greedy_plateau_tolerance_seconds: float = (
+        ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
+    )
     stat_decay: float = ENGINE_TUNER_DEFAULTS.stat_decay
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
     observation_noise_seconds: float = ENGINE_TUNER_DEFAULTS.observation_noise_seconds
@@ -60,6 +72,9 @@ class MlpEnsembleEngineTunerSettings(EngineTunerCommonSettings):
     """Static knobs used only by the MLP ensemble backend."""
 
     backend: Literal["mlp_ensemble"] = "mlp_ensemble"
+    greedy_plateau_tolerance_seconds: float = (
+        ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
+    )
     ensemble_members: int = ENGINE_TUNER_DEFAULTS.mlp_ensemble_members
     randomized_prior_seconds: float = ENGINE_TUNER_DEFAULTS.mlp_randomized_prior_seconds
     hidden_dim: int = ENGINE_TUNER_DEFAULTS.mlp_hidden_dim
@@ -69,7 +84,9 @@ class MlpEnsembleEngineTunerSettings(EngineTunerCommonSettings):
     warmup_successes: int = ENGINE_TUNER_DEFAULTS.mlp_warmup_successes
 
 
-EngineTunerSettings: TypeAlias = GaussianProcessEngineTunerSettings | MlpEnsembleEngineTunerSettings
+EngineTunerSettings: TypeAlias = (
+    BanditEngineTunerSettings | GaussianProcessEngineTunerSettings | MlpEnsembleEngineTunerSettings
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +148,25 @@ def engine_candidates(*, minimum: int, maximum: int) -> tuple[int, ...]:
     if lower > upper:
         raise ValueError(f"engine tuning min_raw_value exceeds max_raw_value: {lower} > {upper}")
     return tuple(range(lower, upper + 1))
+
+
+def engine_bucket_candidates(
+    *,
+    minimum: int,
+    maximum: int,
+    bucket_size: int,
+) -> tuple[int, ...]:
+    """Return inclusive engine values separated by the configured bucket size."""
+
+    lower = max(0, min(100, int(minimum)))
+    upper = max(0, min(100, int(maximum)))
+    if lower > upper:
+        raise ValueError(f"engine tuning min_raw_value exceeds max_raw_value: {lower} > {upper}")
+    step = max(1, int(bucket_size))
+    values = list(range(lower, upper + 1, step))
+    if not values or values[-1] != upper:
+        values.append(upper)
+    return tuple(values)
 
 
 def finish_time_score(race_time_ms: int) -> float:

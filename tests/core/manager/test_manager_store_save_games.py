@@ -40,6 +40,12 @@ def test_manager_store_creates_save_game_record(tmp_path: Path) -> None:
     assert save_game.name == "Unlock Run"
     assert save_game.status == "created"
     assert save_game.save_path == save_games_root / save_game.id / "fzerox.srm"
+    assert save_game.runner_device == "cuda"
+    assert save_game.runner_renderer == "gliden64"
+    assert save_game.runner_policy_mode == "deterministic"
+    assert save_game.runner_attempt_seed is None
+    assert save_game.runner_recording_enabled is False
+    assert save_game.runner_recording_path is None
     assert save_game.save_path.parent.is_dir()
     assert not save_game.save_path.exists()
 
@@ -56,6 +62,33 @@ def test_manager_store_creates_save_game_record(tmp_path: Path) -> None:
     assert progress.next_target.cup_id == "jack"
     with manager_session(store.db_path) as session:
         assert session.get(SaveGameModel, save_game.id) is not None
+
+
+def test_manager_store_updates_save_game_runner_settings(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Unlock Run",
+        save_games_root=tmp_path / "save_games",
+    )
+
+    updated = store.update_save_game_runner_settings(
+        save_game_id=save_game.id,
+        device="cpu",
+        renderer="angrylion",
+        policy_mode="stochastic",
+        attempt_seed=12345,
+        recording_enabled=True,
+        recording_path=Path("local/recordings/career/test.mkv"),
+    )
+
+    assert updated is not None
+    assert updated.runner_device == "cpu"
+    assert updated.runner_renderer == "angrylion"
+    assert updated.runner_policy_mode == "stochastic"
+    assert updated.runner_attempt_seed == 12345
+    assert updated.runner_recording_enabled is True
+    assert updated.runner_recording_path == Path("local/recordings/career/test.mkv")
+    assert store.get_save_game(save_game.id) == updated
 
 
 def test_manager_store_rejects_duplicate_save_game_names_without_directory(
@@ -280,6 +313,34 @@ def test_manager_store_starts_selected_save_attempt_from_course_setup(
     assert attempt.target_kind == "clear_gp_cup"
     assert attempt.difficulty == "novice"
     assert attempt.cup_id == "king"
+    assert attempt.status == "running"
+
+
+def test_manager_store_replays_succeeded_save_attempt_from_course_setup(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    save_game = store.create_save_game(
+        name="Replay Succeeded Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    save_game.save_path.write_bytes(_logical_sra({"jack": 1}))
+    run = store.create_run(
+        name="Replay Unlock Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="jack")
+
+    attempt = store.start_target_save_attempt(
+        save_game.id,
+        target_kind="clear_gp_cup",
+        difficulty="novice",
+        cup_id="jack",
+    )
+
+    assert attempt.difficulty == "novice"
+    assert attempt.cup_id == "jack"
     assert attempt.status == "running"
 
 

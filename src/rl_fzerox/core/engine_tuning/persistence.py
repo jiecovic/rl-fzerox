@@ -286,6 +286,8 @@ def _members_from_model_payload(raw: object) -> tuple[EngineTuningEnsembleMember
 
 
 def _backend(raw: object) -> EngineTunerBackend | None:
+    if raw == "bandit":
+        return "bandit"
     if raw == "gaussian_process":
         return "gaussian_process"
     if raw == "mlp_ensemble":

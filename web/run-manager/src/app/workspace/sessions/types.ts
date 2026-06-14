@@ -38,6 +38,7 @@ export interface WorkspaceSessions {
     initialConfig: DraftEditorSession["initialConfig"];
     initialDraftName: string;
     runId: string;
+    sourceEngineTunerBackend: ForkSource["sourceEngineTunerBackend"];
   }) => void;
   draftEditors: DraftEditorSession[];
   forkSourceRunLabel: (source: ForkSource | null) => string | null;

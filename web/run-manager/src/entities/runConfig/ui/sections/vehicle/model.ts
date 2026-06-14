@@ -50,7 +50,12 @@ export function engineSettingSummary(config: ManagedRunConfig["vehicle"]) {
   if (config.engine_mode !== "adaptive_tuner") {
     return range;
   }
-  const backend = config.adaptive_engine_tuner_backend === "mlp_ensemble" ? "MLP" : "GP";
+  const backend =
+    config.adaptive_engine_tuner_backend === "mlp_ensemble"
+      ? "MLP exp"
+      : config.adaptive_engine_tuner_backend === "gaussian_process"
+        ? "GP exp"
+        : "bandit";
   return `adaptive ${backend} ${range}`;
 }
 

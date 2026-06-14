@@ -127,6 +127,29 @@ def test_mlp_engine_tuner_snapshot_omits_gp_only_fields() -> None:
     assert "adaptive_engine_randomized_prior_seconds" not in vehicle
 
 
+def test_bandit_engine_tuner_snapshot_omits_experimental_backend_fields() -> None:
+    base_config = default_managed_run_config()
+    config = base_config.model_copy(
+        update={
+            "vehicle": base_config.vehicle.model_copy(
+                update={
+                    "engine_mode": "adaptive_tuner",
+                    "adaptive_engine_tuner_backend": "bandit",
+                    "adaptive_engine_bandit_bucket_size": 10,
+                }
+            )
+        }
+    )
+
+    vehicle = json.loads(config_json(config))["vehicle"]
+
+    assert vehicle["adaptive_engine_tuner_backend"] == "bandit"
+    assert vehicle["adaptive_engine_bandit_bucket_size"] == 10
+    assert "adaptive_engine_uniform_exploration" in vehicle
+    assert "adaptive_engine_stat_decay" not in vehicle
+    assert "adaptive_engine_ensemble_members" not in vehicle
+
+
 def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
@@ -173,6 +196,12 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "created_at",
         "updated_at",
         "last_finished_at",
+        "runner_device",
+        "runner_renderer",
+        "runner_policy_mode",
+        "runner_attempt_seed",
+        "runner_recording_enabled",
+        "runner_recording_path",
     }
     assert save_attempt_columns == {
         "id",

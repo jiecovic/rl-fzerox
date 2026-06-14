@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from rl_fzerox.core.manager.db.models.base import ManagerBase
@@ -25,6 +25,12 @@ class SaveGameModel(ManagerBase):
     created_at: Mapped[str]
     updated_at: Mapped[str]
     last_finished_at: Mapped[str | None]
+    runner_device: Mapped[str] = mapped_column(String, default="cuda")
+    runner_renderer: Mapped[str] = mapped_column(String, default="gliden64")
+    runner_policy_mode: Mapped[str] = mapped_column(String, default="deterministic")
+    runner_attempt_seed: Mapped[int | None] = mapped_column(Integer)
+    runner_recording_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    runner_recording_path: Mapped[str | None]
 
 
 class SaveGameCourseSetupModel(ManagerBase):

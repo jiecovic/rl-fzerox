@@ -3,6 +3,7 @@ import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
   createRunResponseSchema,
   deleteRunResponseSchema,
+  type EngineTuningSourceAction,
   forkRunResponseSchema,
   type ManagedRun,
   type ManagedRunConfig,
@@ -36,6 +37,7 @@ export async function launchRun(
   sourceRunId: string | null = null,
   sourceArtifact: "latest" | "best" | null = null,
   copyAltBaselines = true,
+  engineTuningSourceAction?: EngineTuningSourceAction,
 ): Promise<ManagedRunDetail> {
   const response = await fetch("/api/runs", {
     method: "POST",
@@ -47,6 +49,9 @@ export async function launchRun(
       source_run_id: sourceRunId,
       source_artifact: sourceArtifact,
       copy_alt_baselines: copyAltBaselines,
+      ...(engineTuningSourceAction === undefined
+        ? {}
+        : { engine_tuning_source_action: engineTuningSourceAction }),
     }),
   });
   const payload = parseApiPayload(createRunResponseSchema, await parseJson(response));
@@ -59,6 +64,7 @@ export async function forkRun(
   name?: string,
   config?: ManagedRunConfig,
   copyAltBaselines = true,
+  engineTuningSourceAction?: EngineTuningSourceAction,
 ): Promise<ManagedRunDetail> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/fork`, {
     method: "POST",
@@ -68,6 +74,9 @@ export async function forkRun(
       ...(name === undefined ? {} : { name }),
       ...(config === undefined ? {} : { config }),
       copy_alt_baselines: copyAltBaselines,
+      ...(engineTuningSourceAction === undefined
+        ? {}
+        : { engine_tuning_source_action: engineTuningSourceAction }),
     }),
   });
   const payload = parseApiPayload(forkRunResponseSchema, await parseJson(response));

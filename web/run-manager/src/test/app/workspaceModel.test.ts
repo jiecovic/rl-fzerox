@@ -118,6 +118,7 @@ describe("workspace save-game status merge", () => {
       created_at: saveGame.created_at,
       updated_at: "2026-06-02T10:31:00+00:00",
       last_finished_at: saveGame.last_finished_at,
+      runner_settings: saveGame.runner_settings,
       unlock_progress: saveGame.unlock_progress,
     };
 
@@ -142,6 +143,7 @@ describe("workspace save-game status merge", () => {
       created_at: saveGame.created_at,
       updated_at: saveGame.updated_at,
       last_finished_at: saveGame.last_finished_at,
+      runner_settings: saveGame.runner_settings,
       unlock_progress: saveGame.unlock_progress,
     };
 

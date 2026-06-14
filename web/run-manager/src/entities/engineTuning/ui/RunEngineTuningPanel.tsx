@@ -64,6 +64,7 @@ export function RunEngineTuningPanel({
   const selectedContext =
     contexts.find((context) => context.context_key === selectedContextKey) ?? contexts[0] ?? null;
   const backend = state?.model_backend ?? null;
+  const viewMode = engineTuningViewMode(backend);
   const observedCandidateCount = state?.candidates.length ?? 0;
   const statusText =
     state === null
@@ -140,16 +141,19 @@ export function RunEngineTuningPanel({
               </div>
               <EngineSamplingProbabilityBars
                 candidates={selectedContext.candidates}
-                variant={backend === "gaussian_process" ? "aggregate" : "model"}
+                mode={viewMode}
               />
               <EngineMeanPerformanceBars
                 candidates={selectedContext.candidates}
+                mode={viewMode}
                 recommendedEngineSettingRawValue={
                   selectedContext.recommended_engine_setting_raw_value
                 }
               />
             </div>
-            {backend === "gaussian_process" ? (
+            {backend === "bandit" ? (
+              <EngineBanditBucketTable candidates={selectedContext.candidates} />
+            ) : backend === "gaussian_process" ? (
               <EngineMeasuredCandidateTable
                 estimates={selectedContext.candidates}
                 measuredCandidates={measuredCandidatesForContext(
@@ -215,20 +219,37 @@ function contextLabel(context: EngineTuningRuntimeContext, labels: EngineTuningL
 
 function backendLabel(backend: EngineTuningRuntimeState["model_backend"]) {
   if (backend === "mlp_ensemble") {
-    return "MLP ensemble";
+    return "MLP ensemble (experimental)";
   }
   if (backend === "gaussian_process") {
-    return "GP";
+    return "GP (experimental)";
+  }
+  if (backend === "bandit") {
+    return "Bandit";
   }
   return "no model";
 }
 
+type EngineTuningViewMode = "bandit" | "aggregate" | "model";
+
+function engineTuningViewMode(
+  backend: EngineTuningRuntimeState["model_backend"],
+): EngineTuningViewMode {
+  if (backend === "bandit") {
+    return "bandit";
+  }
+  if (backend === "mlp_ensemble") {
+    return "model";
+  }
+  return "aggregate";
+}
+
 function EngineSamplingProbabilityBars({
   candidates,
-  variant,
+  mode,
 }: {
   candidates: readonly EngineTuningRuntimeCandidateEstimate[];
-  variant: "aggregate" | "model";
+  mode: EngineTuningViewMode;
 }) {
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
   const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? 100;
@@ -242,18 +263,16 @@ function EngineSamplingProbabilityBars({
     <div className="grid gap-1">
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-app-muted">
         <div className="flex flex-wrap gap-3">
-          {variant === "aggregate" ? (
+          {mode !== "model" ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
-              successful finish aggregate
+              {mode === "bandit" ? "bucket finish aggregate" : "successful finish aggregate"}
             </span>
           ) : null}
           <span className="inline-flex items-center gap-1.5">
             <span
               className={
-                variant === "aggregate"
-                  ? "h-2.5 w-3 bg-app-accent/60"
-                  : "h-2.5 w-3 bg-app-accent/70"
+                mode !== "model" ? "h-2.5 w-3 bg-app-accent/60" : "h-2.5 w-3 bg-app-accent/70"
               }
               aria-hidden="true"
             />
@@ -276,11 +295,13 @@ function EngineSamplingProbabilityBars({
           const x = index * barWidth + (barWidth - width) / 2;
           const y = 100 - height;
           const fill =
-            variant === "aggregate" && candidate.finish_count > 0
+            mode !== "model" && candidate.finish_count > 0
               ? "var(--accent)"
-              : variant === "aggregate"
+              : mode !== "model"
                 ? "color-mix(in srgb, var(--accent) 58%, transparent)"
                 : "color-mix(in srgb, var(--accent) 70%, transparent)";
+          const rawLabel = mode === "bandit" ? "bucket" : "engine";
+          const estimateLabel = mode === "bandit" ? "mean" : "estimated";
           return (
             <rect
               fill={fill}
@@ -291,7 +312,7 @@ function EngineSamplingProbabilityBars({
               y={y}
               vectorEffect="non-scaling-stroke"
             >
-              <title>{`engine ${candidate.engine_setting_raw_value} · ${formatPercent(candidate.selection_probability)} probability · estimated ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
+              <title>{`${rawLabel} ${candidate.engine_setting_raw_value} · ${formatPercent(candidate.selection_probability)} probability · ${estimateLabel} ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
             </rect>
           );
         })}
@@ -307,9 +328,11 @@ function EngineSamplingProbabilityBars({
 
 function EngineMeanPerformanceBars({
   candidates,
+  mode,
   recommendedEngineSettingRawValue,
 }: {
   candidates: readonly EngineTuningRuntimeCandidateEstimate[];
+  mode: EngineTuningViewMode;
   recommendedEngineSettingRawValue: number;
 }) {
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
@@ -326,15 +349,16 @@ function EngineMeanPerformanceBars({
         <div className="flex flex-wrap gap-3">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-3 bg-app-accent/45" aria-hidden="true" />
-            predicted mean performance
+            {mode === "bandit" ? "bucket mean finish" : "predicted mean performance"}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
-            deterministic greedy
+            {mode === "bandit" ? "greedy bucket" : "deterministic greedy"}
           </span>
         </div>
         <span className="tabular-nums">
-          estimated finish time {formatRaceTime(fastestEstimate)}-{formatRaceTime(slowestEstimate)}
+          {mode === "bandit" ? "bucket mean finish time" : "estimated finish time"}{" "}
+          {formatRaceTime(fastestEstimate)}-{formatRaceTime(slowestEstimate)}
         </span>
       </div>
       <svg
@@ -344,7 +368,11 @@ function EngineMeanPerformanceBars({
         role="img"
         viewBox="0 0 100 100"
       >
-        <title>Predicted mean performance from estimated finish time</title>
+        <title>
+          {mode === "bandit"
+            ? "Measured bucket mean finish time"
+            : "Predicted mean performance from estimated finish time"}
+        </title>
         {candidates.map((candidate, index) => {
           const isRecommended =
             candidate.engine_setting_raw_value === recommendedEngineSettingRawValue;
@@ -353,6 +381,8 @@ function EngineMeanPerformanceBars({
           const width = Math.max(0.2, barWidth * 0.86);
           const x = index * barWidth + (barWidth - width) / 2;
           const y = 100 - height;
+          const rawLabel = mode === "bandit" ? "bucket" : "engine";
+          const estimateLabel = mode === "bandit" ? "mean" : "estimated";
           return (
             <rect
               fill={
@@ -367,18 +397,92 @@ function EngineMeanPerformanceBars({
               y={y}
               vectorEffect="non-scaling-stroke"
             >
-              <title>{`engine ${candidate.engine_setting_raw_value}${isRecommended ? " · deterministic greedy" : ""} · estimated ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
+              <title>{`${rawLabel} ${candidate.engine_setting_raw_value}${isRecommended ? ` · ${mode === "bandit" ? "greedy bucket" : "deterministic greedy"}` : ""} · ${estimateLabel} ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
             </rect>
           );
         })}
       </svg>
       <div className="flex justify-between text-xs tabular-nums text-app-muted">
         <span>{firstCandidate}</span>
-        <span>engine raw value · taller means faster estimated finish</span>
+        <span>
+          engine raw value · taller means faster{" "}
+          {mode === "bandit" ? "bucket mean finish" : "estimated finish"}
+        </span>
         <span>{lastCandidate}</span>
       </div>
     </div>
   );
+}
+
+function EngineBanditBucketTable({
+  candidates,
+}: {
+  candidates: readonly EngineTuningRuntimeCandidateEstimate[];
+}) {
+  if (candidates.length === 0) {
+    return null;
+  }
+  const rows = [...candidates].sort(compareBanditBucketCandidates);
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-collapse text-left text-xs tabular-nums">
+        <caption className="sr-only">Measured bandit bucket finishes</caption>
+        <thead className="text-app-muted">
+          <tr className="border-b border-app-border">
+            <th className="py-1.5 pr-3 font-semibold">Bucket</th>
+            <th className="py-1.5 pr-3 font-semibold">Mean</th>
+            <th className="py-1.5 pr-3 font-semibold">Best</th>
+            <th className="py-1.5 pr-3 font-semibold">Prob</th>
+            <th className="py-1.5 font-semibold">Finishes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((candidate) => (
+            <tr
+              className="border-b border-app-border/70 last:border-b-0"
+              key={candidate.engine_setting_raw_value}
+            >
+              <td className="py-1.5 pr-3 text-app-text">{candidate.engine_setting_raw_value}</td>
+              <td className="py-1.5 pr-3 text-app-text">
+                {candidate.finish_count <= 0
+                  ? "-"
+                  : formatRaceTime(candidate.estimated_finish_time_ms)}
+              </td>
+              <td className="py-1.5 pr-3 text-app-text">
+                {formatOptionalRaceTime(candidate.best_finish_time_ms)}
+              </td>
+              <td className="py-1.5 pr-3 text-app-text">
+                {formatPercent(candidate.selection_probability)}
+              </td>
+              <td className="py-1.5 text-app-text">{candidate.finish_count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function compareBanditBucketCandidates(
+  left: EngineTuningRuntimeCandidateEstimate,
+  right: EngineTuningRuntimeCandidateEstimate,
+) {
+  if (left.finish_count <= 0 && right.finish_count <= 0) {
+    return left.engine_setting_raw_value - right.engine_setting_raw_value;
+  }
+  if (left.finish_count <= 0) {
+    return 1;
+  }
+  if (right.finish_count <= 0) {
+    return -1;
+  }
+  if (left.estimated_finish_time_ms !== right.estimated_finish_time_ms) {
+    return left.estimated_finish_time_ms - right.estimated_finish_time_ms;
+  }
+  if (right.finish_count !== left.finish_count) {
+    return right.finish_count - left.finish_count;
+  }
+  return left.engine_setting_raw_value - right.engine_setting_raw_value;
 }
 
 function EngineMeasuredCandidateTable({

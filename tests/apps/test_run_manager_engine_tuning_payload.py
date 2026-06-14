@@ -6,6 +6,7 @@ from rl_fzerox.apps.run_manager.api.payloads.engine_tuning import (
 )
 from rl_fzerox.core.engine_tuning import (
     ENGINE_TUNING_STATE_VERSION,
+    BanditEngineTunerSettings,
     EngineTuningCandidateState,
     EngineTuningContext,
     EngineTuningRuntimeState,
@@ -51,3 +52,116 @@ def test_engine_tuning_payload_reports_gp_backend_from_settings() -> None:
     assert isinstance(contexts, list)
     assert contexts[0]["observed_candidate_count"] == 1
     assert any(candidate["finish_count"] == 1 for candidate in contexts[0]["candidates"])
+
+
+def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
+    context = EngineTuningContext(
+        course_key="silence",
+        vehicle_id="blue_falcon",
+    )
+    state = EngineTuningRuntimeState(
+        version=ENGINE_TUNING_STATE_VERSION,
+        update_count=1,
+        candidates=(
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=54,
+                finish_count=2,
+                decayed_count=2.0,
+                decayed_score_total=-200.0,
+                score_total=-200.0,
+                best_score=-90.0,
+                best_time_ms=90_000,
+            ),
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=67,
+                finish_count=1,
+                decayed_count=1.0,
+                decayed_score_total=-80.0,
+                score_total=-80.0,
+                best_score=-80.0,
+                best_time_ms=80_000,
+            ),
+        ),
+    )
+
+    payload = engine_tuning_state_payload(
+        state,
+        settings=BanditEngineTunerSettings(
+            min_raw_value=40,
+            max_raw_value=70,
+            bucket_size=10,
+            prior_finish_time_seconds=200.0,
+        ),
+    )
+
+    contexts = payload["contexts"]
+    candidates = payload["candidates"]
+    assert payload["model_backend"] == "bandit"
+    assert isinstance(candidates, list)
+    assert [candidate["engine_setting_raw_value"] for candidate in candidates] == [50, 70]
+    assert isinstance(contexts, list)
+    assert contexts[0]["observed_candidate_count"] == 2
+    assert [candidate["engine_setting_raw_value"] for candidate in contexts[0]["candidates"]] == [
+        40,
+        50,
+        60,
+        70,
+    ]
+    assert contexts[0]["recommended_engine_setting_raw_value"] == 70
+
+
+def test_engine_tuning_payload_uses_bandit_bucket_recommendation() -> None:
+    context = EngineTuningContext(
+        course_key="silence",
+        vehicle_id="blue_falcon",
+    )
+    state = EngineTuningRuntimeState(
+        version=ENGINE_TUNING_STATE_VERSION,
+        update_count=1,
+        candidates=(
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=20,
+                finish_count=1,
+                decayed_count=1.0,
+                decayed_score_total=-80.0,
+                score_total=-80.0,
+                best_score=-80.0,
+                best_time_ms=80_000,
+            ),
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=90,
+                finish_count=1,
+                decayed_count=1.0,
+                decayed_score_total=-80.5,
+                score_total=-80.5,
+                best_score=-80.5,
+                best_time_ms=80_500,
+            ),
+        ),
+    )
+
+    payload = engine_tuning_state_payload(
+        state,
+        settings=BanditEngineTunerSettings(
+            min_raw_value=0,
+            max_raw_value=100,
+            bucket_size=10,
+            prior_finish_time_seconds=200.0,
+        ),
+    )
+
+    contexts = payload["contexts"]
+    assert isinstance(contexts, list)
+    assert contexts[0]["recommended_engine_setting_raw_value"] == 20

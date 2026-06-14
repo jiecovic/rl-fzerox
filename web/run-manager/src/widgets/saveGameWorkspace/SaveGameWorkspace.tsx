@@ -26,6 +26,7 @@ import type {
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
   SaveEngineTuningCourseSetupRecommendation,
+  SaveGameRunnerSettingsUpdateRequest,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
 import { rendererNames } from "@/shared/api/renderers";
@@ -57,6 +58,9 @@ interface SaveGameWorkspaceProps {
   ) => void;
   onRefreshStatus: (saveGameId: string) => Promise<void>;
   onRenameSaveGame: (saveGameId: string, name: string) => Promise<void>;
+  onUpdateRunnerSettings: (
+    request: SaveGameRunnerSettingsUpdateRequest,
+  ) => Promise<ManagedSaveGame>;
   onUpsertCourseSetup: (request: {
     courseId?: string | null;
     cupId?: string | null;
@@ -88,6 +92,7 @@ export function SaveGameWorkspace({
   onPatchSession,
   onRefreshStatus,
   onRenameSaveGame,
+  onUpdateRunnerSettings,
   onUpsertCourseSetup,
   onUpsertCupSetup,
   onStartCareerMode,
@@ -102,6 +107,9 @@ export function SaveGameWorkspace({
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renamingSaveGameId, setRenamingSaveGameId] = useState<string | null>(null);
   const [startingRunnerSaveGameId, setStartingRunnerSaveGameId] = useState<string | null>(null);
+  const [savingRunnerSettingsSaveGameId, setSavingRunnerSettingsSaveGameId] = useState<
+    string | null
+  >(null);
   const [runnerStatus, setRunnerStatus] = useState<string | null>(null);
   const [courseSetupDirty, setCourseSetupDirty] = useState(false);
   const [updatingSaveGameId, setUpdatingSaveGameId] = useState<string | null>(null);
@@ -223,18 +231,74 @@ export function SaveGameWorkspace({
     }
   }
 
+  function runnerSettingsRequest(
+    target: ManagedSaveGame,
+  ): SaveGameRunnerSettingsUpdateRequest | null {
+    const attemptSeed = parseAttemptSeed(session.attemptSeedText);
+    if (attemptSeed === "invalid") {
+      setError("runtime seed must be an integer from 0 to 4294967295");
+      return null;
+    }
+    const trimmedRecordingPath = session.recordingPathText.trim();
+    const recordingPath = trimmedRecordingPath.length === 0 ? null : trimmedRecordingPath;
+    if (session.recordingEnabled && recordingPath === null) {
+      setError("recording path is required");
+      return null;
+    }
+    return {
+      attemptSeed,
+      device: session.runnerDevice,
+      policyMode: session.policyMode,
+      recordingEnabled: session.recordingEnabled,
+      recordingPath,
+      renderer: session.runnerRenderer,
+      saveGameId: target.id,
+    };
+  }
+
+  async function saveRunnerSettings(
+    target: ManagedSaveGame,
+    options: { showNotice: boolean } = { showNotice: true },
+  ): Promise<ManagedSaveGame | null> {
+    const request = runnerSettingsRequest(target);
+    if (request === null) {
+      return null;
+    }
+    setError(null);
+    setSavingRunnerSettingsSaveGameId(target.id);
+    try {
+      const updated = await onUpdateRunnerSettings(request);
+      patchSessionFromRunnerSettings(updated);
+      if (options.showNotice) {
+        setRunnerStatus("Runner settings saved.");
+      }
+      return updated;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "failed to save runner settings");
+      return null;
+    } finally {
+      setSavingRunnerSettingsSaveGameId(null);
+    }
+  }
+
+  function patchSessionFromRunnerSettings(target: ManagedSaveGame) {
+    const settings = target.runner_settings;
+    onPatchSession(session.sessionId, {
+      attemptSeedText: settings.attempt_seed === null ? "" : String(settings.attempt_seed),
+      policyMode: settings.policy_mode,
+      recordingEnabled: settings.recording_enabled,
+      recordingPathText: settings.recording_path ?? defaultCareerRecordingPath(target.id),
+      runnerDevice: settings.device,
+      runnerRenderer: settings.renderer,
+    });
+  }
+
   async function startCareerMode(
     target: ManagedSaveGame,
     requestedTarget: ManagedSaveUnlockTarget | null = null,
   ) {
-    const attemptSeed = parseAttemptSeed(session.attemptSeedText);
-    if (attemptSeed === "invalid") {
-      setError("runtime seed must be an integer from 0 to 4294967295");
-      return;
-    }
-    const recordingPath = session.recordingEnabled ? session.recordingPathText.trim() : null;
-    if (session.recordingEnabled && recordingPath === "") {
-      setError("recording path is required");
+    const settingsRequest = runnerSettingsRequest(target);
+    if (settingsRequest === null) {
       return;
     }
     const launchTarget = requestedTarget ?? nextUnlockTarget(target);
@@ -242,8 +306,8 @@ export function SaveGameWorkspace({
       setError("career save has no pending unlock target");
       return;
     }
-    if (launchTarget.status !== "pending") {
-      setError("selected unlock target is not pending");
+    if (!launchableTargetStatus(launchTarget)) {
+      setError("selected unlock target is not playable");
       return;
     }
     if (metadata === null) {
@@ -265,14 +329,17 @@ export function SaveGameWorkspace({
     setRunnerStatus(null);
     setStartingRunnerSaveGameId(target.id);
     try {
+      const updated = await onUpdateRunnerSettings(settingsRequest);
+      patchSessionFromRunnerSettings(updated);
       const status = await onStartCareerMode({
-        attemptSeed,
-        device: session.runnerDevice,
-        policyMode: session.policyMode,
-        recordingEnabled: session.recordingEnabled,
-        recordingPath,
-        renderer: session.runnerRenderer,
+        attemptSeed: settingsRequest.attemptSeed,
+        device: settingsRequest.device,
+        policyMode: settingsRequest.policyMode,
+        recordingEnabled: settingsRequest.recordingEnabled,
+        recordingPath: settingsRequest.recordingEnabled ? settingsRequest.recordingPath : null,
+        renderer: settingsRequest.renderer,
         saveGameId: target.id,
+        singleTarget: requestedTarget !== null,
         target: requestedTarget,
       });
       setRunnerStatus(status === "started" ? "Runner started." : "Runner is already open.");
@@ -350,7 +417,7 @@ export function SaveGameWorkspace({
       startingRunnerSaveGameId === null &&
       !activeSaveGame.runner_active &&
       !courseSetupDirty &&
-      target.status === "pending" &&
+      launchableTargetStatus(target) &&
       resolveSavedCourseSetup(
         activeSaveGame.course_setups,
         target,
@@ -382,6 +449,10 @@ export function SaveGameWorkspace({
       ? "ready to continue"
       : "not started";
   const rendererOptions = rendererNames(metadata, session.runnerRenderer);
+  const savingRunnerSettings = savingRunnerSettingsSaveGameId === saveGame.id;
+  const runnerSettingsHaveChanges = runnerSettingsDirty(saveGame, session);
+  const canSaveRunnerSettings =
+    !saveGame.runner_active && startingRunnerSaveGameId === null && runnerSettingsHaveChanges;
   return (
     <Panel>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -427,6 +498,7 @@ export function SaveGameWorkspace({
       <RunnerControlPanel
         attemptSeedText={session.attemptSeedText}
         canStart={canStartRunner}
+        canSaveSettings={canSaveRunnerSettings}
         rendererOptions={rendererOptions}
         runnerDevice={session.runnerDevice}
         runnerRenderer={session.runnerRenderer}
@@ -435,6 +507,7 @@ export function SaveGameWorkspace({
         recordingPathText={session.recordingPathText}
         startLabel={startLabel}
         startNote={startNote}
+        savingSettings={savingRunnerSettings}
         starting={startingRunnerSaveGameId === saveGame.id}
         onAttemptSeedChange={(attemptSeedText) =>
           onPatchSession(session.sessionId, { attemptSeedText })
@@ -455,6 +528,7 @@ export function SaveGameWorkspace({
         onRecordingPathChange={(recordingPathText) =>
           onPatchSession(session.sessionId, { recordingPathText })
         }
+        onSaveSettings={() => void saveRunnerSettings(saveGame)}
         onStart={() => void startCareerMode(saveGame)}
       />
       <article className="grid content-start gap-5">
@@ -484,6 +558,10 @@ export function SaveGameWorkspace({
   );
 }
 
+function launchableTargetStatus(target: ManagedSaveUnlockTarget): boolean {
+  return target.status === "pending" || target.status === "succeeded";
+}
+
 function resolveLaunchCupVehicleId(
   saveGame: ManagedSaveGame,
   target: ManagedSaveUnlockTarget,
@@ -492,6 +570,24 @@ function resolveLaunchCupVehicleId(
     resolveSavedCupSetup(saveGame.cup_setups, target)?.vehicle_id ??
     saveGame.unlock_progress?.unlocked_vehicle_ids[0] ??
     null
+  );
+}
+
+function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession): boolean {
+  const settings = saveGame.runner_settings;
+  const attemptSeed = parseAttemptSeed(session.attemptSeedText);
+  const persistedAttemptSeed =
+    settings.attempt_seed === null ? null : String(settings.attempt_seed);
+  const recordingPathText = session.recordingPathText.trim();
+  const recordingPath = recordingPathText.length === 0 ? null : recordingPathText;
+  return (
+    attemptSeed === "invalid" ||
+    persistedAttemptSeed !== attemptSeed ||
+    settings.device !== session.runnerDevice ||
+    settings.renderer !== session.runnerRenderer ||
+    settings.policy_mode !== session.policyMode ||
+    settings.recording_enabled !== session.recordingEnabled ||
+    settings.recording_path !== recordingPath
   );
 }
 

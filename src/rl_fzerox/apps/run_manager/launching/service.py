@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from rl_fzerox.apps.run_manager.launching.engine_tuning_source import EngineTuningSourceAction
 from rl_fzerox.apps.run_manager.launching.run_lifecycle import (
     fork_run,
     launch_run,
@@ -31,6 +32,7 @@ class ManagerRunLauncher:
         source_run_id: str | None = None,
         source_artifact: Literal["latest", "best"] | None = None,
         copy_alt_baselines: bool = True,
+        engine_tuning_source_action: EngineTuningSourceAction = "convert",
     ) -> ManagedRun:
         normalized_name = name.strip()
         if not normalized_name:
@@ -43,6 +45,7 @@ class ManagerRunLauncher:
                 source_run_id=source_run_id,
                 source_artifact=source_artifact,
                 copy_alt_baselines=copy_alt_baselines,
+                engine_tuning_source_action=engine_tuning_source_action,
             )
         return launch_run(
             self._store,
@@ -63,6 +66,7 @@ class ManagerRunLauncher:
         source_snapshot_dir: Path | None = None,
         source_num_timesteps: int | None = None,
         copy_alt_baselines: bool = True,
+        engine_tuning_source_action: EngineTuningSourceAction = "convert",
     ) -> ManagedRun:
         return fork_run(
             self._store,
@@ -74,6 +78,7 @@ class ManagerRunLauncher:
             source_snapshot_dir=source_snapshot_dir,
             source_num_timesteps=source_num_timesteps,
             copy_alt_baselines=copy_alt_baselines,
+            engine_tuning_source_action=engine_tuning_source_action,
             spawn_worker=self._spawn_worker_for_lifecycle,
         )
 
@@ -124,6 +129,7 @@ class ManagerRunLauncher:
         difficulty: str | None = None,
         cup_id: str | None = None,
         course_id: str | None = None,
+        single_target: bool = False,
     ) -> WatchLaunchStatus:
         """Launch the visible Career Mode runner for one save game."""
 
@@ -140,6 +146,7 @@ class ManagerRunLauncher:
             difficulty=difficulty,
             cup_id=cup_id,
             course_id=course_id,
+            single_target=single_target,
         )
 
     def _spawn_worker(self, *, run_id: str, resume: bool) -> None:
@@ -164,6 +171,7 @@ class ManagerRunLauncher:
         source_run_id: str,
         source_artifact: Literal["latest", "best"],
         copy_alt_baselines: bool,
+        engine_tuning_source_action: EngineTuningSourceAction,
     ) -> ManagedRun:
         if draft_id is None:
             return self.fork(
@@ -172,6 +180,7 @@ class ManagerRunLauncher:
                 name=name,
                 config=config,
                 copy_alt_baselines=copy_alt_baselines,
+                engine_tuning_source_action=engine_tuning_source_action,
             )
         draft = self._store.get_draft(draft_id)
         if draft is None:
@@ -191,4 +200,5 @@ class ManagerRunLauncher:
             source_snapshot_dir=draft.source_snapshot_dir,
             source_num_timesteps=draft.source_num_timesteps,
             copy_alt_baselines=copy_alt_baselines,
+            engine_tuning_source_action=engine_tuning_source_action,
         )

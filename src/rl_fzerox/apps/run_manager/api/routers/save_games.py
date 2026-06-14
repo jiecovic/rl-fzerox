@@ -12,6 +12,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     RunLauncher,
     StartCareerModeRequest,
     UpdateSaveGameRequest,
+    UpdateSaveRunnerSettingsRequest,
     UpsertSaveCourseSetupRequest,
     UpsertSaveCupSetupRequest,
 )
@@ -57,6 +58,18 @@ def create_save_games_router(store: ManagerStore, launcher: RunLauncher) -> APIR
             store,
             save_game_id,
             UpdateSaveGameRequest(name=name),
+        )
+
+    @router.put("/api/save-games/{save_game_id}/runner-settings")
+    async def update_save_game_runner_settings(
+        save_game_id: Annotated[str, Path(min_length=1)],
+        request: UpdateSaveRunnerSettingsRequest,
+    ) -> dict[str, dict[str, object]]:
+        return await run_sync(
+            handlers.update_save_game_runner_settings_payload,
+            store,
+            save_game_id,
+            request,
         )
 
     @router.delete("/api/save-games/{save_game_id}")

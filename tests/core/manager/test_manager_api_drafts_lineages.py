@@ -117,8 +117,17 @@ async def test_manager_api_metrics_full_mode_disables_recent_limit(
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
+            engine_tuning_source_action: Literal["convert", "discard"],
         ) -> ManagedRun:
-            del name, config, draft_id, source_run_id, source_artifact, copy_alt_baselines
+            del (
+                name,
+                config,
+                draft_id,
+                source_run_id,
+                source_artifact,
+                copy_alt_baselines,
+                engine_tuning_source_action,
+            )
             raise AssertionError("launch should not be called")
 
     client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))

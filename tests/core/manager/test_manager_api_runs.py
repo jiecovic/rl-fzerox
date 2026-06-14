@@ -44,8 +44,15 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
+            engine_tuning_source_action: Literal["convert", "discard"],
         ):
-            del copy_alt_baselines, draft_id, source_artifact, source_run_id
+            del (
+                copy_alt_baselines,
+                draft_id,
+                source_artifact,
+                source_run_id,
+                engine_tuning_source_action,
+            )
             run = store.create_run(
                 name=name,
                 config=config,
@@ -154,8 +161,15 @@ async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Pat
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
+            engine_tuning_source_action: Literal["convert", "discard"],
         ):
-            del copy_alt_baselines, draft_id, source_artifact, source_run_id
+            del (
+                copy_alt_baselines,
+                draft_id,
+                source_artifact,
+                source_run_id,
+                engine_tuning_source_action,
+            )
             run = store.create_run(
                 name=name,
                 config=config,
@@ -189,7 +203,9 @@ async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Pat
 
 async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
-    seen_source: list[tuple[str | None, str | None, str | None, bool]] = []
+    seen_source: list[
+        tuple[str | None, str | None, str | None, bool, Literal["convert", "discard"]]
+    ] = []
     source_run = store.create_run(
         run_id="run-parent",
         name="Parent Run",
@@ -207,8 +223,17 @@ async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
+            engine_tuning_source_action: Literal["convert", "discard"],
         ):
-            seen_source.append((draft_id, source_run_id, source_artifact, copy_alt_baselines))
+            seen_source.append(
+                (
+                    draft_id,
+                    source_run_id,
+                    source_artifact,
+                    copy_alt_baselines,
+                    engine_tuning_source_action,
+                )
+            )
             run = store.create_run(
                 name=name,
                 config=config,
@@ -238,6 +263,7 @@ async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
             "source_run_id": source_run.id,
             "source_artifact": "best",
             "copy_alt_baselines": False,
+            "engine_tuning_source_action": "discard",
         },
     )
 
@@ -246,7 +272,7 @@ async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
     assert payload["run"]["name"] == "Launch Fork"
     assert payload["run"]["source_run_id"] == source_run.id
     assert payload["run"]["source_artifact"] == "best"
-    assert seen_source == [(None, source_run.id, "best", False)]
+    assert seen_source == [(None, source_run.id, "best", False, "discard")]
 
 
 async def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> None:
@@ -262,8 +288,9 @@ async def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Pat
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
+            engine_tuning_source_action: Literal["convert", "discard"],
         ):
-            del copy_alt_baselines, source_artifact, source_run_id
+            del copy_alt_baselines, source_artifact, source_run_id, engine_tuning_source_action
             run = store.create_run(
                 name=name,
                 config=config,
@@ -314,8 +341,17 @@ async def test_manager_api_forks_run(tmp_path: Path) -> None:
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
+            engine_tuning_source_action: Literal["convert", "discard"],
         ):
-            del copy_alt_baselines, config, draft_id, name, source_artifact, source_run_id
+            del (
+                copy_alt_baselines,
+                config,
+                draft_id,
+                name,
+                source_artifact,
+                source_run_id,
+                engine_tuning_source_action,
+            )
             raise AssertionError("launch should not be called")
 
         def fork(
@@ -326,11 +362,13 @@ async def test_manager_api_forks_run(tmp_path: Path) -> None:
             name: str | None,
             config: ManagedRunConfig | None,
             copy_alt_baselines: bool,
+            engine_tuning_source_action: Literal["convert", "discard"],
         ):
             del config
             assert run_id == parent.id
             assert artifact == "best"
             assert copy_alt_baselines is True
+            assert engine_tuning_source_action == "convert"
             child = store.create_run(
                 run_id="child-run",
                 name=name or "Parent Run best fork",

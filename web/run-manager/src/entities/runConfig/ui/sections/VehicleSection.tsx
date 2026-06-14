@@ -419,7 +419,9 @@ function AdaptiveEngineControls({
 }) {
   const vehicle = config.vehicle;
   const defaultVehicle = defaultConfig.vehicle;
+  const isBanditBackend = vehicle.adaptive_engine_tuner_backend === "bandit";
   const isGaussianProcessBackend = vehicle.adaptive_engine_tuner_backend === "gaussian_process";
+  const isMlpEnsembleBackend = vehicle.adaptive_engine_tuner_backend === "mlp_ensemble";
   return (
     <div className="grid gap-3 border-t border-app-border pt-3">
       <div className="grid gap-1">
@@ -435,26 +437,43 @@ function AdaptiveEngineControls({
           ariaLabel="Adaptive engine tuner backend"
           options={[
             {
+              active: vehicle.adaptive_engine_tuner_backend === "bandit",
+              key: "bandit",
+              label: "Bandit",
+              onClick: () => onChange({ adaptive_engine_tuner_backend: "bandit" }),
+            },
+            {
               active: vehicle.adaptive_engine_tuner_backend === "gaussian_process",
               key: "gaussian_process",
-              label: "GP",
+              label: "GP (exp)",
               onClick: () => onChange({ adaptive_engine_tuner_backend: "gaussian_process" }),
             },
             {
               active: vehicle.adaptive_engine_tuner_backend === "mlp_ensemble",
               key: "mlp_ensemble",
-              label: "MLP ensemble",
+              label: "MLP (exp)",
               onClick: () => onChange({ adaptive_engine_tuner_backend: "mlp_ensemble" }),
             },
           ]}
         />
         <small className="m-0 text-xs leading-snug text-app-muted">
-          GP fits a smooth ordered curve from aggregates. MLP ensemble learns a shared course and
-          vehicle surrogate with bootstrapped uncertainty. Backend uncertainty scales are derived
-          from the episode horizon.
+          Bandit samples coarse measured buckets. GP and MLP are experimental model-backed
+          alternatives. Backend uncertainty scales are derived from the episode horizon.
         </small>
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
+        {isBanditBackend ? (
+          <NumberField
+            help="Bandit-only raw engine stride. The default 10 samples 0, 10, 20, ..., 100."
+            label="Bucket size"
+            resetValue={defaultVehicle.adaptive_engine_bandit_bucket_size}
+            step="1"
+            value={vehicle.adaptive_engine_bandit_bucket_size}
+            onChange={(adaptive_engine_bandit_bucket_size) =>
+              onChange({ adaptive_engine_bandit_bucket_size })
+            }
+          />
+        ) : null}
         {isGaussianProcessBackend ? (
           <RangeNumberField
             help="GP-only discount factor for old successful-finish aggregates. Higher values remember longer."
@@ -468,7 +487,7 @@ function AdaptiveEngineControls({
             onChange={(adaptive_engine_stat_decay) => onChange({ adaptive_engine_stat_decay })}
           />
         ) : null}
-        {!isGaussianProcessBackend ? (
+        {isMlpEnsembleBackend ? (
           <>
             <NumberField
               help="Number of bootstrapped MLP members used for Thompson-style engine selection. More members improve uncertainty estimates but cost more CPU."
@@ -548,16 +567,18 @@ function AdaptiveEngineControls({
             onChange({ adaptive_engine_uniform_exploration })
           }
         />
-        <NumberField
-          help="Deterministic watch and career import treat predicted finish times within this many seconds of best as practically equal, then choose the soft plateau center."
-          label="Greedy plateau seconds"
-          resetValue={defaultVehicle.adaptive_engine_greedy_plateau_seconds}
-          step="0.1"
-          value={vehicle.adaptive_engine_greedy_plateau_seconds}
-          onChange={(adaptive_engine_greedy_plateau_seconds) =>
-            onChange({ adaptive_engine_greedy_plateau_seconds })
-          }
-        />
+        {!isBanditBackend ? (
+          <NumberField
+            help="Deterministic watch and career import treat predicted finish times within this many seconds of best as practically equal, then choose the soft plateau center."
+            label="Greedy plateau seconds"
+            resetValue={defaultVehicle.adaptive_engine_greedy_plateau_seconds}
+            step="0.1"
+            value={vehicle.adaptive_engine_greedy_plateau_seconds}
+            onChange={(adaptive_engine_greedy_plateau_seconds) =>
+              onChange({ adaptive_engine_greedy_plateau_seconds })
+            }
+          />
+        ) : null}
       </div>
     </div>
   );

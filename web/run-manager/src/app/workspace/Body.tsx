@@ -144,6 +144,7 @@ export function WorkspaceBody({
           onImportEngineTuning={actions.importManagedSaveEngineTuning}
           onRenameSaveGame={actions.renameManagedSaveGame}
           onRefreshStatus={onRefreshSaveGameStatus}
+          onUpdateRunnerSettings={actions.updateManagedSaveRunnerSettings}
           onUpsertCourseSetup={actions.upsertManagedSaveCourseSetup}
           onUpsertCupSetup={actions.upsertManagedSaveCupSetup}
           onStartCareerMode={actions.startManagedCareerMode}
@@ -188,6 +189,9 @@ export function WorkspaceBody({
             forkAltBaselineCount={forkDraftAltBaselineCount(activeDraftEditor.forkSource, runs)}
             forkCopyAltBaselines={activeDraftEditor.forkSource?.copyAltBaselines ?? null}
             forkSourceArtifact={activeDraftEditor.forkSource?.artifact ?? null}
+            forkSourceEngineTunerBackend={
+              activeDraftEditor.forkSource?.sourceEngineTunerBackend ?? null
+            }
             forkSourceRunLabel={sessions.forkSourceRunLabel(activeDraftEditor.forkSource)}
             initialConfig={activeDraftEditor.initialConfig}
             initialDraftName={activeDraftEditor.initialDraftName}
@@ -206,8 +210,14 @@ export function WorkspaceBody({
                 currentDraftName: name,
               });
             }}
-            onLaunchRun={(name, config, draftId) =>
-              actions.launchTrainingRun(activeDraftEditor.sessionId, name, config, draftId)
+            onLaunchRun={(name, config, draftId, engineTuningSourceAction) =>
+              actions.launchTrainingRun(
+                activeDraftEditor.sessionId,
+                name,
+                config,
+                draftId,
+                engineTuningSourceAction,
+              )
             }
             onSaveDraft={(name, config) =>
               actions.saveDraft(activeDraftEditor.sessionId, name, config)

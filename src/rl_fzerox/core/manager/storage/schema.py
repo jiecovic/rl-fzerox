@@ -20,6 +20,7 @@ from rl_fzerox.core.manager.db.models import (
     SaveGameAttemptModel,
     SaveGameCourseSetupModel,
     SaveGameCupSetupModel,
+    SaveGameModel,
     SchemaVersionModel,
 )
 from rl_fzerox.core.manager.db.repositories.configs import create_config_snapshot
@@ -28,7 +29,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 27
+SCHEMA_VERSION = 28
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -142,6 +143,7 @@ def _assert_current_schema(
         raise RuntimeError("manager DB is not current: missing config_snapshots")
     if "save_games" not in table_names:
         raise RuntimeError("manager DB is not current: missing save_games")
+    _assert_save_game_columns(inspector=inspector)
     for table_name in SAVE_GAME_CHILD_TABLES:
         if table_name not in table_names:
             raise RuntimeError(f"manager DB is not current: missing {table_name}")
@@ -154,6 +156,13 @@ def _assert_current_schema(
     _assert_alt_baseline_columns(inspector=inspector)
     _assert_track_sampling_entry_columns(inspector=inspector)
     _assert_track_sampling_generated_slot_columns(inspector=inspector)
+
+
+def _assert_save_game_columns(*, inspector: Inspector) -> None:
+    columns = {column["name"] for column in inspector.get_columns("save_games")}
+    for column_name in _required_column_names(SaveGameModel):
+        if column_name not in columns:
+            raise RuntimeError(f"manager DB is not current: save_games is missing {column_name}")
 
 
 def _assert_save_game_child_columns(*, inspector: Inspector) -> None:

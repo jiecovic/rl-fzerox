@@ -59,6 +59,7 @@ from rl_fzerox.apps.run_manager.api.handlers.save_games import (
     save_game_status_payload_for_id,
     save_games_payload,
     update_save_game_payload,
+    update_save_game_runner_settings_payload,
     upsert_save_course_setup_payload,
     upsert_save_cup_setup_payload,
 )
@@ -108,6 +109,7 @@ __all__ = [
     "update_lineage_groups_payload",
     "update_run_payload",
     "update_save_game_payload",
+    "update_save_game_runner_settings_payload",
     "upsert_save_course_setup_payload",
     "import_save_engine_tuning_payload",
     "upsert_save_cup_setup_payload",

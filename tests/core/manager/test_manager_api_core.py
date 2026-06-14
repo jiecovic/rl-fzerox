@@ -65,6 +65,14 @@ async def test_manager_api_creates_save_game(tmp_path: Path) -> None:
     assert payload["save_game"]["name"] == "Unlock Run"
     assert "seed" not in payload["save_game"]
     assert payload["save_game"]["status"] == "created"
+    assert payload["save_game"]["runner_settings"] == {
+        "attempt_seed": None,
+        "device": "cuda",
+        "policy_mode": "deterministic",
+        "recording_enabled": False,
+        "recording_path": None,
+        "renderer": "gliden64",
+    }
     assert payload["save_game"]["unlock_progress"]["completed_count"] == 0
     assert payload["save_game"]["unlock_progress"]["total_count"] == len(default_unlock_targets())
     assert payload["save_game"]["unlock_progress"]["next_target"]["difficulty"] == "novice"
@@ -91,10 +99,47 @@ async def test_manager_api_returns_slim_save_game_status(tmp_path: Path) -> None
     assert save_payload["id"] == save_game_id
     assert save_payload["name"] == "Unlock Run"
     assert save_payload["status"] == "created"
+    assert save_payload["runner_settings"] == {
+        "attempt_seed": None,
+        "device": "cuda",
+        "policy_mode": "deterministic",
+        "recording_enabled": False,
+        "recording_path": None,
+        "renderer": "gliden64",
+    }
     assert save_payload["unlock_progress"]["completed_count"] == 0
     assert "attempts" not in save_payload
     assert "course_setups" not in save_payload
     assert "cup_setups" not in save_payload
+
+
+async def test_manager_api_updates_save_game_runner_settings(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+    save_game_id = create_response.json()["save_game"]["id"]
+
+    response = await client.put(
+        f"/api/save-games/{save_game_id}/runner-settings",
+        json={
+            "attempt_seed": 12345,
+            "device": "cpu",
+            "policy_mode": "stochastic",
+            "recording_enabled": True,
+            "recording_path": "local/recordings/career/test.mkv",
+            "renderer": "angrylion",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["save_game"]
+    assert payload["runner_settings"] == {
+        "attempt_seed": 12345,
+        "device": "cpu",
+        "policy_mode": "stochastic",
+        "recording_enabled": True,
+        "recording_path": "local/recordings/career/test.mkv",
+        "renderer": "angrylion",
+    }
 
 
 async def test_manager_api_deletes_save_game(tmp_path: Path) -> None:
@@ -280,6 +325,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
             difficulty: str | None,
             cup_id: str | None,
             course_id: str | None,
+            single_target: bool,
         ) -> Literal["started", "already_running"]:
             self.request = {
                 "save_game_id": save_game_id,
@@ -293,6 +339,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
                 "difficulty": difficulty,
                 "cup_id": cup_id,
                 "course_id": course_id,
+                "single_target": single_target,
             }
             return "started"
 
@@ -312,6 +359,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
             "difficulty": "novice",
             "cup_id": "queen",
             "course_id": None,
+            "single_target": True,
         },
     )
 
@@ -329,6 +377,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
         "difficulty": "novice",
         "cup_id": "queen",
         "course_id": None,
+        "single_target": True,
     }
 
 

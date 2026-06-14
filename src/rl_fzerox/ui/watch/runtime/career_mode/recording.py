@@ -30,6 +30,8 @@ class FrameRecorder(Protocol):
         audio_samples: Pcm16Samples = (),
     ) -> None: ...
 
+    def drain_notices(self) -> tuple[str, ...]: ...
+
 
 class _RgbVideoWriter(Protocol):
     def __enter__(self) -> _RgbVideoWriter: ...
@@ -44,6 +46,8 @@ class _RgbVideoWriter(Protocol):
 class _RecordingFinalizer(Protocol):
     def finalize(self, path: Path) -> None: ...
 
+    def drain_notices(self) -> tuple[str, ...]: ...
+
     def close(self) -> None: ...
 
 
@@ -56,6 +60,12 @@ class _SegmentIdentity:
     key: str
     label: str
     attempt_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _FinalizerJob:
+    path: Path
+    future: Future[Path]
 
 
 class CareerModeFrameRecorder:
@@ -126,6 +136,9 @@ class CareerModeFrameRecorder:
             errors.append(exc)
         if errors:
             raise errors[0]
+
+    def drain_notices(self) -> tuple[str, ...]:
+        return self._finalizer.drain_notices()
 
     def _start_segment(self, segment: _SegmentIdentity) -> None:
         self._close_segment_writer()
@@ -256,23 +269,43 @@ class _Mp4RecordingFinalizer:
             max_workers=1,
             thread_name_prefix="career-recording-remux",
         )
-        self._futures: list[Future[Path]] = []
+        self._jobs: list[_FinalizerJob] = []
 
     def finalize(self, path: Path) -> None:
         if path.suffix.lower() != ".mkv":
             return
-        self._futures.append(
-            self._executor.submit(
-                remux_recording_to_mp4,
-                path,
-                ffmpeg_path=self._ffmpeg_path,
+        self._jobs.append(
+            _FinalizerJob(
+                path=path,
+                future=self._executor.submit(
+                    remux_recording_to_mp4,
+                    path,
+                    ffmpeg_path=self._ffmpeg_path,
+                ),
             )
         )
 
+    def drain_notices(self) -> tuple[str, ...]:
+        pending: list[_FinalizerJob] = []
+        notices: list[str] = []
+        for job in self._jobs:
+            if not job.future.done():
+                pending.append(job)
+                continue
+            try:
+                output_path = job.future.result()
+            except Exception as exc:  # pragma: no cover - defensive async error reporting
+                notices.append(f"MP4 conversion failed: {exc}")
+            else:
+                notices.append(f"MP4 ready: {output_path.name}")
+        self._jobs = pending
+        return tuple(notices)
+
     def close(self) -> None:
         self._executor.shutdown(wait=True)
-        for future in self._futures:
-            future.result()
+        for job in self._jobs:
+            job.future.result()
+        self._jobs.clear()
 
 
 def open_career_mode_recorder(

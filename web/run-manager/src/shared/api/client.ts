@@ -54,6 +54,7 @@ export {
   updateDraft,
   updateDraftWithSource,
   updateLineageGroups,
+  updateSaveGameRunnerSettings,
   upsertSaveCourseSetup,
   upsertSaveCupSetup,
   watchRun,

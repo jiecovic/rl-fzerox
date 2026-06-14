@@ -31,8 +31,17 @@ class _LauncherStub:
         source_run_id: str | None,
         source_artifact: Literal["latest", "best"] | None,
         copy_alt_baselines: bool,
+        engine_tuning_source_action: Literal["convert", "discard"],
     ) -> ManagedRun:
-        del name, config, draft_id, source_run_id, source_artifact, copy_alt_baselines
+        del (
+            name,
+            config,
+            draft_id,
+            source_run_id,
+            source_artifact,
+            copy_alt_baselines,
+            engine_tuning_source_action,
+        )
         raise AssertionError("launch should not be called")
 
     def fork(
@@ -43,8 +52,9 @@ class _LauncherStub:
         name: str | None,
         config: ManagedRunConfig | None,
         copy_alt_baselines: bool,
+        engine_tuning_source_action: Literal["convert", "discard"],
     ) -> ManagedRun:
-        del run_id, artifact, name, config, copy_alt_baselines
+        del run_id, artifact, name, config, copy_alt_baselines, engine_tuning_source_action
         raise AssertionError("fork should not be called")
 
     def request_pause(self, *, run_id: str) -> ManagedRun:
@@ -85,6 +95,7 @@ class _LauncherStub:
         difficulty: str | None,
         cup_id: str | None,
         course_id: str | None,
+        single_target: bool,
     ) -> Literal["started", "already_running"]:
         del (
             save_game_id,
@@ -98,6 +109,7 @@ class _LauncherStub:
             difficulty,
             cup_id,
             course_id,
+            single_target,
         )
         raise AssertionError("career mode runner should not be called")
 

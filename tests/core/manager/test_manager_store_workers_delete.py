@@ -16,6 +16,7 @@ from rl_fzerox.core.manager import (
 from rl_fzerox.core.manager.artifacts.filesystem import FilesystemOperation
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingAltBaseline,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
@@ -127,6 +128,48 @@ def test_manager_store_deletes_runs_with_generated_x_cup_slots(tmp_path: Path) -
     assert store.delete_run(run.id) is True
     assert store.get_run(run.id) is None
     assert store.get_run_generated_x_cup_slots(run.id) == ()
+
+
+def test_manager_store_deletes_runs_with_alt_baselines(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Delete Alt Baseline Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    stopped = store.update_run_status(
+        run_id=run.id,
+        status="stopped",
+        started_at="2026-05-03T12:00:00+00:00",
+        stopped_at="2026-05-03T12:30:00+00:00",
+        message="worker stopped",
+    )
+    state_path = run.run_dir / "baselines" / "alt" / "alt-a.state"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_bytes(b"state")
+
+    assert stopped is not None
+
+    store.upsert_run_alt_baseline(
+        baseline=TrackSamplingAltBaseline(
+            id="alt-a",
+            run_id=run.id,
+            course_key="mute_city",
+            reset_variant_key="gp_race|novice|blue_falcon",
+            source_entry_id="mute_city_gp_race_novice_blue_falcon",
+            label="chicane approach",
+            state_path=state_path,
+            weight=1.0,
+            enabled=True,
+            created_at="2026-06-13T10:00:00+00:00",
+            updated_at="2026-06-13T10:00:00+00:00",
+        )
+    )
+
+    assert store.delete_run(run.id) is True
+    assert store.get_run(run.id) is None
+    assert store.get_run_alt_baselines(run.id) == ()
+    assert not state_path.exists()
 
 
 def test_manager_store_delete_run_defers_failed_filesystem_cleanup(

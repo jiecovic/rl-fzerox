@@ -38,10 +38,17 @@ class _FakeWriter:
 class _FakeFinalizer:
     def __init__(self) -> None:
         self.paths: list[Path] = []
+        self.notices: list[str] = []
         self.closed = False
 
     def finalize(self, path: Path) -> None:
         self.paths.append(path)
+        self.notices.append(f"MP4 ready: {path.with_suffix('.mp4').name}")
+
+    def drain_notices(self) -> tuple[str, ...]:
+        notices = tuple(self.notices)
+        self.notices.clear()
+        return notices
 
     def close(self) -> None:
         self.closed = True
@@ -258,6 +265,9 @@ def test_career_recorder_finalizes_finished_segment_before_runner_exit(tmp_path:
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-joker-cup.mkv"
     ]
+    assert recorder.drain_notices() == (
+        "MP4 ready: career.segment-001-clear-master-joker-cup.mp4",
+    )
 
     recorder.record_frame(
         frame,
@@ -276,6 +286,7 @@ def test_career_recorder_finalizes_finished_segment_before_runner_exit(tmp_path:
         "career.segment-001-clear-master-joker-cup.mkv",
         "career.mkv",
     ]
+    assert recorder.drain_notices() == ("MP4 ready: career.mp4",)
 
 
 def test_career_segment_recording_path_sanitizes_label() -> None:

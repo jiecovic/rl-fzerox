@@ -70,6 +70,7 @@ def launch_run_payload(
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
             copy_alt_baselines=request.copy_alt_baselines,
+            engine_tuning_source_action=request.engine_tuning_source_action,
         )
     except ManagerNameConflictError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
@@ -92,6 +93,7 @@ def fork_run_payload(
             name=request.name,
             config=request.config,
             copy_alt_baselines=request.copy_alt_baselines,
+            engine_tuning_source_action=request.engine_tuning_source_action,
         )
     except ManagerNameConflictError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

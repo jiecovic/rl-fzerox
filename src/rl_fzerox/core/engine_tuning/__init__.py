@@ -19,6 +19,7 @@ from rl_fzerox.core.engine_tuning.state import (
     EngineTuningRuntimeState,
 )
 from rl_fzerox.core.engine_tuning.tuner import (
+    BanditEngineTunerSettings,
     EngineTunerBackend,
     EngineTunerSettings,
     EngineTuningCandidateEstimate,
@@ -44,6 +45,7 @@ __all__ = (
     "EngineTuningResetSampler",
     "EngineTuningSelectionMode",
     "EngineTuningRuntimeState",
+    "BanditEngineTunerSettings",
     "GaussianProcessEngineTunerSettings",
     "MlpEnsembleEngineTunerSettings",
     "OrderedEngineTuner",

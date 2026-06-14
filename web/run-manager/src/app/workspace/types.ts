@@ -1,5 +1,6 @@
 // web/run-manager/src/app/workspace/types.ts
 import type {
+  EngineTunerBackend,
   ManagedDraft,
   ManagedRunConfig,
   PolicyPlaybackMode,
@@ -25,6 +26,7 @@ export interface ForkSource {
   artifact: "latest" | "best";
   copyAltBaselines: boolean;
   runId: string;
+  sourceEngineTunerBackend: EngineTunerBackend | null;
 }
 
 export interface DraftEditorSession {

@@ -66,6 +66,16 @@ def insert_save_game(session: Session, save_game: ManagedSaveGame) -> None:
             created_at=save_game.created_at,
             updated_at=save_game.updated_at,
             last_finished_at=save_game.last_finished_at,
+            runner_device=save_game.runner_device,
+            runner_renderer=save_game.runner_renderer,
+            runner_policy_mode=save_game.runner_policy_mode,
+            runner_attempt_seed=save_game.runner_attempt_seed,
+            runner_recording_enabled=save_game.runner_recording_enabled,
+            runner_recording_path=(
+                None
+                if save_game.runner_recording_path is None
+                else str(save_game.runner_recording_path)
+            ),
         )
     )
 
@@ -120,6 +130,33 @@ def rename_save_game(
         return None
     assert_save_game_name_available(session, name, exclude_id=save_game_id)
     row.name = name
+    row.updated_at = updated_at
+    return save_game_from_model(row)
+
+
+def update_save_game_runner_settings(
+    session: Session,
+    *,
+    save_game_id: str,
+    device: Literal["cpu", "cuda"],
+    renderer: Literal["angrylion", "gliden64"],
+    policy_mode: Literal["deterministic", "stochastic"],
+    attempt_seed: int | None,
+    recording_enabled: bool,
+    recording_path: Path | None,
+    updated_at: str,
+) -> ManagedSaveGame | None:
+    """Update saved Career runner launch settings."""
+
+    row = session.get(SaveGameModel, save_game_id)
+    if row is None:
+        return None
+    row.runner_device = device
+    row.runner_renderer = renderer
+    row.runner_policy_mode = policy_mode
+    row.runner_attempt_seed = attempt_seed
+    row.runner_recording_enabled = recording_enabled
+    row.runner_recording_path = None if recording_path is None else str(recording_path)
     row.updated_at = updated_at
     return save_game_from_model(row)
 
@@ -424,6 +461,14 @@ def save_game_from_model(row: SaveGameModel) -> ManagedSaveGame:
         created_at=row.created_at,
         updated_at=row.updated_at,
         last_finished_at=row.last_finished_at,
+        runner_device=_required_runner_device(row.runner_device),
+        runner_renderer=_required_runner_renderer(row.runner_renderer),
+        runner_policy_mode=_required_policy_mode(row.runner_policy_mode),
+        runner_attempt_seed=optional_int(row.runner_attempt_seed),
+        runner_recording_enabled=bool(row.runner_recording_enabled),
+        runner_recording_path=None
+        if row.runner_recording_path is None
+        else Path(row.runner_recording_path).expanduser(),
     )
 
 
@@ -489,3 +534,27 @@ def _required_policy_artifact(value: object) -> Literal["latest", "best"]:
     if artifact is None:
         raise ValueError("course setup is missing policy artifact")
     return artifact
+
+
+def _required_runner_device(value: object) -> Literal["cpu", "cuda"]:
+    if value == "cpu":
+        return "cpu"
+    if value == "cuda":
+        return "cuda"
+    raise ValueError(f"save game has invalid runner device: {value!r}")
+
+
+def _required_runner_renderer(value: object) -> Literal["angrylion", "gliden64"]:
+    if value == "angrylion":
+        return "angrylion"
+    if value == "gliden64":
+        return "gliden64"
+    raise ValueError(f"save game has invalid runner renderer: {value!r}")
+
+
+def _required_policy_mode(value: object) -> Literal["deterministic", "stochastic"]:
+    if value == "deterministic":
+        return "deterministic"
+    if value == "stochastic":
+        return "stochastic"
+    raise ValueError(f"save game has invalid runner policy mode: {value!r}")

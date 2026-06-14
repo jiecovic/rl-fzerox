@@ -7,6 +7,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     CreateSaveGameRequest,
     ImportSaveEngineTuningRequest,
     UpdateSaveGameRequest,
+    UpdateSaveRunnerSettingsRequest,
     UpsertSaveCourseSetupRequest,
     UpsertSaveCupSetupRequest,
 )
@@ -67,6 +68,28 @@ def update_save_game_payload(
         save_game = store.rename_save_game(save_game_id=save_game_id, name=request.name)
     except ManagerNameConflictError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if save_game is None:
+        raise HTTPException(status_code=404, detail="save game not found")
+    return {"save_game": save_game_payload_for_store(store, save_game)}
+
+
+def update_save_game_runner_settings_payload(
+    store: ManagerStore,
+    save_game_id: str,
+    request: UpdateSaveRunnerSettingsRequest,
+) -> dict[str, dict[str, object]]:
+    try:
+        save_game = store.update_save_game_runner_settings(
+            save_game_id=save_game_id,
+            device=request.device,
+            renderer=request.renderer,
+            policy_mode=request.policy_mode,
+            attempt_seed=request.attempt_seed,
+            recording_enabled=request.recording_enabled,
+            recording_path=request.recording_path,
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if save_game is None:

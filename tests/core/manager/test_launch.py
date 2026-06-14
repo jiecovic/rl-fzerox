@@ -6,7 +6,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Literal
 
 import pytest
 
@@ -18,8 +18,25 @@ from rl_fzerox.apps.run_manager.launching.watch import (
     watch_failure_detail,
 )
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
-from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_managed_run_config
+from rl_fzerox.core.engine_tuning import (
+    ENGINE_TUNING_STATE_VERSION,
+    EngineTuningCandidateState,
+    EngineTuningContext,
+    EngineTuningRuntimeState,
+    load_engine_tuning_runtime_state,
+    save_engine_tuning_runtime_state,
+)
+from rl_fzerox.core.manager import (
+    ManagedRun,
+    ManagedRunConfig,
+    ManagerStore,
+    default_managed_run_config,
+)
 from rl_fzerox.core.training.runs import RUN_LAYOUT
+from rl_fzerox.core.training.session.artifacts import (
+    engine_tuning_checkpoint_path,
+    engine_tuning_model_path,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingAltBaseline
 
 
@@ -58,8 +75,14 @@ def test_launch_allows_unsaved_fork_source(tmp_path: Path) -> None:
             source_snapshot_dir: Path | None = None,
             source_num_timesteps: int | None = None,
             copy_alt_baselines: bool = True,
+            engine_tuning_source_action: Literal["convert", "discard"] = "convert",
         ) -> ManagedRun:
-            del exclude_draft_id, source_num_timesteps, source_snapshot_dir
+            del (
+                exclude_draft_id,
+                source_num_timesteps,
+                source_snapshot_dir,
+                engine_tuning_source_action,
+            )
             self.fork_calls.append((run_id, artifact, name, config, copy_alt_baselines))
             return source_run
 
@@ -234,6 +257,80 @@ def test_fork_can_skip_active_alt_baselines(tmp_path: Path) -> None:
 
     assert launcher.spawn_calls == [(child.id, False)]
     assert store.get_run_alt_baselines(child.id) == ()
+
+
+def test_fork_converts_engine_tuning_source_to_bandit_buckets(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=parent_dir,
+    )
+    _write_latest_checkpoint(parent_dir)
+    parent_policy_path = parent_dir / RUN_LAYOUT.policy_artifacts.latest
+    parent_state_path = engine_tuning_checkpoint_path(parent_policy_path)
+    parent_model_path = engine_tuning_model_path(parent_policy_path)
+    _write_off_grid_engine_tuning_state(parent_state_path)
+    parent_model_path.write_bytes(b"stale-model-sidecar")
+    launcher = _RecordingLauncher(store)
+
+    child = launcher.fork(
+        run_id=parent.id,
+        artifact="latest",
+        name="Child Run",
+        config=_bandit_engine_config(),
+        engine_tuning_source_action="convert",
+    )
+
+    assert child.source_snapshot_dir is not None
+    child_policy_path = child.source_snapshot_dir / RUN_LAYOUT.policy_artifacts.latest
+    child_state = load_engine_tuning_runtime_state(
+        engine_tuning_checkpoint_path(child_policy_path)
+    )
+    parent_state = load_engine_tuning_runtime_state(parent_state_path)
+    assert child_state is not None
+    assert [candidate.engine_setting_raw_value for candidate in child_state.candidates] == [50, 70]
+    assert [candidate.finish_count for candidate in child_state.candidates] == [2, 1]
+    assert child_state.model_state is None
+    assert not engine_tuning_model_path(child_policy_path).exists()
+    assert parent_state is not None
+    assert [candidate.engine_setting_raw_value for candidate in parent_state.candidates] == [54, 67]
+    assert parent_model_path.is_file()
+
+
+def test_fork_can_discard_engine_tuning_source(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=parent_dir,
+    )
+    _write_latest_checkpoint(parent_dir)
+    parent_policy_path = parent_dir / RUN_LAYOUT.policy_artifacts.latest
+    parent_state_path = engine_tuning_checkpoint_path(parent_policy_path)
+    parent_model_path = engine_tuning_model_path(parent_policy_path)
+    _write_off_grid_engine_tuning_state(parent_state_path)
+    parent_model_path.write_bytes(b"stale-model-sidecar")
+    launcher = _RecordingLauncher(store)
+
+    child = launcher.fork(
+        run_id=parent.id,
+        artifact="latest",
+        name="Child Run",
+        config=_bandit_engine_config(),
+        engine_tuning_source_action="discard",
+    )
+
+    assert child.source_snapshot_dir is not None
+    child_policy_path = child.source_snapshot_dir / RUN_LAYOUT.policy_artifacts.latest
+    assert not engine_tuning_checkpoint_path(child_policy_path).exists()
+    assert not engine_tuning_model_path(child_policy_path).exists()
+    assert parent_state_path.is_file()
+    assert parent_model_path.is_file()
 
 
 def test_resume_rebuilds_missing_fork_source_snapshot(tmp_path: Path) -> None:
@@ -854,6 +951,60 @@ def _write_latest_checkpoint(run_dir: Path) -> None:
     latest_policy_path.with_name("policy.metadata.json").write_text(
         '{"num_timesteps": 816040}\n',
         encoding="utf-8",
+    )
+
+
+def _bandit_engine_config() -> ManagedRunConfig:
+    config = default_managed_run_config()
+    return config.model_copy(
+        update={
+            "vehicle": config.vehicle.model_copy(
+                update={
+                    "engine_mode": "adaptive_tuner",
+                    "engine_setting_min_raw_value": 50,
+                    "engine_setting_max_raw_value": 70,
+                    "adaptive_engine_tuner_backend": "bandit",
+                    "adaptive_engine_bandit_bucket_size": 10,
+                }
+            )
+        }
+    )
+
+
+def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    save_engine_tuning_runtime_state(
+        state_path,
+        EngineTuningRuntimeState(
+            version=ENGINE_TUNING_STATE_VERSION,
+            update_count=2,
+            candidates=(
+                EngineTuningCandidateState(
+                    context_key=context.key,
+                    course_key=context.course_key,
+                    vehicle_id=context.vehicle_id,
+                    engine_setting_raw_value=54,
+                    finish_count=2,
+                    decayed_count=2.0,
+                    decayed_score_total=-200.0,
+                    score_total=-200.0,
+                    best_score=-90.0,
+                    best_time_ms=90_000,
+                ),
+                EngineTuningCandidateState(
+                    context_key=context.key,
+                    course_key=context.course_key,
+                    vehicle_id=context.vehicle_id,
+                    engine_setting_raw_value=67,
+                    finish_count=1,
+                    decayed_count=1.0,
+                    decayed_score_total=-80.0,
+                    score_total=-80.0,
+                    best_score=-80.0,
+                    best_time_ms=80_000,
+                ),
+            ),
+        ),
     )
 
 

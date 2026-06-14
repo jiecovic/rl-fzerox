@@ -8,6 +8,7 @@ from math import ceil
 from typing import TYPE_CHECKING
 
 from rl_fzerox.core.engine_tuning.types import (
+    BanditEngineTunerSettings,
     EngineTunerSettings,
     GaussianProcessEngineTunerSettings,
     MlpEnsembleEngineTunerSettings,
@@ -31,6 +32,15 @@ ENGINE_TUNING_TIMEBASE = EngineTuningTimebase()
 def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSettings:
     """Convert runtime schema into ordered tuner settings."""
 
+    if config.backend == "bandit":
+        return BanditEngineTunerSettings(
+            min_raw_value=config.min_raw_value,
+            max_raw_value=config.max_raw_value,
+            prior_finish_time_seconds=config.prior_finish_time_seconds,
+            uniform_exploration=config.uniform_exploration,
+            bucket_size=config.bucket_size,
+            exploration_seconds=float(config.exploration_scale),
+        )
     if config.backend == "mlp_ensemble":
         return MlpEnsembleEngineTunerSettings(
             min_raw_value=config.min_raw_value,

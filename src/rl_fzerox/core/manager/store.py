@@ -554,6 +554,28 @@ class ManagerStore:
             name=name,
         )
 
+    def update_save_game_runner_settings(
+        self,
+        *,
+        save_game_id: str,
+        device: Literal["cpu", "cuda"],
+        renderer: Literal["angrylion", "gliden64"],
+        policy_mode: Literal["deterministic", "stochastic"],
+        attempt_seed: int | None,
+        recording_enabled: bool,
+        recording_path: Path | None,
+    ) -> ManagedSaveGame | None:
+        return save_game_registry.update_runner_settings(
+            self,
+            save_game_id=save_game_id,
+            device=device,
+            renderer=renderer,
+            policy_mode=policy_mode,
+            attempt_seed=attempt_seed,
+            recording_enabled=recording_enabled,
+            recording_path=recording_path,
+        )
+
     def delete_save_game(self, save_game_id: str) -> bool:
         return save_game_registry.delete_save_game(self, save_game_id)
 

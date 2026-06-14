@@ -16,10 +16,6 @@ from rl_fzerox.core.engine_tuning import (
     MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
-from rl_fzerox.core.engine_tuning.sampling import (
-    StableGreedySelection,
-    stable_greedy_engine_setting,
-)
 
 ENGINE_TUNING_DISTRIBUTION_DRAWS = 128
 
@@ -31,15 +27,29 @@ def engine_tuning_state_payload(
 ) -> dict[str, object]:
     """Return a JSON-safe adaptive engine-tuning state payload."""
 
+    payload_state = _payload_state(state, settings)
     return {
-        "version": state.version,
-        "update_count": state.update_count,
-        "model_backend": _model_backend(state, settings),
+        "version": payload_state.version,
+        "update_count": payload_state.update_count,
+        "model_backend": _model_backend(payload_state, settings),
         "candidates": [
-            _engine_tuning_candidate_payload(candidate) for candidate in state.candidates
+            _engine_tuning_candidate_payload(candidate) for candidate in payload_state.candidates
         ],
-        "contexts": [] if settings is None else _engine_tuning_context_payloads(state, settings),
+        "contexts": (
+            []
+            if settings is None
+            else _engine_tuning_context_payloads(payload_state, settings)
+        ),
     }
+
+
+def _payload_state(
+    state: EngineTuningRuntimeState,
+    settings: EngineTunerSettings | None,
+) -> EngineTuningRuntimeState:
+    if settings is None:
+        return state
+    return OrderedEngineTuner(settings=settings, state=state).state
 
 
 def _model_backend(
@@ -120,14 +130,7 @@ def _engine_tuning_context_payload(
         seed=_distribution_seed(state, context.key),
         draws=ENGINE_TUNING_DISTRIBUTION_DRAWS,
     )
-    recommended_engine_raw = stable_greedy_engine_setting(
-        estimates,
-        selection=StableGreedySelection(
-            plateau_tolerance_seconds=settings.greedy_plateau_tolerance_seconds
-        ),
-    )
-    if recommended_engine_raw is None:
-        recommended_engine_raw = settings.min_raw_value
+    recommendation = tuner.recommendation(context)
     return {
         "context_key": context.key,
         "course_key": context.course_key,
@@ -137,7 +140,7 @@ def _engine_tuning_context_payload(
         "model_ready": model_ready,
         "warmup_successes": warmup_successes,
         "warmup_remaining": max(0, warmup_successes - finish_count),
-        "recommended_engine_setting_raw_value": recommended_engine_raw,
+        "recommended_engine_setting_raw_value": recommendation.engine_setting_raw_value,
         "candidates": [
             _engine_tuning_candidate_estimate_payload(
                 probability,

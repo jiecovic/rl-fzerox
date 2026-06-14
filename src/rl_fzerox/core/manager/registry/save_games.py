@@ -110,6 +110,38 @@ def rename_save_game(
         )
 
 
+def update_runner_settings(
+    store: ManagerStore,
+    *,
+    save_game_id: str,
+    device: Literal["cpu", "cuda"],
+    renderer: Literal["angrylion", "gliden64"],
+    policy_mode: Literal["deterministic", "stochastic"],
+    attempt_seed: int | None,
+    recording_enabled: bool,
+    recording_path: Path | None,
+) -> ManagedSaveGame | None:
+    """Persist Career runner launch settings for one save game."""
+
+    if attempt_seed is not None and not 0 <= attempt_seed <= (1 << 32) - 1:
+        raise ValueError("attempt seed must be an integer from 0 to 4294967295")
+    if recording_enabled and recording_path is None:
+        raise ValueError("recording path is required when recording is enabled")
+    store.initialize()
+    with store._orm_session() as session:
+        return save_game_repository.update_save_game_runner_settings(
+            session,
+            save_game_id=save_game_id,
+            device=device,
+            renderer=renderer,
+            policy_mode=policy_mode,
+            attempt_seed=attempt_seed,
+            recording_enabled=recording_enabled,
+            recording_path=recording_path,
+            updated_at=utc_now(),
+        )
+
+
 def delete_save_game(store: ManagerStore, save_game_id: str) -> bool:
     """Delete one manager-owned save game and queue its filesystem cleanup."""
 
@@ -259,7 +291,7 @@ def start_target_save_attempt(
         )
         if target is None:
             raise ValueError("selected unlock target is not part of the unlock path")
-        if target.status != "pending":
+        if target.status not in {"pending", "succeeded"}:
             raise ValueError(f"selected unlock target is {target.status}")
         return _insert_policy_backed_save_attempt(
             session,

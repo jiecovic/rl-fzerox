@@ -4,6 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
+from rl_fzerox.apps.run_manager.launching.engine_tuning_source import (
+    EngineTuningSourceAction,
+    prepare_engine_tuning_fork_source,
+)
 from rl_fzerox.apps.run_manager.launching.manifest import (
     default_fork_name,
     persist_launch_manifest,
@@ -88,6 +92,7 @@ def fork_run(
     source_snapshot_dir: Path | None = None,
     source_num_timesteps: int | None = None,
     copy_alt_baselines: bool = True,
+    engine_tuning_source_action: EngineTuningSourceAction = "convert",
     spawn_worker: WorkerSpawner = spawn_manager_worker,
 ) -> ManagedRun:
     """Launch one child run warm-started from a parent run checkpoint."""
@@ -120,6 +125,12 @@ def fork_run(
             source_dir=source_snapshot_dir,
             destination_dir=child_source_snapshot_dir,
         )
+    prepare_engine_tuning_fork_source(
+        config=child_config,
+        source_dir=child_source_snapshot_dir,
+        artifact=artifact,
+        action=engine_tuning_source_action,
+    )
     child_lineage_step_offset = source_run.lineage_step_offset + source_num_timesteps
     train_config = build_managed_fork_train_app_config(
         child_config,

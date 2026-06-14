@@ -9,9 +9,11 @@ import {
   type ManagedSaveGameStatus,
   openSaveGameDirectoryResponseSchema,
   type SaveEngineTuningCourseSetupRecommendation,
+  type SaveGameRunnerSettingsUpdateRequest,
   type SavePolicyArtifact,
   saveGameStatusResponseSchema,
   saveGamesResponseSchema,
+  updateSaveGameRunnerSettingsResponseSchema,
   upsertSaveCourseSetupResponseSchema,
   watchRunResponseSchema,
 } from "@/shared/api/contract";
@@ -49,6 +51,37 @@ export async function renameSaveGame(saveGameId: string, name: string): Promise<
   return payload.save_game;
 }
 
+export async function updateSaveGameRunnerSettings({
+  attemptSeed,
+  device,
+  policyMode,
+  recordingEnabled,
+  recordingPath,
+  renderer,
+  saveGameId,
+}: SaveGameRunnerSettingsUpdateRequest): Promise<ManagedSaveGame> {
+  const response = await fetch(
+    `/api/save-games/${encodeURIComponent(saveGameId)}/runner-settings`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        device,
+        renderer,
+        attempt_seed: attemptSeed === null ? null : Number(attemptSeed),
+        policy_mode: policyMode,
+        recording_enabled: recordingEnabled,
+        recording_path: recordingPath,
+      }),
+    },
+  );
+  const payload = parseApiPayload(
+    updateSaveGameRunnerSettingsResponseSchema,
+    await parseJson(response),
+  );
+  return payload.save_game;
+}
+
 export async function deleteSaveGame(saveGameId: string): Promise<void> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}`, {
     method: "DELETE",
@@ -72,6 +105,7 @@ export async function startCareerModeRunner({
   recordingPath,
   renderer,
   saveGameId,
+  singleTarget,
   target,
 }: CareerModeRunnerLaunchRequest): Promise<"started" | "already_running"> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/runner`, {
@@ -84,6 +118,7 @@ export async function startCareerModeRunner({
       policy_mode: policyMode,
       recording_enabled: recordingEnabled,
       recording_path: recordingEnabled ? recordingPath : null,
+      single_target: singleTarget,
       ...(target === null
         ? {}
         : {

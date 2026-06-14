@@ -12,8 +12,6 @@ from rl_fzerox.core.engine_tuning.sampling import (
     EngineTuningResetCandidate,
     EngineTuningResetContext,
     EngineTuningResetSampler,
-    StableGreedySelection,
-    stable_greedy_engine_setting,
 )
 from rl_fzerox.core.engine_tuning.state import (
     EngineTuningRuntimeState,
@@ -67,14 +65,7 @@ class EngineTuningTrainingController:
             )
             if not estimates:
                 continue
-            greedy_engine_raw = stable_greedy_engine_setting(
-                estimates,
-                selection=StableGreedySelection(
-                    plateau_tolerance_seconds=(self.config.greedy_plateau_tolerance_seconds)
-                ),
-            )
-            if greedy_engine_raw is None:
-                continue
+            recommendation = self._tuner.recommendation(context)
             reset_contexts.append(
                 EngineTuningResetContext(
                     context=context,
@@ -90,7 +81,9 @@ class EngineTuningTrainingController:
                         )
                         for estimate in estimates
                     ),
-                    greedy_engine_setting_raw_value=(greedy_engine_raw),
+                    greedy_engine_setting_raw_value=(
+                        recommendation.engine_setting_raw_value
+                    ),
                 )
             )
         return EngineTuningResetSampler(contexts=tuple(reset_contexts))

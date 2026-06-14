@@ -137,14 +137,7 @@ export function useWorkspaceSessions({
   function openSaveGame(saveGame: UseWorkspaceSessionsOptions["saveGames"][number]) {
     const sessionId = saveGameSessionId(saveGame.id);
     setSaveGameSessions((current) =>
-      upsertSaveGameSession(
-        current,
-        saveGameSessionForManagedSave(current, {
-          name: saveGame.name,
-          saveGameId: saveGame.id,
-          sessionId,
-        }),
-      ),
+      upsertSaveGameSession(current, saveGameSessionForManagedSave(current, saveGame, sessionId)),
     );
     setActiveTabId(sessionId);
   }
@@ -155,17 +148,19 @@ export function useWorkspaceSessions({
     initialConfig,
     initialDraftName,
     runId,
+    sourceEngineTunerBackend,
   }: {
     artifact: ForkSource["artifact"];
     copyAltBaselines: boolean;
     initialConfig: DraftEditorSession["initialConfig"];
     initialDraftName: string;
     runId: string;
+    sourceEngineTunerBackend: ForkSource["sourceEngineTunerBackend"];
   }) {
     const sessionId = editorSessionId(crypto.randomUUID());
     setDraftEditors((current) =>
       createDraftSession(current, {
-        forkSource: { artifact, copyAltBaselines, runId },
+        forkSource: { artifact, copyAltBaselines, runId, sourceEngineTunerBackend },
         initialConfig,
         initialDraftName,
         sessionId,
@@ -342,27 +337,26 @@ function upsertSaveGameSession(
 
 function saveGameSessionForManagedSave(
   current: readonly SaveGameSession[],
-  {
-    name,
-    saveGameId,
-    sessionId,
-  }: {
-    name: string;
-    saveGameId: string;
-    sessionId: SaveGameSession["sessionId"];
-  },
+  saveGame: UseWorkspaceSessionsOptions["saveGames"][number],
+  sessionId: SaveGameSession["sessionId"],
 ): SaveGameSession {
   const existing = current.find((session) => session.sessionId === sessionId);
+  const settings = saveGame.runner_settings;
   return {
-    attemptSeedText: existing?.attemptSeedText ?? randomAttemptSeedText(),
-    nameText: name,
-    policyMode: existing?.policyMode ?? "deterministic",
-    recordingEnabled: existing?.recordingEnabled ?? false,
-    recordingPathText: existing?.recordingPathText ?? defaultCareerRecordingPath(saveGameId),
-    runnerDevice: existing?.runnerDevice ?? "cuda",
-    runnerRenderer: existing?.runnerRenderer ?? "gliden64",
-    saveGameId,
+    attemptSeedText:
+      existing?.attemptSeedText ??
+      (settings.attempt_seed === null ? "" : String(settings.attempt_seed)),
+    nameText: saveGame.name,
+    policyMode: existing?.policyMode ?? settings.policy_mode,
+    recordingEnabled: existing?.recordingEnabled ?? settings.recording_enabled,
+    recordingPathText:
+      existing?.recordingPathText ??
+      settings.recording_path ??
+      defaultCareerRecordingPath(saveGame.id),
+    runnerDevice: existing?.runnerDevice ?? settings.device,
+    runnerRenderer: existing?.runnerRenderer ?? settings.renderer,
+    saveGameId: saveGame.id,
     sessionId,
-    title: name,
+    title: saveGame.name,
   };
 }

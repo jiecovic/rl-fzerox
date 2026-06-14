@@ -101,6 +101,25 @@ from rl_fzerox.ui.watch.runtime.visualization import (
     refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
 
+_WATCH_RECORDING_NOTICE_SECONDS = 5.0
+
+
+@dataclass(slots=True)
+class _TimedRecordingNotice:
+    message: str | None = None
+    expires_at: float = 0.0
+
+    def show(self, message: str, *, now: float) -> None:
+        self.message = message
+        self.expires_at = now + _WATCH_RECORDING_NOTICE_SECONDS
+
+    def apply(self, info: dict[str, object], *, now: float) -> dict[str, object]:
+        if self.message is None or now >= self.expires_at:
+            return info
+        with_notice = dict(info)
+        with_notice["watch_save_notice"] = self.message
+        return with_notice
+
 
 def run_career_mode_worker(
     config: WatchAppConfig,
@@ -380,6 +399,7 @@ def _run_career_mode_loop_body(
     cnn_activations = state.cnn_activations
     last_menu_step = state.last_menu_step
     manual_spin_request: SpinRequest = "none"
+    recording_notice = _TimedRecordingNotice()
 
     def publish_snapshot(*, policy_visible: bool) -> None:
         policy_active = policy_visible and observation is not None
@@ -410,6 +430,7 @@ def _run_career_mode_loop_body(
                 action_repeat=snapshot_repeat,
             ),
         )
+        snapshot_info = recording_notice.apply(snapshot_info, now=time.perf_counter())
         runner = (
             active_policy_control.runner
             if policy_active and active_policy_control is not None
@@ -457,6 +478,9 @@ def _run_career_mode_loop_body(
             previous_auxiliary_visualization_enabled = auxiliary_visualization_enabled
             previous_live_visualization_enabled = live_visualization_enabled
             previous_cnn_normalization = cnn_normalization
+            if recording_notices := _drain_recording_notices(frame_recorder):
+                recording_notice.show(recording_notices[-1], now=time.perf_counter())
+                publish_snapshot(policy_visible=controller.policy_owns_control())
             commands, paused, manual_control_state = drain_worker_commands(
                 command_queue,
                 paused=paused,
@@ -867,6 +891,12 @@ def _fresh_menu_runtime_state(
     info = dict(raw_info)
     telemetry = _read_live_telemetry(session.emulator)
     return raw_info, info, telemetry
+
+
+def _drain_recording_notices(frame_recorder: FrameRecorder | None) -> tuple[str, ...]:
+    if frame_recorder is None:
+        return ()
+    return frame_recorder.drain_notices()
 
 
 def _close_career_mode(

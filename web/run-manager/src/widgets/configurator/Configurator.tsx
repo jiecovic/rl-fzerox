@@ -15,6 +15,8 @@ import { VehicleSection } from "@/entities/runConfig/ui/sections/VehicleSection"
 import { fetchPolicyPreview } from "@/shared/api/client";
 import type {
   ConfigMetadata,
+  EngineTunerBackend,
+  EngineTuningSourceAction,
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
@@ -36,6 +38,7 @@ import { Tabs } from "@/shared/ui/Tabs";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 import { ActionBar } from "@/widgets/configurator/ActionBar";
 import { configuratorDraftName } from "@/widgets/configurator/draftName";
+import { EngineTuningSourceDialog } from "@/widgets/configurator/EngineTuningSourceDialog";
 
 interface ConfiguratorProps {
   active?: boolean;
@@ -44,6 +47,7 @@ interface ConfiguratorProps {
   forkAltBaselineCount?: number | null;
   forkCopyAltBaselines?: boolean | null;
   forkSourceArtifact?: "latest" | "best" | null;
+  forkSourceEngineTunerBackend?: EngineTunerBackend | null;
   forkSourceRunLabel?: string | null;
   initialDraftName?: string;
   initialConfig?: ManagedRunConfig | null;
@@ -57,9 +61,16 @@ interface ConfiguratorProps {
     name: string,
     config: ManagedRunConfig,
     draftId: string | null,
+    engineTuningSourceAction?: EngineTuningSourceAction,
   ) => Promise<ManagedRun>;
   onSaveDraft: (name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
   onUpdateDraft: (id: string, name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
+}
+
+interface PendingEngineTuningLaunch {
+  config: ManagedRunConfig;
+  draftId: string | null;
+  name: string;
 }
 
 const POLICY_PREVIEW_DEBOUNCE_MS = 250;
@@ -71,6 +82,7 @@ export function Configurator({
   forkAltBaselineCount = null,
   forkCopyAltBaselines = null,
   forkSourceArtifact = null,
+  forkSourceEngineTunerBackend = null,
   forkSourceRunLabel = null,
   initialDraftName,
   initialConfig = null,
@@ -95,6 +107,8 @@ export function Configurator({
   const [isTraining, setIsTraining] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingEngineTuningLaunch, setPendingEngineTuningLaunch] =
+    useState<PendingEngineTuningLaunch | null>(null);
   const configRef = useRef(config);
   const resetSourceKeyRef = useRef<string | null>(null);
   configRef.current = config;
@@ -151,6 +165,7 @@ export function Configurator({
       initialDraftName ?? baselineDraftName,
       forkSourceRunLabel ?? "",
       forkSourceArtifact ?? "",
+      forkSourceEngineTunerBackend ?? "",
       forkCopyAltBaselines === null ? "" : String(forkCopyAltBaselines),
     ].join(":");
   const checkpointLocked =
@@ -269,15 +284,59 @@ export function Configurator({
       return;
     }
     const committedConfig = committedConfigSnapshot();
+    if (requiresEngineTuningSourceChoice(committedConfig)) {
+      setError(null);
+      setPendingEngineTuningLaunch({
+        config: committedConfig,
+        draftId: loadedDraft?.id ?? null,
+        name: normalizedDraftName,
+      });
+      return;
+    }
+    await executeLaunchRun(normalizedDraftName, committedConfig, loadedDraft?.id ?? null);
+  }
+
+  async function confirmEngineTuningSourceAction(action: EngineTuningSourceAction) {
+    const pending = pendingEngineTuningLaunch;
+    if (pending === null) {
+      return;
+    }
+    setPendingEngineTuningLaunch(null);
+    await executeLaunchRun(pending.name, pending.config, pending.draftId, action);
+  }
+
+  async function executeLaunchRun(
+    name: string,
+    launchConfig: ManagedRunConfig,
+    draftId: string | null,
+    engineTuningSourceAction?: EngineTuningSourceAction,
+  ) {
     setIsTraining(true);
     setError(null);
     try {
-      await onLaunchRun(normalizedDraftName, committedConfig, loadedDraft?.id ?? null);
+      if (engineTuningSourceAction === undefined) {
+        await onLaunchRun(name, launchConfig, draftId);
+      } else {
+        await onLaunchRun(name, launchConfig, draftId, engineTuningSourceAction);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to launch training run");
     } finally {
       setIsTraining(false);
     }
+  }
+
+  function requiresEngineTuningSourceChoice(candidateConfig: ManagedRunConfig) {
+    if (forkSourceArtifact === null) {
+      return false;
+    }
+    if (candidateConfig.vehicle.engine_mode !== "adaptive_tuner") {
+      return false;
+    }
+    if (candidateConfig.vehicle.adaptive_engine_tuner_backend !== "bandit") {
+      return false;
+    }
+    return forkSourceEngineTunerBackend !== "bandit";
   }
 
   function randomizeSeed() {
@@ -344,6 +403,12 @@ export function Configurator({
         onSaveDraft={() => void saveDraft()}
         onTrain={() => void launchRun()}
         onUpdateDraft={() => void updateDraft()}
+      />
+      <EngineTuningSourceDialog
+        open={pendingEngineTuningLaunch !== null}
+        sourceBackend={forkSourceEngineTunerBackend}
+        onClose={() => setPendingEngineTuningLaunch(null)}
+        onSelect={(action) => void confirmEngineTuningSourceAction(action)}
       />
 
       {error !== null || previewError !== null ? (

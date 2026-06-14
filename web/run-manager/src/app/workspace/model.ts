@@ -206,6 +206,7 @@ function sameSaveGameStatus(saveGame: ManagedSaveGame, status: ManagedSaveGameSt
     saveGame.created_at === status.created_at &&
     saveGame.updated_at === status.updated_at &&
     saveGame.last_finished_at === status.last_finished_at &&
+    JSON.stringify(saveGame.runner_settings) === JSON.stringify(status.runner_settings) &&
     JSON.stringify(saveGame.unlock_progress) === JSON.stringify(status.unlock_progress)
   );
 }
@@ -243,6 +244,7 @@ export function draftForkSource(draft: ManagedDraft): ForkSource | null {
     runId: draft.source_run_id,
     artifact: draft.source_artifact,
     copyAltBaselines: true,
+    sourceEngineTunerBackend: null,
   };
 }
 

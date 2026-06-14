@@ -76,6 +76,7 @@ class CareerModeController:
         save_game_id: str,
         attempt_id: str,
         device: str,
+        single_target: bool = False,
     ) -> None:
         self._setup = setup
         store = ManagerStore(db_path)
@@ -83,6 +84,7 @@ class CareerModeController:
             store=store,
             save_game_id=save_game_id,
             attempt_id=attempt_id,
+            single_target=single_target,
         )
         self._camera = CareerCameraSync()
         self._pending_steps: deque[RawMenuStep] = deque()
@@ -126,6 +128,7 @@ class CareerModeController:
             save_game_id=config.watch.managed_save_game_id,
             attempt_id=config.watch.save_attempt_id,
             device=config.watch.device,
+            single_target=config.watch.single_save_target,
         )
 
     def active_policy_control(

@@ -11,6 +11,7 @@ from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
 WatchDevice = Literal["cpu", "cuda"]
 WatchRenderer = Literal["angrylion", "gliden64"]
 PolicyPlaybackMode = Literal["deterministic", "stochastic"]
+EngineTuningSourceAction = Literal["convert", "discard"]
 
 
 class CreateDraftRequest(BaseModel):
@@ -47,6 +48,7 @@ class StartCareerModeRequest(BaseModel):
     difficulty: str | None = None
     cup_id: str | None = None
     course_id: str | None = None
+    single_target: bool = False
 
     @model_validator(mode="after")
     def _validate_target_fields(self) -> StartCareerModeRequest:
@@ -66,6 +68,25 @@ class UpdateSaveGameRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
+
+
+class UpdateSaveRunnerSettingsRequest(BaseModel):
+    """Request body for saved Career Mode runner launch settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    device: WatchDevice = "cuda"
+    renderer: WatchRenderer = "gliden64"
+    attempt_seed: int | None = Field(default=None, ge=0, le=(1 << 32) - 1)
+    policy_mode: PolicyPlaybackMode = "deterministic"
+    recording_enabled: bool = False
+    recording_path: Path | None = None
+
+    @model_validator(mode="after")
+    def _validate_recording_path(self) -> UpdateSaveRunnerSettingsRequest:
+        if self.recording_enabled and self.recording_path is None:
+            raise ValueError("recording_path is required when recording_enabled is true")
+        return self
 
 
 class UpsertSaveCourseSetupRequest(BaseModel):
@@ -160,6 +181,7 @@ class LaunchRunRequest(BaseModel):
     source_run_id: str | None = None
     source_artifact: Literal["latest", "best"] | None = None
     copy_alt_baselines: bool = True
+    engine_tuning_source_action: EngineTuningSourceAction = "convert"
 
 
 class ForkRunRequest(BaseModel):
@@ -171,6 +193,7 @@ class ForkRunRequest(BaseModel):
     name: str | None = None
     config: ManagedRunConfig | None = None
     copy_alt_baselines: bool = True
+    engine_tuning_source_action: EngineTuningSourceAction = "convert"
 
 
 class RunLauncher(Protocol):
@@ -183,6 +206,7 @@ class RunLauncher(Protocol):
         source_run_id: str | None,
         source_artifact: Literal["latest", "best"] | None,
         copy_alt_baselines: bool,
+        engine_tuning_source_action: EngineTuningSourceAction,
     ) -> ManagedRun: ...
 
     def fork(
@@ -193,6 +217,7 @@ class RunLauncher(Protocol):
         name: str | None,
         config: ManagedRunConfig | None,
         copy_alt_baselines: bool,
+        engine_tuning_source_action: EngineTuningSourceAction,
     ) -> ManagedRun: ...
 
     def request_pause(self, *, run_id: str) -> ManagedRun: ...
@@ -225,4 +250,5 @@ class RunLauncher(Protocol):
         difficulty: str | None,
         cup_id: str | None,
         course_id: str | None,
+        single_target: bool,
     ) -> Literal["started", "already_running"]: ...

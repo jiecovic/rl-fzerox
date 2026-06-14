@@ -8,6 +8,7 @@ from sqlalchemy import delete, or_, select
 
 from rl_fzerox.core.manager.db.models import (
     LineageGroupModel,
+    RunAltBaselineModel,
     RunCommandModel,
     RunDraftModel,
     RunEventModel,
@@ -18,6 +19,7 @@ from rl_fzerox.core.manager.db.models import (
     RunTrackSamplingGeneratedSlotModel,
     RunTrackSamplingRuntimeModel,
     RunWorkerModel,
+    SaveGameCourseSetupModel,
 )
 from rl_fzerox.core.manager.db.repositories.filesystem import queue_delete_tree
 from rl_fzerox.core.manager.registry.common import utc_now
@@ -62,6 +64,15 @@ def delete_run(store: ManagerStore, run_id: str) -> bool:
             is not None
         ):
             raise ValueError("delete or retarget fork drafts that still depend on this run")
+        if (
+            session.scalar(
+                select(SaveGameCourseSetupModel.id)
+                .where(SaveGameCourseSetupModel.policy_run_id == run_id)
+                .limit(1)
+            )
+            is not None
+        ):
+            raise ValueError("remove save-game course setups that still use this policy run")
 
         run_dir = Path(run.run_dir).expanduser().resolve()
         if run_dir.exists():
@@ -141,6 +152,7 @@ def delete_lineage(store: ManagerStore, lineage_id: str) -> bool:
 
 
 def _delete_run_sidecars(session: Session, run_id: str) -> None:
+    session.execute(delete(RunAltBaselineModel).where(RunAltBaselineModel.run_id == run_id))
     session.execute(
         delete(RunTrackSamplingArtifactModel).where(RunTrackSamplingArtifactModel.run_id == run_id)
     )

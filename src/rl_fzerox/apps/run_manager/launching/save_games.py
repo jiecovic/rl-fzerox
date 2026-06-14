@@ -36,6 +36,7 @@ def launch_career_mode_runner(
     difficulty: str | None = None,
     cup_id: str | None = None,
     course_id: str | None = None,
+    single_target: bool = False,
 ) -> WatchLaunchStatus:
     """Launch the visible Career Mode runner for one manager-owned save game."""
 
@@ -88,6 +89,7 @@ def launch_career_mode_runner(
         "--viewer-lease-id",
         lease_id,
         *(("--attempt-seed", str(attempt_seed)) if attempt_seed is not None else ()),
+        *(("--single-target",) if single_target else ()),
         "--policy-mode",
         "deterministic" if deterministic_policy else "stochastic",
         "--",

@@ -57,6 +57,42 @@ describe("SaveGameWorkspace", () => {
     expect(onOpenSaveGameDirectory).toHaveBeenCalledWith("save-002");
   });
 
+  it("saves runner launch settings", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture();
+    const onUpdateRunnerSettings = vi.fn(async () =>
+      saveGameFixture({
+        runner_settings: {
+          ...saveGame.runner_settings,
+          attempt_seed: 456,
+        },
+      }),
+    );
+
+    renderSaveGameWorkspace({
+      saveGame,
+      onUpdateRunnerSettings,
+    });
+
+    const runtimeSeedInput = screen.getByRole("textbox", {
+      name: "Career Mode runtime seed",
+    });
+    await user.clear(runtimeSeedInput);
+    await user.type(runtimeSeedInput, "456");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onUpdateRunnerSettings).toHaveBeenCalledWith({
+      attemptSeed: "456",
+      device: "cuda",
+      policyMode: "deterministic",
+      recordingEnabled: false,
+      recordingPath: "local/recordings/career/save-001/test.mkv",
+      renderer: "gliden64",
+      saveGameId: "save-001",
+    });
+    expect(await screen.findByText("Runner settings saved.")).toBeInTheDocument();
+  });
+
   it("stages broad course setup controls and saves course setups", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture();
@@ -246,6 +282,7 @@ describe("SaveGameWorkspace", () => {
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
+      singleTarget: false,
       target: null,
     });
     expect(onRefreshStatus).toHaveBeenCalledWith(saveGame.id);
@@ -298,6 +335,7 @@ describe("SaveGameWorkspace", () => {
       recordingPath: "local/recordings/career/save-001/manual.mkv",
       renderer: "gliden64",
       saveGameId: "save-001",
+      singleTarget: false,
       target: null,
     });
   });
@@ -343,8 +381,55 @@ describe("SaveGameWorkspace", () => {
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
+      singleTarget: true,
       target: launchableSelectedTarget,
     });
+  });
+
+  it("starts a clicked succeeded unlock target as a single-target replay", async () => {
+    const user = userEvent.setup();
+    const baseSaveGame = saveGameFixture({
+      course_setups: courseSetupsForCup("jack"),
+      cup_setups: [cupSetupFixture({ cup_id: "jack" })],
+    });
+    const baseProgress = baseSaveGame.unlock_progress;
+    if (baseProgress === null) {
+      throw new Error("fixture is missing unlock progress");
+    }
+    const firstTarget = baseProgress.targets[0];
+    if (firstTarget === undefined) {
+      throw new Error("fixture is missing the selected target");
+    }
+    const selectedTarget = {
+      ...firstTarget,
+      status: "succeeded",
+    } as const;
+    const saveGame = saveGameFixture({
+      course_setups: courseSetupsForCup("jack"),
+      cup_setups: [cupSetupFixture({ cup_id: "jack" })],
+      unlock_progress: {
+        ...baseProgress,
+        completed_count: 1,
+        inspection_status: "inspected",
+        targets: [selectedTarget, ...baseProgress.targets.slice(1)],
+      },
+    });
+    const onStartCareerMode = vi.fn().mockResolvedValue("started");
+
+    renderSaveGameWorkspace({
+      saveGame,
+      onStartCareerMode,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start Clear Novice Jack Cup" }));
+
+    expect(onStartCareerMode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        saveGameId: "save-001",
+        singleTarget: true,
+        target: selectedTarget,
+      }),
+    );
   });
 
   it("starts a cup target from a cup setup", async () => {
@@ -516,6 +601,7 @@ function renderSaveGameWorkspace({
   onImportEngineTuning = vi.fn(),
   onOpenSaveGameDirectory = vi.fn(),
   onRefreshStatus = vi.fn(),
+  onUpdateRunnerSettings,
   onUpsertCourseSetup = vi.fn(),
   onUpsertCupSetup = vi.fn(),
   onStartCareerMode = vi.fn(),
@@ -525,17 +611,20 @@ function renderSaveGameWorkspace({
   onImportEngineTuning?: Parameters<typeof SaveGameWorkspace>[0]["onImportEngineTuning"];
   onOpenSaveGameDirectory?: (saveGameId: string) => Promise<void>;
   onRefreshStatus?: Parameters<typeof SaveGameWorkspace>[0]["onRefreshStatus"];
+  onUpdateRunnerSettings?: Parameters<typeof SaveGameWorkspace>[0]["onUpdateRunnerSettings"];
   onUpsertCourseSetup?: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
   onUpsertCupSetup?: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCupSetup"];
   onStartCareerMode?: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
   runs?: Parameters<typeof SaveGameWorkspace>[0]["runs"];
   saveGame: ManagedSaveGame;
 }) {
+  const updateRunnerSettings = onUpdateRunnerSettings ?? vi.fn(async () => saveGame);
   return render(
     <StatefulExistingSaveGameWorkspace
       onOpenSaveGameDirectory={onOpenSaveGameDirectory}
       onImportEngineTuning={onImportEngineTuning}
       onRefreshStatus={onRefreshStatus}
+      onUpdateRunnerSettings={updateRunnerSettings}
       onStartCareerMode={onStartCareerMode}
       onUpsertCourseSetup={onUpsertCourseSetup}
       onUpsertCupSetup={onUpsertCupSetup}
@@ -633,6 +722,7 @@ function StatefulNewSaveGameWorkspace({
       }}
       onRefreshStatus={vi.fn()}
       onRenameSaveGame={vi.fn()}
+      onUpdateRunnerSettings={vi.fn()}
       onUpsertCourseSetup={vi.fn()}
       onUpsertCupSetup={vi.fn()}
       onStartCareerMode={vi.fn()}
@@ -644,6 +734,7 @@ function StatefulExistingSaveGameWorkspace({
   onOpenSaveGameDirectory,
   onImportEngineTuning,
   onRefreshStatus,
+  onUpdateRunnerSettings,
   onStartCareerMode,
   onUpsertCourseSetup,
   onUpsertCupSetup,
@@ -653,6 +744,7 @@ function StatefulExistingSaveGameWorkspace({
   onOpenSaveGameDirectory: (saveGameId: string) => Promise<void>;
   onImportEngineTuning: Parameters<typeof SaveGameWorkspace>[0]["onImportEngineTuning"];
   onRefreshStatus: Parameters<typeof SaveGameWorkspace>[0]["onRefreshStatus"];
+  onUpdateRunnerSettings: Parameters<typeof SaveGameWorkspace>[0]["onUpdateRunnerSettings"];
   onStartCareerMode: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
   onUpsertCourseSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
   onUpsertCupSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCupSetup"];
@@ -676,6 +768,7 @@ function StatefulExistingSaveGameWorkspace({
       }}
       onRefreshStatus={onRefreshStatus}
       onRenameSaveGame={vi.fn()}
+      onUpdateRunnerSettings={onUpdateRunnerSettings}
       onUpsertCourseSetup={onUpsertCourseSetup}
       onUpsertCupSetup={onUpsertCupSetup}
       onStartCareerMode={onStartCareerMode}

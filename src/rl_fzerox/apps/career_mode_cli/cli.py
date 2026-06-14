@@ -26,6 +26,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 deterministic_policy=args.policy_mode == "deterministic",
                 save_attempt_id=args.save_attempt_id,
                 save_game_id=args.save_game_id,
+                single_target=args.single_target,
                 overrides=args.overrides,
             )
         except (FileNotFoundError, KeyError, RuntimeError, ValueError) as exc:

@@ -36,12 +36,14 @@ import {
   stopRun,
   updateDraftWithSource,
   updateLineageGroups,
+  updateSaveGameRunnerSettings,
   upsertSaveCourseSetup,
   upsertSaveCupSetup,
   watchRun,
 } from "@/shared/api/client";
 import type {
   CareerModeRunnerLaunchRequest,
+  EngineTuningSourceAction,
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
@@ -49,6 +51,7 @@ import type {
   ManagedSaveGame,
   PolicyPlaybackMode,
   SaveEngineTuningCourseSetupRecommendation,
+  SaveGameRunnerSettingsUpdateRequest,
   SavePolicyArtifact,
   WatchDevice,
   WatchRenderer,
@@ -79,6 +82,7 @@ export interface WorkspaceActions {
     name: string,
     config: ManagedRunConfig,
     draftId: string | null,
+    engineTuningSourceAction?: EngineTuningSourceAction,
   ) => Promise<ManagedRunDetail>;
   openManagedRunDirectory: (runId: string) => Promise<void>;
   openManagedSaveGameDirectory: (saveGameId: string) => Promise<void>;
@@ -116,6 +120,9 @@ export interface WorkspaceActions {
   removeSaveGame: (saveGame: ManagedSaveGame) => Promise<void>;
   renameManagedRun: (runId: string, name: string) => Promise<void>;
   renameManagedSaveGame: (saveGameId: string, name: string) => Promise<void>;
+  updateManagedSaveRunnerSettings: (
+    request: SaveGameRunnerSettingsUpdateRequest,
+  ) => Promise<ManagedSaveGame>;
   clearManagedRunAltBaselines: (runId: string) => Promise<void>;
   clearManagedRunCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
   resetManagedRunEngineTuning: (runId: string) => Promise<void>;
@@ -300,6 +307,7 @@ export function useWorkspaceActions({
     name: string,
     config: ManagedRunConfig,
     draftId: string | null,
+    engineTuningSourceAction?: EngineTuningSourceAction,
   ) {
     const session =
       sessions.draftEditors.find((current) => current.sessionId === sessionId) ?? null;
@@ -314,6 +322,7 @@ export function useWorkspaceActions({
       sourceRunId === null || sourceArtifact === null
         ? true
         : (session?.forkSource?.copyAltBaselines ?? true),
+      engineTuningSourceAction,
     );
     setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
     upsertRunDetail(run);
@@ -338,6 +347,7 @@ export function useWorkspaceActions({
       initialConfig: sourceDetail.config,
       initialDraftName,
       runId,
+      sourceEngineTunerBackend: sourceDetail.config.vehicle.adaptive_engine_tuner_backend,
     });
   }
 
@@ -376,6 +386,12 @@ export function useWorkspaceActions({
       nameText: saveGame.name,
       title: saveGame.name,
     });
+  }
+
+  async function updateManagedSaveRunnerSettings(request: SaveGameRunnerSettingsUpdateRequest) {
+    const saveGame = await updateSaveGameRunnerSettings(request);
+    setSaveGames((current) => upsertSaveGame(current, saveGame));
+    return saveGame;
   }
 
   async function updateManagedLineageGroups(lineageId: string, groupNames: readonly string[]) {
@@ -480,6 +496,7 @@ export function useWorkspaceActions({
     removeSaveGame,
     renameManagedRun,
     renameManagedSaveGame,
+    updateManagedSaveRunnerSettings,
     clearManagedRunAltBaselines,
     clearManagedRunCourseAltBaselines,
     resetManagedRunEngineTuning,
@@ -512,6 +529,7 @@ function mergeForkSourceCopyChoice(
     return {
       ...nextSource,
       copyAltBaselines: previousSource.copyAltBaselines,
+      sourceEngineTunerBackend: previousSource.sourceEngineTunerBackend,
     };
   }
   return nextSource;

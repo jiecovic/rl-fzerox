@@ -35,6 +35,7 @@ export {
   openSaveGameDirectory,
   renameSaveGame,
   startCareerModeRunner,
+  updateSaveGameRunnerSettings,
   upsertSaveCourseSetup,
   upsertSaveCupSetup,
 } from "@/shared/api/client/resources/saveGames";

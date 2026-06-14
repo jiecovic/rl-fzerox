@@ -30,6 +30,7 @@ def resolve_career_mode_config(
     deterministic_policy: bool,
     save_attempt_id: str | None,
     save_game_id: str,
+    single_target: bool,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
     store = ManagerStore(db_path)
@@ -50,6 +51,7 @@ def resolve_career_mode_config(
         emulator=EmulatorConfig.model_validate(emulator_data(context.policy_run.config)),
         attempt_seed=attempt_seed,
         deterministic_policy=deterministic_policy,
+        single_target=single_target,
         race_setup=career_mode_race_setup_config(plan.race_setup),
         label=context.target.label,
     )
@@ -69,6 +71,7 @@ def career_mode_base_config(
     emulator: EmulatorConfig,
     attempt_seed: int | None,
     deterministic_policy: bool,
+    single_target: bool = False,
     race_setup: CareerModeRaceSetupConfig,
     label: str,
 ) -> WatchAppConfig:
@@ -86,6 +89,7 @@ def career_mode_base_config(
             manager_db_path=db_path,
             managed_save_game_id=save_game_id,
             save_attempt_id=attempt_id,
+            single_save_target=single_target,
             unlock_target_label=label,
             attempt_seed=attempt_seed,
             deterministic_policy=deterministic_policy,

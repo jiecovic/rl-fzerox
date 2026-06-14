@@ -83,10 +83,12 @@ class CareerAttemptProgress:
         store: CareerModeStore,
         save_game_id: str,
         attempt_id: str,
+        single_target: bool = False,
     ) -> None:
         self._store = store
         self._save_game_id = save_game_id
         self._attempt_id: str | None = attempt_id
+        self._single_target = single_target
         self._course_setups = self._store.list_save_course_setups(save_game_id)
         self._unlock_progress = self._store.save_game_unlock_progress(save_game_id)
 
@@ -196,6 +198,18 @@ class CareerAttemptProgress:
         finished_failure_reason: str | None,
     ) -> CareerProgressTransition:
         progress = self._refresh_unlock_progress()
+        if self._single_target and finished_status == "succeeded":
+            self._store.update_save_game_status(
+                save_game_id=self._save_game_id,
+                status="paused",
+            )
+            self._attempt_id = None
+            return CareerProgressTransition(
+                attempt_finished=True,
+                finished_attempt_id=finished_attempt_id,
+                finished_status=finished_status,
+                finished_failure_reason=finished_failure_reason,
+            )
         if progress.next_target is None:
             self._store.update_save_game_status(
                 save_game_id=self._save_game_id,

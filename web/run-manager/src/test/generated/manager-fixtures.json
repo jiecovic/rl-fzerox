@@ -1536,9 +1536,9 @@
       "vf_coef": 0.5
     },
     "vehicle": {
+      "adaptive_engine_bandit_bucket_size": 10,
       "adaptive_engine_greedy_plateau_seconds": 1.0,
-      "adaptive_engine_stat_decay": 0.995,
-      "adaptive_engine_tuner_backend": "gaussian_process",
+      "adaptive_engine_tuner_backend": "bandit",
       "adaptive_engine_uniform_exploration": 0.05,
       "engine_mode": "fixed",
       "engine_setting_max_raw_value": 80,

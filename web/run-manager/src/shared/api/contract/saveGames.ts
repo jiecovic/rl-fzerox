@@ -1,7 +1,12 @@
 // web/run-manager/src/shared/api/contract/saveGames.ts
 import { z } from "zod";
 
-import type { WatchDevice, WatchRenderer } from "@/shared/api/contract/enums";
+import {
+  rendererSchema,
+  type WatchDevice,
+  type WatchRenderer,
+  watchDeviceSchema,
+} from "@/shared/api/contract/enums";
 
 export const saveGameStatusSchema = z.enum(["created", "running", "paused", "finished", "failed"]);
 
@@ -79,6 +84,15 @@ export const managedSaveAttemptSchema = z.object({
   failure_reason: z.string().nullable(),
 });
 
+export const saveGameRunnerSettingsSchema = z.object({
+  device: watchDeviceSchema,
+  renderer: rendererSchema,
+  policy_mode: policyPlaybackModeSchema,
+  attempt_seed: z.number().int().min(0).max(4_294_967_295).nullable(),
+  recording_enabled: z.boolean(),
+  recording_path: z.string().nullable(),
+});
+
 export const managedSaveGameSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -88,6 +102,7 @@ export const managedSaveGameSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   last_finished_at: z.string().nullable(),
+  runner_settings: saveGameRunnerSettingsSchema,
   unlock_progress: managedSaveUnlockProgressSchema.nullable(),
   attempts: z.array(managedSaveAttemptSchema),
   course_setups: z.array(managedSaveCourseSetupSchema),
@@ -103,6 +118,7 @@ export const managedSaveGameStatusSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   last_finished_at: z.string().nullable(),
+  runner_settings: saveGameRunnerSettingsSchema,
   unlock_progress: managedSaveUnlockProgressSchema.nullable(),
 });
 
@@ -115,6 +131,10 @@ export const saveGameStatusResponseSchema = z.object({
 });
 
 export const createSaveGameResponseSchema = z.object({
+  save_game: managedSaveGameSchema,
+});
+
+export const updateSaveGameRunnerSettingsResponseSchema = z.object({
   save_game: managedSaveGameSchema,
 });
 
@@ -152,6 +172,7 @@ export type ManagedSaveCupSetup = z.infer<typeof managedSaveCupSetupSchema>;
 export type ManagedSaveUnlockProgress = z.infer<typeof managedSaveUnlockProgressSchema>;
 export type ManagedSaveUnlockTarget = z.infer<typeof managedSaveUnlockTargetSchema>;
 export type PolicyPlaybackMode = z.infer<typeof policyPlaybackModeSchema>;
+export type SaveGameRunnerSettings = z.infer<typeof saveGameRunnerSettingsSchema>;
 export type SaveEngineTuningCourseSetupRecommendation = z.infer<
   typeof saveEngineTuningCourseSetupRecommendationSchema
 >;
@@ -167,5 +188,16 @@ export interface CareerModeRunnerLaunchRequest {
   recordingPath: string | null;
   renderer: WatchRenderer | null;
   saveGameId: string;
+  singleTarget: boolean;
   target: ManagedSaveUnlockTarget | null;
+}
+
+export interface SaveGameRunnerSettingsUpdateRequest {
+  attemptSeed: string | null;
+  device: WatchDevice;
+  policyMode: PolicyPlaybackMode;
+  recordingEnabled: boolean;
+  recordingPath: string | null;
+  renderer: WatchRenderer;
+  saveGameId: string;
 }

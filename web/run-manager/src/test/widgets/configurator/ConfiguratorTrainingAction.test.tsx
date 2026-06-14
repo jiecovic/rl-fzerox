@@ -153,6 +153,60 @@ describe("Configurator", () => {
     );
   });
 
+  it("asks how to handle source tuner history before launching a bandit fork", async () => {
+    const user = userEvent.setup();
+    const onLaunchRun = vi.fn().mockResolvedValue(runFixture({ name: "run" }));
+    const banditConfig: ManagedRunConfig = {
+      ...managedRunConfigFixture,
+      vehicle: {
+        ...managedRunConfigFixture.vehicle,
+        engine_mode: "adaptive_tuner",
+        engine_setting_min_raw_value: 0,
+        engine_setting_max_raw_value: 100,
+        adaptive_engine_tuner_backend: "bandit",
+        adaptive_engine_bandit_bucket_size: 10,
+      },
+    };
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        forkSourceArtifact="latest"
+        forkSourceEngineTunerBackend="gaussian_process"
+        forkSourceRunLabel="source run"
+        initialDraftName="bandit fork"
+        initialConfig={banditConfig}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={onLaunchRun}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Train" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Start bandit engine tuner" });
+    expect(onLaunchRun).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Discard tuner history" }));
+
+    await waitFor(() =>
+      expect(onLaunchRun).toHaveBeenCalledWith(
+        "bandit fork",
+        expect.objectContaining({
+          vehicle: expect.objectContaining({
+            adaptive_engine_tuner_backend: "bandit",
+            engine_mode: "adaptive_tuner",
+          }),
+        }),
+        null,
+        "discard",
+      ),
+    );
+  });
+
   it("stores action entropy group weights from the action tab", async () => {
     const user = userEvent.setup();
     const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());

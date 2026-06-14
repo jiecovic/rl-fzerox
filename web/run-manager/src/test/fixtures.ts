@@ -138,6 +138,14 @@ export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): Manag
     created_at: "2026-06-02T10:30:00+00:00",
     updated_at: "2026-06-02T10:30:00+00:00",
     last_finished_at: null,
+    runner_settings: {
+      attempt_seed: 123,
+      device: "cuda",
+      policy_mode: "deterministic",
+      recording_enabled: false,
+      recording_path: "local/recordings/career/save-001/test.mkv",
+      renderer: "gliden64",
+    },
     unlock_progress: {
       inspection_status: "not_inspected",
       completed_count: 0,

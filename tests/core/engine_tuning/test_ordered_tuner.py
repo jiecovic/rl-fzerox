@@ -5,6 +5,7 @@ import pytest
 
 from rl_fzerox.core.engine_tuning import (
     ENGINE_TUNING_STATE_VERSION,
+    BanditEngineTunerSettings,
     EngineTuningCandidateEstimate,
     EngineTuningCandidateState,
     EngineTuningContext,
@@ -19,11 +20,29 @@ from rl_fzerox.core.engine_tuning.sampling import (
     stable_greedy_engine_setting,
 )
 from rl_fzerox.core.engine_tuning.tuner import engine_candidates
+from rl_fzerox.core.engine_tuning.types import engine_bucket_candidates
 
 
 def test_engine_candidates_are_inclusive_and_clamped() -> None:
     assert engine_candidates(minimum=-10, maximum=3) == (0, 1, 2, 3)
     assert engine_candidates(minimum=98, maximum=120) == (98, 99, 100)
+
+
+def test_engine_bucket_candidates_are_inclusive_and_bucketed() -> None:
+    assert engine_bucket_candidates(minimum=0, maximum=100, bucket_size=10) == (
+        0,
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100,
+    )
+    assert engine_bucket_candidates(minimum=35, maximum=65, bucket_size=10) == (35, 45, 55, 65)
 
 
 def test_engine_candidates_reject_inverted_range() -> None:
@@ -144,6 +163,176 @@ def test_mlp_ensemble_backend_records_model_state() -> None:
     assert state.model_state.contexts[0].finish_count == 2
     assert len(estimates) == 21
     assert tuner.recommendation(context).engine_setting_raw_value in range(40, 61)
+
+
+def test_bandit_backend_records_aggregate_candidates() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=BanditEngineTunerSettings(
+            min_raw_value=40,
+            max_raw_value=60,
+            bucket_size=10,
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+    )
+
+    state = tuner.record_many(
+        (
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=40,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=110_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=60,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=90_000,
+            ),
+        )
+    )
+
+    assert state.model_state is None
+    assert set(state.candidate_map()) == {(context.key, 40), (context.key, 60)}
+    assert tuner.recommendation(context).engine_setting_raw_value == 60
+
+
+def test_bandit_recommendation_uses_best_observed_bucket() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=BanditEngineTunerSettings(
+            min_raw_value=0,
+            max_raw_value=100,
+            bucket_size=10,
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+    )
+    tuner.record_many(
+        (
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=20,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=80_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=90,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=80_500,
+            ),
+        )
+    )
+
+    choice = tuner.recommendation(context)
+
+    assert choice.engine_setting_raw_value == 20
+    assert choice.estimated_finish_time_ms == pytest.approx(80_000, abs=1)
+
+
+def test_bandit_backend_explores_unobserved_buckets_before_resampling() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=BanditEngineTunerSettings(
+            min_raw_value=40,
+            max_raw_value=60,
+            bucket_size=10,
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+    )
+    tuner.record(
+        EngineTuningEpisodeOutcome(
+            context=context,
+            engine_setting_raw_value=50,
+            completion_fraction=1.0,
+            finished=True,
+            race_time_ms=95_000,
+        )
+    )
+
+    probabilities = {
+        estimate.engine_setting_raw_value: estimate.probability
+        for estimate in tuner.distribution(context, seed=123, draws=128)
+    }
+
+    assert probabilities == {40: 0.5, 50: 0.0, 60: 0.5}
+
+
+def test_bandit_backend_buckets_off_grid_aggregate_candidates() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    state = EngineTuningRuntimeState(
+        version=ENGINE_TUNING_STATE_VERSION,
+        update_count=2,
+        candidates=(
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=54,
+                finish_count=2,
+                decayed_count=2.0,
+                decayed_score_total=-200.0,
+                score_total=-200.0,
+                best_score=-90.0,
+                best_time_ms=90_000,
+            ),
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=67,
+                finish_count=1,
+                decayed_count=1.0,
+                decayed_score_total=-80.0,
+                score_total=-80.0,
+                best_score=-80.0,
+                best_time_ms=80_000,
+            ),
+        ),
+    )
+    tuner = OrderedEngineTuner(
+        settings=BanditEngineTunerSettings(
+            min_raw_value=50,
+            max_raw_value=70,
+            bucket_size=10,
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+        state=state,
+    )
+
+    estimates = {
+        estimate.engine_setting_raw_value: estimate
+        for estimate in tuner.distribution(context, seed=123, draws=128)
+    }
+
+    assert estimates[50].finish_count == 2
+    assert estimates[50].mean_score == pytest.approx(-100.0)
+    assert estimates[60].finish_count == 0
+    assert estimates[70].finish_count == 1
+    assert tuner.recommendation(context).engine_setting_raw_value == 70
+    assert [candidate.engine_setting_raw_value for candidate in tuner.state.candidates] == [50, 70]
+    assert [candidate.finish_count for candidate in tuner.state.candidates] == [2, 1]
 
 
 def test_mlp_ensemble_backend_does_not_warm_start_from_aggregate_candidates() -> None:

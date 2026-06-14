@@ -34,6 +34,11 @@ class ManagedVehicleConfig(BaseModel):
     engine_setting_min_raw_value: NonNegativeInt = Field(default=20, le=100)
     engine_setting_max_raw_value: NonNegativeInt = Field(default=80, le=100)
     adaptive_engine_tuner_backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
+    adaptive_engine_bandit_bucket_size: int = Field(
+        default=ENGINE_TUNER_DEFAULTS.bandit_bucket_size,
+        ge=1,
+        le=100,
+    )
     adaptive_engine_stat_decay: float = Field(
         default=ENGINE_TUNER_DEFAULTS.stat_decay,
         gt=0.0,
@@ -83,6 +88,8 @@ class ManagedVehicleConfig(BaseModel):
     @model_serializer(mode="wrap")
     def _serialize_vehicle(self, handler: SerializerFunctionWrapHandler) -> object:
         data = handler(self)
+        if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "bandit":
+            data.pop("adaptive_engine_bandit_bucket_size", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "gaussian_process":
             data.pop("adaptive_engine_stat_decay", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "mlp_ensemble":

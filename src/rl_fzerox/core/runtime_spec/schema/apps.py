@@ -67,6 +67,7 @@ class WatchConfig(BaseModel):
     managed_run_id: str | None = None
     managed_save_game_id: str | None = None
     save_attempt_id: str | None = None
+    single_save_target: bool = False
     unlock_target_label: str | None = None
     start_manual_control: bool = False
     career_mode_race_setup: CareerModeRaceSetupConfig | None = None

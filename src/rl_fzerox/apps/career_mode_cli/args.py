@@ -56,6 +56,11 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         default="deterministic",
         help="Initial policy playback mode; the viewer hotkey can still toggle it.",
     )
+    parser.add_argument(
+        "--single-target",
+        action="store_true",
+        help="Stop after the selected save target succeeds instead of advancing the unlock path.",
+    )
     args = parser.parse_args(argv)
     if args.attempt_seed is not None and not (0 <= args.attempt_seed <= 0xFFFFFFFF):
         parser.error("--attempt-seed must be between 0 and 4294967295")
