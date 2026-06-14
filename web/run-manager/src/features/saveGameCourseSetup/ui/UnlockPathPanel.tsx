@@ -299,6 +299,7 @@ export function UnlockPathPanel({
       <CourseSetupPanel
         assignableRuns={assignableRuns}
         cups={cups}
+        defaultExpandedCupId={saveGame.unlock_progress?.next_target?.cup_id ?? null}
         dirtySetupCount={dirtySetupCount}
         courseSetupDrafts={courseSetupDrafts}
         metadata={metadata}

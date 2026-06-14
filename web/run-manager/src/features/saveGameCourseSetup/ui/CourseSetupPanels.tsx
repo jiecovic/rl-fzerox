@@ -123,6 +123,7 @@ export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
 export const CourseSetupPanel = memo(function CourseSetupPanel({
   assignableRuns,
   cups,
+  defaultExpandedCupId,
   dirtySetupCount,
   metadata,
   onCourseSetupDraftChange,
@@ -137,6 +138,7 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
 }: {
   assignableRuns: readonly ManagedRun[];
   cups: readonly CupView[];
+  defaultExpandedCupId: string | null;
   dirtySetupCount: number;
   metadata: ConfigMetadata;
   onCourseSetupDraftChange: (values: CourseSetupValues, draft: PolicyArtifactDraft) => void;
@@ -149,7 +151,9 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
   updating: boolean;
   unlockedVehicleIds: readonly string[];
 }) {
-  const [collapsedCupIds, setCollapsedCupIds] = useState<readonly string[]>([]);
+  const [collapsedCupIds, setCollapsedCupIds] = useState<readonly string[]>(() =>
+    defaultCollapsedCupIds(cups, defaultExpandedCupId),
+  );
   const collapsedCupIdSet = useMemo(() => new Set(collapsedCupIds), [collapsedCupIds]);
   const saveDisabled = dirtySetupCount === 0 || savingCourseSetups || updating;
   const allCourseSetups = courseSetupsForCups(cups);
@@ -231,6 +235,13 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
     </div>
   );
 });
+
+function defaultCollapsedCupIds(
+  cups: readonly CupView[],
+  defaultExpandedCupId: string | null,
+): readonly string[] {
+  return cups.filter((cup) => cup.id !== defaultExpandedCupId).map((cup) => cup.id);
+}
 
 const CupSetupBlock = memo(function CupSetupBlock({
   assignableRuns,
