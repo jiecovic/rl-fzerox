@@ -12,6 +12,7 @@ import type {
   CupSetupValues,
   CupView,
   PolicyArtifactDraft,
+  PolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   courseSetupsForCups,
@@ -30,8 +31,6 @@ import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
 import { IntegerTextInput } from "@/shared/ui/configFields";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
-
-type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
 
 const EMPTY_POLICY_SELECTION_DRAFT: PolicySelectionDraft = {
   policyArtifact: "best",
@@ -88,7 +87,7 @@ export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
           label="Policy"
           onDraftChange={setDraft}
         />
-        <PolicySelectionArtifactSelect
+        <PolicyArtifactSelect
           disabled={updating}
           draft={draft}
           label="Artifact"
@@ -314,7 +313,7 @@ const CupSetupBlock = memo(function CupSetupBlock({
               visibleLabel="Policy"
               onDraftChange={applyBulkCoursePolicy}
             />
-            <PolicySelectionArtifactSelect
+            <PolicyArtifactSelect
               disabled={updating}
               draft={bulkPolicyDraft}
               label={`${cup.label} artifact`}
@@ -390,7 +389,7 @@ const CupSetupBlock = memo(function CupSetupBlock({
                       visibleLabel="Policy"
                       onDraftChange={updateCourseDraft}
                     />
-                    <ArtifactDraftSelect
+                    <PolicyArtifactSelect
                       disabled={updating}
                       draft={courseDraft}
                       label={`${course.display_name} artifact`}
@@ -453,7 +452,7 @@ function PolicySelectionSelect({
   );
 }
 
-function PolicySelectionArtifactSelect({
+function PolicyArtifactSelect<TDraft extends PolicySelectionDraft>({
   disabled,
   draft,
   label,
@@ -461,9 +460,9 @@ function PolicySelectionArtifactSelect({
   visibleLabel,
 }: {
   disabled: boolean;
-  draft: PolicySelectionDraft;
+  draft: TDraft;
   label: string;
-  onDraftChange: (draft: PolicySelectionDraft) => void;
+  onDraftChange: (draft: TDraft) => void;
   visibleLabel?: string;
 }) {
   return (
@@ -636,40 +635,6 @@ function EngineDraftInput({
           });
         }}
       />
-    </FieldShell>
-  );
-}
-
-function ArtifactDraftSelect({
-  disabled,
-  draft,
-  label,
-  onDraftChange,
-  visibleLabel,
-}: {
-  disabled: boolean;
-  draft: PolicyArtifactDraft;
-  label: string;
-  onDraftChange: (draft: PolicyArtifactDraft) => void;
-  visibleLabel?: string;
-}) {
-  return (
-    <FieldShell>
-      <span>{visibleLabel ?? label}</span>
-      <FieldSelect
-        aria-label={label}
-        disabled={disabled || draft.policyRunId === ""}
-        value={draft.policyArtifact}
-        onChange={(event) => {
-          onDraftChange({
-            ...draft,
-            policyArtifact: event.currentTarget.value as SavePolicyArtifact,
-          });
-        }}
-      >
-        <option value="best">best</option>
-        <option value="latest">latest</option>
-      </FieldSelect>
     </FieldShell>
   );
 }

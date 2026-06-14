@@ -33,6 +33,7 @@ export type PolicyArtifactDraft = {
   vehicleId: string;
 };
 
+export type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
 export type CourseSetupDraft = CourseSetupValues & PolicyArtifactDraft;
 export type CourseSetupDraftMap = Record<string, CourseSetupDraft>;
 export type CupSetupDraft = CupSetupValues & Pick<PolicyArtifactDraft, "vehicleId">;

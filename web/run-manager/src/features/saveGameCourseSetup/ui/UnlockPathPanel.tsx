@@ -9,6 +9,7 @@ import type {
   CupSetupValues,
   CupView,
   PolicyArtifactDraft,
+  PolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   countDirtyCourseSetups,
@@ -74,7 +75,6 @@ interface UnlockPathPanelProps {
   updating: boolean;
 }
 
-type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
 const EMPTY_STRING_ARRAY: readonly string[] = [];
 
 export function UnlockPathPanel({
