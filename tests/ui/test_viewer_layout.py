@@ -11,6 +11,7 @@ from rl_fzerox.ui.watch.app import (
     _initial_policy_observation_layout_shape,
     _next_panel_tab_index,
     _next_policy_observation_layout_shape,
+    _policy_observation_layout_info,
 )
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
 from rl_fzerox.ui.watch.view.components.observation_strip import (
@@ -172,19 +173,54 @@ def test_policy_observation_layout_shape_hint_stabilizes_menu_layout(
     rom_path.touch()
     config = WatchAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        watch=WatchConfig(policy_observation_layout_shape_hint=(100, 480, 3)),
+        watch=WatchConfig(policy_observation_layout_shape_hint=(100, 240, 12)),
     )
 
     assert _initial_policy_observation_layout_shape(_Snapshot(None), config=config) == (
         100,
-        480,
-        3,
+        240,
+        12,
     )
     assert _next_policy_observation_layout_shape(
-        (100, 480, 3),
+        (100, 240, 12),
         _Snapshot((72, 96, 6)),
         config=config,
-    ) == (100, 480, 3)
+    ) == (100, 240, 12)
+
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+    try:
+        fonts = _create_fonts(pygame)
+        layout_info = _policy_observation_layout_info(config)
+        assert layout_info is not None
+        stable_size = _watch_window_size(
+            (592, 444),
+            (100, 240, 12),
+            fonts=fonts,
+            info=layout_info,
+        )
+        live_policy_info = {"observation_stack": 2, "observation_stack_mode": "rgb"}
+
+        assert (
+            _watch_window_size(
+                (592, 444),
+                (100, 240, 12),
+                fonts=fonts,
+                info=layout_info,
+            )
+            == stable_size
+        )
+        assert (
+            _watch_window_size(
+                (592, 444),
+                (100, 240, 12),
+                fonts=fonts,
+                info=live_policy_info,
+            )
+            != stable_size
+        )
+    finally:
+        pygame.quit()
 
 
 def test_panel_tab_hint_shows_active_tab_position() -> None:

@@ -12,8 +12,12 @@ from rl_fzerox.core.career_mode.runner.controller import (
 from rl_fzerox.core.career_mode.runner.menu import (
     MENU_TIMING,
     CareerPhase,
+    DifficultyPopupState,
+    MenuFacts,
     MenuInput,
+    ObservedMenuScreen,
     engine_adjust_steps,
+    observed_menu_screen,
 )
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
@@ -77,6 +81,15 @@ def test_policy_race_continues_terminal_gp_result_screen(tmp_path: Path) -> None
     assert settle_step is not None
     assert settle_step.menu_input is MenuInput.NEUTRAL
     assert settle_step.phase == "continue_after_race:accept:1:settle"
+
+
+def test_unskippable_credits_are_post_gp_screen() -> None:
+    screen = observed_menu_screen(
+        MenuFacts.from_info({"game_mode": "unskippable_credits"}),
+        difficulty_popup_state=DifficultyPopupState.CLOSED,
+    )
+
+    assert screen is ObservedMenuScreen.POST_GP
 
 
 def test_no_active_attempt_rejects_menu_navigation(tmp_path: Path) -> None:

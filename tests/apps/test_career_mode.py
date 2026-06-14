@@ -88,6 +88,6 @@ def test_career_policy_observation_layout_shape_hint_reserves_largest_preview() 
 
     assert career_policy_observation_layout_shape_hint((wide_stack, tall_minimap)) == (
         100,
-        480,
-        3,
+        120,
+        12,
     )

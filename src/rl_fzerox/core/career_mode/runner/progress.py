@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
+from rl_fzerox.core.career_mode.runner.menu import POST_GP_COMPLETION_MODES
 from rl_fzerox.core.career_mode.runner.race import (
     SaveRaceExecutionPlan,
     build_save_race_execution_plan,
@@ -267,7 +268,7 @@ def _is_post_gp_completion(info: dict[str, object]) -> bool:
     mode = info.get("game_mode")
     if not isinstance(mode, str) or not mode:
         mode = info.get("game_mode_name")
-    return mode in {"gp_end_cutscene", "skippable_credits"}
+    return mode in POST_GP_COMPLETION_MODES
 
 
 def _positive_int_info(info: dict[str, object], key: str) -> int | None:

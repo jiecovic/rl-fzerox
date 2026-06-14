@@ -46,6 +46,13 @@ _WINDOW_ICON_SIZE = 32
 _WINDOW_ICON_RADIUS = 6
 _WINDOW_ICON_BACKGROUND = (28, 36, 48)
 _WINDOW_ICON_TEXT = (141, 189, 255)
+_POST_GP_OVERLAY_MODES = frozenset(
+    {
+        "gp_end_cutscene",
+        "skippable_credits",
+        "unskippable_credits",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +63,7 @@ class FrameRenderData:
     policy_observation_image: ObservationFrame | None
     policy_observation_shape: tuple[int, ...] | None
     policy_observation_layout_shape: tuple[int, ...]
+    policy_observation_layout_info: dict[str, object]
     observation_state: StateVector | None
     observation_state_reference: StateVector | None
     observation_state_feature_names: tuple[str, ...]
@@ -275,7 +283,7 @@ def _draw_frame(
     left_column_width = _watch_left_column_width(
         game_display_size,
         observation_layout_shape,
-        info=data.info,
+        info=data.policy_observation_layout_info,
     )
     game_surface = _rgb_surface(pygame, data.raw_frame)
 
@@ -327,10 +335,15 @@ def _draw_frame(
         control_viz=control_viz,
     )
     observation_surface = None
+    active_observation_shape = data.policy_observation_shape
     if data.policy_observation_image is not None:
+        if active_observation_shape is None:
+            active_observation_shape = tuple(
+                int(value) for value in data.policy_observation_image.shape
+            )
         preview_frame = _preview_frame(data.policy_observation_image, info=data.info)
         observation_display_size = _observation_preview_size(
-            observation_layout_shape,
+            active_observation_shape,
             info=data.info,
         )
         observation_surface = _rgb_surface(pygame, preview_frame)
@@ -348,7 +361,7 @@ def _draw_frame(
         y=control_bottom + LAYOUT.preview_gap,
         width=left_column_width - (2 * LAYOUT.preview_padding),
         height=screen.get_height() - control_bottom - LAYOUT.preview_gap - LAYOUT.preview_padding,
-        observation_shape=data.policy_observation_shape,
+        observation_shape=active_observation_shape,
         layout_shape=observation_layout_shape,
         info=data.info,
     )
@@ -360,7 +373,7 @@ def _draw_frame(
             game_display_size,
             observation_layout_shape,
             fonts=fonts,
-            info=data.info,
+            info=data.policy_observation_layout_info,
             panel_tab_index=data.panel_tab_index,
         )[1],
     )
@@ -479,6 +492,10 @@ def _game_course_overlay_label(
     *,
     reset_info: dict[str, object] | None = None,
 ) -> str | None:
+    post_gp_label = _career_post_gp_overlay_label(info)
+    if post_gp_label is not None:
+        return post_gp_label
+
     course_name = info.get("track_course_name")
     if not isinstance(course_name, str) or not course_name:
         course_name = _fallback_course_name(info)
@@ -518,6 +535,23 @@ def _course_anchor_active(
     if target_key is None:
         return True
     return target_key == locked_target_key
+
+
+def _career_post_gp_overlay_label(info: dict[str, object]) -> str | None:
+    observed_screen = info.get("career_mode_fsm_observed_screen")
+    game_mode = info.get("game_mode")
+    game_mode_name = info.get("game_mode_name")
+    if (
+        observed_screen != "post_gp"
+        and game_mode not in _POST_GP_OVERLAY_MODES
+        and game_mode_name not in _POST_GP_OVERLAY_MODES
+    ):
+        return None
+
+    target_label = info.get("career_mode_target_label")
+    if isinstance(target_label, str) and target_label.strip():
+        return target_label.strip()
+    return "Post-GP"
 
 
 def _game_speed_overlay_label(info: dict[str, object], *, action_repeat: int) -> str | None:

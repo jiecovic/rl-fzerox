@@ -73,6 +73,20 @@ def test_game_course_overlay_label_marks_locked_course_lightly() -> None:
     )
 
 
+def test_game_course_overlay_label_uses_career_target_during_post_gp() -> None:
+    assert (
+        _game_course_overlay_label(
+            {
+                "career_mode_fsm_observed_screen": "post_gp",
+                "career_mode_target_label": "Clear Master Joker Cup",
+                "course_index": 55,
+                "game_mode": "unskippable_credits",
+            }
+        )
+        == "Clear Master Joker Cup"
+    )
+
+
 def test_game_speed_overlay_label_formats_actual_speedup() -> None:
     assert (
         _game_speed_overlay_label(

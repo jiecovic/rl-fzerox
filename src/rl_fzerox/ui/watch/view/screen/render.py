@@ -50,6 +50,7 @@ def draw_watch_frame(
     cnn_layer_tab_index: int = 0,
     record_tab_index: int = 0,
     policy_observation_layout_shape: tuple[int, ...] | None = None,
+    policy_observation_layout_info: dict[str, object] | None = None,
 ) -> ViewerHitboxes:
     """Render one worker state packet without leaking env/policy logic into drawing."""
 
@@ -74,10 +75,11 @@ def draw_watch_frame(
     _add_career_mode_info(draw_info, config)
     policy_observation = snapshot.policy_observation
     observation_layout_shape = (
-        snapshot.policy_observation_shape
-        or policy_observation_layout_shape
+        policy_observation_layout_shape
+        or snapshot.policy_observation_shape
         or _default_policy_observation_layout_shape()
     )
+    observation_layout_info = policy_observation_layout_info or draw_info
     return _draw_frame(
         pygame=pygame,
         screen=screen,
@@ -89,6 +91,7 @@ def draw_watch_frame(
             ),
             policy_observation_shape=snapshot.policy_observation_shape,
             policy_observation_layout_shape=observation_layout_shape,
+            policy_observation_layout_info=observation_layout_info,
             observation_state=None if policy_observation is None else policy_observation.state,
             observation_state_reference=(
                 None if policy_observation is None else policy_observation.state_reference

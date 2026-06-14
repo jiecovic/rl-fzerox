@@ -96,6 +96,7 @@ def run_viewer(
             snapshot,
             config=config,
         )
+        policy_observation_layout_info = _policy_observation_layout_info(config)
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -163,7 +164,7 @@ def run_viewer(
                 game_display_size,
                 policy_observation_layout_shape,
                 fonts=fonts,
-                info=snapshot.info,
+                info=policy_observation_layout_info or snapshot.info,
                 panel_tab_index=panel_tab_index,
             )
             render_rate.tick()
@@ -183,6 +184,7 @@ def run_viewer(
                 cnn_layer_tab_index=cnn_layer_tab_index,
                 record_tab_index=record_tab_index,
                 policy_observation_layout_shape=policy_observation_layout_shape,
+                policy_observation_layout_info=policy_observation_layout_info,
             )
             if recorder is not None:
                 recorder.write_surface(pygame, screen)
@@ -271,6 +273,16 @@ def _config_policy_observation_layout_shape(
     if config is None or config.watch.policy_observation_layout_shape_hint is None:
         return None
     return tuple(int(value) for value in config.watch.policy_observation_layout_shape_hint)
+
+
+def _policy_observation_layout_info(config: WatchAppConfig) -> dict[str, object] | None:
+    if config.watch.policy_observation_layout_shape_hint is None:
+        return None
+    return {
+        "observation_stack": config.watch.policy_observation_layout_shape_hint[2] // 3,
+        "observation_stack_mode": "rgb",
+        "observation_minimap_layer": False,
+    }
 
 
 def _snapshot_policy_observation_shape(snapshot: object) -> tuple[int, ...] | None:

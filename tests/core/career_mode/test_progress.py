@@ -200,6 +200,37 @@ def test_single_target_success_waits_for_post_gp_screen(tmp_path: Path) -> None:
     assert store.started_next_attempt_count == 0
 
 
+def test_single_target_success_finishes_on_unskippable_credits(tmp_path: Path) -> None:
+    store = _SingleTargetCompletionStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    credits_transition = progress.sync_post_terminal_success(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert credits_transition.attempt_finished is True
+    assert credits_transition.next_plan is None
+    assert credits_transition.finished_attempt_id == "attempt-1"
+    assert credits_transition.finished_status == "succeeded"
+    assert progress.attempt_id is None
+    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert store.status_updates == ["paused"]
+    assert store.started_next_attempt_count == 0
+
+
 def test_replayed_target_retire_does_not_finish_attempt(tmp_path: Path) -> None:
     store = _ReplayTargetStore(tmp_path)
     progress = CareerAttemptProgress(
@@ -372,9 +403,7 @@ class _SingleTargetCompletionStore(_Store):
                 sequence_index=0 if target_status == "pending" else 1,
                 kind="clear_gp_cup",
                 status="pending",
-                label=(
-                    "Expert Jack Cup" if target_status == "pending" else "Expert Queen Cup"
-                ),
+                label=("Expert Jack Cup" if target_status == "pending" else "Expert Queen Cup"),
                 difficulty="expert",
                 cup_id="jack" if target_status == "pending" else "queen",
             ),

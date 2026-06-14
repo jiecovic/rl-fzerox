@@ -207,7 +207,7 @@ class CareerModeController:
                 if camera_step := self._next_camera_sync_step(info):
                     return camera_step
                 return self._enter_policy_race()
-            if facts.is_skippable_post_gp_screen:
+            if facts.is_post_gp_screen:
                 self._pending_steps.clear()
                 return self._continue_post_gp_screen_step()
             if facts.is_gp_next_course_screen:
@@ -937,7 +937,7 @@ def _post_terminal_progress_screen(facts: MenuFacts) -> bool:
     return (
         facts.is_gp_result_screen
         or facts.is_gp_next_course_screen
-        or facts.is_skippable_post_gp_screen
+        or facts.is_post_gp_screen
         or (facts.in_gp_race and facts.terminal_race_result)
     )
 
@@ -962,7 +962,7 @@ def _info_terminal_reason(
     info: dict[str, object],
 ) -> str | None:
     facts = MenuFacts.from_info(info)
-    if facts.is_skippable_post_gp_screen:
+    if facts.is_post_gp_screen:
         return "finished"
     reason = _game_terminal_reason(_non_empty_str(info.get("termination_reason")))
     if reason is not None:

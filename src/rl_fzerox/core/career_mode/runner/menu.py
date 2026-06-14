@@ -139,6 +139,13 @@ class GpMenuOrder:
 
 GP_MENU_ORDER = GpMenuOrder()
 BUILT_IN_COURSES_BY_INDEX = {course.course_index: course for course in BUILT_IN_COURSES}
+POST_GP_COMPLETION_MODES = frozenset(
+    {
+        "gp_end_cutscene",
+        "skippable_credits",
+        "unskippable_credits",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,8 +279,8 @@ class MenuFacts:
         return self.game_mode == "results"
 
     @property
-    def is_skippable_post_gp_screen(self) -> bool:
-        return self.game_mode in {"gp_end_cutscene", "skippable_credits"}
+    def is_post_gp_screen(self) -> bool:
+        return self.game_mode in POST_GP_COMPLETION_MODES
 
     @property
     def course_select_cup_index(self) -> int | None:
@@ -352,7 +359,7 @@ def observed_menu_screen(
         return ObservedMenuScreen.RESULTS
     if facts.is_gp_next_course_screen:
         return ObservedMenuScreen.GP_NEXT_COURSE
-    if facts.is_skippable_post_gp_screen:
+    if facts.is_post_gp_screen:
         return ObservedMenuScreen.POST_GP
     if facts.in_gp_race:
         return ObservedMenuScreen.GP_RACE

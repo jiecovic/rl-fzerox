@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from math import ceil
 from pathlib import Path
 
 from rl_fzerox.apps._cli import normalize_cli_overrides
@@ -113,17 +114,20 @@ def career_mode_base_config(
 def career_policy_observation_layout_shape_hint(
     policy_configs: Sequence[ManagedRunConfig],
 ) -> tuple[int, int, int] | None:
-    """Return one synthetic shape that reserves every assigned policy preview."""
+    """Return a synthetic shape that reserves every assigned policy preview."""
 
     max_preview_height = 0
     max_preview_width = 0
+    max_frame_count = 1
     for config in policy_configs:
-        preview_height, preview_width = _policy_observation_preview_footprint(config)
+        preview_height, preview_width, frame_count = _policy_observation_preview_footprint(config)
         max_preview_height = max(max_preview_height, preview_height)
         max_preview_width = max(max_preview_width, preview_width)
+        max_frame_count = max(max_frame_count, frame_count)
     if max_preview_height <= 0 or max_preview_width <= 0:
         return None
-    return max_preview_height, max_preview_width, 3
+    tile_width = ceil(max_preview_width / max_frame_count)
+    return max_preview_height, tile_width, 3 * max_frame_count
 
 
 def _assigned_policy_run_configs(
@@ -145,10 +149,11 @@ def _assigned_policy_run_configs(
     return tuple(policy_configs)
 
 
-def _policy_observation_preview_footprint(config: ManagedRunConfig) -> tuple[int, int]:
+def _policy_observation_preview_footprint(config: ManagedRunConfig) -> tuple[int, int, int]:
     height, width = config.observation.image_geometry(renderer=config.environment.renderer)
     frame_count = int(config.observation.frame_stack) + int(config.observation.minimap_layer)
-    return int(height), int(width) * max(1, frame_count)
+    frame_count = max(1, frame_count)
+    return int(height), int(width) * frame_count, frame_count
 
 
 def career_mode_emulator_config(
