@@ -407,6 +407,15 @@ def get_save_attempt_execution_context(
         )
         attempts = save_game_repository.list_save_attempts(session, attempt.save_game_id)
         progress = build_unlock_progress(save_game.save_path, attempts=attempts)
+        progress_target = _progress_target(
+            progress,
+            target_kind=target.kind,
+            difficulty=target.difficulty,
+            cup_id=target.cup_id,
+            course_id=target.course_id,
+        )
+        if progress_target is None:
+            raise ValueError("save attempt target is not part of the unlock path")
         cup_setups = save_game_repository.list_cup_setups(session, attempt.save_game_id)
         cup_setup = _resolve_cup_setup_or_default(
             cup_setups,
@@ -442,7 +451,7 @@ def get_save_attempt_execution_context(
         return SaveAttemptExecutionContext(
             save_game=save_game,
             attempt=attempt,
-            target=target.to_progress_target(status="pending"),
+            target=progress_target,
             course_setup_target=course_setup_target,
             course_setup=course_setup,
             cup_setup=cup_setup,

@@ -159,7 +159,7 @@ class CareerModeController:
     def next_raw_step(self, *, info: dict[str, object]) -> RawMenuStep | None:
         facts = MenuFacts.from_info(info)
         if self._progress.attempt_id is None:
-            return self._next_no_active_attempt_step(facts)
+            raise RuntimeError("Career Mode has no active save attempt")
         if self._phase == CareerPhase.POLICY_RACE:
             if facts.in_gp_race:
                 if facts.terminal_race_result:
@@ -385,6 +385,9 @@ class CareerModeController:
 
     def policy_owns_control(self) -> bool:
         return self._phase == CareerPhase.POLICY_RACE
+
+    def has_active_attempt(self) -> bool:
+        return self._progress.attempt_id is not None
 
     @property
     def phase(self) -> CareerPhase:
@@ -793,28 +796,6 @@ class CareerModeController:
         self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
-
-    def _next_no_active_attempt_step(self, facts: MenuFacts) -> RawMenuStep | None:
-        if self._pending_steps:
-            if _is_neutral_settle_step(self._pending_steps[0]):
-                step = self._pending_steps.popleft()
-                self._phase = phase_from_step(step)
-                return step
-            self._pending_steps.clear()
-        if facts.is_gp_result_screen or (facts.in_gp_race and facts.terminal_race_result):
-            self._phase = CareerPhase.CONTINUE_AFTER_RACE
-            self._continuing_race_result = True
-            self._observed_terminal_race_result = True
-            return self._continue_after_race_pulse()
-        if facts.is_gp_next_course_screen:
-            self._phase = CareerPhase.CONTINUE_AFTER_RACE
-            return self._continue_next_course_step()
-        if facts.is_skippable_post_gp_screen:
-            self._phase = CareerPhase.CONTINUE_AFTER_RACE
-            return self._continue_post_gp_screen_step()
-        self._pending_steps.clear()
-        self._phase = CareerPhase.WAIT_FOR_GP_RACE
-        return raw_step(MenuInput.NEUTRAL, 1, phase="wait_for_gp_race:no_active_attempt")
 
     def _camera_ready(self, info: dict[str, object]) -> bool:
         return self._camera.ready(info)

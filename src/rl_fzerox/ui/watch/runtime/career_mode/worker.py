@@ -617,6 +617,9 @@ def _run_career_mode_loop_body(
                     active_policy_control=active_policy_control,
                 )
                 reset_info = dict(info)
+                if not controller.has_active_attempt():
+                    publish_snapshot(policy_visible=False)
+                    raise _CareerModeWorkerQuit()
             policy_owns_control = controller.policy_owns_control()
             if _should_observe_policy_transition(
                 policy_owns_control=policy_owns_control,
@@ -653,6 +656,8 @@ def _run_career_mode_loop_body(
                     current_auxiliary_targets = None
                     manual_control_enabled = False
                     publish_snapshot(policy_visible=False)
+                    if not controller.has_active_attempt():
+                        raise _CareerModeWorkerQuit()
             menu_step = controller.next_raw_step(info=info)
             if menu_step is not None:
                 last_menu_step = menu_step
@@ -855,6 +860,8 @@ def _run_career_mode_loop_body(
                     current_auxiliary_targets = None
                     manual_control_enabled = False
                     publish_snapshot(policy_visible=False)
+                    if not controller.has_active_attempt():
+                        raise _CareerModeWorkerQuit()
 
             if current_step_seconds is not None:
                 now = time.perf_counter()

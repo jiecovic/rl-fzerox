@@ -330,6 +330,7 @@ def test_manager_store_replays_succeeded_save_attempt_from_course_setup(
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
+    _write_policy_artifact(run.run_dir, "best")
     _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="jack")
 
     attempt = store.start_target_save_attempt(
@@ -338,10 +339,13 @@ def test_manager_store_replays_succeeded_save_attempt_from_course_setup(
         difficulty="novice",
         cup_id="jack",
     )
+    context = store.get_save_attempt_execution_context(attempt.id)
 
     assert attempt.difficulty == "novice"
     assert attempt.cup_id == "jack"
     assert attempt.status == "running"
+    assert context is not None
+    assert context.target.status == "succeeded"
 
 
 def test_manager_store_rejects_selected_save_attempt_before_save_inspection(

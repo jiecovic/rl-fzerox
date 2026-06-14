@@ -114,9 +114,10 @@ class CareerAttemptProgress:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
 
+        target_already_succeeded = _target_succeeded(self._unlock_progress.targets, setup)
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
-        if _target_succeeded(progress.targets, setup):
+        if not target_already_succeeded and _target_succeeded(progress.targets, setup):
             return self._finish_and_advance(
                 info=info,
                 status="succeeded",
@@ -142,9 +143,12 @@ class CareerAttemptProgress:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
 
+        target_already_succeeded = _target_succeeded(self._unlock_progress.targets, setup)
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
         if not _target_succeeded(progress.targets, setup):
+            return CareerProgressTransition(attempt_finished=False)
+        if target_already_succeeded and not _is_post_gp_completion(info):
             return CareerProgressTransition(attempt_finished=False)
         return self._finish_and_advance(
             info=info,
@@ -263,6 +267,13 @@ def _failure_reason(info: dict[str, object]) -> str:
 def _keeps_current_gp_attempt(info: dict[str, object]) -> bool:
     reason = info.get("termination_reason")
     return reason in {"finished", "crashed", "retired"}
+
+
+def _is_post_gp_completion(info: dict[str, object]) -> bool:
+    mode = info.get("game_mode")
+    if not isinstance(mode, str) or not mode:
+        mode = info.get("game_mode_name")
+    return mode in {"gp_end_cutscene", "skippable_credits"}
 
 
 def _positive_int_info(info: dict[str, object], key: str) -> int | None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from rl_fzerox.core.career_mode.runner.controller import (
     CareerModeController,
     _cup_selection_input,
@@ -77,27 +79,15 @@ def test_policy_race_continues_terminal_gp_result_screen(tmp_path: Path) -> None
     assert settle_step.phase == "continue_after_race:accept:1:settle"
 
 
-def test_no_active_attempt_continues_terminal_gp_result_screen(tmp_path: Path) -> None:
+def test_no_active_attempt_rejects_menu_navigation(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
     controller._progress._attempt_id = None
     controller._phase = CareerPhase.WAIT_FOR_GP_RACE
 
-    step = controller.next_raw_step(
-        info={"game_mode": "gp_race", "termination_reason": "finished"},
-    )
-
-    assert step is not None
-    assert step.menu_input is MenuInput.ACCEPT
-    assert step.phase == "continue_after_race:accept:1"
-    assert controller.phase is CareerPhase.CONTINUE_AFTER_RACE
-
-    settle_step = controller.next_raw_step(
-        info={"game_mode": "gp_race", "termination_reason": "finished"},
-    )
-
-    assert settle_step is not None
-    assert settle_step.menu_input is MenuInput.NEUTRAL
-    assert settle_step.phase == "continue_after_race:accept:1:settle"
+    with pytest.raises(RuntimeError, match="no active save attempt"):
+        controller.next_raw_step(
+            info={"game_mode": "gp_race", "termination_reason": "finished"},
+        )
 
 
 def _controller(tmp_path: Path) -> CareerModeController:

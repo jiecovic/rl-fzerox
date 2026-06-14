@@ -164,7 +164,7 @@ def test_crashed_race_keeps_current_gp_attempt(tmp_path: Path) -> None:
 
 
 def test_single_target_success_pauses_without_starting_next_attempt(tmp_path: Path) -> None:
-    store = _SingleTargetStore(tmp_path)
+    store = _SingleTargetCompletionStore(tmp_path)
     progress = CareerAttemptProgress(
         store=store,
         save_game_id=store.save_game.id,
@@ -182,6 +182,57 @@ def test_single_target_success_pauses_without_starting_next_attempt(tmp_path: Pa
     assert transition.next_plan is None
     assert transition.finished_attempt_id == "attempt-1"
     assert transition.finished_status == "succeeded"
+    assert progress.attempt_id is None
+    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert store.status_updates == ["paused"]
+    assert store.started_next_attempt_count == 0
+
+
+def test_replayed_target_retire_does_not_finish_attempt(tmp_path: Path) -> None:
+    store = _ReplayTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+    )
+
+    transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "retired", "position": 30, "race_time_ms": 12_345},
+    )
+
+    assert transition.attempt_finished is False
+    assert progress.attempt_id == "attempt-1"
+    assert store.finished_attempts == []
+    assert store.status_updates == []
+    assert store.started_next_attempt_count == 0
+
+
+def test_replayed_target_success_waits_for_post_gp_screen(tmp_path: Path) -> None:
+    store = _ReplayTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+    )
+
+    result_transition = progress.sync_post_terminal_success(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "results", "termination_reason": "finished"},
+    )
+    post_gp_transition = progress.sync_post_terminal_success(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+
+    assert result_transition.attempt_finished is False
+    assert post_gp_transition.attempt_finished is True
+    assert post_gp_transition.finished_status == "succeeded"
     assert progress.attempt_id is None
     assert store.finished_attempts == [("attempt-1", "succeeded", None)]
     assert store.status_updates == ["paused"]
@@ -290,31 +341,36 @@ class _Store:
         raise AssertionError("no execution context should be requested")
 
 
-class _SingleTargetStore(_Store):
+class _SingleTargetCompletionStore(_Store):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
         self.status_updates: list[SaveGameStatus] = []
+        self.progress_reads = 0
 
     def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
+        self.progress_reads += 1
+        target_status = "succeeded" if self.progress_reads >= 2 else "pending"
         return ManagedSaveUnlockProgress(
             inspection_status="inspected",
-            completed_count=1,
+            completed_count=1 if target_status == "succeeded" else 0,
             total_count=2,
             unlocked_vehicle_count=0,
             unlocked_vehicle_ids=(),
             next_target=ManagedSaveUnlockTarget(
-                sequence_index=1,
+                sequence_index=0 if target_status == "pending" else 1,
                 kind="clear_gp_cup",
                 status="pending",
-                label="Expert Queen Cup",
+                label=(
+                    "Expert Jack Cup" if target_status == "pending" else "Expert Queen Cup"
+                ),
                 difficulty="expert",
-                cup_id="queen",
+                cup_id="jack" if target_status == "pending" else "queen",
             ),
             targets=(
                 ManagedSaveUnlockTarget(
                     sequence_index=0,
                     kind="clear_gp_cup",
-                    status="succeeded",
+                    status=target_status,
                     label="Expert Jack Cup",
                     difficulty="expert",
                     cup_id="jack",
@@ -361,6 +417,43 @@ class _SingleTargetStore(_Store):
         attempt_id: str,
     ) -> SaveAttemptExecutionContext | None:
         raise AssertionError("single-target success must not request the next context")
+
+
+class _ReplayTargetStore(_SingleTargetCompletionStore):
+    def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
+        return ManagedSaveUnlockProgress(
+            inspection_status="inspected",
+            completed_count=1,
+            total_count=2,
+            unlocked_vehicle_count=0,
+            unlocked_vehicle_ids=(),
+            next_target=ManagedSaveUnlockTarget(
+                sequence_index=1,
+                kind="clear_gp_cup",
+                status="pending",
+                label="Expert Queen Cup",
+                difficulty="expert",
+                cup_id="queen",
+            ),
+            targets=(
+                ManagedSaveUnlockTarget(
+                    sequence_index=0,
+                    kind="clear_gp_cup",
+                    status="succeeded",
+                    label="Expert Jack Cup",
+                    difficulty="expert",
+                    cup_id="jack",
+                ),
+                ManagedSaveUnlockTarget(
+                    sequence_index=1,
+                    kind="clear_gp_cup",
+                    status="pending",
+                    label="Expert Queen Cup",
+                    difficulty="expert",
+                    cup_id="queen",
+                ),
+            ),
+        )
 
 
 def _race_setup() -> CareerModeRaceSetupConfig:
