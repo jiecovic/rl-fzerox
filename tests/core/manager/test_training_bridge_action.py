@@ -483,8 +483,7 @@ def test_manager_training_bridge_projects_deficit_budget_track_sampling_settings
     config = default_managed_run_config().model_copy(deep=True)
     config.tracks.sampling_mode = "deficit_budget"
     config.tracks.deficit_budget_uniform_fraction = 0.6
-    config.tracks.deficit_budget_min_weight = 1.2
-    config.tracks.deficit_budget_max_weight = 4.0
+    config.tracks.deficit_budget_focus_sharpness = 2.0
     config.tracks.deficit_budget_ema_alpha = 0.01
     config.tracks.deficit_budget_weight_update_rollouts = 30
 
@@ -496,8 +495,7 @@ def test_manager_training_bridge_projects_deficit_budget_track_sampling_settings
 
     assert train_config.env.track_sampling.sampling_mode == "deficit_budget"
     assert train_config.env.track_sampling.deficit_budget_uniform_fraction == pytest.approx(0.6)
-    assert train_config.env.track_sampling.deficit_budget_min_weight == pytest.approx(1.2)
-    assert train_config.env.track_sampling.deficit_budget_max_weight == pytest.approx(4.0)
+    assert train_config.env.track_sampling.deficit_budget_focus_sharpness == pytest.approx(2.0)
     assert train_config.env.track_sampling.deficit_budget_ema_alpha == pytest.approx(0.01)
     assert train_config.env.track_sampling.deficit_budget_weight_update_rollouts == 30
 

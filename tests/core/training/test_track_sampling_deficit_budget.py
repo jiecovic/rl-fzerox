@@ -134,6 +134,67 @@ def test_deficit_budget_payload_uses_uniform_adaptive_target_mix() -> None:
     assert entries["hard"]["target_step_share"] == pytest.approx(0.575)
 
 
+@pytest.mark.parametrize(
+    ("focus_sharpness", "expected"),
+    [
+        (0.0, {"easy": 1 / 3, "medium": 1 / 3, "hard": 1 / 3}),
+        (1.0, {"easy": 0.0, "medium": 1 / 3, "hard": 2 / 3}),
+        (2.0, {"easy": 0.0, "medium": 0.2, "hard": 0.8}),
+    ],
+)
+def test_deficit_budget_focus_uses_completion_gap_with_sharpness(
+    focus_sharpness: float,
+    expected: dict[str, float],
+) -> None:
+    controller = DeficitBudgetTrackSamplingController(
+        resolved_courses=resolved_track_sampling_courses(
+            {"easy": 1.0, "medium": 1.0, "hard": 1.0},
+            course_keys={"easy": "easy", "medium": "medium", "hard": "hard"},
+            log_keys={"easy": "easy", "medium": "medium", "hard": "hard"},
+            labels={"easy": "Easy", "medium": "Medium", "hard": "Hard"},
+            log_enabled={"easy": True, "medium": True, "hard": True},
+        ),
+        action_repeat=1,
+        settings=DeficitBudgetSettings(
+            uniform_fraction=0.0,
+            focus_sharpness=focus_sharpness,
+            ema_alpha=1.0,
+            weight_update_rollouts=1,
+        ),
+        seed=7,
+    )
+
+    controller.record_episodes(
+        (
+            {
+                "track_id": "easy",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "medium",
+                "episode_step": 100,
+                "episode_completion_fraction": 0.5,
+                "termination_reason": "crashed",
+            },
+            {
+                "track_id": "hard",
+                "episode_step": 100,
+                "episode_completion_fraction": 0.0,
+                "termination_reason": "crashed",
+            },
+        )
+    )
+    controller.maybe_update_weights()
+    values = controller.log_values()
+
+    assert {
+        course_key: values[f"track_sampling/{course_key}/target_step_share"]
+        for course_key in expected
+    } == pytest.approx(expected)
+
+
 def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
     controller = DeficitBudgetTrackSamplingController(
         resolved_courses=resolved_track_sampling_courses(
@@ -146,8 +207,7 @@ def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
@@ -175,8 +235,7 @@ def test_deficit_budget_controller_refills_bounded_balanced_queues() -> None:
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
@@ -203,8 +262,7 @@ def test_deficit_budget_controller_prefers_courses_with_positive_step_debt() -> 
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
@@ -229,8 +287,7 @@ def test_deficit_budget_controller_keeps_alt_baselines_out_of_runtime_stats() ->
         action_repeat=2,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=1.0,
             weight_update_rollouts=20,
         ),
@@ -316,8 +373,7 @@ def test_deficit_budget_controller_restores_historical_step_debt() -> None:
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
@@ -344,8 +400,7 @@ def test_deficit_budget_controller_uses_episode_ema_as_assignment_cost() -> None
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=1.0,
             weight_update_rollouts=20,
         ),
@@ -390,8 +445,7 @@ def test_deficit_budget_runtime_state_persists_accounted_step_totals() -> None:
         action_repeat=2,
         settings=DeficitBudgetSettings(
             uniform_fraction=1.0,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
@@ -425,8 +479,7 @@ def test_deficit_budget_controller_raises_target_share_for_problem_course() -> N
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=0.7,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=1.0,
             weight_update_rollouts=1,
         ),
@@ -513,8 +566,7 @@ def test_deficit_budget_controller_restores_runtime_stats() -> None:
         action_repeat=1,
         settings=DeficitBudgetSettings(
             uniform_fraction=0.7,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
         ),
@@ -593,8 +645,7 @@ def test_deficit_budget_controller_backfills_first_x_cup_generation_stats() -> N
         action_repeat=2,
         settings=DeficitBudgetSettings(
             uniform_fraction=0.7,
-            min_weight=1.0,
-            max_weight=3.0,
+            focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
             x_cup_generation_ema_alpha=0.1,

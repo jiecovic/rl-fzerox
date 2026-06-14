@@ -35,8 +35,7 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
             config.tracks.adaptive_step_balance_confidence_scale
         ),
         "deficit_budget_uniform_fraction": config.tracks.deficit_budget_uniform_fraction,
-        "deficit_budget_min_weight": config.tracks.deficit_budget_min_weight,
-        "deficit_budget_max_weight": config.tracks.deficit_budget_max_weight,
+        "deficit_budget_focus_sharpness": config.tracks.deficit_budget_focus_sharpness,
         "deficit_budget_ema_alpha": config.tracks.deficit_budget_ema_alpha,
         "deficit_budget_weight_update_rollouts": (
             config.tracks.deficit_budget_weight_update_rollouts

@@ -95,8 +95,7 @@ class ManagedTracksConfig(BaseModel):
     adaptive_step_balance_min_confidence_episodes: int = Field(default=24, ge=1)
     adaptive_step_balance_confidence_scale: float = Field(default=4.0, ge=1.0)
     deficit_budget_uniform_fraction: float = Field(default=0.7, ge=0.0, le=1.0)
-    deficit_budget_min_weight: float = Field(default=1.0, gt=0.0)
-    deficit_budget_max_weight: float = Field(default=3.0, gt=0.0)
+    deficit_budget_focus_sharpness: float = Field(default=1.0, ge=0.0)
     deficit_budget_ema_alpha: float = Field(default=0.02, gt=0.0, le=1.0)
     deficit_budget_weight_update_rollouts: int = Field(default=20, ge=1)
     selected_course_ids: tuple[str, ...] = Field(default_factory=default_selected_course_ids)
@@ -130,10 +129,6 @@ class ManagedTracksConfig(BaseModel):
             raise ValueError(f"tracks.selected_course_ids contains unknown courses: {joined}")
         if self.active_course_count() <= 0:
             raise ValueError("tracks must expose at least one active course")
-        if self.deficit_budget_max_weight < self.deficit_budget_min_weight:
-            raise ValueError(
-                "tracks.deficit_budget_max_weight must be >= tracks.deficit_budget_min_weight"
-            )
         return self
 
     @model_serializer(mode="wrap")

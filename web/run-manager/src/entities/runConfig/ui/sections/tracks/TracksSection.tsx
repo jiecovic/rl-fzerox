@@ -78,8 +78,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     adaptive_step_balance_target_completion:
       defaultConfig.tracks.adaptive_step_balance_target_completion,
     deficit_budget_ema_alpha: defaultConfig.tracks.deficit_budget_ema_alpha,
-    deficit_budget_max_weight: defaultConfig.tracks.deficit_budget_max_weight,
-    deficit_budget_min_weight: defaultConfig.tracks.deficit_budget_min_weight,
+    deficit_budget_focus_sharpness: defaultConfig.tracks.deficit_budget_focus_sharpness,
     deficit_budget_uniform_fraction: defaultConfig.tracks.deficit_budget_uniform_fraction,
     deficit_budget_weight_update_rollouts:
       defaultConfig.tracks.deficit_budget_weight_update_rollouts,
@@ -93,8 +92,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     | "adaptive_step_balance_min_confidence_episodes"
     | "adaptive_step_balance_target_completion"
     | "deficit_budget_ema_alpha"
-    | "deficit_budget_max_weight"
-    | "deficit_budget_min_weight"
+    | "deficit_budget_focus_sharpness"
     | "deficit_budget_uniform_fraction"
     | "deficit_budget_weight_update_rollouts"
     | "step_balance_ema_alpha"

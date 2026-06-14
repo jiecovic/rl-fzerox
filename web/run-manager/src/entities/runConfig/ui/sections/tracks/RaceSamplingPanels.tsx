@@ -45,8 +45,7 @@ interface CourseSamplingPanelProps {
     | "adaptive_step_balance_min_confidence_episodes"
     | "adaptive_step_balance_target_completion"
     | "deficit_budget_ema_alpha"
-    | "deficit_budget_max_weight"
-    | "deficit_budget_min_weight"
+    | "deficit_budget_focus_sharpness"
     | "deficit_budget_uniform_fraction"
     | "deficit_budget_weight_update_rollouts"
     | "step_balance_ema_alpha"
@@ -393,23 +392,15 @@ function DeficitBudgetFields({
         </span>
       </div>
       <NumberField
-        help="Lowest adaptive difficulty weight before uniform budget mixing."
-        label="Min weight"
-        resetValue={defaultConfig.tracks.deficit_budget_min_weight}
+        help="Exponent applied to completion-gap scores before splitting the difficulty-focus budget. 0 is uniform, 1 is proportional, larger values concentrate harder on low-completion courses."
+        label="Focus sharpness"
+        resetValue={defaultConfig.tracks.deficit_budget_focus_sharpness}
         step="0.1"
-        value={config.tracks.deficit_budget_min_weight}
-        onChange={(value) => updateTracks({ deficit_budget_min_weight: value })}
+        value={config.tracks.deficit_budget_focus_sharpness}
+        onChange={(value) => updateTracks({ deficit_budget_focus_sharpness: value })}
       />
       <NumberField
-        help="Highest adaptive difficulty weight before uniform budget mixing."
-        label="Max weight"
-        resetValue={defaultConfig.tracks.deficit_budget_max_weight}
-        step="0.1"
-        value={config.tracks.deficit_budget_max_weight}
-        onChange={(value) => updateTracks({ deficit_budget_max_weight: value })}
-      />
-      <NumberField
-        help="EMA smoothing for the per-course difficulty score."
+        help="EMA smoothing for each course's completion gap before focus weights are recomputed."
         label="Difficulty EMA"
         resetValue={defaultConfig.tracks.deficit_budget_ema_alpha}
         step="0.005"

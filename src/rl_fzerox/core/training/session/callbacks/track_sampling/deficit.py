@@ -29,8 +29,7 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
 @dataclass(frozen=True, slots=True)
 class DeficitBudgetSettings:
     uniform_fraction: float
-    min_weight: float
-    max_weight: float
+    focus_sharpness: float
     ema_alpha: float
     weight_update_rollouts: int
     x_cup_generation_ema_alpha: float = 0.3
@@ -91,7 +90,6 @@ class DeficitBudgetTrackSamplingController:
         self._rollout_steps = {course_key: 0 for course_key in self._course_keys}
         self._accounted_env_steps = {course_key: 0 for course_key in self._course_keys}
         self._ema_problem = {course_key: 0.0 for course_key in self._course_keys}
-        self._best_completion = {course_key: 0.0 for course_key in self._course_keys}
         self._crash_episode_count = {course_key: 0 for course_key in self._course_keys}
         self._rollouts_since_weight_update = 0
         self.update_count = 0
@@ -126,8 +124,7 @@ class DeficitBudgetTrackSamplingController:
             action_repeat=env_config.action_repeat,
             settings=DeficitBudgetSettings(
                 uniform_fraction=settings_source.deficit_budget_uniform_fraction,
-                min_weight=settings_source.deficit_budget_min_weight,
-                max_weight=settings_source.deficit_budget_max_weight,
+                focus_sharpness=settings_source.deficit_budget_focus_sharpness,
                 ema_alpha=settings_source.deficit_budget_ema_alpha,
                 weight_update_rollouts=settings_source.deficit_budget_weight_update_rollouts,
                 x_cup_generation_ema_alpha=settings_source.x_cup_rotation.ema_alpha,
@@ -281,11 +278,11 @@ class DeficitBudgetTrackSamplingController:
             action_repeat=self._action_repeat,
             update_episodes=self._settings.weight_update_rollouts,
             ema_alpha=self._settings.ema_alpha,
-            max_weight_scale=self._settings.max_weight,
+            max_weight_scale=max(1.0, self._settings.focus_sharpness),
             adaptive_completion_weight=1.0 - self._settings.uniform_fraction,
             adaptive_target_completion=1.0,
             adaptive_min_confidence_episodes=1,
-            adaptive_confidence_scale=self._settings.max_weight,
+            adaptive_confidence_scale=max(1.0, self._settings.focus_sharpness),
             update_count=self.update_count,
             episodes_since_update=self._rollouts_since_weight_update,
             entries=tuple(
@@ -332,8 +329,6 @@ class DeficitBudgetTrackSamplingController:
                 stats.generation_finished_episode_count = stats.finished_episode_count
                 stats.generation_success_sample_count = stats.success_sample_count
                 stats.generation_ema_completion_fraction = stats.ema_completion_fraction
-            if entry.ema_completion_fraction is not None:
-                self._best_completion[course_key] = max(0.0, float(entry.ema_completion_fraction))
             self._courses[course_key] = self._courses[course_key].with_runtime_generation(entry)
         self.update_count = max(0, int(restored_state.update_count))
         self._rollouts_since_weight_update = max(0, int(restored_state.episodes_since_update))
@@ -341,7 +336,7 @@ class DeficitBudgetTrackSamplingController:
     def _update_problem_scores(self) -> None:
         alpha = self._settings.ema_alpha
         for course_key, stats in self._stats.items():
-            raw_problem = self._raw_problem_score(course_key, stats)
+            raw_problem = self._raw_problem_score(stats)
             self._ema_problem[course_key] = (1.0 - alpha) * self._ema_problem[
                 course_key
             ] + alpha * raw_problem
@@ -350,42 +345,17 @@ class DeficitBudgetTrackSamplingController:
         if not any(stats.success_sample_count > 0 for stats in self._stats.values()):
             return
         for course_key, stats in self._stats.items():
-            self._ema_problem[course_key] = self._raw_problem_score(course_key, stats)
+            self._ema_problem[course_key] = self._raw_problem_score(stats)
 
-    def _raw_problem_score(self, course_key: str, stats: TrackStepStats) -> float:
+    def _raw_problem_score(self, stats: TrackStepStats) -> float:
         avg_completion = stats.ema_completion_fraction or 0.0
-        self._best_completion[course_key] = max(
-            self._best_completion[course_key],
-            avg_completion,
-        )
-        success_count = max(stats.success_sample_count, 1)
-        crash_rate = self._crash_episode_count[course_key] / success_count
-        finish_rate = stats.finished_episode_count / success_count
-        regression = max(0.0, self._best_completion[course_key] - avg_completion)
-        return (
-            1.5 * crash_rate
-            + 1.0 * (1.0 - finish_rate)
-            + 1.0 * (1.0 - avg_completion)
-            + 0.5 * regression
-        )
+        return max(0.0, 1.0 - avg_completion)
 
     def _recompute_target_weights(self) -> None:
-        values = tuple(self._ema_problem[course_key] for course_key in self._course_keys)
-        minimum = min(values)
-        maximum = max(values)
-        if maximum <= minimum:
-            normalized = {course_key: 0.0 for course_key in self._course_keys}
-        else:
-            spread = maximum - minimum
-            normalized = {
-                course_key: (self._ema_problem[course_key] - minimum) / spread
-                for course_key in self._course_keys
-            }
+        sharpness = max(0.0, float(self._settings.focus_sharpness))
         for course_key, stats in self._stats.items():
-            stats.current_weight = (
-                self._settings.min_weight
-                + (self._settings.max_weight - self._settings.min_weight) * normalized[course_key]
-            )
+            problem = max(0.0, self._ema_problem[course_key])
+            stats.current_weight = 1.0 if sharpness <= 0.0 else problem**sharpness
 
     def _target_fractions(self) -> dict[str, float]:
         uniform_share = 1.0 / len(self._course_keys)
