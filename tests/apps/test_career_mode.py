@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.apps.career_mode_cli.config import career_mode_base_config
+from rl_fzerox.apps.career_mode_cli.config import (
+    career_mode_base_config,
+    career_policy_observation_layout_shape_hint,
+)
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, EmulatorConfig
 
 
@@ -54,10 +58,36 @@ def test_career_mode_base_config_uses_save_runtime_without_policy_template(
     assert config.watch.policy_run_dir is None
     assert config.watch.policy_artifact == "latest"
     assert config.watch.policy_algorithm is None
-    assert config.watch.policy_observation_shape_hint is None
+    assert config.watch.policy_observation_layout_shape_hint is None
     assert config.watch.attempt_seed == 1234
     assert config.watch.deterministic_policy is False
     assert config.watch.control_fps == "auto"
     assert config.watch.start_manual_control is False
     assert config.watch.career_mode_race_setup is not None
     assert config.watch.career_mode_race_setup.cup_id == "jack"
+
+
+def test_career_policy_observation_layout_shape_hint_reserves_largest_preview() -> None:
+    wide_stack = ManagedRunConfig.model_validate(
+        {
+            "observation": {
+                "resolution": {"mode": "custom", "height": 72, "width": 120},
+                "frame_stack": 4,
+            }
+        }
+    )
+    tall_minimap = ManagedRunConfig.model_validate(
+        {
+            "observation": {
+                "resolution": {"mode": "custom", "height": 100, "width": 80},
+                "frame_stack": 2,
+                "minimap_layer": True,
+            }
+        }
+    )
+
+    assert career_policy_observation_layout_shape_hint((wide_stack, tall_minimap)) == (
+        100,
+        480,
+        3,
+    )

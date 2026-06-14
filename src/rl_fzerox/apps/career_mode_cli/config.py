@@ -10,7 +10,9 @@ from rl_fzerox.core.career_mode.runner.race import (
     build_save_race_execution_plan,
 )
 from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.manager.projection.assembly import emulator_data
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.schema import (
     CareerModeRaceSetupConfig,
     EmulatorConfig,
@@ -54,6 +56,13 @@ def resolve_career_mode_config(
         single_target=single_target,
         race_setup=career_mode_race_setup_config(plan.race_setup),
         label=context.target.label,
+        policy_observation_layout_shape_hint=career_policy_observation_layout_shape_hint(
+            _assigned_policy_run_configs(
+                store,
+                save_game_id=context.save_game.id,
+                fallback_run=context.policy_run,
+            )
+        ),
     )
     if delta := watch_config_delta_from_dotlist(normalize_cli_overrides(overrides)):
         config = apply_watch_config_delta(config, delta)
@@ -74,6 +83,7 @@ def career_mode_base_config(
     single_target: bool = False,
     race_setup: CareerModeRaceSetupConfig,
     label: str,
+    policy_observation_layout_shape_hint: tuple[int, int, int] | None = None,
 ) -> WatchAppConfig:
     emulator = career_mode_emulator_config(
         emulator=emulator,
@@ -95,8 +105,50 @@ def career_mode_base_config(
             deterministic_policy=deterministic_policy,
             start_manual_control=False,
             career_mode_race_setup=race_setup,
+            policy_observation_layout_shape_hint=policy_observation_layout_shape_hint,
         ),
     )
+
+
+def career_policy_observation_layout_shape_hint(
+    policy_configs: Sequence[ManagedRunConfig],
+) -> tuple[int, int, int] | None:
+    """Return one synthetic shape that reserves every assigned policy preview."""
+
+    max_preview_height = 0
+    max_preview_width = 0
+    for config in policy_configs:
+        preview_height, preview_width = _policy_observation_preview_footprint(config)
+        max_preview_height = max(max_preview_height, preview_height)
+        max_preview_width = max(max_preview_width, preview_width)
+    if max_preview_height <= 0 or max_preview_width <= 0:
+        return None
+    return max_preview_height, max_preview_width, 3
+
+
+def _assigned_policy_run_configs(
+    store: ManagerStore,
+    *,
+    save_game_id: str,
+    fallback_run: ManagedRun,
+) -> tuple[ManagedRunConfig, ...]:
+    policy_configs: list[ManagedRunConfig] = [fallback_run.config]
+    seen_run_ids = {fallback_run.id}
+    for setup in store.list_save_course_setups(save_game_id):
+        if setup.policy_run_id in seen_run_ids:
+            continue
+        policy_run = store.get_run(setup.policy_run_id)
+        if policy_run is None:
+            continue
+        seen_run_ids.add(policy_run.id)
+        policy_configs.append(policy_run.config)
+    return tuple(policy_configs)
+
+
+def _policy_observation_preview_footprint(config: ManagedRunConfig) -> tuple[int, int]:
+    height, width = config.observation.image_geometry(renderer=config.environment.renderer)
+    frame_count = int(config.observation.frame_stack) + int(config.observation.minimap_layer)
+    return int(height), int(width) * max(1, frame_count)
 
 
 def career_mode_emulator_config(

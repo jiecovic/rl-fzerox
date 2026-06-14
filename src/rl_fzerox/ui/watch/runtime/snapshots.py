@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from fzerox_emulator import FZeroXTelemetry, RaceControlState, stacked_observation_channels
+from fzerox_emulator import FZeroXTelemetry, RaceControlState
 from fzerox_emulator.arrays import (
     AudioFrameCounts,
     ControllerMaskBatch,
@@ -447,22 +447,12 @@ def _policy_observation_shape(
     config: WatchAppConfig,
     observation: ObservationValue | None,
 ) -> tuple[int, ...] | None:
+    del config
     if observation is not None:
         return tuple(
             int(value) for value in observation_access.observation_image(observation).shape
         )
-    if config.watch.policy_observation_shape_hint is not None:
-        return tuple(int(value) for value in config.watch.policy_observation_shape_hint)
-    if config.watch.managed_save_game_id is not None:
-        return None
-    height, width = config.env.observation.image_geometry(renderer=config.emulator.renderer)
-    channels = stacked_observation_channels(
-        3,
-        frame_stack=config.env.observation.frame_stack,
-        stack_mode=config.env.observation.stack_mode,
-        minimap_layer=config.env.observation.minimap_layer,
-    )
-    return int(height), int(width), int(channels)
+    return None
 
 
 def _reference_observation_state(

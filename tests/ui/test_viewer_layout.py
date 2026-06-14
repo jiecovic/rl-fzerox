@@ -1,10 +1,12 @@
 # tests/ui/test_viewer_layout.py
 import os
+from pathlib import Path
 
 import numpy as np
 import pygame
 
 from fzerox_emulator import RaceControlState, display_size
+from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig, WatchConfig
 from rl_fzerox.ui.watch.app import (
     _initial_policy_observation_layout_shape,
     _next_panel_tab_index,
@@ -155,6 +157,34 @@ def test_menu_snapshot_keeps_previous_policy_observation_layout_shape() -> None:
         policy_shape,
         _Snapshot((84, 84, 12)),
     ) == (84, 84, 12)
+
+
+def test_policy_observation_layout_shape_hint_stabilizes_menu_layout(
+    tmp_path: Path,
+) -> None:
+    class _Snapshot:
+        def __init__(self, shape: tuple[int, ...] | None) -> None:
+            self.policy_observation_shape = shape
+
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        watch=WatchConfig(policy_observation_layout_shape_hint=(100, 480, 3)),
+    )
+
+    assert _initial_policy_observation_layout_shape(_Snapshot(None), config=config) == (
+        100,
+        480,
+        3,
+    )
+    assert _next_policy_observation_layout_shape(
+        (100, 480, 3),
+        _Snapshot((72, 96, 6)),
+        config=config,
+    ) == (100, 480, 3)
 
 
 def test_panel_tab_hint_shows_active_tab_position() -> None:

@@ -71,7 +71,7 @@ class WatchConfig(BaseModel):
     unlock_target_label: str | None = None
     start_manual_control: bool = False
     career_mode_race_setup: CareerModeRaceSetupConfig | None = None
-    policy_observation_shape_hint: tuple[PositiveInt, PositiveInt, PositiveInt] | None = None
+    policy_observation_layout_shape_hint: tuple[PositiveInt, PositiveInt, PositiveInt] | None = None
     recording: WatchRecordingConfig = Field(default_factory=WatchRecordingConfig)
 
     @model_validator(mode="after")

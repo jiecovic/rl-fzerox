@@ -92,7 +92,10 @@ def run_viewer(
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
         auxiliary_metrics.observe_snapshot(snapshot)
         live_episode_series = getattr(snapshot, "live_episode_series", None)
-        policy_observation_layout_shape = _initial_policy_observation_layout_shape(snapshot)
+        policy_observation_layout_shape = _initial_policy_observation_layout_shape(
+            snapshot,
+            config=config,
+        )
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -143,6 +146,7 @@ def run_viewer(
                 policy_observation_layout_shape = _next_policy_observation_layout_shape(
                     policy_observation_layout_shape,
                     snapshot,
+                    config=config,
                 )
                 auxiliary_metrics.observe_snapshot(snapshot)
                 latest_live_episode_series = getattr(snapshot, "live_episode_series", None)
@@ -238,17 +242,35 @@ def _default_policy_observation_layout_shape() -> tuple[int, int, int]:
     return (72, 96, 3)
 
 
-def _initial_policy_observation_layout_shape(snapshot: object) -> tuple[int, ...]:
+def _initial_policy_observation_layout_shape(
+    snapshot: object,
+    *,
+    config: WatchAppConfig | None = None,
+) -> tuple[int, ...]:
     return (
-        _snapshot_policy_observation_shape(snapshot) or _default_policy_observation_layout_shape()
+        _snapshot_policy_observation_shape(snapshot)
+        or _config_policy_observation_layout_shape(config)
+        or _default_policy_observation_layout_shape()
     )
 
 
 def _next_policy_observation_layout_shape(
     current_shape: tuple[int, ...],
     snapshot: object,
+    *,
+    config: WatchAppConfig | None = None,
 ) -> tuple[int, ...]:
+    if (hint_shape := _config_policy_observation_layout_shape(config)) is not None:
+        return hint_shape
     return _snapshot_policy_observation_shape(snapshot) or current_shape
+
+
+def _config_policy_observation_layout_shape(
+    config: WatchAppConfig | None,
+) -> tuple[int, ...] | None:
+    if config is None or config.watch.policy_observation_layout_shape_hint is None:
+        return None
+    return tuple(int(value) for value in config.watch.policy_observation_layout_shape_hint)
 
 
 def _snapshot_policy_observation_shape(snapshot: object) -> tuple[int, ...] | None:

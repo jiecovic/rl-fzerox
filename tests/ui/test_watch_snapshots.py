@@ -300,7 +300,7 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
         assert np.array_equal(snapshot.policy_action, final_action)
 
 
-def test_menu_snapshot_has_layout_shape_without_policy_observation(tmp_path: Path) -> None:
+def test_menu_snapshot_has_no_policy_observation_shape(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
@@ -335,7 +335,7 @@ def test_menu_snapshot_has_layout_shape_without_policy_observation(tmp_path: Pat
     )
 
     assert snapshot.policy_observation is None
-    assert snapshot.policy_observation_shape == (84, 84, 12)
+    assert snapshot.policy_observation_shape is None
     assert _pixel(snapshot.raw_frame) == 0
 
 
