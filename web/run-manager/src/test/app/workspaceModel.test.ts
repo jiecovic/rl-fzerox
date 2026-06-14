@@ -149,4 +149,23 @@ describe("workspace save-game status merge", () => {
 
     expect(upsertSaveGameStatus(current, status)).toBe(current);
   });
+
+  it("ignores timestamp-only slim status updates", () => {
+    const saveGame = saveGameFixture();
+    const current = [saveGame];
+    const status: ManagedSaveGameStatus = {
+      id: saveGame.id,
+      name: saveGame.name,
+      status: saveGame.status,
+      runner_active: saveGame.runner_active,
+      save_path: saveGame.save_path,
+      created_at: saveGame.created_at,
+      updated_at: "2026-06-02T10:31:30+00:00",
+      last_finished_at: saveGame.last_finished_at,
+      runner_settings: saveGame.runner_settings,
+      unlock_progress: saveGame.unlock_progress,
+    };
+
+    expect(upsertSaveGameStatus(current, status)).toBe(current);
+  });
 });

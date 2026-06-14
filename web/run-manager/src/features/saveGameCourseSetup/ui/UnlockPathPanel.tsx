@@ -1,5 +1,5 @@
 // web/run-manager/src/features/saveGameCourseSetup/ui/UnlockPathPanel.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
 import { formatUnlockTargetStatus, unlockTargetStatusClass } from "@/entities/saveGame/model";
 import type {
@@ -75,6 +75,7 @@ interface UnlockPathPanelProps {
 }
 
 type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
+const EMPTY_STRING_ARRAY: readonly string[] = [];
 
 export function UnlockPathPanel({
   assignableRuns,
@@ -139,20 +140,27 @@ export function UnlockPathPanel({
     onCourseSetupDirtyChange(courseSetupsDirty);
   }, [courseSetupsDirty, onCourseSetupDirtyChange]);
 
-  function updateCourseSetupDraft(values: CourseSetupValues, draft: PolicyArtifactDraft) {
-    setCourseSetupDrafts((current) => ({
-      ...current,
-      [courseSetupKey(values)]: {
-        ...values,
-        engineSettingRawValue: draft.engineSettingRawValue,
-        policyArtifact: draft.policyArtifact,
-        policyRunId: draft.policyRunId,
-        vehicleId: draft.vehicleId,
-      },
-    }));
-  }
+  const unlockedVehicleIds = useStableStringArray(
+    saveGame.unlock_progress?.unlocked_vehicle_ids ?? EMPTY_STRING_ARRAY,
+  );
 
-  function updateCupSetupDraft(values: CupSetupValues, vehicleId: string) {
+  const updateCourseSetupDraft = useCallback(
+    (values: CourseSetupValues, draft: PolicyArtifactDraft) => {
+      setCourseSetupDrafts((current) => ({
+        ...current,
+        [courseSetupKey(values)]: {
+          ...values,
+          engineSettingRawValue: draft.engineSettingRawValue,
+          policyArtifact: draft.policyArtifact,
+          policyRunId: draft.policyRunId,
+          vehicleId: draft.vehicleId,
+        },
+      }));
+    },
+    [],
+  );
+
+  const updateCupSetupDraft = useCallback((values: CupSetupValues, vehicleId: string) => {
     setCupSetupDrafts((current) => ({
       ...current,
       [cupSetupKey(values)]: {
@@ -160,64 +168,67 @@ export function UnlockPathPanel({
         vehicleId,
       },
     }));
-  }
+  }, []);
 
-  function applyCourseSetupDrafts(
-    setups: readonly CourseSetupValues[],
-    draft: PolicySelectionDraft,
-  ) {
-    if (draft.policyRunId === "") {
-      return;
-    }
-    setCourseSetupDrafts((current) => {
-      const next = { ...current };
-      for (const setup of setups) {
-        const currentDraft = current[courseSetupKey(setup)] ?? {
-          ...setup,
-          ...EMPTY_COURSE_SETUP_DRAFT,
-        };
-        next[courseSetupKey(setup)] = {
-          ...setup,
-          engineSettingRawValue: currentDraft.engineSettingRawValue,
-          policyArtifact: draft.policyArtifact,
-          policyRunId: draft.policyRunId,
-          vehicleId: currentDraft.vehicleId,
-        };
+  const applyCourseSetupDrafts = useCallback(
+    (setups: readonly CourseSetupValues[], draft: PolicySelectionDraft) => {
+      if (draft.policyRunId === "") {
+        return;
       }
-      return next;
-    });
-  }
+      setCourseSetupDrafts((current) => {
+        const next = { ...current };
+        for (const setup of setups) {
+          const currentDraft = current[courseSetupKey(setup)] ?? {
+            ...setup,
+            ...EMPTY_COURSE_SETUP_DRAFT,
+          };
+          next[courseSetupKey(setup)] = {
+            ...setup,
+            engineSettingRawValue: currentDraft.engineSettingRawValue,
+            policyArtifact: draft.policyArtifact,
+            policyRunId: draft.policyRunId,
+            vehicleId: currentDraft.vehicleId,
+          };
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
-  function resetEngineSetups(setups: readonly CourseSetupValues[]) {
+  const resetEngineSetups = useCallback((setups: readonly CourseSetupValues[]) => {
     setCourseSetupDrafts((current) => resetCourseEngineDrafts(current, setups));
-  }
+  }, []);
 
-  async function importEngineTuningForDraft(draft: PolicySelectionDraft) {
-    if (draft.policyRunId === "") {
-      return;
-    }
-    const courseSetups = courseSetupRecommendationRequests({
-      courseSetupDrafts,
-      cupSetupDrafts,
-      cups,
-      draft,
-    });
-    const recommendations = await onImportEngineTuning({
-      courseSetups,
-      policyArtifact: draft.policyArtifact,
-      policyRunId: draft.policyRunId,
-      saveGameId: saveGame.id,
-    });
-    setCourseSetupDrafts((current) =>
-      applyEngineRecommendationsToDrafts({
-        current,
+  const importEngineTuningForDraft = useCallback(
+    async (draft: PolicySelectionDraft) => {
+      if (draft.policyRunId === "") {
+        return;
+      }
+      const courseSetups = courseSetupRecommendationRequests({
+        courseSetupDrafts,
+        cupSetupDrafts,
+        cups,
         draft,
-        recommendations,
-      }),
-    );
-  }
+      });
+      const recommendations = await onImportEngineTuning({
+        courseSetups,
+        policyArtifact: draft.policyArtifact,
+        policyRunId: draft.policyRunId,
+        saveGameId: saveGame.id,
+      });
+      setCourseSetupDrafts((current) =>
+        applyEngineRecommendationsToDrafts({
+          current,
+          draft,
+          recommendations,
+        }),
+      );
+    },
+    [courseSetupDrafts, cupSetupDrafts, cups, onImportEngineTuning, saveGame.id],
+  );
 
-  async function saveCourseSetups() {
+  const saveCourseSetups = useCallback(async () => {
     if (dirtySetupCount === 0 || savingCourseSetups) {
       return;
     }
@@ -248,7 +259,20 @@ export function UnlockPathPanel({
     } finally {
       setSavingSetups(false);
     }
-  }
+  }, [
+    courseSetupDrafts,
+    cupSetupDrafts,
+    dirtySetupCount,
+    onUpsertCourseSetup,
+    onUpsertCupSetup,
+    saveGame.id,
+    savedCourseSetupDrafts,
+    savedCupSetupDrafts,
+    savingCourseSetups,
+  ]);
+  const triggerSaveCourseSetups = useCallback(() => {
+    void saveCourseSetups();
+  }, [saveCourseSetups]);
 
   return (
     <section className="grid gap-5 border border-app-border bg-app-surface p-5">
@@ -281,11 +305,11 @@ export function UnlockPathPanel({
         savingCourseSetups={savingCourseSetups}
         cupSetupDrafts={cupSetupDrafts}
         updating={updating}
-        unlockedVehicleIds={saveGame.unlock_progress?.unlocked_vehicle_ids ?? []}
+        unlockedVehicleIds={unlockedVehicleIds}
         onCourseSetupDraftChange={updateCourseSetupDraft}
         onCupSetupDraftChange={updateCupSetupDraft}
         onResetEngineSetups={resetEngineSetups}
-        onSaveSetups={() => void saveCourseSetups()}
+        onSaveSetups={triggerSaveCourseSetups}
       />
     </section>
   );
@@ -460,4 +484,13 @@ function applyEngineRecommendationsToDrafts({
     };
   }
   return next;
+}
+
+function useStableStringArray(values: readonly string[]): readonly string[] {
+  const stable = useRef<{ key: string; values: readonly string[] } | null>(null);
+  const key = values.join("\u001f");
+  if (stable.current?.key !== key) {
+    stable.current = { key, values };
+  }
+  return stable.current.values;
 }

@@ -1,5 +1,5 @@
 // web/run-manager/src/features/saveGameCourseSetup/ui/CourseSetupPanels.tsx
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { courseCardClass } from "@/entities/runConfig/ui/sections/tracks/coursePoolStyle";
 import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/entities/runConfig/ui/sections/tracks/TrackMinimap";
@@ -38,7 +38,7 @@ const EMPTY_POLICY_SELECTION_DRAFT: PolicySelectionDraft = {
   policyRunId: "",
 };
 
-export function GlobalPolicyPanel({
+export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
   assignableRuns,
   cups,
   onImportEngineTuning,
@@ -115,9 +115,9 @@ export function GlobalPolicyPanel({
       </div>
     </div>
   );
-}
+});
 
-export function CourseSetupPanel({
+export const CourseSetupPanel = memo(function CourseSetupPanel({
   assignableRuns,
   cups,
   dirtySetupCount,
@@ -147,7 +147,7 @@ export function CourseSetupPanel({
   unlockedVehicleIds: readonly string[];
 }) {
   const [collapsedCupIds, setCollapsedCupIds] = useState<readonly string[]>([]);
-  const collapsedCupIdSet = new Set(collapsedCupIds);
+  const collapsedCupIdSet = useMemo(() => new Set(collapsedCupIds), [collapsedCupIds]);
   const saveDisabled = dirtySetupCount === 0 || savingCourseSetups || updating;
   const allCourseSetups = courseSetupsForCups(cups);
 
@@ -227,9 +227,9 @@ export function CourseSetupPanel({
       </div>
     </div>
   );
-}
+});
 
-function CupSetupBlock({
+const CupSetupBlock = memo(function CupSetupBlock({
   assignableRuns,
   collapsed,
   cup,
@@ -413,7 +413,7 @@ function CupSetupBlock({
       )}
     </details>
   );
-}
+});
 
 function PolicySelectionSelect({
   assignableRuns,

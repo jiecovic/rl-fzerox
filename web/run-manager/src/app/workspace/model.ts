@@ -204,7 +204,6 @@ function sameSaveGameStatus(saveGame: ManagedSaveGame, status: ManagedSaveGameSt
     saveGame.runner_active === status.runner_active &&
     saveGame.save_path === status.save_path &&
     saveGame.created_at === status.created_at &&
-    saveGame.updated_at === status.updated_at &&
     saveGame.last_finished_at === status.last_finished_at &&
     JSON.stringify(saveGame.runner_settings) === JSON.stringify(status.runner_settings) &&
     JSON.stringify(saveGame.unlock_progress) === JSON.stringify(status.unlock_progress)
