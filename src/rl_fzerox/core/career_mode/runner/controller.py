@@ -5,7 +5,6 @@ from collections import deque
 from pathlib import Path
 from typing import Protocol
 
-from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
 from rl_fzerox.core.career_mode.runner.menu import (
     GP_MENU_ORDER,
@@ -36,6 +35,11 @@ from rl_fzerox.core.career_mode.runner.save_file import SaveRamSession
 from rl_fzerox.core.career_mode.runner.setup import (
     career_mode_race_setup_config,
     save_race_setup_from_config,
+)
+from rl_fzerox.core.career_mode.runner.terminal import (
+    post_terminal_progress_screen,
+    race_terminal_reason,
+    terminal_info,
 )
 from rl_fzerox.core.career_mode.runner.view import (
     CareerControllerViewState,
@@ -718,23 +722,23 @@ class CareerModeController:
     ) -> bool:
         if self._phase == CareerPhase.CONTINUE_AFTER_RACE:
             return False
-        terminal_reason = _race_terminal_reason(
+        terminal_reason = race_terminal_reason(
             session=session,
             info=info,
         )
         if terminal_reason is None:
             return False
         self._reset_camera_sync()
-        terminal_info = _terminal_info(
+        resolved_terminal_info = terminal_info(
             session=session,
             info=info,
             terminal_reason=terminal_reason,
         )
-        info.update(terminal_info)
+        info.update(resolved_terminal_info)
         transition = self._progress.handle_terminal_race(
             session=session,
             setup=self._setup,
-            info=terminal_info,
+            info=resolved_terminal_info,
         )
         self._remember_finished_attempt(transition)
         if transition.next_plan is not None:
@@ -831,7 +835,7 @@ class CareerModeController:
         ):
             return False
         facts = MenuFacts.from_info(info)
-        if not _post_terminal_progress_screen(facts):
+        if not post_terminal_progress_screen(facts):
             return False
         if self._last_progress_sync_continue_pulse == self._continue_after_race_pulses:
             return False
@@ -931,93 +935,6 @@ def _cup_selection_input(*, selected_cup_index: int | None, target_cup_index: in
     if selected_cup_index is None or selected_cup_index < target_cup_index:
         return MenuInput.RIGHT
     return MenuInput.LEFT
-
-
-def _post_terminal_progress_screen(facts: MenuFacts) -> bool:
-    return (
-        facts.is_gp_result_screen
-        or facts.is_gp_next_course_screen
-        or facts.is_post_gp_screen
-        or (facts.in_gp_race and facts.terminal_race_result)
-    )
-
-
-def _race_terminal_reason(
-    *,
-    session: CareerRuntimeSession,
-    info: dict[str, object],
-) -> str | None:
-    info_reason = _info_terminal_reason(info=info)
-    if info_reason is not None:
-        return info_reason
-
-    telemetry = session.emulator.try_read_telemetry()
-    if telemetry is None:
-        return None
-    return _telemetry_terminal_reason(telemetry)
-
-
-def _info_terminal_reason(
-    *,
-    info: dict[str, object],
-) -> str | None:
-    facts = MenuFacts.from_info(info)
-    if facts.is_post_gp_screen:
-        return "finished"
-    reason = _game_terminal_reason(_non_empty_str(info.get("termination_reason")))
-    if reason is not None:
-        return reason
-    for flag_key, flag_reason in (
-        ("entered_finished", "finished"),
-        ("entered_retired", "retired"),
-        ("entered_crashed", "crashed"),
-    ):
-        if info.get(flag_key) is True:
-            return flag_reason
-    return None
-
-
-def _terminal_info(
-    *,
-    session: CareerRuntimeSession,
-    info: dict[str, object],
-    terminal_reason: str,
-) -> dict[str, object]:
-    resolved_info = dict(info)
-    resolved_info["termination_reason"] = terminal_reason
-    resolved_info["career_mode_race_terminal"] = True
-
-    telemetry = session.emulator.try_read_telemetry()
-    if telemetry is None:
-        return resolved_info
-    resolved_info.setdefault("race_time_ms", telemetry.player.race_time_ms)
-    resolved_info.setdefault("position", telemetry.player.position)
-    resolved_info.setdefault("track_id", course_id_from_info(resolved_info))
-    return resolved_info
-
-
-def _telemetry_terminal_reason(telemetry: FZeroXTelemetry) -> str | None:
-    reason = _game_terminal_reason(telemetry.player.terminal_reason)
-    if reason is not None:
-        return reason
-    return None
-
-
-def _game_terminal_reason(reason: str | None) -> str | None:
-    if reason in {"finished", "retired", "crashed"}:
-        return reason
-    return None
-
-
-def _number_info(info: dict[str, object], key: str) -> float | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return None
-    return float(value)
-
-
-def _non_empty_str(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None
 
 
 def _engine_adjust_tap_count(steps: tuple[RawMenuStep, ...]) -> int:
