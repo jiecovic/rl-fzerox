@@ -33,7 +33,6 @@ from rl_fzerox.apps.recording.video import (
     _ffmpeg_command,
     as_pcm16_samples,
     remux_recording_to_mp4,
-    upscale_recording_to_mp4,
 )
 from rl_fzerox.apps.recording.video import (
     attempt_output_path as _attempt_output_path,
@@ -189,70 +188,6 @@ def test_remux_recording_to_mp4_reports_ffmpeg_errors(
 
     with pytest.raises(RuntimeError, match="bad input"):
         remux_recording_to_mp4(source_path, ffmpeg_path="ffmpeg")
-
-
-def test_upscale_recording_to_mp4_encodes_youtube_sized_video(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    source_path = tmp_path / "race.mkv"
-    source_path.write_bytes(b"video")
-    commands: list[list[str]] = []
-
-    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
-        del kwargs
-        commands.append(command)
-        return SimpleNamespace(returncode=0, stderr=b"")
-
-    monkeypatch.setattr("rl_fzerox.apps.recording.video.subprocess.run", fake_run)
-
-    output_path = upscale_recording_to_mp4(source_path, ffmpeg_path="ffmpeg")
-
-    assert output_path == tmp_path / "race.mp4"
-    assert commands == [
-        [
-            "ffmpeg",
-            "-y",
-            "-loglevel",
-            "error",
-            "-i",
-            str(source_path),
-            "-vf",
-            "scale=1280:960:flags=neighbor",
-            "-c:v",
-            "libx264",
-            "-crf",
-            "18",
-            "-preset",
-            "slow",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-movflags",
-            "+faststart",
-            str(tmp_path / "race.mp4"),
-        ]
-    ]
-
-
-def test_upscale_recording_to_mp4_reports_ffmpeg_errors(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    source_path = tmp_path / "race.mkv"
-    source_path.write_bytes(b"video")
-
-    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
-        del command, kwargs
-        return SimpleNamespace(returncode=1, stderr=b"bad upscale")
-
-    monkeypatch.setattr("rl_fzerox.apps.recording.video.subprocess.run", fake_run)
-
-    with pytest.raises(RuntimeError, match="bad upscale"):
-        upscale_recording_to_mp4(source_path, ffmpeg_path="ffmpeg")
 
 
 def test_as_pcm16_samples_requires_flat_stereo_pairs() -> None:

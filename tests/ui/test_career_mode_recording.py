@@ -204,7 +204,7 @@ def test_career_recorder_segments_by_attempt_and_marks_failed_attempts(
         "career.segment-001-clear-novice-jack-cup.mkv",
         "career.segment-002-clear-novice-jack-cup.mkv",
     ]
-    assert [len(writer.frames) for writer in writers] == [3, 2, 1]
+    assert [len(writer.frames) for writer in writers] == [3, 1, 2]
     assert not (tmp_path / "career.segment-001-clear-novice-jack-cup.mkv").exists()
     assert (tmp_path / "career.segment-001-failed-attempt-clear-novice-jack-cup.mkv").exists()
     assert (tmp_path / "career.segment-002-clear-novice-jack-cup.mkv").exists()
@@ -289,7 +289,7 @@ def test_career_segment_recording_path_sanitizes_label() -> None:
     )
 
 
-def test_career_mp4_finalizer_upscales_mkv_segments(
+def test_career_mp4_finalizer_remuxes_mkv_segments(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -298,7 +298,7 @@ def test_career_mp4_finalizer_upscales_mkv_segments(
     def fake_resolve_ffmpeg_path() -> str:
         return "ffmpeg"
 
-    def fake_upscale_recording_to_mp4(
+    def fake_remux_recording_to_mp4(
         path: Path,
         *,
         ffmpeg_path: str,
@@ -311,8 +311,8 @@ def test_career_mp4_finalizer_upscales_mkv_segments(
         fake_resolve_ffmpeg_path,
     )
     monkeypatch.setattr(
-        "rl_fzerox.ui.watch.runtime.career_mode.recording.upscale_recording_to_mp4",
-        fake_upscale_recording_to_mp4,
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.remux_recording_to_mp4",
+        fake_remux_recording_to_mp4,
     )
     finalizer = _Mp4RecordingFinalizer()
     mkv_path = tmp_path / "segment.mkv"

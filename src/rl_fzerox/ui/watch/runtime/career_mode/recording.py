@@ -12,9 +12,9 @@ from fzerox_emulator.arrays import Pcm16Samples, RgbFrame
 from rl_fzerox.apps.recording.video import (
     FfmpegRgbWriter,
     as_rgb_frame,
+    remux_recording_to_mp4,
     resolve_ffmpeg_path,
     resolve_video_fps,
-    upscale_recording_to_mp4,
 )
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
@@ -96,6 +96,7 @@ class CareerModeFrameRecorder:
         normalized_frame = as_rgb_frame(frame)
         self._full_writer.write(normalized_frame)
         self._full_writer.write_audio(audio_samples)
+        self._update_segment_status(info)
         segment = self._recording_segment(info)
         if segment is None:
             return
@@ -180,10 +181,13 @@ class CareerModeFrameRecorder:
         return writer.__enter__()
 
     def _recording_segment(self, info: Mapping[str, object]) -> _SegmentIdentity | None:
+        label = _segment_label(info)
+        attempt_id = _attempt_id(info)
         if (
             _continuing_race_result(info)
             and self._segment_key is not None
             and self._segment_label is not None
+            and not self._retry_attempt_started(attempt_id, info)
         ):
             return _SegmentIdentity(
                 key=self._segment_key,
@@ -194,18 +198,27 @@ class CareerModeFrameRecorder:
             self._current_segment_attempt_finished(info)
             and self._segment_key is not None
             and self._segment_label is not None
+            and not self._retry_attempt_started(attempt_id, info)
         ):
             return _SegmentIdentity(
                 key=self._segment_key,
                 label=self._segment_label,
                 attempt_id=self._segment_attempt_id,
             )
-        label = _segment_label(info)
         if label is None:
             return None
-        attempt_id = _attempt_id(info)
         key = f"attempt:{attempt_id}" if attempt_id is not None else f"target:{label}"
         return _SegmentIdentity(key=key, label=label, attempt_id=attempt_id)
+
+    def _retry_attempt_started(self, attempt_id: str | None, info: Mapping[str, object]) -> bool:
+        if attempt_id is None or self._segment_attempt_id is None:
+            return False
+        if attempt_id == self._segment_attempt_id:
+            return False
+        return (
+            _last_finished_attempt_id(info) == self._segment_attempt_id
+            and _last_finished_attempt_status(info) == "failed"
+        )
 
     def _update_segment_status(self, info: Mapping[str, object]) -> None:
         if self._segment_attempt_id is None:
@@ -235,7 +248,7 @@ class CareerModeFrameRecorder:
 
 
 class _Mp4RecordingFinalizer:
-    """Encode closed live Matroska recordings to YouTube-friendly MP4 in the background."""
+    """Remux closed live Matroska recordings to MP4 without blocking playback."""
 
     def __init__(self) -> None:
         self._ffmpeg_path = resolve_ffmpeg_path()
@@ -250,7 +263,7 @@ class _Mp4RecordingFinalizer:
             return
         self._futures.append(
             self._executor.submit(
-                upscale_recording_to_mp4,
+                remux_recording_to_mp4,
                 path,
                 ffmpeg_path=self._ffmpeg_path,
             )

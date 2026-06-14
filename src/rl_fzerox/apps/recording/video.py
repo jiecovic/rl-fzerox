@@ -239,59 +239,6 @@ def remux_recording_to_mp4(
     return target_path
 
 
-def upscale_recording_to_mp4(
-    input_path: Path,
-    *,
-    ffmpeg_path: str,
-    output_path: Path | None = None,
-    width: int = 1280,
-    height: int = 960,
-) -> Path:
-    source_path = input_path.expanduser()
-    target_path = (output_path or source_path.with_suffix(".mp4")).expanduser()
-    if width <= 0 or height <= 0:
-        raise ValueError("upscaled MP4 dimensions must be positive")
-    if target_path == source_path:
-        raise ValueError(f"upscale target must differ from source path: {source_path}")
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    command = [
-        ffmpeg_path,
-        "-y",
-        "-loglevel",
-        "error",
-        "-i",
-        str(source_path),
-        "-vf",
-        f"scale={width}:{height}:flags=neighbor",
-        "-c:v",
-        "libx264",
-        "-crf",
-        "18",
-        "-preset",
-        "slow",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-movflags",
-        "+faststart",
-        str(target_path),
-    ]
-    result = subprocess.run(  # noqa: S603
-        command,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0:
-        detail = result.stderr.decode(errors="replace").strip()
-        suffix = f": {detail}" if detail else ""
-        raise RuntimeError(f"ffmpeg upscale failed with exit code {result.returncode}{suffix}")
-    return target_path
-
-
 def as_rgb_frame(frame: NumpyArray) -> RgbFrame:
     if frame.ndim != 3 or frame.shape[2] != 3:
         raise ValueError(f"expected RGB frame with shape HxWx3, got {frame.shape}")
