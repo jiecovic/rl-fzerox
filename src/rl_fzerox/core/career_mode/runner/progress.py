@@ -114,15 +114,10 @@ class CareerAttemptProgress:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
 
-        target_already_succeeded = _target_succeeded(self._unlock_progress.targets, setup)
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
-        if not target_already_succeeded and _target_succeeded(progress.targets, setup):
-            return self._finish_and_advance(
-                info=info,
-                status="succeeded",
-                failure_reason=None,
-            )
+        if _target_succeeded(progress.targets, setup):
+            return CareerProgressTransition(attempt_finished=False)
 
         if _keeps_current_gp_attempt(info):
             return CareerProgressTransition(attempt_finished=False)
@@ -143,12 +138,11 @@ class CareerAttemptProgress:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
 
-        target_already_succeeded = _target_succeeded(self._unlock_progress.targets, setup)
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
         if not _target_succeeded(progress.targets, setup):
             return CareerProgressTransition(attempt_finished=False)
-        if target_already_succeeded and not _is_post_gp_completion(info):
+        if not _is_post_gp_completion(info):
             return CareerProgressTransition(attempt_finished=False)
         return self._finish_and_advance(
             info=info,
