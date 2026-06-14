@@ -36,7 +36,7 @@ def test_career_worker_marks_running_attempt_failed(tmp_path: Path) -> None:
     assert attempts[0].failure_reason == "career mode runner failed"
 
 
-def test_career_worker_observes_terminal_result_before_policy_start() -> None:
+def test_career_worker_waits_for_race_exit_before_policy_start_observation() -> None:
     assert _should_observe_policy_transition(
         policy_owns_control=True,
         active_policy_started=False,
@@ -46,7 +46,7 @@ def test_career_worker_observes_terminal_result_before_policy_start() -> None:
         policy_owns_control=True,
         active_policy_started=False,
         info={"game_mode": "gp_race", "termination_reason": "finished"},
-    ) is True
+    ) is False
     assert _should_observe_policy_transition(
         policy_owns_control=True,
         active_policy_started=False,

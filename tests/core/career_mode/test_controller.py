@@ -1,8 +1,20 @@
 # tests/core/career_mode/test_controller.py
 from __future__ import annotations
 
-from rl_fzerox.core.career_mode.runner.controller import _cup_selection_input
-from rl_fzerox.core.career_mode.runner.menu import MENU_TIMING, MenuInput, engine_adjust_steps
+from pathlib import Path
+
+from rl_fzerox.core.career_mode.runner.controller import (
+    CareerModeController,
+    _cup_selection_input,
+)
+from rl_fzerox.core.career_mode.runner.menu import (
+    MENU_TIMING,
+    CareerPhase,
+    MenuInput,
+    engine_adjust_steps,
+)
+from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
 def test_cup_selection_moves_left_when_target_is_before_selected_cup() -> None:
@@ -41,3 +53,85 @@ def test_engine_adjust_steps_cap_burst_by_remaining_safety_budget() -> None:
 
 def test_engine_adjust_steps_empty_when_target_already_selected() -> None:
     assert engine_adjust_steps(current=50, target=50) == ()
+
+
+def test_policy_race_continues_terminal_gp_result_screen(tmp_path: Path) -> None:
+    controller = _controller(tmp_path)
+    controller._phase = CareerPhase.POLICY_RACE
+
+    step = controller.next_raw_step(
+        info={"game_mode": "gp_race", "termination_reason": "finished"},
+    )
+
+    assert step is not None
+    assert step.menu_input is MenuInput.ACCEPT
+    assert step.phase == "continue_after_race:accept:1"
+    assert controller.phase is CareerPhase.CONTINUE_AFTER_RACE
+
+    settle_step = controller.next_raw_step(
+        info={"game_mode": "gp_race", "termination_reason": "finished"},
+    )
+
+    assert settle_step is not None
+    assert settle_step.menu_input is MenuInput.NEUTRAL
+    assert settle_step.phase == "continue_after_race:accept:1:settle"
+
+
+def test_no_active_attempt_continues_terminal_gp_result_screen(tmp_path: Path) -> None:
+    controller = _controller(tmp_path)
+    controller._progress._attempt_id = None
+    controller._phase = CareerPhase.WAIT_FOR_GP_RACE
+
+    step = controller.next_raw_step(
+        info={"game_mode": "gp_race", "termination_reason": "finished"},
+    )
+
+    assert step is not None
+    assert step.menu_input is MenuInput.ACCEPT
+    assert step.phase == "continue_after_race:accept:1"
+    assert controller.phase is CareerPhase.CONTINUE_AFTER_RACE
+
+    settle_step = controller.next_raw_step(
+        info={"game_mode": "gp_race", "termination_reason": "finished"},
+    )
+
+    assert settle_step is not None
+    assert settle_step.menu_input is MenuInput.NEUTRAL
+    assert settle_step.phase == "continue_after_race:accept:1:settle"
+
+
+def _controller(tmp_path: Path) -> CareerModeController:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    save_game = store.create_save_game(
+        name="Career Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    attempt = store.start_save_attempt(
+        save_game_id=save_game.id,
+        target_kind="clear_gp_cup",
+        difficulty="novice",
+        cup_id="jack",
+    )
+    return CareerModeController(
+        _race_setup(),
+        db_path=db_path,
+        save_game_id=save_game.id,
+        attempt_id=attempt.id,
+        device="cpu",
+    )
+
+
+def _race_setup() -> CareerModeRaceSetupConfig:
+    return CareerModeRaceSetupConfig(
+        difficulty="novice",
+        cup_id="jack",
+        course_id=None,
+        vehicle_id="blue_falcon",
+        vehicle_display_name="Blue Falcon",
+        character_index=0,
+        machine_select_slot=0,
+        machine_select_row=0,
+        machine_select_column=0,
+        engine_setting_raw_value=50,
+    )

@@ -113,10 +113,14 @@ class CareerModeFrameRecorder:
         if segment.key != self._segment_key:
             self._start_segment(segment)
         self._update_segment_status(info)
-        self._close_finished_segment(info)
+        close_after_frame = self._should_close_finished_segment_after_frame(info)
+        if not close_after_frame:
+            self._close_finished_segment(info)
         if self._segment_writer is not None:
             self._segment_writer.write(normalized_frame)
             self._segment_writer.write_audio(audio_samples)
+            if close_after_frame:
+                self._close_segment_writer()
 
     def close(self) -> None:
         errors: list[Exception] = []
@@ -259,6 +263,9 @@ class CareerModeFrameRecorder:
             return
         self._close_segment_writer()
 
+    def _should_close_finished_segment_after_frame(self, info: Mapping[str, object]) -> bool:
+        return self._segment_status in {"succeeded", "failed"} and _terminal_result(info)
+
 
 class _Mp4RecordingFinalizer:
     """Remux closed live Matroska recordings to MP4 without blocking playback."""
@@ -367,6 +374,10 @@ def _last_finished_attempt_status(info: Mapping[str, object]) -> str | None:
 
 def _continuing_race_result(info: Mapping[str, object]) -> bool:
     return info.get("career_mode_fsm_continuing_result") is True
+
+
+def _terminal_result(info: Mapping[str, object]) -> bool:
+    return info.get("career_mode_fsm_terminal_result") is True
 
 
 def _finalizer_job_notice(job: _FinalizerJob) -> str:

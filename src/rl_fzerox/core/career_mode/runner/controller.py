@@ -158,8 +158,12 @@ class CareerModeController:
 
     def next_raw_step(self, *, info: dict[str, object]) -> RawMenuStep | None:
         facts = MenuFacts.from_info(info)
+        if self._progress.attempt_id is None:
+            return self._next_no_active_attempt_step(facts)
         if self._phase == CareerPhase.POLICY_RACE:
             if facts.in_gp_race:
+                if facts.terminal_race_result:
+                    return self._continue_terminal_race_result_step()
                 return None
             raise RuntimeError("Career Mode left a race before observing a game result")
 
@@ -224,6 +228,8 @@ class CareerModeController:
         if facts.in_gp_race:
             self._pending_steps.clear()
             self._advance_presses_in_phase = 0
+            if facts.terminal_race_result:
+                return self._continue_terminal_race_result_step()
             if self._awaiting_new_race_after_terminal and not self._new_race_ready_for_policy(info):
                 return raw_step(
                     MenuInput.NEUTRAL,
@@ -328,6 +334,8 @@ class CareerModeController:
                 case ObservedMenuScreen.GP_RACE:
                     self._pending_steps.clear()
                     self._advance_presses_in_phase = 0
+                    if facts.terminal_race_result:
+                        return self._continue_terminal_race_result_step()
                     if self._resolve_policy_control(info) is None:
                         return self._wait_for_policy_resolution()
                     if camera_step := self._next_camera_sync_step(info):
@@ -437,6 +445,10 @@ class CareerModeController:
     def _enter_policy_race(self) -> RawMenuStep:
         self._phase = CareerPhase.POLICY_RACE
         return raw_step(MenuInput.NEUTRAL, 1, phase="policy_race:handoff")
+
+    def _continue_terminal_race_result_step(self) -> RawMenuStep:
+        self._enter_continue_after_race()
+        return self._continue_after_race_pulse()
 
     @staticmethod
     def _wait_for_policy_resolution() -> RawMenuStep:
@@ -725,8 +737,7 @@ class CareerModeController:
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         if self._progress.attempt_id is None:
-            self._phase = CareerPhase.WAIT_FOR_GP_RACE
-            self._pending_steps.clear()
+            self._enter_continue_after_race()
             return True
         self._enter_continue_after_race()
         return True
@@ -782,6 +793,28 @@ class CareerModeController:
         self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
+
+    def _next_no_active_attempt_step(self, facts: MenuFacts) -> RawMenuStep | None:
+        if self._pending_steps:
+            if _is_neutral_settle_step(self._pending_steps[0]):
+                step = self._pending_steps.popleft()
+                self._phase = phase_from_step(step)
+                return step
+            self._pending_steps.clear()
+        if facts.is_gp_result_screen or (facts.in_gp_race and facts.terminal_race_result):
+            self._phase = CareerPhase.CONTINUE_AFTER_RACE
+            self._continuing_race_result = True
+            self._observed_terminal_race_result = True
+            return self._continue_after_race_pulse()
+        if facts.is_gp_next_course_screen:
+            self._phase = CareerPhase.CONTINUE_AFTER_RACE
+            return self._continue_next_course_step()
+        if facts.is_skippable_post_gp_screen:
+            self._phase = CareerPhase.CONTINUE_AFTER_RACE
+            return self._continue_post_gp_screen_step()
+        self._pending_steps.clear()
+        self._phase = CareerPhase.WAIT_FOR_GP_RACE
+        return raw_step(MenuInput.NEUTRAL, 1, phase="wait_for_gp_race:no_active_attempt")
 
     def _camera_ready(self, info: dict[str, object]) -> bool:
         return self._camera.ready(info)

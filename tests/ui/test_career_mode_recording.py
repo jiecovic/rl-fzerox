@@ -160,6 +160,68 @@ def test_career_recorder_keeps_segment_during_post_result_continuation(
     ]
 
 
+def test_career_recorder_closes_finished_segment_after_terminal_result_frame(
+    tmp_path: Path,
+) -> None:
+    writers: list[_FakeWriter] = []
+    finalizer = _FakeFinalizer()
+
+    def writer_factory(path: Path) -> _FakeWriter:
+        writer = _FakeWriter(path)
+        writers.append(writer)
+        return writer
+
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    recorder = CareerModeFrameRecorder(
+        path=tmp_path / "career.mkv",
+        native_fps=60.0,
+        writer_factory=writer_factory,
+        finalizer_factory=lambda: finalizer,
+    )
+
+    recorder.record_frame(
+        frame,
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Novice Jack Cup",
+        },
+    )
+    recorder.record_frame(
+        frame,
+        info={
+            "career_mode_attempt_id": "attempt-b",
+            "career_mode_target_label": "Clear Novice Queen Cup",
+            "career_mode_fsm_continuing_result": True,
+            "career_mode_fsm_terminal_result": True,
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "succeeded",
+        },
+    )
+    recorder.record_frame(
+        frame,
+        info={
+            "career_mode_attempt_id": "attempt-b",
+            "career_mode_target_label": "Clear Novice Queen Cup",
+            "career_mode_fsm_continuing_result": True,
+            "career_mode_fsm_terminal_result": False,
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "succeeded",
+        },
+    )
+    recorder.close()
+
+    assert [writer.path.name for writer in writers] == [
+        "career.mkv",
+        "career.segment-001-clear-novice-jack-cup.mkv",
+    ]
+    assert [len(writer.frames) for writer in writers] == [3, 2]
+    assert writers[1].closed
+    assert [path.name for path in finalizer.paths] == [
+        "career.segment-001-clear-novice-jack-cup.mkv",
+        "career.mkv",
+    ]
+
+
 def test_career_recorder_segments_by_attempt_and_marks_failed_attempts(
     tmp_path: Path,
 ) -> None:
@@ -252,6 +314,7 @@ def test_career_recorder_finalizes_finished_segment_before_runner_exit(tmp_path:
             "career_mode_attempt_id": None,
             "career_mode_target_label": "Clear Master Joker Cup",
             "career_mode_fsm_continuing_result": False,
+            "career_mode_fsm_terminal_result": True,
             "career_mode_last_finished_attempt_id": "attempt-final",
             "career_mode_last_finished_attempt_status": "succeeded",
         },
@@ -281,7 +344,7 @@ def test_career_recorder_finalizes_finished_segment_before_runner_exit(tmp_path:
     )
     recorder.close()
 
-    assert len(writers[1].frames) == 1
+    assert len(writers[1].frames) == 2
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-joker-cup.mkv",
         "career.mkv",
