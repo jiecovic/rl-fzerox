@@ -32,7 +32,7 @@ def test_cup_selection_moves_right_until_selected_cup_is_known() -> None:
 
 
 def test_engine_adjust_steps_use_fast_bounded_right_burst() -> None:
-    steps = engine_adjust_steps(current=40, target=60)
+    steps = engine_adjust_steps(current=0, target=100)
 
     active_steps = [step for step in steps if step.menu_input is not MenuInput.NEUTRAL]
     settle_steps = [step for step in steps if step.menu_input is MenuInput.NEUTRAL]

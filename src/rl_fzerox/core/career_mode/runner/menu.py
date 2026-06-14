@@ -78,9 +78,9 @@ class CareerMenuTiming:
     start_settle_frames: int = 38
     menu_hold_frames: int = 8
     menu_settle_frames: int = 16
-    engine_adjust_hold_frames: int = 4
-    engine_adjust_settle_frames: int = 2
-    engine_adjust_max_taps_per_burst: int = 10
+    engine_adjust_hold_frames: int = 2
+    engine_adjust_settle_frames: int = 1
+    engine_adjust_max_taps_per_burst: int = 25
     engine_ready_confirm_frames: int = 2
     difficulty_popup_open_settle_frames: int = 60
     result_continue_hold_frames: int = 4
