@@ -29,6 +29,7 @@ export {
 export {
   createSaveGame,
   deleteSaveGame,
+  fetchSaveGameStatus,
   fetchSaveGames,
   importSaveEngineTuning,
   openSaveGameDirectory,

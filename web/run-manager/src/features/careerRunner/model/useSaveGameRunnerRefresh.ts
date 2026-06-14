@@ -4,16 +4,21 @@ import { useEffect } from "react";
 import type { ManagedSaveGame } from "@/shared/api/contract";
 
 export function useSaveGameRunnerRefresh({
-  onRefresh,
+  onRefreshStatus,
   saveGame,
 }: {
-  onRefresh: () => Promise<void>;
+  onRefreshStatus: (saveGameId: string) => Promise<void>;
   saveGame: ManagedSaveGame | null;
 }) {
+  const saveGameId = saveGame?.id ?? null;
+  const shouldRefresh =
+    saveGame !== null && (saveGame.runner_active || saveGame.status === "running");
+
   useEffect(() => {
-    if (saveGame === null || (!saveGame.runner_active && saveGame.status !== "running")) {
+    if (saveGameId === null || !shouldRefresh) {
       return undefined;
     }
+    const activeSaveGameId = saveGameId;
     let inFlight = false;
     async function refresh() {
       if (inFlight || document.visibilityState === "hidden") {
@@ -21,7 +26,7 @@ export function useSaveGameRunnerRefresh({
       }
       inFlight = true;
       try {
-        await onRefresh();
+        await onRefreshStatus(activeSaveGameId);
       } finally {
         inFlight = false;
       }
@@ -30,5 +35,5 @@ export function useSaveGameRunnerRefresh({
       void refresh();
     }, 1500);
     return () => window.clearInterval(intervalId);
-  }, [onRefresh, saveGame]);
+  }, [onRefreshStatus, saveGameId, shouldRefresh]);
 }

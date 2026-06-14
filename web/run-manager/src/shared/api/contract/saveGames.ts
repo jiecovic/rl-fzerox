@@ -94,8 +94,24 @@ export const managedSaveGameSchema = z.object({
   cup_setups: z.array(managedSaveCupSetupSchema),
 });
 
+export const managedSaveGameStatusSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: saveGameStatusSchema,
+  runner_active: z.boolean(),
+  save_path: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  last_finished_at: z.string().nullable(),
+  unlock_progress: managedSaveUnlockProgressSchema.nullable(),
+});
+
 export const saveGamesResponseSchema = z.object({
   save_games: z.array(managedSaveGameSchema),
+});
+
+export const saveGameStatusResponseSchema = z.object({
+  save_game: managedSaveGameStatusSchema,
 });
 
 export const createSaveGameResponseSchema = z.object({
@@ -129,6 +145,7 @@ export const openSaveGameDirectoryResponseSchema = z.object({
 });
 
 export type ManagedSaveGame = z.infer<typeof managedSaveGameSchema>;
+export type ManagedSaveGameStatus = z.infer<typeof managedSaveGameStatusSchema>;
 export type ManagedSaveAttempt = z.infer<typeof managedSaveAttemptSchema>;
 export type ManagedSaveCourseSetup = z.infer<typeof managedSaveCourseSetupSchema>;
 export type ManagedSaveCupSetup = z.infer<typeof managedSaveCupSetupSchema>;

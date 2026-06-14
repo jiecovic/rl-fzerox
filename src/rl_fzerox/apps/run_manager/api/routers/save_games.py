@@ -27,6 +27,12 @@ def create_save_games_router(store: ManagerStore, launcher: RunLauncher) -> APIR
     async def save_games() -> dict[str, list[dict[str, object]]]:
         return await run_sync(handlers.save_games_payload, store)
 
+    @router.get("/api/save-games/{save_game_id}/status")
+    async def save_game_status(
+        save_game_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, dict[str, object]]:
+        return await run_sync(handlers.save_game_status_payload_for_id, store, save_game_id)
+
     @router.post("/api/save-games", status_code=201)
     async def create_save_game(
         request: CreateSaveGameRequest,

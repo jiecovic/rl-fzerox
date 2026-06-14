@@ -6,9 +6,11 @@ import {
   deleteSaveGameResponseSchema,
   importSaveEngineTuningResponseSchema,
   type ManagedSaveGame,
+  type ManagedSaveGameStatus,
   openSaveGameDirectoryResponseSchema,
   type SaveEngineTuningCourseSetupRecommendation,
   type SavePolicyArtifact,
+  saveGameStatusResponseSchema,
   saveGamesResponseSchema,
   upsertSaveCourseSetupResponseSchema,
   watchRunResponseSchema,
@@ -17,6 +19,14 @@ import {
 export async function fetchSaveGames(): Promise<ManagedSaveGame[]> {
   const payload = parseApiPayload(saveGamesResponseSchema, await getJson("/api/save-games"));
   return payload.save_games;
+}
+
+export async function fetchSaveGameStatus(saveGameId: string): Promise<ManagedSaveGameStatus> {
+  const payload = parseApiPayload(
+    saveGameStatusResponseSchema,
+    await getJson(`/api/save-games/${encodeURIComponent(saveGameId)}/status`),
+  );
+  return payload.save_game;
 }
 
 export async function createSaveGame(name: string): Promise<ManagedSaveGame> {

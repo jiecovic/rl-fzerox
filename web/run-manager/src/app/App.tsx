@@ -88,7 +88,7 @@ export function App() {
               runDetailsById={managerData.runDetailsById}
               saveGames={managerData.saveGames}
               sessions={sessions}
-              onRefreshSaveGames={managerData.refreshSaveGames}
+              onRefreshSaveGameStatus={managerData.refreshSaveGameStatus}
             />
           </div>
         </div>

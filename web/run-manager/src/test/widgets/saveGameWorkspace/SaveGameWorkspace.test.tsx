@@ -142,14 +142,14 @@ describe("SaveGameWorkspace", () => {
         vehicle_id: "fire_stingray",
       },
     ]);
-    const onRefresh = vi.fn();
+    const onRefreshStatus = vi.fn();
     const onUpsertCourseSetup = vi.fn().mockResolvedValue(saveGame);
 
     renderSaveGameWorkspace({
       runs: [run],
       saveGame,
       onImportEngineTuning,
-      onRefresh,
+      onRefreshStatus,
       onUpsertCourseSetup,
     });
 
@@ -177,7 +177,7 @@ describe("SaveGameWorkspace", () => {
       saveGameId: "save-001",
     });
     expect(onUpsertCourseSetup).not.toHaveBeenCalled();
-    expect(onRefresh).not.toHaveBeenCalled();
+    expect(onRefreshStatus).not.toHaveBeenCalled();
     expect(await screen.findByRole("textbox", { name: "Mute City engine" })).toHaveValue("73");
     expect(screen.getByRole("textbox", { name: "Silence engine" })).toHaveValue("88");
     expect(screen.getByRole("button", { name: "Save 24 changes" })).toBeEnabled();
@@ -223,12 +223,12 @@ describe("SaveGameWorkspace", () => {
       cup_setups: [cupSetupFixture({ cup_id: "jack" })],
     });
     const onStartCareerMode = vi.fn().mockResolvedValue("started");
-    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const onRefreshStatus = vi.fn().mockResolvedValue(undefined);
 
     renderSaveGameWorkspace({
       saveGame,
       onStartCareerMode,
-      onRefresh,
+      onRefreshStatus,
     });
 
     await user.selectOptions(screen.getByLabelText("Career Mode device"), "cpu");
@@ -248,7 +248,7 @@ describe("SaveGameWorkspace", () => {
       saveGameId: "save-001",
       target: null,
     });
-    expect(onRefresh).toHaveBeenCalled();
+    expect(onRefreshStatus).toHaveBeenCalledWith(saveGame.id);
     expect(await screen.findByText("Runner started.")).toBeInTheDocument();
   });
 
@@ -515,7 +515,7 @@ describe("SaveGameWorkspace", () => {
 function renderSaveGameWorkspace({
   onImportEngineTuning = vi.fn(),
   onOpenSaveGameDirectory = vi.fn(),
-  onRefresh = vi.fn(),
+  onRefreshStatus = vi.fn(),
   onUpsertCourseSetup = vi.fn(),
   onUpsertCupSetup = vi.fn(),
   onStartCareerMode = vi.fn(),
@@ -524,7 +524,7 @@ function renderSaveGameWorkspace({
 }: {
   onImportEngineTuning?: Parameters<typeof SaveGameWorkspace>[0]["onImportEngineTuning"];
   onOpenSaveGameDirectory?: (saveGameId: string) => Promise<void>;
-  onRefresh?: () => Promise<void>;
+  onRefreshStatus?: Parameters<typeof SaveGameWorkspace>[0]["onRefreshStatus"];
   onUpsertCourseSetup?: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
   onUpsertCupSetup?: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCupSetup"];
   onStartCareerMode?: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
@@ -535,7 +535,7 @@ function renderSaveGameWorkspace({
     <StatefulExistingSaveGameWorkspace
       onOpenSaveGameDirectory={onOpenSaveGameDirectory}
       onImportEngineTuning={onImportEngineTuning}
-      onRefresh={onRefresh}
+      onRefreshStatus={onRefreshStatus}
       onStartCareerMode={onStartCareerMode}
       onUpsertCourseSetup={onUpsertCourseSetup}
       onUpsertCupSetup={onUpsertCupSetup}
@@ -631,7 +631,7 @@ function StatefulNewSaveGameWorkspace({
           current.sessionId === sessionId ? { ...current, ...patch } : current,
         );
       }}
-      onRefresh={vi.fn()}
+      onRefreshStatus={vi.fn()}
       onRenameSaveGame={vi.fn()}
       onUpsertCourseSetup={vi.fn()}
       onUpsertCupSetup={vi.fn()}
@@ -643,7 +643,7 @@ function StatefulNewSaveGameWorkspace({
 function StatefulExistingSaveGameWorkspace({
   onOpenSaveGameDirectory,
   onImportEngineTuning,
-  onRefresh,
+  onRefreshStatus,
   onStartCareerMode,
   onUpsertCourseSetup,
   onUpsertCupSetup,
@@ -652,7 +652,7 @@ function StatefulExistingSaveGameWorkspace({
 }: {
   onOpenSaveGameDirectory: (saveGameId: string) => Promise<void>;
   onImportEngineTuning: Parameters<typeof SaveGameWorkspace>[0]["onImportEngineTuning"];
-  onRefresh: () => Promise<void>;
+  onRefreshStatus: Parameters<typeof SaveGameWorkspace>[0]["onRefreshStatus"];
   onStartCareerMode: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
   onUpsertCourseSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
   onUpsertCupSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCupSetup"];
@@ -674,7 +674,7 @@ function StatefulExistingSaveGameWorkspace({
           current.sessionId === sessionId ? { ...current, ...patch } : current,
         );
       }}
-      onRefresh={onRefresh}
+      onRefreshStatus={onRefreshStatus}
       onRenameSaveGame={vi.fn()}
       onUpsertCourseSetup={onUpsertCourseSetup}
       onUpsertCupSetup={onUpsertCupSetup}

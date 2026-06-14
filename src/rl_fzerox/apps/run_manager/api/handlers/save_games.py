@@ -12,6 +12,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
 )
 from rl_fzerox.apps.run_manager.api.handlers.save_game_status import (
     save_game_payload_for_store,
+    save_game_status_payload_for_store,
 )
 from rl_fzerox.apps.run_manager.desktop import open_directory
 from rl_fzerox.core.engine_tuning import (
@@ -30,6 +31,16 @@ from rl_fzerox.core.training.session.artifacts import load_engine_tuning_checkpo
 def save_games_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
     items = store.list_save_games()
     return {"save_games": [save_game_payload_for_store(store, item) for item in items]}
+
+
+def save_game_status_payload_for_id(
+    store: ManagerStore,
+    save_game_id: str,
+) -> dict[str, dict[str, object]]:
+    save_game = store.get_save_game(save_game_id)
+    if save_game is None:
+        raise HTTPException(status_code=404, detail="save game not found")
+    return {"save_game": save_game_status_payload_for_store(store, save_game)}
 
 
 def create_save_game_payload(

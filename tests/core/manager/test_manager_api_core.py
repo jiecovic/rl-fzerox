@@ -79,6 +79,24 @@ async def test_manager_api_creates_save_game(tmp_path: Path) -> None:
     assert list_response.json()["save_games"] == [payload["save_game"]]
 
 
+async def test_manager_api_returns_slim_save_game_status(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    create_response = await client.post("/api/save-games", json={"name": "Unlock Run"})
+    save_game_id = create_response.json()["save_game"]["id"]
+
+    response = await client.get(f"/api/save-games/{save_game_id}/status")
+
+    assert response.status_code == 200
+    save_payload = response.json()["save_game"]
+    assert save_payload["id"] == save_game_id
+    assert save_payload["name"] == "Unlock Run"
+    assert save_payload["status"] == "created"
+    assert save_payload["unlock_progress"]["completed_count"] == 0
+    assert "attempts" not in save_payload
+    assert "course_setups" not in save_payload
+    assert "cup_setups" not in save_payload
+
+
 async def test_manager_api_deletes_save_game(tmp_path: Path) -> None:
     client = _client(tmp_path)
     create_response = await client.post("/api/save-games", json={"name": "Delete Save"})

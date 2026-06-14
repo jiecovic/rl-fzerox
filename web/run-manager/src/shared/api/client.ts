@@ -37,6 +37,7 @@ export {
   fetchPolicyPreview,
   fetchRun,
   fetchRuns,
+  fetchSaveGameStatus,
   fetchSaveGames,
   fetchTemplates,
   forkRun,

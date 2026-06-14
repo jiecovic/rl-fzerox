@@ -135,3 +135,24 @@ def save_game_payload(
         "course_setups": [save_course_setup_payload(assignment) for assignment in course_setups],
         "cup_setups": [save_cup_setup_payload(assignment) for assignment in cup_setups],
     }
+
+
+def save_game_status_payload(
+    save_game: ManagedSaveGame,
+    *,
+    runner_active: bool = False,
+    unlock_progress: ManagedSaveUnlockProgress | None = None,
+) -> dict[str, object]:
+    return {
+        "id": save_game.id,
+        "name": save_game.name,
+        "status": save_game.status,
+        "save_path": str(save_game.save_path),
+        "created_at": save_game.created_at,
+        "updated_at": save_game.updated_at,
+        "last_finished_at": save_game.last_finished_at,
+        "runner_active": runner_active,
+        "unlock_progress": None
+        if unlock_progress is None
+        else save_unlock_progress_payload(unlock_progress),
+    }

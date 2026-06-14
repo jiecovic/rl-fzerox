@@ -3,13 +3,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { loadManagerData } from "@/app/managerData";
 import { useRunLiveSync } from "@/app/workspace/liveSync";
-import { compareSaveGames, runSummaryFromDetail } from "@/app/workspace/model";
+import {
+  compareSaveGames,
+  runSummaryFromDetail,
+  upsertSaveGameStatus,
+} from "@/app/workspace/model";
 import {
   hasRunDetail,
   rememberRunDetailAccess,
   trimRunDetailCache,
 } from "@/app/workspace/runDetails";
-import { fetchRun, fetchSaveGames } from "@/shared/api/client";
+import { fetchRun, fetchSaveGameStatus, fetchSaveGames } from "@/shared/api/client";
 import type {
   ConfigMetadata,
   ManagedDraft,
@@ -117,6 +121,26 @@ export function useManagerData() {
     }
   }, []);
 
+  const refreshSaveGameStatus = useCallback(async (saveGameId: string) => {
+    try {
+      const status = await fetchSaveGameStatus(saveGameId);
+      setSaveGames((current) => upsertSaveGameStatus(current, status));
+      setError(null);
+    } catch (caught) {
+      try {
+        const nextSaveGames = [...(await fetchSaveGames())].sort(compareSaveGames);
+        setSaveGames((current) =>
+          saveGamePayloadKey(current) === saveGamePayloadKey(nextSaveGames)
+            ? current
+            : nextSaveGames,
+        );
+        setError(null);
+      } catch {
+        setError(caught instanceof Error ? caught.message : "failed to refresh career save status");
+      }
+    }
+  }, []);
+
   useEffect(() => {
     void reloadManagerData();
   }, [reloadManagerData]);
@@ -136,6 +160,7 @@ export function useManagerData() {
     loadRunDetail,
     metadata,
     reloadManagerData,
+    refreshSaveGameStatus,
     refreshSaveGames,
     runs,
     runDetailsById,

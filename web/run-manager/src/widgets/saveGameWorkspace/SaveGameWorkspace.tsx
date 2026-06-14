@@ -1,5 +1,5 @@
 // web/run-manager/src/widgets/saveGameWorkspace/SaveGameWorkspace.tsx
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 
 import type { SaveGameSession } from "@/app/workspace/types";
 import {
@@ -55,7 +55,7 @@ interface SaveGameWorkspaceProps {
     sessionId: SaveGameSession["sessionId"],
     patch: Partial<Omit<SaveGameSession, "sessionId">>,
   ) => void;
-  onRefresh: () => Promise<void>;
+  onRefreshStatus: (saveGameId: string) => Promise<void>;
   onRenameSaveGame: (saveGameId: string, name: string) => Promise<void>;
   onUpsertCourseSetup: (request: {
     courseId?: string | null;
@@ -86,7 +86,7 @@ export function SaveGameWorkspace({
   onOpenSaveGameDirectory,
   onImportEngineTuning,
   onPatchSession,
-  onRefresh,
+  onRefreshStatus,
   onRenameSaveGame,
   onUpsertCourseSetup,
   onUpsertCupSetup,
@@ -105,9 +105,9 @@ export function SaveGameWorkspace({
   const [runnerStatus, setRunnerStatus] = useState<string | null>(null);
   const [courseSetupDirty, setCourseSetupDirty] = useState(false);
   const [updatingSaveGameId, setUpdatingSaveGameId] = useState<string | null>(null);
-  const assignableRuns = useMemo(() => runs.filter((run) => run.status !== "created"), [runs]);
+  const assignableRuns = useStableAssignableRuns(runs);
 
-  useSaveGameRunnerRefresh({ onRefresh, saveGame });
+  useSaveGameRunnerRefresh({ onRefreshStatus, saveGame });
 
   async function createSaveGame() {
     const name = session.nameText.trim();
@@ -276,7 +276,7 @@ export function SaveGameWorkspace({
         target: requestedTarget,
       });
       setRunnerStatus(status === "started" ? "Runner started." : "Runner is already open.");
-      await onRefresh();
+      await onRefreshStatus(target.id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to start runner");
     } finally {
@@ -493,4 +493,34 @@ function resolveLaunchCupVehicleId(
     saveGame.unlock_progress?.unlocked_vehicle_ids[0] ??
     null
   );
+}
+
+function useStableAssignableRuns(runs: readonly ManagedRun[]): readonly ManagedRun[] {
+  const stableAssignableRuns = useRef<{ key: string; runs: readonly ManagedRun[] } | null>(null);
+  const key = assignableRunsKey(runs);
+  if (stableAssignableRuns.current?.key !== key) {
+    stableAssignableRuns.current = {
+      key,
+      runs: runs.filter((run) => run.status !== "created"),
+    };
+  }
+  return stableAssignableRuns.current.runs;
+}
+
+function assignableRunsKey(runs: readonly ManagedRun[]): string {
+  return runs
+    .filter((run) => run.status !== "created")
+    .map((run) =>
+      [
+        run.id,
+        run.name,
+        run.status,
+        run.vehicle_setup.engine_mode,
+        run.vehicle_setup.engine_setting_raw_value,
+        run.vehicle_setup.engine_setting_min_raw_value,
+        run.vehicle_setup.engine_setting_max_raw_value,
+        run.vehicle_setup.selected_vehicle_ids.join(","),
+      ].join("\u001f"),
+    )
+    .join("\u001e");
 }

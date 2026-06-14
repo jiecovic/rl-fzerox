@@ -1,12 +1,30 @@
 # src/rl_fzerox/apps/run_manager/api/handlers/save_game_status.py
 from __future__ import annotations
 
-from rl_fzerox.apps.run_manager.api.payloads.save_games import save_game_payload
+from dataclasses import dataclass
+
+from rl_fzerox.apps.run_manager.api.payloads.save_games import (
+    save_game_payload,
+    save_game_status_payload,
+)
 from rl_fzerox.apps.run_manager.launching.save_games import active_career_mode_runner_pid
-from rl_fzerox.core.manager import ManagedSaveAttempt, ManagedSaveGame, ManagerStore
+from rl_fzerox.core.manager import (
+    ManagedSaveAttempt,
+    ManagedSaveGame,
+    ManagedSaveUnlockProgress,
+    ManagerStore,
+)
 from rl_fzerox.core.manager.models import SaveGameStatus
 
 _ORPHAN_RUNNER_FAILURE_REASON = "career mode runner process disappeared"
+
+
+@dataclass(frozen=True, slots=True)
+class SaveGameStatusView:
+    save_game: ManagedSaveGame
+    runner_active: bool
+    unlock_progress: ManagedSaveUnlockProgress
+    attempts: tuple[ManagedSaveAttempt, ...]
 
 
 def save_game_payload_for_store(
@@ -15,6 +33,45 @@ def save_game_payload_for_store(
     *,
     cleanup_orphan_runner: bool = True,
 ) -> dict[str, object]:
+    view = save_game_status_view_for_store(
+        store,
+        save_game,
+        cleanup_orphan_runner=cleanup_orphan_runner,
+    )
+    return save_game_payload(
+        view.save_game,
+        runner_active=view.runner_active,
+        unlock_progress=view.unlock_progress,
+        attempts=view.attempts,
+        course_setups=store.list_save_course_setups(view.save_game.id),
+        cup_setups=store.list_save_cup_setups(view.save_game.id),
+    )
+
+
+def save_game_status_payload_for_store(
+    store: ManagerStore,
+    save_game: ManagedSaveGame,
+    *,
+    cleanup_orphan_runner: bool = True,
+) -> dict[str, object]:
+    view = save_game_status_view_for_store(
+        store,
+        save_game,
+        cleanup_orphan_runner=cleanup_orphan_runner,
+    )
+    return save_game_status_payload(
+        view.save_game,
+        runner_active=view.runner_active,
+        unlock_progress=view.unlock_progress,
+    )
+
+
+def save_game_status_view_for_store(
+    store: ManagerStore,
+    save_game: ManagedSaveGame,
+    *,
+    cleanup_orphan_runner: bool = True,
+) -> SaveGameStatusView:
     runner_active = _career_runner_active(store, save_game)
     unlock_progress = store.save_game_unlock_progress(save_game.id)
     attempts = store.list_save_attempts(save_game.id)
@@ -47,13 +104,11 @@ def save_game_payload_for_store(
         updated = store.update_save_game_status(save_game_id=save_game.id, status="created")
         if updated is not None:
             save_game = updated
-    return save_game_payload(
-        save_game,
+    return SaveGameStatusView(
+        save_game=save_game,
         runner_active=runner_active,
         unlock_progress=unlock_progress,
         attempts=attempts,
-        course_setups=store.list_save_course_setups(save_game.id),
-        cup_setups=store.list_save_cup_setups(save_game.id),
     )
 
 

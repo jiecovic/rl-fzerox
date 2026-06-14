@@ -14,6 +14,7 @@ import type {
   ManagedRun,
   ManagedRunDetail,
   ManagedSaveGame,
+  ManagedSaveGameStatus,
 } from "@/shared/api/contract";
 
 export function editorSessionId(seed: string): `editor:${string}` {
@@ -177,6 +178,36 @@ export function upsertRun(current: ManagedRun[], nextRun: ManagedRun) {
 export function upsertSaveGame(current: ManagedSaveGame[], nextSaveGame: ManagedSaveGame) {
   const withoutPrevious = current.filter((saveGame) => saveGame.id !== nextSaveGame.id);
   return [nextSaveGame, ...withoutPrevious].sort(compareSaveGames);
+}
+
+export function upsertSaveGameStatus(current: ManagedSaveGame[], status: ManagedSaveGameStatus) {
+  const existing = current.find((saveGame) => saveGame.id === status.id);
+  if (existing === undefined) {
+    return current;
+  }
+  if (sameSaveGameStatus(existing, status)) {
+    return current;
+  }
+  return upsertSaveGame(current, {
+    ...existing,
+    ...status,
+    attempts: existing.attempts,
+    course_setups: existing.course_setups,
+    cup_setups: existing.cup_setups,
+  });
+}
+
+function sameSaveGameStatus(saveGame: ManagedSaveGame, status: ManagedSaveGameStatus): boolean {
+  return (
+    saveGame.name === status.name &&
+    saveGame.status === status.status &&
+    saveGame.runner_active === status.runner_active &&
+    saveGame.save_path === status.save_path &&
+    saveGame.created_at === status.created_at &&
+    saveGame.updated_at === status.updated_at &&
+    saveGame.last_finished_at === status.last_finished_at &&
+    JSON.stringify(saveGame.unlock_progress) === JSON.stringify(status.unlock_progress)
+  );
 }
 
 export function runSummaryFromDetail(run: ManagedRunDetail): ManagedRun {

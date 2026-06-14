@@ -1,5 +1,5 @@
 // web/run-manager/src/features/saveGameCourseSetup/ui/CourseSetupPanels.tsx
-import { useState } from "react";
+import { memo, useState } from "react";
 import { courseCardClass } from "@/entities/runConfig/ui/sections/tracks/coursePoolStyle";
 import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/entities/runConfig/ui/sections/tracks/TrackMinimap";
@@ -288,101 +288,103 @@ function CupSetupBlock({
           </span>
         </span>
       </summary>
-      <div className="config-disclosure-body gap-3">
-        <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_130px_minmax(180px,240px)] md:items-end">
-          <PolicySelectionSelect
-            assignableRuns={assignableRuns}
-            disabled={updating}
-            draft={bulkPolicyDraft}
-            label={`${cup.label} policy`}
-            visibleLabel="Policy"
-            onDraftChange={applyBulkCoursePolicy}
-          />
-          <PolicySelectionArtifactSelect
-            disabled={updating}
-            draft={bulkPolicyDraft}
-            label={`${cup.label} artifact`}
-            visibleLabel="Artifact"
-            onDraftChange={applyBulkCoursePolicy}
-          />
-          <VehicleDraftSelect
-            disabled={updating}
-            draft={cupDraft}
-            label={`${cup.label} vehicle`}
-            metadata={metadata}
-            unlockedVehicleIds={unlockedVehicleIds}
-            visibleLabel="Vehicle"
-            onDraftChange={(nextDraft) => onCupSetupDraftChange(cupValues, nextDraft.vehicleId)}
-          />
-        </div>
-        <div className="grid grid-cols-1 gap-3 border-t border-app-border pt-3 xl:grid-cols-2 2xl:grid-cols-3">
-          {cup.courses.map((course, courseIndex) => {
-            const values = courseSetupValues(cup, course.id);
-            const courseDraft = {
-              ...(exactCourseSetupDraft(courseSetupDrafts, values) ?? fallbackDraft),
-              vehicleId: cupDraft.vehicleId,
-            };
-            const updateCourseDraft = (nextDraft: PolicyArtifactDraft) =>
-              onCourseSetupDraftChange(values, {
-                ...nextDraft,
+      {collapsed ? null : (
+        <div className="config-disclosure-body gap-3">
+          <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_130px_minmax(180px,240px)] md:items-end">
+            <PolicySelectionSelect
+              assignableRuns={assignableRuns}
+              disabled={updating}
+              draft={bulkPolicyDraft}
+              label={`${cup.label} policy`}
+              visibleLabel="Policy"
+              onDraftChange={applyBulkCoursePolicy}
+            />
+            <PolicySelectionArtifactSelect
+              disabled={updating}
+              draft={bulkPolicyDraft}
+              label={`${cup.label} artifact`}
+              visibleLabel="Artifact"
+              onDraftChange={applyBulkCoursePolicy}
+            />
+            <VehicleDraftSelect
+              disabled={updating}
+              draft={cupDraft}
+              label={`${cup.label} vehicle`}
+              metadata={metadata}
+              unlockedVehicleIds={unlockedVehicleIds}
+              visibleLabel="Vehicle"
+              onDraftChange={(nextDraft) => onCupSetupDraftChange(cupValues, nextDraft.vehicleId)}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 border-t border-app-border pt-3 xl:grid-cols-2 2xl:grid-cols-3">
+            {cup.courses.map((course, courseIndex) => {
+              const values = courseSetupValues(cup, course.id);
+              const courseDraft = {
+                ...(exactCourseSetupDraft(courseSetupDrafts, values) ?? fallbackDraft),
                 vehicleId: cupDraft.vehicleId,
-              });
-            return (
-              <div
-                key={course.id}
-                className={courseCardClass(false, "min-h-[172px] content-start gap-3 p-3")}
-                data-cup={cup.id}
-              >
-                <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] items-start gap-3">
-                  <TrackMinimap
-                    className="h-[72px] w-[104px] self-start"
-                    courseId={course.id}
-                    cup={course.cup}
-                  />
-                  <div className="min-w-0 text-left">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid h-5 w-5 shrink-0 place-items-center border border-app-border bg-app-surface font-mono text-[11px] text-app-muted tabular-nums">
-                        {courseIndex + 1}
-                      </span>
-                      <strong className="block min-w-0 truncate text-sm font-bold text-app-text">
-                        {course.display_name}
-                      </strong>
+              };
+              const updateCourseDraft = (nextDraft: PolicyArtifactDraft) =>
+                onCourseSetupDraftChange(values, {
+                  ...nextDraft,
+                  vehicleId: cupDraft.vehicleId,
+                });
+              return (
+                <div
+                  key={course.id}
+                  className={courseCardClass(false, "min-h-[172px] content-start gap-3 p-3")}
+                  data-cup={cup.id}
+                >
+                  <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] items-start gap-3">
+                    <TrackMinimap
+                      className="h-[72px] w-[104px] self-start"
+                      courseId={course.id}
+                      cup={course.cup}
+                    />
+                    <div className="min-w-0 text-left">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="grid h-5 w-5 shrink-0 place-items-center border border-app-border bg-app-surface font-mono text-[11px] text-app-muted tabular-nums">
+                          {courseIndex + 1}
+                        </span>
+                        <strong className="block min-w-0 truncate text-sm font-bold text-app-text">
+                          {course.display_name}
+                        </strong>
+                      </div>
+                      <span className="text-xs text-app-muted">Course {courseIndex + 1}</span>
                     </div>
-                    <span className="text-xs text-app-muted">Course {courseIndex + 1}</span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_112px_96px]">
+                    <PolicyDraftSelect
+                      assignableRuns={assignableRuns}
+                      disabled={updating}
+                      draft={courseDraft}
+                      label={`${course.display_name} policy`}
+                      lockedVehicleId={cupDraft.vehicleId}
+                      metadata={metadata}
+                      unlockedVehicleIds={unlockedVehicleIds}
+                      visibleLabel="Policy"
+                      onDraftChange={updateCourseDraft}
+                    />
+                    <ArtifactDraftSelect
+                      disabled={updating}
+                      draft={courseDraft}
+                      label={`${course.display_name} artifact`}
+                      visibleLabel="Artifact"
+                      onDraftChange={updateCourseDraft}
+                    />
+                    <EngineDraftInput
+                      disabled={updating}
+                      draft={courseDraft}
+                      label={`${course.display_name} engine`}
+                      visibleLabel="Engine"
+                      onDraftChange={updateCourseDraft}
+                    />
                   </div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_112px_96px]">
-                  <PolicyDraftSelect
-                    assignableRuns={assignableRuns}
-                    disabled={updating}
-                    draft={courseDraft}
-                    label={`${course.display_name} policy`}
-                    lockedVehicleId={cupDraft.vehicleId}
-                    metadata={metadata}
-                    unlockedVehicleIds={unlockedVehicleIds}
-                    visibleLabel="Policy"
-                    onDraftChange={updateCourseDraft}
-                  />
-                  <ArtifactDraftSelect
-                    disabled={updating}
-                    draft={courseDraft}
-                    label={`${course.display_name} artifact`}
-                    visibleLabel="Artifact"
-                    onDraftChange={updateCourseDraft}
-                  />
-                  <EngineDraftInput
-                    disabled={updating}
-                    draft={courseDraft}
-                    label={`${course.display_name} engine`}
-                    visibleLabel="Engine"
-                    onDraftChange={updateCourseDraft}
-                  />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </details>
   );
 }
@@ -419,11 +421,7 @@ function PolicySelectionSelect({
         <option disabled value="">
           Select policy
         </option>
-        {assignableRuns.map((run) => (
-          <option key={run.id} value={run.id}>
-            {run.name}
-          </option>
-        ))}
+        <PolicyRunOptions assignableRuns={assignableRuns} />
       </FieldSelect>
     </FieldShell>
   );
@@ -511,15 +509,27 @@ function PolicyDraftSelect({
         <option disabled value="">
           Select policy
         </option>
-        {assignableRuns.map((run) => (
-          <option key={run.id} value={run.id}>
-            {run.name}
-          </option>
-        ))}
+        <PolicyRunOptions assignableRuns={assignableRuns} />
       </FieldSelect>
     </FieldShell>
   );
 }
+
+const PolicyRunOptions = memo(function PolicyRunOptions({
+  assignableRuns,
+}: {
+  assignableRuns: readonly ManagedRun[];
+}) {
+  return (
+    <>
+      {assignableRuns.map((run) => (
+        <option key={run.id} value={run.id}>
+          {run.name}
+        </option>
+      ))}
+    </>
+  );
+});
 
 function VehicleDraftSelect({
   disabled,
