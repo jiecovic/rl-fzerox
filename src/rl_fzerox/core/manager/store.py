@@ -13,15 +13,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
-from rl_fzerox.core.manager.artifacts.paths import (
-    manager_runs_root,
-    manager_save_games_root,
-    manager_tensorboard_views_root,
-)
-from rl_fzerox.core.manager.artifacts.tensorboard_views import (
-    TensorboardViewGroup,
-    rebuild_tensorboard_views,
-)
+from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
 from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
     ManagedRun,
@@ -43,8 +35,10 @@ from rl_fzerox.core.manager.models import (
 )
 from rl_fzerox.core.manager.registry import drafts as draft_registry
 from rl_fzerox.core.manager.registry import lineages as lineage_registry
+from rl_fzerox.core.manager.registry import paths as path_registry
 from rl_fzerox.core.manager.registry import runs as run_registry
 from rl_fzerox.core.manager.registry import save_games as save_game_registry
+from rl_fzerox.core.manager.registry import tensorboard as tensorboard_registry
 from rl_fzerox.core.manager.registry import viewers as viewer_registry
 from rl_fzerox.core.manager.registry.common import new_run_id
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
@@ -123,20 +117,16 @@ class ManagerStore:
         refresh_default_template(self.db_path, updated_at=self.utc_now())
 
     def manager_runs_root(self, *, output_root: Path | None = None) -> Path:
-        return manager_runs_root(output_root=output_root)
+        return path_registry.manager_root(output_root=output_root)
 
     def tensorboard_views_root(self, *, output_root: Path | None = None) -> Path:
-        if output_root is None:
-            return self.db_path.parent.parent / "tensorboard_views"
-        return manager_tensorboard_views_root(output_root=output_root)
+        return path_registry.tensorboard_views_root(self.db_path, output_root=output_root)
 
     def save_games_root(self, *, output_root: Path | None = None) -> Path:
-        if output_root is None:
-            return self.db_path.parent.parent / "save_games"
-        return manager_save_games_root(output_root=output_root)
+        return path_registry.save_games_root(self.db_path, output_root=output_root)
 
     def path(self, value: str | Path) -> Path:
-        return Path(value).expanduser().resolve()
+        return path_registry.resolved_path(value)
 
     def create_run(
         self,
@@ -489,10 +479,7 @@ class ManagerStore:
         )
 
     def rebuild_tensorboard_views(self) -> tuple[TensorboardViewGroup, ...]:
-        return rebuild_tensorboard_views(
-            self.list_visible_runs(),
-            view_root=self.tensorboard_views_root(),
-        )
+        return tensorboard_registry.rebuild_tensorboard_views(self)
 
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         return run_registry.update_run_name(self, run_id=run_id, name=name)

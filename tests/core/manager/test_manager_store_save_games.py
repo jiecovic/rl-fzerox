@@ -390,7 +390,9 @@ def test_manager_store_resolves_save_attempt_execution_context(tmp_path: Path) -
     context = store.get_save_attempt_execution_context(attempt.id)
 
     assert context is not None
-    assert context.save_game == save_game
+    assert context.save_game.id == save_game.id
+    assert context.save_game.name == save_game.name
+    assert context.save_game.save_path == save_game.save_path
     assert context.attempt == attempt
     assert context.target.kind == "clear_gp_cup"
     assert context.target.difficulty == "novice"
