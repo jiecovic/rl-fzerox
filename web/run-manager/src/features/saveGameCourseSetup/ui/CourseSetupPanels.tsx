@@ -186,15 +186,12 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
             onCollapseAll={() => setCollapsedCupIds(cups.map((cup) => cup.id))}
             onExpandAll={() => setCollapsedCupIds([])}
           />
-          <Button
-            className="gap-2"
+          <ResetEngineSetupsButton
             disabled={updating || savingCourseSetups}
-            type="button"
-            onClick={() => onResetEngineSetups(allCourseSetups)}
-          >
-            <ResetIcon />
-            <span>Reset all engines to 50</span>
-          </Button>
+            label="Reset all engines to 50"
+            setups={allCourseSetups}
+            onResetEngineSetups={onResetEngineSetups}
+          />
           <Button
             className="gap-2"
             disabled={saveDisabled}
@@ -346,15 +343,12 @@ const CupSetupBlock = memo(function CupSetupBlock({
             />
           </div>
           <div className="flex justify-end">
-            <Button
-              className="gap-2"
+            <ResetEngineSetupsButton
               disabled={updating}
-              type="button"
-              onClick={() => onResetEngineSetups(courseValuesList)}
-            >
-              <ResetIcon />
-              <span>Reset {cup.label} engines to 50</span>
-            </Button>
+              label={`Reset ${cup.label} engines to 50`}
+              setups={courseValuesList}
+              onResetEngineSetups={onResetEngineSetups}
+            />
           </div>
           <div className="grid grid-cols-1 gap-3 border-t border-app-border pt-3 xl:grid-cols-2 2xl:grid-cols-3">
             {cup.courses.map((course, courseIndex) => {
@@ -435,5 +429,29 @@ function cupSetupDraft(drafts: CupSetupDraftMap, values: CupSetupValues): CupSet
       ...values,
       ...EMPTY_CUP_SETUP_DRAFT,
     }
+  );
+}
+
+function ResetEngineSetupsButton({
+  disabled,
+  label,
+  onResetEngineSetups,
+  setups,
+}: {
+  disabled: boolean;
+  label: string;
+  onResetEngineSetups: (setups: readonly CourseSetupValues[]) => void;
+  setups: readonly CourseSetupValues[];
+}) {
+  return (
+    <Button
+      className="gap-2"
+      disabled={disabled}
+      type="button"
+      onClick={() => onResetEngineSetups(setups)}
+    >
+      <ResetIcon />
+      <span>{label}</span>
+    </Button>
   );
 }
