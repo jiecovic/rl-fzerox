@@ -94,6 +94,26 @@ pub(crate) struct RacerOffsets {
 }
 
 #[derive(Clone, Copy)]
+pub(crate) struct RacerEnginePhysicsOffsets {
+    pub acceleration_curve_high: usize,
+    pub acceleration_curve_low: usize,
+    pub acceleration_target: usize,
+    pub acceleration_transition_speed: usize,
+    pub boost_multiplier: usize,
+    pub dash_multiplier: usize,
+    pub boost_reserve: usize,
+    pub boost_decay: usize,
+    pub acceleration_smoothing_floor: usize,
+    pub machine_weight: usize,
+    pub grip_primary: usize,
+    pub grip_secondary: usize,
+    pub dash_multiplier_offset: usize,
+    pub engine_curve_bias: usize,
+    pub acceleration_transition_scale: usize,
+    pub acceleration_smoothing_inverse: usize,
+}
+
+#[derive(Clone, Copy)]
 pub(crate) struct RacerSegmentPositionInfoOffsets {
     pub course_segment: usize,
     pub segment_t_value: usize,
@@ -198,6 +218,28 @@ pub(crate) const RACER: RacerOffsets = RacerOffsets {
     lap: 0x2A8,
     laps_completed: 0x2AA,
     position: 0x2AC,
+};
+
+// Derived fields written by `Racer_InitMachineStats` / `Racer_InitRacer`.
+// They must be kept in sync when reset-time engine settings are patched after
+// a save state has already initialized the live racer.
+pub(crate) const RACER_ENGINE: RacerEnginePhysicsOffsets = RacerEnginePhysicsOffsets {
+    acceleration_curve_high: 0x1B0,
+    acceleration_curve_low: 0x1B4,
+    acceleration_target: 0x1B8,
+    acceleration_transition_speed: 0x1BC,
+    boost_multiplier: 0x1C0,
+    dash_multiplier: 0x1C4,
+    boost_reserve: 0x1C8,
+    boost_decay: 0x1CC,
+    acceleration_smoothing_floor: 0x1D0,
+    machine_weight: 0x1F0,
+    grip_primary: 0x1F8,
+    grip_secondary: 0x1FC,
+    dash_multiplier_offset: 0x31C,
+    engine_curve_bias: 0x320,
+    acceleration_transition_scale: 0x324,
+    acceleration_smoothing_inverse: 0x328,
 };
 
 pub(crate) const RACER_SEGMENT_POSITION_INFO: RacerSegmentPositionInfoOffsets =

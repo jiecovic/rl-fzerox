@@ -1,9 +1,11 @@
 // rust/core/game/tests/race_start_tests.rs
 use super::{
     RaceStartMode, RaceStartSetup, force_race_reinit, validate_race_setup, vehicle_setup_info,
-    write_machine_settings, write_race_setup, write_time_attack_menu_mode,
+    write_engine_settings, write_machine_settings, write_race_setup, write_time_attack_menu_mode,
 };
-use crate::core::game::telemetry::layout::{GLOBALS, RACER, TELEMETRY_CONFIG};
+use crate::core::game::telemetry::layout::{
+    GLOBALS, MACHINE_TABLE, RACER, RACER_ENGINE, TELEMETRY_CONFIG,
+};
 
 #[test]
 fn time_attack_setup_writes_expected_menu_and_live_fields() {
@@ -160,6 +162,95 @@ fn vehicle_setup_info_does_not_fail_when_machine_indices_are_uninitialized() {
     assert_eq!(setup.racer_engine_curve, None);
 }
 
+#[test]
+fn engine_setting_patch_updates_live_racer_physics_fields() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let racer_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
+    write_i16(&mut memory, GLOBALS.player_characters, 0);
+    write_i8(&mut memory, racer_base + RACER.character, 0);
+    write_blue_falcon_machine_table(&mut memory);
+
+    write_engine_settings(&mut memory, RaceStartMode::TimeAttack, 50)
+        .expect("engine setting should write live physics fields");
+
+    assert_approx(
+        read_f32(&memory, racer_base + RACER.engine_curve),
+        0.371_747_23,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.acceleration_curve_high),
+        1.694_799_1,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.acceleration_curve_low),
+        1.411_522_7,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.acceleration_target),
+        0.111_396_06,
+    );
+    assert_approx(
+        read_f32(
+            &memory,
+            racer_base + RACER_ENGINE.acceleration_transition_speed,
+        ),
+        35.230_484,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.boost_multiplier),
+        1.847_070_5,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.dash_multiplier),
+        1.847_070_5,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.boost_reserve),
+        0.300_986_86,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.boost_decay),
+        0.007_975_561,
+    );
+    assert_approx(
+        read_f32(
+            &memory,
+            racer_base + RACER_ENGINE.acceleration_smoothing_floor,
+        ),
+        0.333_396_5,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.grip_primary),
+        1.258_281_1,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.grip_secondary),
+        0.382_960_82,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.dash_multiplier_offset),
+        0.847_070_5,
+    );
+    assert_approx(
+        read_f32(&memory, racer_base + RACER_ENGINE.engine_curve_bias),
+        0.064_126_38,
+    );
+    assert_approx(
+        read_f32(
+            &memory,
+            racer_base + RACER_ENGINE.acceleration_transition_scale,
+        ),
+        0.014_192_255,
+    );
+    assert_approx(
+        read_f32(
+            &memory,
+            racer_base + RACER_ENGINE.acceleration_smoothing_inverse,
+        ),
+        0.666_603_5,
+    );
+}
+
 fn sample_setup() -> RaceStartSetup {
     RaceStartSetup {
         course_index: 5,
@@ -179,6 +270,10 @@ fn read_i16(memory: &[u8], offset: usize) -> i16 {
     i16::from_le_bytes(memory[offset..offset + 2].try_into().expect("two bytes"))
 }
 
+fn read_f32(memory: &[u8], offset: usize) -> f32 {
+    f32::from_le_bytes(memory[offset..offset + 4].try_into().expect("four bytes"))
+}
+
 fn write_i16(memory: &mut [u8], offset: usize, value: i16) {
     memory[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
 }
@@ -189,4 +284,28 @@ fn write_i8(memory: &mut [u8], offset: usize, value: i8) {
 
 fn write_f32(memory: &mut [u8], offset: usize, value: f32) {
     memory[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn write_blue_falcon_machine_table(memory: &mut [u8]) {
+    let machine_base = MACHINE_TABLE.machines;
+    write_machine_i8(memory, machine_base + MACHINE_TABLE.boost_stat, 2);
+    write_machine_i8(memory, machine_base + MACHINE_TABLE.grip_stat, 1);
+    write_machine_i16(memory, machine_base + MACHINE_TABLE.weight, 1260);
+}
+
+fn write_machine_i8(memory: &mut [u8], offset: usize, value: i8) {
+    memory[offset ^ 0x03] = value as u8;
+}
+
+fn write_machine_i16(memory: &mut [u8], offset: usize, value: i16) {
+    let bytes = value.to_be_bytes();
+    write_machine_i8(memory, offset, bytes[0] as i8);
+    write_machine_i8(memory, offset + 1, bytes[1] as i8);
+}
+
+fn assert_approx(actual: f32, expected: f32) {
+    assert!(
+        (actual - expected).abs() < 0.000_01,
+        "expected {expected:.9}, got {actual:.9}"
+    );
 }

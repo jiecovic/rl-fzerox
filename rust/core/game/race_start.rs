@@ -5,9 +5,14 @@ use crate::core::error::CoreError;
 use crate::core::game::memory::{
     read_f32, read_i8, read_i16, read_i32, write_f32, write_i8, write_i16, write_i32,
 };
+use crate::core::game::race_start::engine_physics::{
+    engine_to_curve_value, write_live_engine_fields,
+};
 use crate::core::game::telemetry::layout::{
     GLOBALS, GameMode, MACHINE_TABLE, RACER, TELEMETRY_CONFIG,
 };
+
+mod engine_physics;
 
 #[derive(Clone, Copy, Debug)]
 pub struct RaceStartSetup {
@@ -159,11 +164,7 @@ fn write_engine_settings_only(
         GLOBALS.character_last_engine + ((character_index as usize) * 4),
         engine_value,
     )?;
-    write_f32(
-        system_ram,
-        player_base + RACER.engine_curve,
-        engine_to_curve_value(engine_value),
-    )
+    write_live_engine_fields(system_ram, character_index, engine_value, player_base)
 }
 
 pub fn force_race_reinit(system_ram: &mut [u8], mode: RaceStartMode) -> Result<(), CoreError> {
@@ -315,11 +316,7 @@ fn write_live_racer_setup(system_ram: &mut [u8], setup: RaceStartSetup) -> Resul
             setup.machine_skin_index,
         )?;
     }
-    write_f32(
-        system_ram,
-        player_base + RACER.engine_curve,
-        engine_to_curve_value(engine_value),
-    )
+    write_live_engine_fields(system_ram, setup.character_index, engine_value, player_base)
 }
 
 fn validate_setup(mode: RaceStartMode, setup: RaceStartSetup) -> Result<(), CoreError> {
@@ -438,14 +435,6 @@ impl RaceStartMode {
                 current_ghost_type: None,
             },
         }
-    }
-}
-
-fn engine_to_curve_value(engine_value: f32) -> f32 {
-    if engine_value == 0.0 {
-        0.0
-    } else {
-        1.0 / (((1.0 + 0.689_999_8) / engine_value) - 0.689_999_8)
     }
 }
 
