@@ -48,6 +48,8 @@ interface ConfiguratorProps {
   forkCopyAltBaselines?: boolean | null;
   forkSourceArtifact?: "latest" | "best" | null;
   forkSourceEngineTunerBackend?: EngineTunerBackend | null;
+  forkSourceEngineTuning?: ForkSourceEngineTuning | null;
+  forkSourceEngineTuningKnown?: boolean;
   forkSourceRunLabel?: string | null;
   initialDraftName?: string;
   initialConfig?: ManagedRunConfig | null;
@@ -74,6 +76,13 @@ interface PendingEngineTuningLaunch {
   name: string;
 }
 
+interface ForkSourceEngineTuning {
+  backend: EngineTunerBackend;
+  banditBucketSize: number | null;
+  maxRawValue: number;
+  minRawValue: number;
+}
+
 const POLICY_PREVIEW_DEBOUNCE_MS = 250;
 
 export function Configurator({
@@ -84,6 +93,8 @@ export function Configurator({
   forkCopyAltBaselines = null,
   forkSourceArtifact = null,
   forkSourceEngineTunerBackend = null,
+  forkSourceEngineTuning = null,
+  forkSourceEngineTuningKnown = false,
   forkSourceRunLabel = null,
   initialDraftName,
   initialConfig = null,
@@ -166,6 +177,8 @@ export function Configurator({
       forkSourceRunLabel ?? "",
       forkSourceArtifact ?? "",
       forkSourceEngineTunerBackend ?? "",
+      forkSourceEngineTuningKnown ? "known" : "unknown",
+      forkSourceEngineTuning === null ? "" : stableJson(forkSourceEngineTuning),
       forkCopyAltBaselines === null ? "" : String(forkCopyAltBaselines),
     ].join(":");
   const checkpointLocked =
@@ -329,10 +342,30 @@ export function Configurator({
     if (candidateConfig.vehicle.engine_mode !== "adaptive_tuner") {
       return false;
     }
-    if (candidateConfig.vehicle.adaptive_engine_tuner_backend !== "bandit") {
+    if (forkSourceEngineTuningKnown && forkSourceEngineTuning === null) {
       return false;
     }
-    return forkSourceEngineTunerBackend !== "bandit";
+    return true;
+  }
+
+  function engineTuningSourceChoiceIsLossy(candidateConfig: ManagedRunConfig) {
+    if (!forkSourceEngineTuningKnown || forkSourceEngineTuning === null) {
+      return true;
+    }
+    const vehicle = candidateConfig.vehicle;
+    if (forkSourceEngineTuning.backend !== vehicle.adaptive_engine_tuner_backend) {
+      return true;
+    }
+    if (
+      forkSourceEngineTuning.minRawValue !== vehicle.engine_setting_min_raw_value ||
+      forkSourceEngineTuning.maxRawValue !== vehicle.engine_setting_max_raw_value
+    ) {
+      return true;
+    }
+    if (vehicle.adaptive_engine_tuner_backend !== "bandit") {
+      return false;
+    }
+    return forkSourceEngineTuning.banditBucketSize !== vehicle.adaptive_engine_bandit_bucket_size;
   }
 
   function randomizeSeed() {
@@ -399,8 +432,13 @@ export function Configurator({
         onUpdateDraft={() => void updateDraft()}
       />
       <EngineTuningSourceDialog
+        lossy={
+          pendingEngineTuningLaunch === null
+            ? false
+            : engineTuningSourceChoiceIsLossy(pendingEngineTuningLaunch.config)
+        }
         open={pendingEngineTuningLaunch !== null}
-        sourceBackend={forkSourceEngineTunerBackend}
+        sourceBackend={forkSourceEngineTuning?.backend ?? forkSourceEngineTunerBackend}
         onClose={() => setPendingEngineTuningLaunch(null)}
         onSelect={(action) => void confirmEngineTuningSourceAction(action)}
       />

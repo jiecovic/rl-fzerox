@@ -36,9 +36,6 @@ def prepare_engine_tuning_fork_source(
     adaptive_config = adaptive_engine_tuning_config(config)
     if not adaptive_config.enabled:
         return
-    settings = engine_tuner_settings(adaptive_config)
-    if not isinstance(settings, BanditEngineTunerSettings):
-        return
 
     policy_path = resolve_policy_artifact_path(source_dir, artifact=artifact)
     state_path = engine_tuning_checkpoint_path(policy_path)
@@ -46,6 +43,10 @@ def prepare_engine_tuning_fork_source(
     if action == "discard":
         _unlink_if_exists(state_path)
         _unlink_if_exists(model_path)
+        return
+
+    settings = engine_tuner_settings(adaptive_config)
+    if not isinstance(settings, BanditEngineTunerSettings):
         return
 
     state = load_engine_tuning_checkpoint_state(policy_path)

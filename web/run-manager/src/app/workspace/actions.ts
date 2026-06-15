@@ -11,7 +11,7 @@ import {
   upsertSaveGame,
 } from "@/app/workspace/model";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
-import type { DraftEditorSession } from "@/app/workspace/types";
+import type { DraftEditorSession, ForkSourceEngineTuning } from "@/app/workspace/types";
 import {
   clearRunAltBaselines,
   clearRunCourseAltBaselines,
@@ -22,6 +22,7 @@ import {
   deleteRun,
   deleteSaveGame,
   exportRunBundle,
+  fetchRunEngineTuningState,
   importRunBundle,
   importSaveEngineTuning,
   launchRun,
@@ -339,7 +340,10 @@ export function useWorkspaceActions({
     copyAltBaselines: boolean,
   ) {
     const sourceRun = runs.find((candidate) => candidate.id === runId) ?? null;
-    const sourceDetail = await loadRunDetail(runId);
+    const [sourceDetail, sourceTuning] = await Promise.all([
+      loadRunDetail(runId),
+      fetchRunEngineTuningState(runId, artifact),
+    ]);
     const initialDraftName =
       sourceRun === null
         ? nextAvailableDraftName("fork", allKnownNames())
@@ -351,6 +355,9 @@ export function useWorkspaceActions({
       initialDraftName,
       runId,
       sourceEngineTunerBackend: sourceDetail.config.vehicle.adaptive_engine_tuner_backend,
+      sourceEngineTuning:
+        sourceTuning.state === null ? null : forkSourceEngineTuning(sourceDetail.config),
+      sourceEngineTuningKnown: true,
     });
   }
 
@@ -534,7 +541,24 @@ function mergeForkSourceCopyChoice(
       ...nextSource,
       copyAltBaselines: previousSource.copyAltBaselines,
       sourceEngineTunerBackend: previousSource.sourceEngineTunerBackend,
+      sourceEngineTuning: previousSource.sourceEngineTuning,
+      sourceEngineTuningKnown: previousSource.sourceEngineTuningKnown,
     };
   }
   return nextSource;
+}
+
+function forkSourceEngineTuning(config: ManagedRunConfig): ForkSourceEngineTuning | null {
+  if (config.vehicle.engine_mode !== "adaptive_tuner") {
+    return null;
+  }
+  return {
+    backend: config.vehicle.adaptive_engine_tuner_backend,
+    banditBucketSize:
+      config.vehicle.adaptive_engine_tuner_backend === "bandit"
+        ? config.vehicle.adaptive_engine_bandit_bucket_size
+        : null,
+    maxRawValue: config.vehicle.engine_setting_max_raw_value,
+    minRawValue: config.vehicle.engine_setting_min_raw_value,
+  };
 }

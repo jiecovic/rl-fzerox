@@ -39,6 +39,8 @@ export interface WorkspaceSessions {
     initialDraftName: string;
     runId: string;
     sourceEngineTunerBackend: ForkSource["sourceEngineTunerBackend"];
+    sourceEngineTuning: ForkSource["sourceEngineTuning"];
+    sourceEngineTuningKnown: ForkSource["sourceEngineTuningKnown"];
   }) => void;
   draftEditors: DraftEditorSession[];
   forkSourceRunLabel: (source: ForkSource | null) => string | null;

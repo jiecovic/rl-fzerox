@@ -199,6 +199,10 @@ export function WorkspaceBody({
             forkSourceEngineTunerBackend={
               activeDraftEditor.forkSource?.sourceEngineTunerBackend ?? null
             }
+            forkSourceEngineTuning={activeDraftEditor.forkSource?.sourceEngineTuning ?? null}
+            forkSourceEngineTuningKnown={
+              activeDraftEditor.forkSource?.sourceEngineTuningKnown ?? false
+            }
             forkSourceRunLabel={sessions.forkSourceRunLabel(activeDraftEditor.forkSource)}
             initialConfig={activeDraftEditor.initialConfig}
             initialDraftName={activeDraftEditor.initialDraftName}

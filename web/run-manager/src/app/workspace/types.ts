@@ -27,6 +27,15 @@ export interface ForkSource {
   copyAltBaselines: boolean;
   runId: string;
   sourceEngineTunerBackend: EngineTunerBackend | null;
+  sourceEngineTuning: ForkSourceEngineTuning | null;
+  sourceEngineTuningKnown: boolean;
+}
+
+export interface ForkSourceEngineTuning {
+  backend: EngineTunerBackend;
+  banditBucketSize: number | null;
+  maxRawValue: number;
+  minRawValue: number;
 }
 
 export interface DraftEditorSession {

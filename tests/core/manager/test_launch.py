@@ -294,7 +294,12 @@ def test_fork_converts_engine_tuning_source_to_bandit_buckets(tmp_path: Path) ->
     assert child_state.model_state is None
     assert not engine_tuning_model_path(child_policy_path).exists()
     assert parent_state is not None
-    assert [candidate.engine_setting_raw_value for candidate in parent_state.candidates] == [54, 67]
+    assert [candidate.engine_setting_raw_value for candidate in parent_state.candidates] == [
+        50,
+        54,
+        67,
+        70,
+    ]
     assert parent_model_path.is_file()
 
 
@@ -320,6 +325,39 @@ def test_fork_can_discard_engine_tuning_source(tmp_path: Path) -> None:
         artifact="latest",
         name="Child Run",
         config=_bandit_engine_config(),
+        engine_tuning_source_action="discard",
+    )
+
+    assert child.source_snapshot_dir is not None
+    child_policy_path = child.source_snapshot_dir / RUN_LAYOUT.policy_artifacts.latest
+    assert not engine_tuning_checkpoint_path(child_policy_path).exists()
+    assert not engine_tuning_model_path(child_policy_path).exists()
+    assert parent_state_path.is_file()
+    assert parent_model_path.is_file()
+
+
+def test_fork_can_discard_engine_tuning_source_for_non_bandit_child(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=parent_dir,
+    )
+    _write_latest_checkpoint(parent_dir)
+    parent_policy_path = parent_dir / RUN_LAYOUT.policy_artifacts.latest
+    parent_state_path = engine_tuning_checkpoint_path(parent_policy_path)
+    parent_model_path = engine_tuning_model_path(parent_policy_path)
+    _write_off_grid_engine_tuning_state(parent_state_path)
+    parent_model_path.write_bytes(b"stale-model-sidecar")
+    launcher = _RecordingLauncher(store)
+
+    child = launcher.fork(
+        run_id=parent.id,
+        artifact="latest",
+        name="Child Run",
+        config=_gaussian_process_engine_config(),
         engine_tuning_source_action="discard",
     )
 
@@ -983,6 +1021,22 @@ def _bandit_engine_config() -> ManagedRunConfig:
     )
 
 
+def _gaussian_process_engine_config() -> ManagedRunConfig:
+    config = default_managed_run_config()
+    return config.model_copy(
+        update={
+            "vehicle": config.vehicle.model_copy(
+                update={
+                    "engine_mode": "adaptive_tuner",
+                    "engine_setting_min_raw_value": 50,
+                    "engine_setting_max_raw_value": 70,
+                    "adaptive_engine_tuner_backend": "gaussian_process",
+                }
+            )
+        }
+    )
+
+
 def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
     context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
     save_engine_tuning_runtime_state(
@@ -995,7 +1049,7 @@ def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
                     context_key=context.key,
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
-                    engine_setting_raw_value=54,
+                    engine_setting_raw_value=50,
                     finish_count=2,
                     decayed_count=2.0,
                     decayed_score_total=-200.0,
@@ -1007,7 +1061,31 @@ def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
                     context_key=context.key,
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
+                    engine_setting_raw_value=54,
+                    finish_count=99,
+                    decayed_count=99.0,
+                    decayed_score_total=-7_920.0,
+                    score_total=-7_920.0,
+                    best_score=-70.0,
+                    best_time_ms=70_000,
+                ),
+                EngineTuningCandidateState(
+                    context_key=context.key,
+                    course_key=context.course_key,
+                    vehicle_id=context.vehicle_id,
                     engine_setting_raw_value=67,
+                    finish_count=99,
+                    decayed_count=99.0,
+                    decayed_score_total=-7_920.0,
+                    score_total=-7_920.0,
+                    best_score=-70.0,
+                    best_time_ms=70_000,
+                ),
+                EngineTuningCandidateState(
+                    context_key=context.key,
+                    course_key=context.course_key,
+                    vehicle_id=context.vehicle_id,
+                    engine_setting_raw_value=70,
                     finish_count=1,
                     decayed_count=1.0,
                     decayed_score_total=-80.0,

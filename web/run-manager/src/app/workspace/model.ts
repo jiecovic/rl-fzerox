@@ -244,6 +244,8 @@ export function draftForkSource(draft: ManagedDraft): ForkSource | null {
     artifact: draft.source_artifact,
     copyAltBaselines: true,
     sourceEngineTunerBackend: null,
+    sourceEngineTuning: null,
+    sourceEngineTuningKnown: false,
   };
 }
 

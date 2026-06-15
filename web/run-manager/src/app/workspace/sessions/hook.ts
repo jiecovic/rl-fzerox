@@ -149,6 +149,8 @@ export function useWorkspaceSessions({
     initialDraftName,
     runId,
     sourceEngineTunerBackend,
+    sourceEngineTuning,
+    sourceEngineTuningKnown,
   }: {
     artifact: ForkSource["artifact"];
     copyAltBaselines: boolean;
@@ -156,11 +158,20 @@ export function useWorkspaceSessions({
     initialDraftName: string;
     runId: string;
     sourceEngineTunerBackend: ForkSource["sourceEngineTunerBackend"];
+    sourceEngineTuning: ForkSource["sourceEngineTuning"];
+    sourceEngineTuningKnown: ForkSource["sourceEngineTuningKnown"];
   }) {
     const sessionId = editorSessionId(crypto.randomUUID());
     setDraftEditors((current) =>
       createDraftSession(current, {
-        forkSource: { artifact, copyAltBaselines, runId, sourceEngineTunerBackend },
+        forkSource: {
+          artifact,
+          copyAltBaselines,
+          runId,
+          sourceEngineTunerBackend,
+          sourceEngineTuning,
+          sourceEngineTuningKnown,
+        },
         initialConfig,
         initialDraftName,
         sessionId,
