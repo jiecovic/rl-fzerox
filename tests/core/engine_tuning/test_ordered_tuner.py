@@ -302,7 +302,7 @@ def test_bandit_backend_explores_unobserved_buckets_before_resampling() -> None:
     assert probabilities == {40: 0.5, 50: 0.0, 60: 0.5}
 
 
-def test_bandit_backend_buckets_off_grid_aggregate_candidates() -> None:
+def test_bandit_backend_discards_off_grid_aggregate_candidates() -> None:
     context = EngineTuningContext(
         course_key="mute_city",
         vehicle_id="blue_falcon",
@@ -315,7 +315,7 @@ def test_bandit_backend_buckets_off_grid_aggregate_candidates() -> None:
                 context_key=context.key,
                 course_key=context.course_key,
                 vehicle_id=context.vehicle_id,
-                engine_setting_raw_value=54,
+                engine_setting_raw_value=50,
                 finish_count=2,
                 decayed_count=2.0,
                 decayed_score_total=-200.0,
@@ -327,7 +327,31 @@ def test_bandit_backend_buckets_off_grid_aggregate_candidates() -> None:
                 context_key=context.key,
                 course_key=context.course_key,
                 vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=54,
+                finish_count=99,
+                decayed_count=99.0,
+                decayed_score_total=-7_920.0,
+                score_total=-7_920.0,
+                best_score=-70.0,
+                best_time_ms=70_000,
+            ),
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
                 engine_setting_raw_value=67,
+                finish_count=99,
+                decayed_count=99.0,
+                decayed_score_total=-7_920.0,
+                score_total=-7_920.0,
+                best_score=-70.0,
+                best_time_ms=70_000,
+            ),
+            EngineTuningCandidateState(
+                context_key=context.key,
+                course_key=context.course_key,
+                vehicle_id=context.vehicle_id,
+                engine_setting_raw_value=70,
                 finish_count=1,
                 decayed_count=1.0,
                 decayed_score_total=-80.0,

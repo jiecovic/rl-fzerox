@@ -136,7 +136,7 @@ class BanditEngineTuner:
         candidates = self._candidates()
         changed = False
         for outcome, score, finish_time_ms in successful:
-            bucket = _nearest_bucket(outcome.engine_setting_raw_value, candidates)
+            bucket = _exact_bucket(outcome.engine_setting_raw_value, candidates)
             if bucket is None:
                 continue
             candidate = _candidate_from_state(
@@ -251,7 +251,7 @@ def _bucket_candidates(
     for candidate in state.candidates:
         if candidate.context_key != context.key or candidate.finish_count <= 0:
             continue
-        bucket = _nearest_bucket(candidate.engine_setting_raw_value, candidates)
+        bucket = _exact_bucket(candidate.engine_setting_raw_value, candidates)
         if bucket is None:
             continue
         buckets[bucket] = _bucketed_candidate(
@@ -262,12 +262,11 @@ def _bucket_candidates(
     return buckets
 
 
-def _nearest_bucket(raw_value: int, candidates: tuple[int, ...]) -> int | None:
-    if not candidates:
-        return None
-    if raw_value < candidates[0] or raw_value > candidates[-1]:
-        return None
-    return min(candidates, key=lambda candidate: (abs(candidate - raw_value), -candidate))
+def _exact_bucket(raw_value: int, candidates: tuple[int, ...]) -> int | None:
+    raw_bucket = int(raw_value)
+    if raw_bucket in candidates:
+        return raw_bucket
+    return None
 
 
 def _canonical_bandit_state(
@@ -284,7 +283,7 @@ def _canonical_bandit_state(
     for candidate in state.candidates:
         if candidate.finish_count <= 0:
             continue
-        bucket = _nearest_bucket(candidate.engine_setting_raw_value, candidates)
+        bucket = _exact_bucket(candidate.engine_setting_raw_value, candidates)
         if bucket is None:
             continue
         key = (candidate.context_key, bucket)
