@@ -1,6 +1,7 @@
 // web/run-manager/src/widgets/configurator/Configurator.tsx
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import type { ForkSourceEngineTuning } from "@/app/workspace/types";
 import { CONFIG_SECTION_TABS, type ConfigSection } from "@/entities/runConfig/model/sections";
 import { ActionSection } from "@/entities/runConfig/ui/sections/ActionSection";
 import { EnvironmentSection } from "@/entities/runConfig/ui/sections/EnvironmentSection";
@@ -74,13 +75,6 @@ interface PendingEngineTuningLaunch {
   config: ManagedRunConfig;
   draftId: string | null;
   name: string;
-}
-
-interface ForkSourceEngineTuning {
-  backend: EngineTunerBackend;
-  banditBucketSize: number | null;
-  maxRawValue: number;
-  minRawValue: number;
 }
 
 const POLICY_PREVIEW_DEBOUNCE_MS = 250;
