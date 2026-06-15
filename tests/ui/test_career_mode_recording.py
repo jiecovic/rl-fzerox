@@ -63,7 +63,7 @@ class _FakeFinalizer:
         self.closed = True
 
 
-def test_career_recorder_writes_full_video_and_target_segments(tmp_path: Path) -> None:
+def test_career_recorder_writes_live_video_and_target_segments(tmp_path: Path) -> None:
     writers: list[_FakeWriter] = []
     finalizer = _FakeFinalizer()
 
@@ -98,7 +98,7 @@ def test_career_recorder_writes_full_video_and_target_segments(tmp_path: Path) -
     recorder.close()
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-novice-jack-cup.mkv",
         "career.segment-002-clear-standard-queen-cup.mkv",
     ]
@@ -112,7 +112,6 @@ def test_career_recorder_writes_full_video_and_target_segments(tmp_path: Path) -
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-novice-jack-cup.mkv",
         "career.segment-002-clear-standard-queen-cup.mkv",
-        "career.mkv",
     ]
     assert finalizer.closed
 
@@ -158,6 +157,32 @@ def test_career_recorder_draws_input_hud_only_when_requested(tmp_path: Path) -> 
     assert not np.array_equal(writers[0].frames[1], frame)
     assert np.array_equal(writers[1].frames[0], frame)
     assert not np.array_equal(writers[1].frames[1], frame)
+
+
+def test_career_recorder_upscales_written_frames(tmp_path: Path) -> None:
+    writers: list[_FakeWriter] = []
+    finalizer = _FakeFinalizer()
+
+    def writer_factory(path: Path) -> _FakeWriter:
+        writer = _FakeWriter(path)
+        writers.append(writer)
+        return writer
+
+    frame = np.arange(2 * 3 * 3, dtype=np.uint8).reshape((2, 3, 3))
+    recorder = CareerModeFrameRecorder(
+        path=tmp_path / "career.mkv",
+        native_fps=60.0,
+        upscale_factor=3,
+        writer_factory=writer_factory,
+        finalizer_factory=lambda: finalizer,
+    )
+
+    recorder.record_frame(frame, info={"career_mode_target_label": "Clear Novice Jack Cup"})
+    recorder.close()
+
+    expected = np.repeat(np.repeat(frame, 3, axis=0), 3, axis=1)
+    assert np.array_equal(writers[0].frames[0], frame)
+    assert np.array_equal(writers[1].frames[0], expected)
 
 
 def test_career_recorder_delays_input_hud_by_one_frame(tmp_path: Path) -> None:
@@ -243,7 +268,7 @@ def test_career_recorder_keeps_segment_during_post_result_continuation(
     recorder.close()
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-novice-jack-cup.mkv",
         "career.segment-002-clear-novice-queen-cup.mkv",
     ]
@@ -251,7 +276,6 @@ def test_career_recorder_keeps_segment_during_post_result_continuation(
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-novice-jack-cup.mkv",
         "career.segment-002-clear-novice-queen-cup.mkv",
-        "career.mkv",
     ]
 
 
@@ -295,14 +319,13 @@ def test_career_recorder_closes_failed_segment_after_terminal_result_frame(
     recorder.close()
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-novice-jack-cup.mkv",
     ]
     assert [len(writer.frames) for writer in writers] == [2, 2]
     assert writers[1].closed
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-failed-attempt-clear-novice-jack-cup.mkv",
-        "career.mkv",
     ]
 
 
@@ -360,7 +383,7 @@ def test_career_recorder_restarts_segment_after_same_attempt_retry(
     recorder.close()
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-master-jack-cup.mkv",
         "career.segment-002-clear-master-jack-cup.mkv",
     ]
@@ -368,7 +391,6 @@ def test_career_recorder_restarts_segment_after_same_attempt_retry(
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-failed-attempt-clear-master-jack-cup.mkv",
         "career.segment-002-clear-master-jack-cup.mkv",
-        "career.mkv",
     ]
 
 
@@ -425,13 +447,12 @@ def test_career_recorder_keeps_course_retire_inside_current_segment(
     recorder.close()
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-master-joker-cup.mkv",
     ]
     assert [len(writer.frames) for writer in writers] == [4, 4]
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-joker-cup.mkv",
-        "career.mkv",
     ]
 
     summary_json_path = tmp_path / "career.segment-001-clear-master-joker-cup.summary.json"
@@ -487,7 +508,7 @@ def test_career_recorder_segments_by_attempt_and_marks_failed_attempts(
     recorder.close()
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-novice-jack-cup.mkv",
         "career.segment-002-clear-novice-jack-cup.mkv",
     ]
@@ -498,7 +519,6 @@ def test_career_recorder_segments_by_attempt_and_marks_failed_attempts(
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-failed-attempt-clear-novice-jack-cup.mkv",
         "career.segment-002-clear-novice-jack-cup.mkv",
-        "career.mkv",
     ]
 
 
@@ -551,7 +571,7 @@ def test_career_recorder_starts_new_segment_after_succeeded_replay_attempt(
     recorder.close()
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-master-king-cup.mkv",
         "career.segment-002-clear-master-king-cup.mkv",
     ]
@@ -559,7 +579,6 @@ def test_career_recorder_starts_new_segment_after_succeeded_replay_attempt(
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-king-cup.mkv",
         "career.segment-002-clear-master-king-cup.mkv",
-        "career.mkv",
     ]
 
 
@@ -612,7 +631,7 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_exit_frame(
     )
 
     assert [writer.path.name for writer in writers] == [
-        "career.mkv",
+        "career.live.mkv",
         "career.segment-001-clear-master-joker-cup.mkv",
     ]
     assert not writers[1].closed
@@ -682,9 +701,8 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_exit_frame(
 
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-joker-cup.mkv",
-        "career.mkv",
     ]
-    assert recorder.drain_notices() == ("MP4 ready: career.mp4",)
+    assert recorder.drain_notices() == ()
 
 
 def test_career_recorder_summary_captures_terminal_events_between_frames(
@@ -839,6 +857,8 @@ def test_career_mp4_finalizer_writes_session_summary_for_segments(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    concat_calls: list[tuple[tuple[Path, ...], str, Path]] = []
+
     def fake_resolve_ffmpeg_path() -> str:
         return "ffmpeg"
 
@@ -850,6 +870,15 @@ def test_career_mp4_finalizer_writes_session_summary_for_segments(
         del ffmpeg_path
         return path.with_suffix(".mp4")
 
+    def fake_concat_mp4_recordings(
+        input_paths: tuple[Path, ...],
+        *,
+        ffmpeg_path: str,
+        output_path: Path,
+    ) -> Path:
+        concat_calls.append((tuple(input_paths), ffmpeg_path, output_path))
+        return output_path
+
     monkeypatch.setattr(
         "rl_fzerox.ui.watch.runtime.career_mode.recording.resolve_ffmpeg_path",
         fake_resolve_ffmpeg_path,
@@ -858,10 +887,18 @@ def test_career_mp4_finalizer_writes_session_summary_for_segments(
         "rl_fzerox.ui.watch.runtime.career_mode.recording.remux_recording_to_mp4",
         fake_remux_recording_to_mp4,
     )
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.concat_mp4_recordings",
+        fake_concat_mp4_recordings,
+    )
     session_path = tmp_path / "career.mkv"
+    live_path = tmp_path / "career.live.mkv"
     segment_a = tmp_path / "career.segment-001-clear-master-jack-cup.mkv"
     segment_b = tmp_path / "career.segment-002-clear-master-jack-cup.mkv"
-    finalizer = _Mp4RecordingFinalizer(session_source_path=session_path)
+    finalizer = _Mp4RecordingFinalizer(
+        session_source_path=session_path,
+        live_source_path=live_path,
+    )
 
     finalizer.finalize(
         segment_b,
@@ -905,13 +942,13 @@ def test_career_mp4_finalizer_writes_session_summary_for_segments(
             final_info={},
         ),
     )
-    finalizer.finalize(session_path)
     finalizer.close()
 
     payload = json.loads(career_session_summary_path(session_path).read_text(encoding="utf-8"))
     assert payload["kind"] == "career_recording_session_summary"
-    assert payload["source_mkv_path"] == str(session_path)
-    assert payload["mp4_path"] == str(tmp_path / "career.mp4")
+    assert payload["session_source_path"] == str(session_path)
+    assert payload["live_mkv_path"] == str(live_path)
+    assert payload["session_mp4_path"] == str(tmp_path / "career.session.mp4")
     assert payload["segment_count"] == 2
     assert payload["result_counts"] == {"crashed": 1, "failed": 1, "finished": 1, "retired": 0}
     assert [segment["segment_index"] for segment in payload["segments"]] == [1, 2]
@@ -919,6 +956,66 @@ def test_career_mp4_finalizer_writes_session_summary_for_segments(
         str(segment_a.with_suffix(".mp4")),
         str(segment_b.with_suffix(".mp4")),
     ]
+    assert concat_calls == [
+        (
+            (segment_a.with_suffix(".mp4"), segment_b.with_suffix(".mp4")),
+            "ffmpeg",
+            tmp_path / "career.session.mp4",
+        )
+    ]
+
+
+def test_career_mp4_finalizer_can_skip_session_mp4_for_single_target(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_resolve_ffmpeg_path() -> str:
+        return "ffmpeg"
+
+    def fake_remux_recording_to_mp4(
+        path: Path,
+        *,
+        ffmpeg_path: str,
+    ) -> Path:
+        del ffmpeg_path
+        return path.with_suffix(".mp4")
+
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.resolve_ffmpeg_path",
+        fake_resolve_ffmpeg_path,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.remux_recording_to_mp4",
+        fake_remux_recording_to_mp4,
+    )
+    session_path = tmp_path / "career.mkv"
+    segment_path = tmp_path / "career.segment-001-clear-master-jack-cup.mkv"
+    finalizer = _Mp4RecordingFinalizer(
+        session_source_path=session_path,
+        session_mp4_enabled=False,
+    )
+
+    finalizer.finalize(
+        segment_path,
+        summary=_SegmentSummarySnapshot(
+            segment_index=1,
+            label="Clear Master Jack Cup",
+            attempt_id="attempt-a",
+            status="succeeded",
+            source_path=segment_path,
+            started_at_utc="2026-06-15T10:00:00Z",
+            closed_at_utc="2026-06-15T10:01:00Z",
+            frame_count=10,
+            course_results=(),
+            final_info={},
+        ),
+    )
+    finalizer.close()
+
+    payload = json.loads(career_session_summary_path(session_path).read_text(encoding="utf-8"))
+    assert payload["session_mp4_path"] is None
+    assert payload["live_mkv_path"] is None
+    assert payload["segment_count"] == 1
 
 
 def test_career_mp4_finalizer_reports_close_time_remux_failures(

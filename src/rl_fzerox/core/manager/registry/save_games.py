@@ -120,12 +120,15 @@ def update_runner_settings(
     attempt_seed: int | None,
     recording_enabled: bool,
     recording_input_hud_enabled: bool,
+    recording_upscale_factor: int,
     recording_path: Path | None,
 ) -> ManagedSaveGame | None:
     """Persist Career runner launch settings for one save game."""
 
     if attempt_seed is not None and not 0 <= attempt_seed <= (1 << 32) - 1:
         raise ValueError("attempt seed must be an integer from 0 to 4294967295")
+    if not 1 <= recording_upscale_factor <= 4:
+        raise ValueError("recording upscale factor must be an integer from 1 to 4")
     store.initialize()
     with store._orm_session() as session:
         return save_game_repository.update_save_game_runner_settings(
@@ -137,6 +140,7 @@ def update_runner_settings(
             attempt_seed=attempt_seed,
             recording_enabled=recording_enabled,
             recording_input_hud_enabled=recording_input_hud_enabled,
+            recording_upscale_factor=recording_upscale_factor,
             recording_path=recording_path,
             updated_at=utc_now(),
         )

@@ -123,6 +123,7 @@ export function useWorkspaceSessions({
         policyMode: "deterministic",
         recordingEnabled: false,
         recordingInputHudEnabled: false,
+        recordingUpscaleFactor: 2,
         runnerDevice: "cuda",
         runnerRenderer: "gliden64",
         saveGameId: null,
@@ -350,6 +351,7 @@ function saveGameSessionForManagedSave(
     recordingEnabled: existing?.recordingEnabled ?? settings.recording_enabled,
     recordingInputHudEnabled:
       existing?.recordingInputHudEnabled ?? settings.recording_input_hud_enabled,
+    recordingUpscaleFactor: existing?.recordingUpscaleFactor ?? settings.recording_upscale_factor,
     runnerDevice: existing?.runnerDevice ?? settings.device,
     runnerRenderer: existing?.runnerRenderer ?? settings.renderer,
     saveGameId: saveGame.id,

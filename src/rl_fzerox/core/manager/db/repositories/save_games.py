@@ -72,6 +72,7 @@ def insert_save_game(session: Session, save_game: ManagedSaveGame) -> None:
             runner_attempt_seed=save_game.runner_attempt_seed,
             runner_recording_enabled=save_game.runner_recording_enabled,
             runner_recording_input_hud_enabled=save_game.runner_recording_input_hud_enabled,
+            runner_recording_upscale_factor=save_game.runner_recording_upscale_factor,
             runner_recording_path=(
                 None
                 if save_game.runner_recording_path is None
@@ -145,6 +146,7 @@ def update_save_game_runner_settings(
     attempt_seed: int | None,
     recording_enabled: bool,
     recording_input_hud_enabled: bool,
+    recording_upscale_factor: int,
     recording_path: Path | None,
     updated_at: str,
 ) -> ManagedSaveGame | None:
@@ -159,6 +161,7 @@ def update_save_game_runner_settings(
     row.runner_attempt_seed = attempt_seed
     row.runner_recording_enabled = recording_enabled
     row.runner_recording_input_hud_enabled = recording_input_hud_enabled
+    row.runner_recording_upscale_factor = recording_upscale_factor
     row.runner_recording_path = None if recording_path is None else str(recording_path)
     row.updated_at = updated_at
     return save_game_from_model(row)
@@ -470,6 +473,9 @@ def save_game_from_model(row: SaveGameModel) -> ManagedSaveGame:
         runner_attempt_seed=optional_int(row.runner_attempt_seed),
         runner_recording_enabled=bool(row.runner_recording_enabled),
         runner_recording_input_hud_enabled=bool(row.runner_recording_input_hud_enabled),
+        runner_recording_upscale_factor=_required_recording_upscale_factor(
+            row.runner_recording_upscale_factor
+        ),
         runner_recording_path=None
         if row.runner_recording_path is None
         else Path(row.runner_recording_path).expanduser(),
@@ -562,3 +568,10 @@ def _required_policy_mode(value: object) -> Literal["deterministic", "stochastic
     if value == "stochastic":
         return "stochastic"
     raise ValueError(f"save game has invalid runner policy mode: {value!r}")
+
+
+def _required_recording_upscale_factor(value: object) -> int:
+    factor = optional_int(value)
+    if factor is not None and 1 <= factor <= 4:
+        return factor
+    raise ValueError(f"save game has invalid recording upscale factor: {value!r}")

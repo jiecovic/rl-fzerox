@@ -860,6 +860,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         deterministic_policy=False,
         recording_enabled=True,
         recording_input_hud_enabled=True,
+        recording_upscale_factor=3,
         recording_path=None,
     )
 
@@ -890,6 +891,8 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         "emulator.renderer=angrylion",
         "watch.recording.enabled=true",
         f"watch.recording.path={recording_path}",
+        "watch.recording.session_mp4_enabled=true",
+        "watch.recording.upscale_factor=3",
         "watch.recording.render_input_hud=true",
     ]
     lease = store.get_viewer_lease(lease_id)

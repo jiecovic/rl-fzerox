@@ -53,6 +53,7 @@ export interface SaveGameSession {
   policyMode: PolicyPlaybackMode;
   recordingEnabled: boolean;
   recordingInputHudEnabled: boolean;
+  recordingUpscaleFactor: number;
   runnerDevice: WatchDevice;
   runnerRenderer: WatchRenderer;
   saveGameId: string | null;

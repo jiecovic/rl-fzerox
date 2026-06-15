@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
@@ -240,6 +241,58 @@ def remux_recording_to_mp4(
     return target_path
 
 
+def concat_mp4_recordings(
+    input_paths: Sequence[Path],
+    *,
+    ffmpeg_path: str,
+    output_path: Path,
+) -> Path:
+    """Concatenate already-finalized MP4 recordings without re-encoding."""
+
+    source_paths = tuple(path.expanduser() for path in input_paths)
+    if not source_paths:
+        raise ValueError("at least one MP4 input is required")
+    requested_target_path = output_path.expanduser()
+    target_path = _available_output_path(requested_target_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    list_path = target_path.with_name(f".{target_path.stem}.concat.txt")
+    list_path.write_text(
+        "".join(f"file '{_ffmpeg_concat_path(path)}'\n" for path in source_paths),
+        encoding="utf-8",
+    )
+    try:
+        command = [
+            ffmpeg_path,
+            "-n",
+            "-loglevel",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(list_path),
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            str(target_path),
+        ]
+        result = subprocess.run(  # noqa: S603
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    finally:
+        list_path.unlink(missing_ok=True)
+    if result.returncode != 0:
+        detail = result.stderr.decode(errors="replace").strip()
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"ffmpeg concat failed with exit code {result.returncode}{suffix}")
+    return target_path
+
+
 def _available_output_path(path: Path) -> Path:
     if not path.exists():
         return path
@@ -248,6 +301,10 @@ def _available_output_path(path: Path) -> Path:
         if not candidate.exists():
             return candidate
     raise FileExistsError(f"no available recording output path near {path}")
+
+
+def _ffmpeg_concat_path(path: Path) -> str:
+    return str(path.resolve()).replace("'", "'\\''")
 
 
 def as_rgb_frame(frame: NumpyArray) -> RgbFrame:

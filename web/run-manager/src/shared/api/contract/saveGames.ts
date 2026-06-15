@@ -91,6 +91,7 @@ export const saveGameRunnerSettingsSchema = z.object({
   attempt_seed: z.number().int().min(0).max(4_294_967_295).nullable(),
   recording_enabled: z.boolean(),
   recording_input_hud_enabled: z.boolean(),
+  recording_upscale_factor: z.number().int().min(1).max(4),
   recording_path: z.string().nullable(),
 });
 
@@ -187,6 +188,7 @@ export interface CareerModeRunnerLaunchRequest {
   policyMode: PolicyPlaybackMode;
   recordingEnabled: boolean;
   recordingInputHudEnabled: boolean;
+  recordingUpscaleFactor: number;
   recordingPath: string | null;
   renderer: WatchRenderer | null;
   saveGameId: string;
@@ -200,6 +202,7 @@ export interface SaveGameRunnerSettingsUpdateRequest {
   policyMode: PolicyPlaybackMode;
   recordingEnabled: boolean;
   recordingInputHudEnabled: boolean;
+  recordingUpscaleFactor: number;
   recordingPath: string | null;
   renderer: WatchRenderer;
   saveGameId: string;

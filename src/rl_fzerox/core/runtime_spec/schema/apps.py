@@ -46,7 +46,9 @@ class WatchRecordingConfig(BaseModel):
 
     enabled: bool = False
     path: Path | None = None
+    session_mp4_enabled: bool = True
     render_input_hud: bool = False
+    upscale_factor: int = Field(default=1, ge=1, le=4)
 
 
 class WatchConfig(BaseModel):

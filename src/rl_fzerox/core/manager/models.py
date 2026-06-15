@@ -184,6 +184,7 @@ class ManagedSaveGame:
     runner_attempt_seed: int | None = None
     runner_recording_enabled: bool = False
     runner_recording_input_hud_enabled: bool = False
+    runner_recording_upscale_factor: int = 2
     runner_recording_path: Path | None = None
 
 

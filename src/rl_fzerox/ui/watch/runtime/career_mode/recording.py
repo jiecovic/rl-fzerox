@@ -16,6 +16,7 @@ from fzerox_emulator.arrays import Pcm16Samples, RgbFrame
 from rl_fzerox.apps.recording.video import (
     FfmpegRgbWriter,
     as_rgb_frame,
+    concat_mp4_recordings,
     remux_recording_to_mp4,
     resolve_ffmpeg_path,
     resolve_video_fps,
@@ -84,16 +85,22 @@ class _FinalizerJob:
     path: Path
     future: Future[Path]
     summary: _SegmentSummarySnapshot | None = None
+    delete_source: bool = False
 
 
 @dataclass(slots=True)
 class _SessionSummaryWriter:
     source_path: Path
-    full_video_path: Path | None = None
+    live_video_path: Path | None = None
+    session_video_path: Path | None = None
     segment_payloads: list[dict[str, object]] = field(default_factory=list)
 
-    def record_full_video(self, video_path: Path) -> None:
-        self.full_video_path = video_path
+    def record_live_video(self, video_path: Path) -> None:
+        self.live_video_path = video_path
+        self.write()
+
+    def record_session_video(self, video_path: Path) -> None:
+        self.session_video_path = video_path
         self.write()
 
     def record_segment(self, summary: _SegmentSummarySnapshot, *, video_path: Path) -> None:
@@ -106,6 +113,17 @@ class _SessionSummaryWriter:
         self.segment_payloads.append(payload)
         self.segment_payloads.sort(key=_segment_payload_sort_key)
         self.write()
+
+    def segment_video_paths(self) -> tuple[Path, ...]:
+        paths: list[Path] = []
+        for payload in self.segment_payloads:
+            video = payload.get("video")
+            if not isinstance(video, Mapping):
+                continue
+            path = video.get("mp4_path")
+            if isinstance(path, str) and path:
+                paths.append(Path(path))
+        return tuple(paths)
 
     def write(self) -> None:
         career_session_summary_path(self.source_path).write_text(
@@ -181,19 +199,30 @@ class CareerModeFrameRecorder:
         path: Path,
         native_fps: float,
         native_sample_rate: float | None = None,
+        upscale_factor: int = 1,
+        live_enabled: bool = True,
+        live_upscale_factor: int = 1,
+        session_mp4_enabled: bool = True,
         writer_factory: _WriterFactory | None = None,
         finalizer_factory: _FinalizerFactory | None = None,
     ) -> None:
         self._path = path.expanduser()
         self._fps = resolve_video_fps(native_fps=native_fps, override=None)
         self._sample_rate = _resolve_audio_sample_rate(native_sample_rate)
+        self._upscale_factor = _validated_upscale_factor(upscale_factor)
+        self._live_upscale_factor = _validated_upscale_factor(live_upscale_factor)
         self._writer_factory = writer_factory or self._default_writer
+        self._live_path = career_live_recording_path(self._path)
         self._finalizer = (
             finalizer_factory()
             if finalizer_factory is not None
-            else _Mp4RecordingFinalizer(session_source_path=self._path)
+            else _Mp4RecordingFinalizer(
+                session_source_path=self._path,
+                live_source_path=self._live_path if live_enabled else None,
+                session_mp4_enabled=session_mp4_enabled,
+            )
         )
-        self._full_writer = self._open_writer(self._path)
+        self._live_writer = self._open_writer(self._live_path) if live_enabled else None
         self._segment_writer: _RgbVideoWriter | None = None
         self._segment_key: str | None = None
         self._segment_label: str | None = None
@@ -212,16 +241,24 @@ class CareerModeFrameRecorder:
         audio_samples: Pcm16Samples = (),
     ) -> None:
         normalized_frame = as_rgb_frame(frame)
-        recording_frame = _input_hud_frame(
-            normalized_frame,
-            self._delayed_input_hud_info(info),
-        )
-        self._full_writer.write(recording_frame)
-        self._full_writer.write_audio(audio_samples)
+        delayed_info = self._delayed_input_hud_info(info)
+        if self._live_writer is not None:
+            live_frame = _recording_output_frame(
+                normalized_frame,
+                delayed_info,
+                upscale_factor=self._live_upscale_factor,
+            )
+            self._live_writer.write(live_frame)
+            self._live_writer.write_audio(audio_samples)
         self._update_segment_status(info)
         segment = self._recording_segment(info)
         if segment is None:
             return
+        segment_frame = _recording_output_frame(
+            normalized_frame,
+            delayed_info,
+            upscale_factor=self._upscale_factor,
+        )
         if segment.key != self._segment_key:
             self._start_segment(segment)
         self._update_segment_status(info)
@@ -231,7 +268,7 @@ class CareerModeFrameRecorder:
         if self._segment_writer is not None:
             if self._segment_summary is not None:
                 self._segment_summary.observe(info)
-            self._segment_writer.write(recording_frame)
+            self._segment_writer.write(segment_frame)
             self._segment_writer.write_audio(audio_samples)
             if close_after_frame:
                 self._close_segment_writer()
@@ -261,12 +298,11 @@ class CareerModeFrameRecorder:
             self._close_segment_writer()
         except Exception as exc:  # pragma: no cover - defensive close aggregation
             errors.append(exc)
-        try:
-            self._full_writer.close()
-        except Exception as exc:  # pragma: no cover - defensive close aggregation
-            errors.append(exc)
-        else:
-            self._finalizer.finalize(self._path)
+        if self._live_writer is not None:
+            try:
+                self._live_writer.close()
+            except Exception as exc:  # pragma: no cover - defensive close aggregation
+                errors.append(exc)
         try:
             self._finalizer.close()
         except Exception as exc:  # pragma: no cover - defensive close aggregation
@@ -432,11 +468,20 @@ class CareerModeFrameRecorder:
 class _Mp4RecordingFinalizer:
     """Remux closed live Matroska recordings to MP4 without blocking playback."""
 
-    def __init__(self, *, session_source_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        session_source_path: Path | None = None,
+        live_source_path: Path | None = None,
+        session_mp4_enabled: bool = True,
+    ) -> None:
         self._ffmpeg_path = resolve_ffmpeg_path()
         self._session_summary = (
             None if session_source_path is None else _SessionSummaryWriter(session_source_path)
         )
+        self._session_mp4_enabled = session_mp4_enabled
+        if self._session_summary is not None and live_source_path is not None:
+            self._session_summary.record_live_video(live_source_path)
         self._executor = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="career-recording-remux",
@@ -450,13 +495,12 @@ class _Mp4RecordingFinalizer:
                 write_segment_summary_files(summary, video_path=path)
                 if self._session_summary is not None:
                     self._session_summary.record_segment(summary, video_path=path)
-            elif self._session_summary is not None and path == self._session_summary.source_path:
-                self._session_summary.record_full_video(path)
             return
         self._jobs.append(
             _FinalizerJob(
                 path=path,
                 summary=summary,
+                delete_source=summary is not None,
                 future=self._executor.submit(
                     remux_recording_to_mp4,
                     path,
@@ -482,6 +526,30 @@ class _Mp4RecordingFinalizer:
         for job in self._jobs:
             self._notices.append(_finalizer_job_notice(job, session_summary=self._session_summary))
         self._jobs.clear()
+        self._finalize_session_video()
+
+    def _finalize_session_video(self) -> None:
+        if self._session_summary is None:
+            return
+        if not self._session_mp4_enabled:
+            self._session_summary.write()
+            return
+        segment_paths = self._session_summary.segment_video_paths()
+        if not segment_paths:
+            self._session_summary.write()
+            return
+        try:
+            session_video_path = concat_mp4_recordings(
+                segment_paths,
+                ffmpeg_path=self._ffmpeg_path,
+                output_path=career_session_video_path(self._session_summary.source_path),
+            )
+        except Exception as exc:  # pragma: no cover - defensive async error reporting
+            self._notices.append(f"session MP4 assembly failed: {exc}")
+            self._session_summary.write()
+            return
+        self._session_summary.record_session_video(session_video_path)
+        self._notices.append(f"session MP4 ready: {session_video_path.name}")
 
 
 def open_career_mode_recorder(
@@ -499,6 +567,9 @@ def open_career_mode_recorder(
         path=recording.path,
         native_fps=native_fps,
         native_sample_rate=native_sample_rate,
+        upscale_factor=recording.upscale_factor,
+        live_enabled=recording.session_mp4_enabled,
+        session_mp4_enabled=recording.session_mp4_enabled,
     )
 
 
@@ -540,15 +611,49 @@ def career_session_summary_path(path: Path) -> Path:
     return path.with_name(f"{path.stem}.session.json")
 
 
+def career_live_recording_path(path: Path) -> Path:
+    suffix = path.suffix or ".mkv"
+    return path.with_name(f"{path.stem}.live{suffix}")
+
+
+def career_session_video_path(path: Path) -> Path:
+    return path.with_name(f"{path.stem}.session.mp4")
+
+
 _HUD_TINY_GLYPHS: dict[str, tuple[str, ...]] = {
-    "A": ("010", "101", "111", "101", "101"),
-    "B": ("110", "101", "110", "101", "110"),
-    "C": ("111", "100", "100", "100", "111"),
-    "D": ("110", "101", "101", "101", "110"),
-    "L": ("100", "100", "100", "100", "111"),
-    "R": ("110", "101", "110", "101", "101"),
-    "Z": ("111", "001", "010", "100", "111"),
+    "A": ("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
+    "B": ("11110", "10001", "10001", "11110", "10001", "10001", "11110"),
+    "C": ("01111", "10000", "10000", "10000", "10000", "10000", "01111"),
+    "D": ("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
+    "L": ("10000", "10000", "10000", "10000", "10000", "10000", "11111"),
+    "R": ("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
+    "Z": ("11111", "00001", "00010", "00100", "01000", "10000", "11111"),
 }
+
+
+def _recording_output_frame(
+    frame: RgbFrame,
+    info: Mapping[str, object],
+    *,
+    upscale_factor: int,
+) -> RgbFrame:
+    scaled_frame = _upscale_frame_nearest(frame, factor=upscale_factor)
+    return _input_hud_frame(scaled_frame, info)
+
+
+def _upscale_frame_nearest(frame: RgbFrame, *, factor: int) -> RgbFrame:
+    validated_factor = _validated_upscale_factor(factor)
+    if validated_factor == 1:
+        return frame
+    repeated_rows = np.repeat(frame, validated_factor, axis=0)
+    repeated_pixels = np.repeat(repeated_rows, validated_factor, axis=1)
+    return as_rgb_frame(repeated_pixels)
+
+
+def _validated_upscale_factor(factor: int) -> int:
+    if not 1 <= factor <= 4:
+        raise ValueError("recording upscale factor must be an integer from 1 to 4")
+    return factor
 
 
 def _input_hud_frame(frame: RgbFrame, info: Mapping[str, object]) -> RgbFrame:
@@ -621,6 +726,7 @@ def _draw_input_hud(frame: RgbFrame, info: Mapping[str, object]) -> None:
         active=_bool_info(info, "watch_recording_input_boost"),
     )
 
+
 def _draw_stick(
     frame: RgbFrame,
     x: int,
@@ -653,9 +759,18 @@ def _draw_round_button(
     active: bool,
 ) -> None:
     fill = (74, 216, 142) if active else (18, 27, 38)
-    text = (4, 17, 12) if active else (164, 188, 200)
+    text = (3, 20, 13) if active else (225, 239, 245)
     _blend_circle(frame, center_x + 1, center_y + 1, radius, (0, 0, 0), alpha=0.24)
     _blend_circle(frame, center_x, center_y, radius, fill, alpha=0.84 if active else 0.58)
+    _draw_circle_ring(
+        frame,
+        center_x,
+        center_y,
+        radius,
+        (111, 255, 180) if active else (42, 64, 76),
+        thickness=max(1, radius // 5),
+        alpha=0.78 if active else 0.62,
+    )
     _blend_circle(
         frame,
         center_x,
@@ -664,11 +779,11 @@ def _draw_round_button(
         fill,
         alpha=0.18 if active else 0.08,
     )
-    text_scale = max(1, radius // 7)
+    text_scale = max(1, radius // 6)
     text_width = _tiny_text_width(label, scale=text_scale)
     text_x = center_x - text_width // 2
-    text_y = center_y - (5 * text_scale) // 2
-    _draw_tiny_text(frame, label, text_x, text_y, scale=text_scale, color=text)
+    text_y = center_y - (_tiny_text_height(label, scale=text_scale) // 2)
+    _draw_tiny_text(frame, label, text_x, text_y, scale=text_scale, color=text, bold=True)
 
 
 def _draw_tiny_text(
@@ -679,6 +794,7 @@ def _draw_tiny_text(
     *,
     scale: int,
     color: _RgbColor,
+    bold: bool = False,
 ) -> None:
     cursor_x = x
     for char in text.upper():
@@ -686,6 +802,7 @@ def _draw_tiny_text(
         if glyph is None:
             cursor_x += 4 * scale
             continue
+        pixel_width = scale + (max(1, scale // 2) if bold else 0)
         for row_index, row in enumerate(glyph):
             for column_index, pixel in enumerate(row):
                 if pixel == "1":
@@ -693,7 +810,7 @@ def _draw_tiny_text(
                         frame,
                         cursor_x + column_index * scale,
                         y + row_index * scale,
-                        scale,
+                        pixel_width,
                         scale,
                         color,
                     )
@@ -706,6 +823,11 @@ def _tiny_text_width(text: str, *, scale: int) -> int:
         glyph = _HUD_TINY_GLYPHS.get(char)
         width += (len(glyph[0]) + 1 if glyph is not None else 4) * scale
     return max(0, width - scale)
+
+
+def _tiny_text_height(text: str, *, scale: int) -> int:
+    heights = [len(glyph) for char in text.upper() if (glyph := _HUD_TINY_GLYPHS.get(char))]
+    return (max(heights) if heights else 0) * scale
 
 
 def _draw_box_outline(
@@ -771,6 +893,39 @@ def _blend_circle(
         )
 
 
+def _draw_circle_ring(
+    frame: RgbFrame,
+    center_x: int,
+    center_y: int,
+    radius: int,
+    color: _RgbColor,
+    *,
+    thickness: int,
+    alpha: float,
+) -> None:
+    if radius <= 0 or thickness <= 0:
+        return
+    frame_height, frame_width = frame.shape[:2]
+    color_array = np.asarray(color, dtype=np.float32)
+    outer_squared = radius * radius
+    inner_radius = max(0, radius - thickness)
+    inner_squared = inner_radius * inner_radius
+    y0 = max(0, center_y - radius)
+    y1 = min(frame_height, center_y + radius + 1)
+    for row_y in range(y0, y1):
+        row_offset = row_y - center_y
+        x0 = max(0, center_x - radius)
+        x1 = min(frame_width, center_x + radius + 1)
+        for pixel_x in range(x0, x1):
+            column_offset = pixel_x - center_x
+            distance_squared = column_offset * column_offset + row_offset * row_offset
+            if inner_squared < distance_squared <= outer_squared:
+                pixel = frame[row_y, pixel_x]
+                frame[row_y, pixel_x] = (
+                    pixel.astype(np.float32) * (1.0 - alpha) + color_array * alpha
+                ).astype(np.uint8)
+
+
 def _draw_crosshair(
     frame: RgbFrame,
     center_x: int,
@@ -824,8 +979,11 @@ def _session_summary_payload(writer: _SessionSummaryWriter) -> dict[str, object]
     return {
         "kind": "career_recording_session_summary",
         "schema_version": 1,
-        "source_mkv_path": str(writer.source_path),
-        "mp4_path": None if writer.full_video_path is None else str(writer.full_video_path),
+        "session_source_path": str(writer.source_path),
+        "live_mkv_path": None if writer.live_video_path is None else str(writer.live_video_path),
+        "session_mp4_path": None
+        if writer.session_video_path is None
+        else str(writer.session_video_path),
         "segment_count": len(segment_payloads),
         "result_counts": _aggregate_segment_result_counts(segment_payloads),
         "segments": segment_payloads,
@@ -1142,8 +1300,8 @@ def _finalizer_job_notice(
             write_segment_summary_files(job.summary, video_path=output_path)
             if session_summary is not None:
                 session_summary.record_segment(job.summary, video_path=output_path)
-        elif session_summary is not None and job.path == session_summary.source_path:
-            session_summary.record_full_video(output_path)
+        if job.delete_source:
+            job.path.unlink(missing_ok=True)
     except Exception as exc:  # pragma: no cover - defensive async error reporting
         return f"MP4 conversion failed: {exc}"
     return f"MP4 ready: {output_path.name}"

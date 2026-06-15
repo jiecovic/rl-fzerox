@@ -85,6 +85,7 @@ describe("SaveGameWorkspace", () => {
       policyMode: "deterministic",
       recordingEnabled: false,
       recordingInputHudEnabled: false,
+      recordingUpscaleFactor: 2,
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
@@ -278,6 +279,7 @@ describe("SaveGameWorkspace", () => {
       policyMode: "stochastic",
       recordingEnabled: false,
       recordingInputHudEnabled: false,
+      recordingUpscaleFactor: 2,
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
@@ -322,6 +324,7 @@ describe("SaveGameWorkspace", () => {
 
     await user.click(screen.getByLabelText("Record video"));
     await user.click(screen.getByLabelText("Input HUD"));
+    await user.selectOptions(screen.getByLabelText("Career Mode recording upscale"), "2");
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onStartCareerMode).toHaveBeenCalledWith({
@@ -330,6 +333,7 @@ describe("SaveGameWorkspace", () => {
       policyMode: "deterministic",
       recordingEnabled: true,
       recordingInputHudEnabled: true,
+      recordingUpscaleFactor: 2,
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
@@ -377,6 +381,7 @@ describe("SaveGameWorkspace", () => {
       policyMode: "deterministic",
       recordingEnabled: false,
       recordingInputHudEnabled: false,
+      recordingUpscaleFactor: 2,
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
@@ -685,6 +690,7 @@ function newSaveGameSession(): SaveGameSession {
     policyMode: "deterministic",
     recordingEnabled: false,
     recordingInputHudEnabled: false,
+    recordingUpscaleFactor: 2,
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId: null,
@@ -784,6 +790,7 @@ function existingSaveGameSession(saveGameId: string): SaveGameSession {
     policyMode: "deterministic",
     recordingEnabled: false,
     recordingInputHudEnabled: false,
+    recordingUpscaleFactor: 2,
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId,

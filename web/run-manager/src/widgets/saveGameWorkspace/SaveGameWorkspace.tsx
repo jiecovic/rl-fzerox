@@ -243,6 +243,7 @@ export function SaveGameWorkspace({
       policyMode: session.policyMode,
       recordingEnabled: session.recordingEnabled,
       recordingInputHudEnabled: session.recordingInputHudEnabled,
+      recordingUpscaleFactor: session.recordingUpscaleFactor,
       recordingPath: null,
       renderer: session.runnerRenderer,
       saveGameId: target.id,
@@ -281,6 +282,7 @@ export function SaveGameWorkspace({
       policyMode: settings.policy_mode,
       recordingEnabled: settings.recording_enabled,
       recordingInputHudEnabled: settings.recording_input_hud_enabled,
+      recordingUpscaleFactor: settings.recording_upscale_factor,
       runnerDevice: settings.device,
       runnerRenderer: settings.renderer,
     });
@@ -330,6 +332,7 @@ export function SaveGameWorkspace({
         policyMode: settingsRequest.policyMode,
         recordingEnabled: settingsRequest.recordingEnabled,
         recordingInputHudEnabled: settingsRequest.recordingInputHudEnabled,
+        recordingUpscaleFactor: settingsRequest.recordingUpscaleFactor,
         recordingPath: null,
         renderer: settingsRequest.renderer,
         saveGameId: target.id,
@@ -499,6 +502,7 @@ export function SaveGameWorkspace({
         policyMode={session.policyMode}
         recordingEnabled={session.recordingEnabled}
         recordingInputHudEnabled={session.recordingInputHudEnabled}
+        recordingUpscaleFactor={session.recordingUpscaleFactor}
         startLabel={startLabel}
         startNote={startNote}
         savingSettings={savingRunnerSettings}
@@ -521,6 +525,9 @@ export function SaveGameWorkspace({
         }
         onRecordingInputHudEnabledChange={(recordingInputHudEnabled) =>
           onPatchSession(session.sessionId, { recordingInputHudEnabled })
+        }
+        onRecordingUpscaleFactorChange={(recordingUpscaleFactor) =>
+          onPatchSession(session.sessionId, { recordingUpscaleFactor })
         }
         onSaveSettings={() => void saveRunnerSettings(saveGame)}
         onStart={() => void startCareerMode(saveGame)}
@@ -580,6 +587,7 @@ function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession
     settings.policy_mode !== session.policyMode ||
     settings.recording_enabled !== session.recordingEnabled ||
     settings.recording_input_hud_enabled !== session.recordingInputHudEnabled ||
+    settings.recording_upscale_factor !== session.recordingUpscaleFactor ||
     settings.recording_path !== null
   );
 }

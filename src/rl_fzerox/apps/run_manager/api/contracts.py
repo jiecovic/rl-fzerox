@@ -44,6 +44,7 @@ class StartCareerModeRequest(BaseModel):
     policy_mode: PolicyPlaybackMode = "deterministic"
     recording_enabled: bool = False
     recording_input_hud_enabled: bool = False
+    recording_upscale_factor: int = Field(default=2, ge=1, le=4)
     recording_path: Path | None = None
     target_kind: str | None = None
     difficulty: str | None = None
@@ -80,6 +81,7 @@ class UpdateSaveRunnerSettingsRequest(BaseModel):
     policy_mode: PolicyPlaybackMode = "deterministic"
     recording_enabled: bool = False
     recording_input_hud_enabled: bool = False
+    recording_upscale_factor: int = Field(default=2, ge=1, le=4)
     recording_path: Path | None = None
 
 
@@ -240,6 +242,7 @@ class RunLauncher(Protocol):
         deterministic_policy: bool,
         recording_enabled: bool,
         recording_input_hud_enabled: bool,
+        recording_upscale_factor: int,
         recording_path: Path | None,
         target_kind: str | None,
         difficulty: str | None,

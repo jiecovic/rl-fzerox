@@ -15,6 +15,7 @@ export function RunnerControlPanel({
   onPolicyModeChange,
   onRecordingEnabledChange,
   onRecordingInputHudEnabledChange,
+  onRecordingUpscaleFactorChange,
   onRunnerDeviceChange,
   onRunnerRendererChange,
   onSaveSettings,
@@ -22,6 +23,7 @@ export function RunnerControlPanel({
   policyMode,
   recordingEnabled,
   recordingInputHudEnabled,
+  recordingUpscaleFactor,
   rendererOptions,
   runnerDevice,
   runnerRenderer,
@@ -38,6 +40,7 @@ export function RunnerControlPanel({
   onPolicyModeChange: (policyMode: PolicyPlaybackMode) => void;
   onRecordingEnabledChange: (recordingEnabled: boolean) => void;
   onRecordingInputHudEnabledChange: (recordingInputHudEnabled: boolean) => void;
+  onRecordingUpscaleFactorChange: (recordingUpscaleFactor: number) => void;
   onRunnerDeviceChange: (device: WatchDevice) => void;
   onRunnerRendererChange: (renderer: WatchRenderer) => void;
   onSaveSettings: () => void;
@@ -45,6 +48,7 @@ export function RunnerControlPanel({
   policyMode: PolicyPlaybackMode;
   recordingEnabled: boolean;
   recordingInputHudEnabled: boolean;
+  recordingUpscaleFactor: number;
   rendererOptions: readonly WatchRenderer[];
   runnerDevice: WatchDevice;
   runnerRenderer: WatchRenderer;
@@ -142,7 +146,7 @@ export function RunnerControlPanel({
             <span>{starting ? "Opening" : startLabel}</span>
           </Button>
         </div>
-        <div className="grid gap-2 border-t border-app-border pt-3 md:grid-cols-[140px_160px] md:items-end">
+        <div className="grid gap-2 border-t border-app-border pt-3 md:grid-cols-[140px_150px_120px] md:items-end">
           <FieldShell>
             <span>Recording</span>
             <ToggleSwitch
@@ -161,9 +165,31 @@ export function RunnerControlPanel({
               onChange={onRecordingInputHudEnabledChange}
             />
           </FieldShell>
+          <FieldShell>
+            <span>Upscale</span>
+            <FieldSelect
+              aria-label="Career Mode recording upscale"
+              disabled={settingsDisabled || !recordingEnabled}
+              value={String(recordingUpscaleFactor)}
+              onChange={(event) =>
+                onRecordingUpscaleFactorChange(Number(event.currentTarget.value))
+              }
+            >
+              {RECORDING_UPSCALE_OPTIONS.map((option) => (
+                <option key={option.factor} value={option.factor}>
+                  {option.label}
+                </option>
+              ))}
+            </FieldSelect>
+          </FieldShell>
         </div>
       </div>
       <span className="text-xs text-app-muted lg:pb-3">{startNote}</span>
     </div>
   );
 }
+
+const RECORDING_UPSCALE_OPTIONS = [
+  { factor: 1, label: "1x native" },
+  { factor: 2, label: "2x preview" },
+] as const;

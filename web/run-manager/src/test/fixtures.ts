@@ -144,6 +144,7 @@ export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): Manag
       policy_mode: "deterministic",
       recording_enabled: false,
       recording_input_hud_enabled: false,
+      recording_upscale_factor: 2,
       recording_path: null,
       renderer: "gliden64",
     },

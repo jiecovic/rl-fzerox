@@ -33,6 +33,7 @@ def launch_career_mode_runner(
     deterministic_policy: bool,
     recording_enabled: bool = False,
     recording_input_hud_enabled: bool = False,
+    recording_upscale_factor: int = 2,
     recording_path: Path | None = None,
     target_kind: str | None = None,
     difficulty: str | None = None,
@@ -45,6 +46,8 @@ def launch_career_mode_runner(
     save_game = store.get_save_game(save_game_id)
     if save_game is None:
         raise ValueError(f"save game not found: {save_game_id}")
+    if not 1 <= recording_upscale_factor <= 4:
+        raise ValueError("recording upscale factor must be an integer from 1 to 4")
     lease_id = store.viewer_lease_id(kind="career_mode", owner_id=save_game_id)
     if (
         active_career_mode_runner_pid(
@@ -78,6 +81,8 @@ def launch_career_mode_runner(
             *overrides,
             "watch.recording.enabled=true",
             f"watch.recording.path={resolved_recording_path}",
+            f"watch.recording.session_mp4_enabled={str(not single_target).lower()}",
+            f"watch.recording.upscale_factor={recording_upscale_factor}",
         )
         if recording_input_hud_enabled:
             overrides = (*overrides, "watch.recording.render_input_hud=true")

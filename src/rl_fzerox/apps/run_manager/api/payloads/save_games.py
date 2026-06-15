@@ -69,6 +69,7 @@ def save_game_runner_settings_payload(save_game: ManagedSaveGame) -> dict[str, o
         "attempt_seed": save_game.runner_attempt_seed,
         "recording_enabled": save_game.runner_recording_enabled,
         "recording_input_hud_enabled": save_game.runner_recording_input_hud_enabled,
+        "recording_upscale_factor": save_game.runner_recording_upscale_factor,
         "recording_path": None
         if save_game.runner_recording_path is None
         else str(save_game.runner_recording_path),

@@ -92,6 +92,7 @@ def update_save_game_runner_settings_payload(
             attempt_seed=request.attempt_seed,
             recording_enabled=request.recording_enabled,
             recording_input_hud_enabled=request.recording_input_hud_enabled,
+            recording_upscale_factor=request.recording_upscale_factor,
             recording_path=request.recording_path,
         )
     except ValueError as error:

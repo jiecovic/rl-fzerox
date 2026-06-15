@@ -32,6 +32,7 @@ from rl_fzerox.apps.recording.video import (
     VideoSettings,
     _ffmpeg_command,
     as_pcm16_samples,
+    concat_mp4_recordings,
     remux_recording_to_mp4,
 )
 from rl_fzerox.apps.recording.video import (
@@ -212,6 +213,78 @@ def test_remux_recording_to_mp4_reports_ffmpeg_errors(
 
     with pytest.raises(RuntimeError, match="bad input"):
         remux_recording_to_mp4(source_path, ffmpeg_path="ffmpeg")
+
+
+def test_concat_mp4_recordings_copies_streams_with_concat_demuxer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "first.mp4"
+    second_path = tmp_path / "second.mp4"
+    first_path.write_bytes(b"first")
+    second_path.write_bytes(b"second")
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        del kwargs
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stderr=b"")
+
+    monkeypatch.setattr("rl_fzerox.apps.recording.video.subprocess.run", fake_run)
+
+    output_path = concat_mp4_recordings(
+        (first_path, second_path),
+        ffmpeg_path="ffmpeg",
+        output_path=tmp_path / "joined.mp4",
+    )
+
+    assert output_path == tmp_path / "joined.mp4"
+    command = commands[0]
+    list_path = Path(command[command.index("-i") + 1])
+    assert not list_path.exists()
+    assert command == [
+        "ffmpeg",
+        "-n",
+        "-loglevel",
+        "error",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        str(tmp_path / ".joined.concat.txt"),
+        "-c",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(tmp_path / "joined.mp4"),
+    ]
+
+
+def test_concat_mp4_recordings_appends_counter_when_target_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "joined.mp4").write_bytes(b"old")
+    source_path = tmp_path / "segment.mp4"
+    source_path.write_bytes(b"segment")
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        del kwargs
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stderr=b"")
+
+    monkeypatch.setattr("rl_fzerox.apps.recording.video.subprocess.run", fake_run)
+
+    output_path = concat_mp4_recordings(
+        (source_path,),
+        ffmpeg_path="ffmpeg",
+        output_path=tmp_path / "joined.mp4",
+    )
+
+    assert output_path == tmp_path / "joined-001.mp4"
+    assert commands[0][-1] == str(tmp_path / "joined-001.mp4")
 
 
 def test_as_pcm16_samples_requires_flat_stereo_pairs() -> None:
