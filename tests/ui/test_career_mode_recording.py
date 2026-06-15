@@ -10,13 +10,13 @@ import pytest
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.ui.watch.runtime.career_mode.recording import (
     CareerModeFrameRecorder,
-    _input_hud_frame,
     _Mp4RecordingFinalizer,
     _SegmentSummarySnapshot,
     career_segment_recording_path,
     career_session_summary_path,
     write_segment_summary_files,
 )
+from rl_fzerox.ui.watch.runtime.career_mode.recording_hud import input_hud_frame
 
 
 class _FakeWriter:
@@ -224,8 +224,8 @@ def test_career_recorder_delays_input_hud_by_one_frame(tmp_path: Path) -> None:
     recorder.record_frame(frame, info=second_input)
     recorder.close()
 
-    assert np.array_equal(writers[0].frames[0], _input_hud_frame(frame, first_input))
-    assert np.array_equal(writers[0].frames[1], _input_hud_frame(frame, first_input))
+    assert np.array_equal(writers[0].frames[0], input_hud_frame(frame, first_input))
+    assert np.array_equal(writers[0].frames[1], input_hud_frame(frame, first_input))
 
 
 def test_career_recorder_keeps_segment_during_post_result_continuation(
