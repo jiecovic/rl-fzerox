@@ -1,12 +1,16 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/recording.py
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
+
+import numpy as np
 
 from fzerox_emulator.arrays import Pcm16Samples, RgbFrame
 from rl_fzerox.apps.recording.video import (
@@ -30,6 +34,8 @@ class FrameRecorder(Protocol):
         audio_samples: Pcm16Samples = (),
     ) -> None: ...
 
+    def record_event(self, *, info: Mapping[str, object]) -> None: ...
+
     def drain_notices(self) -> tuple[str, ...]: ...
 
 
@@ -44,7 +50,7 @@ class _RgbVideoWriter(Protocol):
 
 
 class _RecordingFinalizer(Protocol):
-    def finalize(self, path: Path) -> None: ...
+    def finalize(self, path: Path, *, summary: _SegmentSummarySnapshot | None = None) -> None: ...
 
     def drain_notices(self) -> tuple[str, ...]: ...
 
@@ -53,6 +59,17 @@ class _RecordingFinalizer(Protocol):
 
 _WriterFactory = Callable[[Path], _RgbVideoWriter]
 _FinalizerFactory = Callable[[], _RecordingFinalizer]
+_RgbColor = tuple[int, int, int]
+_INPUT_HUD_INFO_KEYS = (
+    "watch_recording_input_hud",
+    "watch_recording_input_gas",
+    "watch_recording_input_boost",
+    "watch_recording_input_air_brake",
+    "watch_recording_input_lean_left",
+    "watch_recording_input_lean_right",
+    "watch_recording_input_stick_x",
+    "watch_recording_input_pitch",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +83,93 @@ class _SegmentIdentity:
 class _FinalizerJob:
     path: Path
     future: Future[Path]
+    summary: _SegmentSummarySnapshot | None = None
+
+
+@dataclass(slots=True)
+class _SessionSummaryWriter:
+    source_path: Path
+    full_video_path: Path | None = None
+    segment_payloads: list[dict[str, object]] = field(default_factory=list)
+
+    def record_full_video(self, video_path: Path) -> None:
+        self.full_video_path = video_path
+        self.write()
+
+    def record_segment(self, summary: _SegmentSummarySnapshot, *, video_path: Path) -> None:
+        payload = _segment_summary_payload(summary, video_path=video_path)
+        self.segment_payloads = [
+            segment
+            for segment in self.segment_payloads
+            if segment.get("segment_index") != summary.segment_index
+        ]
+        self.segment_payloads.append(payload)
+        self.segment_payloads.sort(key=_segment_payload_sort_key)
+        self.write()
+
+    def write(self) -> None:
+        career_session_summary_path(self.source_path).write_text(
+            json.dumps(_session_summary_payload(self), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class _SegmentSummarySnapshot:
+    segment_index: int
+    label: str
+    attempt_id: str | None
+    status: str | None
+    source_path: Path
+    started_at_utc: str
+    closed_at_utc: str
+    frame_count: int
+    course_results: tuple[dict[str, object], ...]
+    final_info: dict[str, object]
+
+
+@dataclass(slots=True)
+class _SegmentSummaryBuilder:
+    segment_index: int
+    label: str
+    attempt_id: str | None
+    started_at_utc: str
+    frame_count: int = 0
+    status: str | None = None
+    final_info: dict[str, object] | None = None
+    course_results: list[dict[str, object]] = field(default_factory=list)
+    last_course_result_signature: tuple[object, ...] | None = None
+
+    def observe(self, info: Mapping[str, object]) -> None:
+        self.frame_count += 1
+        self.observe_event(info)
+
+    def observe_event(self, info: Mapping[str, object]) -> None:
+        if status := _last_finished_attempt_status(info):
+            self.status = status
+        self.final_info = _selected_summary_info(info)
+        course_result = _course_result(info)
+        if course_result is None:
+            return
+        signature = _course_result_signature(course_result)
+        if signature == self.last_course_result_signature:
+            return
+        self.course_results.append(course_result)
+        self.last_course_result_signature = signature
+
+    def snapshot(self, *, source_path: Path, status: str | None) -> _SegmentSummarySnapshot:
+        return _SegmentSummarySnapshot(
+            segment_index=self.segment_index,
+            label=self.label,
+            attempt_id=self.attempt_id,
+            status=status or self.status,
+            source_path=source_path,
+            started_at_utc=self.started_at_utc,
+            closed_at_utc=_utc_timestamp(),
+            frame_count=self.frame_count,
+            course_results=tuple(dict(result) for result in self.course_results),
+            final_info=dict(self.final_info or {}),
+        )
 
 
 class CareerModeFrameRecorder:
@@ -85,7 +189,9 @@ class CareerModeFrameRecorder:
         self._sample_rate = _resolve_audio_sample_rate(native_sample_rate)
         self._writer_factory = writer_factory or self._default_writer
         self._finalizer = (
-            finalizer_factory() if finalizer_factory is not None else _Mp4RecordingFinalizer()
+            finalizer_factory()
+            if finalizer_factory is not None
+            else _Mp4RecordingFinalizer(session_source_path=self._path)
         )
         self._full_writer = self._open_writer(self._path)
         self._segment_writer: _RgbVideoWriter | None = None
@@ -94,7 +200,9 @@ class CareerModeFrameRecorder:
         self._segment_attempt_id: str | None = None
         self._segment_status: str | None = None
         self._segment_path: Path | None = None
+        self._segment_summary: _SegmentSummaryBuilder | None = None
         self._segment_index = 0
+        self._previous_input_hud_info: dict[str, object] | None = None
 
     def record_frame(
         self,
@@ -104,7 +212,11 @@ class CareerModeFrameRecorder:
         audio_samples: Pcm16Samples = (),
     ) -> None:
         normalized_frame = as_rgb_frame(frame)
-        self._full_writer.write(normalized_frame)
+        recording_frame = _input_hud_frame(
+            normalized_frame,
+            self._delayed_input_hud_info(info),
+        )
+        self._full_writer.write(recording_frame)
         self._full_writer.write_audio(audio_samples)
         self._update_segment_status(info)
         segment = self._recording_segment(info)
@@ -117,10 +229,31 @@ class CareerModeFrameRecorder:
         if not close_after_frame:
             self._close_finished_segment(info)
         if self._segment_writer is not None:
-            self._segment_writer.write(normalized_frame)
+            if self._segment_summary is not None:
+                self._segment_summary.observe(info)
+            self._segment_writer.write(recording_frame)
             self._segment_writer.write_audio(audio_samples)
             if close_after_frame:
                 self._close_segment_writer()
+
+    def record_event(self, *, info: Mapping[str, object]) -> None:
+        self._update_segment_status(info)
+        if self._segment_summary is not None:
+            self._segment_summary.observe_event(info)
+
+    def _delayed_input_hud_info(self, info: Mapping[str, object]) -> Mapping[str, object]:
+        if info.get("watch_recording_input_hud") is not True:
+            self._previous_input_hud_info = None
+            return info
+        previous_info = self._previous_input_hud_info
+        self._previous_input_hud_info = dict(info)
+        if previous_info is None:
+            return info
+        delayed_info = dict(info)
+        for key in _INPUT_HUD_INFO_KEYS:
+            if key in previous_info:
+                delayed_info[key] = previous_info[key]
+        return delayed_info
 
     def close(self) -> None:
         errors: list[Exception] = []
@@ -156,6 +289,12 @@ class CareerModeFrameRecorder:
             segment_index=self._segment_index,
             label=segment.label,
         )
+        self._segment_summary = _SegmentSummaryBuilder(
+            segment_index=self._segment_index,
+            label=segment.label,
+            attempt_id=segment.attempt_id,
+            started_at_utc=_utc_timestamp(),
+        )
         self._segment_writer = self._open_writer(self._segment_path)
 
     def _close_segment_writer(self) -> None:
@@ -165,7 +304,24 @@ class CareerModeFrameRecorder:
         self._segment_writer = None
         self._rename_failed_segment()
         if self._segment_path is not None:
-            self._finalizer.finalize(self._segment_path)
+            summary = (
+                None
+                if self._segment_summary is None
+                else self._segment_summary.snapshot(
+                    source_path=self._segment_path,
+                    status=self._segment_status,
+                )
+            )
+            self._finalizer.finalize(self._segment_path, summary=summary)
+        self._clear_segment_state()
+
+    def _clear_segment_state(self) -> None:
+        self._segment_key = None
+        self._segment_label = None
+        self._segment_attempt_id = None
+        self._segment_status = None
+        self._segment_path = None
+        self._segment_summary = None
 
     def _rename_failed_segment(self) -> None:
         if (
@@ -204,7 +360,7 @@ class CareerModeFrameRecorder:
             _continuing_race_result(info)
             and self._segment_key is not None
             and self._segment_label is not None
-            and not self._retry_attempt_started(attempt_id, info)
+            and not self._next_attempt_started(info)
         ):
             return _SegmentIdentity(
                 key=self._segment_key,
@@ -215,7 +371,7 @@ class CareerModeFrameRecorder:
             self._current_segment_attempt_finished(info)
             and self._segment_key is not None
             and self._segment_label is not None
-            and not self._retry_attempt_started(attempt_id, info)
+            and not self._next_attempt_started(info)
         ):
             return _SegmentIdentity(
                 key=self._segment_key,
@@ -224,18 +380,10 @@ class CareerModeFrameRecorder:
             )
         if label is None:
             return None
+        if self._segment_key is None and _continuing_race_result(info):
+            return None
         key = f"attempt:{attempt_id}" if attempt_id is not None else f"target:{label}"
         return _SegmentIdentity(key=key, label=label, attempt_id=attempt_id)
-
-    def _retry_attempt_started(self, attempt_id: str | None, info: Mapping[str, object]) -> bool:
-        if attempt_id is None or self._segment_attempt_id is None:
-            return False
-        if attempt_id == self._segment_attempt_id:
-            return False
-        return (
-            _last_finished_attempt_id(info) == self._segment_attempt_id
-            and _last_finished_attempt_status(info) == "failed"
-        )
 
     def _update_segment_status(self, info: Mapping[str, object]) -> None:
         if self._segment_attempt_id is None:
@@ -257,21 +405,38 @@ class CareerModeFrameRecorder:
     def _close_finished_segment(self, info: Mapping[str, object]) -> None:
         if self._segment_writer is None:
             return
-        if self._segment_status not in {"succeeded", "failed"}:
+        if self._segment_status is None:
             return
         if _continuing_race_result(info):
+            return
+        if self._segment_status == "succeeded" and not self._next_attempt_started(info):
             return
         self._close_segment_writer()
 
     def _should_close_finished_segment_after_frame(self, info: Mapping[str, object]) -> bool:
-        return self._segment_status in {"succeeded", "failed"} and _terminal_result(info)
+        if self._segment_status == "failed":
+            return _terminal_result(info)
+        if self._segment_status == "succeeded":
+            return _post_gp_exit_frame(info)
+        return False
+
+    def _next_attempt_started(self, info: Mapping[str, object]) -> bool:
+        attempt_id = _attempt_id(info)
+        return (
+            attempt_id is not None
+            and self._segment_attempt_id is not None
+            and attempt_id != self._segment_attempt_id
+        )
 
 
 class _Mp4RecordingFinalizer:
     """Remux closed live Matroska recordings to MP4 without blocking playback."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, session_source_path: Path | None = None) -> None:
         self._ffmpeg_path = resolve_ffmpeg_path()
+        self._session_summary = (
+            None if session_source_path is None else _SessionSummaryWriter(session_source_path)
+        )
         self._executor = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="career-recording-remux",
@@ -279,12 +444,19 @@ class _Mp4RecordingFinalizer:
         self._jobs: list[_FinalizerJob] = []
         self._notices: list[str] = []
 
-    def finalize(self, path: Path) -> None:
+    def finalize(self, path: Path, *, summary: _SegmentSummarySnapshot | None = None) -> None:
         if path.suffix.lower() != ".mkv":
+            if summary is not None:
+                write_segment_summary_files(summary, video_path=path)
+                if self._session_summary is not None:
+                    self._session_summary.record_segment(summary, video_path=path)
+            elif self._session_summary is not None and path == self._session_summary.source_path:
+                self._session_summary.record_full_video(path)
             return
         self._jobs.append(
             _FinalizerJob(
                 path=path,
+                summary=summary,
                 future=self._executor.submit(
                     remux_recording_to_mp4,
                     path,
@@ -301,14 +473,14 @@ class _Mp4RecordingFinalizer:
             if not job.future.done():
                 pending.append(job)
                 continue
-            notices.append(_finalizer_job_notice(job))
+            notices.append(_finalizer_job_notice(job, session_summary=self._session_summary))
         self._jobs = pending
         return tuple(notices)
 
     def close(self) -> None:
         self._executor.shutdown(wait=True)
         for job in self._jobs:
-            self._notices.append(_finalizer_job_notice(job))
+            self._notices.append(_finalizer_job_notice(job, session_summary=self._session_summary))
         self._jobs.clear()
 
 
@@ -330,6 +502,26 @@ def open_career_mode_recorder(
     )
 
 
+def write_segment_summary_files(
+    summary: _SegmentSummarySnapshot,
+    *,
+    video_path: Path,
+) -> None:
+    """Write machine-readable and human-readable sidecars for one finalized segment."""
+
+    payload = _segment_summary_payload(summary, video_path=video_path)
+    json_path = _segment_summary_path(video_path, ".json")
+    markdown_path = _segment_summary_path(video_path, ".md")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    markdown_path.write_text(
+        _segment_summary_markdown(payload),
+        encoding="utf-8",
+    )
+
+
 def career_segment_recording_path(
     path: Path,
     *,
@@ -342,6 +534,531 @@ def career_segment_recording_path(
     if status == "failed":
         slug = f"failed-attempt-{slug}"
     return path.with_name(f"{path.stem}.segment-{segment_index:03d}-{slug}{suffix}")
+
+
+def career_session_summary_path(path: Path) -> Path:
+    return path.with_name(f"{path.stem}.session.json")
+
+
+_HUD_TINY_GLYPHS: dict[str, tuple[str, ...]] = {
+    "A": ("010", "101", "111", "101", "101"),
+    "B": ("110", "101", "110", "101", "110"),
+    "C": ("111", "100", "100", "100", "111"),
+    "D": ("110", "101", "101", "101", "110"),
+    "L": ("100", "100", "100", "100", "111"),
+    "R": ("110", "101", "110", "101", "101"),
+    "Z": ("111", "001", "010", "100", "111"),
+}
+
+
+def _input_hud_frame(frame: RgbFrame, info: Mapping[str, object]) -> RgbFrame:
+    if info.get("watch_recording_input_hud") is not True:
+        return frame
+    height, width = frame.shape[:2]
+    if width < 120 or height < 90:
+        return frame
+    hud_frame: RgbFrame = np.array(frame, copy=True)
+    _draw_input_hud(hud_frame, info)
+    return hud_frame
+
+
+def _draw_input_hud(frame: RgbFrame, info: Mapping[str, object]) -> None:
+    height, width = frame.shape[:2]
+    scale = max(1, min(width, height) // 220)
+    margin = 2 * scale
+    hud_width = 34 * scale
+    hud_height = 49 * scale
+    x = width - hud_width - margin
+    y = min(height - hud_height - margin, max(margin, int(height * 0.23)))
+
+    stick_size = 24 * scale
+    stick_x = x + (hud_width - stick_size) // 2
+    stick_y = y
+    _draw_stick(
+        frame,
+        stick_x,
+        stick_y,
+        size=stick_size,
+        stick_x_value=_float_info(info, "watch_recording_input_stick_x"),
+        pitch_value=_float_info(info, "watch_recording_input_pitch"),
+    )
+
+    row_x = x + (hud_width - 25 * scale) // 2
+    button_radius = 5 * scale
+    lr_y = y + stick_size + 4 * scale
+    _draw_round_button(
+        frame,
+        "Z",
+        center_x=row_x + button_radius,
+        center_y=lr_y + button_radius,
+        radius=button_radius,
+        active=_bool_info(info, "watch_recording_input_lean_left"),
+    )
+    _draw_round_button(
+        frame,
+        "R",
+        center_x=row_x + 15 * scale + button_radius,
+        center_y=lr_y + button_radius,
+        radius=button_radius,
+        active=_bool_info(info, "watch_recording_input_lean_right"),
+    )
+
+    ab_y = lr_y + 13 * scale
+    _draw_round_button(
+        frame,
+        "A",
+        center_x=row_x + button_radius,
+        center_y=ab_y + button_radius,
+        radius=button_radius,
+        active=_bool_info(info, "watch_recording_input_gas"),
+    )
+    _draw_round_button(
+        frame,
+        "B",
+        center_x=row_x + 15 * scale + button_radius,
+        center_y=ab_y + button_radius,
+        radius=button_radius,
+        active=_bool_info(info, "watch_recording_input_boost"),
+    )
+
+def _draw_stick(
+    frame: RgbFrame,
+    x: int,
+    y: int,
+    *,
+    size: int,
+    stick_x_value: float,
+    pitch_value: float,
+) -> None:
+    _blend_rect(frame, x + 1, y + 1, size, size, (0, 0, 0), alpha=0.25)
+    _blend_rect(frame, x, y, size, size, (6, 12, 22), alpha=0.44)
+    _draw_box_outline(frame, x, y, size, size, (57, 92, 110))
+    center_x = x + size // 2
+    center_y = y + size // 2
+    _draw_rect(frame, x + 4, center_y, size - 8, 1, (40, 69, 83))
+    _draw_rect(frame, center_x, y + 4, 1, size - 8, (40, 69, 83))
+    radius = max(1, size // 2 - 4)
+    puck_x = center_x + int(_clamp(stick_x_value, -1.0, 1.0) * radius)
+    puck_y = center_y + int(_clamp(pitch_value, -1.0, 1.0) * radius)
+    _draw_crosshair(frame, puck_x, puck_y, size=max(3, size // 6), color=(129, 202, 255))
+
+
+def _draw_round_button(
+    frame: RgbFrame,
+    label: str,
+    *,
+    center_x: int,
+    center_y: int,
+    radius: int,
+    active: bool,
+) -> None:
+    fill = (74, 216, 142) if active else (18, 27, 38)
+    text = (4, 17, 12) if active else (164, 188, 200)
+    _blend_circle(frame, center_x + 1, center_y + 1, radius, (0, 0, 0), alpha=0.24)
+    _blend_circle(frame, center_x, center_y, radius, fill, alpha=0.84 if active else 0.58)
+    _blend_circle(
+        frame,
+        center_x,
+        center_y,
+        max(1, radius - 2),
+        fill,
+        alpha=0.18 if active else 0.08,
+    )
+    text_scale = max(1, radius // 7)
+    text_width = _tiny_text_width(label, scale=text_scale)
+    text_x = center_x - text_width // 2
+    text_y = center_y - (5 * text_scale) // 2
+    _draw_tiny_text(frame, label, text_x, text_y, scale=text_scale, color=text)
+
+
+def _draw_tiny_text(
+    frame: RgbFrame,
+    text: str,
+    x: int,
+    y: int,
+    *,
+    scale: int,
+    color: _RgbColor,
+) -> None:
+    cursor_x = x
+    for char in text.upper():
+        glyph = _HUD_TINY_GLYPHS.get(char)
+        if glyph is None:
+            cursor_x += 4 * scale
+            continue
+        for row_index, row in enumerate(glyph):
+            for column_index, pixel in enumerate(row):
+                if pixel == "1":
+                    _draw_rect(
+                        frame,
+                        cursor_x + column_index * scale,
+                        y + row_index * scale,
+                        scale,
+                        scale,
+                        color,
+                    )
+        cursor_x += (len(glyph[0]) + 1) * scale
+
+
+def _tiny_text_width(text: str, *, scale: int) -> int:
+    width = 0
+    for char in text.upper():
+        glyph = _HUD_TINY_GLYPHS.get(char)
+        width += (len(glyph[0]) + 1 if glyph is not None else 4) * scale
+    return max(0, width - scale)
+
+
+def _draw_box_outline(
+    frame: RgbFrame, x: int, y: int, width: int, height: int, color: _RgbColor
+) -> None:
+    _draw_rect(frame, x, y, width, 1, color)
+    _draw_rect(frame, x, y + height - 1, width, 1, color)
+    _draw_rect(frame, x, y, 1, height, color)
+    _draw_rect(frame, x + width - 1, y, 1, height, color)
+
+
+def _draw_rect(frame: RgbFrame, x: int, y: int, width: int, height: int, color: _RgbColor) -> None:
+    x0, y0, x1, y1 = _clipped_rect(frame, x, y, width, height)
+    if x0 >= x1 or y0 >= y1:
+        return
+    frame[y0:y1, x0:x1] = color
+
+
+def _blend_rect(
+    frame: RgbFrame,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    color: _RgbColor,
+    *,
+    alpha: float,
+) -> None:
+    x0, y0, x1, y1 = _clipped_rect(frame, x, y, width, height)
+    if x0 >= x1 or y0 >= y1:
+        return
+    region = frame[y0:y1, x0:x1]
+    color_array = np.asarray(color, dtype=np.float32)
+    region[:] = (region.astype(np.float32) * (1.0 - alpha) + color_array * alpha).astype(np.uint8)
+
+
+def _blend_circle(
+    frame: RgbFrame,
+    center_x: int,
+    center_y: int,
+    radius: int,
+    color: _RgbColor,
+    *,
+    alpha: float,
+) -> None:
+    if radius <= 0:
+        return
+    frame_height, frame_width = frame.shape[:2]
+    color_array = np.asarray(color, dtype=np.float32)
+    radius_squared = radius * radius
+    y0 = max(0, center_y - radius)
+    y1 = min(frame_height, center_y + radius + 1)
+    for row_y in range(y0, y1):
+        row_offset = row_y - center_y
+        half_width = int((radius_squared - row_offset * row_offset) ** 0.5)
+        x0 = max(0, center_x - half_width)
+        x1 = min(frame_width, center_x + half_width + 1)
+        if x0 >= x1:
+            continue
+        region = frame[row_y : row_y + 1, x0:x1]
+        region[:] = (region.astype(np.float32) * (1.0 - alpha) + color_array * alpha).astype(
+            np.uint8
+        )
+
+
+def _draw_crosshair(
+    frame: RgbFrame,
+    center_x: int,
+    center_y: int,
+    *,
+    size: int,
+    color: _RgbColor,
+) -> None:
+    half = max(2, size // 2)
+    gap = max(1, size // 5)
+    _draw_rect(frame, center_x - half, center_y, half - gap + 1, 1, color)
+    _draw_rect(frame, center_x + gap, center_y, half - gap + 1, 1, color)
+    _draw_rect(frame, center_x, center_y - half, 1, half - gap + 1, color)
+    _draw_rect(frame, center_x, center_y + gap, 1, half - gap + 1, color)
+    _draw_rect(frame, center_x, center_y, 1, 1, (224, 242, 255))
+
+
+def _clipped_rect(
+    frame: RgbFrame,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+) -> tuple[int, int, int, int]:
+    frame_height, frame_width = frame.shape[:2]
+    return (
+        max(0, x),
+        max(0, y),
+        min(frame_width, x + width),
+        min(frame_height, y + height),
+    )
+
+
+def _bool_info(info: Mapping[str, object], key: str) -> bool:
+    return info.get(key) is True
+
+
+def _float_info(info: Mapping[str, object], key: str) -> float:
+    value = info.get(key)
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    return 0.0
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return min(max(value, minimum), maximum)
+
+
+def _session_summary_payload(writer: _SessionSummaryWriter) -> dict[str, object]:
+    segment_payloads = tuple(dict(segment) for segment in writer.segment_payloads)
+    return {
+        "kind": "career_recording_session_summary",
+        "schema_version": 1,
+        "source_mkv_path": str(writer.source_path),
+        "mp4_path": None if writer.full_video_path is None else str(writer.full_video_path),
+        "segment_count": len(segment_payloads),
+        "result_counts": _aggregate_segment_result_counts(segment_payloads),
+        "segments": segment_payloads,
+    }
+
+
+def _segment_payload_sort_key(payload: Mapping[str, object]) -> int:
+    value = payload.get("segment_index")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return value
+
+
+def _segment_summary_payload(
+    summary: _SegmentSummarySnapshot,
+    *,
+    video_path: Path,
+) -> dict[str, object]:
+    course_results = tuple(dict(result) for result in summary.course_results)
+    return {
+        "kind": "career_segment_summary",
+        "schema_version": 1,
+        "segment_index": summary.segment_index,
+        "label": summary.label,
+        "attempt_id": summary.attempt_id,
+        "status": summary.status,
+        "started_at_utc": summary.started_at_utc,
+        "closed_at_utc": summary.closed_at_utc,
+        "video": {
+            "mp4_path": str(video_path),
+            "source_mkv_path": str(summary.source_path),
+            "frame_count": summary.frame_count,
+        },
+        "result_counts": _segment_result_counts(course_results),
+        "courses": course_results,
+        "final": summary.final_info,
+    }
+
+
+def _segment_summary_markdown(payload: Mapping[str, object]) -> str:
+    label = payload.get("label")
+    status = payload.get("status")
+    video = payload.get("video")
+    video_path = video.get("mp4_path") if isinstance(video, Mapping) else None
+    frame_count = video.get("frame_count") if isinstance(video, Mapping) else None
+    lines = [
+        f"# {label if isinstance(label, str) and label else 'Career segment'}",
+        "",
+        f"- Status: {_summary_text(status)}",
+        f"- Attempt: {_summary_text(payload.get('attempt_id'))}",
+        f"- Started: {_summary_text(payload.get('started_at_utc'))}",
+        f"- Closed: {_summary_text(payload.get('closed_at_utc'))}",
+        f"- Video: {_summary_text(video_path)}",
+        f"- Frames: {_summary_text(frame_count)}",
+        "",
+        "## Course results",
+        "",
+    ]
+    courses = payload.get("courses")
+    if not isinstance(courses, tuple | list) or not courses:
+        lines.append("No course terminal results captured.")
+        lines.append("")
+        return "\n".join(lines)
+
+    lines.extend(
+        (
+            "| Course | Result | Time | Position | KO stars | Engine |",
+            "| --- | --- | --- | --- | --- | --- |",
+        )
+    )
+    for course in courses:
+        if not isinstance(course, Mapping):
+            continue
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    _summary_text(
+                        course.get("course_name")
+                        or course.get("course_id")
+                        or course.get("track_id")
+                    ),
+                    _summary_text(course.get("termination_reason")),
+                    _format_summary_time(course.get("race_time_ms")),
+                    _summary_text(course.get("position")),
+                    _summary_text(course.get("ko_star_count")),
+                    _summary_text(course.get("engine_setting_raw_value")),
+                )
+            )
+            + " |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _segment_summary_path(video_path: Path, suffix: str) -> Path:
+    return video_path.with_name(f"{video_path.stem}.summary{suffix}")
+
+
+def _segment_result_counts(course_results: tuple[dict[str, object], ...]) -> dict[str, int]:
+    counts = {
+        "finished": 0,
+        "retired": 0,
+        "crashed": 0,
+    }
+    for result in course_results:
+        reason = result.get("termination_reason")
+        if isinstance(reason, str) and reason in counts:
+            counts[reason] += 1
+    counts["failed"] = counts["retired"] + counts["crashed"]
+    return counts
+
+
+def _aggregate_segment_result_counts(
+    segment_payloads: tuple[dict[str, object], ...],
+) -> dict[str, int]:
+    counts = {
+        "finished": 0,
+        "retired": 0,
+        "crashed": 0,
+        "failed": 0,
+    }
+    for payload in segment_payloads:
+        result_counts = payload.get("result_counts")
+        if not isinstance(result_counts, Mapping):
+            continue
+        for key in counts:
+            value = result_counts.get(key)
+            if isinstance(value, bool) or not isinstance(value, int):
+                continue
+            counts[key] += value
+    return counts
+
+
+def _selected_summary_info(info: Mapping[str, object]) -> dict[str, object]:
+    selected: dict[str, object] = {}
+    for key in _SUMMARY_INFO_FIELDS:
+        if key not in info:
+            continue
+        selected[key] = _summary_json_value(info[key])
+    return selected
+
+
+def _course_result(info: Mapping[str, object]) -> dict[str, object] | None:
+    reason = _str_info(info, "termination_reason")
+    if reason not in {"finished", "retired", "crashed"}:
+        return None
+    result: dict[str, object] = {
+        "termination_reason": reason,
+    }
+    for key, output_key in (
+        ("track_id", "track_id"),
+        ("track_course_id", "course_id"),
+        ("track_course_name", "course_name"),
+        ("track_course_index", "course_index"),
+        ("track_gp_difficulty", "difficulty"),
+        ("race_time_ms", "race_time_ms"),
+        ("position", "position"),
+        ("ko_star_count", "ko_star_count"),
+        ("race_laps_completed", "laps_completed"),
+        ("total_lap_count", "total_laps"),
+        ("track_vehicle_name", "vehicle_name"),
+        ("track_engine_setting_raw_value", "engine_setting_raw_value"),
+    ):
+        if key not in info:
+            continue
+        result[output_key] = _summary_json_value(info[key])
+    return result
+
+
+def _course_result_signature(result: Mapping[str, object]) -> tuple[object, ...]:
+    return tuple(
+        result.get(key)
+        for key in (
+            "track_id",
+            "course_id",
+            "course_index",
+            "termination_reason",
+            "race_time_ms",
+            "position",
+        )
+    )
+
+
+def _summary_json_value(value: object) -> object:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, Path):
+        return str(value)
+    return str(value)
+
+
+def _summary_text(value: object) -> str:
+    if value is None:
+        return "-"
+    return str(value).replace("|", "\\|")
+
+
+def _format_summary_time(value: object) -> str:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return "-"
+    minutes, remainder = divmod(max(0, value), 60_000)
+    seconds, millis = divmod(remainder, 1_000)
+    return f"{minutes}:{seconds:02d}.{millis:03d}"
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+_SUMMARY_INFO_FIELDS = (
+    "career_mode_target_label",
+    "career_mode_attempt_id",
+    "career_mode_last_finished_attempt_id",
+    "career_mode_last_finished_attempt_status",
+    "career_mode_last_finished_attempt_failure_reason",
+    "career_mode_fsm_observed_screen",
+    "career_mode_fsm_terminal_reason",
+    "game_mode",
+    "game_mode_name",
+    "track_id",
+    "track_course_id",
+    "track_course_name",
+    "track_course_index",
+    "track_gp_difficulty",
+    "track_vehicle_name",
+    "track_engine_setting_raw_value",
+    "termination_reason",
+    "race_time_ms",
+    "position",
+    "race_laps_completed",
+    "total_lap_count",
+)
 
 
 def _segment_label(info: Mapping[str, object]) -> str | None:
@@ -357,6 +1074,14 @@ def _attempt_id(info: Mapping[str, object]) -> str | None:
     if not isinstance(attempt_id, str):
         return None
     stripped = attempt_id.strip()
+    return stripped or None
+
+
+def _str_info(info: Mapping[str, object], key: str) -> str | None:
+    value = info.get(key)
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
     return stripped or None
 
 
@@ -380,9 +1105,45 @@ def _terminal_result(info: Mapping[str, object]) -> bool:
     return info.get("career_mode_fsm_terminal_result") is True
 
 
-def _finalizer_job_notice(job: _FinalizerJob) -> str:
+def _post_gp_exit_frame(info: Mapping[str, object]) -> bool:
+    return (
+        info.get("career_mode_fsm_observed_screen") in _POST_GP_EXIT_SCREENS
+        or info.get("game_mode") in _POST_GP_EXIT_MODES
+        or info.get("game_mode_name") in _POST_GP_EXIT_MODES
+    )
+
+
+_POST_GP_EXIT_SCREENS = frozenset(
+    {
+        "title",
+        "main_menu_gp",
+        "main_menu_other",
+        "course_select",
+    }
+)
+
+_POST_GP_EXIT_MODES = frozenset(
+    {
+        "title",
+        "main_menu",
+        "course_select",
+    }
+)
+
+
+def _finalizer_job_notice(
+    job: _FinalizerJob,
+    *,
+    session_summary: _SessionSummaryWriter | None = None,
+) -> str:
     try:
         output_path = job.future.result()
+        if job.summary is not None:
+            write_segment_summary_files(job.summary, video_path=output_path)
+            if session_summary is not None:
+                session_summary.record_segment(job.summary, video_path=output_path)
+        elif session_summary is not None and job.path == session_summary.source_path:
+            session_summary.record_full_video(output_path)
     except Exception as exc:  # pragma: no cover - defensive async error reporting
         return f"MP4 conversion failed: {exc}"
     return f"MP4 ready: {output_path.name}"

@@ -183,6 +183,7 @@ class ManagedSaveGame:
     runner_policy_mode: Literal["deterministic", "stochastic"] = "deterministic"
     runner_attempt_seed: int | None = None
     runner_recording_enabled: bool = False
+    runner_recording_input_hud_enabled: bool = False
     runner_recording_path: Path | None = None
 
 

@@ -15,6 +15,7 @@ from rl_fzerox.core.career_mode.runner.save_file import (
     SaveRamRuntimeSession,
     persist_save_ram_for_store,
 )
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, CourseInfo
 from rl_fzerox.core.manager.models import (
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
@@ -92,6 +93,8 @@ class CareerAttemptProgress:
         self._single_target = single_target
         self._course_setups = self._store.list_save_course_setups(save_game_id)
         self._unlock_progress = self._store.save_game_unlock_progress(save_game_id)
+        self._initial_unlock_progress = self._unlock_progress
+        self._observed_target_terminal_success = False
 
     @property
     def attempt_id(self) -> str | None:
@@ -115,6 +118,9 @@ class CareerAttemptProgress:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
 
+        if _target_terminal_succeeded(info, setup):
+            self._observed_target_terminal_success = True
+
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
         if _target_succeeded(progress.targets, setup):
@@ -129,7 +135,7 @@ class CareerAttemptProgress:
             failure_reason=_failure_reason(info),
         )
 
-    def sync_post_terminal_success(
+    def sync_post_terminal_progress(
         self,
         *,
         session: SaveRamRuntimeSession,
@@ -141,20 +147,33 @@ class CareerAttemptProgress:
 
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
-        if not _target_succeeded(progress.targets, setup):
-            return CareerProgressTransition(attempt_finished=False)
-        if not _is_post_gp_completion(info):
-            return CareerProgressTransition(attempt_finished=False)
-        return self._finish_and_advance(
-            info=info,
-            status="succeeded",
-            failure_reason=None,
-        )
+        if _target_succeeded(progress.targets, setup):
+            if (
+                self._target_succeeded_before_attempt(setup)
+                and not self._observed_target_terminal_success
+            ):
+                return CareerProgressTransition(attempt_finished=False)
+            if not _is_post_gp_completion(info):
+                return CareerProgressTransition(attempt_finished=False)
+            return self._finish_and_advance(
+                info=info,
+                status="succeeded",
+                failure_reason=None,
+            )
+        if _is_failed_gp_exit(info) and not self._observed_target_terminal_success:
+            return self._finish_and_advance(
+                info=info,
+                status="failed",
+                failure_reason="gp attempt returned to menu before cup clear",
+            )
+        return CareerProgressTransition(attempt_finished=False)
 
     def apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:
         self._attempt_id = plan.attempt_id
         self._course_setups = self._store.list_save_course_setups(self._save_game_id)
         self._unlock_progress = self._store.save_game_unlock_progress(self._save_game_id)
+        self._initial_unlock_progress = self._unlock_progress
+        self._observed_target_terminal_success = False
 
     def _finish_and_advance(
         self,
@@ -240,6 +259,9 @@ class CareerAttemptProgress:
         self._unlock_progress = self._store.save_game_unlock_progress(self._save_game_id)
         return self._unlock_progress
 
+    def _target_succeeded_before_attempt(self, setup: CareerModeRaceSetupConfig) -> bool:
+        return _target_succeeded(self._initial_unlock_progress.targets, setup)
+
 
 def _target_succeeded(
     targets: Iterable[object],
@@ -252,6 +274,39 @@ def _target_succeeded(
         and getattr(target, "cup_id", None) == setup.cup_id
         for target in targets
     )
+
+
+def _target_terminal_succeeded(
+    info: dict[str, object],
+    setup: CareerModeRaceSetupConfig,
+) -> bool:
+    if info.get("termination_reason") != "finished":
+        return False
+
+    final_course = _target_final_course(setup)
+    if final_course is None:
+        return False
+    return _info_matches_course(info, final_course)
+
+
+def _target_final_course(setup: CareerModeRaceSetupConfig) -> CourseInfo | None:
+    courses = tuple(course for course in BUILT_IN_COURSES if course.cup == setup.cup_id)
+    if not courses:
+        return None
+    return max(courses, key=lambda course: course.course_index)
+
+
+def _info_matches_course(info: dict[str, object], course: CourseInfo) -> bool:
+    course_index = _int_info(info, "track_course_index")
+    if course_index is None:
+        course_index = _int_info(info, "course_index")
+    if course_index == course.course_index:
+        return True
+
+    course_id = _str_info(info, "track_id")
+    if course_id is None:
+        course_id = _str_info(info, "course_id")
+    return course_id in {course.id, course.ref}
 
 
 def _failure_reason(info: dict[str, object]) -> str:
@@ -268,7 +323,22 @@ def _is_post_gp_completion(info: dict[str, object]) -> bool:
     mode = info.get("game_mode")
     if not isinstance(mode, str) or not mode:
         mode = info.get("game_mode_name")
-    return mode in POST_GP_COMPLETION_MODES
+    return mode in POST_GP_COMPLETION_MODES or mode in {
+        "title",
+        "main_menu",
+        "course_select",
+    }
+
+
+def _is_failed_gp_exit(info: dict[str, object]) -> bool:
+    mode = info.get("game_mode")
+    if not isinstance(mode, str) or not mode:
+        mode = info.get("game_mode_name")
+    return mode in {
+        "title",
+        "main_menu",
+        "course_select",
+    }
 
 
 def _positive_int_info(info: dict[str, object], key: str) -> int | None:
@@ -276,3 +346,15 @@ def _positive_int_info(info: dict[str, object], key: str) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value if value > 0 else None
+
+
+def _int_info(info: dict[str, object], key: str) -> int | None:
+    value = info.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _str_info(info: dict[str, object], key: str) -> str | None:
+    value = info.get(key)
+    return value if isinstance(value, str) and value else None

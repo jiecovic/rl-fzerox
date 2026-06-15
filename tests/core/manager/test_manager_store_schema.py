@@ -201,6 +201,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "runner_policy_mode",
         "runner_attempt_seed",
         "runner_recording_enabled",
+        "runner_recording_input_hud_enabled",
         "runner_recording_path",
     }
     assert save_attempt_columns == {

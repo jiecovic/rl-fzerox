@@ -229,6 +229,7 @@ class _CareerModeLoopState:
     auxiliary_visualization_enabled: bool
     live_visualization_enabled: bool
     live_series: EpisodeLiveSeriesTracker
+    track_record_book: TrackRecordBook
     last_live_series_publish_time: float
     cnn_normalization: CnnActivationNormalizationMode
     cnn_sampler: CnnActivationSampler
@@ -281,6 +282,7 @@ def _initial_career_mode_loop_state(
         auxiliary_visualization_enabled=False,
         live_visualization_enabled=False,
         live_series=EpisodeLiveSeriesTracker(),
+        track_record_book=TrackRecordBook(),
         last_live_series_publish_time=0.0,
         cnn_normalization=DEFAULT_CNN_ACTIVATION_NORMALIZATION,
         cnn_sampler=CnnActivationSampler(refresh_interval_steps=1),
@@ -342,7 +344,7 @@ def _publish_initial_career_snapshot(
             manual_control_enabled=False,
             policy_reload_error=None,
             cnn_activations=None,
-            track_record_book=TrackRecordBook(),
+            track_record_book=state.track_record_book,
         ),
     )
 
@@ -380,6 +382,7 @@ def _run_career_mode_loop_body(
     auxiliary_visualization_enabled = state.auxiliary_visualization_enabled
     live_visualization_enabled = state.live_visualization_enabled
     live_series = state.live_series
+    track_record_book = state.track_record_book
     last_live_series_publish_time = state.last_live_series_publish_time
     cnn_normalization = state.cnn_normalization
     cnn_sampler = state.cnn_sampler
@@ -468,7 +471,7 @@ def _run_career_mode_loop_body(
                 manual_control_enabled=manual_control_enabled if policy_active else False,
                 policy_reload_error=_policy_reload_error(runner),
                 cnn_activations=cnn_activations if policy_active else None,
-                track_record_book=TrackRecordBook(),
+                track_record_book=track_record_book,
             ),
         )
 
@@ -633,6 +636,12 @@ def _run_career_mode_loop_body(
                 if not terminal_handled and not in_gp_race(info):
                     raise RuntimeError("Career Mode left a race before observing a game result")
                 if terminal_handled:
+                    _record_terminal_event(frame_recorder=frame_recorder, info=info)
+                    track_record_book = track_record_book.update(
+                        info,
+                        current_telemetry,
+                        episode_done=True,
+                    )
                     control_rate.reset()
                     raw_observation = None
                     observation = None
@@ -684,6 +693,7 @@ def _run_career_mode_loop_body(
                     target_control_fps=target_control_fps,
                     native_frame_seconds=native_frame_seconds,
                     deterministic_policy=deterministic_policy,
+                    track_record_book=track_record_book,
                     frame_recorder=frame_recorder,
                 )
                 current_step_seconds = None
@@ -723,6 +733,7 @@ def _run_career_mode_loop_body(
                         target_control_fps=target_control_fps,
                         native_frame_seconds=native_frame_seconds,
                         deterministic_policy=deterministic_policy,
+                        track_record_book=track_record_book,
                         frame_recorder=frame_recorder,
                     )
                     current_step_seconds = None
@@ -816,6 +827,7 @@ def _run_career_mode_loop_body(
                     live_visualization_enabled=live_visualization_enabled,
                     live_series=live_series,
                     last_live_series_publish_time=last_live_series_publish_time,
+                    track_record_book=track_record_book,
                 )
                 raw_observation = policy_step.raw_observation
                 raw_info = policy_step.raw_info
@@ -836,6 +848,12 @@ def _run_career_mode_loop_body(
                     info=info,
                 )
                 if terminal_handled and not controller.policy_owns_control():
+                    _record_terminal_event(frame_recorder=frame_recorder, info=info)
+                    track_record_book = track_record_book.update(
+                        info,
+                        current_telemetry,
+                        episode_done=True,
+                    )
                     control_rate.reset()
                     episode += 1
                     raw_observation = None
@@ -909,6 +927,15 @@ def _drain_recording_notices(frame_recorder: FrameRecorder | None) -> tuple[str,
     if frame_recorder is None:
         return ()
     return frame_recorder.drain_notices()
+
+
+def _record_terminal_event(
+    *,
+    frame_recorder: FrameRecorder | None,
+    info: dict[str, object],
+) -> None:
+    if frame_recorder is not None:
+        frame_recorder.record_event(info=info)
 
 
 def _should_observe_policy_transition(

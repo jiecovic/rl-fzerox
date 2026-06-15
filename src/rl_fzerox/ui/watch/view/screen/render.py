@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import math
 
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, CourseInfo, CourseRecords
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.runtime_spec.schema import (
     ActionRuntimeConfig,
+    CareerModeRaceSetupConfig,
     CurriculumStageConfig,
     TrackConfig,
     TrackSamplingConfig,
@@ -130,6 +132,7 @@ def draw_watch_frame(
             cnn_activations=snapshot.cnn_activations,
             track_record_book=snapshot.track_record_book,
             track_pool_records=track_pool_records,
+            allow_record_course_jumps=config.watch.managed_save_game_id is None,
             panel_tab_index=panel_tab_index,
             cnn_layer_tab_index=cnn_layer_tab_index,
             record_tab_index=record_tab_index,
@@ -223,8 +226,67 @@ def _track_pool_records(
     )
     if track_sampling.enabled and track_sampling.entries:
         return _track_sampling_records(track_sampling.entries)
+    career_records = _career_mode_track_pool_records(config)
+    if career_records:
+        return career_records
     track_record = _track_config_record(config.track)
     return (track_record,) if track_record else ()
+
+
+def _career_mode_track_pool_records(config: WatchAppConfig) -> tuple[dict[str, object], ...]:
+    if config.watch.managed_save_game_id is None:
+        return ()
+    setup = config.watch.career_mode_race_setup
+    if setup is None:
+        return ()
+    return tuple(
+        _career_mode_course_record(course, setup=setup)
+        for course in BUILT_IN_COURSES
+        if course.cup == setup.cup_id
+    )
+
+
+def _career_mode_course_record(
+    course: CourseInfo,
+    *,
+    setup: CareerModeRaceSetupConfig,
+) -> dict[str, object]:
+    info: dict[str, object] = {
+        "track_entry_id": f"career:{setup.difficulty}:{course.id}",
+        "track_id": course.id,
+        "track_course_key": course.id,
+        "track_reset_target_key": course.id,
+        "track_reset_course_key": course.id,
+        "track_display_name": course.display_name,
+        "track_course_ref": course.ref,
+        "track_course_id": course.id,
+        "track_course_name": course.display_name,
+        "track_course_index": int(course.course_index),
+        "track_mode": "gp_race",
+        "track_gp_difficulty": setup.difficulty,
+        "track_vehicle": setup.vehicle_id,
+        "track_vehicle_name": setup.vehicle_display_name,
+        "track_engine_setting_raw_value": int(setup.engine_setting_raw_value),
+    }
+    if course.records is not None:
+        info.update(_course_records_info(course.records))
+    return info
+
+
+def _course_records_info(records: CourseRecords) -> dict[str, object]:
+    info: dict[str, object] = {
+        "track_record_source_label": records.source_label,
+        "track_record_source_url": records.source_url,
+        "track_non_agg_best_time_ms": int(records.non_agg_best.time_ms),
+        "track_non_agg_best_player": records.non_agg_best.player,
+        "track_non_agg_best_date": records.non_agg_best.date,
+        "track_non_agg_best_mode": records.non_agg_best.mode,
+        "track_non_agg_worst_time_ms": int(records.non_agg_worst.time_ms),
+        "track_non_agg_worst_player": records.non_agg_worst.player,
+        "track_non_agg_worst_date": records.non_agg_worst.date,
+        "track_non_agg_worst_mode": records.non_agg_worst.mode,
+    }
+    return info
 
 
 def _active_track_sampling(

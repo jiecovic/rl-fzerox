@@ -14,14 +14,14 @@ export function RunnerControlPanel({
   onRandomizeAttemptSeed,
   onPolicyModeChange,
   onRecordingEnabledChange,
-  onRecordingPathChange,
+  onRecordingInputHudEnabledChange,
   onRunnerDeviceChange,
   onRunnerRendererChange,
   onSaveSettings,
   onStart,
   policyMode,
   recordingEnabled,
-  recordingPathText,
+  recordingInputHudEnabled,
   rendererOptions,
   runnerDevice,
   runnerRenderer,
@@ -37,14 +37,14 @@ export function RunnerControlPanel({
   onRandomizeAttemptSeed: () => void;
   onPolicyModeChange: (policyMode: PolicyPlaybackMode) => void;
   onRecordingEnabledChange: (recordingEnabled: boolean) => void;
-  onRecordingPathChange: (recordingPathText: string) => void;
+  onRecordingInputHudEnabledChange: (recordingInputHudEnabled: boolean) => void;
   onRunnerDeviceChange: (device: WatchDevice) => void;
   onRunnerRendererChange: (renderer: WatchRenderer) => void;
   onSaveSettings: () => void;
   onStart: () => void;
   policyMode: PolicyPlaybackMode;
   recordingEnabled: boolean;
-  recordingPathText: string;
+  recordingInputHudEnabled: boolean;
   rendererOptions: readonly WatchRenderer[];
   runnerDevice: WatchDevice;
   runnerRenderer: WatchRenderer;
@@ -142,7 +142,7 @@ export function RunnerControlPanel({
             <span>{starting ? "Opening" : startLabel}</span>
           </Button>
         </div>
-        <div className="grid gap-2 border-t border-app-border pt-3 md:grid-cols-[140px_minmax(280px,1fr)] md:items-end">
+        <div className="grid gap-2 border-t border-app-border pt-3 md:grid-cols-[140px_160px] md:items-end">
           <FieldShell>
             <span>Recording</span>
             <ToggleSwitch
@@ -153,13 +153,12 @@ export function RunnerControlPanel({
             />
           </FieldShell>
           <FieldShell>
-            <span>MKV path</span>
-            <FieldInput
-              aria-label="Career Mode recording path"
+            <span>Overlay</span>
+            <ToggleSwitch
+              checked={recordingInputHudEnabled}
               disabled={settingsDisabled || !recordingEnabled}
-              spellCheck={false}
-              value={recordingPathText}
-              onChange={(event) => onRecordingPathChange(event.currentTarget.value)}
+              label="Input HUD"
+              onChange={onRecordingInputHudEnabledChange}
             />
           </FieldShell>
         </div>

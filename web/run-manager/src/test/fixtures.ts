@@ -143,7 +143,8 @@ export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): Manag
       device: "cuda",
       policy_mode: "deterministic",
       recording_enabled: false,
-      recording_path: "local/recordings/career/save-001/test.mkv",
+      recording_input_hud_enabled: false,
+      recording_path: null,
       renderer: "gliden64",
     },
     unlock_progress: {

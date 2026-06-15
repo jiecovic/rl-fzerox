@@ -16,6 +16,7 @@ from rl_fzerox.apps.run_manager.launching.watch import (
     watch_config_overrides,
 )
 from rl_fzerox.core.manager import ManagedSaveAttempt, ManagerStore
+from rl_fzerox.core.manager.registry.common import new_record_id
 from rl_fzerox.core.manager.registry.viewers import viewer_lease_is_fresh
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
@@ -31,6 +32,7 @@ def launch_career_mode_runner(
     attempt_seed: int | None,
     deterministic_policy: bool,
     recording_enabled: bool = False,
+    recording_input_hud_enabled: bool = False,
     recording_path: Path | None = None,
     target_kind: str | None = None,
     difficulty: str | None = None,
@@ -68,13 +70,17 @@ def launch_career_mode_runner(
         deterministic_policy=deterministic_policy,
     )
     if recording_enabled:
-        if recording_path is None:
-            raise ValueError("recording path is required when recording is enabled")
+        resolved_recording_path = recording_path or default_career_recording_path(
+            save_game_id=save_game.id,
+            save_game_name=save_game.name,
+        )
         overrides = (
             *overrides,
             "watch.recording.enabled=true",
-            f"watch.recording.path={recording_path}",
+            f"watch.recording.path={resolved_recording_path}",
         )
+        if recording_input_hud_enabled:
+            overrides = (*overrides, "watch.recording.render_input_hud=true")
     log_path = manager_career_mode_log_path(save_game_id)
     command = [
         sys.executable,
@@ -151,6 +157,13 @@ def manager_career_mode_log_path(save_game_id: str) -> Path:
     return (
         project_root_dir() / "local" / "manager" / "logs" / f"{save_game_id}.career-mode.log"
     ).resolve()
+
+
+def default_career_recording_path(*, save_game_id: str, save_game_name: str) -> Path:
+    """Return the managed output file for one Career runner recording session."""
+
+    session_dir = new_record_id(save_game_name or save_game_id)
+    return Path("local") / "recordings" / "career" / save_game_id / session_dir / "career.mkv"
 
 
 def active_career_mode_runner_pid(

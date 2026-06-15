@@ -46,6 +46,7 @@ class WatchRecordingConfig(BaseModel):
 
     enabled: bool = False
     path: Path | None = None
+    render_input_hud: bool = False
 
 
 class WatchConfig(BaseModel):

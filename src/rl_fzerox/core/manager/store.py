@@ -550,6 +550,7 @@ class ManagerStore:
         policy_mode: Literal["deterministic", "stochastic"],
         attempt_seed: int | None,
         recording_enabled: bool,
+        recording_input_hud_enabled: bool,
         recording_path: Path | None,
     ) -> ManagedSaveGame | None:
         return save_game_registry.update_runner_settings(
@@ -560,6 +561,7 @@ class ManagerStore:
             policy_mode=policy_mode,
             attempt_seed=attempt_seed,
             recording_enabled=recording_enabled,
+            recording_input_hud_enabled=recording_input_hud_enabled,
             recording_path=recording_path,
         )
 

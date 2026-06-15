@@ -9,7 +9,6 @@ import {
   unlockCompletionFraction,
 } from "@/entities/saveGame/model";
 import { SaveGameOverview } from "@/entities/saveGame/ui/SaveGameOverview";
-import { defaultCareerRecordingPath } from "@/features/careerRunner/model/recordingPath";
 import { parseAttemptSeed, randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
 import { useSaveGameRunnerRefresh } from "@/features/careerRunner/model/useSaveGameRunnerRefresh";
 import { RunnerControlPanel } from "@/features/careerRunner/ui/RunnerControlPanel";
@@ -129,7 +128,6 @@ export function SaveGameWorkspace({
       const created = await onCreateSaveGame(name);
       onPatchSession(session.sessionId, {
         nameText: created.name,
-        recordingPathText: defaultCareerRecordingPath(created.id),
         saveGameId: created.id,
         title: created.name,
       });
@@ -239,18 +237,13 @@ export function SaveGameWorkspace({
       onGlobalError("runtime seed must be an integer from 0 to 4294967295");
       return null;
     }
-    const trimmedRecordingPath = session.recordingPathText.trim();
-    const recordingPath = trimmedRecordingPath.length === 0 ? null : trimmedRecordingPath;
-    if (session.recordingEnabled && recordingPath === null) {
-      onGlobalError("recording path is required");
-      return null;
-    }
     return {
       attemptSeed,
       device: session.runnerDevice,
       policyMode: session.policyMode,
       recordingEnabled: session.recordingEnabled,
-      recordingPath,
+      recordingInputHudEnabled: session.recordingInputHudEnabled,
+      recordingPath: null,
       renderer: session.runnerRenderer,
       saveGameId: target.id,
     };
@@ -287,7 +280,7 @@ export function SaveGameWorkspace({
       attemptSeedText: settings.attempt_seed === null ? "" : String(settings.attempt_seed),
       policyMode: settings.policy_mode,
       recordingEnabled: settings.recording_enabled,
-      recordingPathText: settings.recording_path ?? defaultCareerRecordingPath(target.id),
+      recordingInputHudEnabled: settings.recording_input_hud_enabled,
       runnerDevice: settings.device,
       runnerRenderer: settings.renderer,
     });
@@ -336,7 +329,8 @@ export function SaveGameWorkspace({
         device: settingsRequest.device,
         policyMode: settingsRequest.policyMode,
         recordingEnabled: settingsRequest.recordingEnabled,
-        recordingPath: settingsRequest.recordingEnabled ? settingsRequest.recordingPath : null,
+        recordingInputHudEnabled: settingsRequest.recordingInputHudEnabled,
+        recordingPath: null,
         renderer: settingsRequest.renderer,
         saveGameId: target.id,
         singleTarget: requestedTarget !== null,
@@ -428,15 +422,17 @@ export function SaveGameWorkspace({
   const canStartRunner = nextTarget !== null && canStartUnlockTarget(nextTarget);
   const startLabel = saveGame.runner_active
     ? "Running"
-    : careerSaveHasStarted(saveGame)
-      ? "Continue"
-      : "Start";
+    : nextTarget === null
+      ? "Complete"
+      : careerSaveHasStarted(saveGame)
+        ? "Continue"
+        : "Start";
   const startNote = saveGame.runner_active
     ? "Career Mode runner is active."
     : courseSetupDirty
       ? "Save course setups before starting."
       : nextTarget === null
-        ? "All unlock targets are complete."
+        ? "All unlock targets are complete. Select a target below to replay it."
         : nextSetup === null
           ? "Choose a policy for the next cup."
           : nextCupSetup === null && nextCupVehicleId === null
@@ -502,7 +498,7 @@ export function SaveGameWorkspace({
         runnerRenderer={session.runnerRenderer}
         policyMode={session.policyMode}
         recordingEnabled={session.recordingEnabled}
-        recordingPathText={session.recordingPathText}
+        recordingInputHudEnabled={session.recordingInputHudEnabled}
         startLabel={startLabel}
         startNote={startNote}
         savingSettings={savingRunnerSettings}
@@ -523,8 +519,8 @@ export function SaveGameWorkspace({
         onRecordingEnabledChange={(recordingEnabled) =>
           onPatchSession(session.sessionId, { recordingEnabled })
         }
-        onRecordingPathChange={(recordingPathText) =>
-          onPatchSession(session.sessionId, { recordingPathText })
+        onRecordingInputHudEnabledChange={(recordingInputHudEnabled) =>
+          onPatchSession(session.sessionId, { recordingInputHudEnabled })
         }
         onSaveSettings={() => void saveRunnerSettings(saveGame)}
         onStart={() => void startCareerMode(saveGame)}
@@ -576,8 +572,6 @@ function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession
   const attemptSeed = parseAttemptSeed(session.attemptSeedText);
   const persistedAttemptSeed =
     settings.attempt_seed === null ? null : String(settings.attempt_seed);
-  const recordingPathText = session.recordingPathText.trim();
-  const recordingPath = recordingPathText.length === 0 ? null : recordingPathText;
   return (
     attemptSeed === "invalid" ||
     persistedAttemptSeed !== attemptSeed ||
@@ -585,7 +579,8 @@ function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession
     settings.renderer !== session.runnerRenderer ||
     settings.policy_mode !== session.policyMode ||
     settings.recording_enabled !== session.recordingEnabled ||
-    settings.recording_path !== recordingPath
+    settings.recording_input_hud_enabled !== session.recordingInputHudEnabled ||
+    settings.recording_path !== null
   );
 }
 

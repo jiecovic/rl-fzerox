@@ -94,6 +94,7 @@ CAREER_PANEL_TABS = PanelTabRegistry(
         PanelTab(key="state", label="State"),
         PanelTab(key="aux", label="Aux"),
         PanelTab(key="cnn", label="CNN"),
+        PanelTab(key="records", label="Records"),
         PanelTab(key="career", label="Career"),
         PanelTab(key="train", label="Train"),
     )

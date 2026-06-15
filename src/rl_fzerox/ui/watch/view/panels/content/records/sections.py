@@ -16,6 +16,7 @@ def track_record_sections(
     current_info: RecordInfo,
     track_pool_records: tuple[RecordInfo, ...],
     track_record_book: TrackRecordBook,
+    allow_course_jumps: bool = True,
 ) -> tuple[PanelSection, ...]:
     records = _unique_course_records(
         _records_for_selected_difficulty(
@@ -34,6 +35,7 @@ def track_record_sections(
                     group.records,
                     current_info=current_info,
                     track_record_book=track_record_book,
+                    allow_course_jumps=allow_course_jumps,
                 ),
             )
             for group in groups
@@ -43,6 +45,7 @@ def track_record_sections(
         records,
         current_info=current_info,
         track_record_book=track_record_book,
+        allow_course_jumps=allow_course_jumps,
     )
     if not lines:
         return ()

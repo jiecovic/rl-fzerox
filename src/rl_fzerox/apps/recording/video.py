@@ -207,13 +207,14 @@ def remux_recording_to_mp4(
     source_path = input_path.expanduser()
     if source_path.suffix.lower() == ".mp4" and output_path is None:
         return source_path
-    target_path = (output_path or source_path.with_suffix(".mp4")).expanduser()
-    if target_path == source_path:
+    requested_target_path = (output_path or source_path.with_suffix(".mp4")).expanduser()
+    if requested_target_path == source_path:
         raise ValueError(f"remux target must differ from source path: {source_path}")
+    target_path = _available_output_path(requested_target_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     command = [
         ffmpeg_path,
-        "-y",
+        "-n",
         "-loglevel",
         "error",
         "-i",
@@ -237,6 +238,16 @@ def remux_recording_to_mp4(
         suffix = f": {detail}" if detail else ""
         raise RuntimeError(f"ffmpeg remux failed with exit code {result.returncode}{suffix}")
     return target_path
+
+
+def _available_output_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    for counter in range(1, 10_000):
+        candidate = path.with_name(f"{path.stem}-{counter:03d}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+    raise FileExistsError(f"no available recording output path near {path}")
 
 
 def as_rgb_frame(frame: NumpyArray) -> RgbFrame:

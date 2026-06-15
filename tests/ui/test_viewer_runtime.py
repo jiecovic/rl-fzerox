@@ -14,6 +14,7 @@ from rl_fzerox.core.envs.observations import (
 )
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
+    CareerModeRaceSetupConfig,
     CurriculumConfig,
     CurriculumStageConfig,
     EmulatorConfig,
@@ -956,6 +957,47 @@ def test_track_sampling_records_count_in_memory_alt_baselines(tmp_path: Path) ->
     assert records[1]["track_alt_baseline_id"] == "alt-a"
 
 
+def test_career_mode_track_pool_records_cover_selected_cup(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        watch=WatchConfig(
+            managed_save_game_id="save-a",
+            career_mode_race_setup=CareerModeRaceSetupConfig(
+                difficulty="master",
+                cup_id="joker",
+                vehicle_id="blue_falcon",
+                vehicle_display_name="Blue Falcon",
+                character_index=0,
+                machine_select_slot=0,
+                machine_select_row=0,
+                machine_select_column=0,
+                engine_setting_raw_value=80,
+            ),
+        ),
+    )
+
+    records = _track_pool_records(config)
+
+    assert [record["track_course_name"] for record in records] == [
+        "Rainbow Road",
+        "Devil's Forest 3",
+        "Space Plant",
+        "Sand Ocean 2",
+        "Port Town 2",
+        "Big Hand",
+    ]
+    assert {record["track_gp_difficulty"] for record in records} == {"master"}
+    assert {record["track_vehicle_name"] for record in records} == {"Blue Falcon"}
+    assert {record["track_engine_setting_raw_value"] for record in records} == {80}
+    best_time = records[0]["track_non_agg_best_time_ms"]
+    assert isinstance(best_time, int)
+    assert best_time > 0
+
+
 def test_record_rows_click_stable_runtime_course_key() -> None:
     section = track_record_sections(
         current_info={},
@@ -970,6 +1012,23 @@ def test_record_rows_click_stable_runtime_course_key() -> None:
     )[0]
 
     assert section.lines[0].click_course_id == "x_cup_slot_1"
+
+
+def test_record_rows_can_disable_course_jump_clicks() -> None:
+    section = track_record_sections(
+        current_info={},
+        track_pool_records=(
+            {
+                "track_id": "mute_city",
+                "track_course_id": "mute_city",
+                "track_reset_course_key": "mute_city",
+            },
+        ),
+        track_record_book=record_book(),
+        allow_course_jumps=False,
+    )[0]
+
+    assert section.lines[0].click_course_id is None
 
 
 def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:

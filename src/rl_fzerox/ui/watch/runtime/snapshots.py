@@ -190,7 +190,12 @@ def _publish_step_snapshots(
         if frame_recorder is not None:
             frame_recorder.record_frame(
                 frame,
-                info=frame_info,
+                info=_recording_frame_info(
+                    frame_info,
+                    control_state=frame_control_states[index],
+                    render_input_hud=config.watch.recording.render_input_hud,
+                    policy_active=policy_runner is not None and not manual_control_enabled,
+                ),
                 audio_samples=audio_chunks[index],
             )
         publish_worker_message(
@@ -286,6 +291,28 @@ def _display_controller_states(
         ),
         True,
     )
+
+
+def _recording_frame_info(
+    info: dict[str, object],
+    *,
+    control_state: RaceControlState,
+    render_input_hud: bool,
+    policy_active: bool,
+) -> dict[str, object]:
+    if not render_input_hud or not policy_active:
+        return info
+    return {
+        **info,
+        "watch_recording_input_hud": True,
+        "watch_recording_input_gas": control_state.gas,
+        "watch_recording_input_boost": control_state.boost,
+        "watch_recording_input_air_brake": control_state.air_brake,
+        "watch_recording_input_lean_left": control_state.lean_left,
+        "watch_recording_input_lean_right": control_state.lean_right,
+        "watch_recording_input_stick_x": control_state.stick_x,
+        "watch_recording_input_pitch": control_state.pitch,
+    }
 
 
 def _audio_chunks_for_frames(

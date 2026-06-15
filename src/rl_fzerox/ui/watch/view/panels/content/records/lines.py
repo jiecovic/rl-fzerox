@@ -30,6 +30,7 @@ def record_group_lines(
     *,
     current_info: RecordInfo,
     track_record_book: TrackRecordBook,
+    allow_course_jumps: bool = True,
 ) -> list[PanelLine]:
     lines: list[PanelLine] = []
     for record_index, record in enumerate(records):
@@ -40,6 +41,7 @@ def record_group_lines(
                 record,
                 current_info=current_info,
                 track_record_book=track_record_book,
+                allow_course_jumps=allow_course_jumps,
             )
         )
     return lines
@@ -50,6 +52,7 @@ def track_record_pool_lines(
     *,
     current_info: RecordInfo,
     track_record_book: TrackRecordBook,
+    allow_course_jumps: bool = True,
 ) -> tuple[PanelLine, ...]:
     is_current_track = is_current_track_record(record, current_info)
     entry = track_record_book.entry_for(record)
@@ -88,7 +91,7 @@ def track_record_pool_lines(
             status_icon=status_icon,
             status_text="LIVE" if is_current_track and not status_text else status_text,
             label_color=PALETTE.text_accent if is_current_track else None,
-            click_course_id=record_course_id(record),
+            click_course_id=record_course_id(record) if allow_course_jumps else None,
         ),
     ]
     alt_baseline_count = optional_int_info(record, "track_alt_baseline_count")

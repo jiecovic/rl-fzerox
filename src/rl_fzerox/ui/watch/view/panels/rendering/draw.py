@@ -74,6 +74,7 @@ class SidePanelData:
     cnn_activations: CnnActivationSnapshot | None
     track_record_book: TrackRecordBook
     track_pool_records: tuple[dict[str, object], ...]
+    allow_record_course_jumps: bool
     panel_tab_index: int
     cnn_layer_tab_index: int
     record_tab_index: int
@@ -148,6 +149,7 @@ def _draw_side_panel(
         policy_reload_error=data.policy_reload_error,
         track_record_book=data.track_record_book,
         track_pool_records=data.track_pool_records,
+        allow_record_course_jumps=data.allow_record_course_jumps,
         continuous_drive_deadzone=data.continuous_drive_deadzone,
         continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
         continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,

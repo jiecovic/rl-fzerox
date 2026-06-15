@@ -157,7 +157,7 @@ def test_remux_recording_to_mp4_copies_streams(
     assert commands == [
         [
             "ffmpeg",
-            "-y",
+            "-n",
             "-loglevel",
             "error",
             "-i",
@@ -171,6 +171,30 @@ def test_remux_recording_to_mp4_copies_streams(
             str(tmp_path / "race.mp4"),
         ]
     ]
+
+
+def test_remux_recording_to_mp4_appends_counter_when_target_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "race.mkv"
+    source_path.write_bytes(b"video")
+    (tmp_path / "race.mp4").write_bytes(b"old video")
+    (tmp_path / "race-001.mp4").write_bytes(b"older video")
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        del kwargs
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stderr=b"")
+
+    monkeypatch.setattr("rl_fzerox.apps.recording.video.subprocess.run", fake_run)
+
+    output_path = remux_recording_to_mp4(source_path, ffmpeg_path="ffmpeg")
+
+    assert output_path == tmp_path / "race-002.mp4"
+    assert commands[0][1] == "-n"
+    assert commands[0][-1] == str(tmp_path / "race-002.mp4")
 
 
 def test_remux_recording_to_mp4_reports_ffmpeg_errors(

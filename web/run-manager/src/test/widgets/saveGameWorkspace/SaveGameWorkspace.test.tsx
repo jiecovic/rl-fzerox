@@ -38,8 +38,6 @@ describe("SaveGameWorkspace", () => {
         title: "unlock save",
       }),
     );
-    const patch = onPatchSession.mock.calls.at(-1)?.[1];
-    expect(patch.recordingPathText).toMatch(/^local\/recordings\/career\/save-001\/.+\.mkv$/);
   });
 
   it("opens the save-game directory", async () => {
@@ -86,7 +84,8 @@ describe("SaveGameWorkspace", () => {
       device: "cuda",
       policyMode: "deterministic",
       recordingEnabled: false,
-      recordingPath: "local/recordings/career/save-001/test.mkv",
+      recordingInputHudEnabled: false,
+      recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
     });
@@ -140,7 +139,7 @@ describe("SaveGameWorkspace", () => {
     expect(onUpsertCupSetup).not.toHaveBeenCalled();
   });
 
-  it("imports learned engines into staged course setups without saving", async () => {
+  it("imports learned engines from the selected bulk policy without saving", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
       cup_setups: [cupSetupFixture({ cup_id: "jack", vehicle_id: "fire_stingray" })],
@@ -190,7 +189,6 @@ describe("SaveGameWorkspace", () => {
     });
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), run.id);
-    await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
     await user.click(screen.getByRole("button", { name: "Import learned engines" }));
 
     expect(onImportEngineTuning).toHaveBeenCalledWith({
@@ -216,7 +214,7 @@ describe("SaveGameWorkspace", () => {
     expect(onRefreshStatus).not.toHaveBeenCalled();
     expect(await screen.findByRole("textbox", { name: "Mute City engine" })).toHaveValue("73");
     expect(screen.getByRole("textbox", { name: "Silence engine" })).toHaveValue("88");
-    expect(screen.getByRole("button", { name: "Save 24 changes" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save 2 changes" })).toBeEnabled();
   });
 
   it("counts one dirty change for one course engine override", async () => {
@@ -279,6 +277,7 @@ describe("SaveGameWorkspace", () => {
       device: "cpu",
       policyMode: "stochastic",
       recordingEnabled: false,
+      recordingInputHudEnabled: false,
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
@@ -322,9 +321,7 @@ describe("SaveGameWorkspace", () => {
     });
 
     await user.click(screen.getByLabelText("Record video"));
-    const pathInput = screen.getByLabelText("Career Mode recording path");
-    await user.clear(pathInput);
-    await user.type(pathInput, "local/recordings/career/save-001/manual.mkv");
+    await user.click(screen.getByLabelText("Input HUD"));
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onStartCareerMode).toHaveBeenCalledWith({
@@ -332,7 +329,8 @@ describe("SaveGameWorkspace", () => {
       device: "cuda",
       policyMode: "deterministic",
       recordingEnabled: true,
-      recordingPath: "local/recordings/career/save-001/manual.mkv",
+      recordingInputHudEnabled: true,
+      recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
       singleTarget: false,
@@ -378,6 +376,7 @@ describe("SaveGameWorkspace", () => {
       device: "cuda",
       policyMode: "deterministic",
       recordingEnabled: false,
+      recordingInputHudEnabled: false,
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
@@ -685,7 +684,7 @@ function newSaveGameSession(): SaveGameSession {
     attemptSeedText: "123",
     policyMode: "deterministic",
     recordingEnabled: false,
-    recordingPathText: "local/recordings/career/save-001/test.mkv",
+    recordingInputHudEnabled: false,
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId: null,
@@ -784,7 +783,7 @@ function existingSaveGameSession(saveGameId: string): SaveGameSession {
     attemptSeedText: "123",
     policyMode: "deterministic",
     recordingEnabled: false,
-    recordingPathText: "local/recordings/career/save-001/test.mkv",
+    recordingInputHudEnabled: false,
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId,

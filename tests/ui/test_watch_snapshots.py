@@ -7,13 +7,17 @@ import numpy as np
 
 from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    EmulatorConfig,
+    WatchAppConfig,
+)
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.snapshots import (
     _audio_chunks_for_frames,
     _build_snapshot,
     _publish_step_snapshots,
+    _recording_frame_info,
 )
 from tests.ui.viewer_support import record_book, record_entry
 
@@ -298,6 +302,28 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
     for snapshot in snapshots:
         assert isinstance(snapshot.policy_action, np.ndarray)
         assert np.array_equal(snapshot.policy_action, final_action)
+
+
+def test_recording_frame_info_adds_input_hud_metadata() -> None:
+    info = _recording_frame_info(
+        {"phase": "final"},
+        control_state=race_control_state(control_mask=19, stick_x=0.5, pitch=-0.25),
+        render_input_hud=True,
+        policy_active=True,
+    )
+
+    assert info["watch_recording_input_hud"] is True
+    assert info["watch_recording_input_gas"] is True
+    assert info["watch_recording_input_air_brake"] is True
+    assert info["watch_recording_input_lean_right"] is True
+    assert info["watch_recording_input_stick_x"] == 0.5
+    assert info["watch_recording_input_pitch"] == -0.25
+    assert _recording_frame_info(
+        {"phase": "menu"},
+        control_state=race_control_state(control_mask=31),
+        render_input_hud=True,
+        policy_active=False,
+    ) == {"phase": "menu"}
 
 
 def test_menu_snapshot_has_no_policy_observation_shape(tmp_path: Path) -> None:

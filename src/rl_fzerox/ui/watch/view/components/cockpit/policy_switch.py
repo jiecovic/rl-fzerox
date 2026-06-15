@@ -1,6 +1,7 @@
 # src/rl_fzerox/ui/watch/view/components/cockpit/policy_switch.py
 from __future__ import annotations
 
+from dataclasses import dataclass
 from importlib.resources import as_file, files
 
 from rl_fzerox.ui.watch.view.components.cockpit.style import COCKPIT_PANEL_STYLE
@@ -14,6 +15,12 @@ from rl_fzerox.ui.watch.view.screen.types import (
 _switch_assets: dict[str, PygameSurface] = {}
 
 
+@dataclass(frozen=True, slots=True)
+class PolicyModeSwitchDrawResult:
+    bounds: MouseRect
+    hitbox: MouseRect | None
+
+
 def draw_policy_mode_switch(
     *,
     pygame: PygameModule,
@@ -22,7 +29,7 @@ def draw_policy_mode_switch(
     x: int,
     y: int,
     deterministic_policy: bool | None,
-) -> MouseRect | None:
+) -> PolicyModeSwitchDrawResult:
     style = COCKPIT_PANEL_STYLE.policy_mode_switch
     enabled = deterministic_policy is not None
     deterministic = deterministic_policy is True
@@ -39,10 +46,12 @@ def draw_policy_mode_switch(
     label_y = y + (style.height // 2) - (label.get_height() // 2)
     screen.blit(label, (label_x, label_y))
 
-    if not enabled:
-        return None
     hitbox_width = style.switch_width + style.label_gap + label.get_width()
-    return (x, y, hitbox_width, style.height)
+    bounds = (x, y, hitbox_width, style.height)
+    return PolicyModeSwitchDrawResult(
+        bounds=bounds,
+        hitbox=bounds if enabled else None,
+    )
 
 
 def _switch_asset_name(*, deterministic: bool, enabled: bool) -> str:

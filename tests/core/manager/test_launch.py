@@ -286,9 +286,7 @@ def test_fork_converts_engine_tuning_source_to_bandit_buckets(tmp_path: Path) ->
 
     assert child.source_snapshot_dir is not None
     child_policy_path = child.source_snapshot_dir / RUN_LAYOUT.policy_artifacts.latest
-    child_state = load_engine_tuning_runtime_state(
-        engine_tuning_checkpoint_path(child_policy_path)
-    )
+    child_state = load_engine_tuning_runtime_state(engine_tuning_checkpoint_path(child_policy_path))
     parent_state = load_engine_tuning_runtime_state(parent_state_path)
     assert child_state is not None
     assert [candidate.engine_setting_raw_value for candidate in child_state.candidates] == [50, 70]
@@ -809,7 +807,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
     _configure_gp_cup(store, save_game_id=save_game.id, run_id=run.id, cup_id="jack")
     launcher = ManagerRunLauncher(store)
     log_path = tmp_path / "logs" / f"{save_game.id}.log"
-    recording_path = tmp_path / "recordings" / "career.mkv"
+    recording_path = Path("local/recordings/career/save-001/session/career.mkv")
     log_path.parent.mkdir(parents=True)
     log_path.write_text("stale career failure\n", encoding="utf-8")
     captured: dict[str, object] = {}
@@ -845,6 +843,15 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         _fake_popen,
     )
 
+    def _fake_default_recording_path(*, save_game_id: str, save_game_name: str) -> Path:
+        del save_game_id, save_game_name
+        return recording_path
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.save_games.default_career_recording_path",
+        _fake_default_recording_path,
+    )
+
     status = launcher.start_career_mode(
         save_game_id=save_game.id,
         device="cpu",
@@ -852,7 +859,8 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         attempt_seed=1234,
         deterministic_policy=False,
         recording_enabled=True,
-        recording_path=recording_path,
+        recording_input_hud_enabled=True,
+        recording_path=None,
     )
 
     assert status == "started"
@@ -882,6 +890,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         "emulator.renderer=angrylion",
         "watch.recording.enabled=true",
         f"watch.recording.path={recording_path}",
+        "watch.recording.render_input_hud=true",
     ]
     lease = store.get_viewer_lease(lease_id)
     assert lease is not None

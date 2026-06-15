@@ -128,6 +128,7 @@ def step_menu(
     target_control_fps: float | None,
     native_frame_seconds: float | None,
     deterministic_policy: bool,
+    track_record_book: TrackRecordBook,
     frame_recorder: FrameRecorder | None = None,
 ) -> None:
     if step is None:
@@ -200,7 +201,7 @@ def step_menu(
                 policy_reload_error=None,
                 cnn_activations=None,
                 active_track_sampling=None,
-                track_record_book=TrackRecordBook(),
+                track_record_book=track_record_book,
                 action_hold_frame=frame_index + 1,
                 action_hold_frames=controller_step.frames,
                 policy_decision_frame=False,

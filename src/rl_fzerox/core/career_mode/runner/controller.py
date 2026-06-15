@@ -841,7 +841,7 @@ class CareerModeController:
             return False
 
         self._last_progress_sync_continue_pulse = self._continue_after_race_pulses
-        transition = self._progress.sync_post_terminal_success(
+        transition = self._progress.sync_post_terminal_progress(
             session=session,
             setup=self._setup,
             info=info,

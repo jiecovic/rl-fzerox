@@ -30,6 +30,7 @@ class SaveGameModel(ManagerBase):
     runner_policy_mode: Mapped[str] = mapped_column(String, default="deterministic")
     runner_attempt_seed: Mapped[int | None] = mapped_column(Integer)
     runner_recording_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    runner_recording_input_hud_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     runner_recording_path: Mapped[str | None]
 
 

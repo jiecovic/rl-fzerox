@@ -21,6 +21,9 @@ def post_terminal_progress_screen(facts: MenuFacts) -> bool:
         facts.is_gp_result_screen
         or facts.is_gp_next_course_screen
         or facts.is_post_gp_screen
+        or facts.is_title
+        or facts.is_mode_select
+        or facts.is_course_select
         or (facts.in_gp_race and facts.terminal_race_result)
     )
 
@@ -75,6 +78,7 @@ def terminal_info(
         return resolved_info
     resolved_info.setdefault("race_time_ms", telemetry.player.race_time_ms)
     resolved_info.setdefault("position", telemetry.player.position)
+    resolved_info.setdefault("ko_star_count", telemetry.player.ko_star_count)
     resolved_info.setdefault("track_id", course_id_from_info(resolved_info))
     return resolved_info
 

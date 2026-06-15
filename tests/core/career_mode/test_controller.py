@@ -19,6 +19,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     engine_adjust_steps,
     observed_menu_screen,
 )
+from rl_fzerox.core.career_mode.runner.terminal import post_terminal_progress_screen
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
@@ -90,6 +91,10 @@ def test_unskippable_credits_are_post_gp_screen() -> None:
     )
 
     assert screen is ObservedMenuScreen.POST_GP
+
+
+def test_returned_main_menu_is_post_terminal_progress_screen() -> None:
+    assert post_terminal_progress_screen(MenuFacts.from_info({"game_mode": "main_menu"}))
 
 
 def test_no_active_attempt_rejects_menu_navigation(tmp_path: Path) -> None:

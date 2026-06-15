@@ -97,6 +97,7 @@ def step_policy_or_manual(
     live_visualization_enabled: bool,
     live_series: EpisodeLiveSeriesTracker,
     last_live_series_publish_time: float,
+    track_record_book: TrackRecordBook,
     frame_recorder: FrameRecorder | None = None,
 ) -> CareerPolicyStepResult:
     previous_observation = observation
@@ -261,7 +262,7 @@ def step_policy_or_manual(
         policy_reload_error=_policy_reload_error(policy_runner),
         cnn_activations=cnn_activations,
         active_track_sampling=None,
-        track_record_book=TrackRecordBook(),
+        track_record_book=track_record_book,
         manual_control_enabled=manual_control_enabled,
         live_episode_series=live_episode_series,
         frame_recorder=frame_recorder,

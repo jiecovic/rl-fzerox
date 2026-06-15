@@ -1,6 +1,9 @@
 # src/rl_fzerox/apps/run_manager/api/handlers/save_games.py
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Literal
+
 from fastapi import HTTPException
 
 from rl_fzerox.apps.run_manager.api.contracts import (
@@ -88,6 +91,7 @@ def update_save_game_runner_settings_payload(
             policy_mode=request.policy_mode,
             attempt_seed=request.attempt_seed,
             recording_enabled=request.recording_enabled,
+            recording_input_hud_enabled=request.recording_input_hud_enabled,
             recording_path=request.recording_path,
         )
     except ValueError as error:
@@ -168,8 +172,8 @@ def import_save_engine_tuning_payload(
     if run.config.vehicle.engine_mode != "adaptive_tuner":
         raise HTTPException(status_code=400, detail="policy run has no adaptive engine tuning")
     try:
-        policy_path = resolve_policy_artifact_path(
-            run.run_dir,
+        policy_path = _resolve_engine_tuning_policy_artifact(
+            run,
             artifact=request.policy_artifact,
         )
     except FileNotFoundError as error:
@@ -224,3 +228,16 @@ def open_save_game_dir_payload(store: ManagerStore, save_game_id: str) -> dict[s
 
 def _adaptive_engine_config(run: ManagedRun) -> AdaptiveEngineTuningConfig:
     return adaptive_engine_tuning_config(run.config)
+
+
+def _resolve_engine_tuning_policy_artifact(
+    run: ManagedRun,
+    *,
+    artifact: Literal["latest", "best"],
+) -> Path:
+    try:
+        return resolve_policy_artifact_path(run.run_dir, artifact=artifact)
+    except FileNotFoundError:
+        if run.source_snapshot_dir is None:
+            raise
+    return resolve_policy_artifact_path(run.source_snapshot_dir, artifact=artifact)

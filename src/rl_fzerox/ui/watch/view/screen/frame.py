@@ -94,6 +94,7 @@ class FrameRenderData:
     cnn_activations: CnnActivationSnapshot | None
     track_record_book: TrackRecordBook
     track_pool_records: tuple[dict[str, object], ...]
+    allow_record_course_jumps: bool
     panel_tab_index: int
     cnn_layer_tab_index: int
     record_tab_index: int
@@ -382,6 +383,7 @@ def _draw_frame(
             cnn_activations=data.cnn_activations,
             track_record_book=data.track_record_book,
             track_pool_records=data.track_pool_records,
+            allow_record_course_jumps=data.allow_record_course_jumps,
             panel_tab_index=data.panel_tab_index,
             cnn_layer_tab_index=data.cnn_layer_tab_index,
             record_tab_index=data.record_tab_index,

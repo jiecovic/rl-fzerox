@@ -209,7 +209,6 @@ export function UnlockPathPanel({
         courseSetupDrafts,
         cupSetupDrafts,
         cups,
-        draft,
       });
       const recommendations = await onImportEngineTuning({
         courseSetups,
@@ -407,12 +406,10 @@ function courseSetupRecommendationRequests({
   courseSetupDrafts,
   cupSetupDrafts,
   cups,
-  draft,
 }: {
   courseSetupDrafts: CourseSetupDraftMap;
   cupSetupDrafts: CupSetupDraftMap;
   cups: readonly CupView[];
-  draft: PolicySelectionDraft;
 }): {
   courseId: string;
   cupId: string;
@@ -433,12 +430,6 @@ function courseSetupRecommendationRequests({
         ...values,
         ...EMPTY_COURSE_SETUP_DRAFT,
       };
-      if (
-        currentDraft.policyRunId !== draft.policyRunId ||
-        currentDraft.policyArtifact !== draft.policyArtifact
-      ) {
-        continue;
-      }
       requests.push({
         courseId: values.courseId,
         cupId: values.cupId,
@@ -471,16 +462,12 @@ function applyEngineRecommendationsToDrafts({
       ...values,
       ...EMPTY_COURSE_SETUP_DRAFT,
     };
-    if (
-      currentDraft.policyRunId !== draft.policyRunId ||
-      currentDraft.policyArtifact !== draft.policyArtifact
-    ) {
-      continue;
-    }
     next[key] = {
       ...currentDraft,
       ...values,
       engineSettingRawValue: recommendation.engine_setting_raw_value,
+      policyArtifact: draft.policyArtifact,
+      policyRunId: draft.policyRunId,
       vehicleId: recommendation.vehicle_id,
     };
   }

@@ -53,7 +53,7 @@ def _draw_control_viz(
     header = fonts.small.render("COCKPIT CONTROL", True, PALETTE.text_muted)
     screen.blit(header, (panel.x + 16, panel.y + 9))
     mode_switch_style = COCKPIT_PANEL_STYLE.policy_mode_switch
-    mode_switch_rect = draw_policy_mode_switch(
+    mode_switch = draw_policy_mode_switch(
         pygame=pygame,
         screen=screen,
         font=fonts.small,
@@ -77,11 +77,7 @@ def _draw_control_viz(
     thrust_y = panel.y + (38 if wide else 28)
     led_clearance = 9 if wide else 6
     spin_width = _spin_controls_width()
-    mode_switch_right = (
-        mode_switch_rect[0] + mode_switch_rect[2]
-        if mode_switch_rect is not None
-        else panel.x + 16 + header.get_width()
-    )
+    mode_switch_right = mode_switch.bounds[0] + mode_switch.bounds[2]
     preferred_spin_x = mode_switch_right + (16 if wide else 10)
     max_spin_x = thrust_x - spin_width - (18 if wide else 10)
     spin_x = max(panel.x + 16, min(preferred_spin_x, max_spin_x))
@@ -299,7 +295,7 @@ def _draw_control_viz(
             percent_y,
         ),
     )
-    return panel.bottom, mode_switch_rect
+    return panel.bottom, mode_switch.hitbox
 
 
 def _draw_spin_controls(

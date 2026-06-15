@@ -236,7 +236,7 @@ def test_panel_tab_hint_shows_active_tab_position() -> None:
     assert _panel_tab_hint(9) == "Tab 1/9"
 
 
-def test_career_panel_tabs_replace_records_with_career() -> None:
+def test_career_panel_tabs_include_records_and_career() -> None:
     assert CAREER_PANEL_TABS.labels == (
         "Run",
         "Live",
@@ -245,12 +245,13 @@ def test_career_panel_tabs_replace_records_with_career() -> None:
         "State",
         "Aux",
         "CNN",
+        "Records",
         "Career",
         "Train",
     )
-    assert CAREER_PANEL_TABS.records_index is None
-    assert CAREER_PANEL_TABS.career_index == 7
-    assert _panel_tab_hint(7, panel_tabs=CAREER_PANEL_TABS) == "Tab 8/9"
+    assert CAREER_PANEL_TABS.records_index == 7
+    assert CAREER_PANEL_TABS.career_index == 8
+    assert _panel_tab_hint(8, panel_tabs=CAREER_PANEL_TABS) == "Tab 9/10"
 
 
 def test_panel_tabs_fit_side_panel_content_width() -> None:

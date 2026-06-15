@@ -71,6 +71,7 @@ def insert_save_game(session: Session, save_game: ManagedSaveGame) -> None:
             runner_policy_mode=save_game.runner_policy_mode,
             runner_attempt_seed=save_game.runner_attempt_seed,
             runner_recording_enabled=save_game.runner_recording_enabled,
+            runner_recording_input_hud_enabled=save_game.runner_recording_input_hud_enabled,
             runner_recording_path=(
                 None
                 if save_game.runner_recording_path is None
@@ -143,6 +144,7 @@ def update_save_game_runner_settings(
     policy_mode: Literal["deterministic", "stochastic"],
     attempt_seed: int | None,
     recording_enabled: bool,
+    recording_input_hud_enabled: bool,
     recording_path: Path | None,
     updated_at: str,
 ) -> ManagedSaveGame | None:
@@ -156,6 +158,7 @@ def update_save_game_runner_settings(
     row.runner_policy_mode = policy_mode
     row.runner_attempt_seed = attempt_seed
     row.runner_recording_enabled = recording_enabled
+    row.runner_recording_input_hud_enabled = recording_input_hud_enabled
     row.runner_recording_path = None if recording_path is None else str(recording_path)
     row.updated_at = updated_at
     return save_game_from_model(row)
@@ -466,6 +469,7 @@ def save_game_from_model(row: SaveGameModel) -> ManagedSaveGame:
         runner_policy_mode=_required_policy_mode(row.runner_policy_mode),
         runner_attempt_seed=optional_int(row.runner_attempt_seed),
         runner_recording_enabled=bool(row.runner_recording_enabled),
+        runner_recording_input_hud_enabled=bool(row.runner_recording_input_hud_enabled),
         runner_recording_path=None
         if row.runner_recording_path is None
         else Path(row.runner_recording_path).expanduser(),

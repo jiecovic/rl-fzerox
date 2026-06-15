@@ -19,6 +19,7 @@ def start_career_mode_payload(
             attempt_seed=request.attempt_seed,
             deterministic_policy=request.policy_mode == "deterministic",
             recording_enabled=request.recording_enabled,
+            recording_input_hud_enabled=request.recording_input_hud_enabled,
             recording_path=request.recording_path,
             target_kind=request.target_kind,
             difficulty=request.difficulty,
