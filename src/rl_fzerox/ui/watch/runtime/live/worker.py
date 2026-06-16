@@ -1,12 +1,9 @@
 # src/rl_fzerox/ui/watch/runtime/live/worker.py
 from __future__ import annotations
 
-import os
 import time
-from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
-from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.envs.actions import ActionValue
@@ -24,7 +21,6 @@ from rl_fzerox.ui.watch.runtime.courses.baseline import (
 )
 from rl_fzerox.ui.watch.runtime.courses.commands import (
     apply_course_navigation_commands,
-    next_watch_reset_after_episode,
 )
 from rl_fzerox.ui.watch.runtime.courses.navigation import (
     WatchCourseRotation,
@@ -40,6 +36,9 @@ from rl_fzerox.ui.watch.runtime.ipc import (
     drain_worker_commands,
     publish_worker_message,
 )
+from rl_fzerox.ui.watch.runtime.live.bootstrap import _watch_bootstrap_error_message
+from rl_fzerox.ui.watch.runtime.live.notices import _TimedWatchNotice
+from rl_fzerox.ui.watch.runtime.live.reset import _sync_next_watch_reset_after_episode
 from rl_fzerox.ui.watch.runtime.live.session import (
     open_watch_runtime_session,
 )
@@ -82,33 +81,11 @@ if TYPE_CHECKING:
     from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
 
 __all__ = (
+    "_TimedWatchNotice",
     "_refresh_paused_cnn_activations",
+    "_sync_next_watch_reset_after_episode",
     "run_simulation_worker",
 )
-
-
-class _SequentialResetEnv(Protocol):
-    def set_next_sequential_reset_course(self, course_id: str | None) -> None: ...
-
-
-_WATCH_SAVE_NOTICE_SECONDS = 3.0
-
-
-@dataclass(slots=True)
-class _TimedWatchNotice:
-    message: str | None = None
-    expires_at: float = 0.0
-
-    def show(self, message: str, *, now: float) -> None:
-        self.message = message
-        self.expires_at = now + _WATCH_SAVE_NOTICE_SECONDS
-
-    def apply(self, info: dict[str, object], *, now: float) -> dict[str, object]:
-        if self.message is None or now >= self.expires_at:
-            return info
-        with_notice = dict(info)
-        with_notice["watch_save_notice"] = self.message
-        return with_notice
 
 
 def run_simulation_worker(
@@ -661,63 +638,3 @@ def _run_simulation_loop(
             episode += 1
     finally:
         session.close()
-
-
-def _sync_next_watch_reset_after_episode(
-    *,
-    env: _SequentialResetEnv,
-    rotation: WatchCourseRotation,
-    info: dict[str, object],
-    episode_done: bool,
-    selected_reset_target_key: str | None,
-    locked_reset_target_key: str | None,
-) -> str | None:
-    if not episode_done:
-        return selected_reset_target_key
-    next_target_key = next_watch_reset_after_episode(
-        rotation=rotation,
-        info=info,
-        episode_done=episode_done,
-        selected_reset_target_key=selected_reset_target_key,
-        locked_reset_target_key=locked_reset_target_key,
-    )
-    if locked_reset_target_key is None and next_target_key is not None:
-        env.set_next_sequential_reset_course(next_target_key)
-    return next_target_key
-
-
-def _watch_bootstrap_error_message(config: WatchAppConfig, error: Exception) -> str:
-    track_sampling = config.env.track_sampling
-    return "\n".join(
-        (
-            f"watch worker failed during bootstrap: {type(error).__name__}: {error}",
-            f"core_path={_path_report(config.emulator.core_path)}",
-            f"rom_path={_path_report(config.emulator.rom_path)}",
-            f"runtime_dir={_path_report(config.emulator.runtime_dir)}",
-            f"baseline_state_path={_path_report(config.emulator.baseline_state_path)}",
-            f"renderer={config.emulator.renderer}",
-            "track_sampling="
-            f"enabled={track_sampling.enabled} entries={len(track_sampling.entries)}",
-        )
-    )
-
-
-def _path_report(path: Path | None) -> str:
-    if path is None:
-        return "-"
-    resolved = path.expanduser().resolve()
-    if resolved.is_file():
-        return (
-            f"{resolved} file size={resolved.stat().st_size} "
-            f"readable={_yes_no(os.access(resolved, os.R_OK))}"
-        )
-    if resolved.is_dir():
-        return (
-            f"{resolved} dir readable={_yes_no(os.access(resolved, os.R_OK))} "
-            f"writable={_yes_no(os.access(resolved, os.W_OK))}"
-        )
-    return f"{resolved} missing parent_exists={_yes_no(resolved.parent.exists())}"
-
-
-def _yes_no(value: bool) -> str:
-    return "yes" if value else "no"
