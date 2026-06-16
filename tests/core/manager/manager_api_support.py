@@ -7,6 +7,7 @@ from typing import Literal
 
 import httpx
 from fastapi import FastAPI
+from httpx._types import RequestFiles
 
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
@@ -128,6 +129,7 @@ class _ApiClient:
         url: str,
         *,
         content: str | bytes | None = None,
+        files: RequestFiles | None = None,
         headers: Mapping[str, str] | None = None,
         json: object | None = None,
     ) -> httpx.Response:
@@ -140,6 +142,7 @@ class _ApiClient:
                 method,
                 url,
                 content=content,
+                files=files,
                 headers=headers,
                 json=json,
             )
@@ -152,10 +155,18 @@ class _ApiClient:
         url: str,
         *,
         content: str | bytes | None = None,
+        files: RequestFiles | None = None,
         headers: Mapping[str, str] | None = None,
         json: object | None = None,
     ) -> httpx.Response:
-        return await self.request("POST", url, content=content, headers=headers, json=json)
+        return await self.request(
+            "POST",
+            url,
+            content=content,
+            files=files,
+            headers=headers,
+            json=json,
+        )
 
     async def put(self, url: str, *, json: object | None = None) -> httpx.Response:
         return await self.request("PUT", url, json=json)

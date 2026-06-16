@@ -71,21 +71,7 @@ class LiveSnapshotBroadcaster:
         self._ensure_polling()
         try:
             while True:
-                snapshot_task = asyncio.create_task(queue.get())
-                disconnect_task = asyncio.create_task(websocket.receive_text())
-                done, pending = await asyncio.wait(
-                    {snapshot_task, disconnect_task},
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                for task in pending:
-                    task.cancel()
-                for task in pending:
-                    with suppress(asyncio.CancelledError):
-                        await task
-                if disconnect_task in done:
-                    disconnect_task.result()
-                    continue
-                update = snapshot_task.result()
+                update = await queue.get()
                 if isinstance(update, LiveErrorUpdate):
                     await websocket.send_json(
                         {"type": self._message_types.error, "message": update.message}

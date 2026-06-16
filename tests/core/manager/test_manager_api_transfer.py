@@ -5,23 +5,21 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
 import rl_fzerox.apps.run_manager.api.handlers.transfer as manager_api_transfer
-from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.core.manager import (
     ManagerStore,
     default_managed_run_config,
 )
 from rl_fzerox.core.manager.transfer import export_run_bundle
 from tests.core.manager.manager_api_support import (
-    _LauncherStub,
+    _client,
 )
 
 pytestmark = pytest.mark.anyio
 
 
-def test_manager_api_exports_run_bundle(tmp_path: Path) -> None:
+async def test_manager_api_exports_run_bundle(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         run_id="run-a",
@@ -33,8 +31,9 @@ def test_manager_api_exports_run_bundle(tmp_path: Path) -> None:
     (run.run_dir / "train_manifest.yaml").write_text("run_name: run-a\n", encoding="utf-8")
     store.update_run_status(run_id=run.id, status="stopped", message="stopped")
 
-    with TestClient(create_manager_api_app(store, run_launcher=_LauncherStub())) as client:
-        response = client.get(f"/api/runs/{run.id}/export")
+    client = _client(tmp_path, store=store)
+
+    response = await client.get(f"/api/runs/{run.id}/export")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/zip"
@@ -45,7 +44,7 @@ def test_manager_api_exports_run_bundle(tmp_path: Path) -> None:
         assert "run/train_manifest.yaml" in archive.namelist()
 
 
-def test_manager_api_imports_run_bundle(
+async def test_manager_api_imports_run_bundle(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -75,12 +74,13 @@ def test_manager_api_imports_run_bundle(
 
     monkeypatch.setattr(target_store, "manager_runs_root", target_runs_root)
 
-    with TestClient(create_manager_api_app(target_store, run_launcher=_LauncherStub())) as client:
-        with bundle_path.open("rb") as bundle:
-            response = client.post(
-                "/api/run-imports",
-                files={"bundle": ("run-a.zip", bundle, "application/zip")},
-            )
+    client = _client(tmp_path, store=target_store)
+
+    with bundle_path.open("rb") as bundle:
+        response = await client.post(
+            "/api/run-imports",
+            files={"bundle": ("run-a.zip", bundle, "application/zip")},
+        )
 
     assert response.status_code == 201
     payload = response.json()
@@ -93,18 +93,19 @@ def test_manager_api_imports_run_bundle(
     assert str(imported_run.run_dir) in imported_manifest
 
 
-def test_manager_api_rejects_oversized_run_bundle_upload(
+async def test_manager_api_rejects_oversized_run_bundle_upload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     monkeypatch.setattr(manager_api_transfer, "MAX_RUN_BUNDLE_UPLOAD_BYTES", 4)
 
-    with TestClient(create_manager_api_app(store, run_launcher=_LauncherStub())) as client:
-        response = client.post(
-            "/api/run-imports",
-            files={"bundle": ("too-large.zip", b"12345", "application/zip")},
-        )
+    client = _client(tmp_path, store=store)
+
+    response = await client.post(
+        "/api/run-imports",
+        files={"bundle": ("too-large.zip", b"12345", "application/zip")},
+    )
 
     assert response.status_code == 413
     assert response.json()["error"] == "run bundle upload exceeds 4 bytes"

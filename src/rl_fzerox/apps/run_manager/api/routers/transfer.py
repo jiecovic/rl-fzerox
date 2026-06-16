@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, File, Path, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.execution import run_sync
@@ -17,11 +17,11 @@ def create_transfer_router(store: ManagerStore) -> APIRouter:
     @router.get("/api/runs/{run_id}/export")
     async def export_run(
         run_id: Annotated[str, Path(min_length=1)],
-    ) -> FileResponse:
+    ) -> Response:
         bundle_path = await run_sync(handlers.export_run_bundle_path, store, run_id)
-        return FileResponse(
-            bundle_path,
-            filename=f"{run_id}.zip",
+        return Response(
+            content=bundle_path.read_bytes(),
+            headers={"Content-Disposition": f'attachment; filename="{run_id}.zip"'},
             media_type="application/zip",
         )
 
