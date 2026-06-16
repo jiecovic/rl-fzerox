@@ -331,7 +331,7 @@ describe("Configurator", () => {
     expect(screen.queryByRole("dialog", { name: "Engine tuner history" })).not.toBeInTheDocument();
   });
 
-  it("stores action entropy group weights from the action tab", async () => {
+  it("stores action entropy coefficients from the action tab", async () => {
     const user = userEvent.setup();
     const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
 
@@ -350,25 +350,26 @@ describe("Configurator", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Training" }));
-    expect(screen.queryByText("Entropy groups")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Action entropy" })).toBeInTheDocument();
+    expect(screen.queryByText("Entropy coefficients")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Action" }));
-    const entropyPanel = screen.getByText("Entropy groups").closest("section");
+    await user.click(screen.getByRole("button", { name: "Action entropy" }));
+    const entropyPanel = screen.getByText("Entropy coefficients").closest("section");
     if (!(entropyPanel instanceof HTMLElement)) {
-      throw new Error("Missing entropy groups panel");
+      throw new Error("Missing entropy coefficients panel");
     }
 
     const pitchGroup = within(entropyPanel).getByRole("region", {
-      name: "Pitch entropy group",
+      name: "Pitch entropy coefficient",
     });
-    expect(within(pitchGroup).getByText("Effective coeff")).toBeInTheDocument();
-    expect(within(pitchGroup).getByText("1.00e-2")).toBeInTheDocument();
+    expect(within(pitchGroup).getByRole("textbox", { name: "Coefficient" })).toHaveValue("0.01");
 
     const pitchEntropy = within(pitchGroup).getByRole("button", { name: "Pitch" });
+    const pitchCoefficient = within(pitchGroup).getByRole("textbox", { name: "Coefficient" });
     expect(pitchEntropy).toHaveAttribute("aria-pressed", "true");
     await user.click(pitchEntropy);
     expect(pitchEntropy).toHaveAttribute("aria-pressed", "false");
-    expect(within(pitchGroup).getByText("0")).toBeInTheDocument();
+    expect(pitchCoefficient).toHaveValue("0");
 
     await user.click(screen.getByRole("button", { name: "Save draft" }));
 
@@ -377,7 +378,7 @@ describe("Configurator", () => {
         "entropy group draft",
         expect.objectContaining({
           train: expect.objectContaining({
-            entropy_group_weights: expect.objectContaining({ pitch: 0 }),
+            entropy_coefficients: expect.objectContaining({ pitch: 0 }),
           }),
         }),
       ),

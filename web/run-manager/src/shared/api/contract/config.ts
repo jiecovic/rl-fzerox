@@ -23,6 +23,20 @@ import {
 } from "@/shared/api/contract/enums";
 import { centeredEngineBuckets } from "@/shared/domain/engineBuckets";
 
+const defaultEntropyCoefficient = 0.01;
+const actionEntropyGroupKeys = [
+  "steer",
+  "drive",
+  "gas",
+  "air_brake",
+  "boost",
+  "lean",
+  "lean_left",
+  "lean_right",
+  "spin",
+  "pitch",
+] as const;
+
 export const customCnnLayerKindSchema = z.preprocess(
   (value) => (value === "residual" ? "residual_post" : value),
   z.enum(["conv", "residual_pre", "residual_post", "maxpool", "avgpool", "activation"]),
@@ -61,42 +75,71 @@ function isResidualCnnLayerKind(kind: z.infer<typeof customCnnLayerKindSchema>) 
   return kind === "residual_pre" || kind === "residual_post";
 }
 
-const trainConfigSchema = z.object({
-  num_envs: z.number().int().positive(),
-  total_timesteps: z.number().int().positive(),
-  n_steps: z.number().int().positive(),
-  n_epochs: z.number().int().positive(),
-  batch_size: z.number().int().positive(),
-  learning_rate: z.number().positive(),
-  gamma: z.number().positive().max(1),
-  gae_lambda: z.number().positive().max(1),
-  clip_range: z.number().positive(),
-  clip_range_vf: z.number().positive().nullable(),
-  ent_coef: z.number().nonnegative(),
-  entropy_group_weights: z.record(z.string(), z.number().nonnegative()),
-  actor_regularization: z.object({
-    grounded_pitch_neutral_loss_weight: z.number().nonnegative(),
-    pitch_std_cap_loss_weight: z.number().nonnegative(),
-    grounded_pitch_std_cap: z.number().positive(),
-    airborne_pitch_std_cap: z.number().positive(),
-    steer_std_cap_loss_weight: z.number().nonnegative(),
-    steer_std_cap: z.number().positive(),
-    steer_signed_balance_loss_weight: z.number().nonnegative(),
-    steer_signed_balance_deadzone: z.number().min(0).max(1),
-    lean_signed_balance_loss_weight: z.number().nonnegative(),
-    lean_signed_balance_deadzone: z.number().min(0).max(1),
+const trainConfigSchema = z.preprocess(
+  normalizeTrainEntropyConfig,
+  z.object({
+    num_envs: z.number().int().positive(),
+    total_timesteps: z.number().int().positive(),
+    n_steps: z.number().int().positive(),
+    n_epochs: z.number().int().positive(),
+    batch_size: z.number().int().positive(),
+    learning_rate: z.number().positive(),
+    gamma: z.number().positive().max(1),
+    gae_lambda: z.number().positive().max(1),
+    clip_range: z.number().positive(),
+    clip_range_vf: z.number().positive().nullable(),
+    entropy_coefficients: z.record(z.string(), z.number().nonnegative()),
+    actor_regularization: z.object({
+      grounded_pitch_neutral_loss_weight: z.number().nonnegative(),
+      pitch_std_cap_loss_weight: z.number().nonnegative(),
+      grounded_pitch_std_cap: z.number().positive(),
+      airborne_pitch_std_cap: z.number().positive(),
+      steer_std_cap_loss_weight: z.number().nonnegative(),
+      steer_std_cap: z.number().positive(),
+      steer_signed_balance_loss_weight: z.number().nonnegative(),
+      steer_signed_balance_deadzone: z.number().min(0).max(1),
+      lean_signed_balance_loss_weight: z.number().nonnegative(),
+      lean_signed_balance_deadzone: z.number().min(0).max(1),
+    }),
+    vf_coef: z.number().positive(),
+    max_grad_norm: z.number().positive(),
+    normalize_advantage: z.boolean(),
+    target_kl: z.number().positive().nullable(),
+    stats_window_size: z.number().int().positive(),
+    checkpoint_every_rollouts: z.number().int().positive(),
+    save_latest_checkpoint: z.boolean(),
+    save_best_checkpoint: z.boolean(),
+    save_recent_checkpoints: z.boolean(),
+    recent_checkpoint_limit: z.number().int().positive().nullable(),
   }),
-  vf_coef: z.number().positive(),
-  max_grad_norm: z.number().positive(),
-  normalize_advantage: z.boolean(),
-  target_kl: z.number().positive().nullable(),
-  stats_window_size: z.number().int().positive(),
-  checkpoint_every_rollouts: z.number().int().positive(),
-  save_latest_checkpoint: z.boolean(),
-  save_best_checkpoint: z.boolean(),
-  save_recent_checkpoints: z.boolean(),
-  recent_checkpoint_limit: z.number().int().positive().nullable(),
-});
+);
+
+function normalizeTrainEntropyConfig(value: unknown): unknown {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+  const data = value as Record<string, unknown>;
+  if ("entropy_coefficients" in data) {
+    return value;
+  }
+  const entCoef = nonNegativeNumber(data.ent_coef, defaultEntropyCoefficient);
+  const weights =
+    data.entropy_group_weights !== null &&
+    typeof data.entropy_group_weights === "object" &&
+    !Array.isArray(data.entropy_group_weights)
+      ? (data.entropy_group_weights as Record<string, unknown>)
+      : {};
+  return {
+    ...data,
+    entropy_coefficients: Object.fromEntries(
+      actionEntropyGroupKeys.map((key) => [key, entCoef * nonNegativeNumber(weights[key], 1)]),
+    ),
+  };
+}
+
+function nonNegativeNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
+}
 
 type GpDifficulty = z.infer<typeof gpDifficultySchema>;
 type RaceMode = z.infer<typeof raceModeSchema>;

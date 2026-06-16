@@ -1,7 +1,12 @@
 // web/run-manager/src/entities/runConfig/ui/sections/TrainingSection.tsx
 
 import { type ConfigSetter, patchConfigSection } from "@/entities/runConfig/model/state";
+import {
+  actionEntropyGroups,
+  coefficientFor,
+} from "@/entities/runConfig/ui/sections/action/EntropyGroupWeightsPanel";
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
 import { ConfigFieldGroup, ConfigPanelGrid } from "@/shared/ui/config/ConfigLayout";
 import { ConfigPanel } from "@/shared/ui/config/ConfigPanel";
 import {
@@ -18,14 +23,32 @@ interface ConfigSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   setConfig: ConfigSetter;
+  onOpenActionEntropy?: () => void;
 }
 
-export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSectionProps) {
+export function TrainingSection({
+  config,
+  defaultConfig,
+  setConfig,
+  onOpenActionEntropy,
+}: ConfigSectionProps) {
   const updateTrain = (patch: Partial<ManagedRunConfig["train"]>) => {
     patchConfigSection(setConfig, "train", patch);
   };
   const derived = trainingDerivedValues(config.train);
   const rolloutStepValues = compatibleRolloutSteps(config.train);
+  const entropyGroups = actionEntropyGroups(config.action);
+  const entropyEnabled = entropyGroups.some((group) => coefficientFor(config.train, group.key) > 0);
+
+  function setEntropyEnabled(enabled: boolean) {
+    const entropy_coefficients = { ...config.train.entropy_coefficients };
+    for (const group of entropyGroups) {
+      entropy_coefficients[group.key] = enabled
+        ? coefficientFor(defaultConfig.train, group.key)
+        : 0;
+    }
+    updateTrain({ entropy_coefficients });
+  }
 
   return (
     <ConfigPanelGrid>
@@ -183,22 +206,17 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
             value={config.train.clip_range_vf}
             onChange={(value) => updateTrain({ clip_range_vf: value })}
           />
-          <RangeNumberField
-            help="Entropy bonus weight for exploration."
-            label="Entropy coefficient"
-            max={0.05}
-            min={0}
-            numberStep="0.0001"
-            rangeStep={0.001}
-            ticks={[
-              { value: 0, label: "0" },
-              { value: 0.025, label: ".025" },
-              { value: 0.05, label: ".05" },
-            ]}
-            resetValue={defaultConfig.train.ent_coef}
-            value={config.train.ent_coef}
-            onChange={(value) => updateTrain({ ent_coef: value })}
-          />
+          <div className="grid gap-2">
+            <BooleanField
+              help="Toggle PPO entropy bonuses for the active action groups. Per-action coefficients live in the Action tab."
+              label="Entropy bonus"
+              value={entropyEnabled}
+              onChange={setEntropyEnabled}
+            />
+            <Button className="justify-self-start px-3" onClick={onOpenActionEntropy}>
+              Action entropy
+            </Button>
+          </div>
           <RangeNumberField
             help="Value-loss coefficient."
             label="Value coefficient"
@@ -311,7 +329,6 @@ function optimizationDefaults(
   return {
     clip_range: train.clip_range,
     clip_range_vf: train.clip_range_vf,
-    ent_coef: train.ent_coef,
     gae_lambda: train.gae_lambda,
     learning_rate: train.learning_rate,
     vf_coef: train.vf_coef,

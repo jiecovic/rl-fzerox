@@ -11,6 +11,8 @@ interface EntropyGroup {
   label: string;
 }
 
+const defaultEntropyCoefficient = 0.01;
+
 interface EntropyGroupWeightsPanelProps {
   action: ManagedRunConfig["action"];
   defaultTrain: ManagedRunConfig["train"];
@@ -29,44 +31,45 @@ export function EntropyGroupWeightsPanel({
     return null;
   }
 
-  const explicitWeights = train.entropy_group_weights;
-  const usesDefaultWeights = Object.keys(explicitWeights).length === 0;
-  const weightFor = (key: string) => explicitWeights[key] ?? 1;
+  const coefficients = train.entropy_coefficients;
+  const usesDefaultCoefficients = groups.every(
+    (group) => coefficientFor(train, group.key) === coefficientFor(defaultTrain, group.key),
+  );
 
-  function updateGroupWeight(key: string, value: number) {
+  function updateGroupCoefficient(key: string, value: number) {
     updateTrain({
-      entropy_group_weights: normalizedEntropyWeights(groups, {
-        ...currentEntropyWeights(groups, train),
+      entropy_coefficients: {
+        ...coefficients,
         [key]: Math.max(0, value),
-      }),
+      },
     });
   }
 
   return (
     <ConfigPanel
-      title="Entropy groups"
+      title="Entropy coefficients"
       wide
-      onReset={() => updateTrain({ entropy_group_weights: defaultTrain.entropy_group_weights })}
+      onReset={() => updateTrain({ entropy_coefficients: defaultTrain.entropy_coefficients })}
     >
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2 text-sm text-app-text-muted">
-          <span>Per-action multipliers for the global PPO entropy coefficient.</span>
+          <span>Per-action PPO entropy coefficients.</span>
           <HelpTooltipButton
-            label="Entropy groups"
-            text="sb3x stays action-oblivious here. rl-fzerox names each action branch and passes generic entropy weights into PPO."
+            label="Entropy coefficients"
+            text="rl-fzerox stores effective per-action coefficients, then adapts them to sb3x group entropy weights at launch."
           />
           <strong className="text-app-text">
-            {usesDefaultWeights ? "standard PPO entropy" : "custom weights"}
+            {usesDefaultCoefficients ? "default coefficients" : "custom coefficients"}
           </strong>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {groups.map((group) => {
-            const weight = weightFor(group.key);
-            const enabled = weight > 0;
-            const effectiveEntCoef = enabled ? train.ent_coef * weight : 0;
+            const coefficient = coefficientFor(train, group.key);
+            const defaultCoefficient = coefficientFor(defaultTrain, group.key);
+            const enabled = coefficient > 0;
             return (
               <section
-                aria-label={`${group.label} entropy group`}
+                aria-label={`${group.label} entropy coefficient`}
                 className="grid grid-cols-[minmax(0,1fr)_minmax(9ch,14ch)] items-end gap-3 border border-app-border bg-app-surface p-3"
                 key={group.key}
               >
@@ -74,23 +77,20 @@ export function EntropyGroupWeightsPanel({
                   help={`Include ${group.label} entropy in the PPO entropy bonus.`}
                   label={group.label}
                   value={enabled}
-                  onChange={(nextEnabled) => updateGroupWeight(group.key, nextEnabled ? 1 : 0)}
+                  onChange={(nextEnabled) =>
+                    updateGroupCoefficient(group.key, nextEnabled ? defaultCoefficient : 0)
+                  }
                 />
                 <fieldset className="dependent-fieldset" disabled={!enabled}>
                   <NumberField
-                    help={`Multiplier for ${group.label} entropy before the global entropy coefficient is applied.`}
-                    label="Multiplier"
-                    step="0.1"
-                    value={enabled ? weight : 0}
-                    onChange={(value) => updateGroupWeight(group.key, value)}
+                    help={`Effective PPO entropy coefficient for ${group.label}.`}
+                    label="Coefficient"
+                    resetValue={defaultCoefficient}
+                    step="0.001"
+                    value={enabled ? coefficient : 0}
+                    onChange={(value) => updateGroupCoefficient(group.key, value)}
                   />
                 </fieldset>
-                <div className="col-span-2 flex items-baseline justify-between gap-3 border-app-border border-t pt-2 text-xs text-app-muted">
-                  <span>Effective coeff</span>
-                  <strong className="font-mono text-app-text">
-                    {formatEntropyCoefficient(effectiveEntCoef)}
-                  </strong>
-                </div>
               </section>
             );
           })}
@@ -100,33 +100,11 @@ export function EntropyGroupWeightsPanel({
   );
 }
 
-function currentEntropyWeights(
-  groups: EntropyGroup[],
-  train: ManagedRunConfig["train"],
-): Record<string, number> {
-  return Object.fromEntries(
-    groups.map((group) => [group.key, train.entropy_group_weights[group.key] ?? 1]),
-  );
+export function coefficientFor(train: ManagedRunConfig["train"], key: string): number {
+  return train.entropy_coefficients[key] ?? defaultEntropyCoefficient;
 }
 
-function normalizedEntropyWeights(
-  groups: EntropyGroup[],
-  weights: Record<string, number>,
-): Record<string, number> {
-  const normalized = Object.fromEntries(
-    groups.map((group) => [group.key, Math.max(0, weights[group.key] ?? 0)]),
-  );
-  return Object.values(normalized).every((value) => value === 1) ? {} : normalized;
-}
-
-function formatEntropyCoefficient(value: number): string {
-  if (value === 0) {
-    return "0";
-  }
-  return value.toExponential(2);
-}
-
-function actionEntropyGroups(action: ManagedRunConfig["action"]): EntropyGroup[] {
+export function actionEntropyGroups(action: ManagedRunConfig["action"]): EntropyGroup[] {
   const groups: EntropyGroup[] = [];
   if (action.steering_mode === "continuous") {
     groups.push({ key: "steer", label: "Steer" });

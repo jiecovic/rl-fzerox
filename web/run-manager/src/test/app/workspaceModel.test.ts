@@ -88,9 +88,9 @@ describe("workspace draft editor config baseline", () => {
       ...managedRunConfigFixture,
       train: {
         ...managedRunConfigFixture.train,
-        entropy_group_weights: {
-          ...managedRunConfigFixture.train.entropy_group_weights,
-          air_brake: 3,
+        entropy_coefficients: {
+          ...managedRunConfigFixture.train.entropy_coefficients,
+          air_brake: 0.093,
         },
       },
     };

@@ -528,7 +528,12 @@ export function Configurator({
         />
       ) : null}
       {section === "training" ? (
-        <TrainingSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
+        <TrainingSection
+          config={config}
+          defaultConfig={baseConfig}
+          setConfig={setConfig}
+          onOpenActionEntropy={() => setSection("action")}
+        />
       ) : null}
       {section === "observation" ? (
         <ObservationSection

@@ -19,6 +19,7 @@ from rl_fzerox.core.manager.projection.observations import (
 from rl_fzerox.core.manager.projection.policy import build_policy_data
 from rl_fzerox.core.manager.projection.tracks import build_track_sampling_data
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.manager.run_spec.sections.training import DEFAULT_ENTROPY_COEFFICIENT
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
 
@@ -151,7 +152,7 @@ def train_data(config: ManagedRunConfig, *, run_id: str, run_dir: Path) -> dict[
         "gae_lambda": train.gae_lambda,
         "clip_range": train.clip_range,
         "clip_range_vf": train.clip_range_vf,
-        "ent_coef": train.ent_coef,
+        "ent_coef": 1.0,
         "vf_coef": train.vf_coef,
         "max_grad_norm": train.max_grad_norm,
         "normalize_advantage": train.normalize_advantage,
@@ -177,9 +178,8 @@ def train_data(config: ManagedRunConfig, *, run_id: str, run_dir: Path) -> dict[
 def _entropy_group_weights(config: ManagedRunConfig) -> dict[str, float]:
     action_groups = set(continuous_action_axes(config)) | set(discrete_action_axes(config))
     return {
-        name: float(weight)
-        for name, weight in config.train.entropy_group_weights.items()
-        if name in action_groups
+        name: float(config.train.entropy_coefficients.get(name, DEFAULT_ENTROPY_COEFFICIENT))
+        for name in action_groups
     }
 
 
