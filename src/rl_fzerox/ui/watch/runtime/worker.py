@@ -66,7 +66,7 @@ from rl_fzerox.ui.watch.runtime.policy.visualization import (
 from rl_fzerox.ui.watch.runtime.session import (
     open_watch_runtime_session,
 )
-from rl_fzerox.ui.watch.runtime.snapshots import (
+from rl_fzerox.ui.watch.runtime.snapshots.build import (
     _build_snapshot,
     _next_boost_lamp_level,
     _publish_step_snapshots,

@@ -8,7 +8,7 @@ from rl_fzerox.ui.watch.runtime.policy.cnn import (
     CnnActivationSampler,
     CnnActivationSnapshot,
 )
-from rl_fzerox.ui.watch.runtime.snapshots import (
+from rl_fzerox.ui.watch.runtime.snapshots.observation import (
     _policy_auxiliary_state_predictions,
     _policy_auxiliary_state_targets,
 )

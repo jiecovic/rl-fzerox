@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/watch/runtime/snapshots.py
+# src/rl_fzerox/ui/watch/runtime/snapshots/build.py
 from __future__ import annotations
 
 import time
@@ -12,21 +12,15 @@ from fzerox_emulator.arrays import (
     DisplayFrames,
     Pcm16Samples,
     RgbFrame,
-    StateVector,
 )
-from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.policy.auxiliary_state import (
-    AuxiliaryStateTargetName,
-    auxiliary_state_target_values,
-)
+from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.ipc import (
-    PolicyObservationSnapshot,
     WatchSnapshot,
     WorkerMessageQueue,
     publish_worker_message,
@@ -39,6 +33,18 @@ from rl_fzerox.ui.watch.runtime.policy.runner import (
     _policy_label,
     _policy_num_timesteps,
     _policy_reload_age_seconds,
+)
+from rl_fzerox.ui.watch.runtime.snapshots.frames import (
+    _audio_chunks_for_frames,
+    _display_controller_states,
+    _display_frames_or_fallback,
+    _recording_frame_info,
+)
+from rl_fzerox.ui.watch.runtime.snapshots.observation import (
+    _policy_auxiliary_state_predictions,
+    _policy_auxiliary_state_targets,
+    _policy_observation_shape,
+    _policy_observation_snapshot,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import (
     TelemetryReader,
@@ -253,91 +259,6 @@ def _publish_step_snapshots(
             time.sleep(frame_interval_seconds)
 
 
-def _display_frames_or_fallback(
-    display_frames: DisplayFrames,
-    *,
-    fallback: RgbFrame,
-) -> DisplayFrames:
-    if isinstance(display_frames, tuple):
-        return display_frames if display_frames else (fallback,)
-    return display_frames if len(display_frames) > 0 else (fallback,)
-
-
-def _display_controller_states(
-    display_controller_masks: ControllerMaskBatch,
-    *,
-    frames: DisplayFrames,
-    fallback_previous: RaceControlState,
-    fallback_final: RaceControlState,
-) -> tuple[tuple[RaceControlState, ...], bool]:
-    frame_count = len(frames)
-    masks = tuple(int(mask) for mask in display_controller_masks)
-    if len(masks) != frame_count:
-        return (
-            tuple(
-                fallback_final if index == frame_count - 1 else fallback_previous
-                for index in range(frame_count)
-            ),
-            False,
-        )
-    return (
-        tuple(
-            RaceControlState.from_mask(
-                mask,
-                stick_x=fallback_final.stick_x,
-                pitch=fallback_final.pitch,
-            )
-            for mask in masks
-        ),
-        True,
-    )
-
-
-def _recording_frame_info(
-    info: dict[str, object],
-    *,
-    control_state: RaceControlState,
-    render_input_hud: bool,
-    policy_active: bool,
-) -> dict[str, object]:
-    if not render_input_hud or not policy_active:
-        return info
-    return {
-        **info,
-        "watch_recording_input_hud": True,
-        "watch_recording_input_gas": control_state.gas,
-        "watch_recording_input_boost": control_state.boost,
-        "watch_recording_input_air_brake": control_state.air_brake,
-        "watch_recording_input_lean_left": control_state.lean_left,
-        "watch_recording_input_lean_right": control_state.lean_right,
-        "watch_recording_input_stick_x": control_state.stick_x,
-        "watch_recording_input_pitch": control_state.pitch,
-    }
-
-
-def _audio_chunks_for_frames(
-    audio_samples: Pcm16Samples,
-    audio_frame_counts: AudioFrameCounts,
-    *,
-    frame_count: int,
-) -> tuple[Pcm16Samples, ...]:
-    empty = tuple(() for _ in range(frame_count))
-    if len(audio_samples) == 0:
-        return empty
-    counts = tuple(int(count) for count in audio_frame_counts)
-    if len(counts) != frame_count or any(count < 0 for count in counts):
-        return empty
-    chunks: list[Pcm16Samples] = []
-    offset = 0
-    for count in counts:
-        sample_count = count * 2
-        chunks.append(audio_samples[offset : offset + sample_count])
-        offset += sample_count
-    if offset != len(audio_samples):
-        return empty
-    return tuple(chunks)
-
-
 def _build_snapshot(
     *,
     config: WatchAppConfig,
@@ -449,87 +370,6 @@ def _build_snapshot(
     )
 
 
-def _policy_observation_snapshot(
-    *,
-    config: WatchAppConfig,
-    observation: ObservationValue | None,
-    telemetry: FZeroXTelemetry | None,
-    info: dict[str, object],
-) -> PolicyObservationSnapshot | None:
-    if observation is None:
-        return None
-    return PolicyObservationSnapshot(
-        image=observation_access.observation_image(observation),
-        state=observation_access.observation_state(observation),
-        state_reference=_reference_observation_state(
-            config=config,
-            observation=observation,
-            telemetry=telemetry,
-            info=info,
-        ),
-    )
-
-
-def _policy_observation_shape(
-    config: WatchAppConfig,
-    observation: ObservationValue | None,
-) -> tuple[int, ...] | None:
-    del config
-    if observation is not None:
-        return tuple(
-            int(value) for value in observation_access.observation_image(observation).shape
-        )
-    return None
-
-
-def _reference_observation_state(
-    *,
-    config: WatchAppConfig,
-    observation: ObservationValue,
-    telemetry: FZeroXTelemetry | None,
-    info: dict[str, object],
-) -> StateVector | None:
-    observed_state = observation_access.observation_state(observation)
-    if config.env.observation.mode != "image_state":
-        return observed_state
-    state_components = config.env.observation.state_components_data()
-    if state_components is None:
-        return observed_state
-    return observation_access.telemetry_state_vector(
-        telemetry,
-        state_components=state_components,
-        action_history=_reference_action_history(
-            observed_state=observed_state,
-            info=info,
-        ),
-        split_lean_history=config.env.action.runtime().split_lean_history,
-    )
-
-
-def _reference_action_history(
-    *,
-    observed_state: StateVector | None,
-    info: dict[str, object],
-) -> dict[str, float]:
-    if observed_state is None:
-        return {}
-    raw_feature_names = info.get("observation_state_features")
-    if isinstance(raw_feature_names, list):
-        feature_names = tuple(str(name) for name in raw_feature_names)
-    elif isinstance(raw_feature_names, tuple):
-        feature_names = tuple(str(name) for name in raw_feature_names)
-    else:
-        return {}
-    flat_state = observed_state.reshape(-1)
-    if len(feature_names) != int(flat_state.size):
-        return {}
-    return {
-        name.removeprefix("control_history."): float(value)
-        for name, value in zip(feature_names, flat_state, strict=True)
-        if name.startswith("control_history.")
-    }
-
-
 def _continuous_air_brake_disabled(
     config: WatchAppConfig,
     telemetry: FZeroXTelemetry | None,
@@ -537,31 +377,6 @@ def _continuous_air_brake_disabled(
     if config.env.action.runtime().continuous_air_brake_mode != "disable_on_ground":
         return False
     return telemetry is not None and not telemetry.player.airborne
-
-
-def _policy_auxiliary_state_predictions(
-    *,
-    policy_runner: PolicyRunner | None,
-    observation: ObservationValue,
-    target_names: tuple[AuxiliaryStateTargetName, ...],
-) -> dict[str, object] | None:
-    if policy_runner is None:
-        return None
-    return policy_runner.auxiliary_state_predictions(
-        observation,
-        target_names=target_names,
-    )
-
-
-def _policy_auxiliary_state_targets(
-    telemetry: FZeroXTelemetry | None,
-    *,
-    target_names: tuple[AuxiliaryStateTargetName, ...],
-) -> dict[str, object]:
-    if telemetry is None:
-        return {}
-    all_targets = auxiliary_state_target_values(telemetry)
-    return {str(name): value for name, value in all_targets.items() if name in target_names}
 
 
 def _next_boost_lamp_level(

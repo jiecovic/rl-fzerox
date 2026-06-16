@@ -22,7 +22,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.timing import (
     with_measured_game_fps,
 )
 from rl_fzerox.ui.watch.runtime.ipc import publish_worker_message
-from rl_fzerox.ui.watch.runtime.snapshots import _build_snapshot
+from rl_fzerox.ui.watch.runtime.snapshots.build import _build_snapshot
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
 
 

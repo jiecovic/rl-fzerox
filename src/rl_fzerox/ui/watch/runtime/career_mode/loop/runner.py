@@ -81,7 +81,7 @@ from rl_fzerox.ui.watch.runtime.policy.visualization import (
 from rl_fzerox.ui.watch.runtime.policy.visualization import (
     refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
-from rl_fzerox.ui.watch.runtime.snapshots import _build_snapshot
+from rl_fzerox.ui.watch.runtime.snapshots.build import _build_snapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
 from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,

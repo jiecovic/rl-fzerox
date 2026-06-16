@@ -41,7 +41,7 @@ from rl_fzerox.ui.watch.runtime.policy.visualization import (
 from rl_fzerox.ui.watch.runtime.policy.visualization import (
     current_auxiliary_targets as _current_auxiliary_targets,
 )
-from rl_fzerox.ui.watch.runtime.snapshots import (
+from rl_fzerox.ui.watch.runtime.snapshots.build import (
     _next_boost_lamp_level,
     _publish_step_snapshots,
 )
