@@ -13,7 +13,7 @@ from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
-def test_career_policy_resolver_pins_artifacts_on_start(
+def test_career_policy_resolver_preloads_and_refreshes_cached_artifacts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -58,10 +58,22 @@ def test_career_policy_resolver_pins_artifacts_on_start(
     assert loaded == []
     assert resolution is not None
     assert resolution.control.runner is runners[("run-a", "latest")]
+    assert runners[("run-a", "latest")].refresh_count == 0
+
+    refreshed_resolution = resolver.resolve({"course_index": 0}, refresh_artifact=True)
+
+    assert loaded == []
+    assert refreshed_resolution is not None
+    assert refreshed_resolution.control.runner is runners[("run-a", "latest")]
+    assert runners[("run-a", "latest")].refresh_count == 1
 
 
 class _PolicyRunnerStub:
-    pass
+    def __init__(self) -> None:
+        self.refresh_count = 0
+
+    def refresh(self) -> None:
+        self.refresh_count += 1
 
 
 class _PolicyRunStore:

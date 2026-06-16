@@ -76,9 +76,27 @@ def career_viewer_info(
         )
     )
     if active_policy_control is not None:
+        policy_runner = active_policy_control.runner
         viewer_info.update(
             {
                 "career_mode_policy_artifact": active_policy_control.course_setup.policy_artifact,
+                "career_mode_policy_checkpoint_local_num_timesteps": (
+                    policy_runner.checkpoint_local_num_timesteps
+                ),
+                "career_mode_policy_checkpoint_mtime_ns": (
+                    policy_runner.checkpoint_policy_mtime_ns
+                ),
+                "career_mode_policy_checkpoint_mtime_utc": (
+                    policy_runner.checkpoint_policy_mtime_utc
+                ),
+                "career_mode_policy_checkpoint_num_timesteps": (
+                    policy_runner.checkpoint_num_timesteps
+                ),
+                "career_mode_policy_checkpoint_path": str(policy_runner.checkpoint_policy_path),
+                "career_mode_policy_checkpoint_stage": (policy_runner.checkpoint_curriculum_stage),
+                "career_mode_policy_checkpoint_stage_index": (
+                    policy_runner.checkpoint_curriculum_stage_index
+                ),
                 "career_mode_policy_run_id": active_policy_control.policy_run.id,
                 "career_mode_policy_run_name": active_policy_control.policy_run.name,
                 "career_mode_policy_course_id": (

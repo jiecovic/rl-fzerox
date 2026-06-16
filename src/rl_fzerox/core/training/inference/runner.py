@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol, TypeGuard
 
@@ -127,6 +128,24 @@ class PolicyRunner:
         """Return checkpoint timesteps local to the loaded run."""
 
         return self._loaded_policy.num_timesteps
+
+    @property
+    def checkpoint_policy_path(self) -> Path:
+        """Return the concrete policy checkpoint path currently loaded."""
+
+        return self._loaded_policy.policy_path
+
+    @property
+    def checkpoint_policy_mtime_ns(self) -> int:
+        """Return the file mtime for the concrete policy checkpoint."""
+
+        return self._policy_mtime_ns
+
+    @property
+    def checkpoint_policy_mtime_utc(self) -> str:
+        """Return the checkpoint file mtime as an ISO-8601 UTC timestamp."""
+
+        return _mtime_utc(self._loaded_policy.policy_path)
 
     @property
     def supports_action_masks(self) -> bool:
@@ -340,3 +359,11 @@ def _policy_auxiliary_state_predictor(policy: object) -> _AuxiliaryStatePredicto
 
 def _has_auxiliary_state_predictor(policy: object) -> TypeGuard[_AuxiliaryStatePredictor]:
     return callable(getattr(policy, "predict_auxiliary_state", None))
+
+
+def _mtime_utc(path: Path) -> str:
+    return (
+        datetime.fromtimestamp(path.stat().st_mtime, UTC)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )

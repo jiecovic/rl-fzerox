@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -105,6 +106,54 @@ def test_no_active_attempt_rejects_menu_navigation(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="no active save attempt"):
         controller.next_raw_step(
             info={"game_mode": "gp_race", "termination_reason": "finished"},
+        )
+
+
+def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path) -> None:
+    controller = _controller(tmp_path)
+    resolver = _PolicyResolverStub()
+    controller.__dict__["_policy_resolver"] = resolver
+
+    assert (
+        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
+    )
+    assert resolver.refresh_requests == [False]
+
+    controller._remember_finished_attempt(
+        SimpleNamespace(
+            finished_attempt_id="attempt-a",
+            finished_status="failed",
+            finished_failure_reason=None,
+        )
+    )
+
+    assert (
+        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
+    )
+    assert resolver.refresh_requests == [False, True]
+
+    assert (
+        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
+    )
+    assert resolver.refresh_requests == [False, True, False]
+
+
+class _PolicyResolverStub:
+    def __init__(self) -> None:
+        self.refresh_requests: list[bool] = []
+
+    def resolve(
+        self,
+        info: dict[str, object],
+        *,
+        refresh_artifact: bool = False,
+    ) -> object:
+        del info
+        self.refresh_requests.append(refresh_artifact)
+        return SimpleNamespace(
+            activated_new_policy=False,
+            camera_setting=None,
+            control="control",
         )
 
 

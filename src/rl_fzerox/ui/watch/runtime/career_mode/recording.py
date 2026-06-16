@@ -137,6 +137,7 @@ class _SegmentSummarySnapshot:
     frame_count: int
     course_results: tuple[dict[str, object], ...]
     final_info: dict[str, object]
+    policy_checkpoints: tuple[dict[str, object], ...] = ()
 
 
 @dataclass(slots=True)
@@ -149,7 +150,9 @@ class _SegmentSummaryBuilder:
     status: str | None = None
     final_info: dict[str, object] | None = None
     course_results: list[dict[str, object]] = field(default_factory=list)
+    policy_checkpoints: list[dict[str, object]] = field(default_factory=list)
     last_course_result_signature: tuple[object, ...] | None = None
+    last_policy_checkpoint_signature: tuple[object, ...] | None = None
 
     def observe(self, info: Mapping[str, object]) -> None:
         self.frame_count += 1
@@ -160,13 +163,19 @@ class _SegmentSummaryBuilder:
             self.status = status
         self.final_info = _selected_summary_info(info)
         course_result = _course_result(info)
-        if course_result is None:
+        if course_result is not None:
+            signature = _course_result_signature(course_result)
+            if signature != self.last_course_result_signature:
+                self.course_results.append(course_result)
+                self.last_course_result_signature = signature
+        policy_checkpoint = _policy_checkpoint_summary(info)
+        if policy_checkpoint is None:
             return
-        signature = _course_result_signature(course_result)
-        if signature == self.last_course_result_signature:
+        signature = _policy_checkpoint_signature(policy_checkpoint)
+        if signature == self.last_policy_checkpoint_signature:
             return
-        self.course_results.append(course_result)
-        self.last_course_result_signature = signature
+        self.policy_checkpoints.append(policy_checkpoint)
+        self.last_policy_checkpoint_signature = signature
 
     def snapshot(self, *, source_path: Path, status: str | None) -> _SegmentSummarySnapshot:
         return _SegmentSummarySnapshot(
@@ -179,6 +188,7 @@ class _SegmentSummaryBuilder:
             closed_at_utc=_utc_timestamp(),
             frame_count=self.frame_count,
             course_results=tuple(dict(result) for result in self.course_results),
+            policy_checkpoints=tuple(dict(checkpoint) for checkpoint in self.policy_checkpoints),
             final_info=dict(self.final_info or {}),
         )
 
@@ -224,6 +234,7 @@ class CareerModeFrameRecorder:
         self._segment_path: Path | None = None
         self._segment_summary: _SegmentSummaryBuilder | None = None
         self._segment_index = 0
+        self._last_closed_finished_attempt_id: str | None = None
         self._previous_input_hud_info: dict[str, object] | None = None
 
     def record_frame(
@@ -264,12 +275,19 @@ class CareerModeFrameRecorder:
             self._segment_writer.write(segment_frame)
             self._segment_writer.write_audio(audio_samples)
             if close_after_frame:
+                if self._segment_status is None:
+                    self._segment_status = self._cup_segment_exit_status(info)
                 self._close_segment_writer()
 
     def record_event(self, *, info: Mapping[str, object]) -> None:
         self._update_segment_status(info)
         if self._segment_summary is not None:
             self._segment_summary.observe_event(info)
+        if self._current_segment_attempt_finished(info):
+            self._close_segment_writer()
+        elif status := self._cup_segment_exit_status(info):
+            self._segment_status = status
+            self._close_segment_writer()
 
     def _delayed_input_hud_info(self, info: Mapping[str, object]) -> Mapping[str, object]:
         if info.get("watch_recording_input_hud") is not True:
@@ -342,6 +360,8 @@ class CareerModeFrameRecorder:
                 )
             )
             self._finalizer.finalize(self._segment_path, summary=summary)
+        if self._segment_status is not None:
+            self._last_closed_finished_attempt_id = self._segment_attempt_id
         self._clear_segment_state()
 
     def _clear_segment_state(self) -> None:
@@ -407,9 +427,30 @@ class CareerModeFrameRecorder:
                 label=self._segment_label,
                 attempt_id=self._segment_attempt_id,
             )
+        if (
+            _post_gp_exit_frame(info)
+            and attempt_id is None
+            and self._segment_key is not None
+            and self._segment_label is not None
+        ):
+            return _SegmentIdentity(
+                key=self._segment_key,
+                label=self._segment_label,
+                attempt_id=self._segment_attempt_id,
+            )
         if label is None:
             return None
-        if self._segment_key is None and _continuing_race_result(info):
+        if attempt_id is None and _last_finished_attempt_status(info) is not None:
+            return None
+        if self._segment_key is None and attempt_id is None and _continuing_race_result(info):
+            return None
+        if self._segment_key is None and attempt_id is None and _post_gp_exit_frame(info):
+            return None
+        if (
+            self._segment_key is None
+            and attempt_id == self._last_closed_finished_attempt_id
+            and _continuing_race_result(info)
+        ):
             return None
         key = f"attempt:{attempt_id}" if attempt_id is not None else f"target:{label}"
         return _SegmentIdentity(key=key, label=label, attempt_id=attempt_id)
@@ -443,11 +484,25 @@ class CareerModeFrameRecorder:
         self._close_segment_writer()
 
     def _should_close_finished_segment_after_frame(self, info: Mapping[str, object]) -> bool:
+        if self._cup_segment_exit_status(info) is not None:
+            return True
         if self._segment_status == "failed":
             return _terminal_result(info)
         if self._segment_status == "succeeded":
-            return _post_gp_exit_frame(info)
+            return _terminal_result(info) or _post_gp_exit_frame(info)
         return False
+
+    def _cup_segment_exit_status(self, info: Mapping[str, object]) -> str | None:
+        if not _post_gp_exit_frame(info):
+            return None
+        if self._segment_summary is None:
+            return None
+        result_counts = _segment_result_counts(tuple(self._segment_summary.course_results))
+        if result_counts["failed"] > 0:
+            return "failed"
+        if result_counts["finished"] > 0:
+            return "succeeded"
+        return None
 
     def _next_attempt_started(self, info: Mapping[str, object]) -> bool:
         attempt_id = _attempt_id(info)
@@ -667,6 +722,7 @@ def _segment_summary_payload(
     video_path: Path,
 ) -> dict[str, object]:
     course_results = tuple(dict(result) for result in summary.course_results)
+    policy_checkpoints = tuple(dict(checkpoint) for checkpoint in summary.policy_checkpoints)
     return {
         "kind": "career_segment_summary",
         "schema_version": 1,
@@ -683,6 +739,7 @@ def _segment_summary_payload(
         },
         "result_counts": _segment_result_counts(course_results),
         "courses": course_results,
+        "policy_checkpoints": policy_checkpoints,
         "final": summary.final_info,
     }
 
@@ -703,9 +760,14 @@ def _segment_summary_markdown(payload: Mapping[str, object]) -> str:
         f"- Video: {_summary_text(video_path)}",
         f"- Frames: {_summary_text(frame_count)}",
         "",
-        "## Course results",
-        "",
     ]
+    lines.extend(_policy_checkpoint_markdown_lines(payload))
+    lines.extend(
+        (
+            "## Course results",
+            "",
+        )
+    )
     courses = payload.get("courses")
     if not isinstance(courses, tuple | list) or not courses:
         lines.append("No course terminal results captured.")
@@ -745,6 +807,48 @@ def _segment_summary_markdown(payload: Mapping[str, object]) -> str:
 
 def _segment_summary_path(video_path: Path, suffix: str) -> Path:
     return video_path.with_name(f"{video_path.stem}.summary{suffix}")
+
+
+def _policy_checkpoint_markdown_lines(payload: Mapping[str, object]) -> list[str]:
+    lines = [
+        "## Policy checkpoints",
+        "",
+    ]
+    checkpoints = payload.get("policy_checkpoints")
+    if not isinstance(checkpoints, tuple | list) or not checkpoints:
+        lines.extend(
+            (
+                "No policy checkpoint metadata captured.",
+                "",
+            )
+        )
+        return lines
+    lines.extend(
+        (
+            "| Run | Artifact | Course | Steps | Local steps | Modified | Path |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        )
+    )
+    for checkpoint in checkpoints:
+        if not isinstance(checkpoint, Mapping):
+            continue
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    _summary_text(checkpoint.get("run_name") or checkpoint.get("run_id")),
+                    _summary_text(checkpoint.get("artifact")),
+                    _summary_text(checkpoint.get("course_id")),
+                    _summary_text(checkpoint.get("num_timesteps")),
+                    _summary_text(checkpoint.get("local_num_timesteps")),
+                    _summary_text(checkpoint.get("mtime_utc")),
+                    _summary_text(checkpoint.get("path")),
+                )
+            )
+            + " |"
+        )
+    lines.append("")
+    return lines
 
 
 def _segment_result_counts(course_results: tuple[dict[str, object], ...]) -> dict[str, int]:
@@ -832,6 +936,44 @@ def _course_result_signature(result: Mapping[str, object]) -> tuple[object, ...]
     )
 
 
+def _policy_checkpoint_summary(info: Mapping[str, object]) -> dict[str, object] | None:
+    path = _str_info(info, "career_mode_policy_checkpoint_path")
+    if path is None:
+        return None
+    summary: dict[str, object] = {"path": path}
+    for key, output_key in (
+        ("career_mode_policy_run_id", "run_id"),
+        ("career_mode_policy_run_name", "run_name"),
+        ("career_mode_policy_artifact", "artifact"),
+        ("career_mode_policy_course_id", "course_id"),
+        ("career_mode_policy_checkpoint_num_timesteps", "num_timesteps"),
+        ("career_mode_policy_checkpoint_local_num_timesteps", "local_num_timesteps"),
+        ("career_mode_policy_checkpoint_mtime_utc", "mtime_utc"),
+        ("career_mode_policy_checkpoint_mtime_ns", "mtime_ns"),
+        ("career_mode_policy_checkpoint_stage", "stage"),
+        ("career_mode_policy_checkpoint_stage_index", "stage_index"),
+    ):
+        if key not in info:
+            continue
+        summary[output_key] = _summary_json_value(info[key])
+    return summary
+
+
+def _policy_checkpoint_signature(checkpoint: Mapping[str, object]) -> tuple[object, ...]:
+    return tuple(
+        checkpoint.get(key)
+        for key in (
+            "run_id",
+            "artifact",
+            "course_id",
+            "path",
+            "mtime_ns",
+            "num_timesteps",
+            "local_num_timesteps",
+        )
+    )
+
+
 def _summary_json_value(value: object) -> object:
     if value is None or isinstance(value, str | int | float | bool):
         return value
@@ -866,6 +1008,17 @@ _SUMMARY_INFO_FIELDS = (
     "career_mode_last_finished_attempt_failure_reason",
     "career_mode_fsm_observed_screen",
     "career_mode_fsm_terminal_reason",
+    "career_mode_policy_artifact",
+    "career_mode_policy_checkpoint_local_num_timesteps",
+    "career_mode_policy_checkpoint_mtime_ns",
+    "career_mode_policy_checkpoint_mtime_utc",
+    "career_mode_policy_checkpoint_num_timesteps",
+    "career_mode_policy_checkpoint_path",
+    "career_mode_policy_checkpoint_stage",
+    "career_mode_policy_checkpoint_stage_index",
+    "career_mode_policy_course_id",
+    "career_mode_policy_run_id",
+    "career_mode_policy_run_name",
     "game_mode",
     "game_mode_name",
     "track_id",
@@ -949,6 +1102,7 @@ _POST_GP_EXIT_MODES = frozenset(
         "title",
         "main_menu",
         "course_select",
+        "game_over",
     }
 )
 

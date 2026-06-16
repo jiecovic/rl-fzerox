@@ -67,13 +67,21 @@ class CareerPolicyResolver:
         self._active_policy_key = None
         self._preload_policy_cache(self._course_setups)
 
-    def resolve(self, info: dict[str, object]) -> CareerPolicyResolution | None:
+    def resolve(
+        self,
+        info: dict[str, object],
+        *,
+        refresh_artifact: bool = False,
+    ) -> CareerPolicyResolution | None:
         course_setup = self.resolve_course_setup(info)
         if course_setup is None:
             return None
 
         key = (course_setup.policy_run_id, course_setup.policy_artifact)
-        loaded_policy = self._load_policy(course_setup)
+        loaded_policy = self._load_policy(
+            course_setup,
+            refresh_artifact=refresh_artifact,
+        )
 
         activated_new_policy = key != self._active_policy_key
         if activated_new_policy:
@@ -119,10 +127,17 @@ class CareerPolicyResolver:
         for course_setup in course_setups:
             self._load_policy(course_setup)
 
-    def _load_policy(self, course_setup: ManagedSaveCourseSetup) -> _LoadedPolicy:
+    def _load_policy(
+        self,
+        course_setup: ManagedSaveCourseSetup,
+        *,
+        refresh_artifact: bool = False,
+    ) -> _LoadedPolicy:
         key = (course_setup.policy_run_id, course_setup.policy_artifact)
         loaded_policy = self._policy_cache.get(key)
         if loaded_policy is not None:
+            if refresh_artifact:
+                loaded_policy.runner.refresh()
             return loaded_policy
 
         policy_run = self._required_policy_run(course_setup.policy_run_id)

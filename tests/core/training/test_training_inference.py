@@ -522,6 +522,24 @@ def test_policy_runner_prefers_lineage_checkpoint_timesteps(tmp_path: Path) -> N
     assert runner.checkpoint_local_num_timesteps == 660_000
 
 
+def test_policy_runner_exposes_loaded_checkpoint_path_and_time(tmp_path: Path) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    os.utime(policy_path, ns=(1_765_275_200_000_000_000, 1_765_275_200_000_000_000))
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        _FakePolicy([2, 0]),
+    )
+
+    assert runner.checkpoint_policy_path == policy_path
+    assert runner.checkpoint_policy_mtime_ns == 1_765_275_200_000_000_000
+    assert runner.checkpoint_policy_mtime_utc == "2025-12-09T10:13:20Z"
+
+
 def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"

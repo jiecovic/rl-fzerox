@@ -110,6 +110,7 @@ class CareerModeController:
         self._last_finished_attempt_id: str | None = None
         self._last_finished_attempt_status: SaveAttemptStatus | None = None
         self._last_finished_attempt_failure_reason: str | None = None
+        self._refresh_policy_artifact_on_next_handoff = False
         self._policy_resolver = CareerPolicyResolver(
             store=store,
             setup=self._setup,
@@ -206,7 +207,7 @@ class CareerModeController:
                         1,
                         phase="continue_after_race:wait_for_fresh_race",
                     )
-                if self._resolve_policy_control(info) is None:
+                if self._resolve_policy_control(info, refresh_artifact=True) is None:
                     return self._wait_for_policy_resolution()
                 if camera_step := self._next_camera_sync_step(info):
                     return camera_step
@@ -240,7 +241,7 @@ class CareerModeController:
                     1,
                     phase="enter_race:wait_for_fresh_race",
                 )
-            if self._resolve_policy_control(info) is None:
+            if self._resolve_policy_control(info, refresh_artifact=True) is None:
                 return self._wait_for_policy_resolution()
             if camera_step := self._next_camera_sync_step(info):
                 return camera_step
@@ -340,7 +341,7 @@ class CareerModeController:
                     self._advance_presses_in_phase = 0
                     if facts.terminal_race_result:
                         return self._continue_terminal_race_result_step()
-                    if self._resolve_policy_control(info) is None:
+                    if self._resolve_policy_control(info, refresh_artifact=True) is None:
                         return self._wait_for_policy_resolution()
                     if camera_step := self._next_camera_sync_step(info):
                         return camera_step
@@ -441,10 +442,18 @@ class CareerModeController:
     def _resolve_policy_control(
         self,
         info: dict[str, object],
+        *,
+        refresh_artifact: bool = False,
     ) -> CareerModePolicyControl | None:
-        resolution = self._policy_resolver.resolve(info)
+        should_refresh_artifact = refresh_artifact and self._refresh_policy_artifact_on_next_handoff
+        resolution = self._policy_resolver.resolve(
+            info,
+            refresh_artifact=should_refresh_artifact,
+        )
         if resolution is None:
             return None
+        if should_refresh_artifact:
+            self._refresh_policy_artifact_on_next_handoff = False
         if resolution.activated_new_policy:
             self._camera.set_target(resolution.camera_setting)
         return resolution.control
@@ -763,6 +772,7 @@ class CareerModeController:
         self._last_finished_attempt_failure_reason = (
             failure_reason if isinstance(failure_reason, str) else None
         )
+        self._refresh_policy_artifact_on_next_handoff = True
 
     def _apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:
         self._progress.apply_execution_plan(plan)

@@ -619,6 +619,7 @@ def _run_career_mode_loop_body(
                     info=info,
                     active_policy_control=active_policy_control,
                 )
+                _record_terminal_event(frame_recorder=frame_recorder, info=info)
                 reset_info = dict(info)
                 if not controller.has_active_attempt():
                     publish_snapshot(policy_visible=False)
@@ -636,7 +637,11 @@ def _run_career_mode_loop_body(
                 if not terminal_handled and not in_gp_race(info):
                     raise RuntimeError("Career Mode left a race before observing a game result")
                 if terminal_handled:
-                    _record_terminal_event(frame_recorder=frame_recorder, info=info)
+                    terminal_info = controller.viewer_info(
+                        info=info,
+                        active_policy_control=active_policy_control,
+                    )
+                    _record_terminal_event(frame_recorder=frame_recorder, info=terminal_info)
                     track_record_book = track_record_book.update(
                         info,
                         current_telemetry,
@@ -848,7 +853,11 @@ def _run_career_mode_loop_body(
                     info=info,
                 )
                 if terminal_handled and not controller.policy_owns_control():
-                    _record_terminal_event(frame_recorder=frame_recorder, info=info)
+                    terminal_info = controller.viewer_info(
+                        info=info,
+                        active_policy_control=active_policy_control,
+                    )
+                    _record_terminal_event(frame_recorder=frame_recorder, info=terminal_info)
                     track_record_book = track_record_book.update(
                         info,
                         current_telemetry,
