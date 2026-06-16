@@ -8,7 +8,8 @@ import pygame
 
 from fzerox_emulator.arrays import Float32Array
 from rl_fzerox.core.training.inference import PolicyCnnActivation
-from rl_fzerox.ui.watch.runtime.cnn import (
+from rl_fzerox.ui.watch.runtime.live.worker import _refresh_paused_cnn_activations
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
     CnnActivationLayer,
     CnnActivationSampler,
     CnnActivationSnapshot,
@@ -16,7 +17,6 @@ from rl_fzerox.ui.watch.runtime.cnn import (
     _activation_layer,
     next_cnn_activation_normalization,
 )
-from rl_fzerox.ui.watch.runtime.worker import _refresh_paused_cnn_activations
 from rl_fzerox.ui.watch.view.panels.visuals.cnn import (
     _layer_page_label,
     _layer_pages,

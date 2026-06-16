@@ -12,8 +12,8 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
-from rl_fzerox.ui.watch.runtime.course_commands import apply_course_navigation_commands
-from rl_fzerox.ui.watch.runtime.course_navigation import WatchCourseRotation
+from rl_fzerox.ui.watch.runtime.courses.commands import apply_course_navigation_commands
+from rl_fzerox.ui.watch.runtime.courses.navigation import WatchCourseRotation
 from rl_fzerox.ui.watch.runtime.ipc import (
     ViewerCommand,
     WatchWorker,
@@ -21,7 +21,7 @@ from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerError,
     drain_worker_commands,
 )
-from rl_fzerox.ui.watch.runtime.worker import (
+from rl_fzerox.ui.watch.runtime.live.worker import (
     _sync_next_watch_reset_after_episode,
     _TimedWatchNotice,
     run_simulation_worker,
@@ -609,11 +609,11 @@ def test_run_simulation_worker_swallows_keyboard_interrupt(
         raise KeyboardInterrupt
 
     monkeypatch.setattr(
-        "rl_fzerox.ui.watch.runtime.worker._run_simulation_loop",
+        "rl_fzerox.ui.watch.runtime.live.worker._run_simulation_loop",
         _raise_keyboard_interrupt,
     )
     monkeypatch.setattr(
-        "rl_fzerox.ui.watch.runtime.worker.publish_worker_message",
+        "rl_fzerox.ui.watch.runtime.live.worker.publish_worker_message",
         lambda _queue, message: published.append(message),
     )
 
@@ -650,11 +650,11 @@ def test_run_simulation_worker_reports_bootstrap_context(
         raise RuntimeError("native load failed")
 
     monkeypatch.setattr(
-        "rl_fzerox.ui.watch.runtime.worker.open_watch_runtime_session",
+        "rl_fzerox.ui.watch.runtime.live.worker.open_watch_runtime_session",
         _raise_bootstrap_error,
     )
     monkeypatch.setattr(
-        "rl_fzerox.ui.watch.runtime.worker.publish_worker_message",
+        "rl_fzerox.ui.watch.runtime.live.worker.publish_worker_message",
         lambda _queue, message: published.append(message),
     )
 

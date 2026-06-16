@@ -20,8 +20,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingMaterializedArtifact,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import reset_variant_key
-from rl_fzerox.ui.watch.runtime.baseline import _save_managed_alt_baseline
-from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
+from rl_fzerox.ui.watch.runtime.courses.baseline import _save_managed_alt_baseline
+from rl_fzerox.ui.watch.runtime.courses.sampling import ManagedTrackSamplingRefresh
 
 
 def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
