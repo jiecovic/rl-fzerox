@@ -193,6 +193,79 @@ def test_step_control_keeps_ground_air_brake_when_configured() -> None:
     assert reward_breakdown["air_brake"] == pytest.approx(-0.2)
 
 
+def test_step_control_holds_discrete_air_brake_pulse() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=5.0, state_labels=("active",)),
+                summary=_step_summary(max_race_distance=5.0, frames_run=2, final_frame_index=2),
+                status=make_step_status(step_count=2),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active",)),
+                summary=_step_summary(max_race_distance=10.0, frames_run=2, final_frame_index=4),
+                status=make_step_status(step_count=4),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=15.0, state_labels=("active",)),
+                summary=_step_summary(max_race_distance=15.0, frames_run=2, final_frame_index=6),
+                status=make_step_status(step_count=6),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=20.0, state_labels=("active",)),
+                summary=_step_summary(max_race_distance=20.0, frames_run=2, final_frame_index=8),
+                status=make_step_status(step_count=8),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=2,
+            action=configured_hybrid_action(
+                continuous_axes=("steer",),
+                discrete_axes=("air_brake", "boost", "lean"),
+                air_brake_pulse_frames=5,
+                mask_air_brake_on_ground=False,
+            ),
+        ),
+        reward_config=RewardConfig(time_penalty_per_frame=0.0),
+    )
+
+    env.reset(seed=21)
+    _, _, _, _, info = env.step_control(RaceControlState(air_brake=True))
+
+    assert backend.last_race_control_state == RaceControlState(air_brake=True)
+    assert info["air_brake_requested"] is True
+    assert info["air_brake_used"] is True
+    assert info["air_brake_pulse_active"] is True
+    assert info["air_brake_pulse_remaining_frames"] == 3
+    assert env.action_mask_branches()["air_brake"] == (True, False)
+
+    _, _, _, _, info = env.step_control(RaceControlState())
+
+    assert backend.last_race_control_state == RaceControlState(air_brake=True)
+    assert info["air_brake_requested"] is False
+    assert info["air_brake_used"] is True
+    assert info["air_brake_pulse_active"] is True
+    assert info["air_brake_pulse_remaining_frames"] == 1
+    assert env.action_mask_branches()["air_brake"] == (True, False)
+
+    _, _, _, _, info = env.step_control(RaceControlState())
+
+    assert backend.last_race_control_state == RaceControlState(air_brake=True)
+    assert info["air_brake_requested"] is False
+    assert info["air_brake_used"] is True
+    assert info["air_brake_pulse_active"] is False
+    assert info["air_brake_pulse_remaining_frames"] == 0
+    assert env.action_mask_branches()["air_brake"] == (True, True)
+
+    env.step_control(RaceControlState())
+
+    assert backend.last_race_control_state == RaceControlState()
+
+
 def test_step_suppresses_air_only_controls_until_airborne() -> None:
     backend = ScriptedStepBackend(
         [

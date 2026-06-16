@@ -41,6 +41,7 @@ class ManagedActionConfig(BaseModel):
     enable_air_brake: bool = True
     mask_air_brake_on_ground: bool = False
     air_brake_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
+    air_brake_pulse_frames: NonNegativeInt = 0
     continuous_air_brake_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
     continuous_air_brake_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
     continuous_air_brake_min_duty: float = Field(default=0.0, ge=0.0, le=1.0)

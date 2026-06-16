@@ -67,6 +67,7 @@ def build_engine_runtime_components(
     control_state = ControlStateTracker(
         lean_mode=action_config.lean_mode,
         lean_initial_lockout_frames=action_config.lean_initial_lockout_frames,
+        air_brake_pulse_frames=action_config.air_brake_pulse_frames,
         boost_decision_interval_frames=action_config.boost_decision_interval_frames,
         boost_request_lockout_frames=action_config.boost_request_lockout_frames,
         action_history_len=observation_builder.action_history_len,

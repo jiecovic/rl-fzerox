@@ -313,6 +313,7 @@ def test_manager_training_bridge_supports_discrete_air_brake_bias(
     config.action.include_air_brake = True
     config.action.air_brake_mode = "on_off"
     config.action.air_brake_episode_mask_probability = 0.5
+    config.action.air_brake_pulse_frames = 12
     config.policy.air_brake_on_logit = 2.0
 
     train_config = build_managed_train_app_config(
@@ -323,6 +324,7 @@ def test_manager_training_bridge_supports_discrete_air_brake_bias(
 
     assert "air_brake" in train_config.env.action.layout_discrete_axes
     assert train_config.env.action.air_brake_episode_mask_probability == pytest.approx(0.5)
+    assert train_config.env.action.air_brake_pulse_frames == 12
     assert train_config.policy.action_bias.air_brake_on_logit == pytest.approx(2.0)
 
 
@@ -333,6 +335,7 @@ def test_manager_training_bridge_ignores_air_brake_bias_without_discrete_branch(
     config.action.include_air_brake = True
     config.action.air_brake_mode = "pwm"
     config.action.air_brake_episode_mask_probability = 0.5
+    config.action.air_brake_pulse_frames = 12
     config.policy.air_brake_on_logit = 2.0
 
     train_config = build_managed_train_app_config(
@@ -343,6 +346,7 @@ def test_manager_training_bridge_ignores_air_brake_bias_without_discrete_branch(
 
     assert "air_brake" not in train_config.env.action.layout_discrete_axes
     assert train_config.env.action.air_brake_episode_mask_probability == pytest.approx(0.0)
+    assert train_config.env.action.air_brake_pulse_frames == 0
     assert train_config.policy.action_bias.air_brake_on_logit == pytest.approx(0.0)
 
 

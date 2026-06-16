@@ -207,6 +207,7 @@ const actionConfigSchema = z
     enable_air_brake: z.boolean(),
     mask_air_brake_on_ground: z.boolean(),
     air_brake_episode_mask_probability: z.number().min(0).max(1).default(0),
+    air_brake_pulse_frames: z.number().int().nonnegative().default(0),
     continuous_air_brake_deadzone: z.number().min(0).lt(1),
     continuous_air_brake_full_threshold: z.number().gt(0).max(1),
     continuous_air_brake_min_duty: z.number().min(0).max(1),

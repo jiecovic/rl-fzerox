@@ -106,6 +106,9 @@ class PolicyDriveRuntime:
         self._mask_controller.set_lean_allowed_values(
             self._control_state.lean_action_mask_override()
         )
+        self._mask_controller.set_air_brake_allowed_values(
+            self._control_state.air_brake_action_mask_override()
+        )
         self._mask_controller.set_spin_allowed_values(None)
         telemetry = self._backend.try_read_telemetry()
         sync_dynamic_action_masks(

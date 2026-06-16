@@ -6,7 +6,6 @@ import {
   ActionFieldset,
   ActionNote,
   ActionTripleFields,
-  ActionTwoColumn,
 } from "@/entities/runConfig/ui/sections/action/ActionLayout";
 import type {
   AuxiliaryActionConfig,
@@ -17,6 +16,7 @@ import { airBrakeModeDescription } from "@/entities/runConfig/ui/sections/action
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 import {
   FieldLabel,
+  IntegerField,
   NumberField,
   RangeNumberField,
   SegmentedChoiceStrip,
@@ -136,7 +136,7 @@ export function AirBrakeCard({
         </fieldset>
         {action.air_brake_mode === "pwm" ? null : (
           <ActionFields>
-            <ActionTwoColumn>
+            <ActionTripleFields>
               <div className="field-with-note">
                 <NumberField
                   help="Logit offset added to the learned engaged air-brake button logit. The displayed probability assumes the model logit is zero; trained policies also depend on their learned output."
@@ -150,6 +150,13 @@ export function AirBrakeCard({
                   {`sigmoid(${formatSignedDecimal(policy.air_brake_on_logit)}) ≈ ${formatPercent(binaryOnProbability(policy.air_brake_on_logit))} zero-logit engage probability`}
                 </div>
               </div>
+              <IntegerField
+                help="Only for on/off air brake. Set to 0 to follow the global action repeat. Values above 0 make one air-brake request hold the button for this many native frames, rounded to action-step boundaries."
+                label="Pulse frames"
+                resetValue={defaultAction.air_brake_pulse_frames}
+                value={action.air_brake_pulse_frames}
+                onChange={(value) => updateAction({ air_brake_pulse_frames: value })}
+              />
               <RangeNumberField
                 help="At episode reset, sample this probability and force the discrete air-brake button branch neutral for the full episode."
                 label="Episode mask probability"
@@ -167,7 +174,7 @@ export function AirBrakeCard({
                 value={airBrakeEpisodeMaskProbability}
                 onChange={(value) => updateAction({ air_brake_episode_mask_probability: value })}
               />
-            </ActionTwoColumn>
+            </ActionTripleFields>
           </ActionFields>
         )}
         <FieldShell>

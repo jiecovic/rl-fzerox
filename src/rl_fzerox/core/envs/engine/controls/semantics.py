@@ -20,7 +20,7 @@ def apply_control_semantics(
     control_state_tracker: ControlStateTracker,
     last_telemetry: FZeroXTelemetry | None,
 ) -> RaceControlState:
-    """Apply live masks and configured lean semantics to one control request."""
+    """Apply live masks plus configured button semantics to one control request."""
 
     gated_control_state = apply_dynamic_control_gates(
         control_state,
@@ -29,7 +29,17 @@ def apply_control_semantics(
         continuous_air_brake_mode=action_config.continuous_air_brake_mode,
         last_telemetry=last_telemetry,
     )
-    return control_state_tracker.apply_lean_semantics(gated_control_state)
+    lean_control_state = control_state_tracker.apply_lean_semantics(gated_control_state)
+    air_brake_available = action_branch_value_allowed(
+        mask_controller.control_gate_action_mask_branches(),
+        "air_brake",
+        1,
+        missing_allowed=True,
+    )
+    return control_state_tracker.apply_air_brake_semantics(
+        lean_control_state,
+        available=air_brake_available,
+    )
 
 
 def apply_spin_semantics(

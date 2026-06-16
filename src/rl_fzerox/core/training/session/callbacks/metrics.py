@@ -57,6 +57,7 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("damage_taken_frames", "state/damage_taken_step_rate"),
         _MetricLogSpec("boost_pad_entered", "state/boost_pad_entry_step_rate"),
         _MetricLogSpec("gas_used", "action/gas_used_step_rate"),
+        _MetricLogSpec("air_brake_requested", "action/air_brake_requested_step_rate"),
         _MetricLogSpec("air_brake_used", "action/air_brake_used_step_rate"),
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),

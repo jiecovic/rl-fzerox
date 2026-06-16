@@ -152,6 +152,7 @@ class EngineStepAssembler:
         spin_requested = request.spin_request != "none"
         spin_started = bool(step_result.summary.spin_macro_started)
         spin_active_frames = int(step_result.summary.spin_macro_active_frames)
+        air_brake_requested = requested_control_state.air_brake
         air_brake_used = applied_control_state.air_brake
         reward_step = self.reward_tracker.step_summary(
             step_result.summary,
@@ -212,6 +213,7 @@ class EngineStepAssembler:
         info["air_brake_episode_masked"] = self.mask_controller.air_brake_episode_masked
         info["spin_episode_masked"] = self.mask_controller.spin_episode_masked
         info["gas_used"] = gas_level > 0.0
+        info["air_brake_requested"] = air_brake_requested
         info["air_brake_used"] = air_brake_used
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used
@@ -253,6 +255,13 @@ class EngineStepAssembler:
         spin_owns_lean = status.spin_macro_active or status.spin_macro_cooldown_frames > 0
         self.mask_controller.set_lean_allowed_values(
             ((0,) if spin_owns_lean else self.control_state.lean_action_mask_override()),
+        )
+        self.mask_controller.set_air_brake_allowed_values(
+            self.control_state.air_brake_action_mask_override(),
+        )
+        info["air_brake_pulse_active"] = self.control_state.air_brake_pulse_active
+        info["air_brake_pulse_remaining_frames"] = (
+            self.control_state.air_brake_pulse_remaining_frames
         )
         self.mask_controller.set_spin_allowed_values(
             (0,) if status.spin_macro_active or status.spin_macro_cooldown_frames > 0 else None,

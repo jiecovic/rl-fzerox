@@ -70,7 +70,7 @@ def apply_dynamic_control_gates(
 ) -> RaceControlState:
     """Suppress requested controls that are not available for the current frame."""
 
-    branches = mask_controller.action_mask_branches()
+    branches = mask_controller.control_gate_action_mask_branches()
     if not action_branch_value_allowed(
         branches,
         "boost",

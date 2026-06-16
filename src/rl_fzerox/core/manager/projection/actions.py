@@ -24,6 +24,11 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
             if config.action.include_air_brake and config.action.air_brake_mode == "on_off"
             else 0.0
         ),
+        "air_brake_pulse_frames": (
+            config.action.air_brake_pulse_frames
+            if config.action.include_air_brake and config.action.air_brake_mode == "on_off"
+            else 0
+        ),
         "continuous_air_brake_mode": _continuous_air_brake_mode(config),
         "lean_mode": config.action.lean_mode,
         "lean_output_mode": config.action.lean_output_mode,

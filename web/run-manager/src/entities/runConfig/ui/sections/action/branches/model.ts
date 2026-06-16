@@ -18,6 +18,7 @@ export function resetAuxiliaryBranchesAction({
     enable_air_brake: defaultAction.enable_air_brake,
     mask_air_brake_on_ground: defaultAction.mask_air_brake_on_ground,
     air_brake_episode_mask_probability: defaultAction.air_brake_episode_mask_probability,
+    air_brake_pulse_frames: defaultAction.air_brake_pulse_frames,
     continuous_air_brake_deadzone: defaultAction.continuous_air_brake_deadzone,
     continuous_air_brake_full_threshold: defaultAction.continuous_air_brake_full_threshold,
     continuous_air_brake_min_duty: defaultAction.continuous_air_brake_min_duty,

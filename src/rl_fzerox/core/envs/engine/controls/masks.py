@@ -40,6 +40,7 @@ class ActionMaskController:
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
+    _air_brake_allowed_values: tuple[int, ...] | None = None
     _spin_allowed_values: tuple[int, ...] | None = None
     _lean_episode_masked: bool = False
     _air_brake_episode_masked: bool = False
@@ -100,6 +101,7 @@ class ActionMaskController:
                 boost_unlocked=self._boost_unlocked,
                 airborne=self._airborne,
                 lean_allowed_values=self._lean_allowed_values,
+                air_brake_allowed_values=self._air_brake_allowed_values,
                 spin_allowed_values=self._spin_allowed_values,
                 lean_episode_masked=self._lean_episode_masked,
                 air_brake_episode_masked=self._air_brake_episode_masked,
@@ -125,6 +127,22 @@ class ActionMaskController:
             flat=mask,
             branches=split_action_mask_by_branch(self.adapter.action_dimensions, mask),
         )
+
+    def control_gate_action_mask_branches(self) -> ActionMaskBranches:
+        """Return action masks used to suppress unavailable controls.
+
+        Active air-brake pulses mask new policy requests but should not by
+        themselves suppress the held effective brake button. Gameplay gates such
+        as episode masks, grounded air-only masks, and static config masks still
+        apply through this view.
+        """
+
+        air_brake_allowed_values = self._air_brake_allowed_values
+        self._air_brake_allowed_values = None
+        try:
+            return self.action_mask_branches()
+        finally:
+            self._air_brake_allowed_values = air_brake_allowed_values
 
     def set_curriculum_stage(self, stage_index: int) -> None:
         """Switch the active curriculum stage for subsequent action masks."""
@@ -159,6 +177,11 @@ class ActionMaskController:
         """Update live lean restrictions used by lean primitive semantics."""
 
         self._lean_allowed_values = values
+
+    def set_air_brake_allowed_values(self, values: tuple[int, ...] | None) -> None:
+        """Update live air-brake restrictions used by pulse semantics."""
+
+        self._air_brake_allowed_values = values
 
     def set_spin_allowed_values(self, values: tuple[int, ...] | None) -> None:
         """Update live spin restrictions used by the native spin macro."""
@@ -237,6 +260,7 @@ def _dynamic_action_mask_overrides(
     boost_unlocked: bool | None,
     airborne: bool | None = None,
     lean_allowed_values: tuple[int, ...] | None = None,
+    air_brake_allowed_values: tuple[int, ...] | None = None,
     spin_allowed_values: tuple[int, ...] | None = None,
     lean_episode_masked: bool = False,
     air_brake_episode_masked: bool = False,
@@ -271,6 +295,8 @@ def _dynamic_action_mask_overrides(
         overrides["spin"] = spin_allowed_values
     if air_brake_episode_masked or (airborne is False and mask_air_brake_on_ground):
         overrides["air_brake"] = (0,)
+    elif air_brake_allowed_values is not None:
+        overrides["air_brake"] = air_brake_allowed_values
     if airborne is False and mask_pitch_on_ground:
         overrides["pitch"] = (pitch_neutral_index,)
     if not overrides:

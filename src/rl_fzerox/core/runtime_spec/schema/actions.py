@@ -147,6 +147,7 @@ class ActionRuntimeConfig:
     force_full_throttle: bool
     mask_air_brake_on_ground: bool
     air_brake_episode_mask_probability: float
+    air_brake_pulse_frames: int
     continuous_air_brake_mode: ContinuousAirBrakeMode
     continuous_lean_deadzone: float
     lean_mode: LeanMode
@@ -225,6 +226,11 @@ class ActionRuntimeConfig:
             force_full_throttle=bool(config.force_full_throttle),
             mask_air_brake_on_ground=bool(config.mask_air_brake_on_ground),
             air_brake_episode_mask_probability=float(config.air_brake_episode_mask_probability),
+            air_brake_pulse_frames=(
+                int(config.air_brake_pulse_frames)
+                if "air_brake" in config.layout_discrete_axes
+                else 0
+            ),
             continuous_air_brake_mode=config.continuous_air_brake_mode,
             continuous_lean_deadzone=float(config.continuous_lean_deadzone),
             lean_mode=config.lean_mode,
@@ -272,6 +278,7 @@ class ActionConfig(BaseModel):
     force_full_throttle: bool = False
     mask_air_brake_on_ground: bool = True
     air_brake_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
+    air_brake_pulse_frames: NonNegativeInt = 0
     continuous_air_brake_mode: ContinuousAirBrakeMode = "always"
     continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     lean_mode: LeanMode = DEFAULT_LEAN_MODE

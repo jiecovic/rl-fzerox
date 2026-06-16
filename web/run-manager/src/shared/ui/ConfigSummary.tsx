@@ -102,6 +102,8 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
   const labels: string[] = [];
   if (config.action.include_air_brake) {
     const episodeMask = episodeMaskSummary(config.action.air_brake_episode_mask_probability ?? 0);
+    const pulseFrames = config.action.air_brake_pulse_frames ?? 0;
+    const pulse = pulseFrames > 0 ? `, ${pulseFrames}f pulse` : "";
     if (!config.action.enable_air_brake) {
       labels.push(
         config.action.air_brake_mode === "pwm" ? "air brake pwm masked" : "air brake masked",
@@ -113,8 +115,8 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
     } else {
       labels.push(
         config.action.mask_air_brake_on_ground
-          ? `air brake, air-only${episodeMask}`
-          : `air brake${episodeMask}`,
+          ? `air brake, air-only${pulse}${episodeMask}`
+          : `air brake${pulse}${episodeMask}`,
       );
     }
   }

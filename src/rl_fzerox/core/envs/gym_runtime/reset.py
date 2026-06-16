@@ -54,6 +54,9 @@ def reset_gym_episode(
     components.mask_controller.set_lean_allowed_values(
         components.control_state.lean_action_mask_override()
     )
+    components.mask_controller.set_air_brake_allowed_values(
+        components.control_state.air_brake_action_mask_override()
+    )
     components.mask_controller.set_spin_allowed_values(None)
     sync_dynamic_action_masks(
         mask_controller=components.mask_controller,

@@ -141,14 +141,15 @@ function auxiliaryOutputSummary(action: ManagedActionConfig): string {
   const labels: string[] = [];
   if (action.include_air_brake) {
     const episodeMask = episodeMaskSummary(action.air_brake_episode_mask_probability ?? 0);
+    const pulse = airBrakePulseSummary(action.air_brake_pulse_frames ?? 0);
     if (!action.enable_air_brake) {
       labels.push(action.air_brake_mode === "pwm" ? "air brake pwm masked" : "air brake masked");
     } else if (action.air_brake_mode === "pwm") {
       labels.push(action.mask_air_brake_on_ground ? "air brake pwm, air-only" : "air brake pwm");
     } else if (action.mask_air_brake_on_ground) {
-      labels.push(`air brake, air-only${episodeMask}`);
+      labels.push(`air brake, air-only${pulse}${episodeMask}`);
     } else {
-      labels.push(`air brake${episodeMask}`);
+      labels.push(`air brake${pulse}${episodeMask}`);
     }
   }
   if (action.include_boost) {
@@ -237,6 +238,10 @@ function leanOutputSummary(action: ManagedActionConfig): string {
 
 function episodeMaskSummary(probability: number): string {
   return probability > 0 ? `, ${(probability * 100).toFixed(0)}% episode mask` : "";
+}
+
+function airBrakePulseSummary(frames: number): string {
+  return frames > 0 ? `, ${frames}f pulse` : "";
 }
 
 function pitchOutputSummary(action: ManagedActionConfig): string {

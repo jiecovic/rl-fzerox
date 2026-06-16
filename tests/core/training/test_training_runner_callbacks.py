@@ -79,6 +79,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "air_brake_episode_masked": True,
             "spin_episode_masked": False,
             "gas_used": True,
+            "air_brake_requested": True,
             "air_brake_used": False,
             "boost_used": True,
             "lean_used": False,
@@ -125,6 +126,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "air_brake_episode_masked": False,
             "spin_episode_masked": True,
             "gas_used": False,
+            "air_brake_requested": False,
             "air_brake_used": True,
             "boost_used": False,
             "lean_used": True,
@@ -163,6 +165,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
     assert accumulator.step_rates["boost_pad_entered"].rate() == 0.5
     assert accumulator.step_rates["gas_used"].rate() == 0.5
+    assert accumulator.step_rates["air_brake_requested"].rate() == 0.5
     assert accumulator.step_rates["air_brake_used"].rate() == 0.5
     assert accumulator.step_rates["boost_used"].rate() == 0.5
     assert accumulator.step_rates["lean_used"].rate() == 0.5
@@ -207,6 +210,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["action/lean_level_mean"] == 0.0
     assert logger.records["action/lean_request_level_mean"] == -0.5
     assert logger.records["action/gas_used_step_rate"] == 0.5
+    assert logger.records["action/air_brake_requested_step_rate"] == 0.5
     assert logger.records["action/air_brake_used_step_rate"] == 0.5
     assert logger.records["action/boost_used_step_rate"] == 0.5
     assert logger.records["action/lean_used_step_rate"] == 0.5
