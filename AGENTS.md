@@ -64,10 +64,24 @@ extending, and reviewing.
 - Keep public interfaces narrow and well-defined.
 - Prefer composition over inheritance when either would work.
 - Make state transitions and side effects easy to trace.
+- FSM/controller modules that own user-visible lifecycle must document their
+  states, transitions, and permitted side effects close to the code. Lifecycle
+  boundaries such as success, failure, retry, and exit should be emitted as
+  explicit domain events or signals.
+- Worker modules should remain orchestration entrypoints for process IO,
+  command draining, timing, and resource cleanup. Do not let workers become the
+  source of truth for domain state transitions when a controller/FSM already
+  owns that flow.
+- Recording, logging, and persistence should consume explicit lifecycle signals
+  from the domain owner. Do not infer live control boundaries from manager DB
+  progress, telemetry byproducts, file existence, or frontend sync state.
 - When a touched area has mixed ownership, multiple sources of truth, legacy
   compatibility paths, or other structural debt, call that out before extending
   it. Prefer discussing and fixing the ownership boundary over silently building
   new behavior on top of an unclear or unstable boundary.
+- Split large runtime files by cohesive responsibility before adding new
+  behavior to them. For related implementation files, prefer an owned package
+  with a small facade over expanding a flat directory of loosely named modules.
 - For managed run-manager flows, SQLite is the source of truth for run specs
   and mutable runtime state. Treat `train_config.yaml`, checkpoints, baselines,
   TensorBoard logs, and exported bundles as manifests or derived artifacts unless
