@@ -901,7 +901,7 @@ class CareerModeController:
         facts = MenuFacts.from_info(info)
         if not post_terminal_progress_screen(facts):
             return False
-        self._recording.observe_progress_screen(facts)
+        self._recording.observe_progress_screen(facts, info)
         if self._last_progress_sync_continue_pulse == self._continue_after_race_pulses:
             return False
 

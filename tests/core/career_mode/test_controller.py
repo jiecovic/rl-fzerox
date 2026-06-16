@@ -145,16 +145,28 @@ def test_recording_segment_close_waits_for_clean_cup_exit() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "finished"})
-    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "results"}))
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "results"}),
+        {"game_mode": "results"},
+    )
     assert tracker.pop_close() is None
 
-    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "gp_race_next_course"}))
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "gp_race_next_course"}),
+        {"game_mode": "gp_race_next_course"},
+    )
     assert tracker.pop_close() is None
 
-    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "gp_end_cutscene"}))
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "gp_end_cutscene"}),
+        {"game_mode": "gp_end_cutscene"},
+    )
     assert tracker.pop_close() is None
 
-    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "main_menu"}))
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "main_menu"}),
+        {"game_mode": "main_menu"},
+    )
     close = tracker.pop_close()
 
     assert close is not None
@@ -166,10 +178,16 @@ def test_recording_segment_close_marks_game_over_failed() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "retired"})
-    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "results"}))
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "results"}),
+        {"game_mode": "results"},
+    )
     assert tracker.pop_close() is None
 
-    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "game_over"}))
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "game_over"}),
+        {"game_mode": "game_over"},
+    )
     close = tracker.pop_close()
 
     assert close is not None

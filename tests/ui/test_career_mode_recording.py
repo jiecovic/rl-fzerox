@@ -1149,6 +1149,105 @@ def test_career_recorder_summary_captures_terminal_events_between_frames(
     assert "| Run A | latest | mute_city | 14820470 | 660000 | 2025-12-10T12:00:00Z |" in markdown
 
 
+def test_career_recorder_summary_keeps_one_result_per_cup_course(
+    tmp_path: Path,
+) -> None:
+    writers: list[_FakeWriter] = []
+    finalizer = _FakeFinalizer()
+
+    def writer_factory(path: Path) -> _FakeWriter:
+        writer = _FakeWriter(path)
+        writers.append(writer)
+        return writer
+
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    recorder = CareerModeFrameRecorder(
+        path=tmp_path / "career.mkv",
+        native_fps=60.0,
+        writer_factory=writer_factory,
+        finalizer_factory=lambda: finalizer,
+    )
+
+    recorder.record_frame(
+        frame,
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Jack Cup",
+        },
+    )
+    for course_index, course_id, course_name, race_time_ms, first_position, later_position in (
+        (0, "mute_city", "Mute City", 86_136, 7, 24),
+        (1, "silence", "Silence", 78_655, 11, 20),
+        (2, "sand_ocean", "Sand Ocean", 70_828, 1, 30),
+        (3, "devils_forest", "Devil's Forest", 82_910, 4, 27),
+        (4, "big_blue", "Big Blue", 86_007, 1, 30),
+    ):
+        for position in (first_position, later_position):
+            recorder.record_event(
+                info={
+                    "career_mode_attempt_id": "attempt-a",
+                    "career_mode_target_label": "Clear Master Jack Cup",
+                    "termination_reason": "finished",
+                    "race_time_ms": race_time_ms,
+                    "position": position,
+                    "ko_star_count": 0,
+                    "track_course_id": course_id,
+                    "track_course_index": course_index,
+                    "track_course_name": course_name,
+                    "track_gp_difficulty": "master",
+                }
+            )
+    recorder.record_event(
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Jack Cup",
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "failed",
+            "termination_reason": "finished",
+            "race_time_ms": 85_673,
+            "position": 1,
+            "ko_star_count": 1,
+            "track_course_id": "port_town",
+            "track_course_index": 5,
+            "track_course_name": "Port Town",
+            "track_gp_difficulty": "master",
+        }
+    )
+    recorder.finish_segment(
+        status="failed",
+        info={
+            "career_mode_attempt_id": None,
+            "career_mode_target_label": "Clear Master Jack Cup",
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "failed",
+            "game_mode": "main_menu",
+        },
+    )
+    recorder.close()
+
+    summary_json_path = (
+        tmp_path / "career.segment-001-failed-attempt-clear-master-jack-cup.summary.json"
+    )
+    summary_md_path = (
+        tmp_path / "career.segment-001-failed-attempt-clear-master-jack-cup.summary.md"
+    )
+    summary = json.loads(summary_json_path.read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+    assert summary["result_counts"] == {"crashed": 0, "failed": 0, "finished": 6, "retired": 0}
+    assert [course["course_name"] for course in summary["courses"]] == [
+        "Mute City",
+        "Silence",
+        "Sand Ocean",
+        "Devil's Forest",
+        "Big Blue",
+        "Port Town",
+    ]
+    assert [course["position"] for course in summary["courses"]] == [7, 11, 1, 4, 1, 1]
+    markdown = summary_md_path.read_text(encoding="utf-8")
+    assert "| - | finished |" not in markdown
+    assert "| Mute City | finished | 1:26.136 | 7 | 0 | - |" in markdown
+
+
 def test_career_segment_recording_path_sanitizes_label() -> None:
     assert (
         career_segment_recording_path(

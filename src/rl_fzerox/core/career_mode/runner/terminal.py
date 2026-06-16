@@ -4,7 +4,11 @@ from __future__ import annotations
 from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.career_mode.runner.menu import MenuFacts, course_id_from_info
+from rl_fzerox.core.career_mode.runner.menu import (
+    BUILT_IN_COURSES_BY_INDEX,
+    MenuFacts,
+    course_id_from_info,
+)
 
 
 class TerminalTelemetryEmulator(Protocol):
@@ -77,10 +81,14 @@ def terminal_info(
     telemetry = session.emulator.try_read_telemetry()
     if telemetry is None:
         return resolved_info
+    course_index = getattr(telemetry, "course_index", None)
+    if isinstance(course_index, int) and not isinstance(course_index, bool):
+        resolved_info.setdefault("course_index", course_index)
     resolved_info.setdefault("race_time_ms", telemetry.player.race_time_ms)
     resolved_info.setdefault("position", telemetry.player.position)
     resolved_info.setdefault("ko_star_count", telemetry.player.ko_star_count)
     resolved_info.setdefault("track_id", course_id_from_info(resolved_info))
+    _add_course_metadata(resolved_info)
     return resolved_info
 
 
@@ -92,6 +100,19 @@ def game_terminal_reason(reason: str | None) -> str | None:
     if reason in {"finished", "retired", "crashed"}:
         return reason
     return None
+
+
+def _add_course_metadata(info: dict[str, object]) -> None:
+    course_index = info.get("course_index")
+    if isinstance(course_index, bool) or not isinstance(course_index, int):
+        return
+    course = BUILT_IN_COURSES_BY_INDEX.get(course_index)
+    if course is None:
+        return
+    info.setdefault("track_id", course.id)
+    info.setdefault("track_course_id", course.id)
+    info.setdefault("track_course_name", course.display_name)
+    info.setdefault("track_course_index", course.course_index)
 
 
 def _non_empty_str(value: object) -> str | None:

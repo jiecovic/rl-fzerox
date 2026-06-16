@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from multiprocessing.queues import Queue as ProcessQueue
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState, SpinRequest
@@ -18,6 +19,7 @@ from rl_fzerox.core.career_mode.runner.save_file import (
 )
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
+from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.career_mode.loop.recording import (
     drain_recording_notices,
     finish_pending_recording_segment,
@@ -179,6 +181,7 @@ def _run_career_mode_loop_body(
     observation = state.observation
     raw_info = state.raw_info
     info = state.info
+    track_record_attempt_id = _career_mode_attempt_id(info)
     reset_info = state.reset_info
     current_telemetry = state.current_telemetry
     current_auxiliary_predictions = state.current_auxiliary_predictions
@@ -187,6 +190,15 @@ def _run_career_mode_loop_body(
     last_menu_step = state.last_menu_step
     manual_spin_request: SpinRequest = "none"
     recording_notice = TimedRecordingNotice()
+
+    def reset_track_records_if_attempt_changed() -> None:
+        nonlocal track_record_attempt_id, track_record_book
+
+        current_attempt_id = _career_mode_attempt_id(info)
+        if current_attempt_id == track_record_attempt_id:
+            return
+        track_record_book = TrackRecordBook()
+        track_record_attempt_id = current_attempt_id
 
     def publish_snapshot(*, policy_visible: bool) -> None:
         policy_active = policy_visible and observation is not None
@@ -453,6 +465,7 @@ def _run_career_mode_loop_body(
                         current_auxiliary_predictions = None
                         current_auxiliary_targets = None
                         manual_control_enabled = False
+                        reset_track_records_if_attempt_changed()
                         publish_snapshot(policy_visible=False)
                         continue
                     track_record_book = track_record_book.update(
@@ -472,6 +485,7 @@ def _run_career_mode_loop_body(
                         active_policy_control=None,
                     )
                     reset_info = dict(info)
+                    reset_track_records_if_attempt_changed()
                     active_policy_control = None
                     active_policy_started = False
                     current_policy_action = None
@@ -589,6 +603,7 @@ def _run_career_mode_loop_body(
                         active_policy_control=active_policy_control,
                     )
                     reset_info = dict(info)
+                    reset_track_records_if_attempt_changed()
                     episode_reward = required_episode_return(info)
                     current_policy_action = None
                     current_control_state = session.last_requested_control_state
@@ -692,6 +707,7 @@ def _run_career_mode_loop_body(
                         current_auxiliary_predictions = None
                         current_auxiliary_targets = None
                         manual_control_enabled = False
+                        reset_track_records_if_attempt_changed()
                         publish_snapshot(policy_visible=False)
                         continue
                     track_record_book = track_record_book.update(
@@ -712,6 +728,7 @@ def _run_career_mode_loop_body(
                         active_policy_control=None,
                     )
                     reset_info = dict(info)
+                    reset_track_records_if_attempt_changed()
                     active_policy_control = None
                     active_policy_started = False
                     current_policy_action = None
@@ -791,3 +808,8 @@ def _should_observe_policy_transition(
     if active_policy_started:
         return True
     return not in_gp_race(info)
+
+
+def _career_mode_attempt_id(info: Mapping[str, object]) -> str | None:
+    value = info.get("career_mode_attempt_id")
+    return value if isinstance(value, str) and value else None

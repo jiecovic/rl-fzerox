@@ -181,6 +181,15 @@ class CareerAttemptProgress:
                 return CareerProgressTransition(attempt_finished=False)
             if not _is_post_gp_completion(info):
                 return CareerProgressTransition(attempt_finished=False)
+            # On the post-GP ceremony screen, position is the final cup rank.
+            final_rank = _positive_int_info(info, "position")
+            if final_rank is not None and final_rank > 1:
+                return self._finish_and_advance(
+                    info=info,
+                    setup=setup,
+                    status="failed",
+                    failure_reason=f"gp cup final rank {final_rank}",
+                )
             return self._finish_and_advance(
                 info=info,
                 setup=setup,

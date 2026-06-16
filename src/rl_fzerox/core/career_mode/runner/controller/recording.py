@@ -39,11 +39,13 @@ class CareerRecordingSegmentTracker:
         if reason in {"retired", "crashed"}:
             self.failed_result_seen = True
 
-    def observe_progress_screen(self, facts: MenuFacts) -> None:
+    def observe_progress_screen(self, facts: MenuFacts, info: dict[str, object]) -> None:
         if not self.terminal_result_seen:
             return
         if facts.is_post_gp_screen:
             self.post_gp_seen = True
+            if _post_gp_rank(info) not in {None, 1}:
+                self.failed_result_seen = True
             return
         if not recording_segment_exit_screen(facts):
             return
@@ -77,3 +79,10 @@ def recording_segment_exit_screen(facts: MenuFacts) -> bool:
         or facts.is_course_select
         or facts.game_mode == "game_over"
     )
+
+
+def _post_gp_rank(info: dict[str, object]) -> int | None:
+    value = info.get("position")
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value

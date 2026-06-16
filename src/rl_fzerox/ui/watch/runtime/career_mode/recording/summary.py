@@ -96,10 +96,19 @@ class _SegmentSummaryBuilder:
         self.final_info = _selected_summary_info(info)
         course_result = _course_result(info)
         if course_result is not None:
-            signature = _course_result_signature(course_result)
-            if signature != self.last_course_result_signature:
-                self.course_results.append(course_result)
-                self.last_course_result_signature = signature
+            identity = _course_result_identity(course_result)
+            existing_index = _existing_course_result_index(self.course_results, identity)
+            if existing_index is not None:
+                self.course_results[existing_index] = _merge_missing_course_result_fields(
+                    self.course_results[existing_index],
+                    course_result,
+                )
+                self.last_course_result_signature = _course_result_signature(course_result)
+            else:
+                signature = _course_result_signature(course_result)
+                if signature != self.last_course_result_signature:
+                    self.course_results.append(course_result)
+                    self.last_course_result_signature = signature
         policy_checkpoint = _policy_checkpoint_summary(info)
         if policy_checkpoint is None:
             return
@@ -426,6 +435,40 @@ def _course_result_signature(result: Mapping[str, object]) -> tuple[object, ...]
             "position",
         )
     )
+
+
+def _course_result_identity(result: Mapping[str, object]) -> tuple[str, object] | None:
+    for key in ("course_id", "track_id", "course_index"):
+        value = result.get(key)
+        if value is not None:
+            return (key, value)
+    race_time_ms = result.get("race_time_ms")
+    if race_time_ms is not None:
+        return ("race_time_ms", race_time_ms)
+    return None
+
+
+def _existing_course_result_index(
+    results: list[dict[str, object]],
+    identity: tuple[str, object] | None,
+) -> int | None:
+    if identity is None:
+        return None
+    for index, result in enumerate(results):
+        if _course_result_identity(result) == identity:
+            return index
+    return None
+
+
+def _merge_missing_course_result_fields(
+    current: Mapping[str, object],
+    candidate: Mapping[str, object],
+) -> dict[str, object]:
+    merged = dict(current)
+    for key, value in candidate.items():
+        if key not in merged or merged[key] is None:
+            merged[key] = value
+    return merged
 
 
 def _policy_checkpoint_summary(info: Mapping[str, object]) -> dict[str, object] | None:

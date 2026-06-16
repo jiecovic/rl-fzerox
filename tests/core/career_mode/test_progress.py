@@ -237,6 +237,40 @@ def test_single_target_success_finishes_on_unskippable_credits(tmp_path: Path) -
     assert store.started_next_attempt_count == 0
 
 
+def test_single_target_post_gp_rank_two_counts_as_failed_attempt(tmp_path: Path) -> None:
+    store = _SingleTargetCompletionStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        target_clear_goal=1,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    post_gp_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished", "position": 2},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert post_gp_transition.attempt_finished is True
+    assert post_gp_transition.finished_attempt_id == "attempt-1"
+    assert post_gp_transition.finished_status == "failed"
+    assert post_gp_transition.finished_failure_reason == "gp cup final rank 2"
+    assert post_gp_transition.next_plan is not None
+    assert post_gp_transition.next_plan.attempt_id == "attempt-2"
+    assert progress.attempt_id == "attempt-1"
+    assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank 2")]
+    assert store.status_updates == []
+    assert store.started_next_attempt_count == 1
+
+
 def test_single_target_success_repeats_target_without_clear_goal(
     tmp_path: Path,
 ) -> None:
