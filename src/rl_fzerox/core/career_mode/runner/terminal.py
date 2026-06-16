@@ -24,6 +24,7 @@ def post_terminal_progress_screen(facts: MenuFacts) -> bool:
         or facts.is_title
         or facts.is_mode_select
         or facts.is_course_select
+        or facts.game_mode == "game_over"
         or (facts.in_gp_race and facts.terminal_race_result)
     )
 

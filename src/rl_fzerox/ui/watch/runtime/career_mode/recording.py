@@ -8,7 +8,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 import numpy as np
 
@@ -41,6 +41,13 @@ class FrameRecorder(Protocol):
 
     def record_event(self, *, info: Mapping[str, object]) -> None: ...
 
+    def finish_segment(
+        self,
+        *,
+        status: RecordingSegmentStatus,
+        info: Mapping[str, object],
+    ) -> None: ...
+
     def drain_notices(self) -> tuple[str, ...]: ...
 
 
@@ -64,6 +71,7 @@ class _RecordingFinalizer(Protocol):
 
 _WriterFactory = Callable[[Path], _RgbVideoWriter]
 _FinalizerFactory = Callable[[], _RecordingFinalizer]
+RecordingSegmentStatus = Literal["succeeded", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,7 +202,14 @@ class _SegmentSummaryBuilder:
 
 
 class CareerModeFrameRecorder:
-    """Record raw Career Mode game frames at native game playback speed."""
+    """Record raw Career Mode game frames at native game playback speed.
+
+    Segment lifecycle is intentionally controller-driven. The Career FSM knows
+    when a cup attempt exits through success, game-over, or retry flow; this
+    class only records frames/events and executes explicit finish_segment()
+    commands. Keeping that boundary prevents recording from depending on
+    manager DB progress timing or ad-hoc telemetry guesses.
+    """
 
     def __init__(
         self,
@@ -254,7 +269,6 @@ class CareerModeFrameRecorder:
             )
             self._live_writer.write(live_frame)
             self._live_writer.write_audio(audio_samples)
-        self._update_segment_status(info)
         segment = self._recording_segment(info)
         if segment is None:
             return
@@ -265,29 +279,26 @@ class CareerModeFrameRecorder:
         )
         if segment.key != self._segment_key:
             self._start_segment(segment)
-        self._update_segment_status(info)
-        close_after_frame = self._should_close_finished_segment_after_frame(info)
-        if not close_after_frame:
-            self._close_finished_segment(info)
         if self._segment_writer is not None:
             if self._segment_summary is not None:
                 self._segment_summary.observe(info)
             self._segment_writer.write(segment_frame)
             self._segment_writer.write_audio(audio_samples)
-            if close_after_frame:
-                if self._segment_status is None:
-                    self._segment_status = self._cup_segment_exit_status(info)
-                self._close_segment_writer()
 
     def record_event(self, *, info: Mapping[str, object]) -> None:
         self._update_segment_status(info)
         if self._segment_summary is not None:
             self._segment_summary.observe_event(info)
-        if self._current_segment_attempt_finished(info):
-            self._close_segment_writer()
-        elif status := self._cup_segment_exit_status(info):
-            self._segment_status = status
-            self._close_segment_writer()
+
+    def finish_segment(
+        self,
+        *,
+        status: RecordingSegmentStatus,
+        info: Mapping[str, object],
+    ) -> None:
+        self.record_event(info=info)
+        self._segment_status = status
+        self._close_segment_writer()
 
     def _delayed_input_hud_info(self, info: Mapping[str, object]) -> Mapping[str, object]:
         if info.get("watch_recording_input_hud") is not True:
@@ -471,38 +482,6 @@ class CareerModeFrameRecorder:
             _last_finished_attempt_id(info) == self._segment_attempt_id
             and _last_finished_attempt_status(info) is not None
         )
-
-    def _close_finished_segment(self, info: Mapping[str, object]) -> None:
-        if self._segment_writer is None:
-            return
-        if self._segment_status is None:
-            return
-        if _continuing_race_result(info):
-            return
-        if self._segment_status == "succeeded" and not self._next_attempt_started(info):
-            return
-        self._close_segment_writer()
-
-    def _should_close_finished_segment_after_frame(self, info: Mapping[str, object]) -> bool:
-        if self._cup_segment_exit_status(info) is not None:
-            return True
-        if self._segment_status == "failed":
-            return _terminal_result(info)
-        if self._segment_status == "succeeded":
-            return _terminal_result(info) or _post_gp_exit_frame(info)
-        return False
-
-    def _cup_segment_exit_status(self, info: Mapping[str, object]) -> str | None:
-        if not _post_gp_exit_frame(info):
-            return None
-        if self._segment_summary is None:
-            return None
-        result_counts = _segment_result_counts(tuple(self._segment_summary.course_results))
-        if result_counts["failed"] > 0:
-            return "failed"
-        if result_counts["finished"] > 0:
-            return "succeeded"
-        return None
 
     def _next_attempt_started(self, info: Mapping[str, object]) -> bool:
         attempt_id = _attempt_id(info)
@@ -1074,10 +1053,6 @@ def _last_finished_attempt_status(info: Mapping[str, object]) -> str | None:
 
 def _continuing_race_result(info: Mapping[str, object]) -> bool:
     return info.get("career_mode_fsm_continuing_result") is True
-
-
-def _terminal_result(info: Mapping[str, object]) -> bool:
-    return info.get("career_mode_fsm_terminal_result") is True
 
 
 def _post_gp_exit_frame(info: Mapping[str, object]) -> bool:

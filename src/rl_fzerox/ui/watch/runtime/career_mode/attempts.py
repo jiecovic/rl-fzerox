@@ -1,10 +1,20 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/attempts.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from rl_fzerox.core.manager import ManagerStore
 
-RUNNER_FAILED_REASON = "career mode runner failed"
-RUNNER_CLOSED_REASON = "career mode runner closed"
+
+@dataclass(frozen=True, slots=True)
+class RunnerCloseReasons:
+    """Stable failure-reason text written when the standalone runner exits."""
+
+    failed: str = "career mode runner failed"
+    closed: str = "career mode runner closed"
+
+
+RUNNER_CLOSE_REASONS = RunnerCloseReasons()
 
 
 def fail_running_attempts(
