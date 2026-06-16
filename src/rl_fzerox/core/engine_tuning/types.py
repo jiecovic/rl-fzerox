@@ -58,9 +58,7 @@ class GaussianProcessEngineTunerSettings(EngineTunerCommonSettings):
     """Static knobs used only by the Gaussian-process backend."""
 
     backend: Literal["gaussian_process"] = "gaussian_process"
-    greedy_plateau_tolerance_seconds: float = (
-        ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
-    )
+    greedy_plateau_tolerance_seconds: float = ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
     stat_decay: float = ENGINE_TUNER_DEFAULTS.stat_decay
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
     observation_noise_seconds: float = ENGINE_TUNER_DEFAULTS.observation_noise_seconds
@@ -72,9 +70,7 @@ class MlpEnsembleEngineTunerSettings(EngineTunerCommonSettings):
     """Static knobs used only by the MLP ensemble backend."""
 
     backend: Literal["mlp_ensemble"] = "mlp_ensemble"
-    greedy_plateau_tolerance_seconds: float = (
-        ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
-    )
+    greedy_plateau_tolerance_seconds: float = ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
     ensemble_members: int = ENGINE_TUNER_DEFAULTS.mlp_ensemble_members
     randomized_prior_seconds: float = ENGINE_TUNER_DEFAULTS.mlp_randomized_prior_seconds
     hidden_dim: int = ENGINE_TUNER_DEFAULTS.mlp_hidden_dim

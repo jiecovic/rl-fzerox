@@ -81,9 +81,7 @@ class EngineTuningTrainingController:
                         )
                         for estimate in estimates
                     ),
-                    greedy_engine_setting_raw_value=(
-                        recommendation.engine_setting_raw_value
-                    ),
+                    greedy_engine_setting_raw_value=(recommendation.engine_setting_raw_value),
                 )
             )
         return EngineTuningResetSampler(contexts=tuple(reset_contexts))

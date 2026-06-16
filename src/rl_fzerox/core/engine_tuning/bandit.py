@@ -517,9 +517,7 @@ def _bandit_greedy_key(
     midpoint: float,
 ) -> tuple[float, int, int, float, int]:
     best_finish_time_ms = (
-        estimate.best_finish_time_ms
-        if estimate.best_finish_time_ms is not None
-        else 1_000_000_000
+        estimate.best_finish_time_ms if estimate.best_finish_time_ms is not None else 1_000_000_000
     )
     return (
         estimate.mean_score,
