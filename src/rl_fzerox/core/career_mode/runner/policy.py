@@ -120,8 +120,10 @@ def _career_runtime_train_config(train_config: TrainAppConfig) -> TrainAppConfig
     """Return an evaluation-style runtime config for Career Mode policy handoff."""
 
     # Career attempts should replay the trained policy without episode-scoped
-    # training randomization. Keep the observation/action layout intact so the
-    # checkpoint still loads against its original shape.
+    # action randomization. Keep the observation/action layout intact so the
+    # checkpoint still loads against its original shape. State-feature dropout
+    # groups stay in the config because watch inference uses p=1.0 groups as
+    # deterministic zeroing metadata, while p<1.0 groups are not sampled there.
     action_config = train_config.env.action.model_copy(
         update={
             "lean_episode_mask_probability": 0.0,
@@ -130,7 +132,4 @@ def _career_runtime_train_config(train_config: TrainAppConfig) -> TrainAppConfig
         }
     )
     env_config = train_config.env.model_copy(update={"action": action_config})
-    runtime_train_config = train_config.train.model_copy(
-        update={"state_feature_dropout_groups": ()}
-    )
-    return train_config.model_copy(update={"env": env_config, "train": runtime_train_config})
+    return train_config.model_copy(update={"env": env_config})

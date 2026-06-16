@@ -6,12 +6,15 @@ import numpy as np
 import pytest
 
 from fzerox_emulator.arrays import Float32Array, UInt8Array
+from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.domain.observation_image import CustomResolutionChoice
 from rl_fzerox.core.envs.observations import (
     ImageStateObservation,
     observation_state,
     state_feature_names,
 )
+from rl_fzerox.core.manager import default_managed_run_config
+from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     CareerModeRaceSetupConfig,
@@ -30,6 +33,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.ui.watch.records import TrackRecordBook, track_record_key
 from rl_fzerox.ui.watch.runtime.career_mode.menu import reset_race_progress_info
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
@@ -61,6 +65,7 @@ from rl_fzerox.ui.watch.view.screen.render import (
     _observation_state_feature_names,
     _track_pool_records,
 )
+from tests.support.fakes import SyntheticBackend
 from tests.ui.viewer_support import record_book, record_entry
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
@@ -168,6 +173,83 @@ def test_configured_watch_zeroed_features_inherits_dropout_one_groups(tmp_path: 
     assert configured_watch_zeroed_features(config) == frozenset(
         {"track_position.edge_ratio", "course_context"}
     )
+
+
+def test_career_session_inherits_policy_dropout_one_zeroed_features(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config = default_managed_run_config().model_copy(deep=True)
+    config.observation.state_feature_dropouts = (
+        config.observation.state_feature_dropouts[0].model_copy(update={"dropout_prob": 1.0}),
+        config.observation.state_feature_dropouts[1].model_copy(update={"dropout_prob": 0.5}),
+    )
+    run = ManagedRun(
+        id="policy-run",
+        name="Policy Run",
+        status="finished",
+        config=config,
+        config_hash="hash",
+        run_dir=tmp_path / "policy-run",
+        created_at="2026-01-01T00:00:00Z",
+        lineage_id="policy-run",
+    )
+    policy_path = run.run_dir / "checkpoints" / "latest.zip"
+    policy_path.parent.mkdir(parents=True)
+    policy_path.touch()
+    policy_control = CareerModePolicyControl(
+        course_setup=ManagedSaveCourseSetup(
+            id="course-setup",
+            save_game_id="save",
+            policy_run_id=run.id,
+            policy_artifact="latest",
+            engine_setting_raw_value=50,
+            difficulty="novice",
+            cup_id="jack",
+            course_id="mute_city",
+            created_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+        ),
+        policy_run=run,
+        runner=PolicyRunner(
+            LoadedPolicy(run_dir=run.run_dir, policy_path=policy_path, artifact="latest"),
+            policy=_PolicyStub(),
+        ),
+    )
+    emulator: Any = SyntheticBackend()
+    session = CareerModeRuntimeSession(
+        config=WatchAppConfig(emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path)),
+        emulator=emulator,
+        native_fps=60.0,
+        native_sample_rate=48_000.0,
+        native_control_fps=60.0,
+        target_control_fps=None,
+        target_control_seconds=None,
+        watch_zeroed_state_features=frozenset(),
+        auxiliary_target_names=(),
+    )
+
+    session.begin_policy_race(policy_control=policy_control, seed=7, course_id="mute_city")
+
+    expected_zeroed_features = configured_watch_zeroed_features(
+        session.snapshot_config(session.config)
+    )
+    assert session.watch_zeroed_state_features == expected_zeroed_features
+    assert "track_position.edge_ratio" in expected_zeroed_features
+    assert "track_position.outside_track_bounds" not in expected_zeroed_features
+
+
+class _PolicyStub:
+    def predict(
+        self,
+        observation: object,
+        state: object | None = None,
+        episode_start: object | None = None,
+        deterministic: bool = True,
+    ) -> tuple[int, object | None]:
+        _ = (observation, episode_start, deterministic)
+        return 0, state
 
 
 def test_career_mode_render_info_keeps_runtime_target_and_attempt(tmp_path: Path) -> None:

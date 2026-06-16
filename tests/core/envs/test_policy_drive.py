@@ -11,6 +11,7 @@ from fzerox_emulator import (
     ObservationStackMode,
     RaceControlState,
 )
+from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.policy_drive import PolicyDriveRuntime
 from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, EnvConfig, TrainAppConfig
 from rl_fzerox.core.runtime_spec.schema.actions import ActionMaskConfig
@@ -241,6 +242,37 @@ def test_policy_drive_resamples_episode_lean_mask_with_fixed_attempt_seed(
     ]
 
     assert masks == [False, True, False]
+
+
+def test_policy_drive_begin_uses_training_observation_pipeline(tmp_path: Path) -> None:
+    train_config = _train_config(tmp_path)
+    train_env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=train_config.env,
+        reward_config=train_config.reward,
+        curriculum_config=train_config.curriculum,
+    )
+    policy_runtime = PolicyDriveRuntime(
+        emulator=ScriptedPolicyDriveBackend([]),
+        train_config=train_config,
+    )
+
+    training_observation, training_info = train_env.reset(seed=7)
+    policy_observation, policy_info = policy_runtime.begin(seed=7, course_id=None)
+
+    assert isinstance(training_observation, np.ndarray)
+    assert isinstance(policy_observation, np.ndarray)
+    assert np.array_equal(training_observation, policy_observation)
+    assert training_info["observation_shape"] == policy_info["observation_shape"]
+    assert training_info["observation_frame_shape"] == policy_info["observation_frame_shape"]
+    assert training_info["observation_stack"] == policy_info["observation_stack"]
+    assert training_info["observation_stack_mode"] == policy_info["observation_stack_mode"]
+    assert training_info["observation_minimap_layer"] == policy_info["observation_minimap_layer"]
+    assert training_info["observation_resize_filter"] == policy_info["observation_resize_filter"]
+    assert (
+        training_info["observation_minimap_resize_filter"]
+        == policy_info["observation_minimap_resize_filter"]
+    )
 
 
 def _backend_step(
