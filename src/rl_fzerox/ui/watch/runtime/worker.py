@@ -18,21 +18,25 @@ from rl_fzerox.ui.watch.live_series import (
     EpisodeLiveSeriesTracker,
 )
 from rl_fzerox.ui.watch.records import TrackRecordBook
-from rl_fzerox.ui.watch.runtime.baseline import (
-    _save_baseline_state,
-    _save_managed_alt_baseline,
-)
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationSampler,
 )
-from rl_fzerox.ui.watch.runtime.course_commands import (
+from rl_fzerox.ui.watch.runtime.courses.baseline import (
+    _save_baseline_state,
+    _save_managed_alt_baseline,
+)
+from rl_fzerox.ui.watch.runtime.courses.commands import (
     apply_course_navigation_commands,
     next_watch_reset_after_episode,
 )
-from rl_fzerox.ui.watch.runtime.course_navigation import (
+from rl_fzerox.ui.watch.runtime.courses.navigation import (
     WatchCourseRotation,
     sync_watch_rotation_info,
+)
+from rl_fzerox.ui.watch.runtime.courses.sampling import (
+    ManagedTrackSamplingRefresh,
+    missing_generated_x_cup_baseline_paths,
 )
 from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerClosed,
@@ -63,10 +67,6 @@ from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _adjust_control_fps,
     _target_seconds,
-)
-from rl_fzerox.ui.watch.runtime.track_sampling import (
-    ManagedTrackSamplingRefresh,
-    missing_generated_x_cup_baseline_paths,
 )
 from rl_fzerox.ui.watch.runtime.visualization import (
     current_auxiliary_predictions as _current_auxiliary_predictions,
