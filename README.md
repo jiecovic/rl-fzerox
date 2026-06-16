@@ -7,7 +7,12 @@ This repository is still under construction. The teaser shows the current
 checkpoint in action; the checkpoint upload and fuller documentation will follow
 after fine-tuning.
 
-[![rl-fzerox teaser video](https://img.youtube.com/vi/aWTHONOQbAg/maxresdefault.jpg)](https://www.youtube.com/watch?v=aWTHONOQbAg)
+Teaser video: the current policy completes the full Joker Cup on Master
+difficulty, the hardest F-Zero X difficulty.
+
+[![rl-fzerox teaser video - click to watch on YouTube](https://img.youtube.com/vi/aWTHONOQbAg/maxresdefault.jpg)](https://www.youtube.com/watch?v=aWTHONOQbAg)
+
+<https://www.youtube.com/watch?v=aWTHONOQbAg>
 
 ## Requirements
 
