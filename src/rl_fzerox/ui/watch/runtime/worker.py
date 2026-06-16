@@ -18,10 +18,6 @@ from rl_fzerox.ui.watch.live_series import (
     EpisodeLiveSeriesTracker,
 )
 from rl_fzerox.ui.watch.records import TrackRecordBook
-from rl_fzerox.ui.watch.runtime.cnn import (
-    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
-    CnnActivationSampler,
-)
 from rl_fzerox.ui.watch.runtime.courses.baseline import (
     _save_baseline_state,
     _save_managed_alt_baseline,
@@ -48,11 +44,24 @@ from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
     toggle_watch_state_feature,
 )
-from rl_fzerox.ui.watch.runtime.policy import (
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
+    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    CnnActivationSampler,
+)
+from rl_fzerox.ui.watch.runtime.policy.runner import (
     _persist_reload_error,
     _policy_reload_error,
     _reset_policy_runner,
     _sync_policy_curriculum_stage,
+)
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    current_auxiliary_predictions as _current_auxiliary_predictions,
+)
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    current_auxiliary_targets as _current_auxiliary_targets,
+)
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
 from rl_fzerox.ui.watch.runtime.session import (
     open_watch_runtime_session,
@@ -67,15 +76,6 @@ from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _adjust_control_fps,
     _target_seconds,
-)
-from rl_fzerox.ui.watch.runtime.visualization import (
-    current_auxiliary_predictions as _current_auxiliary_predictions,
-)
-from rl_fzerox.ui.watch.runtime.visualization import (
-    current_auxiliary_targets as _current_auxiliary_targets,
-)
-from rl_fzerox.ui.watch.runtime.visualization import (
-    refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
 
 if TYPE_CHECKING:

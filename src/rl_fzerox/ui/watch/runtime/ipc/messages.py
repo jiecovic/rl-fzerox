@@ -10,7 +10,7 @@ from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.records import TrackRecordBook
-from rl_fzerox.ui.watch.runtime.cnn import (
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationNormalizationMode,
     CnnActivationSnapshot,

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.ui.watch.runtime.cnn import (
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
     CnnActivationChannelStats,
     CnnActivationLayer,
     CnnActivationSnapshot,

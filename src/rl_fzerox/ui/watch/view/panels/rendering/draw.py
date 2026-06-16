@@ -12,7 +12,7 @@ from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.records import TrackRecordBook
-from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.runtime.policy.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.components.observation_strip import _draw_observation_preview_in_rect
 from rl_fzerox.ui.watch.view.panels.core.model import (

@@ -21,13 +21,13 @@ from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSess
 from rl_fzerox.ui.watch.runtime.career_mode.timing import (
     native_frame_seconds as _native_frame_seconds,
 )
-from rl_fzerox.ui.watch.runtime.cnn import (
+from rl_fzerox.ui.watch.runtime.ipc import publish_worker_message
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationNormalizationMode,
     CnnActivationSampler,
     CnnActivationSnapshot,
 )
-from rl_fzerox.ui.watch.runtime.ipc import publish_worker_message
 from rl_fzerox.ui.watch.runtime.snapshots import _build_snapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
 from rl_fzerox.ui.watch.runtime.timing import RateMeter

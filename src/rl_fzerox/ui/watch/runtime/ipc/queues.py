@@ -12,16 +12,16 @@ from typing import Protocol
 from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import ViewerInput
-from rl_fzerox.ui.watch.runtime.cnn import (
-    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
-    CnnActivationNormalizationMode,
-)
 from rl_fzerox.ui.watch.runtime.ipc.messages import (
     ViewerCommand,
     WatchSnapshot,
     WorkerClosed,
     WorkerCommandBatch,
     WorkerError,
+)
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
+    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    CnnActivationNormalizationMode,
 )
 
 

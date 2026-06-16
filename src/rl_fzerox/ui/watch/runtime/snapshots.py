@@ -25,14 +25,14 @@ from rl_fzerox.core.policy.auxiliary_state import (
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.records import TrackRecordBook
-from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import (
     PolicyObservationSnapshot,
     WatchSnapshot,
     WorkerMessageQueue,
     publish_worker_message,
 )
-from rl_fzerox.ui.watch.runtime.policy import (
+from rl_fzerox.ui.watch.runtime.policy.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.runtime.policy.runner import (
     _policy_curriculum_stage,
     _policy_deterministic,
     _policy_experience_frames,

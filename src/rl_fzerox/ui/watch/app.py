@@ -18,7 +18,7 @@ from rl_fzerox.ui.watch.runtime import (
     start_watch_worker,
     wait_initial_snapshot,
 )
-from rl_fzerox.ui.watch.runtime.cnn import (
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     next_cnn_activation_normalization,
 )

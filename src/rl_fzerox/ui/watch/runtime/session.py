@@ -19,7 +19,7 @@ from rl_fzerox.core.training.session.artifacts import (
     load_engine_tuning_checkpoint_state,
 )
 from rl_fzerox.ui.watch.runtime.observation import configured_watch_zeroed_features
-from rl_fzerox.ui.watch.runtime.policy import (
+from rl_fzerox.ui.watch.runtime.policy.runner import (
     _load_policy_runner,
     _sync_policy_curriculum_stage,
 )

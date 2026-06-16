@@ -28,25 +28,25 @@ from rl_fzerox.ui.watch.runtime.career_mode.timing import (
     target_game_fps,
     with_measured_game_fps,
 )
-from rl_fzerox.ui.watch.runtime.cnn import (
+from rl_fzerox.ui.watch.runtime.observation import apply_watch_state_feature_zeroing
+from rl_fzerox.ui.watch.runtime.policy.cnn import (
     CnnActivationNormalizationMode,
     CnnActivationSampler,
     CnnActivationSnapshot,
 )
-from rl_fzerox.ui.watch.runtime.observation import apply_watch_state_feature_zeroing
-from rl_fzerox.ui.watch.runtime.policy import _policy_reload_error
+from rl_fzerox.ui.watch.runtime.policy.runner import _policy_reload_error
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    current_auxiliary_predictions as _current_auxiliary_predictions,
+)
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    current_auxiliary_targets as _current_auxiliary_targets,
+)
 from rl_fzerox.ui.watch.runtime.snapshots import (
     _next_boost_lamp_level,
     _publish_step_snapshots,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry, _telemetry_to_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
-from rl_fzerox.ui.watch.runtime.visualization import (
-    current_auxiliary_predictions as _current_auxiliary_predictions,
-)
-from rl_fzerox.ui.watch.runtime.visualization import (
-    current_auxiliary_targets as _current_auxiliary_targets,
-)
 
 
 @dataclass(frozen=True, slots=True)

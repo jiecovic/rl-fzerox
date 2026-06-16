@@ -68,24 +68,24 @@ from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
     toggle_watch_state_feature,
 )
-from rl_fzerox.ui.watch.runtime.policy import (
+from rl_fzerox.ui.watch.runtime.policy.runner import (
     _policy_reload_error,
     _reset_policy_runner,
+)
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    current_auxiliary_predictions as _current_auxiliary_predictions,
+)
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    current_auxiliary_targets as _current_auxiliary_targets,
+)
+from rl_fzerox.ui.watch.runtime.policy.visualization import (
+    refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
 from rl_fzerox.ui.watch.runtime.snapshots import _build_snapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
 from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,
     _target_seconds,
-)
-from rl_fzerox.ui.watch.runtime.visualization import (
-    current_auxiliary_predictions as _current_auxiliary_predictions,
-)
-from rl_fzerox.ui.watch.runtime.visualization import (
-    current_auxiliary_targets as _current_auxiliary_targets,
-)
-from rl_fzerox.ui.watch.runtime.visualization import (
-    refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
 
 
