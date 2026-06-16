@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from hashlib import blake2b
 
 from rl_fzerox.core.engine_tuning import (
+    BanditEngineTunerSettings,
     EngineTunerBackend,
     EngineTunerSettings,
     EngineTuningCandidateEstimate,
@@ -16,6 +17,7 @@ from rl_fzerox.core.engine_tuning import (
     MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
+from rl_fzerox.core.engine_tuning.types import engine_bucket_candidates
 
 ENGINE_TUNING_DISTRIBUTION_DRAWS = 128
 
@@ -36,9 +38,7 @@ def engine_tuning_state_payload(
             _engine_tuning_candidate_payload(candidate) for candidate in payload_state.candidates
         ],
         "contexts": (
-            []
-            if settings is None
-            else _engine_tuning_context_payloads(payload_state, settings)
+            [] if settings is None else _engine_tuning_context_payloads(payload_state, settings)
         ),
     }
 
@@ -49,7 +49,105 @@ def _payload_state(
 ) -> EngineTuningRuntimeState:
     if settings is None:
         return state
+    if isinstance(settings, BanditEngineTunerSettings):
+        state = _bandit_payload_state(state, settings)
     return OrderedEngineTuner(settings=settings, state=state).state
+
+
+def _bandit_payload_state(
+    state: EngineTuningRuntimeState,
+    settings: BanditEngineTunerSettings,
+) -> EngineTuningRuntimeState:
+    candidates = engine_bucket_candidates(
+        minimum=settings.min_raw_value,
+        maximum=settings.max_raw_value,
+        bucket_size=settings.bucket_size,
+    )
+    buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
+    for candidate in state.candidates:
+        if candidate.finish_count <= 0:
+            continue
+        bucket = _nearest_bucket(candidate.engine_setting_raw_value, candidates)
+        if bucket is None:
+            continue
+        key = (candidate.context_key, bucket)
+        buckets[key] = _bucketed_payload_candidate(
+            existing=buckets.get(key),
+            source=candidate,
+            engine_raw=bucket,
+        )
+    return EngineTuningRuntimeState(
+        version=state.version,
+        update_count=state.update_count,
+        candidates=tuple(
+            sorted(
+                buckets.values(),
+                key=lambda candidate: (
+                    candidate.context_key,
+                    candidate.engine_setting_raw_value,
+                ),
+            )
+        ),
+        model_state=None,
+    )
+
+
+def _nearest_bucket(raw_value: int, candidates: tuple[int, ...]) -> int | None:
+    if not candidates:
+        return None
+    raw_bucket = int(raw_value)
+    if raw_bucket < candidates[0] or raw_bucket > candidates[-1]:
+        return None
+    return min(candidates, key=lambda candidate: (abs(candidate - raw_bucket), candidate))
+
+
+def _bucketed_payload_candidate(
+    *,
+    existing: EngineTuningCandidateState | None,
+    source: EngineTuningCandidateState,
+    engine_raw: int,
+) -> EngineTuningCandidateState:
+    if existing is None:
+        return EngineTuningCandidateState(
+            context_key=source.context_key,
+            course_key=source.course_key,
+            vehicle_id=source.vehicle_id,
+            engine_setting_raw_value=int(engine_raw),
+            finish_count=max(0, int(source.finish_count)),
+            decayed_count=max(0.0, float(source.decayed_count)),
+            decayed_score_total=float(source.decayed_score_total),
+            score_total=float(source.score_total),
+            best_score=source.best_score,
+            best_time_ms=source.best_time_ms,
+        )
+    return EngineTuningCandidateState(
+        context_key=existing.context_key,
+        course_key=existing.course_key,
+        vehicle_id=existing.vehicle_id,
+        engine_setting_raw_value=existing.engine_setting_raw_value,
+        finish_count=existing.finish_count + max(0, int(source.finish_count)),
+        decayed_count=existing.decayed_count + max(0.0, float(source.decayed_count)),
+        decayed_score_total=existing.decayed_score_total + float(source.decayed_score_total),
+        score_total=existing.score_total + float(source.score_total),
+        best_score=_max_optional_score(existing.best_score, source.best_score),
+        best_time_ms=_min_optional_time(existing.best_time_ms, source.best_time_ms),
+    )
+
+
+def _max_optional_score(left: float | None, right: float | None) -> float | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return max(left, right)
+
+
+def _min_optional_time(left: int | None, right: int | None) -> int | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return min(left, right)
 
 
 def _model_backend(
