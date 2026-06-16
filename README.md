@@ -7,8 +7,9 @@ This repository is still under construction. The teaser shows the current
 checkpoint in action; the checkpoint upload and fuller documentation will follow
 after fine-tuning.
 
-Teaser video: the current policy completes the full Joker Cup on Master
-difficulty, the hardest F-Zero X difficulty.
+Teaser video: the current policy can unlock everything by completing all cups on
+Master, the hardest F-Zero X difficulty. This run shows one example: winning the
+full Joker Cup on Master.
 
 [![rl-fzerox teaser video - click to watch on YouTube](https://img.youtube.com/vi/aWTHONOQbAg/maxresdefault.jpg)](https://www.youtube.com/watch?v=aWTHONOQbAg)
 
