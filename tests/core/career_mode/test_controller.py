@@ -10,6 +10,9 @@ from rl_fzerox.core.career_mode.runner.controller import (
     CareerModeController,
     _cup_selection_input,
 )
+from rl_fzerox.core.career_mode.runner.controller.recording import (
+    CareerRecordingSegmentTracker,
+)
 from rl_fzerox.core.career_mode.runner.menu import (
     MENU_TIMING,
     CareerPhase,
@@ -138,44 +141,40 @@ def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path)
     assert resolver.refresh_requests == [False, True, False]
 
 
-def test_recording_segment_close_waits_for_clean_cup_exit(tmp_path: Path) -> None:
-    controller = _controller(tmp_path)
+def test_recording_segment_close_waits_for_clean_cup_exit() -> None:
+    tracker = CareerRecordingSegmentTracker()
 
-    controller._observe_recording_terminal_result({"termination_reason": "finished"})
-    controller._observe_recording_progress_screen(MenuFacts.from_info({"game_mode": "results"}))
-    assert controller.pop_recording_segment_close() is None
+    tracker.observe_terminal_result({"termination_reason": "finished"})
+    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "results"}))
+    assert tracker.pop_close() is None
 
-    controller._observe_recording_progress_screen(
-        MenuFacts.from_info({"game_mode": "gp_race_next_course"})
-    )
-    assert controller.pop_recording_segment_close() is None
+    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "gp_race_next_course"}))
+    assert tracker.pop_close() is None
 
-    controller._observe_recording_progress_screen(
-        MenuFacts.from_info({"game_mode": "gp_end_cutscene"})
-    )
-    assert controller.pop_recording_segment_close() is None
+    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "gp_end_cutscene"}))
+    assert tracker.pop_close() is None
 
-    controller._observe_recording_progress_screen(MenuFacts.from_info({"game_mode": "main_menu"}))
-    close = controller.pop_recording_segment_close()
+    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "main_menu"}))
+    close = tracker.pop_close()
 
     assert close is not None
     assert close.status == "succeeded"
-    assert controller.pop_recording_segment_close() is None
+    assert tracker.pop_close() is None
 
 
-def test_recording_segment_close_marks_game_over_failed(tmp_path: Path) -> None:
-    controller = _controller(tmp_path)
+def test_recording_segment_close_marks_game_over_failed() -> None:
+    tracker = CareerRecordingSegmentTracker()
 
-    controller._observe_recording_terminal_result({"termination_reason": "retired"})
-    controller._observe_recording_progress_screen(MenuFacts.from_info({"game_mode": "results"}))
-    assert controller.pop_recording_segment_close() is None
+    tracker.observe_terminal_result({"termination_reason": "retired"})
+    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "results"}))
+    assert tracker.pop_close() is None
 
-    controller._observe_recording_progress_screen(MenuFacts.from_info({"game_mode": "game_over"}))
-    close = controller.pop_recording_segment_close()
+    tracker.observe_progress_screen(MenuFacts.from_info({"game_mode": "game_over"}))
+    close = tracker.pop_close()
 
     assert close is not None
     assert close.status == "failed"
-    assert controller.pop_recording_segment_close() is None
+    assert tracker.pop_close() is None
 
 
 class _PolicyResolverStub:

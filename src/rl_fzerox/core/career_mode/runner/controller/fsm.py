@@ -1,12 +1,15 @@
-# src/rl_fzerox/core/career_mode/runner/controller.py
+# src/rl_fzerox/core/career_mode/runner/controller/fsm.py
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol
 
 from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
+from rl_fzerox.core.career_mode.runner.controller.recording import (
+    CareerRecordingSegmentClose,
+    CareerRecordingSegmentTracker,
+)
 from rl_fzerox.core.career_mode.runner.menu import (
     GP_MENU_ORDER,
     MENU_TIMING,
@@ -58,8 +61,6 @@ from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.models import SaveAttemptStatus
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchAppConfig
 
-CareerRecordingSegmentStatus = Literal["succeeded", "failed"]
-
 
 class CareerRuntimeEmulator(CameraSyncBackend, SaveRamSession, Protocol):
     """Emulator operations needed by the Career Mode controller."""
@@ -72,13 +73,6 @@ class CareerRuntimeSession(Protocol):
     def emulator(self) -> CareerRuntimeEmulator: ...
 
 
-@dataclass(frozen=True, slots=True)
-class CareerRecordingSegmentClose:
-    """FSM-owned signal that one cup-attempt recording segment should close."""
-
-    status: CareerRecordingSegmentStatus
-
-
 class CareerModeController:
     """Own the live Career Mode FSM and side-effect boundaries.
 
@@ -86,18 +80,29 @@ class CareerModeController:
     the watch runner is active. Persistent save progress is an output of those
     transitions, not the authority for live control or recording lifecycle.
 
-    High-level phases:
-    - BOOT/SELECT/ENTER phases navigate menus into a GP race.
-    - POLICY_RACE delegates race inputs to the loaded policy.
-    - CONTINUE_AFTER_RACE advances result, next-course, ceremony, game-over,
-      and post-GP screens until either a fresh race is ready or the cup attempt
-      has exited back to menu/title/game-over.
+    FSM map:
+    1. BOOT_TO_DIFFICULTY navigates title/main-menu screens until GP mode and
+       the configured difficulty are selected.
+    2. ENTER_COURSE_SELECT, SELECT_CUP, SELECT_MACHINE, ENTER_MACHINE_SETTINGS,
+       and APPLY_ENGINE prepare the requested cup/course/machine setup.
+    3. ENTER_RACE waits for the game to expose a fresh GP race, resolves the
+       policy checkpoint for that course, synchronizes camera state, and then
+       enters POLICY_RACE.
+    4. POLICY_RACE delegates control to the policy until a terminal race result
+       is observed. Terminal results move the FSM into CONTINUE_AFTER_RACE.
+    5. CONTINUE_AFTER_RACE advances result screens, next-course handoff,
+       post-GP success ceremony/credits, game-over, and retry/menu exits. A
+       next-course screen keeps the same cup attempt alive; a post-GP exit or
+       game-over/menu exit ends the cup attempt segment.
 
-    Recording segments are cup-attempt segments. The recorder should not infer
-    those boundaries from manager DB state. This FSM records terminal race
-    results as they happen, then emits CareerRecordingSegmentClose when the
-    game flow leaves the cup attempt. That keeps recording aligned with visible
-    game flow even if save-progress persistence catches up earlier or later.
+    Side-effect ownership:
+    - Save progress is written from terminal/progress transitions for manager UI
+      sync and save history, but it is not queried back as live control truth.
+    - Checkpoint refresh is armed only after a finished cup attempt and applied
+      at the next policy handoff, never between courses of the same attempt.
+    - Recording segments are full cup attempts. The FSM emits
+      CareerRecordingSegmentClose when visible game flow leaves the attempt; the
+      recorder only consumes that signal and writes files.
     """
 
     def __init__(
@@ -139,14 +144,7 @@ class CareerModeController:
         self._last_finished_attempt_status: SaveAttemptStatus | None = None
         self._last_finished_attempt_failure_reason: str | None = None
         self._refresh_policy_artifact_on_next_handoff = False
-        # Recording lifecycle for the current cup attempt. We track only
-        # visible FSM/game-flow facts here: terminal race result seen, whether
-        # any course failed, and whether the post-GP success ceremony/credits
-        # were reached before exiting to menu/title/game-over.
-        self._recording_terminal_result_seen = False
-        self._recording_failed_result_seen = False
-        self._recording_post_gp_seen = False
-        self._pending_recording_segment_close: CareerRecordingSegmentClose | None = None
+        self._recording = CareerRecordingSegmentTracker()
         self._policy_resolver = CareerPolicyResolver(
             store=store,
             setup=self._setup,
@@ -452,9 +450,7 @@ class CareerModeController:
         return career_debug_context(info=info, state=self._view_state())
 
     def pop_recording_segment_close(self) -> CareerRecordingSegmentClose | None:
-        close = self._pending_recording_segment_close
-        self._pending_recording_segment_close = None
-        return close
+        return self._recording.pop_close()
 
     def _view_state(self) -> CareerControllerViewState:
         return CareerControllerViewState(
@@ -784,7 +780,7 @@ class CareerModeController:
             info=info,
             terminal_reason=terminal_reason,
         )
-        self._observe_recording_terminal_result(resolved_terminal_info)
+        self._recording.observe_terminal_result(resolved_terminal_info)
         info.update(resolved_terminal_info)
         transition = self._progress.handle_terminal_race(
             session=session,
@@ -836,7 +832,7 @@ class CareerModeController:
         self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
-        self._reset_recording_segment_progress()
+        self._recording.reset()
 
     def _enter_continue_after_race(self) -> None:
         self._pending_steps.clear()
@@ -890,7 +886,7 @@ class CareerModeController:
         facts = MenuFacts.from_info(info)
         if not post_terminal_progress_screen(facts):
             return False
-        self._observe_recording_progress_screen(facts)
+        self._recording.observe_progress_screen(facts)
         if self._last_progress_sync_continue_pulse == self._continue_after_race_pulses:
             return False
 
@@ -904,39 +900,6 @@ class CareerModeController:
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         return transition.attempt_finished
-
-    def _observe_recording_terminal_result(self, info: dict[str, object]) -> None:
-        """Track terminal course outcomes for the current cup attempt segment."""
-
-        reason = info.get("termination_reason")
-        if reason not in {"finished", "retired", "crashed"}:
-            return
-        self._recording_terminal_result_seen = True
-        if reason in {"retired", "crashed"}:
-            self._recording_failed_result_seen = True
-
-    def _observe_recording_progress_screen(self, facts: MenuFacts) -> None:
-        """Emit a segment-close signal when the FSM leaves the cup attempt."""
-
-        if not self._recording_terminal_result_seen:
-            return
-        if facts.is_post_gp_screen:
-            self._recording_post_gp_seen = True
-            return
-        if not _recording_segment_exit_screen(facts):
-            return
-        status: CareerRecordingSegmentStatus = (
-            "failed"
-            if self._recording_failed_result_seen or not self._recording_post_gp_seen
-            else "succeeded"
-        )
-        self._pending_recording_segment_close = CareerRecordingSegmentClose(status=status)
-        self._reset_recording_segment_progress()
-
-    def _reset_recording_segment_progress(self) -> None:
-        self._recording_terminal_result_seen = False
-        self._recording_failed_result_seen = False
-        self._recording_post_gp_seen = False
 
     def _reset_camera_sync(self) -> None:
         self._camera.reset()
@@ -1016,15 +979,6 @@ def _pending_step_matches_observed_screen(
             ObservedMenuScreen.POST_GP,
         }
     return False
-
-
-def _recording_segment_exit_screen(facts: MenuFacts) -> bool:
-    return (
-        facts.is_title
-        or facts.is_mode_select
-        or facts.is_course_select
-        or facts.game_mode == "game_over"
-    )
 
 
 def _cup_selection_input(*, selected_cup_index: int | None, target_cup_index: int) -> MenuInput:
