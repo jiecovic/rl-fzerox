@@ -38,7 +38,8 @@ class RewardMainWeights:
     manual_boost_reward_min_energy_value: float = 0.0
     manual_boost_reward_full_energy_fraction: float = 1.0
     manual_boost_reward_energy_curve: str = "linear"
-    boost_pad_reward: float = 10.0
+    boost_pad_reward_before_unlock: float = 10.0
+    boost_pad_reward_after_unlock: float = 10.0
     boost_pad_reward_progress_window: float = 800.0
     energy_refill_progress_multiplier: float = 3.0
     dirt_progress_multiplier: float = 1.0

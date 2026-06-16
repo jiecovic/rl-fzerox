@@ -57,7 +57,8 @@ class ManagedRewardConfig(BaseModel):
     manual_boost_reward_min_energy_value: float = 0.0
     manual_boost_reward_full_energy_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
     manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] = "linear"
-    boost_pad_reward: NonNegativeFloat = 10.0
+    boost_pad_reward_before_unlock: NonNegativeFloat = 10.0
+    boost_pad_reward_after_unlock: NonNegativeFloat = 10.0
     boost_pad_reward_progress_window: PositiveFloat = 800.0
     lean_request_penalty: float = Field(default=-0.003, le=0.0)
     lean_activation_penalty: float = Field(default=0.0, le=0.0)

@@ -56,7 +56,8 @@ def test_reward_main_rewards_dash_pad_boost_entries_once_per_progress_window() -
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            boost_pad_reward=0.5,
+            boost_pad_reward_before_unlock=0.5,
+            boost_pad_reward_after_unlock=0.5,
             boost_pad_reward_progress_window=1_000.0,
             time_penalty_per_frame=0.0,
             impact_frame_penalty=0.0,
@@ -92,6 +93,45 @@ def test_reward_main_rewards_dash_pad_boost_entries_once_per_progress_window() -
     assert first.breakdown["boost_pad"] == 0.5
     assert "boost_pad" not in blocked_same_window.breakdown
     assert rewarded_next_window.breakdown["boost_pad"] == 0.5
+
+
+def test_reward_main_splits_dash_pad_reward_by_manual_boost_unlock() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            boost_pad_reward_before_unlock=1.25,
+            boost_pad_reward_after_unlock=0.25,
+            boost_pad_reward_progress_window=100.0,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    before_unlock = tracker.step_summary(
+        _summary(
+            max_race_distance=100.0,
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
+        ),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, course_effect_raw=_COURSE_EFFECT_DASH),
+    )
+    after_unlock = tracker.step_summary(
+        _summary(
+            max_race_distance=200.0,
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
+        ),
+        _status(step_count=2),
+        _telemetry(
+            race_distance=200.0,
+            course_effect_raw=_COURSE_EFFECT_DASH,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+
+    assert before_unlock.breakdown["boost_pad"] == 1.25
+    assert after_unlock.breakdown["boost_pad"] == 0.25
 
 
 def test_reward_main_uses_course_reward_override() -> None:

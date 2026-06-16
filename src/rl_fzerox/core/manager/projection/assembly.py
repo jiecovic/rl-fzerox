@@ -117,7 +117,8 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
             reward.manual_boost_reward_full_energy_fraction
         ),
         "manual_boost_reward_energy_curve": reward.manual_boost_reward_energy_curve,
-        "boost_pad_reward": reward.boost_pad_reward,
+        "boost_pad_reward_before_unlock": reward.boost_pad_reward_before_unlock,
+        "boost_pad_reward_after_unlock": reward.boost_pad_reward_after_unlock,
         "boost_pad_reward_progress_window": reward.boost_pad_reward_progress_window,
         "lean_request_penalty": reward.lean_request_penalty,
         "lean_activation_penalty": reward.lean_activation_penalty,

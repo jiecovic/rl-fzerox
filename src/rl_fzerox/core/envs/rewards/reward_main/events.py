@@ -30,11 +30,16 @@ class BoostPadRewardTracker:
         entered_dash_surface: bool,
         reverse_active_frames: int,
         *,
+        boost_unlocked: bool,
         relative_progress: float,
         frontier_distance_before_step: float,
         weights: SharedRewardWeights,
     ) -> float:
-        reward = weights.boost_pad_reward
+        reward = (
+            weights.boost_pad_reward_after_unlock
+            if boost_unlocked
+            else weights.boost_pad_reward_before_unlock
+        )
         if reward <= 0.0 or not entered_dash_surface or reverse_active_frames > 0:
             return 0.0
         if relative_progress < frontier_distance_before_step:

@@ -119,7 +119,8 @@ class RewardCourseOverrideConfig(BaseModel):
     manual_boost_reward_min_energy_value: float | None = None
     manual_boost_reward_full_energy_fraction: float | None = Field(default=None, gt=0.0, le=1.0)
     manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] | None = None
-    boost_pad_reward: NonNegativeFloat | None = None
+    boost_pad_reward_before_unlock: NonNegativeFloat | None = None
+    boost_pad_reward_after_unlock: NonNegativeFloat | None = None
     boost_pad_reward_progress_window: PositiveFloat | None = None
     failure_penalty: float | None = None
     truncation_penalty: float | None = None
@@ -198,7 +199,8 @@ class RewardConfig(BaseModel):
     manual_boost_reward_min_energy_value: float = 0.0
     manual_boost_reward_full_energy_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
     manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] = "linear"
-    boost_pad_reward: NonNegativeFloat = 0.0
+    boost_pad_reward_before_unlock: NonNegativeFloat = 0.0
+    boost_pad_reward_after_unlock: NonNegativeFloat = 0.0
     boost_pad_reward_progress_window: PositiveFloat = 1_000.0
     failure_penalty: float = -20.0
     truncation_penalty: float = -20.0
