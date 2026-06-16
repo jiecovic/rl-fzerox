@@ -8,18 +8,21 @@ import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 export function ConfigPanel({
   children,
   className,
+  id,
   onReset,
   title,
   wide = false,
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
   onReset?: () => void;
   title: string;
   wide?: boolean;
 }) {
   return (
     <section
+      id={id}
       className={cn(
         "grid content-start items-start gap-3 border border-app-border bg-app-surface-muted p-3.5",
         wide ? "col-span-full" : undefined,

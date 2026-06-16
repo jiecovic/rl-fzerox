@@ -78,6 +78,7 @@ interface PendingEngineTuningLaunch {
 }
 
 const POLICY_PREVIEW_DEBOUNCE_MS = 250;
+const ACTION_ENTROPY_PANEL_ID = "action-entropy-coefficients";
 
 export function Configurator({
   active = true,
@@ -112,6 +113,7 @@ export function Configurator({
   const [isSaving, setIsSaving] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingScrollTargetId, setPendingScrollTargetId] = useState<string | null>(null);
   const [pendingEngineTuningLaunch, setPendingEngineTuningLaunch] =
     useState<PendingEngineTuningLaunch | null>(null);
   const configRef = useRef(config);
@@ -226,6 +228,21 @@ export function Configurator({
   useEffect(() => {
     notifyConfigChange(config);
   }, [config]);
+
+  useEffect(() => {
+    if (section !== "action" || pendingScrollTargetId === null) {
+      return undefined;
+    }
+    const animationFrameId = window.requestAnimationFrame(() => {
+      document
+        .getElementById(pendingScrollTargetId)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setPendingScrollTargetId(null);
+    });
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [pendingScrollTargetId, section]);
 
   function committedConfigSnapshot() {
     const activeElement = document.activeElement;
@@ -382,6 +399,11 @@ export function Configurator({
     onGlobalError(null);
   }
 
+  function openActionEntropy() {
+    setPendingScrollTargetId(ACTION_ENTROPY_PANEL_ID);
+    setSection("action");
+  }
+
   const forkedAtLabel = loadedDraft === null ? null : formatDate(loadedDraft.created_at);
   const forkSourceStepCount = loadedDraft?.source_num_timesteps ?? null;
   const configIssue = fixedEnvAssignmentIssue(config);
@@ -532,7 +554,7 @@ export function Configurator({
           config={config}
           defaultConfig={baseConfig}
           setConfig={setConfig}
-          onOpenActionEntropy={() => setSection("action")}
+          onOpenActionEntropy={openActionEntropy}
         />
       ) : null}
       {section === "observation" ? (

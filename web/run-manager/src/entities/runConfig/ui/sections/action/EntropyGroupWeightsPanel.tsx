@@ -47,6 +47,7 @@ export function EntropyGroupWeightsPanel({
 
   return (
     <ConfigPanel
+      id="action-entropy-coefficients"
       title="Entropy coefficients"
       wide
       onReset={() => updateTrain({ entropy_coefficients: defaultTrain.entropy_coefficients })}

@@ -214,7 +214,7 @@ export function TrainingSection({
               onChange={setEntropyEnabled}
             />
             <Button className="justify-self-start px-3" onClick={onOpenActionEntropy}>
-              Action entropy
+              Go to action entropy
             </Button>
           </div>
           <RangeNumberField

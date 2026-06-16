@@ -334,55 +334,71 @@ describe("Configurator", () => {
   it("stores action entropy coefficients from the action tab", async () => {
     const user = userEvent.setup();
     const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
-
-    render(
-      <Configurator
-        baseConfig={managedRunConfigFixture}
-        existingNames={[]}
-        initialDraftName="entropy group draft"
-        loadedDraft={null}
-        metadata={configMetadataFixture}
-        onGlobalError={vi.fn()}
-        onLaunchRun={launchRunMock()}
-        onSaveDraft={onSaveDraft}
-        onUpdateDraft={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Training" }));
-    expect(screen.getByRole("button", { name: "Action entropy" })).toBeInTheDocument();
-    expect(screen.queryByText("Entropy coefficients")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Action entropy" }));
-    const entropyPanel = screen.getByText("Entropy coefficients").closest("section");
-    if (!(entropyPanel instanceof HTMLElement)) {
-      throw new Error("Missing entropy coefficients panel");
-    }
-
-    const pitchGroup = within(entropyPanel).getByRole("region", {
-      name: "Pitch entropy coefficient",
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
     });
-    expect(within(pitchGroup).getByRole("textbox", { name: "Coefficient" })).toHaveValue("0.01");
 
-    const pitchEntropy = within(pitchGroup).getByRole("button", { name: "Pitch" });
-    const pitchCoefficient = within(pitchGroup).getByRole("textbox", { name: "Coefficient" });
-    expect(pitchEntropy).toHaveAttribute("aria-pressed", "true");
-    await user.click(pitchEntropy);
-    expect(pitchEntropy).toHaveAttribute("aria-pressed", "false");
-    expect(pitchCoefficient).toHaveValue("0");
+    try {
+      render(
+        <Configurator
+          baseConfig={managedRunConfigFixture}
+          existingNames={[]}
+          initialDraftName="entropy group draft"
+          loadedDraft={null}
+          metadata={configMetadataFixture}
+          onGlobalError={vi.fn()}
+          onLaunchRun={launchRunMock()}
+          onSaveDraft={onSaveDraft}
+          onUpdateDraft={vi.fn()}
+        />,
+      );
 
-    await user.click(screen.getByRole("button", { name: "Save draft" }));
+      await user.click(screen.getByRole("button", { name: "Training" }));
+      expect(screen.getByRole("button", { name: "Go to action entropy" })).toBeInTheDocument();
+      expect(screen.queryByText("Entropy coefficients")).not.toBeInTheDocument();
 
-    await waitFor(() =>
-      expect(onSaveDraft).toHaveBeenCalledWith(
-        "entropy group draft",
-        expect.objectContaining({
-          train: expect.objectContaining({
-            entropy_coefficients: expect.objectContaining({ pitch: 0 }),
+      await user.click(screen.getByRole("button", { name: "Go to action entropy" }));
+      const entropyPanel = screen.getByText("Entropy coefficients").closest("section");
+      if (!(entropyPanel instanceof HTMLElement)) {
+        throw new Error("Missing entropy coefficients panel");
+      }
+      await waitFor(() =>
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" }),
+      );
+
+      const pitchGroup = within(entropyPanel).getByRole("region", {
+        name: "Pitch entropy coefficient",
+      });
+      expect(within(pitchGroup).getByRole("textbox", { name: "Coefficient" })).toHaveValue("0.01");
+
+      const pitchEntropy = within(pitchGroup).getByRole("button", { name: "Pitch" });
+      const pitchCoefficient = within(pitchGroup).getByRole("textbox", { name: "Coefficient" });
+      expect(pitchEntropy).toHaveAttribute("aria-pressed", "true");
+      await user.click(pitchEntropy);
+      expect(pitchEntropy).toHaveAttribute("aria-pressed", "false");
+      expect(pitchCoefficient).toHaveValue("0");
+
+      await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+      await waitFor(() =>
+        expect(onSaveDraft).toHaveBeenCalledWith(
+          "entropy group draft",
+          expect.objectContaining({
+            train: expect.objectContaining({
+              entropy_coefficients: expect.objectContaining({ pitch: 0 }),
+            }),
           }),
-        }),
-      ),
-    );
+        ),
+      );
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: originalScrollIntoView,
+      });
+    }
   });
 
   it("allows grounded pitch actor loss edits on checkpoint forks", async () => {
