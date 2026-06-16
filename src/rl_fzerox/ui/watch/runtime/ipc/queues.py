@@ -74,7 +74,7 @@ def start_watch_worker(config: WatchAppConfig) -> WatchWorker:
     command_queue = context.Queue()
     snapshot_queue = context.Queue(maxsize=2)
 
-    from rl_fzerox.ui.watch.runtime.worker import run_simulation_worker
+    from rl_fzerox.ui.watch.runtime.live.worker import run_simulation_worker
 
     process = context.Process(
         target=run_simulation_worker,
