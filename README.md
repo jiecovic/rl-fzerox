@@ -3,17 +3,19 @@
 Experimental deep reinforcement-learning project for training agents to race in
 F-Zero X through a libretro N64 emulator.
 
-This repository is still under construction. A trained checkpoint and fuller
-documentation are planned soon.
+This repository is still under construction. The teaser shows the current
+checkpoint in action; the checkpoint upload and fuller documentation will follow
+after fine-tuning.
 
 [![rl-fzerox teaser video](https://img.youtube.com/vi/aWTHONOQbAg/maxresdefault.jpg)](https://www.youtube.com/watch?v=aWTHONOQbAg)
 
 ## Requirements
 
 - Linux userspace, either native Linux or Windows with WSL2
-- Python 3.11
+- Python 3.11 or newer
 - Rust toolchain with Cargo
-- Node.js and npm
+- Node.js 20.19+, 22.12+, or 24+, with npm
+- `just`
 - Mupen64Plus-Next libretro core shared library
 - a local US F-Zero X ROM
 - `sb3x-extensions`
@@ -37,9 +39,12 @@ just native
 just run-manager-install
 ```
 
+`just run-manager-install` installs the local React frontend dependencies used
+by `just fzerox`.
+
 `local/` is the ignored machine-local workspace. After clone, it contains empty
 placeholder folders for required runtime assets. Example paths used by the
-default run-manager config:
+default app config:
 
 ```text
 local/libretro/mupen64plus_next_libretro.so
@@ -55,13 +60,13 @@ are included in git.
 Tracked runtime binary policy is documented in
 [docs/runtime_assets.md](docs/runtime_assets.md).
 
-## Run Manager
+## F-Zero X App
 
-The run manager is the local UI/API for editing experiment specs, launching
-training, watching policies, and tracking run state.
+The local UI/API is used for editing experiment specs, launching training,
+watching policies, and tracking run state.
 
 ```bash
-just run-manager
+just fzerox
 ```
 
 The UI runs at `http://localhost:5174`. The local API runs at
