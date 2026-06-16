@@ -1,7 +1,12 @@
 # rl-fzerox
 
-  Experimental deep reinforcement-learning project for training agents to race in
+Experimental deep reinforcement-learning project for training agents to race in
 F-Zero X through a libretro N64 emulator.
+
+This repository is still under construction. A trained checkpoint and fuller
+documentation are planned soon.
+
+[![rl-fzerox teaser video](https://img.youtube.com/vi/aWTHONOQbAg/maxresdefault.jpg)](https://www.youtube.com/watch?v=aWTHONOQbAg)
 
 ## Requirements
 
