@@ -40,6 +40,14 @@ def _discrete_gas_boost_action(*, boost_index: int = 0) -> Int64Array:
     return np.array([3, 0, boost_index], dtype=np.int64)
 
 
+def _discrete_gas_air_brake_boost_action(
+    *,
+    air_brake_index: int = 0,
+    boost_index: int = 0,
+) -> Int64Array:
+    return np.array([3, 0, air_brake_index, boost_index], dtype=np.int64)
+
+
 def _hybrid_boost_lean_action(
     *,
     boost_index: int = 0,
@@ -344,6 +352,124 @@ def test_env_action_masks_can_mask_lean_for_full_episode() -> None:
     assert info["spin_requested"] is False
     assert not backend.last_race_control_state.lean_left
     assert not backend.last_race_control_state.lean_right
+
+
+def test_env_action_masks_can_mask_discrete_air_brake_for_full_episode() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "air_brake",
+                "boost",
+                air_brake_episode_mask_probability=1.0,
+                mask_air_brake_on_ground=False,
+            ),
+        ),
+    )
+
+    _, reset_info = env.reset(seed=1)
+
+    assert reset_info["air_brake_episode_masked"] is True
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 2) + [True, False] + ([True] * 2)
+    )
+
+    _, _, _, _, info = env.step(_discrete_gas_air_brake_boost_action(air_brake_index=1))
+
+    assert info["air_brake_episode_masked"] is True
+    assert info["air_brake_used"] is False
+    assert not backend.last_race_control_state.air_brake
+
+
+def test_env_action_masks_ignore_air_brake_episode_mask_without_discrete_branch() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "air_brake"),
+                discrete_axes=("gas",),
+                air_brake_episode_mask_probability=1.0,
+                mask_air_brake_on_ground=False,
+            ),
+        ),
+    )
+
+    _, reset_info = env.reset(seed=1)
+
+    assert reset_info["air_brake_episode_masked"] is False
+    assert env.action_masks().tolist() == [True, True]
+
+    _, _, _, _, info = env.step(
+        {
+            "continuous": np.array([0.0, 1.0], dtype=np.float32),
+            "discrete": np.array([1], dtype=np.int64),
+        }
+    )
+
+    assert info["air_brake_episode_masked"] is False
+    assert info["air_brake_used"] is True
+    assert backend.last_race_control_state.air_brake
+
+
+def test_env_action_masks_can_mask_spin_for_full_episode() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "boost",
+                "lean",
+                "spin",
+                spin_episode_mask_probability=1.0,
+            ),
+        ),
+    )
+
+    _, reset_info = env.reset(seed=1)
+
+    assert reset_info["spin_episode_masked"] is True
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 2) + ([True] * 2) + ([True] * 3) + [True, False, False]
+    )
+
+    _, _, _, _, info = env.step(_discrete_gas_boost_lean_spin_action(spin_index=1))
+
+    assert info["spin_episode_masked"] is True
+    assert info["spin_requested"] is False
+    assert backend.last_spin_request == "none"
 
 
 def test_env_action_masks_disable_spin_and_lean_during_native_spin_macro() -> None:

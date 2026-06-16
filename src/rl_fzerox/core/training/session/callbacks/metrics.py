@@ -61,6 +61,11 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
         _MetricLogSpec("lean_episode_masked", "action/lean_episode_masked_step_rate"),
+        _MetricLogSpec(
+            "air_brake_episode_masked",
+            "action/air_brake_episode_masked_step_rate",
+        ),
+        _MetricLogSpec("spin_episode_masked", "action/spin_episode_masked_step_rate"),
         _MetricLogSpec("spin_requested", "action/spin_requested_step_rate"),
         _MetricLogSpec("spin_started", "action/spin_started_step_rate"),
         _MetricLogSpec(
@@ -196,6 +201,8 @@ class RolloutInfoAccumulator:
     airborne_finished_count: int = 0
     airborne_failed_count: int = 0
     lean_masked_episode_count: int = 0
+    air_brake_masked_episode_count: int = 0
+    spin_masked_episode_count: int = 0
     termination_counts: dict[str, int] = field(
         default_factory=lambda: {
             reason: 0 for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.termination
@@ -250,6 +257,10 @@ class RolloutInfoAccumulator:
         for episode in episodes:
             if episode.get("lean_episode_masked") is True:
                 self.lean_masked_episode_count += 1
+            if episode.get("air_brake_episode_masked") is True:
+                self.air_brake_masked_episode_count += 1
+            if episode.get("spin_episode_masked") is True:
+                self.spin_masked_episode_count += 1
             if _episode_was_airborne(episode):
                 self.airborne_episode_count += 1
                 if episode.get("termination_reason") == "finished":
@@ -326,6 +337,14 @@ class RolloutInfoAccumulator:
         logger.record(
             "episode/lean_episode_masked_rate",
             self.lean_masked_episode_count / self.episode_count,
+        )
+        logger.record(
+            "episode/air_brake_episode_masked_rate",
+            self.air_brake_masked_episode_count / self.episode_count,
+        )
+        logger.record(
+            "episode/spin_episode_masked_rate",
+            self.spin_masked_episode_count / self.episode_count,
         )
 
     def _add_course_finish_time(self, episode: dict[str, object]) -> None:

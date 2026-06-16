@@ -18,6 +18,8 @@ from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 def test_career_policy_runtime_disables_training_dropouts(tmp_path: Path) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.action.lean_episode_mask_probability = 1.0
+    config.action.air_brake_episode_mask_probability = 1.0
+    config.action.spin_episode_mask_probability = 1.0
     config.observation.state_feature_dropouts = tuple(
         feature.model_copy(update={"dropout_prob": 1.0})
         for feature in config.observation.state_feature_dropouts
@@ -59,8 +61,12 @@ def test_career_policy_runtime_disables_training_dropouts(tmp_path: Path) -> Non
     train_config = _policy_train_config(control)
 
     assert train_config.env.action.lean_episode_mask_probability == 0.0
+    assert train_config.env.action.air_brake_episode_mask_probability == 0.0
+    assert train_config.env.action.spin_episode_mask_probability == 0.0
     assert train_config.train.state_feature_dropout_groups == ()
     assert config.action.lean_episode_mask_probability == 1.0
+    assert config.action.air_brake_episode_mask_probability == 1.0
+    assert config.action.spin_episode_mask_probability == 1.0
     assert all(feature.dropout_prob == 1.0 for feature in config.observation.state_feature_dropouts)
 
 

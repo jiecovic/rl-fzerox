@@ -5,7 +5,7 @@ from fzerox_emulator import ControllerState, EmulatorBackend
 from rl_fzerox.core.envs.actions import ResettableActionAdapter
 from rl_fzerox.core.envs.engine.components import EngineRuntimeComponents
 from rl_fzerox.core.envs.engine.controls import sync_dynamic_action_masks
-from rl_fzerox.core.envs.engine.controls.episode_dropout import sample_episode_lean_mask
+from rl_fzerox.core.envs.engine.controls.episode_dropout import sample_episode_action_masks
 from rl_fzerox.core.envs.engine.info import set_curriculum_info, telemetry_info
 from rl_fzerox.core.envs.engine.reset import EngineResetCoordinator
 from rl_fzerox.core.envs.engine.stepping import set_episode_boost_pad_info
@@ -34,11 +34,23 @@ def reset_gym_episode(
     components.episode.uses_custom_baseline = reset_result.uses_custom_baseline
     backend.set_controller_state(ControllerState())
     components.control_state.reset()
-    components.episode.lean_episode_masked = sample_episode_lean_mask(
-        probability=components.action_config.lean_episode_mask_probability,
+    episode_action_masks = sample_episode_action_masks(
+        lean_probability=components.action_config.lean_episode_mask_probability,
+        air_brake_probability=components.action_config.air_brake_episode_mask_probability,
+        spin_probability=components.action_config.spin_episode_mask_probability,
         seed=reset_coordinator.action_episode_mask_seed(seed),
+        available_branches={
+            dimension.label for dimension in components.action_adapter.action_dimensions
+        },
     )
+    components.episode.lean_episode_masked = episode_action_masks.lean
+    components.episode.air_brake_episode_masked = episode_action_masks.air_brake
+    components.episode.spin_episode_masked = episode_action_masks.spin
     components.mask_controller.set_lean_episode_masked(components.episode.lean_episode_masked)
+    components.mask_controller.set_air_brake_episode_masked(
+        components.episode.air_brake_episode_masked
+    )
+    components.mask_controller.set_spin_episode_masked(components.episode.spin_episode_masked)
     components.mask_controller.set_lean_allowed_values(
         components.control_state.lean_action_mask_override()
     )
@@ -77,6 +89,8 @@ def reset_gym_episode(
     info["episode_return"] = components.episode.return_value
     info["episode_airborne_frames"] = components.episode.airborne_frames
     info["lean_episode_masked"] = components.episode.lean_episode_masked
+    info["air_brake_episode_masked"] = components.episode.air_brake_episode_masked
+    info["spin_episode_masked"] = components.episode.spin_episode_masked
     image_observation = components.observation_builder.render_image()
     observation = components.observation_builder.build_observation(
         image=image_observation,

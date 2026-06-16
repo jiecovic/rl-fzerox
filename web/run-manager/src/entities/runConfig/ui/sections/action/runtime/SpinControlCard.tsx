@@ -4,7 +4,7 @@ import {
   ActionCard,
   ActionFieldset,
   ActionNote,
-  ActionTwoColumn,
+  ActionTripleFields,
 } from "@/entities/runConfig/ui/sections/action/ActionLayout";
 import type {
   AuxiliaryActionConfig,
@@ -12,7 +12,7 @@ import type {
   UpdatePolicy,
 } from "@/entities/runConfig/ui/sections/action/branches/types";
 import type { ManagedRunConfig } from "@/shared/api/contract";
-import { FieldLabel, IntegerField } from "@/shared/ui/configFields";
+import { FieldLabel, IntegerField, RangeNumberField } from "@/shared/ui/configFields";
 import { formatEditableDecimal } from "@/shared/ui/configFields/format";
 import {
   blurOnEnter,
@@ -40,6 +40,9 @@ export function SpinControlCard({
   updateAction,
   updatePolicy,
 }: SpinControlCardProps) {
+  const spinEpisodeMaskProbability = action.spin_episode_mask_probability ?? 0;
+  const defaultSpinEpisodeMaskProbability = defaultAction.spin_episode_mask_probability ?? 0;
+
   return (
     <ActionCard description="Configure the native spin macro request guard." title="Spin control">
       {action.include_spin ? null : (
@@ -48,7 +51,7 @@ export function SpinControlCard({
         </ActionNote>
       )}
       <ActionFieldset disabled={!action.include_spin}>
-        <ActionTwoColumn>
+        <ActionTripleFields>
           <IntegerField
             help="After a completed native spin macro, keep spin requests masked for this many native frames."
             label="Cooldown frames"
@@ -61,7 +64,24 @@ export function SpinControlCard({
             value={policy.spin_idle_logit}
             onChange={(value) => updatePolicy({ spin_idle_logit: value })}
           />
-        </ActionTwoColumn>
+          <RangeNumberField
+            help="At episode reset, sample this probability and force the spin branch to no-spin for the full episode."
+            label="Episode mask probability"
+            max={1}
+            min={0}
+            numberStep="0.01"
+            rangeStep={0.01}
+            resetValue={defaultSpinEpisodeMaskProbability}
+            ticks={[
+              { label: "0", value: 0 },
+              { label: "0.1", value: 0.1 },
+              { label: "0.5", value: 0.5 },
+              { label: "1", value: 1 },
+            ]}
+            value={spinEpisodeMaskProbability}
+            onChange={(value) => updateAction({ spin_episode_mask_probability: value })}
+          />
+        </ActionTripleFields>
       </ActionFieldset>
     </ActionCard>
   );
@@ -90,7 +110,7 @@ function SpinIdleLogitField({
   return (
     <FieldShell>
       <FieldLabel
-        help="Initial logit bias toward the idle spin action. Positive values reduce random spin requests when the spin branch is first enabled."
+        help="Logit offset added to the learned idle spin action. Positive values suppress spin; negative values encourage left/right spin. The displayed probability assumes all learned spin logits are zero."
         label="No-spin logit"
         onReset={resetHandler(value, resetValue, onChange)}
       />
@@ -116,6 +136,13 @@ function spinIdleProbability(value: number): number {
 }
 
 function formatPercent(value: number): string {
+  const percent = value * 100;
+  if (percent > 0 && percent < 0.1) {
+    return "<0.1%";
+  }
+  if (percent < 100 && percent > 99.9) {
+    return ">99.9%";
+  }
   return `${(value * 100).toLocaleString(undefined, {
     maximumFractionDigits: 1,
     minimumFractionDigits: 1,

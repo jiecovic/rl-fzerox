@@ -146,6 +146,7 @@ class ActionRuntimeConfig:
     continuous_air_brake_min_duty: float
     force_full_throttle: bool
     mask_air_brake_on_ground: bool
+    air_brake_episode_mask_probability: float
     continuous_air_brake_mode: ContinuousAirBrakeMode
     continuous_lean_deadzone: float
     lean_mode: LeanMode
@@ -156,6 +157,7 @@ class ActionRuntimeConfig:
     boost_decision_interval_frames: int
     boost_request_lockout_frames: int
     spin_cooldown_frames: int
+    spin_episode_mask_probability: float
     lean_unmask_min_speed_kph: float | None
     lean_initial_lockout_frames: int
     lean_episode_mask_probability: float
@@ -222,6 +224,7 @@ class ActionRuntimeConfig:
             continuous_air_brake_min_duty=float(config.continuous_air_brake_min_duty),
             force_full_throttle=bool(config.force_full_throttle),
             mask_air_brake_on_ground=bool(config.mask_air_brake_on_ground),
+            air_brake_episode_mask_probability=float(config.air_brake_episode_mask_probability),
             continuous_air_brake_mode=config.continuous_air_brake_mode,
             continuous_lean_deadzone=float(config.continuous_lean_deadzone),
             lean_mode=config.lean_mode,
@@ -236,6 +239,7 @@ class ActionRuntimeConfig:
             boost_decision_interval_frames=int(config.boost_decision_interval_frames),
             boost_request_lockout_frames=int(config.boost_request_lockout_frames),
             spin_cooldown_frames=int(config.spin_cooldown_frames),
+            spin_episode_mask_probability=float(config.spin_episode_mask_probability),
             lean_unmask_min_speed_kph=(
                 None
                 if config.lean_unmask_min_speed_kph is None
@@ -267,6 +271,7 @@ class ActionConfig(BaseModel):
     continuous_air_brake_min_duty: float = Field(default=0.0, ge=0.0, le=1.0)
     force_full_throttle: bool = False
     mask_air_brake_on_ground: bool = True
+    air_brake_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
     continuous_air_brake_mode: ContinuousAirBrakeMode = "always"
     continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
@@ -276,6 +281,7 @@ class ActionConfig(BaseModel):
     boost_decision_interval_frames: PositiveInt = 1
     boost_request_lockout_frames: NonNegativeInt = 5
     spin_cooldown_frames: NonNegativeInt = DEFAULT_SPIN_COOLDOWN_FRAMES
+    spin_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0

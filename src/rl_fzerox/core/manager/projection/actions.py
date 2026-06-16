@@ -19,6 +19,11 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
         "continuous_air_brake_min_duty": config.action.continuous_air_brake_min_duty,
         "force_full_throttle": config.action.force_full_throttle,
         "mask_air_brake_on_ground": config.action.mask_air_brake_on_ground,
+        "air_brake_episode_mask_probability": (
+            config.action.air_brake_episode_mask_probability
+            if config.action.include_air_brake and config.action.air_brake_mode == "on_off"
+            else 0.0
+        ),
         "continuous_air_brake_mode": _continuous_air_brake_mode(config),
         "lean_mode": config.action.lean_mode,
         "lean_output_mode": config.action.lean_output_mode,
@@ -29,6 +34,9 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
         ),
         "boost_request_lockout_frames": config.action.boost_request_lockout_frames,
         "spin_cooldown_frames": config.action.spin_cooldown_frames,
+        "spin_episode_mask_probability": (
+            config.action.spin_episode_mask_probability if config.action.include_spin else 0.0
+        ),
         "boost_unmask_max_speed_kph": config.action.boost_unmask_max_speed_kph,
         "lean_unmask_min_speed_kph": config.action.lean_unmask_min_speed_kph,
         "lean_initial_lockout_frames": config.action.lean_initial_lockout_frames,

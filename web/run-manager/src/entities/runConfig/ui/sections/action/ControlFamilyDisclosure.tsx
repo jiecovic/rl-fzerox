@@ -207,7 +207,7 @@ export function ControlFamilyDisclosure({
             <ActionFields>
               <div className="field-with-note">
                 <NumberField
-                  help="Initial logit bias toward the engaged gas button when throttle uses the discrete N64-style button branch."
+                  help="Logit offset added to the learned engaged gas button logit. The displayed probability assumes the model logit is zero; trained policies also depend on their learned output."
                   label="Gas-on logit"
                   resetValue={defaultConfig.policy.gas_on_logit}
                   step="0.1"
@@ -215,7 +215,7 @@ export function ControlFamilyDisclosure({
                   onChange={(value) => updatePolicy({ gas_on_logit: value })}
                 />
                 <div className="field-note">
-                  {`sigmoid(${formatSignedDecimal(config.policy.gas_on_logit)}) ≈ ${formatPercent(gasOnProbability(config.policy.gas_on_logit))} initial engage probability`}
+                  {`sigmoid(${formatSignedDecimal(config.policy.gas_on_logit)}) ≈ ${formatPercent(gasOnProbability(config.policy.gas_on_logit))} zero-logit engage probability`}
                 </div>
               </div>
             </ActionFields>
@@ -274,7 +274,14 @@ function gasOnProbability(value: number) {
 }
 
 function formatPercent(value: number) {
-  return `${(value * 100).toLocaleString(undefined, {
+  const percent = value * 100;
+  if (percent > 0 && percent < 0.1) {
+    return "<0.1%";
+  }
+  if (percent < 100 && percent > 99.9) {
+    return ">99.9%";
+  }
+  return `${percent.toLocaleString(undefined, {
     maximumFractionDigits: 1,
     minimumFractionDigits: 1,
   })}%`;

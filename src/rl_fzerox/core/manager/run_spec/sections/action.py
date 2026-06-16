@@ -40,6 +40,7 @@ class ManagedActionConfig(BaseModel):
     air_brake_mode: ActionDriveMode = "on_off"
     enable_air_brake: bool = True
     mask_air_brake_on_ground: bool = False
+    air_brake_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
     continuous_air_brake_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
     continuous_air_brake_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
     continuous_air_brake_min_duty: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -61,6 +62,7 @@ class ManagedActionConfig(BaseModel):
     include_spin: bool = False
     enable_spin: bool = True
     spin_cooldown_frames: NonNegativeInt = DEFAULT_SPIN_COOLDOWN_FRAMES
+    spin_episode_mask_probability: float = Field(default=0.0, ge=0.0, le=1.0)
     include_pitch: bool = True
     enable_pitch: bool = True
     pitch_mode: ActionAxisMode = "discrete"

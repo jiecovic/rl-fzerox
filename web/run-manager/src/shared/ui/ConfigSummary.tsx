@@ -101,6 +101,7 @@ function displayObservationResolution(config: ManagedRunConfig) {
 function displayAuxiliarySummary(config: ManagedRunConfig) {
   const labels: string[] = [];
   if (config.action.include_air_brake) {
+    const episodeMask = episodeMaskSummary(config.action.air_brake_episode_mask_probability ?? 0);
     if (!config.action.enable_air_brake) {
       labels.push(
         config.action.air_brake_mode === "pwm" ? "air brake pwm masked" : "air brake masked",
@@ -110,7 +111,11 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
         config.action.mask_air_brake_on_ground ? "air brake pwm, air-only" : "air brake pwm",
       );
     } else {
-      labels.push(config.action.mask_air_brake_on_ground ? "air brake, air-only" : "air brake");
+      labels.push(
+        config.action.mask_air_brake_on_ground
+          ? `air brake, air-only${episodeMask}`
+          : `air brake${episodeMask}`,
+      );
     }
   }
   if (config.action.include_boost) {
@@ -166,10 +171,11 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
   }
   if (config.action.include_spin) {
     const spinSummary = config.action.enable_spin ? "spin macro" : "spin macro masked";
+    const episodeMask = episodeMaskSummary(config.action.spin_episode_mask_probability ?? 0);
     labels.push(
       config.action.spin_cooldown_frames > 0
-        ? `${spinSummary}, ${config.action.spin_cooldown_frames}f cooldown`
-        : spinSummary,
+        ? `${spinSummary}, ${config.action.spin_cooldown_frames}f cooldown${episodeMask}`
+        : `${spinSummary}${episodeMask}`,
     );
   }
   if (config.action.include_pitch) {
@@ -182,4 +188,8 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
     }
   }
   return labels.join(" · ");
+}
+
+function episodeMaskSummary(probability: number) {
+  return probability > 0 ? `, ${(probability * 100).toFixed(0)}% episode mask` : "";
 }

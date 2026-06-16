@@ -42,6 +42,8 @@ class ActionMaskController:
     _lean_allowed_values: tuple[int, ...] | None = None
     _spin_allowed_values: tuple[int, ...] | None = None
     _lean_episode_masked: bool = False
+    _air_brake_episode_masked: bool = False
+    _spin_episode_masked: bool = False
     _speed_kph: float | None = None
     _airborne: bool | None = None
 
@@ -100,6 +102,8 @@ class ActionMaskController:
                 lean_allowed_values=self._lean_allowed_values,
                 spin_allowed_values=self._spin_allowed_values,
                 lean_episode_masked=self._lean_episode_masked,
+                air_brake_episode_masked=self._air_brake_episode_masked,
+                spin_episode_masked=self._spin_episode_masked,
                 speed_kph=self._speed_kph,
                 lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
                 mask_air_brake_on_ground=self.mask_air_brake_on_ground,
@@ -166,6 +170,16 @@ class ActionMaskController:
 
         self._lean_episode_masked = bool(masked)
 
+    def set_air_brake_episode_masked(self, masked: bool) -> None:
+        """Force air-brake neutral for the current episode."""
+
+        self._air_brake_episode_masked = bool(masked)
+
+    def set_spin_episode_masked(self, masked: bool) -> None:
+        """Force native spin requests neutral for the current episode."""
+
+        self._spin_episode_masked = bool(masked)
+
     def set_speed_kph(self, speed_kph: float | None) -> None:
         """Update the live speed used by dynamic speed-gated masks."""
 
@@ -209,6 +223,14 @@ class ActionMaskController:
     def lean_episode_masked(self) -> bool:
         return self._lean_episode_masked
 
+    @property
+    def air_brake_episode_masked(self) -> bool:
+        return self._air_brake_episode_masked
+
+    @property
+    def spin_episode_masked(self) -> bool:
+        return self._spin_episode_masked
+
 
 def _dynamic_action_mask_overrides(
     *,
@@ -217,6 +239,8 @@ def _dynamic_action_mask_overrides(
     lean_allowed_values: tuple[int, ...] | None = None,
     spin_allowed_values: tuple[int, ...] | None = None,
     lean_episode_masked: bool = False,
+    air_brake_episode_masked: bool = False,
+    spin_episode_masked: bool = False,
     speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
     mask_air_brake_on_ground: bool = True,
@@ -241,11 +265,11 @@ def _dynamic_action_mask_overrides(
         if lean_values == (0,):
             overrides["lean_left"] = (0,)
             overrides["lean_right"] = (0,)
-    if spin_allowed_values is not None:
-        overrides["spin"] = spin_allowed_values
-    elif lean_episode_masked:
+    if spin_episode_masked or lean_episode_masked:
         overrides["spin"] = (0,)
-    if airborne is False and mask_air_brake_on_ground:
+    elif spin_allowed_values is not None:
+        overrides["spin"] = spin_allowed_values
+    if air_brake_episode_masked or (airborne is False and mask_air_brake_on_ground):
         overrides["air_brake"] = (0,)
     if airborne is False and mask_pitch_on_ground:
         overrides["pitch"] = (pitch_neutral_index,)

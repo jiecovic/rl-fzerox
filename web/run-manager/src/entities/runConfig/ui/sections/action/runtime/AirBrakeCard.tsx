@@ -6,6 +6,7 @@ import {
   ActionFieldset,
   ActionNote,
   ActionTripleFields,
+  ActionTwoColumn,
 } from "@/entities/runConfig/ui/sections/action/ActionLayout";
 import type {
   AuxiliaryActionConfig,
@@ -43,6 +44,10 @@ export function AirBrakeCard({
   updateAction,
   updatePolicy,
 }: AirBrakeCardProps) {
+  const airBrakeEpisodeMaskProbability = action.air_brake_episode_mask_probability ?? 0;
+  const defaultAirBrakeEpisodeMaskProbability =
+    defaultAction.air_brake_episode_mask_probability ?? 0;
+
   return (
     <ActionCard
       description="Choose the output family, optional PWM shaping, and grounded-use guard."
@@ -127,11 +132,14 @@ export function AirBrakeCard({
                 onChange={(value) => updateAction({ continuous_air_brake_min_duty: value })}
               />
             </ActionTripleFields>
-          ) : (
-            <ActionFields>
+          ) : null}
+        </fieldset>
+        {action.air_brake_mode === "pwm" ? null : (
+          <ActionFields>
+            <ActionTwoColumn>
               <div className="field-with-note">
                 <NumberField
-                  help="Initial logit bias toward the engaged air-brake button when air brake uses the discrete N64-style button branch."
+                  help="Logit offset added to the learned engaged air-brake button logit. The displayed probability assumes the model logit is zero; trained policies also depend on their learned output."
                   label="Air-brake-on logit"
                   resetValue={defaultPolicy.air_brake_on_logit}
                   step="0.1"
@@ -139,12 +147,29 @@ export function AirBrakeCard({
                   onChange={(value) => updatePolicy({ air_brake_on_logit: value })}
                 />
                 <div className="field-note">
-                  {`sigmoid(${formatSignedDecimal(policy.air_brake_on_logit)}) ≈ ${formatPercent(binaryOnProbability(policy.air_brake_on_logit))} initial engage probability`}
+                  {`sigmoid(${formatSignedDecimal(policy.air_brake_on_logit)}) ≈ ${formatPercent(binaryOnProbability(policy.air_brake_on_logit))} zero-logit engage probability`}
                 </div>
               </div>
-            </ActionFields>
-          )}
-        </fieldset>
+              <RangeNumberField
+                help="At episode reset, sample this probability and force the discrete air-brake button branch neutral for the full episode."
+                label="Episode mask probability"
+                max={1}
+                min={0}
+                numberStep="0.01"
+                rangeStep={0.01}
+                resetValue={defaultAirBrakeEpisodeMaskProbability}
+                ticks={[
+                  { label: "0", value: 0 },
+                  { label: "0.1", value: 0.1 },
+                  { label: "0.5", value: 0.5 },
+                  { label: "1", value: 1 },
+                ]}
+                value={airBrakeEpisodeMaskProbability}
+                onChange={(value) => updateAction({ air_brake_episode_mask_probability: value })}
+              />
+            </ActionTwoColumn>
+          </ActionFields>
+        )}
         <FieldShell>
           <FieldLabel
             help="When enabled, the air-brake branch is masked back to neutral while grounded. Turn this off to let the policy use air brake freely on ground too."
@@ -178,6 +203,13 @@ function binaryOnProbability(value: number) {
 }
 
 function formatPercent(value: number) {
+  const percent = value * 100;
+  if (percent > 0 && percent < 0.1) {
+    return "<0.1%";
+  }
+  if (percent < 100 && percent > 99.9) {
+    return ">99.9%";
+  }
   return `${(value * 100).toLocaleString(undefined, {
     maximumFractionDigits: 1,
     minimumFractionDigits: 1,

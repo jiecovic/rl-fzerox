@@ -1221,6 +1221,7 @@
   "managed_run_config": {
     "action": {
       "action_repeat": 2,
+      "air_brake_episode_mask_probability": 0.0,
       "air_brake_mode": "on_off",
       "boost_decision_interval_steps": 1,
       "boost_min_energy_fraction": 0.1,
@@ -1257,6 +1258,7 @@
       "pitch_deadzone": 0.1,
       "pitch_mode": "discrete",
       "spin_cooldown_frames": 120,
+      "spin_episode_mask_probability": 0.0,
       "steer_buckets": 7,
       "steering_mode": "continuous"
     },

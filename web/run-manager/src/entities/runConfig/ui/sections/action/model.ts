@@ -140,14 +140,15 @@ function actionHeadShape(action: ManagedActionConfig): {
 function auxiliaryOutputSummary(action: ManagedActionConfig): string {
   const labels: string[] = [];
   if (action.include_air_brake) {
+    const episodeMask = episodeMaskSummary(action.air_brake_episode_mask_probability ?? 0);
     if (!action.enable_air_brake) {
       labels.push(action.air_brake_mode === "pwm" ? "air brake pwm masked" : "air brake masked");
     } else if (action.air_brake_mode === "pwm") {
       labels.push(action.mask_air_brake_on_ground ? "air brake pwm, air-only" : "air brake pwm");
     } else if (action.mask_air_brake_on_ground) {
-      labels.push("air brake, air-only");
+      labels.push(`air brake, air-only${episodeMask}`);
     } else {
-      labels.push("air brake");
+      labels.push(`air brake${episodeMask}`);
     }
   }
   if (action.include_boost) {
@@ -198,9 +199,10 @@ function boostOutputSummary(action: ManagedActionConfig): string {
 
 function spinOutputSummary(action: ManagedActionConfig): string {
   const base = action.enable_spin ? "spin macro" : "spin macro masked";
+  const episodeMask = episodeMaskSummary(action.spin_episode_mask_probability ?? 0);
   return action.spin_cooldown_frames > 0
-    ? `${base}, ${action.spin_cooldown_frames}f cooldown`
-    : base;
+    ? `${base}, ${action.spin_cooldown_frames}f cooldown${episodeMask}`
+    : `${base}${episodeMask}`;
 }
 
 function leanOutputSummary(action: ManagedActionConfig): string {
@@ -231,6 +233,10 @@ function leanOutputSummary(action: ManagedActionConfig): string {
   }
   const mode = action.lean_mode === "raw" ? `${base}, raw` : `${base}, ${action.lean_mode}`;
   return `${mode}${episodeMask}`;
+}
+
+function episodeMaskSummary(probability: number): string {
+  return probability > 0 ? `, ${(probability * 100).toFixed(0)}% episode mask` : "";
 }
 
 function pitchOutputSummary(action: ManagedActionConfig): string {

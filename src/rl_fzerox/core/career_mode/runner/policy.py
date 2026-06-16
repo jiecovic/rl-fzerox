@@ -123,7 +123,11 @@ def _career_runtime_train_config(train_config: TrainAppConfig) -> TrainAppConfig
     # training randomization. Keep the observation/action layout intact so the
     # checkpoint still loads against its original shape.
     action_config = train_config.env.action.model_copy(
-        update={"lean_episode_mask_probability": 0.0}
+        update={
+            "lean_episode_mask_probability": 0.0,
+            "air_brake_episode_mask_probability": 0.0,
+            "spin_episode_mask_probability": 0.0,
+        }
     )
     env_config = train_config.env.model_copy(update={"action": action_config})
     runtime_train_config = train_config.train.model_copy(
