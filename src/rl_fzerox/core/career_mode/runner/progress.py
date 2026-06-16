@@ -181,8 +181,7 @@ class CareerAttemptProgress:
                 return CareerProgressTransition(attempt_finished=False)
             if not _is_post_gp_completion(info):
                 return CareerProgressTransition(attempt_finished=False)
-            # On the post-GP ceremony screen, position is the final cup rank.
-            final_rank = _positive_int_info(info, "position")
+            final_rank = _gp_final_rank(info)
             if final_rank is not None and final_rank > 1:
                 return self._finish_and_advance(
                     info=info,
@@ -427,6 +426,14 @@ def _positive_int_info(info: dict[str, object], key: str) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value if value > 0 else None
+
+
+def _gp_final_rank(info: dict[str, object]) -> int | None:
+    for key in ("career_mode_gp_final_rank", "gp_final_rank"):
+        value = _positive_int_info(info, key)
+        if value is not None:
+            return value
+    return None
 
 
 def _int_info(info: dict[str, object], key: str) -> int | None:

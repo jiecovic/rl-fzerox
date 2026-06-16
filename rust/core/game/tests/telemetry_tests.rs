@@ -28,6 +28,8 @@ fn read_snapshot_decodes_player_one_race_values() {
     memory[GLOBALS.queued_game_mode..GLOBALS.queued_game_mode + 4]
         .copy_from_slice(&14_i32.to_le_bytes());
     memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
+    memory[GLOBALS.player_1_overall_position..GLOBALS.player_1_overall_position + 2]
+        .copy_from_slice(&2_i16.to_le_bytes());
     memory[GLOBALS.player_characters..GLOBALS.player_characters + 2]
         .copy_from_slice(&4_i16.to_le_bytes());
     memory[GLOBALS.player_engine..GLOBALS.player_engine + 4]
@@ -160,6 +162,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.menu_current_ghost_type_raw, 1);
     assert_eq!(telemetry.queued_game_mode_raw, 14);
     assert_eq!(telemetry.total_racers, 30);
+    assert_eq!(telemetry.gp_final_rank, 2);
     assert_eq!(telemetry.course_index, 0);
     assert_eq!(telemetry.course_segment_count, 64);
     assert!((telemetry.course_length - 80_000.0).abs() < f32::EPSILON);

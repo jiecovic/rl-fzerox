@@ -175,6 +175,7 @@ class FZeroXTelemetryDict(TypedDict, total=False):
     game_mode_name: str
     in_race_mode: bool
     total_racers: int
+    gp_final_rank: int
     course_index: int
     player: PlayerTelemetry
     course_length: float

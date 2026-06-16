@@ -272,6 +272,7 @@ pub struct TelemetrySnapshot {
     pub queued_game_mode_raw: i32,
     pub in_race_mode: bool,
     pub total_racers: i32,
+    pub gp_final_rank: i16,
     pub course_index: u32,
     pub course_segment_count: i32,
     pub course_length: f32,

@@ -127,6 +127,7 @@ def _telemetry_from_data(data: dict[str, object] | None) -> FZeroXTelemetry | No
                 "menu_current_ghost_type_raw",
             ),
             "queued_game_mode_raw": _mapping_int(data, "queued_game_mode_raw"),
+            "gp_final_rank": _mapping_int(data, "gp_final_rank"),
         }
     )
 

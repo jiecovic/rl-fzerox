@@ -44,7 +44,7 @@ class CareerRecordingSegmentTracker:
             return
         if facts.is_post_gp_screen:
             self.post_gp_seen = True
-            if _post_gp_rank(info) not in {None, 1}:
+            if _post_gp_final_rank(info) not in {None, 1}:
                 self.failed_result_seen = True
             return
         if not recording_segment_exit_screen(facts):
@@ -81,8 +81,8 @@ def recording_segment_exit_screen(facts: MenuFacts) -> bool:
     )
 
 
-def _post_gp_rank(info: dict[str, object]) -> int | None:
-    value = info.get("position")
+def _post_gp_final_rank(info: dict[str, object]) -> int | None:
+    value = info.get("career_mode_gp_final_rank", info.get("gp_final_rank"))
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         return None
     return value

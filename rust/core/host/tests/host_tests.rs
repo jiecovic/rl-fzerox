@@ -300,6 +300,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
         queued_game_mode_raw: 0,
         in_race_mode,
         total_racers: 30,
+        gp_final_rank: 0,
         course_index: 0,
         course_segment_count: 64,
         course_length: 80_000.0,

@@ -79,6 +79,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         queued_game_mode_raw: read_i32(system_ram, GLOBALS.queued_game_mode)?,
         in_race_mode: game_mode.is_some_and(GameMode::is_race),
         total_racers: read_i32(system_ram, GLOBALS.total_racers)?,
+        gp_final_rank: read_i16(system_ram, GLOBALS.player_1_overall_position)?,
         course_index: read_u32(system_ram, GLOBALS.course_index)?,
         course_segment_count: course_info.segment_count,
         course_length: course_info.length,
@@ -120,6 +121,7 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
     let menu_transition_state_end = GLOBALS.game_mode_change_state + size_of::<i16>();
     let menu_current_ghost_type_end = GLOBALS.current_ghost_type + size_of::<i32>();
     let queued_game_mode_end = GLOBALS.queued_game_mode + size_of::<i32>();
+    let player_1_overall_position_end = GLOBALS.player_1_overall_position + size_of::<i16>();
     let required_end = player_end
         .max(camera_setting_end)
         .max(reverse_timer_end)
@@ -129,7 +131,8 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
         .max(menu_difficulty_cursor_end)
         .max(menu_transition_state_end)
         .max(menu_current_ghost_type_end)
-        .max(queued_game_mode_end);
+        .max(queued_game_mode_end)
+        .max(player_1_overall_position_end);
     if required_end > system_ram.len() {
         return Err(CoreError::MemoryOutOfRange {
             memory_id: MEMORY_SYSTEM_RAM,

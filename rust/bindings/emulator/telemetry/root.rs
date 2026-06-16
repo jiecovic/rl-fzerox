@@ -33,6 +33,7 @@ pub struct PyTelemetry {
     queued_game_mode_raw: i32,
     in_race_mode: bool,
     total_racers: i32,
+    gp_final_rank: i16,
     course_index: u32,
     course_segment_count: i32,
     course_length: f32,
@@ -64,6 +65,7 @@ impl PyTelemetry {
             queued_game_mode_raw: optional_item(data, "queued_game_mode_raw", 0)?,
             in_race_mode: required_item(data, TELEMETRY_PAYLOAD, "in_race_mode")?.extract()?,
             total_racers: required_item(data, TELEMETRY_PAYLOAD, "total_racers")?.extract()?,
+            gp_final_rank: optional_item(data, "gp_final_rank", 0)?,
             course_index: required_item(data, TELEMETRY_PAYLOAD, "course_index")?.extract()?,
             course_segment_count: optional_item(data, "course_segment_count", 0)?,
             course_length: optional_item(data, "course_length", 0.0)?,
@@ -152,6 +154,11 @@ impl PyTelemetry {
     }
 
     #[getter]
+    fn gp_final_rank(&self) -> i16 {
+        self.gp_final_rank
+    }
+
+    #[getter]
     fn course_index(&self) -> u32 {
         self.course_index
     }
@@ -201,6 +208,7 @@ impl PyTelemetry {
         dict.set_item("queued_game_mode_raw", self.queued_game_mode_raw())?;
         dict.set_item("in_race_mode", self.in_race_mode())?;
         dict.set_item("total_racers", self.total_racers())?;
+        dict.set_item("gp_final_rank", self.gp_final_rank())?;
         dict.set_item("course_index", self.course_index())?;
         dict.set_item("course_segment_count", self.course_segment_count())?;
         dict.set_item("course_length", self.course_length())?;
@@ -233,6 +241,7 @@ impl PyTelemetry {
             queued_game_mode_raw: telemetry.queued_game_mode_raw,
             in_race_mode: telemetry.in_race_mode,
             total_racers: telemetry.total_racers,
+            gp_final_rank: telemetry.gp_final_rank,
             course_index: telemetry.course_index,
             course_segment_count: telemetry.course_segment_count,
             course_length: telemetry.course_length,
