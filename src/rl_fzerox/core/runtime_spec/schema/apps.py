@@ -47,6 +47,7 @@ class WatchRecordingConfig(BaseModel):
     enabled: bool = False
     path: Path | None = None
     session_mp4_enabled: bool = True
+    keep_failed_segments: bool = True
     render_input_hud: bool = False
     upscale_factor: int = Field(default=1, ge=1, le=4)
 
@@ -71,6 +72,8 @@ class WatchConfig(BaseModel):
     managed_save_game_id: str | None = None
     save_attempt_id: str | None = None
     single_save_target: bool = False
+    single_save_target_perfect: bool = False
+    single_save_target_clear_goal: NonNegativeInt = 0
     unlock_target_label: str | None = None
     start_manual_control: bool = False
     career_mode_race_setup: CareerModeRaceSetupConfig | None = None

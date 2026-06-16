@@ -78,6 +78,9 @@ def insert_save_game(session: Session, save_game: ManagedSaveGame) -> None:
                 if save_game.runner_recording_path is None
                 else str(save_game.runner_recording_path)
             ),
+            runner_target_restart_on_retire=save_game.runner_target_restart_on_retire,
+            runner_target_clear_goal=save_game.runner_target_clear_goal,
+            runner_keep_failed_recordings=save_game.runner_keep_failed_recordings,
         )
     )
 
@@ -148,6 +151,9 @@ def update_save_game_runner_settings(
     recording_input_hud_enabled: bool,
     recording_upscale_factor: int,
     recording_path: Path | None,
+    target_restart_on_retire: bool,
+    target_clear_goal: int,
+    keep_failed_recordings: bool,
     updated_at: str,
 ) -> ManagedSaveGame | None:
     """Update saved Career runner launch settings."""
@@ -163,6 +169,9 @@ def update_save_game_runner_settings(
     row.runner_recording_input_hud_enabled = recording_input_hud_enabled
     row.runner_recording_upscale_factor = recording_upscale_factor
     row.runner_recording_path = None if recording_path is None else str(recording_path)
+    row.runner_target_restart_on_retire = target_restart_on_retire
+    row.runner_target_clear_goal = target_clear_goal
+    row.runner_keep_failed_recordings = keep_failed_recordings
     row.updated_at = updated_at
     return save_game_from_model(row)
 
@@ -479,6 +488,9 @@ def save_game_from_model(row: SaveGameModel) -> ManagedSaveGame:
         runner_recording_path=None
         if row.runner_recording_path is None
         else Path(row.runner_recording_path).expanduser(),
+        runner_target_restart_on_retire=bool(row.runner_target_restart_on_retire),
+        runner_target_clear_goal=_required_target_clear_goal(row.runner_target_clear_goal),
+        runner_keep_failed_recordings=bool(row.runner_keep_failed_recordings),
     )
 
 
@@ -575,3 +587,10 @@ def _required_recording_upscale_factor(value: object) -> int:
     if factor is not None and 1 <= factor <= 4:
         return factor
     raise ValueError(f"save game has invalid recording upscale factor: {value!r}")
+
+
+def _required_target_clear_goal(value: object) -> int:
+    parsed = optional_int(value)
+    if parsed is None:
+        return 1
+    return max(0, parsed)

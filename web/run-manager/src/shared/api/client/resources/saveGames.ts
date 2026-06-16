@@ -61,6 +61,9 @@ export async function updateSaveGameRunnerSettings({
   recordingPath,
   renderer,
   saveGameId,
+  targetRestartOnRetire,
+  targetClearGoal,
+  keepFailedRecordings,
 }: SaveGameRunnerSettingsUpdateRequest): Promise<ManagedSaveGame> {
   const response = await fetch(
     `/api/save-games/${encodeURIComponent(saveGameId)}/runner-settings`,
@@ -76,6 +79,9 @@ export async function updateSaveGameRunnerSettings({
         recording_input_hud_enabled: recordingInputHudEnabled,
         recording_upscale_factor: recordingUpscaleFactor,
         recording_path: recordingPath,
+        target_restart_on_retire: targetRestartOnRetire,
+        target_clear_goal: targetClearGoal,
+        keep_failed_recordings: keepFailedRecordings,
       }),
     },
   );
@@ -112,6 +118,9 @@ export async function startCareerModeRunner({
   renderer,
   saveGameId,
   singleTarget,
+  perfectRun,
+  keepFailedRecordings,
+  targetClearGoal,
   target,
 }: CareerModeRunnerLaunchRequest): Promise<"started" | "already_running"> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/runner`, {
@@ -127,6 +136,9 @@ export async function startCareerModeRunner({
       recording_upscale_factor: recordingUpscaleFactor,
       recording_path: recordingEnabled ? recordingPath : null,
       single_target: singleTarget,
+      perfect_run: perfectRun,
+      keep_failed_recordings: keepFailedRecordings,
+      target_clear_goal: targetClearGoal,
       ...(target === null
         ? {}
         : {

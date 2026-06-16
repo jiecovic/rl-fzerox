@@ -146,6 +146,9 @@ export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): Manag
       recording_input_hud_enabled: false,
       recording_upscale_factor: 2,
       recording_path: null,
+      target_restart_on_retire: false,
+      target_clear_goal: 1,
+      keep_failed_recordings: false,
       renderer: "gliden64",
     },
     unlock_progress: {

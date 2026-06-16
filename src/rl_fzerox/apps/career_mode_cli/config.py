@@ -19,6 +19,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
     WatchAppConfig,
     WatchConfig,
+    WatchRecordingConfig,
 )
 from rl_fzerox.core.runtime_spec.watch_overrides import (
     apply_watch_config_delta,
@@ -34,6 +35,9 @@ def resolve_career_mode_config(
     save_attempt_id: str | None,
     save_game_id: str,
     single_target: bool,
+    perfect_run: bool,
+    keep_failed_recordings: bool,
+    target_clear_goal: int,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
     store = ManagerStore(db_path)
@@ -55,6 +59,9 @@ def resolve_career_mode_config(
         attempt_seed=attempt_seed,
         deterministic_policy=deterministic_policy,
         single_target=single_target,
+        perfect_run=perfect_run,
+        keep_failed_recordings=keep_failed_recordings,
+        target_clear_goal=target_clear_goal,
         race_setup=career_mode_race_setup_config(plan.race_setup),
         label=context.target.label,
         policy_observation_layout_shape_hint=career_policy_observation_layout_shape_hint(
@@ -82,6 +89,9 @@ def career_mode_base_config(
     attempt_seed: int | None,
     deterministic_policy: bool,
     single_target: bool = False,
+    perfect_run: bool = False,
+    keep_failed_recordings: bool = True,
+    target_clear_goal: int = 0,
     race_setup: CareerModeRaceSetupConfig,
     label: str,
     policy_observation_layout_shape_hint: tuple[int, int, int] | None = None,
@@ -101,12 +111,15 @@ def career_mode_base_config(
             managed_save_game_id=save_game_id,
             save_attempt_id=attempt_id,
             single_save_target=single_target,
+            single_save_target_perfect=perfect_run,
+            single_save_target_clear_goal=target_clear_goal,
             unlock_target_label=label,
             attempt_seed=attempt_seed,
             deterministic_policy=deterministic_policy,
             start_manual_control=False,
             career_mode_race_setup=race_setup,
             policy_observation_layout_shape_hint=policy_observation_layout_shape_hint,
+            recording=WatchRecordingConfig(keep_failed_segments=keep_failed_recordings),
         ),
     )
 

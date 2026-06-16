@@ -174,6 +174,7 @@ def test_single_target_success_waits_for_post_gp_screen(tmp_path: Path) -> None:
         save_game_id=store.save_game.id,
         attempt_id="attempt-1",
         single_target=True,
+        target_clear_goal=1,
     )
 
     terminal_transition = progress.handle_terminal_race(
@@ -211,6 +212,7 @@ def test_single_target_success_finishes_on_unskippable_credits(tmp_path: Path) -
         save_game_id=store.save_game.id,
         attempt_id="attempt-1",
         single_target=True,
+        target_clear_goal=1,
     )
 
     terminal_transition = progress.handle_terminal_race(
@@ -235,6 +237,96 @@ def test_single_target_success_finishes_on_unskippable_credits(tmp_path: Path) -
     assert store.started_next_attempt_count == 0
 
 
+def test_single_target_success_repeats_target_without_clear_goal(
+    tmp_path: Path,
+) -> None:
+    store = _SingleTargetCompletionStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    post_gp_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert post_gp_transition.attempt_finished is True
+    assert post_gp_transition.next_plan is not None
+    assert post_gp_transition.next_plan.attempt_id == "attempt-2"
+    assert post_gp_transition.finished_attempt_id == "attempt-1"
+    assert post_gp_transition.finished_status == "succeeded"
+    assert progress.attempt_id == "attempt-1"
+    progress.apply_execution_plan(post_gp_transition.next_plan)
+    assert progress.attempt_id == "attempt-2"
+    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert store.status_updates == []
+    assert store.started_next_attempt_count == 1
+
+
+def test_single_target_success_stops_after_target_clear_goal(tmp_path: Path) -> None:
+    store = _SingleTargetCompletionStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        target_clear_goal=2,
+    )
+
+    progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    first_clear = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+    assert first_clear.next_plan is not None
+    progress.apply_execution_plan(first_clear.next_plan)
+
+    progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={
+            "termination_reason": "finished",
+            "position": 1,
+            "race_time_ms": 77_000,
+            "course_index": 5,
+        },
+    )
+    second_clear = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+
+    assert first_clear.attempt_finished is True
+    assert first_clear.finished_status == "succeeded"
+    assert first_clear.next_plan.attempt_id == "attempt-2"
+    assert second_clear.attempt_finished is True
+    assert second_clear.finished_status == "succeeded"
+    assert second_clear.next_plan is None
+    assert progress.attempt_id is None
+    assert store.finished_attempts == [
+        ("attempt-1", "succeeded", None),
+        ("attempt-2", "succeeded", None),
+    ]
+    assert store.status_updates == ["paused"]
+    assert store.started_next_attempt_count == 1
+
+
 def test_single_target_success_finishes_after_return_to_main_menu(tmp_path: Path) -> None:
     store = _SingleTargetCompletionStore(tmp_path)
     progress = CareerAttemptProgress(
@@ -242,6 +334,7 @@ def test_single_target_success_finishes_after_return_to_main_menu(tmp_path: Path
         save_game_id=store.save_game.id,
         attempt_id="attempt-1",
         single_target=True,
+        target_clear_goal=1,
     )
 
     terminal_transition = progress.handle_terminal_race(
@@ -275,6 +368,7 @@ def test_single_target_success_does_not_finish_on_mid_cup_machine_settings(
         save_game_id=store.save_game.id,
         attempt_id="attempt-1",
         single_target=True,
+        target_clear_goal=1,
     )
 
     terminal_transition = progress.handle_terminal_race(
@@ -303,6 +397,7 @@ def test_replayed_target_retire_does_not_finish_attempt(tmp_path: Path) -> None:
         save_game_id=store.save_game.id,
         attempt_id="attempt-1",
         single_target=True,
+        target_clear_goal=1,
     )
 
     transition = progress.handle_terminal_race(
@@ -325,6 +420,7 @@ def test_single_target_failed_gp_exit_starts_retry_attempt(tmp_path: Path) -> No
         save_game_id=store.save_game.id,
         attempt_id="attempt-1",
         single_target=True,
+        target_clear_goal=1,
     )
 
     terminal_transition = progress.handle_terminal_race(
@@ -355,6 +451,67 @@ def test_single_target_failed_gp_exit_starts_retry_attempt(tmp_path: Path) -> No
     assert store.started_next_attempt_count == 1
 
 
+def test_perfect_run_failure_starts_fresh_target_attempt_without_persisting_save(
+    tmp_path: Path,
+) -> None:
+    store = _FailedRetryStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        perfect_run=True,
+    )
+
+    transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "crashed", "position": 30, "race_time_ms": 12_345},
+    )
+
+    assert transition.attempt_finished is True
+    assert transition.finished_attempt_id == "attempt-1"
+    assert transition.finished_status == "failed"
+    assert transition.finished_failure_reason == "perfect run reset after crashed"
+    assert transition.next_plan is not None
+    assert transition.next_plan.attempt_id == "attempt-2"
+    assert transition.reset_emulator is True
+    assert not store.save_game.save_path.exists()
+    assert progress.attempt_id == "attempt-1"
+    progress.apply_execution_plan(transition.next_plan)
+    assert progress.attempt_id == "attempt-2"
+    assert store.finished_attempts == [("attempt-1", "failed", "perfect run reset after crashed")]
+    assert store.status_updates == []
+    assert store.started_next_attempt_count == 1
+
+
+def test_perfect_run_failure_retries_cup_target_when_setup_has_course_id(
+    tmp_path: Path,
+) -> None:
+    store = _FailedRetryStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        perfect_run=True,
+    )
+
+    transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(course_id="mute_city"),
+        info={"termination_reason": "crashed", "position": 30, "race_time_ms": 12_345},
+    )
+
+    assert transition.attempt_finished is True
+    assert transition.next_plan is not None
+    assert store.next_attempt is not None
+    assert store.next_attempt.target_kind == "clear_gp_cup"
+    assert store.next_attempt.difficulty == "expert"
+    assert store.next_attempt.cup_id == "jack"
+    assert store.next_attempt.course_id is None
+
+
 def test_replayed_target_success_waits_for_post_gp_screen(tmp_path: Path) -> None:
     store = _ReplayTargetStore(tmp_path)
     progress = CareerAttemptProgress(
@@ -362,6 +519,7 @@ def test_replayed_target_success_waits_for_post_gp_screen(tmp_path: Path) -> Non
         save_game_id=store.save_game.id,
         attempt_id="attempt-1",
         single_target=True,
+        target_clear_goal=1,
     )
 
     terminal_transition = progress.handle_terminal_race(
@@ -525,6 +683,18 @@ class _Store:
         self.started_next_attempt_count += 1
         raise AssertionError("crashed GP races must not start the next attempt")
 
+    def start_target_save_attempt(
+        self,
+        save_game_id: str,
+        *,
+        target_kind: str,
+        difficulty: str,
+        cup_id: str,
+        course_id: str | None = None,
+    ) -> ManagedSaveAttempt:
+        del save_game_id, target_kind, difficulty, cup_id, course_id
+        raise AssertionError("crashed GP races must not start a target retry attempt")
+
     def get_save_attempt_execution_context(
         self,
         attempt_id: str,
@@ -535,8 +705,10 @@ class _Store:
 class _SingleTargetCompletionStore(_Store):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
+        self.tmp_path = tmp_path
         self.status_updates: list[SaveGameStatus] = []
         self.progress_reads = 0
+        self.next_attempt: ManagedSaveAttempt | None = None
 
     def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
         self.progress_reads += 1
@@ -601,11 +773,39 @@ class _SingleTargetCompletionStore(_Store):
         self.started_next_attempt_count += 1
         raise AssertionError("single-target success must not start the next attempt")
 
+    def start_target_save_attempt(
+        self,
+        save_game_id: str,
+        *,
+        target_kind: str,
+        difficulty: str,
+        cup_id: str,
+        course_id: str | None = None,
+    ) -> ManagedSaveAttempt:
+        self.started_next_attempt_count += 1
+        self.next_attempt = ManagedSaveAttempt(
+            id=f"attempt-{self.started_next_attempt_count + 1}",
+            save_game_id=save_game_id,
+            status="running",
+            started_at="2026-01-01T00:01:00Z",
+            target_kind=target_kind,
+            difficulty=difficulty,
+            cup_id=cup_id,
+            course_id=course_id,
+        )
+        return self.next_attempt
+
     def get_save_attempt_execution_context(
         self,
         attempt_id: str,
     ) -> SaveAttemptExecutionContext | None:
-        raise AssertionError("single-target success must not request the next context")
+        if self.next_attempt is None or attempt_id != self.next_attempt.id:
+            return None
+        return _execution_context(
+            save_game=self.save_game,
+            attempt=self.next_attempt,
+            tmp_path=self.tmp_path,
+        )
 
 
 class _ReplayTargetStore(_SingleTargetCompletionStore):
@@ -714,69 +914,36 @@ class _FailedRetryStore(_Store):
         )
         return self.next_attempt
 
+    def start_target_save_attempt(
+        self,
+        save_game_id: str,
+        *,
+        target_kind: str,
+        difficulty: str,
+        cup_id: str,
+        course_id: str | None = None,
+    ) -> ManagedSaveAttempt:
+        del target_kind, difficulty, cup_id, course_id
+        return self.start_next_save_attempt(save_game_id)
+
     def get_save_attempt_execution_context(
         self,
         attempt_id: str,
     ) -> SaveAttemptExecutionContext | None:
         if self.next_attempt is None or attempt_id != self.next_attempt.id:
             return None
-        return SaveAttemptExecutionContext(
+        return _execution_context(
             save_game=self.save_game,
             attempt=self.next_attempt,
-            target=ManagedSaveUnlockTarget(
-                sequence_index=0,
-                kind="clear_gp_cup",
-                status="pending",
-                label="Expert Jack Cup",
-                difficulty="expert",
-                cup_id="jack",
-            ),
-            course_setup_target=CourseSetupTarget(
-                difficulty="expert",
-                cup_id="jack",
-                course_id=None,
-            ),
-            course_setup=ManagedSaveCourseSetup(
-                id="course-setup",
-                save_game_id=self.save_game.id,
-                policy_run_id="policy-run",
-                policy_artifact="latest",
-                engine_setting_raw_value=50,
-                created_at="2026-01-01T00:00:00Z",
-                updated_at="2026-01-01T00:00:00Z",
-                difficulty="expert",
-                cup_id="jack",
-                course_id=None,
-            ),
-            cup_setup=ManagedSaveCupSetup(
-                id="cup-setup",
-                save_game_id=self.save_game.id,
-                cup_id="jack",
-                vehicle_id="blue_falcon",
-                created_at="2026-01-01T00:00:00Z",
-                updated_at="2026-01-01T00:00:00Z",
-                difficulty="expert",
-            ),
-            policy_run=ManagedRun(
-                id="policy-run",
-                name="Policy Run",
-                status="finished",
-                config=default_managed_run_config(),
-                config_hash="policy-run-hash",
-                run_dir=self.tmp_path / "policy-run",
-                created_at="2026-01-01T00:00:00Z",
-                lineage_id="policy-run",
-            ),
-            policy_artifact="latest",
-            policy_path=self.tmp_path / "policy-run" / "latest.zip",
+            tmp_path=self.tmp_path,
         )
 
 
-def _race_setup() -> CareerModeRaceSetupConfig:
+def _race_setup(course_id: str | None = None) -> CareerModeRaceSetupConfig:
     return CareerModeRaceSetupConfig(
         difficulty="expert",
         cup_id="jack",
-        course_id=None,
+        course_id=course_id,
         vehicle_id="blue_falcon",
         vehicle_display_name="Blue Falcon",
         character_index=0,
@@ -784,4 +951,71 @@ def _race_setup() -> CareerModeRaceSetupConfig:
         machine_select_row=0,
         machine_select_column=0,
         engine_setting_raw_value=50,
+    )
+
+
+def _execution_context(
+    *,
+    save_game: ManagedSaveGame,
+    attempt: ManagedSaveAttempt,
+    tmp_path: Path,
+) -> SaveAttemptExecutionContext:
+    run_id = "run-1"
+    difficulty = attempt.difficulty or "expert"
+    cup_id = attempt.cup_id or "jack"
+    target = ManagedSaveUnlockTarget(
+        sequence_index=0,
+        kind=attempt.target_kind or "clear_gp_cup",
+        status="pending",
+        label=f"{difficulty.title()} {cup_id.title()} Cup",
+        difficulty=difficulty,
+        cup_id=cup_id,
+        course_id=attempt.course_id,
+    )
+    course_setup_target = CourseSetupTarget(
+        difficulty=difficulty,
+        cup_id=cup_id,
+        course_id=attempt.course_id,
+    )
+    course_setup = ManagedSaveCourseSetup(
+        id="course-setup-1",
+        save_game_id=save_game.id,
+        policy_run_id=run_id,
+        policy_artifact="latest",
+        engine_setting_raw_value=50,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+        difficulty=difficulty,
+        cup_id=cup_id,
+        course_id=attempt.course_id,
+    )
+    cup_setup = ManagedSaveCupSetup(
+        id="cup-setup-1",
+        save_game_id=save_game.id,
+        cup_id=cup_id,
+        vehicle_id="blue_falcon",
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+        difficulty=difficulty,
+    )
+    policy_run = ManagedRun(
+        id=run_id,
+        name="Run",
+        status="finished",
+        config=default_managed_run_config(),
+        config_hash="hash",
+        run_dir=tmp_path / "run-1",
+        created_at="2026-01-01T00:00:00Z",
+        lineage_id="lineage-1",
+    )
+    return SaveAttemptExecutionContext(
+        save_game=save_game,
+        attempt=attempt,
+        target=target,
+        course_setup_target=course_setup_target,
+        course_setup=course_setup,
+        cup_setup=cup_setup,
+        policy_run=policy_run,
+        policy_artifact="latest",
+        policy_path=policy_run.run_dir / "latest.zip",
     )

@@ -42,6 +42,8 @@ import type {
   SaveEngineTuningCourseSetupRecommendation,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
+import { ToggleSwitch } from "@/shared/ui/configFields";
+import { FieldInput, FieldShell } from "@/shared/ui/Field";
 
 interface UnlockPathPanelProps {
   assignableRuns: readonly ManagedRun[];
@@ -73,9 +75,16 @@ interface UnlockPathPanelProps {
     vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onCourseSetupDirtyChange: (dirty: boolean) => void;
+  onKeepFailedPerfectRunVideosChange: (keepFailedPerfectRunVideos: boolean) => void;
+  onPerfectRunChange: (perfectRun: boolean) => void;
   onStartTarget: (target: ManagedSaveUnlockTarget) => void;
+  onTargetClearGoalTextChange: (targetClearGoalText: string) => void;
+  perfectRun: boolean;
+  keepFailedPerfectRunVideos: boolean;
+  recordingEnabled: boolean;
   saveGame: ManagedSaveGame;
   startableTargetKeys: ReadonlySet<string>;
+  targetClearGoalText: string;
   targets: readonly ManagedSaveUnlockTarget[];
   updating: boolean;
 }
@@ -86,12 +95,19 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
   assignableRuns,
   metadata,
   onCourseSetupDirtyChange,
+  onKeepFailedPerfectRunVideosChange,
   onStartTarget,
   onImportEngineTuning,
+  onPerfectRunChange,
+  onTargetClearGoalTextChange,
   onUpsertCourseSetup,
   onUpsertCupSetup,
+  perfectRun,
+  keepFailedPerfectRunVideos,
+  recordingEnabled,
   saveGame,
   startableTargetKeys,
+  targetClearGoalText,
   targets,
   updating,
 }: UnlockPathPanelProps) {
@@ -283,9 +299,20 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
       <div className="grid gap-1">
         <h3 className="m-0 text-lg font-bold text-app-text">Unlock path</h3>
         <p className="m-0 text-sm text-app-muted">
-          Game-rule order for GP cup clears. Progress is read from the save file.
+          Game-rule order for GP cup clears. Progress is read from the save file. Click a target to
+          run only that target repeatedly until the runner is stopped.
         </p>
       </div>
+      <TargetReplayOptions
+        disabled={saveGame.runner_active || updating}
+        keepFailedPerfectRunVideos={keepFailedPerfectRunVideos}
+        perfectRun={perfectRun}
+        recordingEnabled={recordingEnabled}
+        targetClearGoalText={targetClearGoalText}
+        onKeepFailedPerfectRunVideosChange={onKeepFailedPerfectRunVideosChange}
+        onPerfectRunChange={onPerfectRunChange}
+        onTargetClearGoalTextChange={onTargetClearGoalTextChange}
+      />
       <TargetMatrix
         cups={cups}
         metadata={metadata}
@@ -317,6 +344,72 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
         onSaveSetups={triggerSaveCourseSetups}
       />
     </section>
+  );
+});
+
+const TargetReplayOptions = memo(function TargetReplayOptions({
+  disabled,
+  keepFailedPerfectRunVideos,
+  onKeepFailedPerfectRunVideosChange,
+  onPerfectRunChange,
+  onTargetClearGoalTextChange,
+  perfectRun,
+  recordingEnabled,
+  targetClearGoalText,
+}: {
+  disabled: boolean;
+  keepFailedPerfectRunVideos: boolean;
+  onKeepFailedPerfectRunVideosChange: (keepFailedPerfectRunVideos: boolean) => void;
+  onPerfectRunChange: (perfectRun: boolean) => void;
+  onTargetClearGoalTextChange: (targetClearGoalText: string) => void;
+  perfectRun: boolean;
+  recordingEnabled: boolean;
+  targetClearGoalText: string;
+}) {
+  const recordingOptionDisabled = disabled || !recordingEnabled;
+  return (
+    <div className="flex flex-wrap items-end gap-x-6 gap-y-3 border-t border-app-border pt-3">
+      <FieldShell className="gap-2">
+        <span>Target replay</span>
+        <span className="flex min-h-9 items-center gap-2">
+          <ToggleSwitch
+            checked={perfectRun}
+            disabled={disabled}
+            hideLabel
+            label="Restart on retire"
+            onChange={onPerfectRunChange}
+          />
+          <span className="text-sm font-semibold text-app-text">Restart on retire</span>
+        </span>
+      </FieldShell>
+      <FieldShell className={`gap-2 ${recordingOptionDisabled ? "opacity-50" : ""}`}>
+        <span>Successful clears</span>
+        <span className="flex min-h-9 items-center gap-2 whitespace-nowrap">
+          <FieldInput
+            aria-label="Successful clear recordings to collect"
+            className="h-9 !w-14 px-2 text-center"
+            disabled={recordingOptionDisabled}
+            inputMode="numeric"
+            value={targetClearGoalText}
+            onChange={(event) => onTargetClearGoalTextChange(event.currentTarget.value)}
+          />
+          <span className="text-sm font-semibold text-app-text">recordings</span>
+        </span>
+      </FieldShell>
+      <FieldShell className={`gap-2 ${recordingOptionDisabled ? "opacity-50" : ""}`}>
+        <span>Failed attempts</span>
+        <span className="flex min-h-9 items-center gap-2 whitespace-nowrap">
+          <ToggleSwitch
+            checked={keepFailedPerfectRunVideos}
+            disabled={recordingOptionDisabled}
+            hideLabel
+            label="Keep failed attempt recordings"
+            onChange={onKeepFailedPerfectRunVideosChange}
+          />
+          <span className="text-sm font-semibold text-app-text">Keep recordings</span>
+        </span>
+      </FieldShell>
+    </div>
   );
 });
 

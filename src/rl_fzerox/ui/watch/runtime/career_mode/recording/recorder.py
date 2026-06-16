@@ -114,6 +114,7 @@ class CareerModeFrameRecorder:
         live_enabled: bool = True,
         live_upscale_factor: int = 1,
         session_mp4_enabled: bool = True,
+        keep_failed_segments: bool = True,
         writer_factory: _WriterFactory | None = None,
         finalizer_factory: _FinalizerFactory | None = None,
     ) -> None:
@@ -122,6 +123,7 @@ class CareerModeFrameRecorder:
         self._sample_rate = _resolve_audio_sample_rate(native_sample_rate)
         self._upscale_factor = _validated_upscale_factor(upscale_factor)
         self._live_upscale_factor = _validated_upscale_factor(live_upscale_factor)
+        self._keep_failed_segments = keep_failed_segments
         self._writer_factory = writer_factory or self._default_writer
         self._live_path = career_live_recording_path(self._path)
         self._finalizer = (
@@ -253,6 +255,11 @@ class CareerModeFrameRecorder:
             return
         self._segment_writer.close()
         self._segment_writer = None
+        if self._discard_failed_segment():
+            if self._segment_status is not None:
+                self._last_closed_finished_attempt_id = self._segment_attempt_id
+            self._clear_segment_state()
+            return
         self._rename_failed_segment()
         if self._segment_path is not None:
             summary = (
@@ -293,6 +300,13 @@ class CareerModeFrameRecorder:
         if failed_path != self._segment_path:
             self._segment_path.replace(failed_path)
             self._segment_path = failed_path
+
+    def _discard_failed_segment(self) -> bool:
+        if self._keep_failed_segments or self._segment_status != "failed":
+            return False
+        if self._segment_path is not None:
+            self._segment_path.unlink(missing_ok=True)
+        return True
 
     def _default_writer(self, path: Path) -> FfmpegRgbWriter:
         return FfmpegRgbWriter(
@@ -403,6 +417,7 @@ def open_career_mode_recorder(
         upscale_factor=recording.upscale_factor,
         live_enabled=recording.session_mp4_enabled,
         session_mp4_enabled=recording.session_mp4_enabled,
+        keep_failed_segments=recording.keep_failed_segments,
     )
 
 

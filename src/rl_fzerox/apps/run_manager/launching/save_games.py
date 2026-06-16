@@ -40,6 +40,9 @@ def launch_career_mode_runner(
     cup_id: str | None = None,
     course_id: str | None = None,
     single_target: bool = False,
+    perfect_run: bool = False,
+    keep_failed_recordings: bool = True,
+    target_clear_goal: int = 0,
 ) -> WatchLaunchStatus:
     """Launch the visible Career Mode runner for one manager-owned save game."""
 
@@ -48,6 +51,12 @@ def launch_career_mode_runner(
         raise ValueError(f"save game not found: {save_game_id}")
     if not 1 <= recording_upscale_factor <= 4:
         raise ValueError("recording upscale factor must be an integer from 1 to 4")
+    if target_clear_goal < 0:
+        raise ValueError("target clear goal must be non-negative")
+    if not recording_enabled and (target_clear_goal > 0 or not keep_failed_recordings):
+        raise ValueError("target recording options require recording to be enabled")
+    if (perfect_run or target_clear_goal > 0 or not keep_failed_recordings) and not single_target:
+        raise ValueError("target fishing options require a selected single target")
     lease_id = store.viewer_lease_id(kind="career_mode", owner_id=save_game_id)
     if (
         active_career_mode_runner_pid(
@@ -82,6 +91,7 @@ def launch_career_mode_runner(
             "watch.recording.enabled=true",
             f"watch.recording.path={resolved_recording_path}",
             f"watch.recording.session_mp4_enabled={str(not single_target).lower()}",
+            f"watch.recording.keep_failed_segments={str(keep_failed_recordings).lower()}",
             f"watch.recording.upscale_factor={recording_upscale_factor}",
         )
         if recording_input_hud_enabled:
@@ -101,6 +111,8 @@ def launch_career_mode_runner(
         lease_id,
         *(("--attempt-seed", str(attempt_seed)) if attempt_seed is not None else ()),
         *(("--single-target",) if single_target else ()),
+        *(("--perfect-run",) if perfect_run else ()),
+        *(("--target-clear-goal", str(target_clear_goal)) if target_clear_goal > 0 else ()),
         "--policy-mode",
         "deterministic" if deterministic_policy else "stochastic",
         "--",

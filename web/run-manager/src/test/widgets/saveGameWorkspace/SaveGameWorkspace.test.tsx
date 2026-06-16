@@ -89,6 +89,9 @@ describe("SaveGameWorkspace", () => {
       recordingPath: null,
       renderer: "gliden64",
       saveGameId: "save-001",
+      targetRestartOnRetire: false,
+      targetClearGoal: 1,
+      keepFailedRecordings: false,
     });
     expect(await screen.findByText("Runner settings saved.")).toBeInTheDocument();
   });
@@ -284,6 +287,9 @@ describe("SaveGameWorkspace", () => {
       renderer: "gliden64",
       saveGameId: "save-001",
       singleTarget: false,
+      perfectRun: false,
+      keepFailedRecordings: true,
+      targetClearGoal: 0,
       target: null,
     });
     expect(onRefreshStatus).toHaveBeenCalledWith(saveGame.id);
@@ -338,6 +344,9 @@ describe("SaveGameWorkspace", () => {
       renderer: "gliden64",
       saveGameId: "save-001",
       singleTarget: false,
+      perfectRun: false,
+      keepFailedRecordings: true,
+      targetClearGoal: 0,
       target: null,
     });
   });
@@ -386,8 +395,71 @@ describe("SaveGameWorkspace", () => {
       renderer: "gliden64",
       saveGameId: "save-001",
       singleTarget: true,
+      perfectRun: false,
+      keepFailedRecordings: true,
+      targetClearGoal: 0,
       target: launchableSelectedTarget,
     });
+  });
+
+  it("starts a clicked target in perfect-run fishing mode", async () => {
+    const user = userEvent.setup();
+    const baseSaveGame = saveGameFixture({
+      course_setups: courseSetupsForCup("queen"),
+      cup_setups: [cupSetupFixture({ cup_id: "queen" })],
+    });
+    const baseProgress = baseSaveGame.unlock_progress;
+    if (baseProgress === null) {
+      throw new Error("fixture is missing unlock progress");
+    }
+    const selectedTarget = baseProgress.targets[1];
+    if (selectedTarget === undefined) {
+      throw new Error("fixture is missing the selected target");
+    }
+    const launchableSelectedTarget = { ...selectedTarget, status: "pending" } as const;
+    const saveGame = saveGameFixture({
+      course_setups: courseSetupsForCup("queen"),
+      cup_setups: [cupSetupFixture({ cup_id: "queen" })],
+      unlock_progress: {
+        ...baseProgress,
+        inspection_status: "inspected",
+        targets: [...baseProgress.targets.slice(0, 1), launchableSelectedTarget],
+      },
+    });
+    const onUpdateRunnerSettings = vi.fn(async (request) =>
+      saveGameFixture({
+        ...saveGame,
+        runner_settings: {
+          ...saveGame.runner_settings,
+          recording_enabled: request.recordingEnabled,
+          target_restart_on_retire: request.targetRestartOnRetire,
+          target_clear_goal: request.targetClearGoal,
+          keep_failed_recordings: request.keepFailedRecordings,
+        },
+      }),
+    );
+    const onStartCareerMode = vi.fn().mockResolvedValue("started");
+
+    renderSaveGameWorkspace({
+      saveGame,
+      onUpdateRunnerSettings,
+      onStartCareerMode,
+    });
+
+    await user.click(screen.getByLabelText("Record video"));
+    await user.click(screen.getByLabelText("Restart on retire"));
+    await user.click(screen.getByRole("button", { name: "Start Clear Novice Queen Cup" }));
+
+    expect(onStartCareerMode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keepFailedRecordings: false,
+        perfectRun: true,
+        singleTarget: true,
+        targetClearGoal: 1,
+        target: launchableSelectedTarget,
+      }),
+    );
+    expect(screen.getByLabelText("Restart on retire")).toBeChecked();
   });
 
   it("starts a clicked succeeded unlock target as a single-target replay", async () => {
@@ -431,6 +503,9 @@ describe("SaveGameWorkspace", () => {
       expect.objectContaining({
         saveGameId: "save-001",
         singleTarget: true,
+        perfectRun: false,
+        keepFailedRecordings: true,
+        targetClearGoal: 0,
         target: selectedTarget,
       }),
     );
@@ -687,7 +762,9 @@ function newSaveGameSession(): SaveGameSession {
   return {
     nameText: "unlock save",
     attemptSeedText: "123",
+    keepFailedPerfectRunVideos: false,
     policyMode: "deterministic",
+    perfectRun: false,
     recordingEnabled: false,
     recordingInputHudEnabled: false,
     recordingUpscaleFactor: 2,
@@ -695,6 +772,7 @@ function newSaveGameSession(): SaveGameSession {
     runnerRenderer: "gliden64",
     saveGameId: null,
     sessionId: "save-game:new",
+    targetClearGoalText: "1",
     title: "unlock save",
   };
 }
@@ -787,7 +865,9 @@ function existingSaveGameSession(saveGameId: string): SaveGameSession {
   return {
     nameText: "expert unlock",
     attemptSeedText: "123",
+    keepFailedPerfectRunVideos: false,
     policyMode: "deterministic",
+    perfectRun: false,
     recordingEnabled: false,
     recordingInputHudEnabled: false,
     recordingUpscaleFactor: 2,
@@ -795,6 +875,7 @@ function existingSaveGameSession(saveGameId: string): SaveGameSession {
     runnerRenderer: "gliden64",
     saveGameId,
     sessionId: `save-game:${saveGameId}`,
+    targetClearGoalText: "1",
     title: "expert unlock",
   };
 }

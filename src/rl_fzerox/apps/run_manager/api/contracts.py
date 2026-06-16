@@ -51,14 +51,27 @@ class StartCareerModeRequest(BaseModel):
     cup_id: str | None = None
     course_id: str | None = None
     single_target: bool = False
+    perfect_run: bool = False
+    keep_failed_recordings: bool = True
+    target_clear_goal: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _validate_target_fields(self) -> StartCareerModeRequest:
+        if not self.recording_enabled and (
+            self.target_clear_goal > 0 or not self.keep_failed_recordings
+        ):
+            raise ValueError("target recording options require recording_enabled=true")
         values = (self.target_kind, self.difficulty, self.cup_id, self.course_id)
         if not any(value is not None for value in values):
+            if self.perfect_run or self.target_clear_goal > 0 or not self.keep_failed_recordings:
+                raise ValueError("target fishing options require a selected single target")
             return self
         if self.target_kind is None or self.difficulty is None or self.cup_id is None:
             raise ValueError("target_kind, difficulty, and cup_id are required together")
+        if (
+            self.perfect_run or self.target_clear_goal > 0 or not self.keep_failed_recordings
+        ) and not self.single_target:
+            raise ValueError("target fishing options require single_target=true")
         return self
 
 
@@ -83,6 +96,9 @@ class UpdateSaveRunnerSettingsRequest(BaseModel):
     recording_input_hud_enabled: bool = False
     recording_upscale_factor: int = Field(default=2, ge=1, le=4)
     recording_path: Path | None = None
+    target_restart_on_retire: bool = False
+    target_clear_goal: int = Field(default=1, ge=0)
+    keep_failed_recordings: bool = False
 
 
 class UpsertSaveCourseSetupRequest(BaseModel):
@@ -249,4 +265,7 @@ class RunLauncher(Protocol):
         cup_id: str | None,
         course_id: str | None,
         single_target: bool,
+        perfect_run: bool,
+        keep_failed_recordings: bool,
+        target_clear_goal: int,
     ) -> Literal["started", "already_running"]: ...

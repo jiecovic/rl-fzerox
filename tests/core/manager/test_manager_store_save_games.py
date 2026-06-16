@@ -48,6 +48,9 @@ def test_manager_store_creates_save_game_record(tmp_path: Path) -> None:
     assert save_game.runner_recording_input_hud_enabled is False
     assert save_game.runner_recording_upscale_factor == 2
     assert save_game.runner_recording_path is None
+    assert save_game.runner_target_restart_on_retire is False
+    assert save_game.runner_target_clear_goal == 1
+    assert save_game.runner_keep_failed_recordings is False
     assert save_game.save_path.parent.is_dir()
     assert not save_game.save_path.exists()
 
@@ -83,6 +86,9 @@ def test_manager_store_updates_save_game_runner_settings(tmp_path: Path) -> None
         recording_input_hud_enabled=True,
         recording_upscale_factor=2,
         recording_path=Path("local/recordings/career/test.mkv"),
+        target_restart_on_retire=True,
+        target_clear_goal=5,
+        keep_failed_recordings=True,
     )
 
     assert updated is not None
@@ -94,6 +100,9 @@ def test_manager_store_updates_save_game_runner_settings(tmp_path: Path) -> None
     assert updated.runner_recording_input_hud_enabled is True
     assert updated.runner_recording_upscale_factor == 2
     assert updated.runner_recording_path == Path("local/recordings/career/test.mkv")
+    assert updated.runner_target_restart_on_retire is True
+    assert updated.runner_target_clear_goal == 5
+    assert updated.runner_keep_failed_recordings is True
     assert store.get_save_game(save_game.id) == updated
 
 

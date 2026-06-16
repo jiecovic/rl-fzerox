@@ -94,6 +94,9 @@ def update_save_game_runner_settings_payload(
             recording_input_hud_enabled=request.recording_input_hud_enabled,
             recording_upscale_factor=request.recording_upscale_factor,
             recording_path=request.recording_path,
+            target_restart_on_retire=request.target_restart_on_retire,
+            target_clear_goal=request.target_clear_goal,
+            keep_failed_recordings=request.keep_failed_recordings,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

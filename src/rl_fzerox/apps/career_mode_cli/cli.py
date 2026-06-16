@@ -27,6 +27,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 save_attempt_id=args.save_attempt_id,
                 save_game_id=args.save_game_id,
                 single_target=args.single_target,
+                perfect_run=args.perfect_run,
+                keep_failed_recordings=not args.discard_failed_recordings,
+                target_clear_goal=args.target_clear_goal,
                 overrides=args.overrides,
             )
         except (FileNotFoundError, KeyError, RuntimeError, ValueError) as exc:

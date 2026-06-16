@@ -257,6 +257,9 @@ export function SaveGameWorkspace({
       recordingPath: null,
       renderer: session.runnerRenderer,
       saveGameId: target.id,
+      targetRestartOnRetire: session.perfectRun,
+      targetClearGoal: parseTargetClearGoal(session.targetClearGoalText),
+      keepFailedRecordings: session.keepFailedPerfectRunVideos,
     };
   }
 
@@ -296,6 +299,9 @@ export function SaveGameWorkspace({
         recordingUpscaleFactor: settings.recording_upscale_factor,
         runnerDevice: settings.device,
         runnerRenderer: settings.renderer,
+        perfectRun: settings.target_restart_on_retire,
+        targetClearGoalText: String(settings.target_clear_goal),
+        keepFailedPerfectRunVideos: settings.keep_failed_recordings,
       });
     },
     [onPatchSession, session.sessionId],
@@ -345,6 +351,7 @@ export function SaveGameWorkspace({
     try {
       const updated = await onUpdateRunnerSettings(settingsRequest);
       patchSessionFromRunnerSettings(updated);
+      const targetRecordingEnabled = requestedTarget !== null && settingsRequest.recordingEnabled;
       const status = await onStartCareerMode({
         attemptSeed: settingsRequest.attemptSeed,
         device: settingsRequest.device,
@@ -356,6 +363,9 @@ export function SaveGameWorkspace({
         renderer: settingsRequest.renderer,
         saveGameId: target.id,
         singleTarget: requestedTarget !== null,
+        perfectRun: requestedTarget !== null && settingsRequest.targetRestartOnRetire,
+        keepFailedRecordings: !targetRecordingEnabled || settingsRequest.keepFailedRecordings,
+        targetClearGoal: targetRecordingEnabled ? settingsRequest.targetClearGoal : 0,
         target: requestedTarget,
       });
       setRunnerStatus(status === "started" ? "Runner started." : "Runner is already open.");
@@ -617,14 +627,25 @@ export function SaveGameWorkspace({
         />
         <UnlockPathPanel
           assignableRuns={assignableRuns}
+          keepFailedPerfectRunVideos={session.keepFailedPerfectRunVideos}
           metadata={metadata}
+          perfectRun={session.perfectRun}
+          recordingEnabled={session.recordingEnabled}
           saveGame={saveGame}
+          targetClearGoalText={session.targetClearGoalText}
           targets={unlockTargets}
           updating={updatingSaveGameId === saveGame.id}
           startableTargetKeys={startableTargetKeys}
           onCourseSetupDirtyChange={setCourseSetupDirty}
           onImportEngineTuning={importEngineTuning}
+          onKeepFailedPerfectRunVideosChange={(keepFailedPerfectRunVideos) =>
+            onPatchSession(session.sessionId, { keepFailedPerfectRunVideos })
+          }
+          onPerfectRunChange={(perfectRun) => onPatchSession(session.sessionId, { perfectRun })}
           onStartTarget={handleStartTarget}
+          onTargetClearGoalTextChange={(targetClearGoalText) =>
+            onPatchSession(session.sessionId, { targetClearGoalText })
+          }
           onUpsertCourseSetup={upsertCourseSetup}
           onUpsertCupSetup={upsertCupSetup}
         />
@@ -635,6 +656,14 @@ export function SaveGameWorkspace({
 
 function launchableTargetStatus(target: ManagedSaveUnlockTarget): boolean {
   return target.status === "pending" || target.status === "succeeded";
+}
+
+function parseTargetClearGoal(text: string): number {
+  const parsed = Number.parseInt(text.trim(), 10);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+  return Math.max(0, parsed);
 }
 
 function resolveLaunchCupVehicleId(
@@ -694,7 +723,10 @@ function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession
     settings.recording_enabled !== session.recordingEnabled ||
     settings.recording_input_hud_enabled !== session.recordingInputHudEnabled ||
     settings.recording_upscale_factor !== session.recordingUpscaleFactor ||
-    settings.recording_path !== null
+    settings.recording_path !== null ||
+    settings.target_restart_on_retire !== session.perfectRun ||
+    settings.target_clear_goal !== parseTargetClearGoal(session.targetClearGoalText) ||
+    settings.keep_failed_recordings !== session.keepFailedPerfectRunVideos
   );
 }
 

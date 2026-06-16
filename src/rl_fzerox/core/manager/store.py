@@ -553,6 +553,9 @@ class ManagerStore:
         recording_input_hud_enabled: bool,
         recording_upscale_factor: int,
         recording_path: Path | None,
+        target_restart_on_retire: bool,
+        target_clear_goal: int,
+        keep_failed_recordings: bool,
     ) -> ManagedSaveGame | None:
         return save_game_registry.update_runner_settings(
             self,
@@ -565,6 +568,9 @@ class ManagerStore:
             recording_input_hud_enabled=recording_input_hud_enabled,
             recording_upscale_factor=recording_upscale_factor,
             recording_path=recording_path,
+            target_restart_on_retire=target_restart_on_retire,
+            target_clear_goal=target_clear_goal,
+            keep_failed_recordings=keep_failed_recordings,
         )
 
     def delete_save_game(self, save_game_id: str) -> bool:

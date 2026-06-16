@@ -61,6 +61,16 @@ class CareerModeStore(Protocol):
 
     def start_next_save_attempt(self, save_game_id: str) -> ManagedSaveAttempt: ...
 
+    def start_target_save_attempt(
+        self,
+        save_game_id: str,
+        *,
+        target_kind: str,
+        difficulty: str,
+        cup_id: str,
+        course_id: str | None = None,
+    ) -> ManagedSaveAttempt: ...
+
     def get_save_attempt_execution_context(
         self,
         attempt_id: str,
@@ -74,6 +84,7 @@ class CareerProgressTransition:
     finished_attempt_id: str | None = None
     finished_status: SaveAttemptStatus | None = None
     finished_failure_reason: str | None = None
+    reset_emulator: bool = False
 
 
 class CareerAttemptProgress:
@@ -86,11 +97,16 @@ class CareerAttemptProgress:
         save_game_id: str,
         attempt_id: str,
         single_target: bool = False,
+        perfect_run: bool = False,
+        target_clear_goal: int = 0,
     ) -> None:
         self._store = store
         self._save_game_id = save_game_id
         self._attempt_id: str | None = attempt_id
         self._single_target = single_target
+        self._perfect_run = perfect_run
+        self._target_clear_goal = target_clear_goal
+        self._successful_target_clears = 0
         self._course_setups = self._store.list_save_course_setups(save_game_id)
         self._unlock_progress = self._store.save_game_unlock_progress(save_game_id)
         self._initial_unlock_progress = self._unlock_progress
@@ -121,6 +137,15 @@ class CareerAttemptProgress:
         if _target_terminal_succeeded(info, setup):
             self._observed_target_terminal_success = True
 
+        if self._perfect_run and _is_failed_terminal_result(info):
+            return self._finish_and_advance(
+                info=info,
+                setup=setup,
+                status="failed",
+                failure_reason=f"perfect run reset after {_failure_reason(info)}",
+                reset_emulator=True,
+            )
+
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
         if _target_succeeded(progress.targets, setup):
@@ -131,6 +156,7 @@ class CareerAttemptProgress:
 
         return self._finish_and_advance(
             info=info,
+            setup=setup,
             status="failed",
             failure_reason=_failure_reason(info),
         )
@@ -157,12 +183,14 @@ class CareerAttemptProgress:
                 return CareerProgressTransition(attempt_finished=False)
             return self._finish_and_advance(
                 info=info,
+                setup=setup,
                 status="succeeded",
                 failure_reason=None,
             )
         if _is_failed_gp_exit(info) and not self._observed_target_terminal_success:
             return self._finish_and_advance(
                 info=info,
+                setup=setup,
                 status="failed",
                 failure_reason="gp attempt returned to menu before cup clear",
             )
@@ -179,15 +207,19 @@ class CareerAttemptProgress:
         self,
         *,
         info: dict[str, object],
+        setup: CareerModeRaceSetupConfig,
         status: SaveAttemptStatus,
         failure_reason: str | None,
+        reset_emulator: bool = False,
     ) -> CareerProgressTransition:
         finished_attempt_id = self._attempt_id
         self._finish_attempt(info=info, status=status, failure_reason=failure_reason)
         return self._advance_after_finished_attempt(
+            setup=setup,
             finished_attempt_id=finished_attempt_id,
             finished_status=status,
             finished_failure_reason=failure_reason,
+            reset_emulator=reset_emulator,
         )
 
     def _finish_attempt(
@@ -211,22 +243,56 @@ class CareerAttemptProgress:
     def _advance_after_finished_attempt(
         self,
         *,
+        setup: CareerModeRaceSetupConfig,
         finished_attempt_id: str | None,
         finished_status: SaveAttemptStatus,
         finished_failure_reason: str | None,
+        reset_emulator: bool,
     ) -> CareerProgressTransition:
         progress = self._refresh_unlock_progress()
-        if self._single_target and finished_status == "succeeded":
-            self._store.update_save_game_status(
-                save_game_id=self._save_game_id,
-                status="paused",
+        if self._single_target:
+            if finished_status == "succeeded":
+                self._successful_target_clears += 1
+            if (
+                finished_status == "succeeded"
+                and self._target_clear_goal > 0
+                and self._successful_target_clears >= self._target_clear_goal
+            ):
+                self._store.update_save_game_status(
+                    save_game_id=self._save_game_id,
+                    status="paused",
+                )
+                self._attempt_id = None
+                return CareerProgressTransition(
+                    attempt_finished=True,
+                    finished_attempt_id=finished_attempt_id,
+                    finished_status=finished_status,
+                    finished_failure_reason=finished_failure_reason,
+                    reset_emulator=reset_emulator,
+                )
+            next_attempt = self._store.start_target_save_attempt(
+                self._save_game_id,
+                target_kind="clear_gp_cup",
+                difficulty=setup.difficulty,
+                cup_id=setup.cup_id,
+                # Unlock targets are GP-cup clears. The resolved race setup may
+                # carry a concrete course_id for policy setup; using it here
+                # would turn a cup replay into a non-existent course target.
+                course_id=None,
             )
-            self._attempt_id = None
+            context = self._store.get_save_attempt_execution_context(next_attempt.id)
+            if context is None:
+                raise RuntimeError(
+                    "save attempt disappeared before Career Mode could repeat selected target: "
+                    f"{next_attempt.id}"
+                )
             return CareerProgressTransition(
                 attempt_finished=True,
+                next_plan=build_save_race_execution_plan(context),
                 finished_attempt_id=finished_attempt_id,
                 finished_status=finished_status,
                 finished_failure_reason=finished_failure_reason,
+                reset_emulator=reset_emulator,
             )
         if progress.next_target is None:
             self._store.update_save_game_status(
@@ -239,6 +305,7 @@ class CareerAttemptProgress:
                 finished_attempt_id=finished_attempt_id,
                 finished_status=finished_status,
                 finished_failure_reason=finished_failure_reason,
+                reset_emulator=reset_emulator,
             )
 
         next_attempt = self._store.start_next_save_attempt(self._save_game_id)
@@ -253,6 +320,7 @@ class CareerAttemptProgress:
             finished_attempt_id=finished_attempt_id,
             finished_status=finished_status,
             finished_failure_reason=finished_failure_reason,
+            reset_emulator=reset_emulator,
         )
 
     def _refresh_unlock_progress(self) -> ManagedSaveUnlockProgress:
@@ -312,6 +380,10 @@ def _info_matches_course(info: dict[str, object], course: CourseInfo) -> bool:
 def _failure_reason(info: dict[str, object]) -> str:
     reason = info.get("termination_reason")
     return reason if isinstance(reason, str) and reason else "race ended before cup clear"
+
+
+def _is_failed_terminal_result(info: dict[str, object]) -> bool:
+    return info.get("termination_reason") in {"crashed", "retired"}
 
 
 def _keeps_current_gp_attempt(info: dict[str, object]) -> bool:

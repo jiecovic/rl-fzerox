@@ -59,9 +59,34 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--single-target",
         action="store_true",
-        help="Stop after the selected save target succeeds instead of advancing the unlock path.",
+        help="Keep replaying the selected save target instead of advancing the unlock path.",
+    )
+    parser.add_argument(
+        "--perfect-run",
+        action="store_true",
+        help="For a selected target, restart the cup attempt after the first crash or retire.",
+    )
+    parser.add_argument(
+        "--discard-failed-recordings",
+        action="store_true",
+        help="Delete failed target-segment recordings instead of finalizing MP4s.",
+    )
+    parser.add_argument(
+        "--target-clear-goal",
+        type=int,
+        default=0,
+        help=(
+            "Stop selected-target replay after this many successful cup clears. "
+            "Use 0 to repeat until stopped."
+        ),
     )
     args = parser.parse_args(argv)
     if args.attempt_seed is not None and not (0 <= args.attempt_seed <= 0xFFFFFFFF):
         parser.error("--attempt-seed must be between 0 and 4294967295")
+    if args.target_clear_goal < 0:
+        parser.error("--target-clear-goal must be non-negative")
+    if (
+        args.perfect_run or args.target_clear_goal > 0 or args.discard_failed_recordings
+    ) and not args.single_target:
+        parser.error("target fishing options require --single-target")
     return args

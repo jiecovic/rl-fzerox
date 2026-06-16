@@ -381,6 +381,48 @@ def test_career_recorder_finishes_failed_segment_from_terminal_event(
     ]
 
 
+def test_career_recorder_discards_failed_segments_when_requested(
+    tmp_path: Path,
+) -> None:
+    writers: list[_FakeWriter] = []
+    finalizer = _FakeFinalizer()
+
+    def writer_factory(path: Path) -> _FakeWriter:
+        writer = _FakeWriter(path)
+        writers.append(writer)
+        return writer
+
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    recorder = CareerModeFrameRecorder(
+        path=tmp_path / "career.mkv",
+        native_fps=60.0,
+        keep_failed_segments=False,
+        writer_factory=writer_factory,
+        finalizer_factory=lambda: finalizer,
+    )
+
+    recorder.record_frame(
+        frame,
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Joker Cup",
+        },
+    )
+    recorder.finish_segment(
+        status="failed",
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Joker Cup",
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "failed",
+        },
+    )
+
+    assert writers[1].closed
+    assert not (tmp_path / "career.segment-001-clear-master-joker-cup.mkv").exists()
+    assert finalizer.paths == []
+
+
 def test_career_recorder_restarts_segment_after_same_attempt_retry(
     tmp_path: Path,
 ) -> None:

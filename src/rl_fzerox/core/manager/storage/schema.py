@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import inspect, select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.orm import DeclarativeBase, Session
@@ -29,7 +29,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 31
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -55,6 +55,11 @@ TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS = frozenset(
         "generated_baseline_state_path",
     }
 )
+SAVE_GAME_RUNNER_REPLAY_COLUMNS = (
+    ("runner_target_restart_on_retire", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("runner_target_clear_goal", "INTEGER NOT NULL DEFAULT 1"),
+    ("runner_keep_failed_recordings", "BOOLEAN NOT NULL DEFAULT 0"),
+)
 
 
 def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
@@ -65,6 +70,7 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
     try:
         table_names = set(inspect(engine).get_table_names())
         if _has_manager_schema(table_names):
+            _upgrade_save_game_runner_replay_columns(engine=engine, table_names=table_names)
             _assert_current_schema(engine=engine, table_names=table_names)
         else:
             ManagerBase.metadata.create_all(engine)
@@ -156,6 +162,35 @@ def _assert_current_schema(
     _assert_alt_baseline_columns(inspector=inspector)
     _assert_track_sampling_entry_columns(inspector=inspector)
     _assert_track_sampling_generated_slot_columns(inspector=inspector)
+
+
+def _upgrade_save_game_runner_replay_columns(
+    *,
+    engine: Engine,
+    table_names: set[str],
+) -> None:
+    """Add target-replay runner settings to pre-31 manager DBs.
+
+    The manager registry is current-schema oriented. These additive columns are
+    safe to backfill in place because defaults preserve the old launch behavior.
+    """
+
+    if "save_games" not in table_names:
+        return
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("save_games")}
+    missing_columns = [
+        (column_name, definition)
+        for column_name, definition in SAVE_GAME_RUNNER_REPLAY_COLUMNS
+        if column_name not in columns
+    ]
+    if not missing_columns:
+        return
+    with engine.begin() as connection:
+        for column_name, definition in missing_columns:
+            connection.execute(
+                text(f"ALTER TABLE save_games ADD COLUMN {column_name} {definition}")
+            )
 
 
 def _assert_save_game_columns(*, inspector: Inspector) -> None:

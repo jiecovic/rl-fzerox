@@ -27,6 +27,9 @@ def start_career_mode_payload(
             cup_id=request.cup_id,
             course_id=request.course_id,
             single_target=request.single_target,
+            perfect_run=request.perfect_run,
+            keep_failed_recordings=request.keep_failed_recordings,
+            target_clear_goal=request.target_clear_goal,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

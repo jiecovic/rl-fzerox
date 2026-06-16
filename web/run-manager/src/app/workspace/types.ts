@@ -59,7 +59,9 @@ export interface RunSession {
 export interface SaveGameSession {
   nameText: string;
   attemptSeedText: string;
+  keepFailedPerfectRunVideos: boolean;
   policyMode: PolicyPlaybackMode;
+  perfectRun: boolean;
   recordingEnabled: boolean;
   recordingInputHudEnabled: boolean;
   recordingUpscaleFactor: number;
@@ -67,6 +69,7 @@ export interface SaveGameSession {
   runnerRenderer: WatchRenderer;
   saveGameId: string | null;
   sessionId: `save-game:${string}`;
+  targetClearGoalText: string;
   title: string;
 }
 

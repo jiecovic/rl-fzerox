@@ -73,6 +73,9 @@ async def test_manager_api_creates_save_game(tmp_path: Path) -> None:
         "recording_input_hud_enabled": False,
         "recording_upscale_factor": 2,
         "recording_path": None,
+        "target_restart_on_retire": False,
+        "target_clear_goal": 1,
+        "keep_failed_recordings": False,
         "renderer": "gliden64",
     }
     assert payload["save_game"]["unlock_progress"]["completed_count"] == 0
@@ -109,6 +112,9 @@ async def test_manager_api_returns_slim_save_game_status(tmp_path: Path) -> None
         "recording_input_hud_enabled": False,
         "recording_upscale_factor": 2,
         "recording_path": None,
+        "target_restart_on_retire": False,
+        "target_clear_goal": 1,
+        "keep_failed_recordings": False,
         "renderer": "gliden64",
     }
     assert save_payload["unlock_progress"]["completed_count"] == 0
@@ -132,6 +138,9 @@ async def test_manager_api_updates_save_game_runner_settings(tmp_path: Path) -> 
             "recording_input_hud_enabled": True,
             "recording_upscale_factor": 2,
             "recording_path": "local/recordings/career/test.mkv",
+            "target_restart_on_retire": True,
+            "target_clear_goal": 5,
+            "keep_failed_recordings": True,
             "renderer": "angrylion",
         },
     )
@@ -146,6 +155,9 @@ async def test_manager_api_updates_save_game_runner_settings(tmp_path: Path) -> 
         "recording_input_hud_enabled": True,
         "recording_upscale_factor": 2,
         "recording_path": "local/recordings/career/test.mkv",
+        "target_restart_on_retire": True,
+        "target_clear_goal": 5,
+        "keep_failed_recordings": True,
         "renderer": "angrylion",
     }
 
@@ -336,6 +348,9 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
             cup_id: str | None,
             course_id: str | None,
             single_target: bool,
+            perfect_run: bool,
+            keep_failed_recordings: bool,
+            target_clear_goal: int,
         ) -> Literal["started", "already_running"]:
             self.request = {
                 "save_game_id": save_game_id,
@@ -352,6 +367,9 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
                 "cup_id": cup_id,
                 "course_id": course_id,
                 "single_target": single_target,
+                "perfect_run": perfect_run,
+                "keep_failed_recordings": keep_failed_recordings,
+                "target_clear_goal": target_clear_goal,
             }
             return "started"
 
@@ -374,6 +392,9 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
             "cup_id": "queen",
             "course_id": None,
             "single_target": True,
+            "perfect_run": True,
+            "keep_failed_recordings": False,
+            "target_clear_goal": 3,
         },
     )
 
@@ -394,6 +415,9 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
         "cup_id": "queen",
         "course_id": None,
         "single_target": True,
+        "perfect_run": True,
+        "keep_failed_recordings": False,
+        "target_clear_goal": 3,
     }
 
 

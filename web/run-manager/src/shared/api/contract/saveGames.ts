@@ -93,6 +93,9 @@ export const saveGameRunnerSettingsSchema = z.object({
   recording_input_hud_enabled: z.boolean(),
   recording_upscale_factor: z.number().int().min(1).max(4),
   recording_path: z.string().nullable(),
+  target_restart_on_retire: z.boolean().default(false),
+  target_clear_goal: z.number().int().min(0).default(1),
+  keep_failed_recordings: z.boolean().default(false),
 });
 
 export const managedSaveGameSchema = z.object({
@@ -193,6 +196,9 @@ export interface CareerModeRunnerLaunchRequest {
   renderer: WatchRenderer | null;
   saveGameId: string;
   singleTarget: boolean;
+  perfectRun: boolean;
+  keepFailedRecordings: boolean;
+  targetClearGoal: number;
   target: ManagedSaveUnlockTarget | null;
 }
 
@@ -206,4 +212,7 @@ export interface SaveGameRunnerSettingsUpdateRequest {
   recordingPath: string | null;
   renderer: WatchRenderer;
   saveGameId: string;
+  targetRestartOnRetire: boolean;
+  targetClearGoal: number;
+  keepFailedRecordings: boolean;
 }

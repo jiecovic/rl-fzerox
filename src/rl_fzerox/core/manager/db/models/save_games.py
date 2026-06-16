@@ -33,6 +33,9 @@ class SaveGameModel(ManagerBase):
     runner_recording_input_hud_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     runner_recording_upscale_factor: Mapped[int] = mapped_column(Integer, default=2)
     runner_recording_path: Mapped[str | None]
+    runner_target_restart_on_retire: Mapped[bool] = mapped_column(Boolean, default=False)
+    runner_target_clear_goal: Mapped[int] = mapped_column(Integer, default=1)
+    runner_keep_failed_recordings: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class SaveGameCourseSetupModel(ManagerBase):

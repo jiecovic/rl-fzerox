@@ -73,6 +73,9 @@ def save_game_runner_settings_payload(save_game: ManagedSaveGame) -> dict[str, o
         "recording_path": None
         if save_game.runner_recording_path is None
         else str(save_game.runner_recording_path),
+        "target_restart_on_retire": save_game.runner_target_restart_on_retire,
+        "target_clear_goal": save_game.runner_target_clear_goal,
+        "keep_failed_recordings": save_game.runner_keep_failed_recordings,
     }
 
 

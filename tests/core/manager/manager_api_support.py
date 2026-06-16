@@ -99,6 +99,9 @@ class _LauncherStub:
         cup_id: str | None,
         course_id: str | None,
         single_target: bool,
+        perfect_run: bool,
+        keep_failed_recordings: bool,
+        target_clear_goal: int,
     ) -> Literal["started", "already_running"]:
         del (
             save_game_id,
@@ -115,6 +118,9 @@ class _LauncherStub:
             cup_id,
             course_id,
             single_target,
+            perfect_run,
+            keep_failed_recordings,
+            target_clear_goal,
         )
         raise AssertionError("career mode runner should not be called")
 

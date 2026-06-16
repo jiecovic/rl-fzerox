@@ -120,7 +120,9 @@ export function useWorkspaceSessions({
       upsertSaveGameSession(current, {
         nameText,
         attemptSeedText: randomAttemptSeedText(),
+        keepFailedPerfectRunVideos: false,
         policyMode: "deterministic",
+        perfectRun: false,
         recordingEnabled: false,
         recordingInputHudEnabled: false,
         recordingUpscaleFactor: 2,
@@ -128,6 +130,7 @@ export function useWorkspaceSessions({
         runnerRenderer: "gliden64",
         saveGameId: null,
         sessionId,
+        targetClearGoalText: "1",
         title: nameText,
       }),
     );
@@ -357,8 +360,11 @@ function saveGameSessionForManagedSave(
     attemptSeedText:
       existing?.attemptSeedText ??
       (settings.attempt_seed === null ? "" : String(settings.attempt_seed)),
+    keepFailedPerfectRunVideos:
+      existing?.keepFailedPerfectRunVideos ?? settings.keep_failed_recordings,
     nameText: saveGame.name,
     policyMode: existing?.policyMode ?? settings.policy_mode,
+    perfectRun: existing?.perfectRun ?? settings.target_restart_on_retire,
     recordingEnabled: existing?.recordingEnabled ?? settings.recording_enabled,
     recordingInputHudEnabled:
       existing?.recordingInputHudEnabled ?? settings.recording_input_hud_enabled,
@@ -367,6 +373,7 @@ function saveGameSessionForManagedSave(
     runnerRenderer: existing?.runnerRenderer ?? settings.renderer,
     saveGameId: saveGame.id,
     sessionId,
+    targetClearGoalText: existing?.targetClearGoalText ?? String(settings.target_clear_goal),
     title: saveGame.name,
   };
 }

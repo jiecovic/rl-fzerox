@@ -186,6 +186,9 @@ class ManagedSaveGame:
     runner_recording_input_hud_enabled: bool = False
     runner_recording_upscale_factor: int = 2
     runner_recording_path: Path | None = None
+    runner_target_restart_on_retire: bool = False
+    runner_target_clear_goal: int = 1
+    runner_keep_failed_recordings: bool = False
 
 
 @dataclass(frozen=True, slots=True)

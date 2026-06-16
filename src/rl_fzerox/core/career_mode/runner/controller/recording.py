@@ -53,6 +53,12 @@ class CareerRecordingSegmentTracker:
         self.pending_close = CareerRecordingSegmentClose(status=status)
         self.reset()
 
+    def force_close(self, *, status: CareerRecordingSegmentStatus) -> None:
+        """Close the current segment when the FSM resets the emulator itself."""
+
+        self.pending_close = CareerRecordingSegmentClose(status=status)
+        self.reset()
+
     def pop_close(self) -> CareerRecordingSegmentClose | None:
         close = self.pending_close
         self.pending_close = None

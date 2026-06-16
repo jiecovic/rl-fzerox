@@ -114,6 +114,8 @@ class CareerModeController:
         attempt_id: str,
         device: str,
         single_target: bool = False,
+        perfect_run: bool = False,
+        target_clear_goal: int = 0,
     ) -> None:
         self._setup = setup
         store = ManagerStore(db_path)
@@ -122,6 +124,8 @@ class CareerModeController:
             save_game_id=save_game_id,
             attempt_id=attempt_id,
             single_target=single_target,
+            perfect_run=perfect_run,
+            target_clear_goal=target_clear_goal,
         )
         self._camera = CareerCameraSync()
         self._pending_steps: deque[RawMenuStep] = deque()
@@ -144,6 +148,7 @@ class CareerModeController:
         self._last_finished_attempt_status: SaveAttemptStatus | None = None
         self._last_finished_attempt_failure_reason: str | None = None
         self._refresh_policy_artifact_on_next_handoff = False
+        self._emulator_reset_requested = False
         self._recording = CareerRecordingSegmentTracker()
         self._policy_resolver = CareerPolicyResolver(
             store=store,
@@ -168,6 +173,8 @@ class CareerModeController:
             attempt_id=config.watch.save_attempt_id,
             device=config.watch.device,
             single_target=config.watch.single_save_target,
+            perfect_run=config.watch.single_save_target_perfect,
+            target_clear_goal=config.watch.single_save_target_clear_goal,
         )
 
     def active_policy_control(
@@ -451,6 +458,11 @@ class CareerModeController:
 
     def pop_recording_segment_close(self) -> CareerRecordingSegmentClose | None:
         return self._recording.pop_close()
+
+    def pop_emulator_reset_request(self) -> bool:
+        requested = self._emulator_reset_requested
+        self._emulator_reset_requested = False
+        return requested
 
     def _view_state(self) -> CareerControllerViewState:
         return CareerControllerViewState(
@@ -790,6 +802,9 @@ class CareerModeController:
         self._remember_finished_attempt(transition)
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
+        if transition.reset_emulator:
+            self._request_emulator_reset_for_next_attempt()
+            return True
         if self._progress.attempt_id is None:
             self._enter_continue_after_race()
             return True
@@ -899,7 +914,28 @@ class CareerModeController:
         self._remember_finished_attempt(transition)
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
+        if transition.reset_emulator:
+            self._request_emulator_reset_for_next_attempt()
         return transition.attempt_finished
+
+    def _request_emulator_reset_for_next_attempt(self) -> None:
+        """Restart from title after perfect-run failure instead of continuing GP lives."""
+
+        self._emulator_reset_requested = True
+        self._recording.force_close(status="failed")
+        self._pending_steps.clear()
+        self._phase = CareerPhase.BOOT_TO_DIFFICULTY
+        self._reset_engine_adjustment()
+        self._difficulty_popup_state = DifficultyPopupState.CLOSED
+        self._machine_selection_applied = False
+        self._advance_presses_in_phase = 0
+        self._awaiting_new_race_after_terminal = False
+        self._continuing_race_result = False
+        self._observed_terminal_race_result = False
+        self._continue_after_race_pulses = 0
+        self._last_progress_sync_continue_pulse = -1
+        self._fresh_race_ready_frames = 0
+        self._reset_camera_sync()
 
     def _reset_camera_sync(self) -> None:
         self._camera.reset()

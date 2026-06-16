@@ -13,6 +13,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     in_gp_race,
 )
 from rl_fzerox.core.career_mode.runner.save_file import (
+    load_save_ram,
     persist_save_ram,
 )
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
@@ -435,6 +436,25 @@ def _run_career_mode_loop_body(
                         frame_recorder=frame_recorder,
                         info=terminal_info,
                     )
+                    if controller.pop_emulator_reset_request():
+                        raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
+                            config=config,
+                            session=session,
+                            controller=controller,
+                        )
+                        reset_info = dict(info)
+                        active_policy_control = None
+                        active_policy_started = False
+                        current_policy_action = None
+                        current_control_state = RaceControlState()
+                        current_gas_level = 0.0
+                        boost_lamp_level = 0.0
+                        cnn_activations = None
+                        current_auxiliary_predictions = None
+                        current_auxiliary_targets = None
+                        manual_control_enabled = False
+                        publish_snapshot(policy_visible=False)
+                        continue
                     track_record_book = track_record_book.update(
                         info,
                         current_telemetry,
@@ -655,6 +675,25 @@ def _run_career_mode_loop_body(
                         frame_recorder=frame_recorder,
                         info=terminal_info,
                     )
+                    if controller.pop_emulator_reset_request():
+                        raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
+                            config=config,
+                            session=session,
+                            controller=controller,
+                        )
+                        reset_info = dict(info)
+                        active_policy_control = None
+                        active_policy_started = False
+                        current_policy_action = None
+                        current_control_state = RaceControlState()
+                        current_gas_level = 0.0
+                        boost_lamp_level = 0.0
+                        cnn_activations = None
+                        current_auxiliary_predictions = None
+                        current_auxiliary_targets = None
+                        manual_control_enabled = False
+                        publish_snapshot(policy_visible=False)
+                        continue
                     track_record_book = track_record_book.update(
                         info,
                         current_telemetry,
@@ -727,6 +766,18 @@ def _fresh_menu_runtime_state(
     info = dict(raw_info)
     telemetry = _read_live_telemetry(session.emulator)
     return raw_info, info, telemetry
+
+
+def _reset_emulator_for_next_attempt(
+    *,
+    config: WatchAppConfig,
+    session: CareerModeRuntimeSession,
+    controller: CareerModeController,
+) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
+    load_save_ram(config, session)
+    session.emulator.reset()
+    raw_info, info, telemetry = _fresh_menu_runtime_state(session)
+    return raw_info, controller.viewer_info(info=info, active_policy_control=None), telemetry
 
 
 def _should_observe_policy_transition(

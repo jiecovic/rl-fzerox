@@ -132,6 +132,9 @@ class ManagerRunLauncher:
         cup_id: str | None = None,
         course_id: str | None = None,
         single_target: bool = False,
+        perfect_run: bool = False,
+        keep_failed_recordings: bool = True,
+        target_clear_goal: int = 0,
     ) -> WatchLaunchStatus:
         """Launch the visible Career Mode runner for one save game."""
 
@@ -151,6 +154,9 @@ class ManagerRunLauncher:
             cup_id=cup_id,
             course_id=course_id,
             single_target=single_target,
+            perfect_run=perfect_run,
+            keep_failed_recordings=keep_failed_recordings,
+            target_clear_goal=target_clear_goal,
         )
 
     def _spawn_worker(self, *, run_id: str, resume: bool) -> None:
