@@ -1343,6 +1343,7 @@
     },
     "policy": {
       "activation": "relu",
+      "air_brake_on_logit": 0.0,
       "auxiliary_state_enabled": false,
       "auxiliary_state_head_arch": [128],
       "auxiliary_state_losses": [],

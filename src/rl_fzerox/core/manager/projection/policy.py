@@ -33,6 +33,11 @@ def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
             "gas_on_logit": (
                 config.policy.gas_on_logit if config.action.drive_mode == "on_off" else 0.0
             ),
+            "air_brake_on_logit": (
+                config.policy.air_brake_on_logit
+                if config.action.include_air_brake and config.action.air_brake_mode == "on_off"
+                else 0.0
+            ),
             "spin_idle_logit": (
                 config.policy.spin_idle_logit if config.action.include_spin else 0.0
             ),

@@ -114,6 +114,7 @@ class PolicyActionBiasConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     gas_on_logit: float = 0.0
+    air_brake_on_logit: float = 0.0
     spin_idle_logit: float = 0.0
 
 

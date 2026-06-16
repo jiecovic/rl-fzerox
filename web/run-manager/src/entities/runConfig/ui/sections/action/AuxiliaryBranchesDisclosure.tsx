@@ -34,6 +34,7 @@ export function AuxiliaryBranchesDisclosure({
           actor_regularization: defaultConfig.train.actor_regularization,
         });
         updatePolicy({
+          air_brake_on_logit: defaultConfig.policy.air_brake_on_logit,
           spin_idle_logit: defaultConfig.policy.spin_idle_logit,
         });
       }}

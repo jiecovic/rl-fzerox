@@ -1,8 +1,11 @@
 # src/rl_fzerox/core/training/session/model/action_bias.py
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
+from zipfile import BadZipFile, ZipFile
 
 import torch as th
 
@@ -10,8 +13,6 @@ from rl_fzerox.core.envs.actions import DiscreteActionDimension
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig
 
 MODEL_ACTION_BIAS_OFFSETS_ATTR = "_fzerox_action_bias_logit_offsets"
-_ACTION_BIAS_FIELD_NAMES = ("gas_on_logit", "spin_idle_logit")
-_MARKERLESS_FULL_RESUME_DELTA_FIELDS = frozenset(("spin_idle_logit",))
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +21,21 @@ class _ActionBiasSpec:
     branch_label: str
     action_index: int
     value: float
+
+
+@dataclass(frozen=True, slots=True)
+class _ActionBiasTarget:
+    field_name: str
+    branch_label: str
+    action_index: int
+
+
+ACTION_BIAS_TARGETS = (
+    _ActionBiasTarget(field_name="gas_on_logit", branch_label="gas", action_index=1),
+    _ActionBiasTarget(field_name="air_brake_on_logit", branch_label="air_brake", action_index=1),
+    _ActionBiasTarget(field_name="spin_idle_logit", branch_label="spin", action_index=0),
+)
+ACTION_BIAS_FIELD_NAMES = tuple(target.field_name for target in ACTION_BIAS_TARGETS)
 
 
 class TrainingEnvActionDimensions(Protocol):
@@ -52,7 +68,7 @@ def apply_resume_action_bias_delta(
     """Apply only newly requested logit nudges after a full-model resume."""
 
     desired_offsets = _configured_action_bias_offsets(policy_config)
-    previous_offsets = _model_action_bias_offsets(model, desired_offsets=desired_offsets)
+    previous_offsets = _model_action_bias_offsets(model)
     delta_offsets = {
         field_name: desired_offsets[field_name] - previous_offsets.get(field_name, 0.0)
         for field_name in desired_offsets
@@ -65,37 +81,63 @@ def apply_resume_action_bias_delta(
     _set_model_action_bias_offsets(model, desired_offsets)
 
 
+def load_action_bias_offsets_from_archive(model_path: Path) -> dict[str, float]:
+    """Read persisted action-bias metadata from an SB3 model archive."""
+
+    try:
+        with ZipFile(model_path) as archive:
+            data = archive.read("data")
+    except (BadZipFile, FileNotFoundError, KeyError) as exc:
+        raise _action_bias_metadata_error("weights-only resume source checkpoint") from exc
+
+    try:
+        loaded: object = json.loads(data.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise _action_bias_metadata_error("weights-only resume source checkpoint") from exc
+    if not isinstance(loaded, dict):
+        raise _action_bias_metadata_error("weights-only resume source checkpoint")
+    return _normalized_action_bias_offsets(
+        loaded.get(MODEL_ACTION_BIAS_OFFSETS_ATTR),
+        source="weights-only resume source checkpoint",
+    )
+
+
+def set_model_action_bias_offsets(model: object, offsets: dict[str, float]) -> None:
+    _set_model_action_bias_offsets(model, offsets)
+
+
 def _configured_action_bias_offsets(policy_config: PolicyConfig) -> dict[str, float]:
     return {
-        "gas_on_logit": float(policy_config.action_bias.gas_on_logit),
-        "spin_idle_logit": float(policy_config.action_bias.spin_idle_logit),
+        target.field_name: float(getattr(policy_config.action_bias, target.field_name))
+        for target in ACTION_BIAS_TARGETS
     }
 
 
-def _model_action_bias_offsets(
-    model: object,
-    *,
-    desired_offsets: dict[str, float],
-) -> dict[str, float]:
-    value = getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR, None)
+def _model_action_bias_offsets(model: object) -> dict[str, float]:
+    return _normalized_action_bias_offsets(
+        getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR, None),
+        source="full-model resume checkpoint",
+    )
+
+
+def _normalized_action_bias_offsets(value: object, *, source: str) -> dict[str, float]:
     if value is None or not isinstance(value, dict):
-        # Older checkpoints have no marker. Gas bias already existed as an initial
-        # model-construction nudge, so do not replay it. The spin-idle field is new
-        # and intentionally resume-adjustable for existing spin-enabled runs.
-        return {
-            field_name: (
-                0.0
-                if field_name in _MARKERLESS_FULL_RESUME_DELTA_FIELDS
-                else desired_offsets[field_name]
-            )
-            for field_name in _ACTION_BIAS_FIELD_NAMES
-        }
+        raise _action_bias_metadata_error(source)
     offsets: dict[str, float] = {}
-    for field_name in _ACTION_BIAS_FIELD_NAMES:
+    for field_name in ACTION_BIAS_FIELD_NAMES:
         raw_offset = value.get(field_name)
         if isinstance(raw_offset, int | float) and not isinstance(raw_offset, bool):
             offsets[field_name] = float(raw_offset)
+            continue
+        raise _action_bias_metadata_error(source)
     return offsets
+
+
+def _action_bias_metadata_error(source: str) -> RuntimeError:
+    return RuntimeError(
+        f"{source} is missing action-bias metadata; "
+        "run the local action-bias checkpoint migration before resuming"
+    )
 
 
 def _set_model_action_bias_offsets(model: object, offsets: dict[str, float]) -> None:
@@ -104,17 +146,14 @@ def _set_model_action_bias_offsets(model: object, offsets: dict[str, float]) -> 
 
 def _action_bias_specs(offsets: dict[str, float]) -> tuple[_ActionBiasSpec, ...]:
     return (
-        _ActionBiasSpec(
-            field_name="gas_on_logit",
-            branch_label="gas",
-            action_index=1,
-            value=offsets["gas_on_logit"],
-        ),
-        _ActionBiasSpec(
-            field_name="spin_idle_logit",
-            branch_label="spin",
-            action_index=0,
-            value=offsets["spin_idle_logit"],
+        *(
+            _ActionBiasSpec(
+                field_name=target.field_name,
+                branch_label=target.branch_label,
+                action_index=target.action_index,
+                value=offsets[target.field_name],
+            )
+            for target in ACTION_BIAS_TARGETS
         ),
     )
 

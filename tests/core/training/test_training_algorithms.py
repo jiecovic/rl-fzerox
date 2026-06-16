@@ -55,6 +55,18 @@ class _HybridPolicy(Protocol):
     hybrid_action_spec: _HybridActionSpec
 
 
+def _discrete_branch_offset(dimensions: tuple[object, ...], branch_label: str) -> int:
+    offset = 0
+    for dimension in dimensions:
+        if getattr(dimension, "label", None) == branch_label:
+            return offset
+        size = getattr(dimension, "size", None)
+        if not isinstance(size, int):
+            raise TypeError(f"action dimension has no integer size: {dimension!r}")
+        offset += size
+    raise ValueError(f"discrete action branch not found: {branch_label}")
+
+
 def _emulator_config(tmp_path: Path) -> EmulatorConfig:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -769,6 +781,59 @@ def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
     assert float(bias[1] - bias[0]) == pytest.approx(0.5)
 
 
+def test_build_ppo_model_applies_hybrid_air_brake_on_logit_bias() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=configured_hybrid_action(
+                        continuous_axes=("steer",),
+                        discrete_axes=("gas", "air_brake", "boost", "lean", "pitch"),
+                    ),
+                    observation=ObservationConfig(
+                        mode="image_state",
+                        state_components=_VEHICLE_STATE_COMPONENT,
+                    ),
+                ),
+            )
+        )
+    )
+
+    try:
+        dimensions = env.get_attr("action_dimensions")[0]
+        air_brake_offset = _discrete_branch_offset(dimensions, "air_brake")
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+                action_bias=PolicyActionBiasConfig(air_brake_on_logit=2.0),
+            ),
+            tensorboard_log=None,
+        )
+    finally:
+        env.close()
+
+    bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
+    assert float(bias[air_brake_offset]) == pytest.approx(0.0)
+    assert float(bias[air_brake_offset + 1]) == pytest.approx(2.0)
+    assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["air_brake_on_logit"] == pytest.approx(
+        2.0
+    )
+
+
 def test_build_ppo_model_applies_hybrid_spin_idle_logit_bias() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -792,11 +857,7 @@ def test_build_ppo_model_applies_hybrid_spin_idle_logit_bias() -> None:
 
     try:
         dimensions = env.get_attr("action_dimensions")[0]
-        spin_offset = 0
-        for dimension in dimensions:
-            if dimension.label == "spin":
-                break
-            spin_offset += dimension.size
+        spin_offset = _discrete_branch_offset(dimensions, "spin")
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
@@ -825,7 +886,7 @@ def test_build_ppo_model_applies_hybrid_spin_idle_logit_bias() -> None:
     assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["spin_idle_logit"] == pytest.approx(1.0)
 
 
-def test_resume_action_bias_delta_does_not_stack_spin_idle_bias() -> None:
+def test_resume_action_bias_delta_does_not_stack_resume_adjustable_biases() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
@@ -848,11 +909,8 @@ def test_resume_action_bias_delta_does_not_stack_spin_idle_bias() -> None:
 
     try:
         dimensions = env.get_attr("action_dimensions")[0]
-        spin_offset = 0
-        for dimension in dimensions:
-            if dimension.label == "spin":
-                break
-            spin_offset += dimension.size
+        air_brake_offset = _discrete_branch_offset(dimensions, "air_brake")
+        spin_offset = _discrete_branch_offset(dimensions, "spin")
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
@@ -876,7 +934,10 @@ def test_resume_action_bias_delta_does_not_stack_spin_idle_bias() -> None:
                 hidden_size=512,
                 n_lstm_layers=1,
             ),
-            action_bias=PolicyActionBiasConfig(spin_idle_logit=1.0),
+            action_bias=PolicyActionBiasConfig(
+                air_brake_on_logit=2.0,
+                spin_idle_logit=1.0,
+            ),
         )
         apply_resume_action_bias_delta(model, train_env=env, policy_config=policy_config)
         apply_resume_action_bias_delta(model, train_env=env, policy_config=policy_config)
@@ -884,11 +945,15 @@ def test_resume_action_bias_delta_does_not_stack_spin_idle_bias() -> None:
         env.close()
 
     bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
+    assert float(bias[air_brake_offset + 1]) == pytest.approx(2.0)
     assert float(bias[spin_offset]) == pytest.approx(1.0)
+    assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["air_brake_on_logit"] == pytest.approx(
+        2.0
+    )
     assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["spin_idle_logit"] == pytest.approx(1.0)
 
 
-def test_markerless_resume_action_bias_delta_skips_legacy_gas_bias() -> None:
+def test_markerless_resume_action_bias_delta_requires_migration() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
@@ -910,12 +975,6 @@ def test_markerless_resume_action_bias_delta_skips_legacy_gas_bias() -> None:
     )
 
     try:
-        dimensions = env.get_attr("action_dimensions")[0]
-        spin_offset = 0
-        for dimension in dimensions:
-            if dimension.label == "spin":
-                break
-            spin_offset += dimension.size
         model = build_ppo_model(
             train_env=env,
             train_config=TrainConfig(
@@ -934,27 +993,25 @@ def test_markerless_resume_action_bias_delta_skips_legacy_gas_bias() -> None:
             tensorboard_log=None,
         )
         delattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)
-        apply_resume_action_bias_delta(
-            model,
-            train_env=env,
-            policy_config=PolicyConfig(
-                recurrent=PolicyRecurrentConfig(
-                    enabled=True,
-                    hidden_size=512,
-                    n_lstm_layers=1,
+        with pytest.raises(RuntimeError, match="action-bias checkpoint migration"):
+            apply_resume_action_bias_delta(
+                model,
+                train_env=env,
+                policy_config=PolicyConfig(
+                    recurrent=PolicyRecurrentConfig(
+                        enabled=True,
+                        hidden_size=512,
+                        n_lstm_layers=1,
+                    ),
+                    action_bias=PolicyActionBiasConfig(
+                        gas_on_logit=1.0,
+                        air_brake_on_logit=2.0,
+                        spin_idle_logit=0.5,
+                    ),
                 ),
-                action_bias=PolicyActionBiasConfig(
-                    gas_on_logit=1.0,
-                    spin_idle_logit=0.5,
-                ),
-            ),
-        )
+            )
     finally:
         env.close()
-
-    bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
-    assert float(bias[1]) == pytest.approx(0.0)
-    assert float(bias[spin_offset]) == pytest.approx(0.5)
 
 
 def test_build_ppo_model_can_construct_recurrent_discrete_only_hybrid_ppo() -> None:

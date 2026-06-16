@@ -302,6 +302,42 @@ def test_manager_training_bridge_supports_optional_spin_macro(
     assert train_config.policy.action_bias.spin_idle_logit == pytest.approx(1.0)
 
 
+def test_manager_training_bridge_supports_discrete_air_brake_bias(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.include_air_brake = True
+    config.action.air_brake_mode = "on_off"
+    config.policy.air_brake_on_logit = 2.0
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-air-brake-bias",
+        run_dir=tmp_path / "runs" / "bridge-air-brake-bias_0001",
+    )
+
+    assert "air_brake" in train_config.env.action.layout_discrete_axes
+    assert train_config.policy.action_bias.air_brake_on_logit == pytest.approx(2.0)
+
+
+def test_manager_training_bridge_ignores_air_brake_bias_without_discrete_branch(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.include_air_brake = True
+    config.action.air_brake_mode = "pwm"
+    config.policy.air_brake_on_logit = 2.0
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-air-brake-pwm-bias",
+        run_dir=tmp_path / "runs" / "bridge-air-brake-pwm-bias_0001",
+    )
+
+    assert "air_brake" not in train_config.env.action.layout_discrete_axes
+    assert train_config.policy.action_bias.air_brake_on_logit == pytest.approx(0.0)
+
+
 def test_manager_training_bridge_ignores_spin_idle_bias_without_spin_branch(
     tmp_path: Path,
 ) -> None:

@@ -49,8 +49,11 @@ export function RuntimeCards({
         action={action}
         checkpointLocked={checkpointLocked}
         defaultAction={defaultAction}
+        defaultPolicy={defaultPolicy}
         metadata={metadata}
+        policy={policy}
         updateAction={updateAction}
+        updatePolicy={updatePolicy}
       />
       <BoostGuardsCard action={action} defaultAction={defaultAction} updateAction={updateAction} />
       <LeanControlCard

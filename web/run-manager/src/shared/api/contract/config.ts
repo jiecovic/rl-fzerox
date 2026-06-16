@@ -334,6 +334,7 @@ const policyConfigSchema = z.object({
   pi_net_arch: z.array(z.number().int().positive()),
   vf_net_arch: z.array(z.number().int().positive()),
   gas_on_logit: z.number(),
+  air_brake_on_logit: z.number().default(0),
   spin_idle_logit: z.number().default(0),
   auxiliary_state_enabled: z.boolean(),
   auxiliary_state_head_arch: z.array(z.number().int().positive()),

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from torch import nn
 
 from rl_fzerox.core.runtime_spec.schema import PolicyActionBiasConfig, PolicyConfig, TrainConfig
+from rl_fzerox.core.training.session.model.action_bias import MODEL_ACTION_BIAS_OFFSETS_ATTR
 from rl_fzerox.core.training.session.model.preload import maybe_resume_training_model
 
 
@@ -109,7 +110,7 @@ def test_weights_only_resume_keeps_exact_match_when_aux_bank_signature_matches(
     assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
 
 
-def test_weights_only_resume_applies_action_bias_after_parameter_load(
+def test_weights_only_resume_imports_source_action_bias_marker_before_reconcile(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -121,6 +122,11 @@ def test_weights_only_resume_applies_action_bias_after_parameter_load(
     )
     train_env = SimpleNamespace(get_attr=lambda _attr_name: [])
     calls: list[PolicyConfig] = []
+    source_offsets = {
+        "gas_on_logit": 0.0,
+        "air_brake_on_logit": 9.0,
+        "spin_idle_logit": 0.0,
+    }
 
     monkeypatch.setattr(
         "rl_fzerox.core.training.session.model.preload.load_train_run_config",
@@ -130,19 +136,24 @@ def test_weights_only_resume_applies_action_bias_after_parameter_load(
         "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
         lambda run_dir, artifact: model_path,
     )
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.load_action_bias_offsets_from_archive",
+        lambda path: source_offsets,
+    )
 
-    def fake_apply_initial_action_biases(
+    def fake_apply_resume_action_bias_delta(
         model: _DummyModel,
         *,
         train_env: object,
         policy_config: PolicyConfig,
     ) -> None:
         assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
+        assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR) == source_offsets
         calls.append(policy_config)
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.apply_initial_action_biases",
-        fake_apply_initial_action_biases,
+        "rl_fzerox.core.training.session.model.preload.apply_resume_action_bias_delta",
+        fake_apply_resume_action_bias_delta,
     )
 
     maybe_resume_training_model(

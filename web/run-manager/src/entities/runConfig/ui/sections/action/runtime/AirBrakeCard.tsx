@@ -2,6 +2,7 @@
 
 import {
   ActionCard,
+  ActionFields,
   ActionFieldset,
   ActionNote,
   ActionTripleFields,
@@ -9,26 +10,38 @@ import {
 import type {
   AuxiliaryActionConfig,
   UpdateAction,
+  UpdatePolicy,
 } from "@/entities/runConfig/ui/sections/action/branches/types";
 import { airBrakeModeDescription } from "@/entities/runConfig/ui/sections/action/descriptions";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
-import { FieldLabel, RangeNumberField, SegmentedChoiceStrip } from "@/shared/ui/configFields";
+import {
+  FieldLabel,
+  NumberField,
+  RangeNumberField,
+  SegmentedChoiceStrip,
+} from "@/shared/ui/configFields";
 import { FieldShell } from "@/shared/ui/Field";
 
 interface AirBrakeCardProps {
   action: AuxiliaryActionConfig;
   checkpointLocked: boolean;
   defaultAction: AuxiliaryActionConfig;
+  defaultPolicy: ManagedRunConfig["policy"];
   metadata: ConfigMetadata;
+  policy: ManagedRunConfig["policy"];
   updateAction: UpdateAction;
+  updatePolicy: UpdatePolicy;
 }
 
 export function AirBrakeCard({
   action,
   checkpointLocked,
   defaultAction,
+  defaultPolicy,
   metadata,
+  policy,
   updateAction,
+  updatePolicy,
 }: AirBrakeCardProps) {
   return (
     <ActionCard
@@ -114,7 +127,23 @@ export function AirBrakeCard({
                 onChange={(value) => updateAction({ continuous_air_brake_min_duty: value })}
               />
             </ActionTripleFields>
-          ) : null}
+          ) : (
+            <ActionFields>
+              <div className="field-with-note">
+                <NumberField
+                  help="Initial logit bias toward the engaged air-brake button when air brake uses the discrete N64-style button branch."
+                  label="Air-brake-on logit"
+                  resetValue={defaultPolicy.air_brake_on_logit}
+                  step="0.1"
+                  value={policy.air_brake_on_logit}
+                  onChange={(value) => updatePolicy({ air_brake_on_logit: value })}
+                />
+                <div className="field-note">
+                  {`sigmoid(${formatSignedDecimal(policy.air_brake_on_logit)}) ≈ ${formatPercent(binaryOnProbability(policy.air_brake_on_logit))} initial engage probability`}
+                </div>
+              </div>
+            </ActionFields>
+          )}
         </fieldset>
         <FieldShell>
           <FieldLabel
@@ -142,4 +171,23 @@ export function AirBrakeCard({
       </ActionFieldset>
     </ActionCard>
   );
+}
+
+function binaryOnProbability(value: number) {
+  return 1 / (1 + Math.exp(-value));
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })}%`;
+}
+
+function formatSignedDecimal(value: number) {
+  const formatted = value.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  });
+  return value > 0 ? `+${formatted}` : formatted;
 }
