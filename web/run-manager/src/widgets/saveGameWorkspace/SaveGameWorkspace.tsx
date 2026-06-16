@@ -1,12 +1,13 @@
 // web/run-manager/src/widgets/saveGameWorkspace/SaveGameWorkspace.tsx
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { SaveGameSession } from "@/app/workspace/types";
 import {
-  careerSaveHasStarted,
   nextUnlockTarget,
-  summarizeSaveGameTargets,
+  summarizeUnlockTargets,
+  type UnlockTargetSummary,
   unlockCompletionFraction,
+  unlockTargetKey,
 } from "@/entities/saveGame/model";
 import { SaveGameOverview } from "@/entities/saveGame/ui/SaveGameOverview";
 import { parseAttemptSeed, randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
@@ -167,67 +168,76 @@ export function SaveGameWorkspace({
     }
   }
 
-  async function upsertCourseSetup(request: {
-    courseId?: string | null;
-    cupId?: string | null;
-    difficulty?: string | null;
-    engineSettingRawValue: number;
-    policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
-    saveGameId: string;
-  }) {
-    onGlobalError(null);
-    setUpdatingSaveGameId(request.saveGameId);
-    try {
-      return await onUpsertCourseSetup(request);
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to save course setup");
-      throw caught;
-    } finally {
-      setUpdatingSaveGameId(null);
-    }
-  }
+  const upsertCourseSetup = useCallback(
+    async function upsertCourseSetup(request: {
+      courseId?: string | null;
+      cupId?: string | null;
+      difficulty?: string | null;
+      engineSettingRawValue: number;
+      policyArtifact: SavePolicyArtifact;
+      policyRunId: string;
+      saveGameId: string;
+    }) {
+      onGlobalError(null);
+      setUpdatingSaveGameId(request.saveGameId);
+      try {
+        return await onUpsertCourseSetup(request);
+      } catch (caught) {
+        onGlobalError(caught instanceof Error ? caught.message : "failed to save course setup");
+        throw caught;
+      } finally {
+        setUpdatingSaveGameId(null);
+      }
+    },
+    [onGlobalError, onUpsertCourseSetup],
+  );
 
-  async function upsertCupSetup(request: {
-    cupId: string;
-    difficulty?: string | null;
-    saveGameId: string;
-    vehicleId: string;
-  }) {
-    onGlobalError(null);
-    setUpdatingSaveGameId(request.saveGameId);
-    try {
-      return await onUpsertCupSetup(request);
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to save cup setup");
-      throw caught;
-    } finally {
-      setUpdatingSaveGameId(null);
-    }
-  }
-
-  async function importEngineTuning(request: {
-    courseSetups: readonly {
-      courseId: string;
+  const upsertCupSetup = useCallback(
+    async function upsertCupSetup(request: {
       cupId: string;
       difficulty?: string | null;
+      saveGameId: string;
       vehicleId: string;
-    }[];
-    policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
-    saveGameId: string;
-  }) {
-    onGlobalError(null);
-    setUpdatingSaveGameId(request.saveGameId);
-    try {
-      return await onImportEngineTuning(request);
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to import engine tuning");
-      throw caught;
-    } finally {
-      setUpdatingSaveGameId(null);
-    }
-  }
+    }) {
+      onGlobalError(null);
+      setUpdatingSaveGameId(request.saveGameId);
+      try {
+        return await onUpsertCupSetup(request);
+      } catch (caught) {
+        onGlobalError(caught instanceof Error ? caught.message : "failed to save cup setup");
+        throw caught;
+      } finally {
+        setUpdatingSaveGameId(null);
+      }
+    },
+    [onGlobalError, onUpsertCupSetup],
+  );
+
+  const importEngineTuning = useCallback(
+    async function importEngineTuning(request: {
+      courseSetups: readonly {
+        courseId: string;
+        cupId: string;
+        difficulty?: string | null;
+        vehicleId: string;
+      }[];
+      policyArtifact: SavePolicyArtifact;
+      policyRunId: string;
+      saveGameId: string;
+    }) {
+      onGlobalError(null);
+      setUpdatingSaveGameId(request.saveGameId);
+      try {
+        return await onImportEngineTuning(request);
+      } catch (caught) {
+        onGlobalError(caught instanceof Error ? caught.message : "failed to import engine tuning");
+        throw caught;
+      } finally {
+        setUpdatingSaveGameId(null);
+      }
+    },
+    [onGlobalError, onImportEngineTuning],
+  );
 
   function runnerSettingsRequest(
     target: ManagedSaveGame,
@@ -275,18 +285,21 @@ export function SaveGameWorkspace({
     }
   }
 
-  function patchSessionFromRunnerSettings(target: ManagedSaveGame) {
-    const settings = target.runner_settings;
-    onPatchSession(session.sessionId, {
-      attemptSeedText: settings.attempt_seed === null ? "" : String(settings.attempt_seed),
-      policyMode: settings.policy_mode,
-      recordingEnabled: settings.recording_enabled,
-      recordingInputHudEnabled: settings.recording_input_hud_enabled,
-      recordingUpscaleFactor: settings.recording_upscale_factor,
-      runnerDevice: settings.device,
-      runnerRenderer: settings.renderer,
-    });
-  }
+  const patchSessionFromRunnerSettings = useCallback(
+    function patchSessionFromRunnerSettings(target: ManagedSaveGame) {
+      const settings = target.runner_settings;
+      onPatchSession(session.sessionId, {
+        attemptSeedText: settings.attempt_seed === null ? "" : String(settings.attempt_seed),
+        policyMode: settings.policy_mode,
+        recordingEnabled: settings.recording_enabled,
+        recordingInputHudEnabled: settings.recording_input_hud_enabled,
+        recordingUpscaleFactor: settings.recording_upscale_factor,
+        runnerDevice: settings.device,
+        runnerRenderer: settings.renderer,
+      });
+    },
+    [onPatchSession, session.sessionId],
+  );
 
   async function startCareerMode(
     target: ManagedSaveGame,
@@ -316,7 +329,13 @@ export function SaveGameWorkspace({
       onGlobalError("choose a policy for the selected cup");
       return;
     }
-    if (resolveLaunchCupVehicleId(target, launchTarget) === null) {
+    if (
+      resolveLaunchCupVehicleId(
+        target.cup_setups,
+        target.unlock_progress?.unlocked_vehicle_ids ?? [],
+        launchTarget,
+      ) === null
+    ) {
       onGlobalError("choose a vehicle for the selected cup");
       return;
     }
@@ -358,6 +377,93 @@ export function SaveGameWorkspace({
     }
   }
 
+  const saveGameRef = useRef<ManagedSaveGame | null>(null);
+  const startCareerModeRef = useRef<typeof startCareerMode | null>(null);
+  saveGameRef.current = saveGame;
+  startCareerModeRef.current = startCareerMode;
+
+  const handleStartRunner = useCallback(() => {
+    const currentSaveGame = saveGameRef.current;
+    const currentStartCareerMode = startCareerModeRef.current;
+    if (currentSaveGame !== null && currentStartCareerMode !== null) {
+      void currentStartCareerMode(currentSaveGame);
+    }
+  }, []);
+  const handleStartTarget = useCallback((target: ManagedSaveUnlockTarget) => {
+    const currentSaveGame = saveGameRef.current;
+    const currentStartCareerMode = startCareerModeRef.current;
+    if (currentSaveGame !== null && currentStartCareerMode !== null) {
+      void currentStartCareerMode(currentSaveGame, target);
+    }
+  }, []);
+
+  const saveGameCourseSetups = saveGame?.course_setups ?? EMPTY_COURSE_SETUPS;
+  const saveGameCupSetups = saveGame?.cup_setups ?? EMPTY_CUP_SETUPS;
+  const saveGameUnlockProgress = saveGame?.unlock_progress ?? null;
+  const builtInCourses = metadata?.built_in_courses ?? EMPTY_BUILT_IN_COURSES;
+  const hasSaveGame = saveGame !== null;
+  const runnerActive = saveGame?.runner_active ?? false;
+  const unlockedVehicleIds = saveGameUnlockProgress?.unlocked_vehicle_ids ?? EMPTY_STRING_ARRAY;
+  const unlockTargets = useStableUnlockTargets(
+    saveGameUnlockProgress?.targets ?? EMPTY_UNLOCK_TARGETS,
+  );
+  const targetSummary = useMemo(() => summarizeUnlockTargets(unlockTargets), [unlockTargets]);
+  const completion = useMemo(() => unlockCompletionFraction(targetSummary), [targetSummary]);
+  const nextTarget = saveGameUnlockProgress?.next_target ?? null;
+  const nextSetup = useMemo(
+    () =>
+      metadata === null || nextTarget === null
+        ? null
+        : resolveSavedCourseSetup(saveGameCourseSetups, nextTarget, builtInCourses),
+    [builtInCourses, metadata, nextTarget, saveGameCourseSetups],
+  );
+  const nextCupSetup = useMemo(
+    () => (nextTarget === null ? null : resolveSavedCupSetup(saveGameCupSetups, nextTarget)),
+    [nextTarget, saveGameCupSetups],
+  );
+  const nextCupVehicleId = useMemo(
+    () =>
+      nextTarget === null
+        ? null
+        : resolveLaunchCupVehicleId(saveGameCupSetups, unlockedVehicleIds, nextTarget),
+    [nextTarget, saveGameCupSetups, unlockedVehicleIds],
+  );
+  const startableTargetKeys = useMemo(
+    () =>
+      startableUnlockTargetKeys({
+        builtInCourses,
+        courseSetups: saveGameCourseSetups,
+        cupSetups: saveGameCupSetups,
+        disabled:
+          metadata === null ||
+          !hasSaveGame ||
+          startingRunnerSaveGameId !== null ||
+          runnerActive ||
+          courseSetupDirty,
+        targets: unlockTargets,
+        unlockedVehicleIds,
+      }),
+    [
+      builtInCourses,
+      courseSetupDirty,
+      hasSaveGame,
+      metadata,
+      runnerActive,
+      saveGameCourseSetups,
+      saveGameCupSetups,
+      startingRunnerSaveGameId,
+      unlockTargets,
+      unlockedVehicleIds,
+    ],
+  );
+  const canStartRunner =
+    nextTarget !== null && startableTargetKeys.has(unlockTargetKey(nextTarget));
+  const rendererOptions = useMemo(
+    () =>
+      metadata === null ? EMPTY_RENDERER_OPTIONS : rendererNames(metadata, session.runnerRenderer),
+    [metadata, session.runnerRenderer],
+  );
+
   if (session.saveGameId === null) {
     return (
       <Panel>
@@ -391,43 +497,11 @@ export function SaveGameWorkspace({
     );
   }
 
-  const activeSaveGame = saveGame;
-  const activeMetadata = metadata;
-  const targetSummary = summarizeSaveGameTargets(activeSaveGame);
-  const completion = unlockCompletionFraction(targetSummary);
-  const nextTarget = nextUnlockTarget(activeSaveGame);
-  const nextSetup =
-    nextTarget === null
-      ? null
-      : resolveSavedCourseSetup(
-          activeSaveGame.course_setups,
-          nextTarget,
-          activeMetadata.built_in_courses,
-        );
-  const nextCupSetup =
-    nextTarget === null ? null : resolveSavedCupSetup(activeSaveGame.cup_setups, nextTarget);
-  const nextCupVehicleId =
-    nextTarget === null ? null : resolveLaunchCupVehicleId(activeSaveGame, nextTarget);
-  function canStartUnlockTarget(target: ManagedSaveUnlockTarget): boolean {
-    return (
-      startingRunnerSaveGameId === null &&
-      !activeSaveGame.runner_active &&
-      !courseSetupDirty &&
-      launchableTargetStatus(target) &&
-      resolveSavedCourseSetup(
-        activeSaveGame.course_setups,
-        target,
-        activeMetadata.built_in_courses,
-      ) !== null &&
-      resolveLaunchCupVehicleId(activeSaveGame, target) !== null
-    );
-  }
-  const canStartRunner = nextTarget !== null && canStartUnlockTarget(nextTarget);
   const startLabel = saveGame.runner_active
     ? "Running"
     : nextTarget === null
       ? "Complete"
-      : careerSaveHasStarted(saveGame)
+      : targetSummaryHasStarted(targetSummary)
         ? "Continue"
         : "Start";
   const startNote = saveGame.runner_active
@@ -443,10 +517,9 @@ export function SaveGameWorkspace({
             : `${nextTarget.label} is ready.`;
   const runnerLabel = saveGame.runner_active
     ? "running"
-    : careerSaveHasStarted(saveGame)
+    : targetSummaryHasStarted(targetSummary)
       ? "ready to continue"
       : "not started";
-  const rendererOptions = rendererNames(metadata, session.runnerRenderer);
   const savingRunnerSettings = savingRunnerSettingsSaveGameId === saveGame.id;
   const runnerSettingsHaveChanges = runnerSettingsDirty(saveGame, session);
   const canSaveRunnerSettings =
@@ -530,7 +603,7 @@ export function SaveGameWorkspace({
           onPatchSession(session.sessionId, { recordingUpscaleFactor })
         }
         onSaveSettings={() => void saveRunnerSettings(saveGame)}
-        onStart={() => void startCareerMode(saveGame)}
+        onStart={handleStartRunner}
       />
       <article className="grid content-start gap-5">
         <SaveGameOverview
@@ -546,11 +619,12 @@ export function SaveGameWorkspace({
           assignableRuns={assignableRuns}
           metadata={metadata}
           saveGame={saveGame}
+          targets={unlockTargets}
           updating={updatingSaveGameId === saveGame.id}
-          canStartTarget={canStartUnlockTarget}
+          startableTargetKeys={startableTargetKeys}
           onCourseSetupDirtyChange={setCourseSetupDirty}
           onImportEngineTuning={importEngineTuning}
-          onStartTarget={(target) => void startCareerMode(saveGame, target)}
+          onStartTarget={handleStartTarget}
           onUpsertCourseSetup={upsertCourseSetup}
           onUpsertCupSetup={upsertCupSetup}
         />
@@ -564,14 +638,46 @@ function launchableTargetStatus(target: ManagedSaveUnlockTarget): boolean {
 }
 
 function resolveLaunchCupVehicleId(
-  saveGame: ManagedSaveGame,
+  cupSetups: ManagedSaveGame["cup_setups"],
+  unlockedVehicleIds: readonly string[],
   target: ManagedSaveUnlockTarget,
 ): string | null {
-  return (
-    resolveSavedCupSetup(saveGame.cup_setups, target)?.vehicle_id ??
-    saveGame.unlock_progress?.unlocked_vehicle_ids[0] ??
-    null
-  );
+  return resolveSavedCupSetup(cupSetups, target)?.vehicle_id ?? unlockedVehicleIds[0] ?? null;
+}
+
+function startableUnlockTargetKeys({
+  builtInCourses,
+  courseSetups,
+  cupSetups,
+  disabled,
+  targets,
+  unlockedVehicleIds,
+}: {
+  builtInCourses: ConfigMetadata["built_in_courses"];
+  courseSetups: ManagedSaveGame["course_setups"];
+  cupSetups: ManagedSaveGame["cup_setups"];
+  disabled: boolean;
+  targets: readonly ManagedSaveUnlockTarget[];
+  unlockedVehicleIds: readonly string[];
+}): ReadonlySet<string> {
+  if (disabled) {
+    return EMPTY_STRING_SET;
+  }
+  const keys = new Set<string>();
+  for (const target of targets) {
+    if (
+      launchableTargetStatus(target) &&
+      resolveSavedCourseSetup(courseSetups, target, builtInCourses) !== null &&
+      resolveLaunchCupVehicleId(cupSetups, unlockedVehicleIds, target) !== null
+    ) {
+      keys.add(unlockTargetKey(target));
+    }
+  }
+  return keys;
+}
+
+function targetSummaryHasStarted(summary: UnlockTargetSummary): boolean {
+  return summary.succeeded > 0 || summary.failed > 0 || summary.skipped > 0;
 }
 
 function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession): boolean {
@@ -594,7 +700,7 @@ function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession
 
 function useStableAssignableRuns(runs: readonly ManagedRun[]): readonly ManagedRun[] {
   const stableAssignableRuns = useRef<{ key: string; runs: readonly ManagedRun[] } | null>(null);
-  const key = assignableRunsKey(runs);
+  const key = useMemo(() => assignableRunsKey(runs), [runs]);
   if (stableAssignableRuns.current?.key !== key) {
     stableAssignableRuns.current = {
       key,
@@ -602,6 +708,44 @@ function useStableAssignableRuns(runs: readonly ManagedRun[]): readonly ManagedR
     };
   }
   return stableAssignableRuns.current.runs;
+}
+
+const EMPTY_BUILT_IN_COURSES: ConfigMetadata["built_in_courses"] = [];
+const EMPTY_COURSE_SETUPS: ManagedSaveGame["course_setups"] = [];
+const EMPTY_CUP_SETUPS: ManagedSaveGame["cup_setups"] = [];
+const EMPTY_RENDERER_OPTIONS: ReturnType<typeof rendererNames> = [];
+const EMPTY_STRING_ARRAY: readonly string[] = [];
+const EMPTY_STRING_SET: ReadonlySet<string> = new Set<string>();
+const EMPTY_UNLOCK_TARGETS: readonly ManagedSaveUnlockTarget[] = [];
+
+function useStableUnlockTargets(
+  targets: readonly ManagedSaveUnlockTarget[],
+): readonly ManagedSaveUnlockTarget[] {
+  const stableTargets = useRef<{
+    key: string;
+    targets: readonly ManagedSaveUnlockTarget[];
+  } | null>(null);
+  const key = useMemo(() => unlockTargetsKey(targets), [targets]);
+  if (stableTargets.current?.key !== key) {
+    stableTargets.current = { key, targets };
+  }
+  return stableTargets.current.targets;
+}
+
+function unlockTargetsKey(targets: readonly ManagedSaveUnlockTarget[]): string {
+  return targets
+    .map((target) =>
+      [
+        target.sequence_index,
+        target.kind,
+        target.status,
+        target.label,
+        target.difficulty ?? "",
+        target.cup_id ?? "",
+        target.course_id ?? "",
+      ].join("\u001f"),
+    )
+    .join("\u001e");
 }
 
 function assignableRunsKey(runs: readonly ManagedRun[]): string {

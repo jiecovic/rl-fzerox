@@ -56,10 +56,13 @@ export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
 }) {
   const [draft, setDraft] = useState<PolicySelectionDraft>(EMPTY_POLICY_SELECTION_DRAFT);
   const [importing, setImporting] = useState(false);
-  const selectedRun = assignableRuns.find((run) => run.id === draft.policyRunId) ?? null;
+  const selectedRun = useMemo(
+    () => assignableRuns.find((run) => run.id === draft.policyRunId) ?? null,
+    [assignableRuns, draft.policyRunId],
+  );
   const canImportEngines = !updating && selectedRun?.vehicle_setup.engine_mode === "adaptive_tuner";
   const canApply = !updating && draft.policyRunId !== "";
-  const allCourseSetups = courseSetupsForCups(cups);
+  const allCourseSetups = useMemo(() => courseSetupsForCups(cups), [cups]);
 
   async function importEngineTuning() {
     if (!canImportEngines) {
@@ -156,7 +159,7 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
   );
   const collapsedCupIdSet = useMemo(() => new Set(collapsedCupIds), [collapsedCupIds]);
   const saveDisabled = dirtySetupCount === 0 || savingCourseSetups || updating;
-  const allCourseSetups = courseSetupsForCups(cups);
+  const allCourseSetups = useMemo(() => courseSetupsForCups(cups), [cups]);
 
   function setCupCollapsed(cupId: string, collapsed: boolean) {
     setCollapsedCupIds((current) =>
@@ -269,23 +272,42 @@ const CupSetupBlock = memo(function CupSetupBlock({
 }) {
   const cupValues = cupSetupValues(cup);
   const cupDraft = cupSetupDraft(cupSetupDrafts, cupValues);
-  const courseValuesList = cup.courses.map((course) => courseSetupValues(cup, course.id));
-  const courseDrafts = courseValuesList
-    .map((values) => exactCourseSetupDraft(courseSetupDrafts, values))
-    .filter((draft): draft is CourseSetupDraft => draft !== null);
-  const fallbackDraft: PolicyArtifactDraft = {
-    ...EMPTY_COURSE_SETUP_DRAFT,
-    vehicleId: cupDraft.vehicleId,
-  };
-  const sharedDraft = sharedCourseDraft(courseDrafts, courseValuesList.length) ?? fallbackDraft;
-  const bulkDraft: PolicyArtifactDraft = {
-    ...sharedDraft,
-    vehicleId: cupDraft.vehicleId,
-  };
-  const bulkPolicyDraft: PolicySelectionDraft = {
-    policyArtifact: bulkDraft.policyArtifact,
-    policyRunId: bulkDraft.policyRunId,
-  };
+  const courseValuesList = useMemo(
+    () => cup.courses.map((course) => courseSetupValues(cup, course.id)),
+    [cup],
+  );
+  const courseDrafts = useMemo(
+    () =>
+      courseValuesList
+        .map((values) => exactCourseSetupDraft(courseSetupDrafts, values))
+        .filter((draft): draft is CourseSetupDraft => draft !== null),
+    [courseSetupDrafts, courseValuesList],
+  );
+  const fallbackDraft = useMemo<PolicyArtifactDraft>(
+    () => ({
+      ...EMPTY_COURSE_SETUP_DRAFT,
+      vehicleId: cupDraft.vehicleId,
+    }),
+    [cupDraft.vehicleId],
+  );
+  const sharedDraft = useMemo(
+    () => sharedCourseDraft(courseDrafts, courseValuesList.length) ?? fallbackDraft,
+    [courseDrafts, courseValuesList.length, fallbackDraft],
+  );
+  const bulkDraft = useMemo<PolicyArtifactDraft>(
+    () => ({
+      ...sharedDraft,
+      vehicleId: cupDraft.vehicleId,
+    }),
+    [cupDraft.vehicleId, sharedDraft],
+  );
+  const bulkPolicyDraft = useMemo<PolicySelectionDraft>(
+    () => ({
+      policyArtifact: bulkDraft.policyArtifact,
+      policyRunId: bulkDraft.policyRunId,
+    }),
+    [bulkDraft.policyArtifact, bulkDraft.policyRunId],
+  );
 
   function applyBulkCoursePolicy(nextDraft: PolicySelectionDraft) {
     for (const values of courseValuesList) {

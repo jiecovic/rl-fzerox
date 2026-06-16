@@ -1,5 +1,5 @@
 // web/run-manager/src/features/saveGameCourseSetup/ui/CourseSetupFields.tsx
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type {
   PolicyArtifactDraft,
   PolicySelectionDraft,
@@ -168,8 +168,11 @@ export function VehicleDraftSelect({
   unlockedVehicleIds: readonly string[];
   visibleLabel?: string;
 }) {
-  const unlockedVehicleSet = new Set(unlockedVehicleIds);
-  const vehicleOptions = metadata.vehicles.filter((vehicle) => unlockedVehicleSet.has(vehicle.id));
+  const unlockedVehicleSet = useMemo(() => new Set(unlockedVehicleIds), [unlockedVehicleIds]);
+  const vehicleOptions = useMemo(
+    () => metadata.vehicles.filter((vehicle) => unlockedVehicleSet.has(vehicle.id)),
+    [metadata.vehicles, unlockedVehicleSet],
+  );
   return (
     <FieldShell>
       <span>{visibleLabel ?? label}</span>

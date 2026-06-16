@@ -1,7 +1,11 @@
 // web/run-manager/src/features/saveGameCourseSetup/ui/UnlockPathPanel.tsx
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
-import { formatUnlockTargetStatus, unlockTargetStatusClass } from "@/entities/saveGame/model";
+import {
+  formatUnlockTargetStatus,
+  unlockTargetKey,
+  unlockTargetStatusClass,
+} from "@/entities/saveGame/model";
 import type {
   CourseSetupDraftMap,
   CourseSetupValues,
@@ -69,17 +73,17 @@ interface UnlockPathPanelProps {
     vehicleId: string;
   }) => Promise<ManagedSaveGame>;
   onCourseSetupDirtyChange: (dirty: boolean) => void;
-  canStartTarget: (target: ManagedSaveUnlockTarget) => boolean;
   onStartTarget: (target: ManagedSaveUnlockTarget) => void;
   saveGame: ManagedSaveGame;
+  startableTargetKeys: ReadonlySet<string>;
+  targets: readonly ManagedSaveUnlockTarget[];
   updating: boolean;
 }
 
 const EMPTY_STRING_ARRAY: readonly string[] = [];
 
-export function UnlockPathPanel({
+export const UnlockPathPanel = memo(function UnlockPathPanel({
   assignableRuns,
-  canStartTarget,
   metadata,
   onCourseSetupDirtyChange,
   onStartTarget,
@@ -87,9 +91,10 @@ export function UnlockPathPanel({
   onUpsertCourseSetup,
   onUpsertCupSetup,
   saveGame,
+  startableTargetKeys,
+  targets,
   updating,
 }: UnlockPathPanelProps) {
-  const targets = saveGame.unlock_progress?.targets ?? [];
   const cups = useMemo(() => cupsWithCourses(metadata), [metadata]);
   const savedCourseSetupDrafts = useMemo(
     () => courseSetupDraftsFromSavedSetups(saveGame.course_setups),
@@ -282,9 +287,9 @@ export function UnlockPathPanel({
         </p>
       </div>
       <TargetMatrix
-        canStartTarget={canStartTarget}
         cups={cups}
         metadata={metadata}
+        startableTargetKeys={startableTargetKeys}
         targets={targets}
         onStartTarget={onStartTarget}
       />
@@ -313,22 +318,23 @@ export function UnlockPathPanel({
       />
     </section>
   );
-}
+});
 
-function TargetMatrix({
-  canStartTarget,
+const TargetMatrix = memo(function TargetMatrix({
   cups,
   metadata,
   onStartTarget,
+  startableTargetKeys,
   targets,
 }: {
-  canStartTarget: (target: ManagedSaveUnlockTarget) => boolean;
   cups: readonly CupView[];
   metadata: ConfigMetadata;
   onStartTarget: (target: ManagedSaveUnlockTarget) => void;
+  startableTargetKeys: ReadonlySet<string>;
   targets: readonly ManagedSaveUnlockTarget[];
 }) {
   const difficulties = metadata.gp_difficulties;
+  const targetByKey = useMemo(() => unlockTargetMap(targets), [targets]);
   return (
     <div className="grid gap-2">
       {difficulties.map((difficulty) => (
@@ -340,12 +346,10 @@ function TargetMatrix({
             {difficulty.label}
           </div>
           {cups.map((cup) => {
-            const target = targets.find(
-              (candidate) =>
-                candidate.difficulty === difficulty.value && candidate.cup_id === cup.id,
-            );
+            const target = targetByKey.get(unlockTargetGridKey(difficulty.value, cup.id));
             const status = target?.status ?? "pending";
-            const startable = target !== undefined && canStartTarget(target);
+            const startable =
+              target !== undefined && startableTargetKeys.has(unlockTargetKey(target));
             return (
               <button
                 key={`${difficulty.value}:${cup.id}`}
@@ -389,6 +393,22 @@ function TargetMatrix({
       ))}
     </div>
   );
+});
+
+function unlockTargetMap(
+  targets: readonly ManagedSaveUnlockTarget[],
+): ReadonlyMap<string, ManagedSaveUnlockTarget> {
+  const targetByKey = new Map<string, ManagedSaveUnlockTarget>();
+  for (const target of targets) {
+    if (target.difficulty !== null && target.cup_id !== null) {
+      targetByKey.set(unlockTargetGridKey(target.difficulty, target.cup_id), target);
+    }
+  }
+  return targetByKey;
+}
+
+function unlockTargetGridKey(difficulty: string, cupId: string): string {
+  return `${difficulty}\u001f${cupId}`;
 }
 
 function targetStatusLabel(target: ManagedSaveUnlockTarget | undefined): string {

@@ -15,7 +15,24 @@ export interface UnlockTargetSummary {
 }
 
 export function summarizeSaveGameTargets(saveGame: ManagedSaveGame): UnlockTargetSummary {
-  return summarizeTargets(saveGame.unlock_progress?.targets ?? []);
+  return summarizeUnlockTargets(saveGame.unlock_progress?.targets ?? []);
+}
+
+export function summarizeUnlockTargets(
+  targets: readonly ManagedSaveUnlockTarget[],
+): UnlockTargetSummary {
+  const summary: UnlockTargetSummary = {
+    failed: 0,
+    locked: 0,
+    pending: 0,
+    skipped: 0,
+    succeeded: 0,
+    total: targets.length,
+  };
+  for (const target of targets) {
+    summary[target.status] += 1;
+  }
+  return summary;
 }
 
 export function unlockCompletionFraction(summary: UnlockTargetSummary): number {
@@ -49,6 +66,16 @@ export function formatUnlockTarget(target: ManagedSaveUnlockTarget): string {
   return parts.length === 0 ? target.label : `${target.label}: ${parts.join(" / ")}`;
 }
 
+export function unlockTargetKey(target: ManagedSaveUnlockTarget): string {
+  return [
+    target.sequence_index,
+    target.kind,
+    target.difficulty ?? "",
+    target.cup_id ?? "",
+    target.course_id ?? "",
+  ].join("\u001f");
+}
+
 export function formatUnlockTargetStatus(status: SaveUnlockTargetStatus): string {
   return titleizeIdentifier(status);
 }
@@ -73,21 +100,6 @@ export function titleizeIdentifier(value: string): string {
     .split("_")
     .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function summarizeTargets(targets: readonly ManagedSaveUnlockTarget[]): UnlockTargetSummary {
-  const summary: UnlockTargetSummary = {
-    failed: 0,
-    locked: 0,
-    pending: 0,
-    skipped: 0,
-    succeeded: 0,
-    total: targets.length,
-  };
-  for (const target of targets) {
-    summary[target.status] += 1;
-  }
-  return summary;
 }
 
 function formatTargetPart(value: string | null): string | null {
