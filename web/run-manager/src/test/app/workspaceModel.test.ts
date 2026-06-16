@@ -1,9 +1,15 @@
 // web/run-manager/src/test/app/workspaceModel.test.ts
 import { describe, expect, it } from "vitest";
 
-import { compareRuns, nextForkDraftName, upsertSaveGameStatus } from "@/app/workspace/model";
+import {
+  compareRuns,
+  configuratorBaseConfigForDraftEditor,
+  nextForkDraftName,
+  upsertSaveGameStatus,
+} from "@/app/workspace/model";
+import type { DraftEditorSession } from "@/app/workspace/types";
 import type { ManagedSaveGameStatus } from "@/shared/api/contract";
-import { runFixture, saveGameFixture } from "@/test/fixtures";
+import { managedRunConfigFixture, runFixture, saveGameFixture } from "@/test/fixtures";
 
 describe("workspace naming", () => {
   it("increments fork names from the lineage root name", () => {
@@ -72,6 +78,60 @@ describe("workspace run ordering", () => {
       "failed-run",
       "stopped-run",
     ]);
+  });
+});
+
+describe("workspace draft editor config baseline", () => {
+  it("uses the source run config as the reset baseline for unsaved fork drafts", () => {
+    const defaultConfig = managedRunConfigFixture;
+    const sourceConfig = {
+      ...managedRunConfigFixture,
+      train: {
+        ...managedRunConfigFixture.train,
+        entropy_group_weights: {
+          ...managedRunConfigFixture.train.entropy_group_weights,
+          air_brake: 3,
+        },
+      },
+    };
+    const session: DraftEditorSession = {
+      currentConfig: sourceConfig,
+      currentDraftName: "source fork",
+      draftId: null,
+      forkSource: {
+        artifact: "latest",
+        copyAltBaselines: true,
+        runId: "source-run",
+        sourceEngineTunerBackend: null,
+        sourceEngineTuning: null,
+        sourceEngineTuningKnown: false,
+      },
+      initialConfig: sourceConfig,
+      initialDraftName: "source fork",
+      loadedDraft: null,
+      sessionId: "editor:fork",
+      title: "source fork",
+    };
+
+    expect(configuratorBaseConfigForDraftEditor(defaultConfig, session)).toBe(sourceConfig);
+  });
+
+  it("keeps the global default baseline for ordinary draft editors", () => {
+    const session: DraftEditorSession = {
+      currentConfig: managedRunConfigFixture,
+      currentDraftName: "draft",
+      draftId: null,
+      forkSource: null,
+      initialConfig: null,
+      initialDraftName: "draft",
+      loadedDraft: null,
+      sessionId: "editor:draft",
+      title: "draft",
+    };
+
+    expect(configuratorBaseConfigForDraftEditor(managedRunConfigFixture, session)).toBe(
+      managedRunConfigFixture,
+    );
   });
 });
 

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { WorkspaceActions } from "@/app/workspace/actions";
+import { configuratorBaseConfigForDraftEditor } from "@/app/workspace/model";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import { DraftsPanel } from "@/pages/drafts/DraftsPanel";
 import { RunsPanel } from "@/pages/runs/RunsPanel";
@@ -191,7 +192,7 @@ export function WorkspaceBody({
           <Configurator
             key={activeDraftEditor.sessionId}
             active
-            baseConfig={defaultConfig}
+            baseConfig={configuratorBaseConfigForDraftEditor(defaultConfig, activeDraftEditor)}
             existingNames={sessions.reservedNamesForSession(activeDraftEditor.sessionId)}
             forkAltBaselineCount={forkDraftAltBaselineCount(activeDraftEditor.forkSource, runs)}
             forkCopyAltBaselines={activeDraftEditor.forkSource?.copyAltBaselines ?? null}

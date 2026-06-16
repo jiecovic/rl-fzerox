@@ -12,6 +12,7 @@ import { isPinnedRun } from "@/entities/run/model/runtime";
 import type {
   ManagedDraft,
   ManagedRun,
+  ManagedRunConfig,
   ManagedRunDetail,
   ManagedSaveGame,
   ManagedSaveGameStatus,
@@ -247,6 +248,16 @@ export function draftForkSource(draft: ManagedDraft): ForkSource | null {
     sourceEngineTuning: null,
     sourceEngineTuningKnown: false,
   };
+}
+
+export function configuratorBaseConfigForDraftEditor(
+  defaultConfig: ManagedRunConfig,
+  session: DraftEditorSession,
+): ManagedRunConfig {
+  if (session.forkSource !== null && session.initialConfig !== null) {
+    return session.initialConfig;
+  }
+  return defaultConfig;
 }
 
 export function buildWorkspaceSessionTabs(

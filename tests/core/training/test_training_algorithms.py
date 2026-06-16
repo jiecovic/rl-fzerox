@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import pytest
+import torch as th
 from gymnasium import spaces
 
 from rl_fzerox.core.envs import FZeroXEnv
@@ -951,6 +952,88 @@ def test_resume_action_bias_delta_does_not_stack_resume_adjustable_biases() -> N
         2.0
     )
     assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["spin_idle_logit"] == pytest.approx(1.0)
+
+
+def test_resume_action_bias_delta_preserves_loaded_bias_when_marker_matches_config() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=configured_hybrid_action(
+                        continuous_axes=("steer",),
+                        discrete_axes=("gas", "air_brake", "boost", "lean", "spin", "pitch"),
+                    ),
+                    observation=ObservationConfig(
+                        mode="image_state",
+                        state_components=_VEHICLE_STATE_COMPONENT,
+                    ),
+                ),
+            )
+        )
+    )
+
+    try:
+        dimensions = env.get_attr("action_dimensions")[0]
+        air_brake_offset = _discrete_branch_offset(dimensions, "air_brake")
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+            ),
+            tensorboard_log=None,
+        )
+        bias = model.policy.action_net.discrete_net.bias
+        with th.no_grad():
+            bias[air_brake_offset] = 1.5
+            bias[air_brake_offset + 1] = 14.5
+        setattr(
+            model,
+            MODEL_ACTION_BIAS_OFFSETS_ATTR,
+            {
+                "gas_on_logit": -5.0,
+                "air_brake_on_logit": 16.0,
+                "spin_idle_logit": 0.0,
+            },
+        )
+
+        apply_resume_action_bias_delta(
+            model,
+            train_env=env,
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+                action_bias=PolicyActionBiasConfig(
+                    gas_on_logit=-5.0,
+                    air_brake_on_logit=16.0,
+                    spin_idle_logit=0.0,
+                ),
+            ),
+        )
+    finally:
+        env.close()
+
+    saved_bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
+    assert float(saved_bias[air_brake_offset]) == pytest.approx(1.5)
+    assert float(saved_bias[air_brake_offset + 1]) == pytest.approx(14.5)
+    assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["air_brake_on_logit"] == pytest.approx(
+        16.0
+    )
 
 
 def test_markerless_resume_action_bias_delta_requires_migration() -> None:
