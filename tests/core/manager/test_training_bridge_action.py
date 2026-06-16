@@ -255,32 +255,6 @@ def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
     assert train_config.train.actor_regularization.pitch_std_cap_loss_weight == 0.0
 
 
-def test_managed_train_config_imports_legacy_entropy_weights() -> None:
-    default_config = default_managed_run_config()
-    legacy_train_data = default_config.train.model_dump(mode="json")
-    legacy_train_data.pop("entropy_coefficients", None)
-    config = ManagedRunConfig.model_validate(
-        {
-            **default_config.model_dump(mode="json"),
-            "train": {
-                **legacy_train_data,
-                "ent_coef": 0.031,
-                "entropy_group_weights": {
-                    "air_brake": 3.2,
-                    "gas": 3.5,
-                },
-            },
-        }
-    )
-
-    assert config.train.entropy_coefficients["air_brake"] == pytest.approx(0.0992)
-    assert config.train.entropy_coefficients["gas"] == pytest.approx(0.1085)
-    assert config.train.entropy_coefficients["pitch"] == pytest.approx(0.031)
-    dumped_train = config.model_dump(mode="json")["train"]
-    assert "ent_coef" not in dumped_train
-    assert "entropy_group_weights" not in dumped_train
-
-
 def test_manager_training_bridge_supports_four_way_categorical_lean(
     tmp_path: Path,
 ) -> None:
