@@ -403,7 +403,7 @@ def _control_viz_height(fonts: ViewerFonts) -> int:
 _FLAG_DISPLAY_LABELS = {
     "reverse_detected": "reverse",
     "low_speed_detected": "slow",
-    "can_boost": "can boost",
+    "can_boost": "boost unlocked",
     "boost_active": "boost",
     "refill_surface": "refill",
     "ground_dirt": "dirt",

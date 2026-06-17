@@ -226,20 +226,20 @@ export function TrackActionPanels({
             <h4 className={rewardActionTitleClass}>Boost pads</h4>
             <div className={rewardActionFieldsClass}>
               <NumberField
-                help="Reward for entering a detected boost pad before manual boost is unlocked."
-                label="Before boost unlock"
-                resetValue={defaultConfig.reward.boost_pad_reward_before_unlock}
+                help="Reward for entering a detected boost pad when manual boost cannot be used."
+                label="Cannot boost"
+                resetValue={defaultConfig.reward.boost_pad_reward_cannot_boost}
                 step="0.5"
-                value={config.reward.boost_pad_reward_before_unlock}
-                onChange={(value) => updateReward({ boost_pad_reward_before_unlock: value })}
+                value={config.reward.boost_pad_reward_cannot_boost}
+                onChange={(value) => updateReward({ boost_pad_reward_cannot_boost: value })}
               />
               <NumberField
-                help="Reward for entering a detected boost pad after manual boost is unlocked."
-                label="After boost unlock"
-                resetValue={defaultConfig.reward.boost_pad_reward_after_unlock}
+                help="Reward for entering a detected boost pad when manual boost can be used."
+                label="Can boost"
+                resetValue={defaultConfig.reward.boost_pad_reward_can_boost}
                 step="0.5"
-                value={config.reward.boost_pad_reward_after_unlock}
-                onChange={(value) => updateReward({ boost_pad_reward_after_unlock: value })}
+                value={config.reward.boost_pad_reward_can_boost}
+                onChange={(value) => updateReward({ boost_pad_reward_can_boost: value })}
               />
               <NumberField
                 help="Progress window used to make boost-pad rewards one-way and non-farmable."

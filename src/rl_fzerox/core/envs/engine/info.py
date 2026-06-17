@@ -167,11 +167,12 @@ def _episode_completion_fraction(telemetry: FZeroXTelemetry) -> float:
     return max(0.0, min(1.0, float(telemetry.player.race_distance) / total_race_distance))
 
 
-def telemetry_can_boost(telemetry: FZeroXTelemetry | None) -> bool:
+def telemetry_boost_unlocked(telemetry: FZeroXTelemetry | None) -> bool:
     """Return the game's manual-boost unlock flag.
 
-    This is the post-lap game state, not the stricter action-mask decision for
-    whether a boost request should be accepted on the current frame.
+    The emulator field is named ``can_boost``, but in game semantics it means
+    boost has been unlocked after lap one. It is not the stricter
+    ``can_boost`` policy/reward signal.
     """
 
     if telemetry is None:

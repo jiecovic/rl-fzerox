@@ -104,6 +104,40 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
     assert draft.config.reward.time_penalty_per_frame == 0.0
 
 
+def test_load_config_json_normalizes_legacy_can_boost_names() -> None:
+    config = default_managed_run_config().model_dump(mode="json")
+    vehicle_component = next(
+        component
+        for component in config["observation"]["state_components"]
+        if component["name"] == "vehicle_state"
+    )
+    vehicle_component["included_features"] = (
+        "vehicle_state.speed_norm",
+        "vehicle_state.boost_unlocked",
+    )
+    config["observation"]["state_feature_dropouts"] = [
+        {"name": "vehicle_state.boost_unlocked", "dropout_prob": 1.0}
+    ]
+    reward = config["reward"]
+    reward["boost_pad_reward_before_unlock"] = reward.pop("boost_pad_reward_cannot_boost")
+    reward["boost_pad_reward_after_unlock"] = reward.pop("boost_pad_reward_can_boost")
+
+    loaded = load_config_json(json.dumps(config))
+
+    loaded_vehicle_component = next(
+        component
+        for component in loaded.observation.state_components
+        if component.name == "vehicle_state"
+    )
+    assert loaded_vehicle_component.included_features == (
+        "vehicle_state.speed_norm",
+        "vehicle_state.can_boost",
+    )
+    assert loaded.observation.state_feature_dropouts[0].name == "vehicle_state.can_boost"
+    assert loaded.reward.boost_pad_reward_cannot_boost == 10.0
+    assert loaded.reward.boost_pad_reward_can_boost == 10.0
+
+
 def test_mlp_engine_tuner_snapshot_omits_gp_only_fields() -> None:
     base_config = default_managed_run_config()
     config = base_config.model_copy(

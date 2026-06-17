@@ -56,8 +56,8 @@ def test_reward_main_rewards_dash_pad_boost_entries_once_per_progress_window() -
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            boost_pad_reward_before_unlock=0.5,
-            boost_pad_reward_after_unlock=0.5,
+            boost_pad_reward_cannot_boost=0.5,
+            boost_pad_reward_can_boost=0.5,
             boost_pad_reward_progress_window=1_000.0,
             time_penalty_per_frame=0.0,
             impact_frame_penalty=0.0,
@@ -95,13 +95,13 @@ def test_reward_main_rewards_dash_pad_boost_entries_once_per_progress_window() -
     assert rewarded_next_window.breakdown["boost_pad"] == 0.5
 
 
-def test_reward_main_splits_dash_pad_reward_by_manual_boost_unlock() -> None:
+def test_reward_main_splits_dash_pad_reward_by_manual_boost_availability() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            boost_pad_reward_before_unlock=1.25,
-            boost_pad_reward_after_unlock=0.25,
+            boost_pad_reward_cannot_boost=1.25,
+            boost_pad_reward_can_boost=0.25,
             boost_pad_reward_progress_window=100.0,
             time_penalty_per_frame=0.0,
             impact_frame_penalty=0.0,
@@ -109,7 +109,7 @@ def test_reward_main_splits_dash_pad_reward_by_manual_boost_unlock() -> None:
     )
     tracker.reset(_telemetry(race_distance=0.0))
 
-    before_unlock = tracker.step_summary(
+    cannot_boost = tracker.step_summary(
         _summary(
             max_race_distance=100.0,
             entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
@@ -117,7 +117,7 @@ def test_reward_main_splits_dash_pad_reward_by_manual_boost_unlock() -> None:
         _status(step_count=1),
         _telemetry(race_distance=100.0, course_effect_raw=_COURSE_EFFECT_DASH),
     )
-    after_unlock = tracker.step_summary(
+    low_energy_can_boost = tracker.step_summary(
         _summary(
             max_race_distance=200.0,
             entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
@@ -127,11 +127,26 @@ def test_reward_main_splits_dash_pad_reward_by_manual_boost_unlock() -> None:
             race_distance=200.0,
             course_effect_raw=_COURSE_EFFECT_DASH,
             state_labels=("active", "can_boost"),
+            energy=29.0,
+        ),
+    )
+    available_can_boost = tracker.step_summary(
+        _summary(
+            max_race_distance=300.0,
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
+        ),
+        _status(step_count=3),
+        _telemetry(
+            race_distance=300.0,
+            course_effect_raw=_COURSE_EFFECT_DASH,
+            state_labels=("active", "can_boost"),
+            energy=30.0,
         ),
     )
 
-    assert before_unlock.breakdown["boost_pad"] == 1.25
-    assert after_unlock.breakdown["boost_pad"] == 0.25
+    assert cannot_boost.breakdown["boost_pad"] == 1.25
+    assert low_energy_can_boost.breakdown["boost_pad"] == 1.25
+    assert available_can_boost.breakdown["boost_pad"] == 0.25
 
 
 def test_reward_main_uses_course_reward_override() -> None:

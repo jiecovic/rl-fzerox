@@ -103,7 +103,7 @@ def test_reset_can_return_image_state_observation() -> None:
         "vehicle_state.energy_frac",
         "vehicle_state.reverse_active",
         "vehicle_state.airborne",
-        "vehicle_state.boost_unlocked",
+        "vehicle_state.can_boost",
         "vehicle_state.boost_active",
         "vehicle_state.lateral_velocity_norm",
         "vehicle_state.sliding_active",

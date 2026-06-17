@@ -106,6 +106,20 @@ def test_auxiliary_state_target_vector_matches_expected_slots() -> None:
     assert int(np.argmax(vector[15:39])) == 7
 
 
+def test_auxiliary_state_boost_availability_requires_energy() -> None:
+    boost_index = resolve_auxiliary_state_target("vehicle_state.can_boost").vector_start
+
+    low_energy = auxiliary_state_target_vector(
+        make_telemetry(state_labels=("active", "can_boost"), energy=29.0, max_energy=178.0)
+    )
+    available = auxiliary_state_target_vector(
+        make_telemetry(state_labels=("active", "can_boost"), energy=30.0, max_energy=178.0)
+    )
+
+    assert float(low_energy[boost_index]) == 0.0
+    assert float(available[boost_index]) == 1.0
+
+
 def test_pitch_std_cap_loss_caps_existing_pitch_std_per_sample() -> None:
     pitch_std = _tensor([0.6, 0.2])
 

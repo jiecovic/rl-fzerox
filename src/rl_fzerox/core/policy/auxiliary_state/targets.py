@@ -12,7 +12,7 @@ from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import Float32Array, StateVector
 from rl_fzerox.core.domain.track_position import height_above_ground_feature
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active, telemetry_can_boost
 from rl_fzerox.core.envs.track_bounds import track_edge_state
 from rl_fzerox.core.policy.auxiliary_state.names import AuxiliaryStateTargetName
 
@@ -98,7 +98,7 @@ _TARGET_DEFINITIONS: tuple[AuxiliaryStateTargetDefinition, ...] = (
         high=1.0,
     ),
     AuxiliaryStateTargetDefinition(
-        name="vehicle_state.boost_unlocked",
+        name="vehicle_state.can_boost",
         kind="binary",
         low=0.0,
         high=1.0,
@@ -285,7 +285,11 @@ def auxiliary_state_target_vector(telemetry: FZeroXTelemetry) -> StateVector:
     _set_scalar(vector, "vehicle_state.energy_frac", _clamp(energy_frac, 0.0, 1.0))
     _set_scalar(vector, "vehicle_state.reverse_active", 1.0 if player.reverse_timer > 0 else 0.0)
     _set_scalar(vector, "vehicle_state.airborne", 1.0 if player.airborne else 0.0)
-    _set_scalar(vector, "vehicle_state.boost_unlocked", 1.0 if player.can_boost else 0.0)
+    _set_scalar(
+        vector,
+        "vehicle_state.can_boost",
+        1.0 if telemetry_can_boost(telemetry) else 0.0,
+    )
     _set_scalar(
         vector,
         "vehicle_state.boost_active",

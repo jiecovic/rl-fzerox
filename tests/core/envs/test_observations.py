@@ -301,7 +301,7 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
         "vehicle_state.energy_frac",
         "vehicle_state.reverse_active",
         "vehicle_state.airborne",
-        "vehicle_state.boost_unlocked",
+        "vehicle_state.can_boost",
         "vehicle_state.boost_active",
         "vehicle_state.lateral_velocity_norm",
         "vehicle_state.sliding_active",
@@ -317,7 +317,7 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["vehicle_state.speed_norm"] == 0.5
     assert values["vehicle_state.energy_frac"] == 0.5
     assert values["vehicle_state.reverse_active"] == 1.0
-    assert values["vehicle_state.boost_unlocked"] == 1.0
+    assert values["vehicle_state.can_boost"] == 1.0
     assert values["vehicle_state.lateral_velocity_norm"] == 0.5
     assert values["vehicle_state.sliding_active"] == 1.0
     assert values["machine_context.body_stat"] == 0.25
@@ -334,6 +334,41 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["control_history.prev_thrust_1"] == 1.0
     assert values["control_history.prev_boost_2"] == 1.0
     assert values["control_history.prev_lean_1"] == -1.0
+
+
+def test_vehicle_state_boost_availability_requires_energy() -> None:
+    components = (ObservationStateComponentSettings(name="vehicle_state"),)
+
+    low_energy = telemetry_state_vector(
+        make_telemetry(
+            state_labels=("active", "can_boost"),
+            energy=29.0,
+            max_energy=178.0,
+        ),
+        state_components=components,
+    )
+    available = telemetry_state_vector(
+        make_telemetry(
+            state_labels=("active", "can_boost"),
+            energy=30.0,
+            max_energy=178.0,
+        ),
+        state_components=components,
+    )
+    locked = telemetry_state_vector(
+        make_telemetry(
+            state_labels=("active",),
+            energy=178.0,
+            max_energy=178.0,
+        ),
+        state_components=components,
+    )
+
+    feature_names = state_feature_names(state_components=components)
+    boost_index = feature_names.index("vehicle_state.can_boost")
+    assert float(low_energy[boost_index]) == 0.0
+    assert float(available[boost_index]) == 1.0
+    assert float(locked[boost_index]) == 0.0
 
 
 def test_surface_state_refill_surface_ignores_energy_fullness() -> None:

@@ -462,7 +462,7 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
             "vehicle_state.energy_frac",
             "vehicle_state.reverse_active",
             "vehicle_state.airborne",
-            "vehicle_state.boost_unlocked",
+            "vehicle_state.can_boost",
             "vehicle_state.boost_active",
             "control_history.prev_steer_1",
             "control_history.prev_lean_1",

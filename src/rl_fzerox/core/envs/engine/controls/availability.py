@@ -2,17 +2,16 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
-from rl_fzerox.core.runtime_spec.schema.common import ContinuousAirBrakeMode
-
-from ..info import telemetry_can_boost, telemetry_energy_fraction
-from .gates import with_pitch, without_controls
-from .history import ControlStateTracker
-from .mask_queries import (
+from rl_fzerox.core.envs.engine.controls.gates import with_pitch, without_controls
+from rl_fzerox.core.envs.engine.controls.history import ControlStateTracker
+from rl_fzerox.core.envs.engine.controls.mask_queries import (
     action_branch_non_neutral_allowed,
     action_branch_value_allowed,
 )
-from .masks import ActionMaskController
+from rl_fzerox.core.envs.engine.controls.masks import ActionMaskController
+from rl_fzerox.core.envs.engine.info import telemetry_boost_unlocked, telemetry_energy_fraction
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.runtime_spec.schema.common import ContinuousAirBrakeMode
 
 
 def sync_dynamic_action_masks(
@@ -36,28 +35,28 @@ def sync_dynamic_action_masks(
     mask_controller.set_speed_kph(speed_kph)
     mask_controller.set_airborne(bool(telemetry.player.airborne))
 
-    can_boost = telemetry_can_boost(telemetry)
+    boost_unlocked = telemetry_boost_unlocked(telemetry)
     if mask_boost_when_active:
-        can_boost = can_boost and not telemetry_boost_active(telemetry)
+        boost_unlocked = boost_unlocked and not telemetry_boost_active(telemetry)
     if mask_boost_when_airborne:
-        can_boost = can_boost and not telemetry.player.airborne
-    can_boost = can_boost and telemetry.player.reverse_timer <= 0
-    can_boost = can_boost and control_state.boost_action_allowed_by_timing()
+        boost_unlocked = boost_unlocked and not telemetry.player.airborne
+    boost_unlocked = boost_unlocked and telemetry.player.reverse_timer <= 0
+    boost_unlocked = boost_unlocked and control_state.boost_action_allowed_by_timing()
 
     max_boost_speed = mask_controller.current_boost_unmask_max_speed_kph
     if max_boost_speed is not None:
-        can_boost = can_boost and speed_kph < float(max_boost_speed)
+        boost_unlocked = boost_unlocked and speed_kph < float(max_boost_speed)
 
     energy_fraction = telemetry_energy_fraction(telemetry)
     min_energy_fraction = mask_controller.current_boost_min_energy_fraction(
         boost_min_energy_fraction
     )
     if energy_fraction is not None:
-        can_boost = can_boost and energy_fraction > 0.0
+        boost_unlocked = boost_unlocked and energy_fraction > 0.0
         if min_energy_fraction > 0.0:
-            can_boost = can_boost and energy_fraction >= min_energy_fraction
+            boost_unlocked = boost_unlocked and energy_fraction >= min_energy_fraction
 
-    mask_controller.set_boost_unlocked(can_boost)
+    mask_controller.set_boost_unlocked(boost_unlocked)
 
 
 def apply_dynamic_control_gates(

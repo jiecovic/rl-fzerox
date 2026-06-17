@@ -10,6 +10,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     CurriculumStageConfig,
     CurriculumTriggerConfig,
     EnvConfig,
+    RewardConfig,
 )
 from tests.core.envs.helpers import ScriptedStepBackend
 from tests.core.envs.helpers import backend_step_result as _backend_step_result
@@ -585,6 +586,52 @@ def test_env_action_masks_disable_boost_below_energy_threshold() -> None:
 
     env.step(_discrete_gas_boost_action())
     assert env.action_masks().tolist() == ([True] * (7 + 2 + 2))
+
+
+def test_env_action_masks_disable_zero_energy_boost_and_reward() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=0.0,
+                    state_labels=("active", "can_boost"),
+                    energy=0.0,
+                    max_energy=100.0,
+                ),
+                summary=_step_summary(max_race_distance=0.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+            energy=0.0,
+            max_energy=100.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            boost_min_energy_fraction=0.0,
+            action=configured_discrete_action("steer", "gas", "boost"),
+        ),
+        reward_config=RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            manual_boost_reward=1.0,
+            impact_frame_penalty=0.0,
+        ),
+    )
+
+    env.reset(seed=1)
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 2) + [True, False])
+
+    _, reward, _, _, info = env.step(_discrete_gas_boost_action(boost_index=1))
+
+    assert reward == 0.0
+    reward_breakdown = info.get("reward_breakdown", {})
+    assert isinstance(reward_breakdown, dict)
+    assert "manual_boost" not in reward_breakdown
 
 
 def test_env_action_masks_disable_boost_while_dash_pad_boost_is_active_by_default() -> None:

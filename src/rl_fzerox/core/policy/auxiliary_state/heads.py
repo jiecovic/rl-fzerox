@@ -26,7 +26,7 @@ _SCALAR_TARGET_NAMES: tuple[AuxiliaryStateTargetName, ...] = (
 _BINARY_TARGET_NAMES: tuple[AuxiliaryStateTargetName, ...] = (
     "vehicle_state.reverse_active",
     "vehicle_state.airborne",
-    "vehicle_state.boost_unlocked",
+    "vehicle_state.can_boost",
     "vehicle_state.boost_active",
     "vehicle_state.sliding_active",
     "track_position.outside_track_bounds",

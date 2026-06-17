@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
-from rl_fzerox.core.envs.engine.info import telemetry_can_boost
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.rewards.common import (
     RewardActionContext,
@@ -49,6 +48,7 @@ from rl_fzerox.core.envs.rewards.reward_main.step_terms import (
     ko_star_reward_event,
 )
 from rl_fzerox.core.envs.rewards.reward_main.weights import RewardMainWeights
+from rl_fzerox.core.envs.telemetry import telemetry_can_boost
 from rl_fzerox.core.envs.track_bounds import (
     telemetry_outside_track_bounds,
     track_recovery_segment_distance,
@@ -253,7 +253,7 @@ class RewardMainTracker:
         boost_pad_reward = self._boost_pads.reward(
             summary.entered_dash_surface,
             summary.reverse_active_frames,
-            boost_unlocked=telemetry_can_boost(telemetry),
+            can_boost=telemetry_can_boost(telemetry),
             relative_progress=self._progress.relative_distance(summary.max_race_distance),
             frontier_distance_before_step=frontier_distance_before_step,
             weights=self._weights,
@@ -393,8 +393,8 @@ class RewardMainTracker:
 
         info: dict[str, object] = {
             "reward_profile": "reward_main",
-            "boost_pad_reward_before_unlock": self._weights.boost_pad_reward_before_unlock,
-            "boost_pad_reward_after_unlock": self._weights.boost_pad_reward_after_unlock,
+            "boost_pad_reward_cannot_boost": self._weights.boost_pad_reward_cannot_boost,
+            "boost_pad_reward_can_boost": self._weights.boost_pad_reward_can_boost,
             "boost_pad_reward_progress_window": self._weights.boost_pad_reward_progress_window,
             "rewarded_boost_pad_progress_windows": self._boost_pads.rewarded_window_count,
             "landing_reward_frontier_bucket_index": (

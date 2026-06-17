@@ -7,7 +7,7 @@ from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
 from rl_fzerox.core.envs.observations.state.types import OBSERVATION_STATE_DEFAULTS, StateFeature
 from rl_fzerox.core.envs.observations.state.utils import clamp
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active, telemetry_can_boost
 
 
 def vehicle_component_features(
@@ -32,7 +32,7 @@ def vehicle_state_features() -> tuple[StateFeature, ...]:
         StateFeature("vehicle_state.energy_frac", 1.0),
         StateFeature("vehicle_state.reverse_active", 1.0),
         StateFeature("vehicle_state.airborne", 1.0),
-        StateFeature("vehicle_state.boost_unlocked", 1.0),
+        StateFeature("vehicle_state.can_boost", 1.0),
         StateFeature("vehicle_state.boost_active", 1.0),
         StateFeature("vehicle_state.lateral_velocity_norm", 1.0, low=-1.0),
         StateFeature("vehicle_state.sliding_active", 1.0),
@@ -50,7 +50,7 @@ def vehicle_state_values(telemetry: FZeroXTelemetry | None) -> list[float]:
         clamp(float(energy_frac), 0.0, 1.0),
         1.0 if player.reverse_timer > 0 else 0.0,
         1.0 if player.airborne else 0.0,
-        1.0 if player.can_boost else 0.0,
+        1.0 if telemetry_can_boost(telemetry) else 0.0,
         1.0 if telemetry_boost_active(telemetry) else 0.0,
         clamp(
             lateral_velocity / OBSERVATION_STATE_DEFAULTS.lateral_velocity_normalizer,
