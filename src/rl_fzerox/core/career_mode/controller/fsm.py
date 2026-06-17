@@ -5,10 +5,10 @@ from collections import deque
 from pathlib import Path
 from typing import Protocol
 
+from rl_fzerox.core.career_mode.controller.engine_setup import CareerEngineSetupFlow
 from rl_fzerox.core.career_mode.controller.events import CareerControllerLifecycleEvents
 from rl_fzerox.core.career_mode.controller.menu_flow import (
     cup_selection_input,
-    engine_adjust_tap_count,
     is_neutral_settle_step,
     pending_step_matches_observed_screen,
 )
@@ -30,7 +30,6 @@ from rl_fzerox.core.career_mode.navigation import (
     RawMenuStep,
     continue_next_course_step,
     course_id_from_info,
-    engine_adjust_steps,
     in_gp_race,
     machine_select_steps,
     observed_menu_screen,
@@ -140,11 +139,7 @@ class CareerModeController:
         self._camera = CareerCameraSync()
         self._pending_steps: deque[RawMenuStep] = deque()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
-        self._engine_applied_course_id: str | None = None
-        self._engine_adjust_taps = 0
-        self._engine_ready_course_id: str | None = None
-        self._engine_ready_target: int | None = None
-        self._engine_ready_frames = 0
+        self._engine_setup = CareerEngineSetupFlow()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
@@ -382,7 +377,7 @@ class CareerModeController:
                             1,
                             phase="apply_engine:wait_for_course",
                         )
-                    if self._engine_applied_course_id != course_id:
+                    if not self._engine_setup.applied_for(course_id):
                         self._enter_phase(CareerPhase.APPLY_ENGINE)
                         return self._apply_engine_step(info)
                     self._enter_phase(CareerPhase.ENTER_RACE)
@@ -591,18 +586,6 @@ class CareerModeController:
         self._pending_steps.extend(steps[1:])
         return steps[0]
 
-    def _reset_engine_adjustment(self) -> None:
-        self._engine_applied_course_id = None
-        self._engine_adjust_taps = 0
-        self._engine_ready_course_id = None
-        self._engine_ready_target = None
-        self._engine_ready_frames = 0
-
-    def _reset_engine_confirmation(self) -> None:
-        self._engine_ready_course_id = None
-        self._engine_ready_target = None
-        self._engine_ready_frames = 0
-
     def _open_difficulty_popup(self) -> RawMenuStep:
         self._pending_steps.clear()
         self._difficulty_popup_state = DifficultyPopupState.OPENING
@@ -703,44 +686,11 @@ class CareerModeController:
         )
 
     def _apply_engine_step(self, info: dict[str, object]) -> RawMenuStep:
-        facts = MenuFacts.from_info(info)
-        if not facts.is_machine_settings:
-            return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_settings")
-        course_id = course_id_from_info(info)
-        if course_id is None:
-            return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_course")
-        course_setup = self._policy_resolver.resolve_course_setup(info)
-        if course_setup is None:
-            return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_setup")
-        current = facts.engine_setting_raw_value
-        target = course_setup.engine_setting_raw_value
-        if current == target:
-            self._engine_adjust_taps = 0
-            if self._engine_ready_course_id == course_id and self._engine_ready_target == target:
-                self._engine_ready_frames += 1
-            else:
-                self._engine_ready_course_id = course_id
-                self._engine_ready_target = target
-                self._engine_ready_frames = 1
-            if self._engine_ready_frames >= MENU_TIMING.engine_ready_confirm_frames:
-                self._engine_applied_course_id = course_id
-                return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:ready")
-            return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:confirm")
-        self._reset_engine_confirmation()
-        if current is None:
-            return raw_step(MenuInput.NEUTRAL, 1, phase="apply_engine:wait_for_read")
-        remaining_taps = MENU_TIMING.max_engine_adjust_taps - self._engine_adjust_taps
-        if remaining_taps <= 0:
-            raise RuntimeError(
-                f"Career Mode could not reach the requested engine setting {target} from {current}"
-            )
-        steps = engine_adjust_steps(
-            current=current,
-            target=target,
-            max_taps=remaining_taps,
+        return self._engine_setup.next_step(
+            info=info,
+            course_setup=self._policy_resolver.resolve_course_setup(info),
+            queue_menu_steps=self._queue_menu_steps,
         )
-        self._engine_adjust_taps += engine_adjust_tap_count(steps)
-        return self._queue_menu_steps(steps)
 
     def _course_select_matches_target(self, facts: MenuFacts) -> bool:
         return facts.difficulty_raw == self._setup_difficulty_raw_value()
@@ -856,7 +806,7 @@ class CareerModeController:
         self._setup = career_mode_race_setup_config(plan.race_setup)
         self._pending_steps.clear()
         self._phase = CareerPhase.CONTINUE_AFTER_RACE
-        self._reset_engine_adjustment()
+        self._engine_setup.reset_adjustment()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
@@ -872,8 +822,7 @@ class CareerModeController:
         self._pending_steps.clear()
         self._phase = CareerPhase.CONTINUE_AFTER_RACE
         self._advance_presses_in_phase = 0
-        self._engine_adjust_taps = 0
-        self._reset_engine_confirmation()
+        self._engine_setup.reset_tap_budget()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._post_race.enter_continue_after_race()
@@ -954,7 +903,7 @@ class CareerModeController:
         self._recording.force_close(status=recording_status)
         self._pending_steps.clear()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
-        self._reset_engine_adjustment()
+        self._engine_setup.reset_adjustment()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
