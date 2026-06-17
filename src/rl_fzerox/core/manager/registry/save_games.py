@@ -14,7 +14,7 @@ from rl_fzerox.core.career_mode.course_setup import (
     resolve_cup_setup,
 )
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
-from rl_fzerox.core.career_mode.progress import (
+from rl_fzerox.core.career_mode.progress.unlocks import (
     UnlockRuleTarget,
     build_unlock_progress,
     default_unlock_targets,

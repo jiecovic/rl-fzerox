@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.models import ManagedSaveGame
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.manager import ManagerStore
 
 
 class SaveRamSession(Protocol):
@@ -62,6 +64,8 @@ def store_from_config(config: WatchAppConfig) -> ManagerStore:
     db_path = config.watch.manager_db_path
     if db_path is None:
         raise RuntimeError("career mode requires watch.manager_db_path")
+    from rl_fzerox.core.manager import ManagerStore
+
     return ManagerStore(db_path)
 
 

@@ -10,7 +10,7 @@ import pytest
 import rl_fzerox.apps.run_manager.api.handlers.save_games as manager_api_save_games
 from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
 from rl_fzerox.apps.run_manager.api.routes import _run_sync
-from rl_fzerox.core.career_mode.progress import default_unlock_targets
+from rl_fzerox.core.career_mode.progress.unlocks import default_unlock_targets
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager import (
     ManagerStore,

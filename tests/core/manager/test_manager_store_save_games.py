@@ -6,7 +6,7 @@ from typing import Literal
 
 import pytest
 
-from rl_fzerox.core.career_mode.progress import default_unlock_targets
+from rl_fzerox.core.career_mode.progress.unlocks import default_unlock_targets
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.manager import (
     ManagerStore,

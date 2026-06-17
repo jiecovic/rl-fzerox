@@ -6,11 +6,11 @@ from pathlib import Path
 
 from rl_fzerox.core.career_mode.course_setup import CourseSetupTarget
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
-from rl_fzerox.core.career_mode.progress import (
+from rl_fzerox.core.career_mode.progress.attempt import CareerAttemptProgress
+from rl_fzerox.core.career_mode.progress.unlocks import (
     build_unlock_progress,
     default_unlock_targets,
 )
-from rl_fzerox.core.career_mode.progress.attempt import CareerAttemptProgress
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.models import (
     ManagedRun,
