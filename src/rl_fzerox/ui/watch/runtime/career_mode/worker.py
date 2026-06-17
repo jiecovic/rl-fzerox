@@ -16,6 +16,9 @@ from rl_fzerox.ui.watch.runtime.career_mode.attempts import (
     fail_running_attempts,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop import runner as career_loop_runner
+from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
+    should_observe_policy_transition,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
     open_career_mode_runtime_session,
@@ -100,7 +103,7 @@ def _should_observe_policy_transition(
     active_policy_started: bool,
     info: dict[str, object],
 ) -> bool:
-    return career_loop_runner._should_observe_policy_transition(
+    return should_observe_policy_transition(
         policy_owns_control=policy_owns_control,
         active_policy_started=active_policy_started,
         info=info,

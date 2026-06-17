@@ -2,15 +2,11 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
 from multiprocessing.queues import Queue as ProcessQueue
 
-from fzerox_emulator import FZeroXTelemetry, RaceControlState, SpinRequest
+from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.career_mode.controller import CareerModeController
-from rl_fzerox.core.career_mode.execution.save_file import (
-    load_save_ram,
-    persist_save_ram,
-)
+from rl_fzerox.core.career_mode.execution.save_file import persist_save_ram
 from rl_fzerox.core.career_mode.navigation import (
     MenuInput,
     RawMenuStep,
@@ -20,9 +16,22 @@ from rl_fzerox.core.career_mode.navigation import (
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.records import TrackRecordBook
+from rl_fzerox.ui.watch.runtime.career_mode.loop.commands import (
+    apply_control_timing_command,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.loop.recording import (
     drain_recording_notices,
     handle_controller_lifecycle,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
+    career_mode_attempt_id,
+    career_runtime_error_context,
+    fresh_menu_runtime_state,
+    reset_emulator_for_next_attempt,
+    should_observe_policy_transition,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.loop.snapshot import (
+    publish_career_loop_snapshot,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.state import (
     CareerModeLoopState,
@@ -32,7 +41,6 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.state import (
 )
 from rl_fzerox.ui.watch.runtime.career_mode.menu import (
     menu_viewer_info,
-    reset_race_progress_info,
     step_menu,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.policy_step import (
@@ -46,32 +54,13 @@ from rl_fzerox.ui.watch.runtime.career_mode.recording import (
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
 )
-from rl_fzerox.ui.watch.runtime.career_mode.timing import (
-    active_policy_timing,
-    measured_game_fps,
-    set_session_control_timing,
-    target_game_fps,
-    with_measured_game_fps,
-)
-from rl_fzerox.ui.watch.runtime.career_mode.timing import (
-    native_frame_seconds as _native_frame_seconds,
-)
-from rl_fzerox.ui.watch.runtime.career_mode.timing import (
-    snapshot_action_repeat as _snapshot_action_repeat,
-)
-from rl_fzerox.ui.watch.runtime.career_mode.timing import (
-    snapshot_target_control_fps as _snapshot_target_control_fps,
-)
-from rl_fzerox.ui.watch.runtime.ipc import (
-    drain_worker_commands,
-    publish_worker_message,
-)
+from rl_fzerox.ui.watch.runtime.career_mode.timing import active_policy_timing
+from rl_fzerox.ui.watch.runtime.ipc import drain_worker_commands
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
     toggle_watch_state_feature,
 )
 from rl_fzerox.ui.watch.runtime.policy.runner import (
-    _policy_reload_error,
     _reset_policy_runner,
 )
 from rl_fzerox.ui.watch.runtime.policy.visualization import (
@@ -83,12 +72,7 @@ from rl_fzerox.ui.watch.runtime.policy.visualization import (
 from rl_fzerox.ui.watch.runtime.policy.visualization import (
     refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
-from rl_fzerox.ui.watch.runtime.snapshots.build import _build_snapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
-from rl_fzerox.ui.watch.runtime.timing import (
-    _adjust_control_fps,
-    _target_seconds,
-)
 
 
 def run_loaded_career_mode_loop(
@@ -180,7 +164,7 @@ def _run_career_mode_loop_body(
     observation = state.observation
     raw_info = state.raw_info
     info = state.info
-    track_record_attempt_id = _career_mode_attempt_id(info)
+    track_record_attempt_id = career_mode_attempt_id(info)
     reset_info = state.reset_info
     current_telemetry = state.current_telemetry
     current_auxiliary_predictions = state.current_auxiliary_predictions
@@ -190,84 +174,64 @@ def _run_career_mode_loop_body(
     manual_spin_request: SpinRequest = "none"
     recording_notice = TimedRecordingNotice()
 
+    def clear_policy_runtime_state(*, reset_episode_reward: bool = False) -> None:
+        nonlocal active_policy_control, active_policy_started, manual_control_enabled
+        nonlocal current_policy_action, current_control_state, current_gas_level
+        nonlocal boost_lamp_level, cnn_activations, current_auxiliary_predictions
+        nonlocal current_auxiliary_targets, episode_reward
+
+        active_policy_control = None
+        active_policy_started = False
+        manual_control_enabled = False
+        current_policy_action = None
+        current_control_state = RaceControlState()
+        current_gas_level = 0.0
+        boost_lamp_level = 0.0
+        cnn_activations = None
+        current_auxiliary_predictions = None
+        current_auxiliary_targets = None
+        if reset_episode_reward:
+            episode_reward = 0.0
+
     def reset_track_records_if_attempt_changed() -> None:
         nonlocal track_record_attempt_id, track_record_book
 
-        current_attempt_id = _career_mode_attempt_id(info)
+        current_attempt_id = career_mode_attempt_id(info)
         if current_attempt_id == track_record_attempt_id:
             return
         track_record_book = TrackRecordBook()
         track_record_attempt_id = current_attempt_id
 
     def publish_snapshot(*, policy_visible: bool) -> None:
-        policy_active = policy_visible and observation is not None
-        snapshot_target_fps = _snapshot_target_control_fps(
+        publish_career_loop_snapshot(
             config=config,
             session=session,
+            controller=controller,
+            snapshot_queue=snapshot_queue,
+            control_rate=control_rate,
             native_control_fps=native_control_fps,
             target_control_fps=target_control_fps,
-            policy_active=policy_active,
-        )
-        snapshot_info = controller.viewer_info(
-            info=info if policy_active else reset_race_progress_info(info),
-            active_policy_control=(active_policy_control if policy_active else None),
-        )
-        snapshot_config = session.snapshot_config(config) if policy_active else config
-        snapshot_repeat = _snapshot_action_repeat(
-            snapshot_config,
-            policy_active=policy_active,
-        )
-        snapshot_info = with_measured_game_fps(
-            snapshot_info,
-            game_fps=measured_game_fps(
-                control_fps=control_rate.rate_hz(),
-                action_repeat=snapshot_repeat,
-            ),
-            game_fps_target=target_game_fps(
-                target_control_fps=snapshot_target_fps,
-                action_repeat=snapshot_repeat,
-            ),
-        )
-        snapshot_info = recording_notice.apply(snapshot_info, now=time.perf_counter())
-        runner = (
-            active_policy_control.runner
-            if policy_active and active_policy_control is not None
-            else None
-        )
-        publish_worker_message(
-            snapshot_queue,
-            _build_snapshot(
-                config=snapshot_config,
-                env=session,
-                emulator=session.emulator,
-                observation=observation if policy_active else None,
-                info=snapshot_info,
-                reset_info=reset_info,
-                episode=episode,
-                episode_reward=episode_reward if policy_active else 0.0,
-                control_fps=control_rate.rate_hz(),
-                target_control_fps=snapshot_target_fps,
-                action_repeat=snapshot_repeat,
-                control_state=current_control_state,
-                gas_level=current_gas_level,
-                boost_lamp_level=boost_lamp_level,
-                action_mask_branches=session.action_mask_branches(),
-                policy_action=current_policy_action if policy_active else None,
-                policy_runner=runner,
-                policy_auxiliary_state_predictions=(
-                    current_auxiliary_predictions if policy_active else None
-                ),
-                policy_auxiliary_state_targets=(
-                    current_auxiliary_targets if policy_active else None
-                ),
-                include_auxiliary_state=(policy_active and auxiliary_visualization_enabled),
-                auxiliary_target_names=auxiliary_target_names,
-                deterministic_policy=deterministic_policy,
-                manual_control_enabled=manual_control_enabled if policy_active else False,
-                policy_reload_error=_policy_reload_error(runner),
-                cnn_activations=cnn_activations if policy_active else None,
-                track_record_book=track_record_book,
-            ),
+            policy_visible=policy_visible,
+            active_policy_control=active_policy_control,
+            observation=observation,
+            info=info,
+            reset_info=reset_info,
+            episode=episode,
+            episode_reward=episode_reward,
+            current_control_state=current_control_state,
+            current_gas_level=current_gas_level,
+            boost_lamp_level=boost_lamp_level,
+            current_policy_action=current_policy_action,
+            current_auxiliary_predictions=current_auxiliary_predictions,
+            current_auxiliary_targets=current_auxiliary_targets,
+            auxiliary_visualization_enabled=auxiliary_visualization_enabled,
+            auxiliary_target_names=auxiliary_target_names,
+            deterministic_policy=deterministic_policy,
+            manual_control_enabled=manual_control_enabled,
+            cnn_activations=cnn_activations,
+            track_record_book=track_record_book,
+            recording_notice=recording_notice,
+            now=time.perf_counter(),
         )
 
     try:
@@ -294,32 +258,18 @@ def _run_career_mode_loop_body(
                 raise _CareerModeWorkerQuit()
             if commands.save_requests:
                 persist_save_ram(config, session)
-            if commands.reset_control_fps:
-                target_control_fps = native_control_fps
-                target_control_seconds = _target_seconds(target_control_fps)
-                native_frame_seconds = _native_frame_seconds(target_control_seconds)
-                set_session_control_timing(
-                    session,
-                    target_control_fps=target_control_fps,
-                    target_control_seconds=target_control_seconds,
-                )
-                control_rate.reset()
-                next_step_time = time.perf_counter()
-            elif commands.control_fps_delta:
-                target_control_fps = _adjust_control_fps(
-                    target_control_fps,
-                    commands.control_fps_delta,
-                    native_control_fps=native_control_fps,
-                )
-                target_control_seconds = _target_seconds(target_control_fps)
-                native_frame_seconds = _native_frame_seconds(target_control_seconds)
-                set_session_control_timing(
-                    session,
-                    target_control_fps=target_control_fps,
-                    target_control_seconds=target_control_seconds,
-                )
-                control_rate.reset()
-                next_step_time = time.perf_counter()
+            timing_update = apply_control_timing_command(
+                commands=commands,
+                session=session,
+                control_rate=control_rate,
+                native_control_fps=native_control_fps,
+                target_control_fps=target_control_fps,
+            )
+            if timing_update is not None:
+                target_control_fps = timing_update.target_control_fps
+                target_control_seconds = timing_update.target_control_seconds
+                native_frame_seconds = timing_update.native_frame_seconds
+                next_step_time = timing_update.next_step_time
             current_step_seconds = target_control_seconds
             if commands.toggle_zeroed_state_feature_name is not None:
                 watch_zeroed_state_features = toggle_watch_state_feature(
@@ -410,7 +360,7 @@ def _run_career_mode_loop_body(
 
             before_step_handled = controller.before_step(session=session, info=info)
             if before_step_handled:
-                raw_info, info, current_telemetry = _fresh_menu_runtime_state(session)
+                raw_info, info, current_telemetry = fresh_menu_runtime_state(session)
                 info = controller.viewer_info(
                     info=info,
                     active_policy_control=active_policy_control,
@@ -421,7 +371,7 @@ def _run_career_mode_loop_body(
                 info=info,
             )
             if lifecycle.reset_requested:
-                raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
+                raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
                     config=config,
                     session=session,
                     controller=controller,
@@ -446,7 +396,7 @@ def _run_career_mode_loop_body(
                     publish_snapshot(policy_visible=False)
                     raise _CareerModeWorkerQuit()
             policy_owns_control = controller.policy_owns_control()
-            if _should_observe_policy_transition(
+            if should_observe_policy_transition(
                 policy_owns_control=policy_owns_control,
                 active_policy_started=active_policy_started,
                 info=info,
@@ -469,22 +419,13 @@ def _run_career_mode_loop_body(
                         record_event=True,
                     )
                     if lifecycle.reset_requested:
-                        raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
+                        raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
                             config=config,
                             session=session,
                             controller=controller,
                         )
                         reset_info = dict(info)
-                        active_policy_control = None
-                        active_policy_started = False
-                        current_policy_action = None
-                        current_control_state = RaceControlState()
-                        current_gas_level = 0.0
-                        boost_lamp_level = 0.0
-                        cnn_activations = None
-                        current_auxiliary_predictions = None
-                        current_auxiliary_targets = None
-                        manual_control_enabled = False
+                        clear_policy_runtime_state()
                         reset_track_records_if_attempt_changed()
                         publish_snapshot(policy_visible=False)
                         continue
@@ -499,23 +440,14 @@ def _run_career_mode_loop_body(
                     episode_reward = 0.0
                     live_series = EpisodeLiveSeriesTracker()
                     last_live_series_publish_time = 0.0
-                    raw_info, info, current_telemetry = _fresh_menu_runtime_state(session)
+                    raw_info, info, current_telemetry = fresh_menu_runtime_state(session)
                     info = controller.viewer_info(
                         info=info,
                         active_policy_control=None,
                     )
                     reset_info = dict(info)
                     reset_track_records_if_attempt_changed()
-                    active_policy_control = None
-                    active_policy_started = False
-                    current_policy_action = None
-                    current_control_state = RaceControlState()
-                    current_gas_level = 0.0
-                    boost_lamp_level = 0.0
-                    cnn_activations = None
-                    current_auxiliary_predictions = None
-                    current_auxiliary_targets = None
-                    manual_control_enabled = False
+                    clear_policy_runtime_state()
                     publish_snapshot(policy_visible=False)
                     if not lifecycle.has_active_attempt:
                         raise _CareerModeWorkerQuit()
@@ -525,15 +457,7 @@ def _run_career_mode_loop_body(
             menu_step = controller.next_raw_step(info=info)
             if menu_step is not None:
                 last_menu_step = menu_step
-                active_policy_control = None
-                active_policy_started = False
-                manual_control_enabled = False
-                current_policy_action = None
-                current_control_state = RaceControlState()
-                current_gas_level = 0.0
-                boost_lamp_level = 0.0
-                episode_reward = 0.0
-                cnn_activations = None
+                clear_policy_runtime_state(reset_episode_reward=True)
                 step_menu(
                     config=config,
                     session=session,
@@ -715,22 +639,13 @@ def _run_career_mode_loop_body(
                         record_event=True,
                     )
                     if lifecycle.reset_requested:
-                        raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
+                        raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
                             config=config,
                             session=session,
                             controller=controller,
                         )
                         reset_info = dict(info)
-                        active_policy_control = None
-                        active_policy_started = False
-                        current_policy_action = None
-                        current_control_state = RaceControlState()
-                        current_gas_level = 0.0
-                        boost_lamp_level = 0.0
-                        cnn_activations = None
-                        current_auxiliary_predictions = None
-                        current_auxiliary_targets = None
-                        manual_control_enabled = False
+                        clear_policy_runtime_state()
                         reset_track_records_if_attempt_changed()
                         publish_snapshot(policy_visible=False)
                         continue
@@ -746,23 +661,14 @@ def _run_career_mode_loop_body(
                     episode_reward = 0.0
                     live_series = EpisodeLiveSeriesTracker()
                     last_live_series_publish_time = 0.0
-                    raw_info, info, current_telemetry = _fresh_menu_runtime_state(session)
+                    raw_info, info, current_telemetry = fresh_menu_runtime_state(session)
                     info = controller.viewer_info(
                         info=info,
                         active_policy_control=None,
                     )
                     reset_info = dict(info)
                     reset_track_records_if_attempt_changed()
-                    active_policy_control = None
-                    active_policy_started = False
-                    current_policy_action = None
-                    current_control_state = RaceControlState()
-                    current_gas_level = 0.0
-                    boost_lamp_level = 0.0
-                    cnn_activations = None
-                    current_auxiliary_predictions = None
-                    current_auxiliary_targets = None
-                    manual_control_enabled = False
+                    clear_policy_runtime_state()
                     publish_snapshot(policy_visible=False)
                     if not lifecycle.has_active_attempt:
                         raise _CareerModeWorkerQuit()
@@ -774,66 +680,10 @@ def _run_career_mode_loop_body(
         raise
     except Exception as exc:
         raise RuntimeError(
-            _career_runtime_error_context(
+            career_runtime_error_context(
                 exc,
                 controller=controller,
                 info=info,
                 last_menu_step=last_menu_step,
             )
         ) from exc
-
-
-def _career_runtime_error_context(
-    exc: Exception,
-    *,
-    controller: CareerModeController,
-    info: dict[str, object],
-    last_menu_step: RawMenuStep | None,
-) -> str:
-    context = controller.debug_context(info)
-    message = f"{exc}; {context}"
-    if last_menu_step is None:
-        return message
-    return (
-        f"{message}; last_step="
-        f"{last_menu_step.phase}:{last_menu_step.menu_input}:{last_menu_step.frames}f"
-    )
-
-
-def _fresh_menu_runtime_state(
-    session: CareerModeRuntimeSession,
-) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
-    raw_info = menu_viewer_info(session)
-    info = dict(raw_info)
-    telemetry = _read_live_telemetry(session.emulator)
-    return raw_info, info, telemetry
-
-
-def _reset_emulator_for_next_attempt(
-    *,
-    config: WatchAppConfig,
-    session: CareerModeRuntimeSession,
-    controller: CareerModeController,
-) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
-    load_save_ram(config, session)
-    session.emulator.reset()
-    raw_info, info, telemetry = _fresh_menu_runtime_state(session)
-    return raw_info, controller.viewer_info(info=info, active_policy_control=None), telemetry
-
-
-def _should_observe_policy_transition(
-    *,
-    policy_owns_control: bool,
-    active_policy_started: bool,
-    info: dict[str, object],
-) -> bool:
-    if not policy_owns_control:
-        return False
-    if active_policy_started:
-        return True
-    return not in_gp_race(info)
-
-
-def _career_mode_attempt_id(info: Mapping[str, object]) -> str | None:
-    value = info.get("career_mode_attempt_id")
-    return value if isinstance(value, str) and value else None
