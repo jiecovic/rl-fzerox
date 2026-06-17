@@ -1,7 +1,6 @@
 # src/rl_fzerox/core/career_mode/controller/fsm.py
 from __future__ import annotations
 
-from collections import deque
 from pathlib import Path
 from typing import Protocol
 
@@ -12,6 +11,7 @@ from rl_fzerox.core.career_mode.controller.menu_flow import (
     is_neutral_settle_step,
     pending_step_matches_observed_screen,
 )
+from rl_fzerox.core.career_mode.controller.menu_queue import CareerMenuStepQueue
 from rl_fzerox.core.career_mode.controller.post_race import PostRaceContinuation
 from rl_fzerox.core.career_mode.controller.progress_sync import CareerPostTerminalProgressSync
 from rl_fzerox.core.career_mode.controller.recording import (
@@ -136,12 +136,11 @@ class CareerModeController:
             target_clear_goal=target_clear_goal,
         )
         self._camera = CareerCameraSync()
-        self._pending_steps: deque[RawMenuStep] = deque()
+        self._menu_steps = CareerMenuStepQueue()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
         self._engine_setup = CareerEngineSetupFlow()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
-        self._advance_presses_in_phase = 0
         self._post_race = PostRaceContinuation()
         self._last_finished_attempt_id: str | None = None
         self._last_finished_attempt_status: SaveAttemptStatus | None = None
@@ -214,8 +213,9 @@ class CareerModeController:
             raise RuntimeError("Career Mode left a race before observing a game result")
 
         if self._phase == CareerPhase.CONTINUE_AFTER_RACE:
-            if self._pending_steps and is_neutral_settle_step(self._pending_steps[0]):
-                step = self._pending_steps.popleft()
+            pending_step = self._menu_steps.peek()
+            if pending_step is not None and is_neutral_settle_step(pending_step):
+                step = self._menu_steps.pop()
                 self._phase = phase_from_step(step)
                 return step
             if facts.is_gp_result_screen:
@@ -223,7 +223,7 @@ class CareerModeController:
                     self._post_race.observe_terminal_result()
                 if self._post_race.continue_observed_result():
                     return self._continue_after_race_pulse()
-                self._pending_steps.clear()
+                self._menu_steps.clear()
                 return raw_step(
                     MenuInput.NEUTRAL,
                     1,
@@ -241,7 +241,7 @@ class CareerModeController:
                     else:
                         return self._continue_after_race_pulse()
                 self._post_race.stop_result_continuation()
-                self._pending_steps.clear()
+                self._menu_steps.clear()
                 if not self._post_race.new_race_ready_for_policy(info):
                     return raw_step(
                         MenuInput.NEUTRAL,
@@ -254,26 +254,27 @@ class CareerModeController:
                     return camera_step
                 return self._enter_policy_race()
             if facts.is_post_gp_screen:
-                self._pending_steps.clear()
+                self._menu_steps.clear()
                 return self._continue_post_gp_screen_step()
             if facts.is_gp_next_course_screen:
-                self._pending_steps.clear()
+                self._menu_steps.clear()
                 return self._continue_next_course_step()
-            if self._pending_steps:
-                if not is_neutral_settle_step(self._pending_steps[0]):
-                    self._pending_steps.clear()
+            if self._menu_steps:
+                pending_step = self._menu_steps.peek()
+                if pending_step is None or not is_neutral_settle_step(pending_step):
+                    self._menu_steps.clear()
                     return raw_step(
                         MenuInput.NEUTRAL,
                         1,
                         phase="continue_after_race:wait_for_known_screen",
                     )
-                step = self._pending_steps.popleft()
+                step = self._menu_steps.pop()
                 self._phase = phase_from_step(step)
                 return step
             return self._next_menu_step(info)
         if facts.in_gp_race:
-            self._pending_steps.clear()
-            self._advance_presses_in_phase = 0
+            self._menu_steps.clear()
+            self._menu_steps.reset_advance_presses()
             if facts.terminal_race_result:
                 return self._continue_terminal_race_result_step()
             if (
@@ -290,7 +291,7 @@ class CareerModeController:
             if camera_step := self._next_camera_sync_step(info):
                 return camera_step
             return self._enter_policy_race()
-        if self._pending_steps:
+        if self._menu_steps:
             if step := self._next_pending_menu_step(facts):
                 return step
         return self._next_menu_step(info)
@@ -309,7 +310,7 @@ class CareerModeController:
                 case ObservedMenuScreen.MAIN_MENU_OTHER:
                     self._phase = CareerPhase.BOOT_TO_DIFFICULTY
                     self._difficulty_popup_state = DifficultyPopupState.CLOSED
-                    self._pending_steps.clear()
+                    self._menu_steps.clear()
                     if gp_step := self._main_menu_step_toward_gp(facts):
                         return gp_step
                     return raw_step(
@@ -319,11 +320,11 @@ class CareerModeController:
                     )
                 case ObservedMenuScreen.DIFFICULTY_POPUP:
                     self._phase = CareerPhase.SELECT_DIFFICULTY
-                    self._advance_presses_in_phase = 0
+                    self._menu_steps.reset_advance_presses()
                     return self._select_difficulty_popup_step(facts)
                 case ObservedMenuScreen.DIFFICULTY_CONFIRM:
                     self._phase = CareerPhase.ENTER_COURSE_SELECT
-                    self._advance_presses_in_phase = 0
+                    self._menu_steps.reset_advance_presses()
                     return self._confirm_difficulty_popup_step(facts)
                 case ObservedMenuScreen.TRANSITION:
                     return raw_step(
@@ -356,13 +357,13 @@ class CareerModeController:
                     self._difficulty_popup_state = DifficultyPopupState.CLOSED
                     if not self._machine_selection_applied:
                         self._enter_phase(CareerPhase.SELECT_MACHINE)
-                        if not self._pending_steps:
+                        if not self._menu_steps:
                             route_steps = machine_select_steps(self._setup)
-                            self._pending_steps.extend(route_steps)
-                            self._advance_presses_in_phase = 0
+                            self._menu_steps.extend(route_steps)
+                            self._menu_steps.reset_advance_presses()
                             if not route_steps:
                                 self._machine_selection_applied = True
-                        if self._pending_steps:
+                        if self._menu_steps:
                             return self._next_pending_menu_step(facts)
                     self._enter_phase(CareerPhase.ENTER_MACHINE_SETTINGS)
                     return self._accept_until_phase("enter_machine_settings")
@@ -381,8 +382,8 @@ class CareerModeController:
                     self._enter_phase(CareerPhase.ENTER_RACE)
                     return self._accept_until_phase("enter_race")
                 case ObservedMenuScreen.GP_RACE:
-                    self._pending_steps.clear()
-                    self._advance_presses_in_phase = 0
+                    self._menu_steps.clear()
+                    self._menu_steps.reset_advance_presses()
                     if facts.terminal_race_result:
                         return self._continue_terminal_race_result_step()
                     if self._resolve_policy_control(info, refresh_artifact=True) is None:
@@ -410,26 +411,26 @@ class CareerModeController:
     def _next_pending_menu_step(self, facts: MenuFacts) -> RawMenuStep | None:
         """Pop a queued menu step only while its owning screen is still visible."""
 
-        if not self._pending_steps:
+        step = self._menu_steps.peek()
+        if step is None:
             return None
-        step = self._pending_steps[0]
         screen = self._observed_menu_screen(facts)
         if not pending_step_matches_observed_screen(step, screen):
-            self._pending_steps.clear()
+            self._menu_steps.clear()
             return None
-        step = self._pending_steps.popleft()
+        step = self._menu_steps.pop()
         if step.phase == "main_menu:open_difficulty:settle":
             self._difficulty_popup_state = DifficultyPopupState.OPEN
         if step.phase.startswith("select_difficulty:accept"):
             self._difficulty_popup_state = DifficultyPopupState.SUBMITTED
         self._phase = phase_from_step(step)
-        if step.phase.startswith("select_machine") and not self._pending_steps:
+        if step.phase.startswith("select_machine") and not self._menu_steps:
             self._machine_selection_applied = True
         return step
 
     def _enter_phase(self, phase: CareerPhase) -> None:
         if self._phase is not phase:
-            self._advance_presses_in_phase = 0
+            self._menu_steps.reset_advance_presses()
         self._phase = phase
 
     def policy_owns_control(self) -> bool:
@@ -477,7 +478,7 @@ class CareerModeController:
             setup=self._setup,
             progress=self._progress.unlock_progress,
             phase=self._phase,
-            pending_step_count=len(self._pending_steps),
+            pending_step_count=self._menu_steps.pending_count,
             difficulty_popup_state=self._difficulty_popup_state,
             camera_synced=self._camera.synced,
             camera_setting=self._camera.target,
@@ -527,43 +528,10 @@ class CareerModeController:
         return raw_step(MenuInput.NEUTRAL, 1, phase="policy_resolution:wait")
 
     def _start_until_phase(self, phase: str) -> RawMenuStep:
-        return self._tap_until_phase(
-            MenuInput.START,
-            hold_frames=MENU_TIMING.start_hold_frames,
-            settle_frames=MENU_TIMING.start_settle_frames,
-            phase=phase,
-            label="start",
-        )
+        return self._menu_steps.start_until_phase(phase)
 
     def _accept_until_phase(self, phase: str) -> RawMenuStep:
-        return self._tap_until_phase(
-            MenuInput.ACCEPT,
-            hold_frames=MENU_TIMING.start_hold_frames,
-            settle_frames=MENU_TIMING.start_settle_frames,
-            phase=phase,
-            label="accept",
-        )
-
-    def _tap_until_phase(
-        self,
-        menu_input: MenuInput,
-        *,
-        hold_frames: int,
-        settle_frames: int,
-        phase: str,
-        label: str,
-    ) -> RawMenuStep:
-        self._advance_presses_in_phase += 1
-        if self._advance_presses_in_phase > MENU_TIMING.max_advance_presses_per_phase:
-            raise RuntimeError(
-                f"Career Mode menu phase {phase!r} did not reach the expected screen"
-            )
-        return self._queue_tap(
-            menu_input,
-            hold_frames=hold_frames,
-            settle_frames=settle_frames,
-            phase=f"{phase}:{label}:{self._advance_presses_in_phase}",
-        )
+        return self._menu_steps.accept_until_phase(phase)
 
     def _queue_tap(
         self,
@@ -573,21 +541,20 @@ class CareerModeController:
         settle_frames: int,
         phase: str,
     ) -> RawMenuStep:
-        self._pending_steps.append(
-            raw_step(MenuInput.NEUTRAL, settle_frames, phase=f"{phase}:settle")
+        return self._menu_steps.queue_tap(
+            menu_input,
+            hold_frames=hold_frames,
+            settle_frames=settle_frames,
+            phase=phase,
         )
-        return raw_step(menu_input, hold_frames, phase=phase)
 
     def _queue_menu_steps(self, steps: tuple[RawMenuStep, ...]) -> RawMenuStep:
-        if not steps:
-            return raw_step(MenuInput.NEUTRAL, 1, phase="menu_steps:empty")
-        self._pending_steps.extend(steps[1:])
-        return steps[0]
+        return self._menu_steps.queue_menu_steps(steps)
 
     def _open_difficulty_popup(self) -> RawMenuStep:
-        self._pending_steps.clear()
+        self._menu_steps.clear()
         self._difficulty_popup_state = DifficultyPopupState.OPENING
-        self._advance_presses_in_phase = 0
+        self._menu_steps.reset_advance_presses()
         return self._queue_tap(
             MenuInput.ACCEPT,
             hold_frames=MENU_TIMING.menu_hold_frames,
@@ -624,7 +591,7 @@ class CareerModeController:
     def _select_difficulty_popup_step(self, facts: MenuFacts) -> RawMenuStep:
         self._difficulty_popup_state = DifficultyPopupState.OPEN
         if not facts.selected_gp_mode:
-            self._pending_steps.clear()
+            self._menu_steps.clear()
             self._difficulty_popup_state = DifficultyPopupState.CLOSED
             if gp_step := self._main_menu_step_toward_gp(facts):
                 return gp_step
@@ -634,7 +601,7 @@ class CareerModeController:
                 phase="difficulty_popup:lost_gp_cursor",
             )
         if not facts.has_difficulty_popup:
-            self._pending_steps.clear()
+            self._menu_steps.clear()
             return raw_step(
                 MenuInput.NEUTRAL,
                 1,
@@ -643,7 +610,7 @@ class CareerModeController:
         target = self._setup_difficulty_raw_value()
         current = facts.difficulty_cursor_raw
         if current is None:
-            self._pending_steps.clear()
+            self._menu_steps.clear()
             return raw_step(
                 MenuInput.NEUTRAL,
                 1,
@@ -668,7 +635,7 @@ class CareerModeController:
 
     def _confirm_difficulty_popup_step(self, facts: MenuFacts) -> RawMenuStep:
         if facts.difficulty_raw != self._setup_difficulty_raw_value():
-            self._pending_steps.clear()
+            self._menu_steps.clear()
             self._difficulty_popup_state = DifficultyPopupState.OPEN
             return raw_step(
                 MenuInput.NEUTRAL,
@@ -701,9 +668,9 @@ class CareerModeController:
         return race_difficulty_raw_value(difficulty)
 
     def _leave_wrong_difficulty_course_select(self) -> RawMenuStep:
-        self._pending_steps.clear()
+        self._menu_steps.clear()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
-        self._advance_presses_in_phase = 0
+        self._menu_steps.reset_advance_presses()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         return self._queue_tap(
@@ -714,7 +681,7 @@ class CareerModeController:
         )
 
     def _continue_post_gp_screen_step(self) -> RawMenuStep:
-        self._advance_presses_in_phase = 0
+        self._menu_steps.reset_advance_presses()
         return self._queue_tap(
             MenuInput.A_BUTTON,
             hold_frames=MENU_TIMING.menu_hold_frames,
@@ -723,9 +690,9 @@ class CareerModeController:
         )
 
     def _continue_next_course_step(self) -> RawMenuStep:
-        self._advance_presses_in_phase = 0
+        self._menu_steps.reset_advance_presses()
         step = continue_next_course_step()
-        self._pending_steps.append(
+        self._menu_steps.append(
             raw_step(
                 MenuInput.NEUTRAL,
                 MENU_TIMING.result_continue_settle_frames,
@@ -805,12 +772,12 @@ class CareerModeController:
     def _apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:
         self._progress.apply_execution_plan(plan)
         self._setup = career_mode_race_setup_config(plan.race_setup)
-        self._pending_steps.clear()
+        self._menu_steps.clear()
         self._phase = CareerPhase.CONTINUE_AFTER_RACE
         self._engine_setup.reset_adjustment()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
-        self._advance_presses_in_phase = 0
+        self._menu_steps.reset_advance_presses()
         self._policy_resolver.update_context(
             setup=self._setup,
             course_setups=self._progress.course_setups,
@@ -820,9 +787,9 @@ class CareerModeController:
         self._reset_camera_sync()
 
     def _enter_continue_after_race(self) -> None:
-        self._pending_steps.clear()
+        self._menu_steps.clear()
         self._phase = CareerPhase.CONTINUE_AFTER_RACE
-        self._advance_presses_in_phase = 0
+        self._menu_steps.reset_advance_presses()
         self._engine_setup.reset_tap_budget()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
@@ -892,12 +859,12 @@ class CareerModeController:
 
         self._emulator_reset_requested = True
         self._recording.force_close(status=recording_status)
-        self._pending_steps.clear()
+        self._menu_steps.clear()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
         self._engine_setup.reset_adjustment()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
-        self._advance_presses_in_phase = 0
+        self._menu_steps.reset_advance_presses()
         self._post_race.reset()
         self._post_terminal_progress.reset()
         self._reset_camera_sync()
@@ -906,7 +873,7 @@ class CareerModeController:
         self._camera.reset()
 
     def _continue_after_race_pulse(self) -> RawMenuStep:
-        self._pending_steps.clear()
+        self._menu_steps.clear()
         step, settle_step = self._post_race.continue_after_race_pulse()
-        self._pending_steps.append(settle_step)
+        self._menu_steps.append(settle_step)
         return step
