@@ -121,7 +121,7 @@ def test_weights_only_resume_imports_source_action_bias_marker_before_reconcile(
         action_bias=PolicyActionBiasConfig(spin_idle_logit=0.5),
     )
     train_env = SimpleNamespace(get_attr=lambda _attr_name: [])
-    calls: list[PolicyConfig] = []
+    calls: list[tuple[PolicyConfig, dict[str, float]]] = []
     source_offsets = {
         "gas_on_logit": 0.0,
         "air_brake_on_logit": 9.0,
@@ -141,19 +141,20 @@ def test_weights_only_resume_imports_source_action_bias_marker_before_reconcile(
         lambda path: source_offsets,
     )
 
-    def fake_apply_resume_action_bias_delta(
+    def fake_apply_weights_only_action_bias_delta(
         model: _DummyModel,
         *,
         train_env: object,
         policy_config: PolicyConfig,
+        source_offsets: dict[str, float],
     ) -> None:
         assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
         assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR) == source_offsets
-        calls.append(policy_config)
+        calls.append((policy_config, source_offsets))
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.apply_resume_action_bias_delta",
-        fake_apply_resume_action_bias_delta,
+        "rl_fzerox.core.training.session.model.preload.apply_weights_only_action_bias_delta",
+        fake_apply_weights_only_action_bias_delta,
     )
 
     maybe_resume_training_model(
@@ -163,7 +164,7 @@ def test_weights_only_resume_imports_source_action_bias_marker_before_reconcile(
         policy_config=policy_config,
     )
 
-    assert calls == [policy_config]
+    assert calls == [(policy_config, source_offsets)]
 
 
 def test_weights_only_resume_relaxes_exact_match_when_aux_bank_arch_differs(

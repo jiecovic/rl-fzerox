@@ -110,12 +110,12 @@ function SpinIdleLogitField({
   return (
     <FieldShell>
       <FieldLabel
-        help="Logit offset added to the learned idle spin action. Positive values suppress spin; negative values encourage left/right spin. The displayed probability assumes all learned spin logits are zero."
-        label="No-spin logit"
+        help="One-shot logit delta added to the idle spin action when launching a fresh run or fork. Positive values suppress spin; negative values encourage left/right spin. It is not reapplied when resuming."
+        label="No-spin logit delta"
         onReset={resetHandler(value, resetValue, onChange)}
       />
       <FieldInput
-        aria-label="No-spin logit"
+        aria-label="No-spin logit delta"
         className="min-w-[9ch] max-w-[14ch] justify-self-start"
         {...editableNumberInputProps("decimal")}
         value={input.rawValue}
@@ -124,7 +124,7 @@ function SpinIdleLogitField({
         onKeyDown={blurOnEnter}
       />
       <FieldNote>
-        {`logit ${formatSignedDecimal(noteValue)} -> idle ${formatPercent(idleProbability)}, left/right ${formatPercent(sideProbability)} each`}
+        {`delta ${formatSignedDecimal(noteValue)} -> idle ${formatPercent(idleProbability)}, left/right ${formatPercent(sideProbability)} each`}
       </FieldNote>
     </FieldShell>
   );

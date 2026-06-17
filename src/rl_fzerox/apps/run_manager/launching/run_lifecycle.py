@@ -27,6 +27,7 @@ from rl_fzerox.core.manager.artifacts.fork_source import (
 )
 from rl_fzerox.core.manager.artifacts.paths import predicted_managed_run_dir
 from rl_fzerox.core.manager.models import RunCommand
+from rl_fzerox.core.manager.run_spec import reset_fork_action_bias_deltas
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,
     build_managed_fork_train_app_config,
@@ -106,7 +107,9 @@ def fork_run(
     normalized_name = (name or default_fork_name(source_run.name, artifact)).strip()
     if not normalized_name:
         raise ValueError("run name is required")
-    child_config = config or source_run.config
+    child_config = (
+        config if config is not None else reset_fork_action_bias_deltas(source_run.config)
+    )
     assert_managed_fork_compatible(source_run.config, child_config)
     child_run_id = new_managed_run_id(normalized_name)
     child_run_dir = predicted_managed_run_dir(

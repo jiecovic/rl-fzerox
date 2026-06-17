@@ -28,7 +28,7 @@ from rl_fzerox.core.manager.registry.drafts.fork_sources import (
     reset_draft_source,
     snapshot_draft_source,
 )
-from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig, reset_fork_action_bias_deltas
 from rl_fzerox.core.manager.storage.serialization import load_config_json
 
 if TYPE_CHECKING:
@@ -54,6 +54,8 @@ def create_draft(
     source_run = None if source_run_id is None else store.get_run(source_run_id)
     if source_run_id is not None and source_run is None:
         raise ValueError(f"run not found: {source_run_id}")
+    if source_run_id is not None and source_artifact is not None:
+        config = reset_fork_action_bias_deltas(config)
     draft: ManagedRunDraft | None = None
 
     try:

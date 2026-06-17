@@ -217,6 +217,68 @@ def test_fork_copies_active_alt_baselines(tmp_path: Path) -> None:
     assert child_baseline.state_path.read_bytes() == b"alt-state"
 
 
+def test_fork_without_explicit_config_resets_action_bias_deltas(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    parent_config = default_managed_run_config().model_copy(
+        update={
+            "policy": default_managed_run_config().policy.model_copy(
+                update={
+                    "gas_on_logit": -2.0,
+                    "air_brake_on_logit": 16.0,
+                    "spin_idle_logit": 1.0,
+                }
+            )
+        }
+    )
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=parent_config,
+        explicit_run_dir=parent_dir,
+    )
+    _write_latest_checkpoint(parent_dir)
+    launcher = _RecordingLauncher(store)
+
+    child = launcher.fork(run_id=parent.id, artifact="latest", name="Child Run")
+
+    assert child.config.policy.gas_on_logit == pytest.approx(0.0)
+    assert child.config.policy.air_brake_on_logit == pytest.approx(0.0)
+    assert child.config.policy.spin_idle_logit == pytest.approx(0.0)
+
+
+def test_fork_with_explicit_config_preserves_action_bias_delta(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    parent_config = default_managed_run_config().model_copy(
+        update={
+            "policy": default_managed_run_config().policy.model_copy(
+                update={"air_brake_on_logit": 16.0}
+            )
+        }
+    )
+    child_config = parent_config.model_copy(
+        update={"policy": parent_config.policy.model_copy(update={"air_brake_on_logit": 1.0})}
+    )
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=parent_config,
+        explicit_run_dir=parent_dir,
+    )
+    _write_latest_checkpoint(parent_dir)
+    launcher = _RecordingLauncher(store)
+
+    child = launcher.fork(
+        run_id=parent.id,
+        artifact="latest",
+        name="Child Run",
+        config=child_config,
+    )
+
+    assert child.config.policy.air_brake_on_logit == pytest.approx(1.0)
+
+
 def test_fork_can_skip_active_alt_baselines(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     config = default_managed_run_config()

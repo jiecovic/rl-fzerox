@@ -139,15 +139,15 @@ export function AirBrakeCard({
             <ActionTripleFields>
               <div className="field-with-note">
                 <NumberField
-                  help="Logit offset added to the learned engaged air-brake button logit. The displayed probability assumes the model logit is zero; trained policies also depend on their learned output."
-                  label="Air-brake-on logit"
+                  help="One-shot logit delta added to the engaged air-brake button when launching a fresh run or fork. It is not reapplied when resuming a stopped run."
+                  label="Air-brake-on logit delta"
                   resetValue={defaultPolicy.air_brake_on_logit}
                   step="0.1"
                   value={policy.air_brake_on_logit}
                   onChange={(value) => updatePolicy({ air_brake_on_logit: value })}
                 />
                 <div className="field-note">
-                  {`sigmoid(${formatSignedDecimal(policy.air_brake_on_logit)}) ≈ ${formatPercent(binaryOnProbability(policy.air_brake_on_logit))} zero-logit engage probability`}
+                  {`delta ${formatSignedDecimal(policy.air_brake_on_logit)} -> ${formatPercent(binaryOnProbability(policy.air_brake_on_logit))} zero-logit engage probability`}
                 </div>
               </div>
               <IntegerField

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   compareRuns,
   configuratorBaseConfigForDraftEditor,
+  forkInitialConfig,
   nextForkDraftName,
   upsertSaveGameStatus,
 } from "@/app/workspace/model";
@@ -82,6 +83,35 @@ describe("workspace run ordering", () => {
 });
 
 describe("workspace draft editor config baseline", () => {
+  it("resets launch-time action logit deltas for fork drafts", () => {
+    const sourceConfig = {
+      ...managedRunConfigFixture,
+      policy: {
+        ...managedRunConfigFixture.policy,
+        gas_on_logit: -2,
+        air_brake_on_logit: 16,
+        spin_idle_logit: 1,
+      },
+      train: {
+        ...managedRunConfigFixture.train,
+        entropy_coefficients: {
+          ...managedRunConfigFixture.train.entropy_coefficients,
+          air_brake: 0.093,
+        },
+      },
+    };
+
+    expect(forkInitialConfig(sourceConfig)).toEqual({
+      ...sourceConfig,
+      policy: {
+        ...sourceConfig.policy,
+        gas_on_logit: 0,
+        air_brake_on_logit: 0,
+        spin_idle_logit: 0,
+      },
+    });
+  });
+
   it("uses the source run config as the reset baseline for unsaved fork drafts", () => {
     const defaultConfig = managedRunConfigFixture;
     const sourceConfig = {

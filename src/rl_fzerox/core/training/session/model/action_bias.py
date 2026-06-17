@@ -59,15 +59,29 @@ def apply_initial_action_biases(
     _set_model_action_bias_offsets(model, offsets)
 
 
-def apply_resume_action_bias_delta(
+def apply_weights_only_action_bias_delta(
     model: object,
     *,
     train_env: TrainingEnvActionDimensions,
     policy_config: PolicyConfig,
+    source_offsets: dict[str, float],
 ) -> None:
-    """Apply only newly requested logit nudges after a full-model resume."""
+    """Apply fork config logit nudges on top of source checkpoint metadata.
 
-    desired_offsets = _configured_action_bias_offsets(policy_config)
+    Checkpoint metadata stores the cumulative bias already baked into the
+    source weights. Fork config fields are launch-time deltas, so a reset fork
+    config of zero must preserve the source bias instead of undoing it.
+    """
+
+    base_offsets = _normalized_action_bias_offsets(
+        source_offsets,
+        source="weights-only resume source checkpoint",
+    )
+    requested_deltas = _configured_action_bias_offsets(policy_config)
+    desired_offsets = {
+        field_name: base_offsets[field_name] + requested_deltas[field_name]
+        for field_name in ACTION_BIAS_FIELD_NAMES
+    }
     previous_offsets = _model_action_bias_offsets(model)
     delta_offsets = {
         field_name: desired_offsets[field_name] - previous_offsets.get(field_name, 0.0)

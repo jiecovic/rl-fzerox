@@ -35,7 +35,7 @@ from rl_fzerox.core.training.session.model import (
 )
 from rl_fzerox.core.training.session.model.action_bias import (
     MODEL_ACTION_BIAS_OFFSETS_ATTR,
-    apply_resume_action_bias_delta,
+    apply_weights_only_action_bias_delta,
 )
 from tests.support.action_configs import (
     configured_discrete_action,
@@ -887,7 +887,7 @@ def test_build_ppo_model_applies_hybrid_spin_idle_logit_bias() -> None:
     assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["spin_idle_logit"] == pytest.approx(1.0)
 
 
-def test_resume_action_bias_delta_does_not_stack_resume_adjustable_biases() -> None:
+def test_weights_only_action_bias_delta_applies_child_delta_once() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
@@ -940,8 +940,23 @@ def test_resume_action_bias_delta_does_not_stack_resume_adjustable_biases() -> N
                 spin_idle_logit=1.0,
             ),
         )
-        apply_resume_action_bias_delta(model, train_env=env, policy_config=policy_config)
-        apply_resume_action_bias_delta(model, train_env=env, policy_config=policy_config)
+        source_offsets = {
+            "gas_on_logit": 0.0,
+            "air_brake_on_logit": 0.0,
+            "spin_idle_logit": 0.0,
+        }
+        apply_weights_only_action_bias_delta(
+            model,
+            train_env=env,
+            policy_config=policy_config,
+            source_offsets=source_offsets,
+        )
+        apply_weights_only_action_bias_delta(
+            model,
+            train_env=env,
+            policy_config=policy_config,
+            source_offsets=source_offsets,
+        )
     finally:
         env.close()
 
@@ -954,7 +969,7 @@ def test_resume_action_bias_delta_does_not_stack_resume_adjustable_biases() -> N
     assert getattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)["spin_idle_logit"] == pytest.approx(1.0)
 
 
-def test_resume_action_bias_delta_preserves_loaded_bias_when_marker_matches_config() -> None:
+def test_weights_only_action_bias_delta_preserves_source_bias_when_child_delta_is_zero() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
@@ -1009,7 +1024,7 @@ def test_resume_action_bias_delta_preserves_loaded_bias_when_marker_matches_conf
             },
         )
 
-        apply_resume_action_bias_delta(
+        apply_weights_only_action_bias_delta(
             model,
             train_env=env,
             policy_config=PolicyConfig(
@@ -1018,12 +1033,13 @@ def test_resume_action_bias_delta_preserves_loaded_bias_when_marker_matches_conf
                     hidden_size=512,
                     n_lstm_layers=1,
                 ),
-                action_bias=PolicyActionBiasConfig(
-                    gas_on_logit=-5.0,
-                    air_brake_on_logit=16.0,
-                    spin_idle_logit=0.0,
-                ),
+                action_bias=PolicyActionBiasConfig(),
             ),
+            source_offsets={
+                "gas_on_logit": -5.0,
+                "air_brake_on_logit": 16.0,
+                "spin_idle_logit": 0.0,
+            },
         )
     finally:
         env.close()
@@ -1036,7 +1052,7 @@ def test_resume_action_bias_delta_preserves_loaded_bias_when_marker_matches_conf
     )
 
 
-def test_markerless_resume_action_bias_delta_requires_migration() -> None:
+def test_markerless_weights_only_action_bias_delta_requires_migration() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
@@ -1077,7 +1093,7 @@ def test_markerless_resume_action_bias_delta_requires_migration() -> None:
         )
         delattr(model, MODEL_ACTION_BIAS_OFFSETS_ATTR)
         with pytest.raises(RuntimeError, match="action-bias checkpoint migration"):
-            apply_resume_action_bias_delta(
+            apply_weights_only_action_bias_delta(
                 model,
                 train_env=env,
                 policy_config=PolicyConfig(
@@ -1092,6 +1108,11 @@ def test_markerless_resume_action_bias_delta_requires_migration() -> None:
                         spin_idle_logit=0.5,
                     ),
                 ),
+                source_offsets={
+                    "gas_on_logit": 0.0,
+                    "air_brake_on_logit": 0.0,
+                    "spin_idle_logit": 0.0,
+                },
             )
     finally:
         env.close()

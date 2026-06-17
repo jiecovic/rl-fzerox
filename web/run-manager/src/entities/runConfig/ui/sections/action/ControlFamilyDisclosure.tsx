@@ -207,15 +207,15 @@ export function ControlFamilyDisclosure({
             <ActionFields>
               <div className="field-with-note">
                 <NumberField
-                  help="Logit offset added to the learned engaged gas button logit. The displayed probability assumes the model logit is zero; trained policies also depend on their learned output."
-                  label="Gas-on logit"
+                  help="One-shot logit delta added to the engaged gas button when launching a fresh run or fork. It is not reapplied when resuming a stopped run."
+                  label="Gas-on logit delta"
                   resetValue={defaultConfig.policy.gas_on_logit}
                   step="0.1"
                   value={config.policy.gas_on_logit}
                   onChange={(value) => updatePolicy({ gas_on_logit: value })}
                 />
                 <div className="field-note">
-                  {`sigmoid(${formatSignedDecimal(config.policy.gas_on_logit)}) ≈ ${formatPercent(gasOnProbability(config.policy.gas_on_logit))} zero-logit engage probability`}
+                  {`delta ${formatSignedDecimal(config.policy.gas_on_logit)} -> ${formatPercent(gasOnProbability(config.policy.gas_on_logit))} zero-logit engage probability`}
                 </div>
               </div>
             </ActionFields>

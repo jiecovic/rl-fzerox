@@ -12,6 +12,7 @@ from rl_fzerox.core.manager.run_spec.common import (
     ConvProfile,
     ObservationPreset,
 )
+from rl_fzerox.core.manager.run_spec.forks import reset_fork_action_bias_deltas
 from rl_fzerox.core.manager.run_spec.run import (
     ManagedRunConfig,
     default_managed_run_config,
@@ -55,4 +56,5 @@ __all__ = [
     "default_state_components",
     "default_state_feature_dropouts",
     "managed_state_component_feature_names",
+    "reset_fork_action_bias_deltas",
 ]

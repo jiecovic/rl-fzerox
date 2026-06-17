@@ -42,7 +42,17 @@ def test_manager_store_pins_and_cleans_fork_draft_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
-    config = default_managed_run_config()
+    config = default_managed_run_config().model_copy(
+        update={
+            "policy": default_managed_run_config().policy.model_copy(
+                update={
+                    "gas_on_logit": -1.0,
+                    "air_brake_on_logit": 16.0,
+                    "spin_idle_logit": 1.0,
+                }
+            )
+        }
+    )
     source_run = store.create_run(
         run_id="parent-run",
         name="Parent Run",
@@ -77,6 +87,9 @@ def test_manager_store_pins_and_cleans_fork_draft_snapshot(
     assert draft.source_snapshot_dir is not None
     assert draft.source_snapshot_dir.is_dir()
     assert draft.source_num_timesteps == 123_456
+    assert draft.config.policy.gas_on_logit == pytest.approx(0.0)
+    assert draft.config.policy.air_brake_on_logit == pytest.approx(0.0)
+    assert draft.config.policy.spin_idle_logit == pytest.approx(0.0)
 
     assert store.delete_draft(draft.id)
     assert not draft.source_snapshot_dir.exists()

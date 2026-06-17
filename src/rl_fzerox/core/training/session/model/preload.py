@@ -16,7 +16,7 @@ from rl_fzerox.core.training.runs import (
 )
 from rl_fzerox.core.training.session.model.action_bias import (
     TrainingEnvActionDimensions,
-    apply_resume_action_bias_delta,
+    apply_weights_only_action_bias_delta,
     load_action_bias_offsets_from_archive,
     set_model_action_bias_offsets,
 )
@@ -94,12 +94,6 @@ def maybe_resume_training_model(
             loaded_model,
             train_config=train_config,
         )
-        if policy_config is not None:
-            apply_resume_action_bias_delta(
-                loaded_model,
-                train_env=_action_dimensions_env(train_env),
-                policy_config=policy_config,
-            )
         return loaded_model
 
     _set_model_parameters(
@@ -113,10 +107,11 @@ def maybe_resume_training_model(
     if policy_config is not None:
         source_action_bias_offsets = load_action_bias_offsets_from_archive(model_path)
         set_model_action_bias_offsets(model, source_action_bias_offsets)
-        apply_resume_action_bias_delta(
+        apply_weights_only_action_bias_delta(
             model,
             train_env=_action_dimensions_env(train_env),
             policy_config=policy_config,
+            source_offsets=source_action_bias_offsets,
         )
     return model
 

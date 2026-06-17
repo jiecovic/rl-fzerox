@@ -2,6 +2,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import {
   draftForkSource,
+  forkInitialConfig,
   nextAvailableDraftName,
   nextForkDraftName,
   runSummaryFromDetail,
@@ -348,15 +349,16 @@ export function useWorkspaceActions({
       sourceRun === null
         ? nextAvailableDraftName("fork", allKnownNames())
         : nextForkDraftName(sourceRun, runs, allKnownNames());
+    const initialConfig = forkInitialConfig(sourceDetail.config);
     sessions.createForkDraft({
       artifact,
       copyAltBaselines,
-      initialConfig: sourceDetail.config,
+      initialConfig,
       initialDraftName,
       runId,
       sourceEngineTunerBackend: sourceDetail.config.vehicle.adaptive_engine_tuner_backend,
       sourceEngineTuning:
-        sourceTuning.state === null ? null : forkSourceEngineTuning(sourceDetail.config),
+        sourceTuning.state === null ? null : forkSourceEngineTuning(initialConfig),
       sourceEngineTuningKnown: true,
     });
   }

@@ -250,6 +250,18 @@ export function draftForkSource(draft: ManagedDraft): ForkSource | null {
   };
 }
 
+export function forkInitialConfig(config: ManagedRunConfig): ManagedRunConfig {
+  return {
+    ...config,
+    policy: {
+      ...config.policy,
+      gas_on_logit: 0,
+      air_brake_on_logit: 0,
+      spin_idle_logit: 0,
+    },
+  };
+}
+
 export function configuratorBaseConfigForDraftEditor(
   defaultConfig: ManagedRunConfig,
   session: DraftEditorSession,
