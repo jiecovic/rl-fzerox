@@ -1258,7 +1258,9 @@ def test_career_mp4_finalizer_remuxes_mkv_segments(
         ffmpeg_path: str,
     ) -> Path:
         calls.append((path, ffmpeg_path))
-        return path.with_suffix(".mp4")
+        output_path = path.with_suffix(".mp4")
+        output_path.write_bytes(b"mp4")
+        return output_path
 
     monkeypatch.setattr(
         "rl_fzerox.ui.watch.runtime.career_mode.recording.resolve_ffmpeg_path",
@@ -1293,7 +1295,9 @@ def test_career_mp4_finalizer_writes_session_summary_for_segments(
         ffmpeg_path: str,
     ) -> Path:
         del ffmpeg_path
-        return path.with_suffix(".mp4")
+        output_path = path.with_suffix(".mp4")
+        output_path.write_bytes(b"mp4")
+        return output_path
 
     def fake_concat_mp4_recordings(
         input_paths: tuple[Path, ...],
@@ -1302,6 +1306,7 @@ def test_career_mp4_finalizer_writes_session_summary_for_segments(
         output_path: Path,
     ) -> Path:
         concat_calls.append((tuple(input_paths), ffmpeg_path, output_path))
+        output_path.write_bytes(b"session mp4")
         return output_path
 
     monkeypatch.setattr(
@@ -1403,7 +1408,9 @@ def test_career_mp4_finalizer_can_skip_session_mp4_for_single_target(
         ffmpeg_path: str,
     ) -> Path:
         del ffmpeg_path
-        return path.with_suffix(".mp4")
+        output_path = path.with_suffix(".mp4")
+        output_path.write_bytes(b"mp4")
+        return output_path
 
     monkeypatch.setattr(
         "rl_fzerox.ui.watch.runtime.career_mode.recording.resolve_ffmpeg_path",
@@ -1472,3 +1479,57 @@ def test_career_mp4_finalizer_reports_close_time_remux_failures(
     finalizer.close()
 
     assert finalizer.drain_notices() == ("MP4 conversion failed: remux failed",)
+
+
+def test_career_mp4_finalizer_keeps_mkv_when_remux_output_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_resolve_ffmpeg_path() -> str:
+        return "ffmpeg"
+
+    def fake_remux_recording_to_mp4(
+        path: Path,
+        *,
+        ffmpeg_path: str,
+    ) -> Path:
+        del ffmpeg_path
+        return path.with_suffix(".mp4")
+
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.resolve_ffmpeg_path",
+        fake_resolve_ffmpeg_path,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.career_mode.recording.remux_recording_to_mp4",
+        fake_remux_recording_to_mp4,
+    )
+    session_path = tmp_path / "career.mkv"
+    segment_path = tmp_path / "career.segment-001-clear-master-joker-cup.mkv"
+    segment_path.write_bytes(b"mkv")
+    finalizer = _Mp4RecordingFinalizer(session_source_path=session_path)
+
+    finalizer.finalize(
+        segment_path,
+        summary=_SegmentSummarySnapshot(
+            segment_index=1,
+            label="Clear Master Joker Cup",
+            attempt_id="attempt-a",
+            status="succeeded",
+            source_path=segment_path,
+            started_at_utc="2026-06-17T10:00:00Z",
+            closed_at_utc="2026-06-17T10:01:00Z",
+            frame_count=10,
+            course_results=(),
+            final_info={},
+        ),
+    )
+    finalizer.close()
+
+    notices = finalizer.drain_notices()
+    payload = json.loads(career_session_summary_path(session_path).read_text(encoding="utf-8"))
+    assert segment_path.exists()
+    assert notices == (
+        f"MP4 conversion failed: MP4 output was not created: {segment_path.with_suffix('.mp4')}",
+    )
+    assert payload["segment_count"] == 0

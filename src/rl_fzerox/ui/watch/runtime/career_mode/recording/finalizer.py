@@ -121,6 +121,7 @@ def _finalizer_job_notice(
 ) -> str:
     try:
         output_path = job.future.result()
+        _verify_finalized_video(output_path)
         if job.summary is not None:
             write_segment_summary_files(job.summary, video_path=output_path)
             if session_summary is not None:
@@ -130,3 +131,12 @@ def _finalizer_job_notice(
     except Exception as exc:  # pragma: no cover - defensive async error reporting
         return f"MP4 conversion failed: {exc}"
     return f"MP4 ready: {output_path.name}"
+
+
+def _verify_finalized_video(path: Path) -> None:
+    """Fail before source deletion if remuxing did not leave a usable MP4."""
+
+    if not path.exists():
+        raise FileNotFoundError(f"MP4 output was not created: {path}")
+    if path.stat().st_size <= 0:
+        raise RuntimeError(f"MP4 output is empty: {path}")
