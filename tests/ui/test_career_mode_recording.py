@@ -900,7 +900,7 @@ def test_career_recorder_finishes_failed_cup_after_game_over_frame(
     assert finalizer.summaries[-1].status == "failed"
 
 
-def test_career_recorder_finalizes_succeeded_segment_on_post_gp_exit_frame(
+def test_career_recorder_finalizes_succeeded_segment_on_post_gp_completion(
     tmp_path: Path,
 ) -> None:
     writers: list[_FakeWriter] = []
@@ -955,36 +955,20 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_exit_frame(
     assert not writers[1].closed
     assert finalizer.paths == []
 
-    for mode in ("gp_end_cutscene", "skippable_credits", "unskippable_credits"):
-        recorder.record_frame(
-            frame,
-            info={
-                "career_mode_attempt_id": None,
-                "career_mode_target_label": "Clear Master Joker Cup",
-                "game_mode": mode,
-                "career_mode_fsm_continuing_result": False,
-                "career_mode_last_finished_attempt_id": "attempt-final",
-                "career_mode_last_finished_attempt_status": "succeeded",
-            },
-        )
-
-    assert not writers[1].closed
-    assert finalizer.paths == []
-
-    title_info = {
+    post_gp_info = {
         "career_mode_attempt_id": None,
         "career_mode_target_label": "Clear Master Joker Cup",
-        "game_mode": "title",
-        "career_mode_fsm_observed_screen": "title",
+        "game_mode": "gp_end_cutscene",
+        "career_mode_fsm_observed_screen": "post_gp",
         "career_mode_fsm_continuing_result": False,
         "career_mode_last_finished_attempt_id": "attempt-final",
         "career_mode_last_finished_attempt_status": "succeeded",
     }
-    recorder.record_frame(frame, info=title_info)
-    recorder.finish_segment(status="succeeded", info=title_info)
+    recorder.record_frame(frame, info=post_gp_info)
+    recorder.finish_segment(status="succeeded", info=post_gp_info)
 
     assert writers[1].closed
-    assert len(writers[1].frames) == 6
+    assert len(writers[1].frames) == 3
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-joker-cup.mkv",
     ]
@@ -994,7 +978,7 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_exit_frame(
     summary = json.loads(summary_json_path.read_text(encoding="utf-8"))
     assert summary["label"] == "Clear Master Joker Cup"
     assert summary["status"] == "succeeded"
-    assert summary["video"]["frame_count"] == 6
+    assert summary["video"]["frame_count"] == 3
     assert summary["result_counts"] == {"crashed": 0, "failed": 0, "finished": 1, "retired": 0}
     assert summary["courses"] == [
         {

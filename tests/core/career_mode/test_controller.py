@@ -141,7 +141,7 @@ def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path)
     assert resolver.refresh_requests == [False, True, False]
 
 
-def test_recording_segment_close_waits_for_clean_cup_exit() -> None:
+def test_recording_segment_close_ends_at_post_gp_completion() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "finished"})
@@ -161,16 +161,31 @@ def test_recording_segment_close_waits_for_clean_cup_exit() -> None:
         MenuFacts.from_info({"game_mode": "gp_end_cutscene"}),
         {"game_mode": "gp_end_cutscene"},
     )
+    close = tracker.pop_close()
+
+    assert close is not None
+    assert close.status == "succeeded"
     assert tracker.pop_close() is None
 
     tracker.observe_progress_screen(
         MenuFacts.from_info({"game_mode": "main_menu"}),
         {"game_mode": "main_menu"},
     )
+    assert tracker.pop_close() is None
+
+
+def test_recording_segment_close_marks_losing_post_gp_rank_failed() -> None:
+    tracker = CareerRecordingSegmentTracker()
+
+    tracker.observe_terminal_result({"termination_reason": "finished"})
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "gp_end_cutscene"}),
+        {"game_mode": "gp_end_cutscene", "career_mode_gp_final_rank": 2},
+    )
     close = tracker.pop_close()
 
     assert close is not None
-    assert close.status == "succeeded"
+    assert close.status == "failed"
     assert tracker.pop_close() is None
 
 

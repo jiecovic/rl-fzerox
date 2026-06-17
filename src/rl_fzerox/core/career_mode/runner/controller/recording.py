@@ -22,8 +22,14 @@ class CareerRecordingSegmentTracker:
 
     This object deliberately knows nothing about manager DB progress. It only
     observes facts the live FSM sees on-screen: terminal course result, whether
-    any terminal result failed, whether the post-GP success screen appeared,
+    any terminal result failed, whether the post-GP success ceremony appeared,
     and whether the flow exited to menu/title/course-select/game-over.
+
+    A successful GP cup does not naturally return to the menu after the ceremony
+    and credits; the final "See you again" screen requires a console reset.
+    Therefore post-GP completion is the segment end for successful cup attempts.
+    Menu/title/course-select/game-over exits are failure exits unless a post-GP
+    completion already closed the segment.
     """
 
     terminal_result_seen: bool = False
@@ -44,8 +50,14 @@ class CareerRecordingSegmentTracker:
             return
         if facts.is_post_gp_screen:
             self.post_gp_seen = True
-            if _post_gp_final_rank(info) not in {None, 1}:
+            final_rank = _post_gp_final_rank(info)
+            if final_rank not in {None, 1}:
                 self.failed_result_seen = True
+            status: CareerRecordingSegmentStatus = (
+                "failed" if self.failed_result_seen else "succeeded"
+            )
+            self.pending_close = CareerRecordingSegmentClose(status=status)
+            self.reset()
             return
         if not recording_segment_exit_screen(facts):
             return

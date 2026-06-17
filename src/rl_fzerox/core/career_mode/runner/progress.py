@@ -223,6 +223,7 @@ class CareerAttemptProgress:
         finished_attempt_id = self._attempt_id
         self._finish_attempt(info=info, status=status, failure_reason=failure_reason)
         return self._advance_after_finished_attempt(
+            info=info,
             setup=setup,
             finished_attempt_id=finished_attempt_id,
             finished_status=status,
@@ -251,6 +252,7 @@ class CareerAttemptProgress:
     def _advance_after_finished_attempt(
         self,
         *,
+        info: dict[str, object],
         setup: CareerModeRaceSetupConfig,
         finished_attempt_id: str | None,
         finished_status: SaveAttemptStatus,
@@ -294,13 +296,14 @@ class CareerAttemptProgress:
                     "save attempt disappeared before Career Mode could repeat selected target: "
                     f"{next_attempt.id}"
                 )
+            next_attempt_reset_emulator = reset_emulator or _is_post_gp_completion(info)
             return CareerProgressTransition(
                 attempt_finished=True,
                 next_plan=build_save_race_execution_plan(context),
                 finished_attempt_id=finished_attempt_id,
                 finished_status=finished_status,
                 finished_failure_reason=finished_failure_reason,
-                reset_emulator=reset_emulator,
+                reset_emulator=next_attempt_reset_emulator,
             )
         if progress.next_target is None:
             self._store.update_save_game_status(
@@ -322,13 +325,14 @@ class CareerAttemptProgress:
             raise RuntimeError(
                 f"save attempt disappeared before Career Mode could continue: {next_attempt.id}"
             )
+        next_attempt_reset_emulator = reset_emulator or _is_post_gp_completion(info)
         return CareerProgressTransition(
             attempt_finished=True,
             next_plan=build_save_race_execution_plan(context),
             finished_attempt_id=finished_attempt_id,
             finished_status=finished_status,
             finished_failure_reason=finished_failure_reason,
-            reset_emulator=reset_emulator,
+            reset_emulator=next_attempt_reset_emulator,
         )
 
     def _refresh_unlock_progress(self) -> ManagedSaveUnlockProgress:

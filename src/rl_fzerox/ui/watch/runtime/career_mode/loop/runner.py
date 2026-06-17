@@ -423,6 +423,26 @@ def _run_career_mode_loop_body(
             )
             if before_step_handled:
                 reset_info = dict(info)
+                if controller.pop_emulator_reset_request():
+                    raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
+                        config=config,
+                        session=session,
+                        controller=controller,
+                    )
+                    reset_info = dict(info)
+                    active_policy_control = None
+                    active_policy_started = False
+                    current_policy_action = None
+                    current_control_state = RaceControlState()
+                    current_gas_level = 0.0
+                    boost_lamp_level = 0.0
+                    cnn_activations = None
+                    current_auxiliary_predictions = None
+                    current_auxiliary_targets = None
+                    manual_control_enabled = False
+                    reset_track_records_if_attempt_changed()
+                    publish_snapshot(policy_visible=False)
+                    continue
                 if not controller.has_active_attempt():
                     publish_snapshot(policy_visible=False)
                     raise _CareerModeWorkerQuit()

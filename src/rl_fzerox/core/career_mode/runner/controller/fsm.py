@@ -8,6 +8,7 @@ from typing import Protocol
 from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
 from rl_fzerox.core.career_mode.runner.controller.recording import (
     CareerRecordingSegmentClose,
+    CareerRecordingSegmentStatus,
     CareerRecordingSegmentTracker,
 )
 from rl_fzerox.core.career_mode.runner.menu import (
@@ -803,7 +804,9 @@ class CareerModeController:
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         if transition.reset_emulator:
-            self._request_emulator_reset_for_next_attempt()
+            self._request_emulator_reset_for_next_attempt(
+                recording_status=_transition_recording_status(transition.finished_status),
+            )
             return True
         if self._progress.attempt_id is None:
             self._enter_continue_after_race()
@@ -915,14 +918,20 @@ class CareerModeController:
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         if transition.reset_emulator:
-            self._request_emulator_reset_for_next_attempt()
+            self._request_emulator_reset_for_next_attempt(
+                recording_status=_transition_recording_status(transition.finished_status),
+            )
         return transition.attempt_finished
 
-    def _request_emulator_reset_for_next_attempt(self) -> None:
-        """Restart from title after perfect-run failure instead of continuing GP lives."""
+    def _request_emulator_reset_for_next_attempt(
+        self,
+        *,
+        recording_status: CareerRecordingSegmentStatus,
+    ) -> None:
+        """Restart from title when the current game screen cannot reach the next attempt."""
 
         self._emulator_reset_requested = True
-        self._recording.force_close(status="failed")
+        self._recording.force_close(status=recording_status)
         self._pending_steps.clear()
         self._phase = CareerPhase.BOOT_TO_DIFFICULTY
         self._reset_engine_adjustment()
@@ -974,6 +983,14 @@ class CareerModeController:
             )
         )
         return step
+
+
+def _transition_recording_status(
+    status: SaveAttemptStatus | None,
+) -> CareerRecordingSegmentStatus:
+    if status == "succeeded":
+        return "succeeded"
+    return "failed"
 
 
 def _is_neutral_settle_step(step: RawMenuStep) -> bool:

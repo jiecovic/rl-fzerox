@@ -271,6 +271,7 @@ def test_single_target_explicit_post_gp_rank_two_counts_as_failed_attempt(
     assert post_gp_transition.finished_failure_reason == "gp cup final rank 2"
     assert post_gp_transition.next_plan is not None
     assert post_gp_transition.next_plan.attempt_id == "attempt-2"
+    assert post_gp_transition.reset_emulator is True
     assert progress.attempt_id == "attempt-1"
     assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank 2")]
     assert store.status_updates == []
@@ -333,6 +334,7 @@ def test_single_target_success_repeats_target_without_clear_goal(
     assert post_gp_transition.next_plan.attempt_id == "attempt-2"
     assert post_gp_transition.finished_attempt_id == "attempt-1"
     assert post_gp_transition.finished_status == "succeeded"
+    assert post_gp_transition.reset_emulator is True
     assert progress.attempt_id == "attempt-1"
     progress.apply_execution_plan(post_gp_transition.next_plan)
     assert progress.attempt_id == "attempt-2"
