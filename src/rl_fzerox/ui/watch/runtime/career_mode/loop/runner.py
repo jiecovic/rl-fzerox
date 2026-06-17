@@ -6,13 +6,13 @@ from collections.abc import Mapping
 from multiprocessing.queues import Queue as ProcessQueue
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState, SpinRequest
-from rl_fzerox.core.career_mode.runner.controller import CareerModeController
-from rl_fzerox.core.career_mode.runner.menu import (
+from rl_fzerox.core.career_mode.navigation import (
     MenuInput,
     RawMenuStep,
     course_id_from_info,
     in_gp_race,
 )
+from rl_fzerox.core.career_mode.runner.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.save_file import (
     load_save_ram,
     persist_save_ram,

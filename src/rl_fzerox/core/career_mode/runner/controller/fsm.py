@@ -5,13 +5,7 @@ from collections import deque
 from pathlib import Path
 from typing import Protocol
 
-from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
-from rl_fzerox.core.career_mode.runner.controller.recording import (
-    CareerRecordingSegmentClose,
-    CareerRecordingSegmentStatus,
-    CareerRecordingSegmentTracker,
-)
-from rl_fzerox.core.career_mode.runner.menu import (
+from rl_fzerox.core.career_mode.navigation import (
     GP_MENU_ORDER,
     MENU_TIMING,
     CareerPhase,
@@ -29,6 +23,20 @@ from rl_fzerox.core.career_mode.runner.menu import (
     observed_menu_screen,
     phase_from_step,
     raw_step,
+)
+from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
+from rl_fzerox.core.career_mode.runner.controller.menu_flow import (
+    cup_selection_input,
+    engine_adjust_tap_count,
+    is_neutral_settle_step,
+    pending_step_matches_observed_screen,
+)
+from rl_fzerox.core.career_mode.runner.controller.post_gp import PostGpCutsceneTracker
+from rl_fzerox.core.career_mode.runner.controller.recording import (
+    CareerRecordingSegmentClose,
+    CareerRecordingSegmentStatus,
+    CareerRecordingSegmentTracker,
+    recording_status_from_attempt_status,
 )
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.career_mode.runner.policy_resolver import CareerPolicyResolver
@@ -151,8 +159,7 @@ class CareerModeController:
         self._last_finished_attempt_failure_reason: str | None = None
         self._refresh_policy_artifact_on_next_handoff = False
         self._emulator_reset_requested = False
-        self._post_gp_cutscene_start_frame: int | None = None
-        self._post_gp_cutscene_polls = 0
+        self._post_gp_cutscene = PostGpCutsceneTracker()
         self._last_progress_sync_key: tuple[str | None, bool] | None = None
         self._recording = CareerRecordingSegmentTracker()
         self._policy_resolver = CareerPolicyResolver(
@@ -219,7 +226,7 @@ class CareerModeController:
             raise RuntimeError("Career Mode left a race before observing a game result")
 
         if self._phase == CareerPhase.CONTINUE_AFTER_RACE:
-            if self._pending_steps and _is_neutral_settle_step(self._pending_steps[0]):
+            if self._pending_steps and is_neutral_settle_step(self._pending_steps[0]):
                 step = self._pending_steps.popleft()
                 self._phase = phase_from_step(step)
                 return step
@@ -265,7 +272,7 @@ class CareerModeController:
                 self._pending_steps.clear()
                 return self._continue_next_course_step()
             if self._pending_steps:
-                if not _is_neutral_settle_step(self._pending_steps[0]):
+                if not is_neutral_settle_step(self._pending_steps[0]):
                     self._pending_steps.clear()
                     return raw_step(
                         MenuInput.NEUTRAL,
@@ -343,7 +350,7 @@ class CareerModeController:
                     if selected_cup_index == target_cup_index:
                         self._enter_phase(CareerPhase.ENTER_MACHINE_SELECT)
                         return self._accept_until_phase("enter_machine_select")
-                    cup_input = _cup_selection_input(
+                    cup_input = cup_selection_input(
                         selected_cup_index=selected_cup_index,
                         target_cup_index=target_cup_index,
                     )
@@ -416,7 +423,7 @@ class CareerModeController:
             return None
         step = self._pending_steps[0]
         screen = self._observed_menu_screen(facts)
-        if not _pending_step_matches_observed_screen(step, screen):
+        if not pending_step_matches_observed_screen(step, screen):
             self._pending_steps.clear()
             return None
         step = self._pending_steps.popleft()
@@ -730,7 +737,7 @@ class CareerModeController:
             target=target,
             max_taps=remaining_taps,
         )
-        self._engine_adjust_taps += _engine_adjust_tap_count(steps)
+        self._engine_adjust_taps += engine_adjust_tap_count(steps)
         return self._queue_menu_steps(steps)
 
     def _course_select_matches_target(self, facts: MenuFacts) -> bool:
@@ -810,7 +817,7 @@ class CareerModeController:
             self._apply_execution_plan(transition.next_plan)
         if transition.reset_emulator:
             self._request_emulator_reset_for_next_attempt(
-                recording_status=_transition_recording_status(transition.finished_status),
+                recording_status=recording_status_from_attempt_status(transition.finished_status),
             )
             return True
         if self._progress.attempt_id is None:
@@ -839,7 +846,7 @@ class CareerModeController:
         if not transition.attempt_finished:
             return
         self._recording.close(
-            status=_transition_recording_status(transition.finished_status),
+            status=recording_status_from_attempt_status(transition.finished_status),
         )
 
     def _apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:
@@ -916,9 +923,9 @@ class CareerModeController:
             return False
         facts = MenuFacts.from_info(info)
         if not post_terminal_progress_screen(facts):
-            self._reset_post_gp_cutscene_tracking()
+            self._post_gp_cutscene.reset()
             return False
-        progress_info = self._post_terminal_progress_info(facts=facts, info=info)
+        progress_info = self._post_gp_cutscene.progress_info(facts=facts, info=info)
         sync_key = (
             facts.game_mode,
             progress_info.get("career_mode_post_gp_cutscene_complete") is True,
@@ -940,41 +947,9 @@ class CareerModeController:
             self._apply_execution_plan(transition.next_plan)
         if transition.reset_emulator:
             self._request_emulator_reset_for_next_attempt(
-                recording_status=_transition_recording_status(transition.finished_status),
+                recording_status=recording_status_from_attempt_status(transition.finished_status),
             )
         return transition.attempt_finished
-
-    def _post_terminal_progress_info(
-        self,
-        *,
-        facts: MenuFacts,
-        info: dict[str, object],
-    ) -> dict[str, object]:
-        if not facts.is_gp_end_cutscene:
-            self._reset_post_gp_cutscene_tracking()
-            return info
-
-        frame_index = _int_info(info, "frame_index")
-        if self._post_gp_cutscene_start_frame is None:
-            self._post_gp_cutscene_start_frame = frame_index
-            self._post_gp_cutscene_polls = 0
-        self._post_gp_cutscene_polls += 1
-
-        elapsed_frames = (
-            frame_index - self._post_gp_cutscene_start_frame
-            if frame_index is not None and self._post_gp_cutscene_start_frame is not None
-            else self._post_gp_cutscene_polls * MENU_TIMING.menu_hold_frames
-        )
-        if elapsed_frames < MENU_TIMING.post_gp_cutscene_record_frames:
-            return info
-
-        annotated = dict(info)
-        annotated["career_mode_post_gp_cutscene_complete"] = True
-        return annotated
-
-    def _reset_post_gp_cutscene_tracking(self) -> None:
-        self._post_gp_cutscene_start_frame = None
-        self._post_gp_cutscene_polls = 0
 
     def _request_emulator_reset_for_next_attempt(
         self,
@@ -997,7 +972,7 @@ class CareerModeController:
         self._continue_after_race_pulses = 0
         self._last_progress_sync_continue_pulse = -1
         self._last_progress_sync_key = None
-        self._reset_post_gp_cutscene_tracking()
+        self._post_gp_cutscene.reset()
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
@@ -1038,69 +1013,3 @@ class CareerModeController:
             )
         )
         return step
-
-
-def _transition_recording_status(
-    status: SaveAttemptStatus | None,
-) -> CareerRecordingSegmentStatus:
-    if status == "succeeded":
-        return "succeeded"
-    return "failed"
-
-
-def _is_neutral_settle_step(step: RawMenuStep) -> bool:
-    return step.menu_input is MenuInput.NEUTRAL and step.phase.endswith(":settle")
-
-
-def _pending_step_matches_observed_screen(
-    step: RawMenuStep,
-    screen: ObservedMenuScreen,
-) -> bool:
-    if step.menu_input is MenuInput.NEUTRAL:
-        return True
-    if step.phase.startswith("title_to_main_menu"):
-        return screen is ObservedMenuScreen.TITLE
-    if step.phase.startswith("main_menu"):
-        return screen in {
-            ObservedMenuScreen.MAIN_MENU_GP,
-            ObservedMenuScreen.MAIN_MENU_OTHER,
-        }
-    if step.phase.startswith("select_difficulty"):
-        return screen is ObservedMenuScreen.DIFFICULTY_POPUP
-    if step.phase.startswith("enter_course_select:confirm_difficulty"):
-        return screen is ObservedMenuScreen.DIFFICULTY_CONFIRM
-    if step.phase.startswith(("select_cup", "enter_machine_select")):
-        return screen is ObservedMenuScreen.COURSE_SELECT
-    if step.phase.startswith("select_machine"):
-        return screen is ObservedMenuScreen.MACHINE_SELECT
-    if step.phase.startswith("enter_machine_settings"):
-        return screen is ObservedMenuScreen.MACHINE_SELECT
-    if step.phase.startswith(("apply_engine", "enter_race")):
-        return screen is ObservedMenuScreen.MACHINE_SETTINGS
-    if step.phase.startswith("course_select:wrong_difficulty"):
-        return screen is ObservedMenuScreen.COURSE_SELECT
-    if step.phase.startswith("continue_after_race"):
-        return screen in {
-            ObservedMenuScreen.GP_RACE,
-            ObservedMenuScreen.RESULTS,
-            ObservedMenuScreen.GP_NEXT_COURSE,
-            ObservedMenuScreen.POST_GP,
-        }
-    return False
-
-
-def _cup_selection_input(*, selected_cup_index: int | None, target_cup_index: int) -> MenuInput:
-    if selected_cup_index is None or selected_cup_index < target_cup_index:
-        return MenuInput.RIGHT
-    return MenuInput.LEFT
-
-
-def _engine_adjust_tap_count(steps: tuple[RawMenuStep, ...]) -> int:
-    return sum(step.menu_input is not MenuInput.NEUTRAL for step in steps)
-
-
-def _int_info(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value

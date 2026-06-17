@@ -5,11 +5,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
-from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
-from rl_fzerox.core.career_mode.runner.menu import (
+from rl_fzerox.core.career_mode.navigation import (
     POST_GP_COMPLETION_MODES,
     POST_GP_RECORDING_END_MODES,
 )
+from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.career_mode.runner.race import (
     SaveRaceExecutionPlan,
     build_save_race_execution_plan,

@@ -4,9 +4,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from rl_fzerox.core.career_mode.runner.menu import MenuFacts
+from rl_fzerox.core.career_mode.navigation import MenuFacts
+from rl_fzerox.core.manager.models import SaveAttemptStatus
 
 CareerRecordingSegmentStatus = Literal["succeeded", "failed"]
+
+
+def recording_status_from_attempt_status(
+    status: SaveAttemptStatus | None,
+) -> CareerRecordingSegmentStatus:
+    if status == "succeeded":
+        return "succeeded"
+    return "failed"
 
 
 @dataclass(frozen=True, slots=True)

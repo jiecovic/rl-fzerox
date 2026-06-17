@@ -5,14 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
-from rl_fzerox.core.career_mode.runner.controller import (
-    CareerModeController,
-    _cup_selection_input,
-)
-from rl_fzerox.core.career_mode.runner.controller.recording import (
-    CareerRecordingSegmentTracker,
-)
-from rl_fzerox.core.career_mode.runner.menu import (
+from rl_fzerox.core.career_mode.navigation import (
     MENU_TIMING,
     CareerPhase,
     DifficultyPopupState,
@@ -21,6 +14,13 @@ from rl_fzerox.core.career_mode.runner.menu import (
     ObservedMenuScreen,
     engine_adjust_steps,
     observed_menu_screen,
+)
+from rl_fzerox.core.career_mode.runner.controller import (
+    CareerModeController,
+    _cup_selection_input,
+)
+from rl_fzerox.core.career_mode.runner.controller.recording import (
+    CareerRecordingSegmentTracker,
 )
 from rl_fzerox.core.career_mode.runner.progress import CareerProgressTransition
 from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan, SaveRaceSetup

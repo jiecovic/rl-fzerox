@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState
+from rl_fzerox.core.career_mode.navigation import RawMenuStep
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
-from rl_fzerox.core.career_mode.runner.menu import RawMenuStep
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue

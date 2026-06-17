@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.career_mode.runner.menu import (
+from rl_fzerox.core.career_mode.navigation import (
     BUILT_IN_COURSES_BY_INDEX,
     MenuFacts,
     course_id_from_info,

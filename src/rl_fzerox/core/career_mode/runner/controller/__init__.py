@@ -5,7 +5,9 @@ from rl_fzerox.core.career_mode.runner.controller.fsm import (
     CareerModeController,
     CareerRuntimeEmulator,
     CareerRuntimeSession,
-    _cup_selection_input,
+)
+from rl_fzerox.core.career_mode.runner.controller.menu_flow import (
+    cup_selection_input as _cup_selection_input,
 )
 from rl_fzerox.core.career_mode.runner.controller.recording import (
     CareerRecordingSegmentClose,

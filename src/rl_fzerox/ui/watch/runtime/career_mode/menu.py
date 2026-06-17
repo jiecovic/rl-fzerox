@@ -9,8 +9,8 @@ from multiprocessing.queues import Queue as ProcessQueue
 
 from fzerox_emulator import MENU_BUTTON_MASKS, ControllerState, RaceControlState
 from fzerox_emulator.arrays import Pcm16Samples
+from rl_fzerox.core.career_mode.navigation import MenuInput, RawMenuStep
 from rl_fzerox.core.career_mode.runner.controller import CareerModeController
-from rl_fzerox.core.career_mode.runner.menu import MenuInput, RawMenuStep
 from rl_fzerox.core.envs.engine.reset.camera import CAMERA_SYNC_CONTROLS
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.records import TrackRecordBook

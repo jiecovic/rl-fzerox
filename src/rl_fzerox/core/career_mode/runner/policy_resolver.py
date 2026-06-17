@@ -9,7 +9,7 @@ from rl_fzerox.core.career_mode.course_setup import (
     CourseSetupTarget,
     resolve_course_setup,
 )
-from rl_fzerox.core.career_mode.runner.menu import course_id_from_info
+from rl_fzerox.core.career_mode.navigation import course_id_from_info
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
