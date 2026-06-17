@@ -114,6 +114,7 @@ class CareerAttemptProgress:
         self._unlock_progress = self._store.save_game_unlock_progress(save_game_id)
         self._initial_unlock_progress = self._unlock_progress
         self._observed_target_terminal_success = False
+        self._observed_post_gp_rank_one = False
 
     @property
     def attempt_id(self) -> str | None:
@@ -176,6 +177,7 @@ class CareerAttemptProgress:
 
         if _is_post_gp_winning_screen(info):
             self._observed_target_terminal_success = True
+            self._observed_post_gp_rank_one = True
 
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
@@ -189,7 +191,11 @@ class CareerAttemptProgress:
                     failure_reason=f"gp cup final rank {final_rank}",
                     reset_emulator=True,
                 )
-            if self._target_succeeded_before_attempt(setup) and final_rank != 1:
+            if (
+                self._target_succeeded_before_attempt(setup)
+                and final_rank != 1
+                and not self._observed_post_gp_rank_one
+            ):
                 return CareerProgressTransition(attempt_finished=False)
             if not _is_post_gp_completion(info):
                 return CareerProgressTransition(attempt_finished=False)
@@ -214,6 +220,7 @@ class CareerAttemptProgress:
         self._unlock_progress = self._store.save_game_unlock_progress(self._save_game_id)
         self._initial_unlock_progress = self._unlock_progress
         self._observed_target_terminal_success = False
+        self._observed_post_gp_rank_one = False
 
     def _finish_and_advance(
         self,
