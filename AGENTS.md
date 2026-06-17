@@ -52,6 +52,9 @@ extending, and reviewing.
   a small module directory with a facade module over many loose sibling files.
   For example, use `foo.rs` plus `foo/bar.rs` files when the `bar` pieces are
   owned by `foo`.
+- Do not leave empty source directories behind after moves. Avoid one-file
+  packages unless they are a deliberate public facade or a near-term grouping
+  point with more than one cohesive module.
 - Avoid ad-hoc suffix names such as `_state`, `_utils`, or `_helpers` when a
   clearer module boundary or nested module name can express the responsibility.
 - Use clear names, straightforward control flow, and predictable data flow.
