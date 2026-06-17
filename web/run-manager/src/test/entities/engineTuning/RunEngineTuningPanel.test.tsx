@@ -99,13 +99,58 @@ describe("RunEngineTuningPanel", () => {
 
     expect(onReset).toHaveBeenCalledTimes(1);
   });
+
+  it("orders equal-mean bandit buckets by best finish time before finish count", () => {
+    render(
+      <RunEngineTuningPanel
+        artifact="latest"
+        canReset={true}
+        enabled={true}
+        expanded={true}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        state={engineTuningStateFixture({
+          contexts: [
+            engineTuningContextFixture({
+              candidates: [
+                engineTuningCandidateEstimateFixture({
+                  best_finish_time_ms: 90_000,
+                  engine_setting_raw_value: 25,
+                  estimated_finish_time_ms: 95_000,
+                  finish_count: 2,
+                }),
+                engineTuningCandidateEstimateFixture({
+                  best_finish_time_ms: 94_000,
+                  engine_setting_raw_value: 90,
+                  estimated_finish_time_ms: 95_000,
+                  finish_count: 3,
+                }),
+              ],
+              recommended_engine_setting_raw_value: 25,
+            }),
+          ],
+          model_backend: "bandit",
+        })}
+        onExpandedChange={() => undefined}
+        onReset={() => undefined}
+      />,
+    );
+
+    const table = screen.getByRole("table", { name: "Measured bandit bucket finishes" });
+    const rows = within(table).getAllByRole("row").slice(1);
+
+    expect(within(rows[0] as HTMLElement).getByText("ENG 19.5")).toBeInTheDocument();
+    expect(within(rows[1] as HTMLElement).getByText("ENG 70.3")).toBeInTheDocument();
+  });
 });
 
 function hasExactText(expected: string) {
   return (_content: string, element: Element | null) => element?.textContent === expected;
 }
 
-function engineTuningStateFixture(): EngineTuningRuntimeState {
+function engineTuningStateFixture(
+  overrides: Partial<EngineTuningRuntimeState> = {},
+): EngineTuningRuntimeState {
   return {
     candidates: [
       engineTuningCandidateFixture({ course_key: "big_blue_2", vehicle_id: "blue_falcon" }),
@@ -140,6 +185,7 @@ function engineTuningStateFixture(): EngineTuningRuntimeState {
     model_backend: "gaussian_process",
     update_count: 10,
     version: 1,
+    ...overrides,
   };
 }
 

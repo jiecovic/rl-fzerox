@@ -484,10 +484,20 @@ function compareBanditBucketCandidates(
   if (left.estimated_finish_time_ms !== right.estimated_finish_time_ms) {
     return left.estimated_finish_time_ms - right.estimated_finish_time_ms;
   }
+  if (left.best_finish_time_ms !== right.best_finish_time_ms) {
+    return (
+      nullableRaceTimeSortValue(left.best_finish_time_ms) -
+      nullableRaceTimeSortValue(right.best_finish_time_ms)
+    );
+  }
   if (right.finish_count !== left.finish_count) {
     return right.finish_count - left.finish_count;
   }
   return left.engine_setting_raw_value - right.engine_setting_raw_value;
+}
+
+function nullableRaceTimeSortValue(value: number | null) {
+  return value ?? Number.POSITIVE_INFINITY;
 }
 
 function EngineMeasuredCandidateTable({

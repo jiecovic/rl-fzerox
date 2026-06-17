@@ -273,6 +273,67 @@ def test_bandit_recommendation_uses_best_observed_bucket() -> None:
     assert choice.estimated_finish_time_ms == pytest.approx(80_000, abs=1)
 
 
+def test_bandit_recommendation_tiebreaks_equal_means_by_best_time() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=BanditEngineTunerSettings(
+            min_raw_value=0,
+            max_raw_value=128,
+            slider_spacing=13,
+            prior_finish_time_seconds=200.0,
+            uniform_exploration=0.0,
+        ),
+    )
+    tuner.record_many(
+        (
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=25,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=90_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=25,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=100_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=90,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=94_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=90,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=95_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=90,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=96_000,
+            ),
+        )
+    )
+
+    choice = tuner.recommendation(context)
+
+    assert choice.engine_setting_raw_value == 25
+    assert choice.estimated_finish_time_ms == 95_000
+    assert choice.best_finish_time_ms == 90_000
+
+
 def test_bandit_backend_explores_unobserved_buckets_before_resampling() -> None:
     context = EngineTuningContext(
         course_key="mute_city",
