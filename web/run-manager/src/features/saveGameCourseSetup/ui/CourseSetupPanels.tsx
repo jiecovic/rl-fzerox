@@ -191,7 +191,7 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
           />
           <ResetEngineSetupsButton
             disabled={updating || savingCourseSetups}
-            label="Reset all engines to 50"
+            label="Reset all engines to ENG 50"
             setups={allCourseSetups}
             onResetEngineSetups={onResetEngineSetups}
           />
@@ -367,7 +367,7 @@ const CupSetupBlock = memo(function CupSetupBlock({
           <div className="flex justify-end">
             <ResetEngineSetupsButton
               disabled={updating}
-              label={`Reset ${cup.label} engines to 50`}
+              label={`Reset ${cup.label} engines to ENG 50`}
               setups={courseValuesList}
               onResetEngineSetups={onResetEngineSetups}
             />

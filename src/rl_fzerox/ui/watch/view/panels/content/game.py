@@ -5,11 +5,17 @@ import math
 from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
+from rl_fzerox.core.domain.engine_setting import (
+    ENGINE_SLIDER_STEP_MAX,
+    engine_percent_to_slider_step,
+    engine_value_to_slider_step,
+)
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.envs.track_bounds import track_edge_state
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
     VehicleInfo,
+    engine_setting_display_name_for_raw,
     vehicle_by_character_index,
 )
 from rl_fzerox.ui.watch.view.panels.core.format import (
@@ -176,9 +182,9 @@ def _format_telemetry_vehicle_setup(telemetry: _VehicleSetupTelemetry) -> str | 
         return None
 
     engine_setting = getattr(telemetry.player, "engine_setting", None)
-    engine_raw = _int_setup_value(None if engine_setting is None else float(engine_setting) * 100.0)
+    engine_raw = None if engine_setting is None else engine_value_to_slider_step(engine_setting)
     parts = [vehicle.display_name]
-    if engine_raw is not None and 0 <= engine_raw <= 100:
+    if engine_raw is not None and 0 <= engine_raw <= ENGINE_SLIDER_STEP_MAX:
         parts.append(_format_engine_setting_raw(engine_raw))
     return " / ".join(parts)
 
@@ -192,16 +198,8 @@ def _format_live_vehicle_setup(info: dict[str, object]) -> str | None:
             info.get("player_character_index_ram"),
         )
     )
-    engine_raw = _int_setup_value(
-        info.get(
-            "engine_setting_raw_value",
-            info.get(
-                "track_engine_setting_raw_value",
-                info.get("engine_setting_percent_ram"),
-            ),
-        )
-    )
-    if engine_raw is not None and not 0 <= engine_raw <= 100:
+    engine_raw = _live_engine_setting_raw(info)
+    if engine_raw is not None and not 0 <= engine_raw <= ENGINE_SLIDER_STEP_MAX:
         engine_raw = None
     parts: list[str] = []
     if character_index is not None:
@@ -212,7 +210,27 @@ def _format_live_vehicle_setup(info: dict[str, object]) -> str | None:
 
 
 def _format_engine_setting_raw(raw_value: int) -> str:
-    return f"Engine {raw_value}"
+    return engine_setting_display_name_for_raw(raw_value)
+
+
+def _live_engine_setting_raw(info: dict[str, object]) -> int | None:
+    raw = _int_setup_value(
+        info.get(
+            "engine_setting_raw_value_ram",
+            info.get(
+                "engine_setting_raw_value",
+                info.get("track_engine_setting_raw_value"),
+            ),
+        )
+    )
+    if raw is not None:
+        return raw
+    percent = info.get("engine_setting_percent_ram")
+    if isinstance(percent, bool) or not isinstance(percent, int | float):
+        return None
+    if not math.isfinite(float(percent)) or not 0.0 <= float(percent) <= 100.0:
+        return None
+    return engine_percent_to_slider_step(percent)
 
 
 def _first_known_character_index(values: tuple[object, ...]) -> VehicleInfo | None:

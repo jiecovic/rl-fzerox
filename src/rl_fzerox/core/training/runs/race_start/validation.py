@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend
+from rl_fzerox.core.domain.engine_setting import validate_engine_slider_step
 from rl_fzerox.core.domain.race_difficulty import race_difficulty_names
 from rl_fzerox.core.training.runs.race_start.boundary import (
     race_start_gp_difficulty_raw_value,
@@ -31,10 +32,7 @@ def validate_variant(variant: RaceStartVariant) -> None:
         raise ValueError(
             f"machine_select_slot must be non-negative, got {variant.machine_select_slot}"
         )
-    if not 0 <= variant.engine_setting_raw_value <= 100:
-        raise ValueError(
-            f"engine_setting raw value must be in [0, 100], got {variant.engine_setting_raw_value}"
-        )
+    validate_engine_slider_step(variant.engine_setting_raw_value, label="engine_setting raw value")
     if variant.total_lap_count <= 0:
         raise ValueError(f"total_lap_count must be positive, got {variant.total_lap_count}")
 

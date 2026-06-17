@@ -19,6 +19,10 @@ from rl_fzerox.core.career_mode.progress import (
     default_unlock_targets,
 )
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
+from rl_fzerox.core.domain.engine_setting import (
+    engine_percent_to_slider_step,
+    validate_engine_slider_step,
+)
 from rl_fzerox.core.manager.artifacts.paths import predicted_managed_save_game_path
 from rl_fzerox.core.manager.db.repositories import runs as run_repository
 from rl_fzerox.core.manager.db.repositories import save_games as save_game_repository
@@ -516,7 +520,7 @@ def upsert_course_setup(
     save_game_id: str,
     policy_run_id: str,
     policy_artifact: Literal["latest", "best"],
-    engine_setting_raw_value: int = 50,
+    engine_setting_raw_value: int = engine_percent_to_slider_step(50),
     difficulty: str | None = None,
     cup_id: str | None = None,
     course_id: str | None = None,
@@ -758,7 +762,4 @@ def _course_setup_target_label(target: CourseSetupTarget) -> str:
 
 
 def _validate_engine_setting(*, engine_setting_raw_value: int) -> None:
-    if not 0 <= engine_setting_raw_value <= 100:
-        raise ValueError(
-            f"engine_setting_raw_value must be in [0, 100], got {engine_setting_raw_value}"
-        )
+    validate_engine_slider_step(engine_setting_raw_value)

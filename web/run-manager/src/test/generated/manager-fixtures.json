@@ -1550,14 +1550,14 @@
       "vf_coef": 0.5
     },
     "vehicle": {
-      "adaptive_engine_bandit_bucket_size": 10,
+      "adaptive_engine_bandit_slider_spacing": 13,
       "adaptive_engine_greedy_plateau_seconds": 1.0,
       "adaptive_engine_tuner_backend": "bandit",
       "adaptive_engine_uniform_exploration": 0.05,
       "engine_mode": "fixed",
-      "engine_setting_max_raw_value": 80,
-      "engine_setting_min_raw_value": 20,
-      "engine_setting_raw_value": 50,
+      "engine_setting_max_raw_value": 102,
+      "engine_setting_min_raw_value": 26,
+      "engine_setting_raw_value": 64,
       "selected_vehicle_ids": ["blue_falcon"],
       "selection_mode": "pool"
     },

@@ -142,6 +142,7 @@ def _state_vector_group_lines(
                     auxiliary_loss=aux_loss,
                 ),
                 format_state_vector_value(
+                    feature_name=row.name,
                     auxiliary_name=None if aux_loss is None else aux_loss.name,
                     show_aux_columns=bool(auxiliary_losses),
                     observation_value=row.observation_value,
@@ -193,6 +194,7 @@ def _control_history_state_lines(
                 ),
             ),
             format_state_vector_value(
+                feature_name=row.name,
                 auxiliary_name=None,
                 show_aux_columns=show_aux_columns,
                 observation_value=row.observation_value,

@@ -6,6 +6,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from fzerox_emulator import FZeroXTelemetry
+from rl_fzerox.core.domain.engine_setting import (
+    ENGINE_SLIDER_STEP_MAX,
+    engine_value_to_slider_step,
+)
 from rl_fzerox.core.domain.race_difficulty import is_race_difficulty_name
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_character_index
@@ -462,17 +466,17 @@ def _finish_engine_setting_raw(
     if telemetry is not None:
         engine_setting = telemetry.player.engine_setting
         if math.isfinite(float(engine_setting)):
-            raw_value = round(float(engine_setting) * 100.0)
-            if 0 <= raw_value <= 100:
+            raw_value = engine_value_to_slider_step(float(engine_setting))
+            if 0 <= raw_value <= ENGINE_SLIDER_STEP_MAX:
                 return raw_value
 
     for key in (
         "engine_setting_raw_value",
+        "engine_setting_raw_value_ram",
         "track_engine_setting_raw_value",
-        "engine_setting_percent_ram",
     ):
         raw_value = _int_setup_value(info.get(key))
-        if raw_value is not None and 0 <= raw_value <= 100:
+        if raw_value is not None and 0 <= raw_value <= ENGINE_SLIDER_STEP_MAX:
             return raw_value
     return None
 

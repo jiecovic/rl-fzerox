@@ -38,7 +38,7 @@ def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSett
             max_raw_value=config.max_raw_value,
             prior_finish_time_seconds=config.prior_finish_time_seconds,
             uniform_exploration=config.uniform_exploration,
-            bucket_size=config.bucket_size,
+            slider_spacing=config.slider_spacing,
             exploration_seconds=float(config.exploration_scale),
         )
     if config.backend == "mlp_ensemble":

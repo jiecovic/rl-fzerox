@@ -554,9 +554,9 @@ function forkSourceEngineTuning(config: ManagedRunConfig): ForkSourceEngineTunin
   }
   return {
     backend: config.vehicle.adaptive_engine_tuner_backend,
-    banditBucketSize:
+    banditSliderSpacing:
       config.vehicle.adaptive_engine_tuner_backend === "bandit"
-        ? config.vehicle.adaptive_engine_bandit_bucket_size
+        ? config.vehicle.adaptive_engine_bandit_slider_spacing
         : null,
     maxRawValue: config.vehicle.engine_setting_max_raw_value,
     minRawValue: config.vehicle.engine_setting_min_raw_value,

@@ -8,6 +8,7 @@ import type {
   EngineTuningRuntimeContext,
   EngineTuningRuntimeState,
 } from "@/shared/api/contract";
+import { ENGINE_SLIDER_STEP_MAX, engineSliderStepLabel } from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { ConfigDisclosure } from "@/shared/ui/config/ConfigDisclosure";
@@ -135,7 +136,7 @@ export function RunEngineTuningPanel({
                 </strong>
                 <span className="text-xs tabular-nums text-app-muted">
                   {selectedContext.model_ready ? "greedy engine" : "warmup engine"}{" "}
-                  {selectedContext.recommended_engine_setting_raw_value} ·{" "}
+                  {engineStepLabel(selectedContext.recommended_engine_setting_raw_value)} ·{" "}
                   {selectedContext.finish_count.toLocaleString()} successful finishes
                 </span>
               </div>
@@ -252,7 +253,7 @@ function EngineSamplingProbabilityBars({
   mode: EngineTuningViewMode;
 }) {
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
-  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? 100;
+  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? ENGINE_SLIDER_STEP_MAX;
   const barWidth = 100 / Math.max(1, candidates.length);
   const maxProbability = Math.max(
     ...candidates.map((candidate) => candidate.selection_probability),
@@ -282,7 +283,7 @@ function EngineSamplingProbabilityBars({
         <span className="tabular-nums">y: probability 0-{formatPercent(maxProbability)}</span>
       </div>
       <svg
-        aria-label="Engine sampling probability by raw engine value"
+        aria-label="Engine sampling probability by slider step"
         className="h-36 w-full border border-app-border bg-app-surface-muted"
         preserveAspectRatio="none"
         role="img"
@@ -301,6 +302,7 @@ function EngineSamplingProbabilityBars({
                 ? "color-mix(in srgb, var(--accent) 58%, transparent)"
                 : "color-mix(in srgb, var(--accent) 70%, transparent)";
           const rawLabel = mode === "bandit" ? "bucket" : "engine";
+          const engineLabel = engineStepLabel(candidate.engine_setting_raw_value);
           const estimateLabel = mode === "bandit" ? "mean" : "estimated";
           return (
             <rect
@@ -312,15 +314,15 @@ function EngineSamplingProbabilityBars({
               y={y}
               vectorEffect="non-scaling-stroke"
             >
-              <title>{`${rawLabel} ${candidate.engine_setting_raw_value} · ${formatPercent(candidate.selection_probability)} probability · ${estimateLabel} ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
+              <title>{`${rawLabel} ${engineLabel} · ${formatPercent(candidate.selection_probability)} probability · ${estimateLabel} ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
             </rect>
           );
         })}
       </svg>
       <div className="flex justify-between text-xs tabular-nums text-app-muted">
-        <span>{firstCandidate}</span>
-        <span>engine raw value</span>
-        <span>{lastCandidate}</span>
+        <span>{engineStepLabel(firstCandidate)}</span>
+        <span>engine slider step</span>
+        <span>{engineStepLabel(lastCandidate)}</span>
       </div>
     </div>
   );
@@ -336,7 +338,7 @@ function EngineMeanPerformanceBars({
   recommendedEngineSettingRawValue: number;
 }) {
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
-  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? 100;
+  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? ENGINE_SLIDER_STEP_MAX;
   const barWidth = 100 / Math.max(1, candidates.length);
   const estimatedTimes = candidates.map((candidate) => candidate.estimated_finish_time_ms);
   const fastestEstimate = Math.min(...estimatedTimes, Number.POSITIVE_INFINITY);
@@ -362,7 +364,7 @@ function EngineMeanPerformanceBars({
         </span>
       </div>
       <svg
-        aria-label="Engine predicted mean performance by raw engine value"
+        aria-label="Engine predicted mean performance by slider step"
         className="h-32 w-full border border-app-border bg-app-surface-muted"
         preserveAspectRatio="none"
         role="img"
@@ -382,6 +384,7 @@ function EngineMeanPerformanceBars({
           const x = index * barWidth + (barWidth - width) / 2;
           const y = 100 - height;
           const rawLabel = mode === "bandit" ? "bucket" : "engine";
+          const engineLabel = engineStepLabel(candidate.engine_setting_raw_value);
           const estimateLabel = mode === "bandit" ? "mean" : "estimated";
           return (
             <rect
@@ -397,18 +400,18 @@ function EngineMeanPerformanceBars({
               y={y}
               vectorEffect="non-scaling-stroke"
             >
-              <title>{`${rawLabel} ${candidate.engine_setting_raw_value}${isRecommended ? ` · ${mode === "bandit" ? "greedy bucket" : "deterministic greedy"}` : ""} · ${estimateLabel} ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
+              <title>{`${rawLabel} ${engineLabel}${isRecommended ? ` · ${mode === "bandit" ? "greedy bucket" : "deterministic greedy"}` : ""} · ${estimateLabel} ${formatRaceTime(candidate.estimated_finish_time_ms)} · best ${formatOptionalRaceTime(candidate.best_finish_time_ms)} · ${candidate.finish_count} successful finishes`}</title>
             </rect>
           );
         })}
       </svg>
       <div className="flex justify-between text-xs tabular-nums text-app-muted">
-        <span>{firstCandidate}</span>
+        <span>{engineStepLabel(firstCandidate)}</span>
         <span>
-          engine raw value · taller means faster{" "}
+          engine slider step · taller means faster{" "}
           {mode === "bandit" ? "bucket mean finish" : "estimated finish"}
         </span>
-        <span>{lastCandidate}</span>
+        <span>{engineStepLabel(lastCandidate)}</span>
       </div>
     </div>
   );
@@ -442,7 +445,9 @@ function EngineBanditBucketTable({
               className="border-b border-app-border/70 last:border-b-0"
               key={candidate.engine_setting_raw_value}
             >
-              <td className="py-1.5 pr-3 text-app-text">{candidate.engine_setting_raw_value}</td>
+              <td className="py-1.5 pr-3 text-app-text">
+                {engineStepLabel(candidate.engine_setting_raw_value)}
+              </td>
               <td className="py-1.5 pr-3 text-app-text">
                 {candidate.finish_count <= 0
                   ? "-"
@@ -523,7 +528,9 @@ function EngineMeasuredCandidateTable({
                 className="border-b border-app-border/70 last:border-b-0"
                 key={candidate.engine_setting_raw_value}
               >
-                <td className="py-1.5 pr-3 text-app-text">{candidate.engine_setting_raw_value}</td>
+                <td className="py-1.5 pr-3 text-app-text">
+                  {engineStepLabel(candidate.engine_setting_raw_value)}
+                </td>
                 <td className="py-1.5 pr-3 text-app-text">
                   {formatOptionalRaceTime(candidate.best_finish_time_ms)}
                 </td>
@@ -573,7 +580,9 @@ function EngineModelCandidateTable({
               className="border-b border-app-border/70 last:border-b-0"
               key={candidate.engine_setting_raw_value}
             >
-              <td className="py-1.5 pr-3 text-app-text">{candidate.engine_setting_raw_value}</td>
+              <td className="py-1.5 pr-3 text-app-text">
+                {engineStepLabel(candidate.engine_setting_raw_value)}
+              </td>
               <td className="py-1.5 pr-3 text-app-text">
                 {formatPercent(candidate.selection_probability)}
               </td>
@@ -626,6 +635,10 @@ function formatPercent(value: number | null) {
   }
   const percent = value * 100;
   return `${percent.toFixed(Math.abs(percent) < 1 ? 2 : 1)}%`;
+}
+
+function engineStepLabel(step: number) {
+  return `${engineSliderStepLabel(step)} (${step})`;
 }
 
 function formatOptionalRaceTime(value: number | null) {

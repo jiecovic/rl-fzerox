@@ -6,6 +6,10 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from rl_fzerox.core.domain.engine_setting import (
+    ENGINE_SLIDER_STEP_MAX,
+    engine_percent_to_slider_step,
+)
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
 
 WatchDevice = Literal["cpu", "cuda"]
@@ -108,7 +112,11 @@ class UpsertSaveCourseSetupRequest(BaseModel):
 
     policy_run_id: str
     policy_artifact: Literal["latest", "best"] = "best"
-    engine_setting_raw_value: int = Field(default=50, ge=0, le=100)
+    engine_setting_raw_value: int = Field(
+        default=engine_percent_to_slider_step(50),
+        ge=0,
+        le=ENGINE_SLIDER_STEP_MAX,
+    )
     difficulty: str | None = None
     cup_id: str | None = None
     course_id: str | None = None

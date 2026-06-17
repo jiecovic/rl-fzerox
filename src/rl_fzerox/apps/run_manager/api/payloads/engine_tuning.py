@@ -61,13 +61,13 @@ def _bandit_payload_state(
     candidates = engine_bucket_candidates(
         minimum=settings.min_raw_value,
         maximum=settings.max_raw_value,
-        bucket_size=settings.bucket_size,
+        slider_spacing=settings.slider_spacing,
     )
     buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
     for candidate in state.candidates:
         if candidate.finish_count <= 0:
             continue
-        bucket = _nearest_bucket(candidate.engine_setting_raw_value, candidates)
+        bucket = _exact_bucket(candidate.engine_setting_raw_value, candidates)
         if bucket is None:
             continue
         key = (candidate.context_key, bucket)
@@ -92,13 +92,11 @@ def _bandit_payload_state(
     )
 
 
-def _nearest_bucket(raw_value: int, candidates: tuple[int, ...]) -> int | None:
-    if not candidates:
-        return None
+def _exact_bucket(raw_value: int, candidates: tuple[int, ...]) -> int | None:
     raw_bucket = int(raw_value)
-    if raw_bucket < candidates[0] or raw_bucket > candidates[-1]:
-        return None
-    return min(candidates, key=lambda candidate: (abs(candidate - raw_bucket), candidate))
+    if raw_bucket in candidates:
+        return raw_bucket
+    return None
 
 
 def _bucketed_payload_candidate(

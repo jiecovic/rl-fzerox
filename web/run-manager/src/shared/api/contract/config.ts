@@ -21,7 +21,11 @@ import {
   trackSamplingModeSchema,
   vehicleSelectionModeSchema,
 } from "@/shared/api/contract/enums";
-import { centeredEngineBuckets } from "@/shared/domain/engineBuckets";
+import {
+  centeredEngineBuckets,
+  ENGINE_SLIDER_STEP_MAX,
+  enginePercentToSliderStep,
+} from "@/shared/domain/engineBuckets";
 
 export const customCnnLayerKindSchema = z.preprocess(
   (value) => (value === "residual" ? "residual_post" : value),
@@ -151,25 +155,44 @@ const tracksConfigSchema = z
   }));
 
 const vehicleConfigSchema = z
-  .object({
-    selection_mode: vehicleSelectionModeSchema,
-    selected_vehicle_ids: z.array(z.string()).min(1),
-    engine_mode: engineSettingModeSchema,
-    engine_setting_raw_value: z.number().int().min(0).max(100),
-    engine_setting_min_raw_value: z.number().int().min(0).max(100),
-    engine_setting_max_raw_value: z.number().int().min(0).max(100),
-    adaptive_engine_tuner_backend: engineTunerBackendSchema.default("bandit"),
-    adaptive_engine_bandit_bucket_size: z.number().int().min(1).max(100).default(10),
-    adaptive_engine_stat_decay: z.number().gt(0).lt(1).default(0.995),
-    adaptive_engine_ensemble_members: z.number().int().min(1).max(32).default(5),
-    adaptive_engine_mlp_hidden_dim: z.number().int().min(4).max(512).default(32),
-    adaptive_engine_mlp_training_steps: z.number().int().min(1).max(2048).default(48),
-    adaptive_engine_mlp_learning_rate: z.number().gt(0).max(1).default(0.004),
-    adaptive_engine_mlp_bootstrap_keep_probability: z.number().gt(0).max(1).default(0.8),
-    adaptive_engine_mlp_warmup_successes: z.number().int().min(1).max(4096).default(32),
-    adaptive_engine_uniform_exploration: z.number().min(0).max(1).default(0.05),
-    adaptive_engine_greedy_plateau_seconds: z.number().min(0).max(30).default(1),
-  })
+  .preprocess(
+    (raw) => {
+      if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+        return raw;
+      }
+      const data = { ...raw } as Record<string, unknown>;
+      const legacySpacing = data.adaptive_engine_bandit_bucket_size;
+      delete data.adaptive_engine_bandit_bucket_size;
+      if (legacySpacing !== undefined && data.adaptive_engine_bandit_slider_spacing === undefined) {
+        data.adaptive_engine_bandit_slider_spacing = legacySpacing;
+      }
+      return data;
+    },
+    z.object({
+      selection_mode: vehicleSelectionModeSchema,
+      selected_vehicle_ids: z.array(z.string()).min(1),
+      engine_mode: engineSettingModeSchema,
+      engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+      engine_setting_min_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+      engine_setting_max_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+      adaptive_engine_tuner_backend: engineTunerBackendSchema.default("bandit"),
+      adaptive_engine_bandit_slider_spacing: z
+        .number()
+        .int()
+        .min(1)
+        .max(ENGINE_SLIDER_STEP_MAX)
+        .default(enginePercentToSliderStep(10)),
+      adaptive_engine_stat_decay: z.number().gt(0).lt(1).default(0.995),
+      adaptive_engine_ensemble_members: z.number().int().min(1).max(32).default(5),
+      adaptive_engine_mlp_hidden_dim: z.number().int().min(4).max(512).default(32),
+      adaptive_engine_mlp_training_steps: z.number().int().min(1).max(2048).default(48),
+      adaptive_engine_mlp_learning_rate: z.number().gt(0).max(1).default(0.004),
+      adaptive_engine_mlp_bootstrap_keep_probability: z.number().gt(0).max(1).default(0.8),
+      adaptive_engine_mlp_warmup_successes: z.number().int().min(1).max(4096).default(32),
+      adaptive_engine_uniform_exploration: z.number().min(0).max(1).default(0.05),
+      adaptive_engine_greedy_plateau_seconds: z.number().min(0).max(30).default(1),
+    }),
+  )
   .refine(
     (vehicle) => vehicle.engine_setting_min_raw_value <= vehicle.engine_setting_max_raw_value,
     {
@@ -182,13 +205,13 @@ const vehicleConfigSchema = z
       vehicle.engine_mode !== "adaptive_tuner" ||
       vehicle.adaptive_engine_tuner_backend !== "bandit" ||
       centeredEngineBuckets({
-        bucketSize: vehicle.adaptive_engine_bandit_bucket_size,
+        sliderSpacing: vehicle.adaptive_engine_bandit_slider_spacing,
         minimum: vehicle.engine_setting_min_raw_value,
         maximum: vehicle.engine_setting_max_raw_value,
       }).length > 0,
     {
-      message: "bandit bucket grid has no values inside the engine range",
-      path: ["adaptive_engine_bandit_bucket_size"],
+      message: "engine slider spacing has no values inside the engine range",
+      path: ["adaptive_engine_bandit_slider_spacing"],
     },
   );
 

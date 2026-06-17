@@ -376,7 +376,9 @@ export function Configurator({
     if (vehicle.adaptive_engine_tuner_backend !== "bandit") {
       return false;
     }
-    return forkSourceEngineTuning.banditBucketSize !== vehicle.adaptive_engine_bandit_bucket_size;
+    return (
+      forkSourceEngineTuning.banditSliderSpacing !== vehicle.adaptive_engine_bandit_slider_spacing
+    );
   }
 
   function randomizeSeed() {

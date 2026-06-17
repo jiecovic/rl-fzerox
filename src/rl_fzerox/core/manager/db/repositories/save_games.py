@@ -9,6 +9,7 @@ from typing import Literal
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
 from rl_fzerox.core.manager.db.models.runs import RunModel
 from rl_fzerox.core.manager.db.models.save_games import (
     SaveGameAttemptModel,
@@ -505,7 +506,7 @@ def course_setup_from_model(
         save_game_id=row.save_game_id,
         policy_run_id=row.policy_run_id,
         policy_artifact=_required_policy_artifact(row.policy_artifact),
-        engine_setting_raw_value=50
+        engine_setting_raw_value=engine_percent_to_slider_step(50)
         if engine_setting_raw_value is None
         else engine_setting_raw_value,
         created_at=row.created_at,

@@ -25,7 +25,11 @@ class RaceStartMixin:
         total_lap_count: int,
         gp_difficulty_raw_value: int = -1,
     ) -> None:
-        """Patch one live race start using native-owned RAM layout rules."""
+        """Patch one live race start using native-owned RAM layout rules.
+
+        ``engine_setting_raw_value`` is the canonical game slider step in the
+        inclusive range 0..128, not the rounded ENG display percent.
+        """
 
         self._native.patch_race_start_setup(
             _race_start_request(

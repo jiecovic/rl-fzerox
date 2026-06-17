@@ -3,10 +3,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from rl_fzerox.core.domain.engine_setting import (
+    ENGINE_SLIDER_STEP_MAX,
+    engine_slider_step_to_display_percent,
+    validate_engine_slider_step,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class EngineSetting:
-    """Resolved 0..100 engine-slider setting used for RAM writes."""
+    """Resolved game slider step used for RAM writes."""
 
     raw_value: int
 
@@ -123,20 +129,26 @@ def vehicle_menu_row_and_column(machine_select_slot: int) -> tuple[int, int]:
 
 
 def resolve_engine_setting(raw_engine_setting: object, *, context: str) -> EngineSetting:
-    """Resolve one raw 0..100 engine-slider value."""
+    """Resolve one raw game slider step."""
 
     if isinstance(raw_engine_setting, bool) or not isinstance(raw_engine_setting, int):
-        raise ValueError(f"{context} engine_setting_raw_value must be a raw integer in [0, 100]")
+        raise ValueError(
+            f"{context} engine_setting_raw_value must be a raw integer in "
+            f"[0, {ENGINE_SLIDER_STEP_MAX}]"
+        )
     _validate_engine_setting_raw_value(raw_engine_setting, context=context)
     return EngineSetting(raw_value=raw_engine_setting)
 
 
 def engine_setting_display_name_for_raw(raw_value: int) -> str:
-    """Return a short display label for a native 0..100 engine-slider value."""
+    """Return a short display label for a native engine slider step."""
 
-    return f"Engine {raw_value}"
+    display_percent = engine_slider_step_to_display_percent(raw_value)
+    return f"Engine {display_percent}"
 
 
 def _validate_engine_setting_raw_value(raw_value: int, *, context: str) -> None:
-    if not 0 <= raw_value <= 100:
-        raise ValueError(f"{context} raw engine_setting must be in [0, 100], got {raw_value}")
+    try:
+        validate_engine_slider_step(raw_value, label=f"{context} raw engine_setting")
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc

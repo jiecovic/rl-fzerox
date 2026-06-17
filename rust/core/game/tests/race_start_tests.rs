@@ -170,7 +170,7 @@ fn engine_setting_patch_updates_live_racer_physics_fields() {
     write_i8(&mut memory, racer_base + RACER.character, 0);
     write_blue_falcon_machine_table(&mut memory);
 
-    write_engine_settings(&mut memory, RaceStartMode::TimeAttack, 50)
+    write_engine_settings(&mut memory, RaceStartMode::TimeAttack, 64)
         .expect("engine setting should write live physics fields");
 
     assert_approx(
@@ -251,12 +251,26 @@ fn engine_setting_patch_updates_live_racer_physics_fields() {
     );
 }
 
+#[test]
+fn engine_setting_patch_uses_game_slider_steps() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let racer_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
+    write_i16(&mut memory, GLOBALS.player_characters, 0);
+    write_i8(&mut memory, racer_base + RACER.character, 0);
+    write_blue_falcon_machine_table(&mut memory);
+
+    write_engine_settings(&mut memory, RaceStartMode::GpRace, 115)
+        .expect("engine setting should accept the displayed ENG 90 slot");
+
+    assert_approx(read_f32(&memory, GLOBALS.player_engine), 115.0 / 128.0);
+}
+
 fn sample_setup() -> RaceStartSetup {
     RaceStartSetup {
         course_index: 5,
         character_index: 7,
         machine_skin_index: 0,
-        engine_setting_raw_value: 75,
+        engine_setting_raw_value: 96,
         total_lap_count: 3,
         gp_difficulty_raw_value: 2,
     }

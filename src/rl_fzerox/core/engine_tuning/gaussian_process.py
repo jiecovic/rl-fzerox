@@ -11,6 +11,7 @@ import gpytorch
 import torch
 from linear_operator import LinearOperator
 
+from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER_STEP_MAX
 from rl_fzerox.core.engine_tuning.sampling import (
     StableGreedySelection,
     stable_greedy_engine_setting,
@@ -34,7 +35,7 @@ from rl_fzerox.core.engine_tuning.types import (
 
 
 class GaussianProcessEngineTuner:
-    """Choose engine values from a smooth finish-time model over the 0-100 slider."""
+    """Choose engine values from a smooth model over game slider steps."""
 
     def __init__(
         self,
@@ -383,7 +384,7 @@ def _gp_posterior(
         train_y=train_y,
         likelihood=likelihood,
         prior_score=prior_score,
-        lengthscale=_smoothing_bandwidth(settings) / 100.0,
+        lengthscale=_smoothing_bandwidth(settings) / float(ENGINE_SLIDER_STEP_MAX),
         outputscale=max(1.0, float(settings.exploration_seconds)) ** 2,
     )
     model.eval()
@@ -558,7 +559,7 @@ def _better_choice(
 
 
 def _normalize_engine_raw(raw_value: int) -> float:
-    return max(0.0, min(1.0, float(raw_value) / 100.0))
+    return max(0.0, min(1.0, float(raw_value) / float(ENGINE_SLIDER_STEP_MAX)))
 
 
 def _observation_noise_variance(

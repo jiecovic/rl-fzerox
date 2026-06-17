@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
+from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER_STEP_MAX
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
@@ -180,7 +181,7 @@ class MenuFacts:
     camera_setting: str | None
     race_intro_timer: int | None
     race_time_ms: float | None
-    engine_setting_percent: float | None
+    engine_setting_raw: int | None
     completion_fraction: float | None
     completed_laps: int | None
     total_laps: int | None
@@ -211,7 +212,7 @@ class MenuFacts:
             camera_setting=camera_setting(info),
             race_intro_timer=_int_info(info, "race_intro_timer"),
             race_time_ms=_number_info(info, "race_time_ms"),
-            engine_setting_percent=_number_info(info, "engine_setting_percent_ram"),
+            engine_setting_raw=_int_info(info, "engine_setting_raw_value_ram"),
             completion_fraction=_number_info(info, "episode_completion_fraction"),
             completed_laps=_int_info(info, "race_laps_completed"),
             total_laps=_int_info(info, "total_lap_count"),
@@ -333,11 +334,11 @@ class MenuFacts:
 
     @property
     def engine_setting_raw_value(self) -> int | None:
-        if self.engine_setting_percent is None:
+        if self.engine_setting_raw is None:
             return None
-        if not 0.0 <= self.engine_setting_percent <= 100.0:
+        if not 0 <= self.engine_setting_raw <= ENGINE_SLIDER_STEP_MAX:
             return None
-        return round(self.engine_setting_percent)
+        return self.engine_setting_raw
 
 
 def observed_menu_screen(

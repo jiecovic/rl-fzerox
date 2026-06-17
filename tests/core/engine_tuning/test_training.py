@@ -51,21 +51,21 @@ def test_bandit_reset_sampler_uses_best_observed_bucket_as_greedy() -> None:
             enabled=True,
             backend="bandit",
             min_raw_value=0,
-            max_raw_value=100,
-            bucket_size=10,
+            max_raw_value=128,
+            slider_spacing=13,
             uniform_exploration=0.0,
         )
     )
     assert controller.record_episodes(
         (
-            _successful_engine_episode(engine_raw=20, race_time_ms=80_000),
+            _successful_engine_episode(engine_raw=25, race_time_ms=80_000),
             _successful_engine_episode(engine_raw=90, race_time_ms=80_500),
         )
     )
 
     snapshot = controller.reset_sampler_snapshot((context,))
 
-    assert snapshot.contexts[0].greedy_engine_setting_raw_value == 20
+    assert snapshot.contexts[0].greedy_engine_setting_raw_value == 25
 
 
 def _successful_engine_episode(

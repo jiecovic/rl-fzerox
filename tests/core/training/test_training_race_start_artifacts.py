@@ -158,9 +158,9 @@ def test_materialize_train_run_config_generates_race_start_engine_variant(
     assert course_vehicle_variant.course_index == 1
     assert course_vehicle_variant.mode == "time_attack"
     assert course_vehicle_variant.character_index == 0
-    assert course_vehicle_variant.engine_setting_raw_value == 50
+    assert course_vehicle_variant.engine_setting_raw_value == 64
     assert entry.source_vehicle == "blue_falcon"
-    assert entry.source_engine_setting_raw_value == 50
+    assert entry.source_engine_setting_raw_value == 64
 
 
 def test_materialize_train_run_config_reuses_target_variant_cache_without_source(
@@ -231,7 +231,7 @@ def test_materialize_train_run_config_reuses_target_variant_cache_without_source
             mode="time_attack",
             character_index=0,
             machine_select_slot=0,
-            engine_setting_raw_value=50,
+            engine_setting_raw_value=64,
             race_intro_target_timer=None,
         )
     ]
@@ -286,10 +286,10 @@ def test_materialize_train_run_config_generates_vehicle_variant(
     assert entry.baseline_state_path is not None
     assert entry.baseline_state_path.read_bytes() == b"generated"
     assert entry.source_vehicle == "white_cat"
-    assert entry.source_engine_setting_raw_value == 50
+    assert entry.source_engine_setting_raw_value == 64
     assert [variant.character_index for variant in capture.variants] == [4]
     assert [variant.machine_select_slot for variant in capture.variants] == [4]
-    assert [variant.engine_setting_raw_value for variant in capture.variants] == [50]
+    assert [variant.engine_setting_raw_value for variant in capture.variants] == [64]
 
 
 def test_materialize_train_run_config_rewrites_curriculum_track_sampling(

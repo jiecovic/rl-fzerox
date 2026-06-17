@@ -33,7 +33,7 @@ export interface ForkSource {
 
 export interface ForkSourceEngineTuning {
   backend: EngineTunerBackend;
-  banditBucketSize: number | null;
+  banditSliderSpacing: number | null;
   maxRawValue: number;
   minRawValue: number;
 }

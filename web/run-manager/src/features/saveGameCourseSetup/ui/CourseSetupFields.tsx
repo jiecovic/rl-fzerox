@@ -6,6 +6,7 @@ import type {
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import { preferredVehicleSetup } from "@/features/saveGameCourseSetup/model/courseSetup";
 import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
+import { ENGINE_SLIDER_STEP_MAX, engineSliderStepLabel } from "@/shared/domain/engineBuckets";
 import { IntegerTextInput } from "@/shared/ui/configFields";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 
@@ -214,7 +215,7 @@ export function EngineDraftInput({
         aria-label={label}
         className="h-[34px] indent-0 tabular-nums"
         disabled={disabled}
-        max={100}
+        max={ENGINE_SLIDER_STEP_MAX}
         min={0}
         value={draft.engineSettingRawValue}
         onChange={(value) => {
@@ -224,6 +225,9 @@ export function EngineDraftInput({
           });
         }}
       />
+      <small className="m-0 text-[11px] leading-snug text-app-muted">
+        {engineSliderStepLabel(draft.engineSettingRawValue)} - step {draft.engineSettingRawValue}
+      </small>
     </FieldShell>
   );
 }

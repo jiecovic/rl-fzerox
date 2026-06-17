@@ -43,7 +43,7 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
     if vehicle.adaptive_engine_tuner_backend == "bandit":
         payload.update(
             {
-                "bucket_size": vehicle.adaptive_engine_bandit_bucket_size,
+                "slider_spacing": vehicle.adaptive_engine_bandit_slider_spacing,
                 "exploration_scale": uncertainty_scale_seconds,
             }
         )

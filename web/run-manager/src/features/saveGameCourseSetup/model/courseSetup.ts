@@ -7,6 +7,7 @@ import type {
   ManagedSaveUnlockTarget,
   SavePolicyArtifact,
 } from "@/shared/api/contract";
+import { enginePercentToSliderStep } from "@/shared/domain/engineBuckets";
 
 export interface CupView {
   courses: ConfigMetadata["built_in_courses"];
@@ -39,7 +40,7 @@ export type CourseSetupDraftMap = Record<string, CourseSetupDraft>;
 export type CupSetupDraft = CupSetupValues & Pick<PolicyArtifactDraft, "vehicleId">;
 export type CupSetupDraftMap = Record<string, CupSetupDraft>;
 
-export const NEUTRAL_ENGINE_SETTING_RAW_VALUE = 50;
+export const NEUTRAL_ENGINE_SETTING_RAW_VALUE = enginePercentToSliderStep(50);
 
 export const EMPTY_COURSE_SETUP_DRAFT: PolicyArtifactDraft = {
   engineSettingRawValue: NEUTRAL_ENGINE_SETTING_RAW_VALUE,

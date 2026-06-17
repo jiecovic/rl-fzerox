@@ -18,10 +18,10 @@ class AuxiliaryLossSpec:
 
 @dataclass(frozen=True, slots=True)
 class StateVectorColumnLayout:
-    pred_width: int = 6
-    ref_width: int = 6
+    pred_width: int = 7
+    ref_width: int = 7
     err_width: int = 5
-    obs_width: int = 6
+    obs_width: int = 7
 
 
 @dataclass(frozen=True, slots=True)

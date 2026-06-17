@@ -75,7 +75,7 @@ async def test_save_engine_tuning_import_uses_fresh_fork_source_snapshot(
             "cup_id": "jack",
             "course_id": "mute_city",
             "vehicle_id": "blue_falcon",
-            "engine_setting_raw_value": 70,
+            "engine_setting_raw_value": 84,
             "mean_score": -80.0,
             "finish_count": 2,
         }
@@ -89,10 +89,10 @@ def _adaptive_bandit_config() -> ManagedRunConfig:
             "vehicle": config.vehicle.model_copy(
                 update={
                     "engine_mode": "adaptive_tuner",
-                    "engine_setting_min_raw_value": 50,
-                    "engine_setting_max_raw_value": 70,
+                    "engine_setting_min_raw_value": 44,
+                    "engine_setting_max_raw_value": 84,
                     "adaptive_engine_tuner_backend": "bandit",
-                    "adaptive_engine_bandit_bucket_size": 10,
+                    "adaptive_engine_bandit_slider_spacing": 10,
                 }
             )
         }
@@ -111,7 +111,7 @@ def _write_engine_tuning_state(state_path: Path) -> None:
                     context_key=context.key,
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
-                    engine_setting_raw_value=50,
+                    engine_setting_raw_value=44,
                     finish_count=2,
                     decayed_count=2.0,
                     decayed_score_total=-200.0,
@@ -123,7 +123,7 @@ def _write_engine_tuning_state(state_path: Path) -> None:
                     context_key=context.key,
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
-                    engine_setting_raw_value=70,
+                    engine_setting_raw_value=84,
                     finish_count=2,
                     decayed_count=2.0,
                     decayed_score_total=-160.0,

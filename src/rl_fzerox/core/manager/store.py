@@ -13,6 +13,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
+from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
 from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
 from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
@@ -697,7 +698,7 @@ class ManagerStore:
         save_game_id: str,
         policy_run_id: str,
         policy_artifact: Literal["latest", "best"],
-        engine_setting_raw_value: int = 50,
+        engine_setting_raw_value: int = engine_percent_to_slider_step(50),
         difficulty: str | None = None,
         cup_id: str | None = None,
         course_id: str | None = None,

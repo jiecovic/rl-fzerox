@@ -7,6 +7,7 @@ import {
   type WatchRenderer,
   watchDeviceSchema,
 } from "@/shared/api/contract/enums";
+import { ENGINE_SLIDER_STEP_MAX } from "@/shared/domain/engineBuckets";
 
 export const saveGameStatusSchema = z.enum(["created", "running", "paused", "finished", "failed"]);
 
@@ -34,7 +35,7 @@ export const managedSaveCourseSetupSchema = z.object({
   course_id: z.string().nullable(),
   policy_run_id: z.string(),
   policy_artifact: savePolicyArtifactSchema,
-  engine_setting_raw_value: z.number().int().min(0).max(100),
+  engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -152,7 +153,7 @@ export const saveEngineTuningCourseSetupRecommendationSchema = z.object({
   cup_id: z.string(),
   course_id: z.string(),
   vehicle_id: z.string(),
-  engine_setting_raw_value: z.number().int().min(0).max(100),
+  engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
   mean_score: z.number().nullable(),
   finish_count: z.number().int().nonnegative(),
 });

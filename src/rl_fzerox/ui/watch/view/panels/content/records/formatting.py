@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 
+from rl_fzerox.core.runtime_spec.vehicle_catalog import engine_setting_display_name_for_raw
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import StatusIcon
 
@@ -129,7 +130,7 @@ def format_finish_setup(setup: dict[str, str | int] | None) -> str | None:
         parts.append(format_mode_name(vehicle_name))
     engine_raw = setup.get("engine_setting_raw_value")
     if isinstance(engine_raw, int) and not isinstance(engine_raw, bool):
-        parts.append(f"Engine {engine_raw}")
+        parts.append(engine_setting_display_name_for_raw(engine_raw))
     return " / ".join(parts) if parts else None
 
 

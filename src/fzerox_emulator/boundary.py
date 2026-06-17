@@ -54,6 +54,7 @@ class VehicleSetupInfoDict(TypedDict):
     player_character_index_ram: int
     racer_character_index_ram: int
     engine_setting_ram: float
+    engine_setting_raw_value_ram: int
     engine_setting_percent_ram: float
     character_engine_setting_ram: float | None
     racer_engine_curve_ram: float | None

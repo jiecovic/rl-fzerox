@@ -1,5 +1,6 @@
 // web/run-manager/src/shared/ui/ConfigSummary.tsx
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { engineSliderStepLabel } from "@/shared/domain/engineBuckets";
 
 export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
   const selectedVehicles = config.vehicle.selected_vehicle_ids;
@@ -9,10 +10,10 @@ export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
       : `${selectedVehicles.length} vehicles`;
   const engineSummary =
     config.vehicle.engine_mode === "fixed"
-      ? `engine ${config.vehicle.engine_setting_raw_value}`
+      ? `engine ${displayEngineStep(config.vehicle.engine_setting_raw_value)}`
       : config.vehicle.engine_mode === "random_range"
-        ? `engine ${config.vehicle.engine_setting_min_raw_value}-${config.vehicle.engine_setting_max_raw_value}`
-        : `adaptive engine ${config.vehicle.engine_setting_min_raw_value}-${config.vehicle.engine_setting_max_raw_value}`;
+        ? `engine ${displayEngineRange(config)}`
+        : `adaptive engine ${displayEngineRange(config)}`;
   const actionSummary = `${displayActionRepeatSummary(config)} · ${displaySteeringSummary(config)} · ${displayDriveSummary(config)}${
     config.action.include_air_brake ||
     config.action.include_boost ||
@@ -44,6 +45,16 @@ export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
       <SummaryItem label="Environment" value={displayEnvironmentSummary(config)} />
     </div>
   );
+}
+
+function displayEngineRange(config: ManagedRunConfig) {
+  return `${displayEngineStep(config.vehicle.engine_setting_min_raw_value)}-${displayEngineStep(
+    config.vehicle.engine_setting_max_raw_value,
+  )}`;
+}
+
+function displayEngineStep(step: number) {
+  return `${engineSliderStepLabel(step)} (${step})`;
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {

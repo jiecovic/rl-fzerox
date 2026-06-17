@@ -13,6 +13,7 @@ from rl_fzerox.ui.watch.view.panels.content.state_vector_panel.model import (
 
 def format_state_vector_value(
     *,
+    feature_name: str | None = None,
     auxiliary_name: AuxiliaryStateTargetName | None,
     show_aux_columns: bool,
     observation_value: float | None,
@@ -24,18 +25,19 @@ def format_state_vector_value(
         if observation_value is None:
             return "--"
         if not show_aux_columns:
-            return f"{observation_value:.3f}"
+            return _format_obs_scalar_value(observation_value, feature_name=feature_name)
         return (
             f"{blank_pred_slot()} | "
             f"{blank_ref_slot()} | "
             f"{blank_error_slot()} | "
-            f"{format_obs_scalar_slot(observation_value)}"
+            f"{format_obs_scalar_slot(observation_value, feature_name=feature_name)}"
         )
     if isinstance(prediction, dict) or isinstance(target, dict):
         return _format_categorical_auxiliary_value(
             prediction,
             target,
             observation_value=observation_value,
+            feature_name=feature_name,
         )
 
     predicted_scalar = _float_or_none(prediction)
@@ -48,6 +50,7 @@ def format_state_vector_value(
             predicted=predicted_scalar,
             target=target_scalar,
             observation_value=observation_value,
+            feature_name=feature_name,
         )
     predicted_text = _format_aux_scalar_slot(predicted_scalar)
     reference_text = format_ref_scalar_slot(target_scalar)
@@ -56,7 +59,7 @@ def format_state_vector_value(
         predicted=predicted_scalar,
         target=target_scalar,
     )
-    observation_text = format_obs_scalar_slot(observation_value)
+    observation_text = format_obs_scalar_slot(observation_value, feature_name=feature_name)
     return f"{predicted_text} | {reference_text} | {error_text} | {observation_text}"
 
 
@@ -72,13 +75,14 @@ def state_vector_header_value() -> str:
 def format_ref_scalar_slot(value: float | None) -> str:
     if value is None:
         return blank_ref_slot()
-    return f"{value:>{STATE_VECTOR_COLUMNS.ref_width}.2f}"
+    return f"{value:>{STATE_VECTOR_COLUMNS.ref_width}.4f}"
 
 
-def format_obs_scalar_slot(value: float | None) -> str:
+def format_obs_scalar_slot(value: float | None, *, feature_name: str | None = None) -> str:
     if value is None:
         return blank_obs_slot()
-    return f"{value:>{STATE_VECTOR_COLUMNS.obs_width}.2f}"
+    formatted = _format_obs_scalar_value(value, feature_name=feature_name)
+    return f"{formatted:>{STATE_VECTOR_COLUMNS.obs_width}}"
 
 
 def blank_pred_slot() -> str:
@@ -102,6 +106,7 @@ def _format_categorical_auxiliary_value(
     target: object,
     *,
     observation_value: float | None,
+    feature_name: str | None,
 ) -> str:
     predicted_index = None
     predicted_confidence = None
@@ -136,7 +141,7 @@ def _format_categorical_auxiliary_value(
         f"{predicted_text} | "
         f"{target_text} | "
         f"{match_text} | "
-        f"{format_obs_scalar_slot(observation_value)}"
+        f"{format_obs_scalar_slot(observation_value, feature_name=feature_name)}"
     )
 
 
@@ -145,6 +150,7 @@ def _format_binary_auxiliary_value(
     predicted: float | None,
     target: float | None,
     observation_value: float | None,
+    feature_name: str | None,
 ) -> str:
     predicted_text = _format_aux_scalar_slot(predicted)
     target_text = format_ref_scalar_slot(target)
@@ -157,8 +163,13 @@ def _format_binary_auxiliary_value(
         f"{predicted_text} | "
         f"{target_text} | "
         f"{match_text} | "
-        f"{format_obs_scalar_slot(observation_value)}"
+        f"{format_obs_scalar_slot(observation_value, feature_name=feature_name)}"
     )
+
+
+def _format_obs_scalar_value(value: float, *, feature_name: str | None) -> str:
+    del feature_name
+    return f"{value:.4f}"
 
 
 def _float_or_none(value: object) -> float | None:
@@ -170,7 +181,7 @@ def _float_or_none(value: object) -> float | None:
 def _format_aux_scalar_slot(value: float | None) -> str:
     if value is None:
         return blank_pred_slot()
-    return f"{value:>{STATE_VECTOR_COLUMNS.pred_width}.2f}"
+    return f"{value:>{STATE_VECTOR_COLUMNS.pred_width}.4f}"
 
 
 def _format_aux_percent_slot(

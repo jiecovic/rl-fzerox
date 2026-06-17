@@ -6,6 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
+from rl_fzerox.core.domain.engine_setting import (
+    centered_engine_slider_buckets,
+    engine_percent_to_slider_step,
+    engine_slider_steps,
+)
+
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
 
 
@@ -14,7 +20,7 @@ class EngineTunerDefaults:
     """Default scale values for adaptive engine tuning."""
 
     backend: EngineTunerBackend = "bandit"
-    bandit_bucket_size: int = 10
+    bandit_slider_spacing: int = engine_percent_to_slider_step(10)
     stat_decay: float = 0.995
     prior_finish_time_seconds: float = 200.0
     exploration_seconds: float = 30.0
@@ -26,7 +32,7 @@ class EngineTunerDefaults:
     mlp_bootstrap_keep_probability: float = 0.8
     mlp_warmup_successes: int = 32
     observation_noise_seconds: float = 1.5
-    curve_lengthscale_raw: float = 12.0
+    curve_lengthscale_raw: float = float(engine_percent_to_slider_step(12))
     uniform_exploration: float = 0.05
     greedy_plateau_tolerance_seconds: float = 1.0
 
@@ -39,7 +45,7 @@ class EngineTunerCommonSettings:
     """Backend-independent knobs for one adaptive engine-tuning run."""
 
     min_raw_value: int = 0
-    max_raw_value: int = 100
+    max_raw_value: int = 128
     prior_finish_time_seconds: float = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     uniform_exploration: float = ENGINE_TUNER_DEFAULTS.uniform_exploration
 
@@ -49,7 +55,7 @@ class BanditEngineTunerSettings(EngineTunerCommonSettings):
     """Static knobs used by the aggregate bandit backend."""
 
     backend: Literal["bandit"] = "bandit"
-    bucket_size: int = ENGINE_TUNER_DEFAULTS.bandit_bucket_size
+    slider_spacing: int = ENGINE_TUNER_DEFAULTS.bandit_slider_spacing
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
 
 
@@ -137,47 +143,24 @@ class EngineTuningEpisodeOutcome:
 
 
 def engine_candidates(*, minimum: int, maximum: int) -> tuple[int, ...]:
-    """Return inclusive integer engine values clamped to the game's raw 0-100 range."""
+    """Return inclusive integer values clamped to game slider steps 0..128."""
 
-    lower = max(0, min(100, int(minimum)))
-    upper = max(0, min(100, int(maximum)))
-    if lower > upper:
-        raise ValueError(f"engine tuning min_raw_value exceeds max_raw_value: {lower} > {upper}")
-    return tuple(range(lower, upper + 1))
+    return engine_slider_steps(minimum=minimum, maximum=maximum)
 
 
 def engine_bucket_candidates(
     *,
     minimum: int,
     maximum: int,
-    bucket_size: int,
+    slider_spacing: int,
 ) -> tuple[int, ...]:
-    """Return engine buckets mirrored around neutral 50 and clipped to range."""
+    """Return engine buckets mirrored around neutral step 64 and clipped to range."""
 
-    lower = max(0, min(100, int(minimum)))
-    upper = max(0, min(100, int(maximum)))
-    if lower > upper:
-        raise ValueError(f"engine tuning min_raw_value exceeds max_raw_value: {lower} > {upper}")
-    step = max(1, int(bucket_size))
-    center = 50
-    values: set[int] = set()
-    offset = 0
-    while True:
-        low = center - offset
-        high = center + offset
-        if lower <= low <= upper:
-            values.add(low)
-        if offset != 0 and lower <= high <= upper:
-            values.add(high)
-        if low < lower and high > upper:
-            break
-        offset += step
-    if not values:
-        raise ValueError(
-            "engine tuning bucket grid contains no values; adjust min_raw_value, "
-            "max_raw_value, or bucket_size"
-        )
-    return tuple(sorted(values))
+    return centered_engine_slider_buckets(
+        minimum=minimum,
+        maximum=maximum,
+        slider_spacing=slider_spacing,
+    )
 
 
 def finish_time_score(race_time_ms: int) -> float:

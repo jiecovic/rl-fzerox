@@ -289,16 +289,16 @@ def test_fork_converts_engine_tuning_source_to_bandit_buckets(tmp_path: Path) ->
     child_state = load_engine_tuning_runtime_state(engine_tuning_checkpoint_path(child_policy_path))
     parent_state = load_engine_tuning_runtime_state(parent_state_path)
     assert child_state is not None
-    assert [candidate.engine_setting_raw_value for candidate in child_state.candidates] == [50, 70]
+    assert [candidate.engine_setting_raw_value for candidate in child_state.candidates] == [44, 84]
     assert [candidate.finish_count for candidate in child_state.candidates] == [2, 1]
     assert child_state.model_state is None
     assert not engine_tuning_model_path(child_policy_path).exists()
     assert parent_state is not None
     assert [candidate.engine_setting_raw_value for candidate in parent_state.candidates] == [
+        44,
         50,
-        54,
         67,
-        70,
+        84,
     ]
     assert parent_model_path.is_file()
 
@@ -930,6 +930,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         "watch.recording.enabled=true",
         f"watch.recording.path={recording_path}",
         "watch.recording.session_mp4_enabled=true",
+        "watch.recording.keep_failed_segments=true",
         "watch.recording.upscale_factor=3",
         "watch.recording.render_input_hud=true",
     ]
@@ -1011,10 +1012,10 @@ def _bandit_engine_config() -> ManagedRunConfig:
             "vehicle": config.vehicle.model_copy(
                 update={
                     "engine_mode": "adaptive_tuner",
-                    "engine_setting_min_raw_value": 50,
-                    "engine_setting_max_raw_value": 70,
+                    "engine_setting_min_raw_value": 44,
+                    "engine_setting_max_raw_value": 84,
                     "adaptive_engine_tuner_backend": "bandit",
-                    "adaptive_engine_bandit_bucket_size": 10,
+                    "adaptive_engine_bandit_slider_spacing": 10,
                 }
             )
         }
@@ -1028,8 +1029,8 @@ def _gaussian_process_engine_config() -> ManagedRunConfig:
             "vehicle": config.vehicle.model_copy(
                 update={
                     "engine_mode": "adaptive_tuner",
-                    "engine_setting_min_raw_value": 50,
-                    "engine_setting_max_raw_value": 70,
+                    "engine_setting_min_raw_value": 44,
+                    "engine_setting_max_raw_value": 84,
                     "adaptive_engine_tuner_backend": "gaussian_process",
                 }
             )
@@ -1049,7 +1050,7 @@ def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
                     context_key=context.key,
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
-                    engine_setting_raw_value=50,
+                    engine_setting_raw_value=44,
                     finish_count=2,
                     decayed_count=2.0,
                     decayed_score_total=-200.0,
@@ -1061,7 +1062,7 @@ def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
                     context_key=context.key,
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
-                    engine_setting_raw_value=54,
+                    engine_setting_raw_value=50,
                     finish_count=99,
                     decayed_count=99.0,
                     decayed_score_total=-7_920.0,
@@ -1085,7 +1086,7 @@ def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
                     context_key=context.key,
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
-                    engine_setting_raw_value=70,
+                    engine_setting_raw_value=84,
                     finish_count=1,
                     decayed_count=1.0,
                     decayed_score_total=-80.0,

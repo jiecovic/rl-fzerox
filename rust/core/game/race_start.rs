@@ -19,6 +19,7 @@ pub struct RaceStartSetup {
     pub course_index: i32,
     pub character_index: i16,
     pub machine_skin_index: i16,
+    /// Canonical in-game engine slider step, inclusive 0..128.
     pub engine_setting_raw_value: i32,
     pub total_lap_count: i32,
     pub gp_difficulty_raw_value: i32,
@@ -75,7 +76,7 @@ const BOUNDS: RaceStartBounds = RaceStartBounds {
     built_in_course_count: 24,
     x_cup_course_index: 48,
     engine_setting_min: 0,
-    engine_setting_max: 100,
+    engine_setting_max: 128,
     minimum_lap_count: 1,
 };
 
@@ -155,7 +156,7 @@ fn write_engine_settings_only(
 ) -> Result<(), CoreError> {
     let character_index = active_character_index(system_ram)?;
     validate_character_and_engine(character_index, engine_setting_raw_value)?;
-    let engine_value = engine_setting_raw_value as f32 / 100.0;
+    let engine_value = engine_setting_value(engine_setting_raw_value);
     let player_base = player_racer_base();
 
     write_f32(system_ram, GLOBALS.player_engine, engine_value)?;
@@ -184,7 +185,7 @@ pub fn validate_race_setup(
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
     validate_setup(mode, setup)?;
-    let engine_value = setup.engine_setting_raw_value as f32 / 100.0;
+    let engine_value = engine_setting_value(setup.engine_setting_raw_value);
     let engine_curve = engine_to_curve_value(engine_value);
     let player_base = player_racer_base();
 
@@ -265,7 +266,7 @@ fn write_menu_setup(
     mode: RaceStartMode,
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
-    let engine_value = setup.engine_setting_raw_value as f32 / 100.0;
+    let engine_value = engine_setting_value(setup.engine_setting_raw_value);
 
     write_i32(system_ram, GLOBALS.num_players, GAME_IDS.single_player)?;
     write_i32(system_ram, GLOBALS.total_lap_count, setup.total_lap_count)?;
@@ -302,7 +303,7 @@ fn write_menu_setup(
 }
 
 fn write_live_racer_setup(system_ram: &mut [u8], setup: RaceStartSetup) -> Result<(), CoreError> {
-    let engine_value = setup.engine_setting_raw_value as f32 / 100.0;
+    let engine_value = engine_setting_value(setup.engine_setting_raw_value);
     let player_base = player_racer_base();
     write_i8(
         system_ram,
@@ -384,6 +385,10 @@ fn validate_character_and_engine(
         )));
     }
     Ok(())
+}
+
+fn engine_setting_value(engine_setting_raw_value: i32) -> f32 {
+    engine_setting_raw_value as f32 / BOUNDS.engine_setting_max as f32
 }
 
 fn invalid_setup(message: String) -> CoreError {

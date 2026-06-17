@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
 
@@ -14,14 +15,14 @@ class GenericModeBaselineDefaults:
 
     course_index: int = 0
     vehicle: str = "blue_falcon"
-    engine_setting_raw_value: int = 50
+    engine_setting_raw_value: int = engine_percent_to_slider_step(50)
 
 
 @dataclass(frozen=True, slots=True)
 class BaselineMaterializerSettings:
     """Stable materializer settings that affect cache identity and filenames."""
 
-    schema_version: int = 16
+    schema_version: int = 17
     boot_menu_gp_race_mode: str = "boot_menu_gp_race"
     boot_menu_time_attack_mode: str = "boot_menu_time_attack"
     generic_mode_gp_race_mode: str = "generic_mode_gp_race"

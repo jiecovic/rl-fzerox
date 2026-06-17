@@ -6,6 +6,7 @@ import type {
   EngineMode,
   SliderTick,
 } from "@/entities/runConfig/ui/sections/vehicle/engineSetting/types";
+import { engineSliderStepLabel } from "@/shared/domain/engineBuckets";
 import { FieldLabel } from "@/shared/ui/configFields/label";
 import {
   blurOnEnter,
@@ -108,10 +109,10 @@ export function EngineSettingControl({
         </div>
         <div className="w-[176px] max-[720px]:w-full">
           {mode === "fixed" ? (
-            <div className="grid grid-cols-[repeat(2,84px)] justify-end gap-2 max-[720px]:justify-start">
+            <div className="grid justify-end gap-1 max-[720px]:justify-start">
               <FieldInput
                 aria-label={label}
-                className="col-span-2 !h-[34px] !w-[176px] text-center tabular-nums"
+                className="!h-[34px] !w-[176px] text-center tabular-nums"
                 max={max}
                 min={min}
                 step={1}
@@ -121,33 +122,41 @@ export function EngineSettingControl({
                 onChange={(event) => fixedInput.changeRawValue(event.target.value)}
                 onKeyDown={blurOnEnter}
               />
+              <small className="m-0 text-right text-[11px] leading-snug text-app-muted max-[720px]:text-left">
+                {engineSliderStepLabel(fixedValue)} - step {fixedValue}
+              </small>
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(2,84px)] justify-end gap-2 max-[720px]:justify-start">
-              <FieldInput
-                aria-label={`${label} minimum`}
-                className="!h-[34px] !w-[84px] text-center tabular-nums"
-                max={rangeMax}
-                min={min}
-                step={1}
-                {...editableNumberInputProps("integer")}
-                value={rangeMinInput.rawValue}
-                onBlur={rangeMinInput.commitRawValue}
-                onChange={(event) => rangeMinInput.changeRawValue(event.target.value)}
-                onKeyDown={blurOnEnter}
-              />
-              <FieldInput
-                aria-label={`${label} maximum`}
-                className="!h-[34px] !w-[84px] text-center tabular-nums"
-                max={max}
-                min={rangeMin}
-                step={1}
-                {...editableNumberInputProps("integer")}
-                value={rangeMaxInput.rawValue}
-                onBlur={rangeMaxInput.commitRawValue}
-                onChange={(event) => rangeMaxInput.changeRawValue(event.target.value)}
-                onKeyDown={blurOnEnter}
-              />
+            <div className="grid justify-end gap-1 max-[720px]:justify-start">
+              <div className="grid grid-cols-[repeat(2,84px)] gap-2">
+                <FieldInput
+                  aria-label={`${label} minimum`}
+                  className="!h-[34px] !w-[84px] text-center tabular-nums"
+                  max={rangeMax}
+                  min={min}
+                  step={1}
+                  {...editableNumberInputProps("integer")}
+                  value={rangeMinInput.rawValue}
+                  onBlur={rangeMinInput.commitRawValue}
+                  onChange={(event) => rangeMinInput.changeRawValue(event.target.value)}
+                  onKeyDown={blurOnEnter}
+                />
+                <FieldInput
+                  aria-label={`${label} maximum`}
+                  className="!h-[34px] !w-[84px] text-center tabular-nums"
+                  max={max}
+                  min={rangeMin}
+                  step={1}
+                  {...editableNumberInputProps("integer")}
+                  value={rangeMaxInput.rawValue}
+                  onBlur={rangeMaxInput.commitRawValue}
+                  onChange={(event) => rangeMaxInput.changeRawValue(event.target.value)}
+                  onKeyDown={blurOnEnter}
+                />
+              </div>
+              <small className="m-0 text-right text-[11px] leading-snug text-app-muted max-[720px]:text-left">
+                {engineSliderStepLabel(rangeMin)}-{engineSliderStepLabel(rangeMax)}
+              </small>
             </div>
           )}
         </div>

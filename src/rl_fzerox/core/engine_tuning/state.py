@@ -9,7 +9,7 @@ import torch
 
 from rl_fzerox.core.engine_tuning.types import EngineTunerBackend
 
-ENGINE_TUNING_STATE_VERSION = 5
+ENGINE_TUNING_STATE_VERSION = 6
 
 
 @dataclass(frozen=True, slots=True)

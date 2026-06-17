@@ -67,7 +67,7 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
                 context_key=context.key,
                 course_key=context.course_key,
                 vehicle_id=context.vehicle_id,
-                engine_setting_raw_value=54,
+                engine_setting_raw_value=44,
                 finish_count=2,
                 decayed_count=2.0,
                 decayed_score_total=-200.0,
@@ -79,7 +79,7 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
                 context_key=context.key,
                 course_key=context.course_key,
                 vehicle_id=context.vehicle_id,
-                engine_setting_raw_value=67,
+                engine_setting_raw_value=84,
                 finish_count=1,
                 decayed_count=1.0,
                 decayed_score_total=-80.0,
@@ -93,9 +93,9 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
     payload = engine_tuning_state_payload(
         state,
         settings=BanditEngineTunerSettings(
-            min_raw_value=40,
-            max_raw_value=70,
-            bucket_size=10,
+            min_raw_value=44,
+            max_raw_value=84,
+            slider_spacing=10,
             prior_finish_time_seconds=200.0,
         ),
     )
@@ -104,16 +104,17 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
     candidates = payload["candidates"]
     assert payload["model_backend"] == "bandit"
     assert isinstance(candidates, list)
-    assert [candidate["engine_setting_raw_value"] for candidate in candidates] == [50, 70]
+    assert [candidate["engine_setting_raw_value"] for candidate in candidates] == [44, 84]
     assert isinstance(contexts, list)
     assert contexts[0]["observed_candidate_count"] == 2
     assert [candidate["engine_setting_raw_value"] for candidate in contexts[0]["candidates"]] == [
-        40,
-        50,
-        60,
-        70,
+        44,
+        54,
+        64,
+        74,
+        84,
     ]
-    assert contexts[0]["recommended_engine_setting_raw_value"] == 70
+    assert contexts[0]["recommended_engine_setting_raw_value"] == 84
 
 
 def test_engine_tuning_payload_uses_bandit_bucket_recommendation() -> None:
@@ -129,7 +130,7 @@ def test_engine_tuning_payload_uses_bandit_bucket_recommendation() -> None:
                 context_key=context.key,
                 course_key=context.course_key,
                 vehicle_id=context.vehicle_id,
-                engine_setting_raw_value=20,
+                engine_setting_raw_value=25,
                 finish_count=1,
                 decayed_count=1.0,
                 decayed_score_total=-80.0,
@@ -156,12 +157,12 @@ def test_engine_tuning_payload_uses_bandit_bucket_recommendation() -> None:
         state,
         settings=BanditEngineTunerSettings(
             min_raw_value=0,
-            max_raw_value=100,
-            bucket_size=10,
+            max_raw_value=128,
+            slider_spacing=13,
             prior_finish_time_seconds=200.0,
         ),
     )
 
     contexts = payload["contexts"]
     assert isinstance(contexts, list)
-    assert contexts[0]["recommended_engine_setting_raw_value"] == 20
+    assert contexts[0]["recommended_engine_setting_raw_value"] == 25

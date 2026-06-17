@@ -167,7 +167,7 @@ describe("Configurator", () => {
         engine_setting_min_raw_value: 0,
         engine_setting_max_raw_value: 100,
         adaptive_engine_tuner_backend: "bandit",
-        adaptive_engine_bandit_bucket_size: 10,
+        adaptive_engine_bandit_slider_spacing: 10,
       },
     };
 
@@ -179,7 +179,7 @@ describe("Configurator", () => {
         forkSourceEngineTunerBackend="gaussian_process"
         forkSourceEngineTuning={{
           backend: "gaussian_process",
-          banditBucketSize: null,
+          banditSliderSpacing: null,
           minRawValue: 0,
           maxRawValue: 100,
         }}
@@ -230,7 +230,7 @@ describe("Configurator", () => {
         engine_setting_min_raw_value: 5,
         engine_setting_max_raw_value: 95,
         adaptive_engine_tuner_backend: "bandit",
-        adaptive_engine_bandit_bucket_size: 15,
+        adaptive_engine_bandit_slider_spacing: 15,
       },
     };
 
@@ -242,7 +242,7 @@ describe("Configurator", () => {
         forkSourceEngineTunerBackend="bandit"
         forkSourceEngineTuning={{
           backend: "bandit",
-          banditBucketSize: 15,
+          banditSliderSpacing: 15,
           minRawValue: 5,
           maxRawValue: 95,
         }}
@@ -271,7 +271,7 @@ describe("Configurator", () => {
         "bandit fork",
         expect.objectContaining({
           vehicle: expect.objectContaining({
-            adaptive_engine_bandit_bucket_size: 15,
+            adaptive_engine_bandit_slider_spacing: 15,
             adaptive_engine_tuner_backend: "bandit",
             engine_mode: "adaptive_tuner",
           }),

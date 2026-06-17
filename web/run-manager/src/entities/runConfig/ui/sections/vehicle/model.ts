@@ -1,5 +1,6 @@
 // web/run-manager/src/entities/runConfig/ui/sections/vehicle/model.ts
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
+import { engineSliderStepLabel } from "@/shared/domain/engineBuckets";
 
 export interface VehicleRow {
   id: string;
@@ -44,9 +45,11 @@ export function selectionSummary(selectedVehicles: readonly ConfigMetadata["vehi
 
 export function engineSettingSummary(config: ManagedRunConfig["vehicle"]) {
   if (config.engine_mode === "fixed") {
-    return String(config.engine_setting_raw_value);
+    return engineSettingStepSummary(config.engine_setting_raw_value);
   }
-  const range = `${config.engine_setting_min_raw_value}-${config.engine_setting_max_raw_value}`;
+  const range = `${engineSettingStepSummary(
+    config.engine_setting_min_raw_value,
+  )}-${engineSettingStepSummary(config.engine_setting_max_raw_value)}`;
   if (config.engine_mode !== "adaptive_tuner") {
     return range;
   }
@@ -57,6 +60,10 @@ export function engineSettingSummary(config: ManagedRunConfig["vehicle"]) {
         ? "GP exp"
         : "bandit";
   return `adaptive ${backend} ${range}`;
+}
+
+function engineSettingStepSummary(step: number) {
+  return `${engineSliderStepLabel(step)} (${step})`;
 }
 
 export function vehicleSlotLabel(machineSelectSlot: number) {

@@ -17,7 +17,7 @@ def test_race_setup_uses_native_live_vehicle_setup_keys() -> None:
             "frame_index": 0,
             "native_fps": 60.0,
             "racer_character_index": 0,
-            "engine_setting_raw_value": 50,
+            "engine_setting_raw_value": 64,
         },
         reset_info={},
         episode_reward=0.0,

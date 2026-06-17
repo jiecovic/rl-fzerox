@@ -49,7 +49,7 @@ def test_materialize_train_run_config_reuses_baseline_materializer_cache(
             course_index=0,
             mode="time_attack",
             vehicle="blue_falcon",
-            engine_setting_raw_value=50,
+            engine_setting_raw_value=64,
         ),
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
@@ -132,7 +132,7 @@ def test_materialize_train_run_config_regenerates_stale_run_local_baseline_for_i
             course_index=0,
             mode="time_attack",
             vehicle="blue_falcon",
-            engine_setting_raw_value=50,
+            engine_setting_raw_value=64,
         ),
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
@@ -152,7 +152,7 @@ def test_materialize_train_run_config_regenerates_stale_run_local_baseline_for_i
             mode="time_attack",
             character_index=0,
             machine_select_slot=0,
-            engine_setting_raw_value=50,
+            engine_setting_raw_value=64,
             race_intro_target_timer=None,
         )
     ]

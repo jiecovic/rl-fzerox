@@ -43,6 +43,7 @@ class RaceStartVariant:
     course_index: int
     mode: RaceStartMode
     character_index: int
+    # Canonical F-Zero X engine slider step, not display percent: 0..128.
     engine_setting_raw_value: int
     race_intro_target_timer: int | None
     gp_difficulty: RaceDifficultyName | None = None

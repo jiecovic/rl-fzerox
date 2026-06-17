@@ -116,7 +116,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
                     latest_finish_time_ms=101234,
                     latest_finish_setup={
                         "vehicle_name": "Blue Falcon",
-                        "engine_setting_raw_value": 40,
+                        "engine_setting_raw_value": 51,
                     },
                     attempt_stats={
                         "attempts": 3,
@@ -181,13 +181,13 @@ def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
                     best_finish_rank_time_ms=101_000,
                     best_finish_rank_setup={
                         "vehicle_name": "Deep Claw",
-                        "engine_setting_raw_value": 60,
+                        "engine_setting_raw_value": 77,
                     },
                     best_finish_time_ms=98765,
                     best_finish_time_rank=2,
                     best_finish_time_setup={
                         "vehicle_name": "Blue Falcon",
-                        "engine_setting_raw_value": 50,
+                        "engine_setting_raw_value": 64,
                     },
                 )
             }

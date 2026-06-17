@@ -10,6 +10,10 @@ from random import Random
 
 import torch
 
+from rl_fzerox.core.domain.engine_setting import (
+    ENGINE_SLIDER_STEP_MAX,
+    engine_percent_to_slider_step,
+)
 from rl_fzerox.core.engine_tuning.sampling import (
     StableGreedySelection,
     stable_greedy_engine_setting,
@@ -43,7 +47,7 @@ class EngineTuningEnsembleShape:
     course_embedding_dim: int = 8
     vehicle_embedding_dim: int = 4
     engine_basis_count: int = 21
-    engine_basis_width_raw: float = 7.5
+    engine_basis_width_raw: float = float(engine_percent_to_slider_step(7.5))
     hidden_dim: int = 32
     training_steps: int = 48
     learning_rate: float = 0.004
@@ -493,7 +497,10 @@ def _training_tensors(
             [vehicle_index[outcome.context.vehicle_id] for outcome, _, _ in successful]
         ).long(),
         engine_values=torch.Tensor(
-            [outcome.engine_setting_raw_value / 100.0 for outcome, _, _ in successful]
+            [
+                outcome.engine_setting_raw_value / float(ENGINE_SLIDER_STEP_MAX)
+                for outcome, _, _ in successful
+            ]
         ),
         targets=torch.Tensor([score for _, score, _ in successful]),
         weights=torch.Tensor(len(successful)).fill_(1.0),
@@ -570,7 +577,9 @@ def _predict_member_scores(
     vehicle_index = state.vehicle_ids.index(context.vehicle_id)
     course_indices = torch.Tensor(len(candidates)).fill_(course_index).long()
     vehicle_indices = torch.Tensor(len(candidates)).fill_(vehicle_index).long()
-    engine_values = torch.Tensor([candidate / 100.0 for candidate in candidates])
+    engine_values = torch.Tensor(
+        [candidate / float(ENGINE_SLIDER_STEP_MAX) for candidate in candidates]
+    )
     scores_by_engine = {candidate: [] for candidate in candidates}
     for member_index, member_state in enumerate(state.members):
         model = _EngineTuningMember(
@@ -815,7 +824,7 @@ def _engine_basis(engine_values: torch.Tensor, shape: EngineTuningEnsembleShape)
     centers = engine_values.new_tensor(
         [index / (center_count - 1) for index in range(center_count)]
     )
-    width = max(0.001, float(shape.engine_basis_width_raw) / 100.0)
+    width = max(0.001, float(shape.engine_basis_width_raw) / float(ENGINE_SLIDER_STEP_MAX))
     distances = (engine_values.unsqueeze(-1) - centers) / width
     basis = (-0.5 * distances.pow(2)).exp()
     return basis / basis.sum(dim=-1, keepdim=True).clamp_min(1.0e-6)

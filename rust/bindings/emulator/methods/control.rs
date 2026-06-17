@@ -233,6 +233,10 @@ pub(in crate::bindings::emulator) fn vehicle_setup_info<'py>(
     dict.set_item("player_character_index_ram", setup.player_character_index)?;
     dict.set_item("racer_character_index_ram", setup.racer_character_index)?;
     dict.set_item("engine_setting_ram", setup.engine_setting)?;
+    dict.set_item(
+        "engine_setting_raw_value_ram",
+        (setup.engine_setting * 128.0).round() as i32,
+    )?;
     dict.set_item("engine_setting_percent_ram", setup.engine_setting * 100.0)?;
     dict.set_item(
         "character_engine_setting_ram",

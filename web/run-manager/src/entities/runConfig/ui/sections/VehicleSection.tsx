@@ -10,7 +10,11 @@ import {
   vehicleSlotLabel,
 } from "@/entities/runConfig/ui/sections/vehicle/model";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
-import { centeredEngineBuckets } from "@/shared/domain/engineBuckets";
+import {
+  centeredEngineBuckets,
+  ENGINE_SLIDER_STEP_MAX,
+  enginePercentToSliderStep,
+} from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
 import { cn } from "@/shared/ui/cn";
 import { ConfigGrid, ConfigStack } from "@/shared/ui/config/ConfigLayout";
@@ -37,7 +41,10 @@ export function VehicleSection({
   metadata,
   setConfig,
 }: VehicleSectionProps) {
-  const randomEngineDefaults = { min: 20, max: 80 } as const;
+  const randomEngineDefaults = {
+    max: enginePercentToSliderStep(80),
+    min: enginePercentToSliderStep(20),
+  } as const;
   const rows = useMemo(() => vehicleRows(metadata), [metadata]);
   const allVehicles = useMemo(() => orderedVehicles(metadata), [metadata]);
   const allVehicleIds = useMemo(() => allVehicles.map((vehicle) => vehicle.id), [allVehicles]);
@@ -54,9 +61,9 @@ export function VehicleSection({
     row.vehicles.some((vehicle) => selectedVehicleSet.has(vehicle.id)),
   ).length;
   const engineTicks = [
-    { value: 0, label: "0" },
-    { value: 50, label: "50" },
-    { value: 100, label: "100" },
+    { value: 0, label: "ENG 0" },
+    { value: enginePercentToSliderStep(50), label: "ENG 50" },
+    { value: ENGINE_SLIDER_STEP_MAX, label: "ENG 100" },
   ] as const;
 
   const updateVehicle = (patch: Partial<ManagedRunConfig["vehicle"]>) => {
@@ -87,7 +94,7 @@ export function VehicleSection({
           return {
             engine_mode: mode,
             engine_setting_min_raw_value: 0,
-            engine_setting_max_raw_value: 100,
+            engine_setting_max_raw_value: ENGINE_SLIDER_STEP_MAX,
           };
         }
         if (currentConfig.vehicle.engine_mode !== "fixed") {
@@ -238,13 +245,13 @@ export function VehicleSection({
               fixedValue={config.vehicle.engine_setting_raw_value}
               help={
                 config.vehicle.engine_mode === "fixed"
-                  ? "F-Zero X engine slider. Lower values bias acceleration, higher values bias top speed."
+                  ? "F-Zero X engine slider step. Labels show the rounded in-game ENG percent."
                   : config.vehicle.engine_mode === "random_range"
-                    ? "Sample one engine slider value inside this range on each episode reset."
-                    : "Candidate engine slider range used by the adaptive tuner at episode reset."
+                    ? "Sample one representable engine slider step inside this range on each episode reset."
+                    : "Candidate engine slider-step range used by the adaptive tuner at episode reset."
               }
               label={config.vehicle.engine_mode === "fixed" ? "Engine slider" : "Engine range"}
-              max={100}
+              max={ENGINE_SLIDER_STEP_MAX}
               min={0}
               mode={config.vehicle.engine_mode}
               rangeMax={config.vehicle.engine_setting_max_raw_value}
@@ -426,12 +433,12 @@ function AdaptiveEngineControls({
   const banditBuckets = useMemo(
     () =>
       centeredEngineBuckets({
-        bucketSize: vehicle.adaptive_engine_bandit_bucket_size,
+        sliderSpacing: vehicle.adaptive_engine_bandit_slider_spacing,
         minimum: vehicle.engine_setting_min_raw_value,
         maximum: vehicle.engine_setting_max_raw_value,
       }),
     [
-      vehicle.adaptive_engine_bandit_bucket_size,
+      vehicle.adaptive_engine_bandit_slider_spacing,
       vehicle.engine_setting_max_raw_value,
       vehicle.engine_setting_min_raw_value,
     ],
@@ -478,13 +485,13 @@ function AdaptiveEngineControls({
       <div className="grid gap-3 lg:grid-cols-3">
         {isBanditBackend ? (
           <NumberField
-            help="Bandit-only raw engine spacing, mirrored around 50 and including the configured range boundaries."
-            label="Bucket size"
-            resetValue={defaultVehicle.adaptive_engine_bandit_bucket_size}
+            help="Distance in engine slider steps between bandit candidates. Range endpoints are always included."
+            label="Engine slider spacing"
+            resetValue={defaultVehicle.adaptive_engine_bandit_slider_spacing}
             step="1"
-            value={vehicle.adaptive_engine_bandit_bucket_size}
-            onChange={(adaptive_engine_bandit_bucket_size) =>
-              onChange({ adaptive_engine_bandit_bucket_size })
+            value={vehicle.adaptive_engine_bandit_slider_spacing}
+            onChange={(adaptive_engine_bandit_slider_spacing) =>
+              onChange({ adaptive_engine_bandit_slider_spacing })
             }
           />
         ) : null}

@@ -314,9 +314,9 @@ def test_state_tab_shows_auxiliary_state_predictions_next_to_targets() -> None:
     refill_line = next(line for line in state_section.lines if line.label == "on_refill_surface")
     course_line = next(line for line in state_section.lines if line.label == "course id")
 
-    assert edge_ratio_line.value == "  0.12 |   0.25 |    6% |       "
-    assert refill_line.value == "  0.26 |   0.00 |  hit  |       "
-    assert course_line.value == " 7@82% |      3 | miss  |       "
+    assert edge_ratio_line.value == " 0.1250 |  0.2500 |    6% |        "
+    assert refill_line.value == " 0.2600 |  0.0000 |  hit  |        "
+    assert course_line.value == " 7@82% |       3 | miss  |        "
 
 
 def test_session_section_shows_episode_step_counter() -> None:
@@ -588,14 +588,14 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
     values = _panel_group_values(state_vector_section, "Vehicle")
 
     assert values == {
-        "speed_norm": "0.500",
-        "energy_frac": "0.750",
-        "reverse_active": "1.000",
-        "airborne": "0.000",
-        "boost_unlocked": "1.000",
-        "boost_active": "0.000",
-        "lateral_velocity_norm": "0.250",
-        "sliding_active": "1.000",
+        "speed_norm": "0.5000",
+        "energy_frac": "0.7500",
+        "reverse_active": "1.0000",
+        "airborne": "0.0000",
+        "boost_unlocked": "1.0000",
+        "boost_active": "0.0000",
+        "lateral_velocity_norm": "0.2500",
+        "sliding_active": "1.0000",
     }
 
 
