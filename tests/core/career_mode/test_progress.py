@@ -4,13 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from rl_fzerox.core.career_mode.attempts import CareerAttemptProgress
 from rl_fzerox.core.career_mode.course_setup import CourseSetupTarget
 from rl_fzerox.core.career_mode.progress import (
     build_unlock_progress,
     default_unlock_targets,
 )
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
-from rl_fzerox.core.career_mode.runner.progress import CareerAttemptProgress
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.models import (
     ManagedRun,

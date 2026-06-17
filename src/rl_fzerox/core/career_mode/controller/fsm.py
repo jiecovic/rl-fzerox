@@ -4,6 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
+from rl_fzerox.core.career_mode.attempts import (
+    CareerAttemptProgress,
+    CareerProgressTransition,
+)
 from rl_fzerox.core.career_mode.controller.engine_setup import CareerEngineSetupFlow
 from rl_fzerox.core.career_mode.controller.events import CareerControllerLifecycleEvents
 from rl_fzerox.core.career_mode.controller.menu_flow import (
@@ -38,10 +42,6 @@ from rl_fzerox.core.career_mode.navigation import (
 )
 from rl_fzerox.core.career_mode.policy import CareerModePolicyControl, CareerPolicyResolver
 from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
-from rl_fzerox.core.career_mode.runner.progress import (
-    CareerAttemptProgress,
-    CareerProgressTransition,
-)
 from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan
 from rl_fzerox.core.career_mode.runner.save_file import SaveRamSession
 from rl_fzerox.core.career_mode.runner.setup import (
