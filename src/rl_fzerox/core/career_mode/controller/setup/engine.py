@@ -1,10 +1,10 @@
-# src/rl_fzerox/core/career_mode/controller/engine_setup.py
+# src/rl_fzerox/core/career_mode/controller/setup/engine.py
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from rl_fzerox.core.career_mode.controller.menu_flow import engine_adjust_tap_count
+from rl_fzerox.core.career_mode.controller.setup.menu_flow import engine_adjust_tap_count
 from rl_fzerox.core.career_mode.navigation import (
     MENU_TIMING,
     MenuFacts,

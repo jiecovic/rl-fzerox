@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/controller/post_gp.py
+# src/rl_fzerox/core/career_mode/controller/lifecycle/post_gp.py
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -8,30 +8,28 @@ from rl_fzerox.core.career_mode.attempts import (
     CareerAttemptProgress,
     CareerProgressTransition,
 )
-from rl_fzerox.core.career_mode.controller.camera import CareerCameraSync
-from rl_fzerox.core.career_mode.controller.engine_setup import CareerEngineSetupFlow
-from rl_fzerox.core.career_mode.controller.events import CareerControllerLifecycleEvents
-from rl_fzerox.core.career_mode.controller.menu_flow import (
-    cup_selection_input,
-    is_neutral_settle_step,
-    pending_step_matches_observed_screen,
-)
-from rl_fzerox.core.career_mode.controller.menu_queue import CareerMenuStepQueue
-from rl_fzerox.core.career_mode.controller.post_race import PostRaceContinuation
-from rl_fzerox.core.career_mode.controller.progress_sync import CareerPostTerminalProgressSync
-from rl_fzerox.core.career_mode.controller.recording import (
+from rl_fzerox.core.career_mode.controller.lifecycle import (
+    CareerControllerLifecycleEvents,
+    CareerPostTerminalProgressSync,
     CareerRecordingSegmentStatus,
     CareerRecordingSegmentTracker,
-    recording_status_from_attempt_status,
-)
-from rl_fzerox.core.career_mode.controller.terminal import (
+    PostRaceContinuation,
     race_terminal_reason,
+    recording_status_from_attempt_status,
     terminal_info,
 )
-from rl_fzerox.core.career_mode.controller.view import (
+from rl_fzerox.core.career_mode.controller.presentation import (
     CareerControllerViewState,
     career_debug_context,
     career_viewer_info,
+)
+from rl_fzerox.core.career_mode.controller.setup import (
+    CareerCameraSync,
+    CareerEngineSetupFlow,
+    CareerMenuStepQueue,
+    cup_selection_input,
+    is_neutral_settle_step,
+    pending_step_matches_observed_screen,
 )
 from rl_fzerox.core.career_mode.execution.race import SaveRaceExecutionPlan
 from rl_fzerox.core.career_mode.execution.save_file import SaveRamSession

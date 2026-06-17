@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/controller/menu_queue.py
+# src/rl_fzerox/core/career_mode/controller/setup/menu_queue.py
 from __future__ import annotations
 
 from collections import deque

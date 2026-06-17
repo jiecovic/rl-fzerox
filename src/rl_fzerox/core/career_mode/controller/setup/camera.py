@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/controller/camera.py
+# src/rl_fzerox/core/career_mode/controller/setup/camera.py
 from __future__ import annotations
 
 from dataclasses import dataclass

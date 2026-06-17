@@ -10,10 +10,10 @@ from rl_fzerox.core.career_mode.controller import (
     CareerModeController,
     _cup_selection_input,
 )
-from rl_fzerox.core.career_mode.controller.recording import (
+from rl_fzerox.core.career_mode.controller.lifecycle import (
     CareerRecordingSegmentTracker,
+    post_terminal_progress_screen,
 )
-from rl_fzerox.core.career_mode.controller.terminal import post_terminal_progress_screen
 from rl_fzerox.core.career_mode.execution.race import SaveRaceExecutionPlan, SaveRaceSetup
 from rl_fzerox.core.career_mode.navigation import (
     MENU_TIMING,
