@@ -13,6 +13,7 @@ from rl_fzerox.core.career_mode.controller import (
 from rl_fzerox.core.career_mode.controller.recording import (
     CareerRecordingSegmentTracker,
 )
+from rl_fzerox.core.career_mode.execution.race import SaveRaceExecutionPlan, SaveRaceSetup
 from rl_fzerox.core.career_mode.navigation import (
     MENU_TIMING,
     CareerPhase,
@@ -23,7 +24,6 @@ from rl_fzerox.core.career_mode.navigation import (
     engine_adjust_steps,
     observed_menu_screen,
 )
-from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan, SaveRaceSetup
 from rl_fzerox.core.career_mode.runner.terminal import post_terminal_progress_screen
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig

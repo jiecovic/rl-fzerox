@@ -13,12 +13,12 @@ from rl_fzerox.core.career_mode.course_setup import (
     resolve_course_setup,
     resolve_cup_setup,
 )
+from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.career_mode.progress import (
     UnlockRuleTarget,
     build_unlock_progress,
     default_unlock_targets,
 )
-from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
 from rl_fzerox.core.domain.engine_setting import (
     engine_percent_to_slider_step,
     validate_engine_slider_step,

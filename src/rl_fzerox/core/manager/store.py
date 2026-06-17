@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
+from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
 from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
 from rl_fzerox.core.manager.db import manager_engine

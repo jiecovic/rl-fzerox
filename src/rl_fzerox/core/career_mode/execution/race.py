@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/runner/race.py
+# src/rl_fzerox/core/career_mode/execution/race.py
 """Race setup resolution for save-game unlock attempts."""
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
+from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
     vehicle_by_id,

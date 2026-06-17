@@ -6,7 +6,7 @@ from math import ceil
 from pathlib import Path
 
 from rl_fzerox.apps._cli import normalize_cli_overrides
-from rl_fzerox.core.career_mode.runner.race import (
+from rl_fzerox.core.career_mode.execution.race import (
     SaveRaceSetup,
     build_save_race_execution_plan,
 )
