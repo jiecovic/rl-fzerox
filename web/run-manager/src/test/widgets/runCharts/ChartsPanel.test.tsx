@@ -203,6 +203,7 @@ describe("ChartsPanel", () => {
 
   it("colors selected runs individually when one lineage is selected", async () => {
     window.localStorage.clear();
+    const user = userEvent.setup();
     fetchFreshRunMetricsMock.mockResolvedValue([]);
     getCachedRunMetricsMock.mockReturnValue(null);
 
@@ -225,8 +226,110 @@ describe("ChartsPanel", () => {
 
     render(<ChartsPanel onGlobalError={vi.fn()} focusedRunId={null} runs={[forkRun, rootRun]} />);
 
+    await user.click(screen.getByRole("radio", { name: "Runs" }));
+
     expect(legendSwatchStyle(forkRun.name)).not.toBe(legendSwatchStyle(rootRun.name));
     expect(selectedLegendNames()).toEqual([forkRun.name, rootRun.name]);
+  });
+
+  it("collapses straight fork continuations into one branch legend entry", async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const rootRun = runFixture({
+      id: "run-root",
+      name: "ppo_test_1",
+      lineage_id: "lineage-a",
+      created_at: "2026-05-03T18:52:02+00:00",
+      status: "stopped",
+    });
+    const forkRun = runFixture({
+      id: "run-fork",
+      name: "ppo_test_1 fork",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:39:23+00:00",
+      status: "stopped",
+    });
+    const secondForkRun = runFixture({
+      id: "run-fork-2",
+      name: "ppo_test_1 fork fork",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-fork",
+      source_run_id: "run-fork",
+      created_at: "2026-05-04T08:58:00+00:00",
+      status: "stopped",
+    });
+
+    render(
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[secondForkRun, forkRun, rootRun]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Select all" }));
+
+    expect(selectedLegendNames()).toEqual(["ppo_test_1 · 3 runs"]);
+    expect(selectionSwatchStyle(secondForkRun.name)).toBe(selectionSwatchStyle(forkRun.name));
+    expect(selectionSwatchStyle(forkRun.name)).toBe(selectionSwatchStyle(rootRun.name));
+  });
+
+  it("keeps divergent sibling forks in separate branch colors", async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const rootRun = runFixture({
+      id: "run-root",
+      name: "ppo_test_1",
+      lineage_id: "lineage-a",
+      created_at: "2026-05-03T18:52:02+00:00",
+      status: "stopped",
+    });
+    const airBrakeFork = runFixture({
+      id: "run-air-brake",
+      name: "ppo_test_1 air brake",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:39:23+00:00",
+      status: "stopped",
+    });
+    const noAirBrakeFork = runFixture({
+      id: "run-no-air-brake",
+      name: "ppo_test_1 no air brake",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:58:00+00:00",
+      status: "stopped",
+    });
+
+    render(
+      <ChartsPanel
+        onGlobalError={vi.fn()}
+        focusedRunId={null}
+        runs={[noAirBrakeFork, airBrakeFork, rootRun]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Select all" }));
+
+    expect(selectedLegendNames()).toEqual([
+      "ppo_test_1",
+      "ppo_test_1 air brake",
+      "ppo_test_1 no air brake",
+    ]);
+    expect(selectionSwatchStyle(airBrakeFork.name)).not.toBe(selectionSwatchStyle(rootRun.name));
+    expect(selectionSwatchStyle(airBrakeFork.name)).not.toBe(
+      selectionSwatchStyle(noAirBrakeFork.name),
+    );
   });
 
   it("colors runs by lineage when multiple lineages are selected", async () => {
@@ -267,6 +370,7 @@ describe("ChartsPanel", () => {
       />,
     );
 
+    await user.click(screen.getByRole("radio", { name: "Lineages" }));
     await user.click(within(rowForRun(rootRun.name)).getByRole("checkbox"));
 
     expect(selectedLegendNames()).toEqual(["ppo_test_1", "ppo_masked_lidar"]);
@@ -327,7 +431,7 @@ describe("ChartsPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Clear" }));
     await user.click(lineageToggle);
-    expect(selectedLegendNames()).toEqual(["ppo_test_1 fork", "ppo_test_1"]);
+    expect(selectedLegendNames()).toEqual(["ppo_test_1 · 2 runs"]);
 
     await user.click(lineageToggle);
     expect(

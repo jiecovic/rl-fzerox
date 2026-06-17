@@ -1,4 +1,6 @@
 // web/run-manager/src/entities/runChart/model/lineages.ts
+
+import { buildBranchGroupKeyByRunId } from "@/entities/runChart/model/colors";
 import type { ManagedRun } from "@/shared/api/contract";
 
 export type LineageInfo = {
@@ -8,6 +10,13 @@ export type LineageInfo = {
 };
 
 export type LineageRunGroup = LineageInfo & {
+  runs: ManagedRun[];
+};
+
+export type BranchRunGroup = {
+  color: string;
+  id: string;
+  label: string;
   runs: ManagedRun[];
 };
 
@@ -56,6 +65,35 @@ export function buildLineageRunGroups(
   return [...groupsByLineageId.values()];
 }
 
+export function buildBranchRunGroups(
+  selectedRuns: readonly ManagedRun[],
+  colorByRunId: ReadonlyMap<string, string>,
+) {
+  const groupKeyByRunId = buildBranchGroupKeyByRunId(selectedRuns);
+  const groupsByKey = new Map<string, ManagedRun[]>();
+  for (const run of selectedRuns) {
+    const groupKey = groupKeyByRunId.get(run.id) ?? run.id;
+    const groupRuns = groupsByKey.get(groupKey);
+    if (groupRuns === undefined) {
+      groupsByKey.set(groupKey, [run]);
+    } else {
+      groupRuns.push(run);
+    }
+  }
+  return [...groupsByKey.entries()]
+    .map(([groupKey, groupRuns]) => {
+      const sortedRuns = [...groupRuns].sort(compareRunsAscending);
+      const firstRun = sortedRuns[0] ?? groupRuns[0];
+      return {
+        color: colorByRunId.get(firstRun?.id ?? "") ?? "var(--accent)",
+        id: groupKey,
+        label: branchGroupLabel(sortedRuns),
+        runs: sortedRuns,
+      } satisfies BranchRunGroup;
+    })
+    .sort(compareBranchGroupsAscending);
+}
+
 export function lineageSelectionState(
   runs: readonly ManagedRun[],
   selectedRunIds: readonly string[],
@@ -97,6 +135,27 @@ function lineageLabel(runs: readonly ManagedRun[]) {
     [...(rootCandidates.length > 0 ? rootCandidates : runs)].sort(compareRunsAscending).at(0) ??
     null;
   return rootRun?.name ?? "Lineage";
+}
+
+function branchGroupLabel(runs: readonly ManagedRun[]) {
+  const firstRun = runs[0] ?? null;
+  if (firstRun === null) {
+    return "Branch";
+  }
+  return runs.length <= 1 ? firstRun.name : `${firstRun.name} · ${runs.length} runs`;
+}
+
+function compareBranchGroupsAscending(left: BranchRunGroup, right: BranchRunGroup) {
+  const leftRun = left.runs[0] ?? null;
+  const rightRun = right.runs[0] ?? null;
+  if (leftRun === null || rightRun === null) {
+    return leftRun === null && rightRun === null
+      ? left.label.localeCompare(right.label)
+      : leftRun === null
+        ? 1
+        : -1;
+  }
+  return compareRunsAscending(leftRun, rightRun);
 }
 
 function compareRunsAscending(left: ManagedRun, right: ManagedRun) {

@@ -10,6 +10,7 @@ export {
 } from "@/entities/runChart/model/catalog";
 export {
   buildChartColorByRunId,
+  type ChartColorMode,
   chartSeriesColor,
 } from "@/entities/runChart/model/colors";
 export {
@@ -17,6 +18,8 @@ export {
   latestPointValue,
 } from "@/entities/runChart/model/format";
 export {
+  type BranchRunGroup,
+  buildBranchRunGroups,
   buildLineageInfoById,
   buildLineageRunGroups,
   defaultSelectedRunIds,

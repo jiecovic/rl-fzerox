@@ -1,11 +1,13 @@
 // web/run-manager/src/widgets/runCharts/ChartsPanel.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  buildBranchRunGroups,
   buildChartColorByRunId,
   buildChartGroups,
   buildLineageInfoById,
   buildLineageRunGroups,
   CHART_RANGE_OPTIONS,
+  type ChartColorMode,
   DEFAULT_CHART_RANGE_MODE,
   defaultSelectedRunIds,
   INITIAL_GROUP_OPEN,
@@ -53,6 +55,7 @@ export function ChartsPanel({
     readStoredSelectedRunIds(runs, focusedRunId),
   );
   const [rangeMode, setRangeMode] = useState<RunMetricRangeMode>(DEFAULT_CHART_RANGE_MODE);
+  const [colorMode, setColorMode] = useState<ChartColorMode>("branch");
   const [groupFilter, setGroupFilter] = useState(() => defaultChartGroupFilter(runs, focusedRunId));
   const groupOptions = useMemo(() => chartGroupOptions(runs), [runs]);
   const fallbackGroupFilter = useMemo(
@@ -160,14 +163,17 @@ export function ChartsPanel({
     }
   }, [loadError, onGlobalError]);
   const colorByRunId = useMemo(
-    () => buildChartColorByRunId(visibleRuns, selectedRuns),
-    [selectedRuns, visibleRuns],
+    () => buildChartColorByRunId(visibleRuns, selectedRuns, colorMode),
+    [colorMode, selectedRuns, visibleRuns],
   );
   const selectedLineageGroups = useMemo(
     () => buildLineageRunGroups(selectedRuns, lineageInfoById),
     [lineageInfoById, selectedRuns],
   );
-  const chartColorMode = selectedLineageGroups.length > 1 ? "lineage" : "run";
+  const selectedBranchGroups = useMemo(
+    () => buildBranchRunGroups(selectedRuns, colorByRunId),
+    [colorByRunId, selectedRuns],
+  );
   const chartGroups = useMemo(
     () => buildChartGroups(selectedRuns, metricsByRun),
     [metricsByRun, selectedRuns],
@@ -268,6 +274,29 @@ export function ChartsPanel({
               onClick: () => setRangeMode(option.value),
             }))}
           />
+          <SegmentedChoiceStrip
+            ariaLabel="Chart color mode"
+            options={[
+              {
+                active: colorMode === "branch",
+                key: "branch",
+                label: "Branches",
+                onClick: () => setColorMode("branch"),
+              },
+              {
+                active: colorMode === "run",
+                key: "run",
+                label: "Runs",
+                onClick: () => setColorMode("run"),
+              },
+              {
+                active: colorMode === "lineage",
+                key: "lineage",
+                label: "Lineages",
+                onClick: () => setColorMode("lineage"),
+              },
+            ]}
+          />
           <DisclosureToolbar
             collapseLabel="Collapse all chart groups"
             expandLabel="Expand all chart groups"
@@ -293,7 +322,8 @@ export function ChartsPanel({
       ) : (
         <div className="grid gap-3.5">
           <RunChartLegend
-            colorMode={chartColorMode}
+            branchGroups={selectedBranchGroups}
+            colorMode={colorMode}
             colorByRunId={colorByRunId}
             groups={selectedLineageGroups}
             onOpenRun={onOpenRun}

@@ -1,21 +1,40 @@
 // web/run-manager/src/widgets/runCharts/chartsPanel/RunChartLegend.tsx
 
-import { chartSeriesColor, type LineageRunGroup } from "@/entities/runChart/model";
+import {
+  type BranchRunGroup,
+  type ChartColorMode,
+  chartSeriesColor,
+  type LineageRunGroup,
+} from "@/entities/runChart/model";
 import type { ManagedRun } from "@/shared/api/contract";
 
 interface RunChartLegendProps {
-  colorMode: "lineage" | "run";
+  branchGroups: readonly BranchRunGroup[];
+  colorMode: ChartColorMode;
   colorByRunId: ReadonlyMap<string, string>;
   groups: readonly LineageRunGroup[];
   onOpenRun?: (run: ManagedRun) => void;
 }
 
 export function RunChartLegend({
+  branchGroups,
   colorByRunId,
   colorMode,
   groups,
   onOpenRun,
 }: RunChartLegendProps) {
+  if (colorMode === "branch") {
+    return (
+      <section className={globalLegendClass} aria-label="Selected run colors">
+        <div className="flex flex-wrap justify-end gap-2 max-[1100px]:justify-start">
+          {branchGroups.map((group) => (
+            <BranchLegendEntry group={group} key={group.id} onOpenRun={onOpenRun} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   if (colorMode === "lineage") {
     return (
       <section className={globalLegendClass} aria-label="Selected run colors">
@@ -55,6 +74,37 @@ export function RunChartLegend({
         </div>
       ))}
     </section>
+  );
+}
+
+function BranchLegendEntry({
+  group,
+  onOpenRun,
+}: {
+  group: BranchRunGroup;
+  onOpenRun?: (run: ManagedRun) => void;
+}) {
+  const firstRun = group.runs[0] ?? null;
+  const content = (
+    <>
+      <LegendSwatch color={group.color} />
+      <span className={`${legendNameClass} run-chart-global-legend-name`}>{group.label}</span>
+    </>
+  );
+  return (
+    <div className="inline-flex">
+      {firstRun === null ? (
+        <span className={`${legendPillClass} run-chart-global-legend-button`}>{content}</span>
+      ) : (
+        <button
+          className={`${legendPillClass} run-chart-global-legend-button`}
+          type="button"
+          onClick={() => onOpenRun?.(firstRun)}
+        >
+          {content}
+        </button>
+      )}
+    </div>
   );
 }
 
