@@ -30,25 +30,30 @@ export function RunComparisonChart({
   seriesUnit,
   title,
 }: RunComparisonChartProps) {
-  const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
+  const groupByRunId = useMemo(() => {
+    const next = new Map<string, RunComparisonSeriesGroup>();
+    for (const group of seriesGroups) {
+      for (const runId of group.runIds) {
+        next.set(runId, group);
+      }
+    }
+    return next;
+  }, [seriesGroups]);
   const series = useMemo(
     () =>
-      seriesGroups.map((group, index) => {
-        const points = group.runIds
-          .flatMap((runId) => {
-            const run = runById.get(runId);
-            return run === undefined ? [] : buildPoints(run, metricsByRun[run.id] ?? []);
-          })
-          .sort((left, right) => left.step - right.step);
+      runs.map((run, index) => {
+        const group = groupByRunId.get(run.id);
+        const points = buildPoints(run, metricsByRun[run.id] ?? []);
         return {
-          color: group.color || chartSeriesColor(index),
+          color: group?.color || chartSeriesColor(index),
+          ...(group === undefined ? {} : { groupId: group.id }),
           latest: latestPointValue(points),
-          name: group.label,
+          name: group?.label ?? run.name,
           points,
-          runId: group.id,
+          runId: run.id,
         };
       }),
-    [buildPoints, metricsByRun, runById, seriesGroups],
+    [buildPoints, groupByRunId, metricsByRun, runs],
   );
   const formatValue = useMemo(
     () => (value: number | null) => formatChartValue(value, title),

@@ -5,6 +5,7 @@ export type RunPlotPoint = { step: number; value: number };
 
 export type RunPlotSeries = {
   color: string;
+  groupId?: string;
   latest: number | null;
   name: string;
   points: readonly RunPlotPoint[];

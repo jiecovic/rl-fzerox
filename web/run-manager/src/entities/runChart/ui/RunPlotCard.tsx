@@ -43,7 +43,7 @@ export function RunPlotCard({
           <span className="text-xs text-app-muted">
             {visibleSeries.length === 0
               ? "n/a"
-              : seriesCountLabel(visibleSeries.length, seriesUnit)}
+              : seriesCountLabel(visibleLogicalSeriesCount(visibleSeries), seriesUnit)}
           </span>
         </div>
       </div>
@@ -88,6 +88,10 @@ export function RunPlotCard({
 
 function seriesCountLabel(count: number, unit: string) {
   return `${count} ${count === 1 ? singularSeriesUnit(unit) : unit}`;
+}
+
+function visibleLogicalSeriesCount(series: readonly RunPlotSeries[]) {
+  return new Set(series.map((entry) => entry.groupId ?? entry.runId)).size;
 }
 
 function singularSeriesUnit(unit: string) {
