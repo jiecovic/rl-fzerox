@@ -10,20 +10,66 @@ from rl_fzerox.core.career_mode.runner.policy import (
 )
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.manager import default_managed_run_config
+from rl_fzerox.core.manager import ManagedRunConfig, default_managed_run_config
 from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 
 
 def test_career_policy_runtime_disables_random_action_dropouts_only(tmp_path: Path) -> None:
     config = default_managed_run_config().model_copy(deep=True)
-    config.action.lean_episode_mask_probability = 1.0
-    config.action.air_brake_episode_mask_probability = 1.0
-    config.action.spin_episode_mask_probability = 1.0
+    config.action.lean_episode_mask_probability = 0.5
+    config.action.air_brake_episode_mask_probability = 0.25
+    config.action.spin_episode_mask_probability = 0.75
     config.observation.state_feature_dropouts = tuple(
         feature.model_copy(update={"dropout_prob": 1.0})
         for feature in config.observation.state_feature_dropouts
     )
+    run = _managed_run(tmp_path, config=config)
+    control = _policy_control(run)
+
+    train_config = _policy_train_config(control)
+
+    assert train_config.env.action.lean_episode_mask_probability == 0.0
+    assert train_config.env.action.air_brake_episode_mask_probability == 0.0
+    assert train_config.env.action.spin_episode_mask_probability == 0.0
+    assert train_config.train.state_feature_dropout_groups
+    assert all(
+        group.dropout_prob == 1.0 for group in train_config.train.state_feature_dropout_groups
+    )
+    assert config.action.lean_episode_mask_probability == 0.5
+    assert config.action.air_brake_episode_mask_probability == 0.25
+    assert config.action.spin_episode_mask_probability == 0.75
+    assert all(feature.dropout_prob == 1.0 for feature in config.observation.state_feature_dropouts)
+
+
+def test_career_policy_runtime_preserves_hard_action_masks(tmp_path: Path) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.include_spin = True
+    config.action.lean_episode_mask_probability = 1.0
+    config.action.air_brake_episode_mask_probability = 1.0
+    config.action.spin_episode_mask_probability = 1.0
+    run = _managed_run(tmp_path, config=config)
+    control = _policy_control(run)
+
+    train_config = _policy_train_config(control)
+
+    assert train_config.env.action.lean_episode_mask_probability == 1.0
+    assert train_config.env.action.air_brake_episode_mask_probability == 1.0
+    assert train_config.env.action.spin_episode_mask_probability == 1.0
+
+
+class _PolicyStub:
+    def predict(
+        self,
+        observation: ObservationValue,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
+        deterministic: bool = True,
+    ) -> tuple[ActionValue, PolicyState]:
+        return 0, state
+
+
+def _managed_run(tmp_path: Path, *, config: ManagedRunConfig) -> ManagedRun:
     run = ManagedRun(
         id="policy-run",
         name="Policy Run",
@@ -37,11 +83,19 @@ def test_career_policy_runtime_disables_random_action_dropouts_only(tmp_path: Pa
     policy_path = run.run_dir / "checkpoints" / "latest.zip"
     policy_path.parent.mkdir(parents=True)
     policy_path.touch()
+    return run
+
+
+def _policy_control(run: ManagedRun) -> CareerModePolicyControl:
     runner = PolicyRunner(
-        LoadedPolicy(run_dir=run.run_dir, policy_path=policy_path, artifact="latest"),
+        LoadedPolicy(
+            run_dir=run.run_dir,
+            policy_path=run.run_dir / "checkpoints" / "latest.zip",
+            artifact="latest",
+        ),
         policy=_PolicyStub(),
     )
-    control = CareerModePolicyControl(
+    return CareerModePolicyControl(
         course_setup=ManagedSaveCourseSetup(
             id="course-setup",
             save_game_id="save",
@@ -57,28 +111,3 @@ def test_career_policy_runtime_disables_random_action_dropouts_only(tmp_path: Pa
         policy_run=run,
         runner=runner,
     )
-
-    train_config = _policy_train_config(control)
-
-    assert train_config.env.action.lean_episode_mask_probability == 0.0
-    assert train_config.env.action.air_brake_episode_mask_probability == 0.0
-    assert train_config.env.action.spin_episode_mask_probability == 0.0
-    assert train_config.train.state_feature_dropout_groups
-    assert all(
-        group.dropout_prob == 1.0 for group in train_config.train.state_feature_dropout_groups
-    )
-    assert config.action.lean_episode_mask_probability == 1.0
-    assert config.action.air_brake_episode_mask_probability == 1.0
-    assert config.action.spin_episode_mask_probability == 1.0
-    assert all(feature.dropout_prob == 1.0 for feature in config.observation.state_feature_dropouts)
-
-
-class _PolicyStub:
-    def predict(
-        self,
-        observation: ObservationValue,
-        state: PolicyState = None,
-        episode_start: BoolArray | None = None,
-        deterministic: bool = True,
-    ) -> tuple[ActionValue, PolicyState]:
-        return 0, state
