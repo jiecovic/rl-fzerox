@@ -3,10 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from rl_fzerox.core.career_mode.attempts import (
-    CareerAttemptProgress,
-    CareerProgressTransition,
-)
 from rl_fzerox.core.career_mode.controller.lifecycle.post_gp import PostGpCutsceneTracker
 from rl_fzerox.core.career_mode.controller.lifecycle.post_race import PostRaceContinuation
 from rl_fzerox.core.career_mode.controller.lifecycle.recording import (
@@ -17,6 +13,10 @@ from rl_fzerox.core.career_mode.controller.lifecycle.terminal import (
 )
 from rl_fzerox.core.career_mode.execution.save_file import SaveRamRuntimeSession
 from rl_fzerox.core.career_mode.navigation import MenuFacts
+from rl_fzerox.core.career_mode.progress.attempt import (
+    CareerAttemptProgress,
+    CareerProgressTransition,
+)
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 

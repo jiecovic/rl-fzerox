@@ -5,7 +5,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
-from rl_fzerox.core.career_mode.attempts import CareerProgressTransition
 from rl_fzerox.core.career_mode.controller import (
     CareerModeController,
     _cup_selection_input,
@@ -25,6 +24,7 @@ from rl_fzerox.core.career_mode.navigation import (
     engine_adjust_steps,
     observed_menu_screen,
 )
+from rl_fzerox.core.career_mode.progress.attempt import CareerProgressTransition
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 

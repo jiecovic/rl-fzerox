@@ -4,10 +4,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from rl_fzerox.core.career_mode.attempts import (
-    CareerAttemptProgress,
-    CareerProgressTransition,
-)
 from rl_fzerox.core.career_mode.controller.lifecycle import (
     CareerControllerLifecycleEvents,
     CareerPostTerminalProgressSync,
@@ -55,6 +51,10 @@ from rl_fzerox.core.career_mode.navigation import (
     raw_step,
 )
 from rl_fzerox.core.career_mode.policy import CareerModePolicyControl, CareerPolicyResolver
+from rl_fzerox.core.career_mode.progress.attempt import (
+    CareerAttemptProgress,
+    CareerProgressTransition,
+)
 from rl_fzerox.core.domain.race_difficulty import (
     is_race_difficulty_name,
     race_difficulty_raw_value,

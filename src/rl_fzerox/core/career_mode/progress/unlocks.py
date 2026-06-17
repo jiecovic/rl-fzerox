@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/progress.py
+# src/rl_fzerox/core/career_mode/progress/unlocks.py
 """Rule-derived unlock path for portable save games."""
 
 from __future__ import annotations
