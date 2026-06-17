@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/career_mode/controller/setup/routing.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rl_fzerox.core.career_mode.controller.setup.menu_flow import (
     cup_selection_input,
     pending_step_matches_observed_screen,
@@ -26,6 +28,17 @@ from rl_fzerox.core.domain.race_difficulty import (
     race_difficulty_raw_value,
 )
 
+if TYPE_CHECKING:
+    from rl_fzerox.core.career_mode.controller.setup import (
+        CareerEngineSetupFlow,
+        CareerMenuStepQueue,
+    )
+    from rl_fzerox.core.career_mode.policy import (
+        CareerModePolicyControl,
+        CareerPolicyResolver,
+    )
+    from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
+
 
 class CareerMenuRoutingMixin:
     """Menu navigation branch of the Career Mode controller FSM.
@@ -36,6 +49,35 @@ class CareerMenuRoutingMixin:
     controller's private state so screen transitions remain traceable in one
     state machine without growing the orchestration file back into a monolith.
     """
+
+    if TYPE_CHECKING:
+        _setup: CareerModeRaceSetupConfig
+        _phase: CareerPhase
+        _engine_setup: CareerEngineSetupFlow
+        _menu_steps: CareerMenuStepQueue
+        _difficulty_popup_state: DifficultyPopupState
+        _machine_selection_applied: bool
+        _policy_resolver: CareerPolicyResolver
+
+        def _enter_phase(self, phase: CareerPhase) -> None: ...
+
+        def _continue_terminal_race_result_step(self) -> RawMenuStep: ...
+
+        def _resolve_policy_control(
+            self,
+            info: dict[str, object],
+            *,
+            refresh_artifact: bool = False,
+        ) -> CareerModePolicyControl | None: ...
+
+        @staticmethod
+        def _wait_for_policy_resolution() -> RawMenuStep: ...
+
+        def _next_camera_sync_step(self, info: dict[str, object]) -> RawMenuStep | None: ...
+
+        def _enter_policy_race(self) -> RawMenuStep: ...
+
+        def _continue_after_race_pulse(self) -> RawMenuStep: ...
 
     def _next_menu_step(self, info: dict[str, object]) -> RawMenuStep | None:
         facts = MenuFacts.from_info(info)
