@@ -23,6 +23,7 @@ from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, XCupGeneratedCourseKind
 from rl_fzerox.core.engine_tuning.types import (
     ENGINE_TUNER_DEFAULTS,
     EngineTunerBackend,
+    EngineTunerObjective,
     engine_bucket_candidates,
 )
 from rl_fzerox.core.runtime_spec.schema.common import TrackSamplingMode
@@ -174,6 +175,8 @@ class AdaptiveEngineTuningConfig(BaseModel):
         le=ENGINE_SLIDER_STEP_MAX,
     )
     backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
+    objective: EngineTunerObjective = ENGINE_TUNER_DEFAULTS.objective
+    reward_fingerprint: str | None = None
     slider_spacing: PositiveInt = Field(
         default=ENGINE_TUNER_DEFAULTS.bandit_slider_spacing,
         le=ENGINE_SLIDER_STEP_MAX,
@@ -207,6 +210,8 @@ class AdaptiveEngineTuningConfig(BaseModel):
     def _serialize_engine_tuning(self, handler: SerializerFunctionWrapHandler) -> object:
         data = handler(self)
         if isinstance(data, dict) and self.backend != "bandit":
+            data.pop("objective", None)
+            data.pop("reward_fingerprint", None)
             data.pop("slider_spacing", None)
         if isinstance(data, dict) and self.backend == "bandit":
             data.pop("greedy_plateau_tolerance_seconds", None)

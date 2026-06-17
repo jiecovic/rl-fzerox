@@ -180,6 +180,8 @@ describe("Configurator", () => {
         forkSourceEngineTuning={{
           backend: "gaussian_process",
           banditSliderSpacing: null,
+          objective: null,
+          rewardFingerprint: null,
           minRawValue: 0,
           maxRawValue: 100,
         }}
@@ -243,6 +245,8 @@ describe("Configurator", () => {
         forkSourceEngineTuning={{
           backend: "bandit",
           banditSliderSpacing: 15,
+          objective: "finish_time",
+          rewardFingerprint: stableJson(managedRunConfigFixture.reward),
           minRawValue: 5,
           maxRawValue: 95,
         }}
@@ -724,3 +728,21 @@ describe("Configurator", () => {
     ).toBeEnabled();
   });
 });
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(sortObjectKeys(value));
+}
+
+function sortObjectKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortObjectKeys);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nestedValue]) => [key, sortObjectKeys(nestedValue)]),
+  );
+}

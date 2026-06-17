@@ -376,8 +376,17 @@ export function Configurator({
     if (vehicle.adaptive_engine_tuner_backend !== "bandit") {
       return false;
     }
-    return (
+    if (
       forkSourceEngineTuning.banditSliderSpacing !== vehicle.adaptive_engine_bandit_slider_spacing
+    ) {
+      return true;
+    }
+    if (forkSourceEngineTuning.objective !== vehicle.adaptive_engine_tuner_objective) {
+      return true;
+    }
+    return (
+      vehicle.adaptive_engine_tuner_objective === "episode_return" &&
+      forkSourceEngineTuning.rewardFingerprint !== stableJson(candidateConfig.reward)
     );
   }
 

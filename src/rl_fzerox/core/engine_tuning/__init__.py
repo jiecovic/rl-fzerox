@@ -30,10 +30,12 @@ from rl_fzerox.core.engine_tuning.tuner import (
     MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
+from rl_fzerox.core.engine_tuning.types import EngineTunerObjective
 
 __all__ = (
     "ENGINE_TUNING_STATE_VERSION",
     "EngineTunerBackend",
+    "EngineTunerObjective",
     "EngineTunerSettings",
     "EngineTuningCandidateEstimate",
     "EngineTuningCandidateState",

@@ -195,6 +195,8 @@ export function VehicleSection({
                 defaultConfig.vehicle.adaptive_engine_mlp_warmup_successes,
               adaptive_engine_stat_decay: defaultConfig.vehicle.adaptive_engine_stat_decay,
               adaptive_engine_tuner_backend: defaultConfig.vehicle.adaptive_engine_tuner_backend,
+              adaptive_engine_tuner_objective:
+                defaultConfig.vehicle.adaptive_engine_tuner_objective,
               adaptive_engine_uniform_exploration:
                 defaultConfig.vehicle.adaptive_engine_uniform_exploration,
               adaptive_engine_greedy_plateau_seconds:
@@ -449,7 +451,7 @@ function AdaptiveEngineControls({
       <div className="grid gap-1">
         <strong className="text-[13px] text-app-text">Adaptive engine tuner</strong>
         <small className="m-0 text-xs leading-snug text-app-muted">
-          Learns reset-time engine settings from successful finish times while preserving uniform
+          Learns reset-time engine settings from the selected score while preserving uniform
           exploration.
         </small>
       </div>
@@ -483,6 +485,32 @@ function AdaptiveEngineControls({
           alternatives. Backend uncertainty scales are derived from the episode horizon.
         </small>
       </div>
+      {isBanditBackend ? (
+        <div className="grid gap-2">
+          <strong className="text-[13px] text-app-text">Bandit objective</strong>
+          <SegmentedChoiceStrip
+            ariaLabel="Bandit engine tuner objective"
+            options={[
+              {
+                active: vehicle.adaptive_engine_tuner_objective === "finish_time",
+                key: "finish_time",
+                label: "Finish time",
+                onClick: () => onChange({ adaptive_engine_tuner_objective: "finish_time" }),
+              },
+              {
+                active: vehicle.adaptive_engine_tuner_objective === "episode_return",
+                key: "episode_return",
+                label: "Episode return",
+                onClick: () => onChange({ adaptive_engine_tuner_objective: "episode_return" }),
+              },
+            ]}
+          />
+          <small className="m-0 text-xs leading-snug text-app-muted">
+            Finish time uses successful races only. Episode return uses default-baseline episodes,
+            including failed and retired attempts, and is tied to the reward settings.
+          </small>
+        </div>
+      ) : null}
       <div className="grid gap-3 lg:grid-cols-3">
         {isBanditBackend ? (
           <NumberField

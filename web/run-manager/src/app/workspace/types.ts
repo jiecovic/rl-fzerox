@@ -1,6 +1,7 @@
 // web/run-manager/src/app/workspace/types.ts
 import type {
   EngineTunerBackend,
+  EngineTunerObjective,
   ManagedDraft,
   ManagedRunConfig,
   PolicyPlaybackMode,
@@ -34,6 +35,8 @@ export interface ForkSource {
 export interface ForkSourceEngineTuning {
   backend: EngineTunerBackend;
   banditSliderSpacing: number | null;
+  objective: EngineTunerObjective | null;
+  rewardFingerprint: string | null;
   maxRawValue: number;
   minRawValue: number;
 }

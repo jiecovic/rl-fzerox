@@ -11,6 +11,7 @@ import {
   customCnnActivationSchema,
   engineSettingModeSchema,
   engineTunerBackendSchema,
+  engineTunerObjectiveSchema,
   gpDifficultySchema,
   leanModeSchema,
   leanOutputModeSchema,
@@ -176,6 +177,7 @@ const vehicleConfigSchema = z
       engine_setting_min_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
       engine_setting_max_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
       adaptive_engine_tuner_backend: engineTunerBackendSchema.default("bandit"),
+      adaptive_engine_tuner_objective: engineTunerObjectiveSchema.default("finish_time"),
       adaptive_engine_bandit_slider_spacing: z
         .number()
         .int()

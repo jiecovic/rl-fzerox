@@ -4,6 +4,7 @@ import { z } from "zod";
 import { managedRunConfigSchema } from "@/shared/api/contract/config";
 import {
   engineSettingModeSchema,
+  engineTunerObjectiveSchema,
   runCommandSchema,
   runStatusSchema,
   vehicleSelectionModeSchema,
@@ -161,10 +162,14 @@ export const engineTuningRuntimeCandidateSchema = z.object({
   course_key: z.string(),
   vehicle_id: z.string(),
   engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+  score_count: z.number().int().nonnegative().default(0),
+  episode_count: z.number().int().nonnegative().default(0),
   finish_count: z.number().int().nonnegative(),
   mean_score: z.number().nullable(),
   raw_mean_score: z.number().nullable(),
   best_score: z.number().nullable(),
+  mean_finish_score: z.number().nullable().default(null),
+  mean_return_score: z.number().nullable().default(null),
   best_finish_time_ms: z.number().int().positive().nullable(),
 });
 
@@ -175,6 +180,8 @@ export const engineTuningRuntimeCandidateEstimateSchema = z.object({
   uncertainty_score: z.number().nonnegative(),
   estimated_finish_time_ms: z.number().int().positive(),
   best_finish_time_ms: z.number().int().positive().nullable(),
+  best_score: z.number().nullable().default(null),
+  score_count: z.number().int().nonnegative().default(0),
   finish_count: z.number().int().nonnegative(),
 });
 
@@ -182,6 +189,7 @@ export const engineTuningRuntimeContextSchema = z.object({
   context_key: z.string(),
   course_key: z.string(),
   vehicle_id: z.string(),
+  score_count: z.number().int().nonnegative().default(0),
   finish_count: z.number().int().nonnegative(),
   observed_candidate_count: z.number().int().nonnegative(),
   model_ready: z.boolean().default(true),
@@ -194,6 +202,8 @@ export const engineTuningRuntimeContextSchema = z.object({
 export const engineTuningRuntimeStateSchema = z.object({
   version: z.number().int().positive(),
   update_count: z.number().int().nonnegative(),
+  objective: engineTunerObjectiveSchema.default("finish_time"),
+  reward_fingerprint: z.string().nullable().default(null),
   model_backend: z.enum(["bandit", "gaussian_process", "mlp_ensemble"]).nullable().default(null),
   candidates: z.array(engineTuningRuntimeCandidateSchema),
   contexts: z.array(engineTuningRuntimeContextSchema).default([]),

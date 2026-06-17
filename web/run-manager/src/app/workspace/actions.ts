@@ -358,7 +358,7 @@ export function useWorkspaceActions({
       runId,
       sourceEngineTunerBackend: sourceDetail.config.vehicle.adaptive_engine_tuner_backend,
       sourceEngineTuning:
-        sourceTuning.state === null ? null : forkSourceEngineTuning(initialConfig),
+        sourceTuning.state === null ? null : forkSourceEngineTuning(sourceDetail.config),
       sourceEngineTuningKnown: true,
     });
   }
@@ -560,7 +560,31 @@ function forkSourceEngineTuning(config: ManagedRunConfig): ForkSourceEngineTunin
       config.vehicle.adaptive_engine_tuner_backend === "bandit"
         ? config.vehicle.adaptive_engine_bandit_slider_spacing
         : null,
+    objective:
+      config.vehicle.adaptive_engine_tuner_backend === "bandit"
+        ? config.vehicle.adaptive_engine_tuner_objective
+        : null,
+    rewardFingerprint:
+      config.vehicle.adaptive_engine_tuner_backend === "bandit" ? stableJson(config.reward) : null,
     maxRawValue: config.vehicle.engine_setting_max_raw_value,
     minRawValue: config.vehicle.engine_setting_min_raw_value,
   };
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(sortObjectKeys(value));
+}
+
+function sortObjectKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortObjectKeys);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nestedValue]) => [key, sortObjectKeys(nestedValue)]),
+  );
 }

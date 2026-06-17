@@ -33,6 +33,8 @@ def engine_tuning_state_payload(
     return {
         "version": payload_state.version,
         "update_count": payload_state.update_count,
+        "objective": payload_state.objective,
+        "reward_fingerprint": payload_state.reward_fingerprint,
         "model_backend": _model_backend(payload_state, settings),
         "candidates": [
             _engine_tuning_candidate_payload(candidate) for candidate in payload_state.candidates
@@ -65,7 +67,7 @@ def _bandit_payload_state(
     )
     buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
     for candidate in state.candidates:
-        if candidate.finish_count <= 0:
+        if candidate.active_score_count <= 0:
             continue
         bucket = _exact_bucket(candidate.engine_setting_raw_value, candidates)
         if bucket is None:
@@ -88,6 +90,8 @@ def _bandit_payload_state(
                 ),
             )
         ),
+        objective=state.objective,
+        reward_fingerprint=state.reward_fingerprint,
         model_state=None,
     )
 
@@ -111,11 +115,17 @@ def _bucketed_payload_candidate(
             course_key=source.course_key,
             vehicle_id=source.vehicle_id,
             engine_setting_raw_value=int(engine_raw),
+            score_count=max(0, int(source.active_score_count)),
+            episode_count=max(0, int(source.episode_count)),
             finish_count=max(0, int(source.finish_count)),
             decayed_count=max(0.0, float(source.decayed_count)),
             decayed_score_total=float(source.decayed_score_total),
             score_total=float(source.score_total),
             best_score=source.best_score,
+            finish_score_total=float(source.finish_score_total),
+            best_finish_score=source.best_finish_score,
+            return_score_total=float(source.return_score_total),
+            best_return_score=source.best_return_score,
             best_time_ms=source.best_time_ms,
         )
     return EngineTuningCandidateState(
@@ -123,11 +133,17 @@ def _bucketed_payload_candidate(
         course_key=existing.course_key,
         vehicle_id=existing.vehicle_id,
         engine_setting_raw_value=existing.engine_setting_raw_value,
+        score_count=existing.active_score_count + max(0, int(source.active_score_count)),
+        episode_count=existing.episode_count + max(0, int(source.episode_count)),
         finish_count=existing.finish_count + max(0, int(source.finish_count)),
         decayed_count=existing.decayed_count + max(0.0, float(source.decayed_count)),
         decayed_score_total=existing.decayed_score_total + float(source.decayed_score_total),
         score_total=existing.score_total + float(source.score_total),
         best_score=_max_optional_score(existing.best_score, source.best_score),
+        finish_score_total=existing.finish_score_total + float(source.finish_score_total),
+        best_finish_score=_max_optional_score(existing.best_finish_score, source.best_finish_score),
+        return_score_total=existing.return_score_total + float(source.return_score_total),
+        best_return_score=_max_optional_score(existing.best_return_score, source.best_return_score),
         best_time_ms=_min_optional_time(existing.best_time_ms, source.best_time_ms),
     )
 
@@ -167,10 +183,14 @@ def _engine_tuning_candidate_payload(
         "course_key": candidate.course_key,
         "vehicle_id": candidate.vehicle_id,
         "engine_setting_raw_value": candidate.engine_setting_raw_value,
+        "score_count": candidate.active_score_count,
+        "episode_count": candidate.episode_count,
         "finish_count": candidate.finish_count,
         "mean_score": candidate.mean_score,
         "raw_mean_score": candidate.raw_mean_score,
         "best_score": candidate.best_score,
+        "mean_finish_score": candidate.mean_finish_score,
+        "mean_return_score": candidate.mean_return_score,
         "best_finish_time_ms": candidate.best_time_ms,
     }
 
@@ -190,6 +210,7 @@ def _engine_tuning_context_payloads(
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
                 ),
+                score_count=context.finish_count,
                 finish_count=context.finish_count,
                 observed_candidate_count=0,
             )
@@ -201,9 +222,10 @@ def _engine_tuning_context_payloads(
             settings=settings,
             tuner=tuner,
             context=context,
+            score_count=sum(candidate.active_score_count for candidate in candidates),
             finish_count=sum(candidate.finish_count for candidate in candidates),
             observed_candidate_count=sum(
-                1 for candidate in candidates if candidate.finish_count > 0
+                1 for candidate in candidates if candidate.active_score_count > 0
             ),
         )
         for context, candidates in _observed_contexts(state)
@@ -216,6 +238,7 @@ def _engine_tuning_context_payload(
     settings: EngineTunerSettings,
     tuner: OrderedEngineTuner,
     context: EngineTuningContext,
+    score_count: int,
     finish_count: int,
     observed_candidate_count: int,
 ) -> dict[str, object]:
@@ -231,6 +254,7 @@ def _engine_tuning_context_payload(
         "context_key": context.key,
         "course_key": context.course_key,
         "vehicle_id": context.vehicle_id,
+        "score_count": score_count,
         "finish_count": finish_count,
         "observed_candidate_count": observed_candidate_count,
         "model_ready": model_ready,
@@ -268,6 +292,8 @@ def _engine_tuning_candidate_estimate_payload(
         "uncertainty_score": probability.uncertainty_score,
         "estimated_finish_time_ms": probability.estimated_finish_time_ms,
         "best_finish_time_ms": probability.best_finish_time_ms,
+        "best_score": probability.best_score,
+        "score_count": probability.score_count,
         "finish_count": 0 if candidate is None else candidate.finish_count,
     }
 
@@ -277,7 +303,7 @@ def _observed_contexts(
 ) -> Iterable[tuple[EngineTuningContext, tuple[EngineTuningCandidateState, ...]]]:
     grouped: dict[str, list[EngineTuningCandidateState]] = {}
     for candidate in state.candidates:
-        if candidate.finish_count <= 0:
+        if candidate.active_score_count <= 0:
             continue
         grouped.setdefault(candidate.context_key, []).append(candidate)
     contexts = []
@@ -292,7 +318,7 @@ def _observed_contexts(
     return sorted(
         contexts,
         key=lambda item: (
-            -sum(candidate.finish_count for candidate in item[1]),
+            -sum(candidate.active_score_count for candidate in item[1]),
             item[0].course_key,
             item[0].vehicle_id,
         ),

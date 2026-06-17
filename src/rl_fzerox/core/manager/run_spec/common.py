@@ -31,6 +31,7 @@ TrackSamplingMode = Literal[
 VehicleSelectionMode = Literal["fixed", "pool"]
 EngineSettingMode = Literal["fixed", "random_range", "adaptive_tuner"]
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
+EngineTunerObjective = Literal["finish_time", "episode_return"]
 ActionAxisMode = Literal["continuous", "discrete"]
 ActionDriveMode = Literal["pwm", "on_off"]
 ObservationPreset = ObservationPresetName

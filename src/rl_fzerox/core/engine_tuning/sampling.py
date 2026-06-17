@@ -27,6 +27,7 @@ class EngineTuningResetCandidate:
     probability: float
     mean_score: float
     sampled_score: float
+    score_count: int
     finish_count: int
     estimated_finish_time_ms: int
     best_finish_time_ms: int | None
@@ -39,6 +40,7 @@ class EngineTuningResetCandidate:
             engine_setting_raw_value=self.engine_setting_raw_value,
             sampled_score=self.sampled_score,
             mean_score=self.mean_score,
+            score_count=self.score_count,
             finish_count=self.finish_count,
             estimated_finish_time_ms=self.estimated_finish_time_ms,
             best_finish_time_ms=self.best_finish_time_ms,

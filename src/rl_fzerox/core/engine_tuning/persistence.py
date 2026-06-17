@@ -23,7 +23,11 @@ from rl_fzerox.core.engine_tuning.state import (
     EngineTuningRuntimeState,
     EngineTuningTensorState,
 )
-from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS, EngineTunerBackend
+from rl_fzerox.core.engine_tuning.types import (
+    ENGINE_TUNER_DEFAULTS,
+    EngineTunerBackend,
+    EngineTunerObjective,
+)
 
 _LEGACY_BANDIT_PERCENT_BUCKETS = tuple(range(0, 101, 10))
 _DEFAULT_BANDIT_SLIDER_BUCKETS = centered_engine_slider_buckets(
@@ -79,17 +83,25 @@ def engine_tuning_runtime_state_json(state: EngineTuningRuntimeState) -> str:
     data = {
         "version": state.version,
         "update_count": state.update_count,
+        "objective": state.objective,
+        "reward_fingerprint": state.reward_fingerprint,
         "candidates": [
             {
                 "context_key": candidate.context_key,
                 "course_key": candidate.course_key,
                 "vehicle_id": candidate.vehicle_id,
                 "engine_setting_raw_value": candidate.engine_setting_raw_value,
+                "score_count": candidate.score_count,
+                "episode_count": candidate.episode_count,
                 "finish_count": candidate.finish_count,
                 "decayed_count": candidate.decayed_count,
                 "decayed_score_total": candidate.decayed_score_total,
                 "score_total": candidate.score_total,
                 "best_score": candidate.best_score,
+                "finish_score_total": candidate.finish_score_total,
+                "best_finish_score": candidate.best_finish_score,
+                "return_score_total": candidate.return_score_total,
+                "best_return_score": candidate.best_return_score,
                 "best_time_ms": candidate.best_time_ms,
             }
             for candidate in state.candidates
@@ -106,7 +118,7 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
     if not isinstance(loaded, Mapping):
         return None
     version = _mapping_int(loaded, "version") or 1
-    if version not in {5, ENGINE_TUNING_STATE_VERSION}:
+    if version not in {5, 6, ENGINE_TUNING_STATE_VERSION}:
         return None
     raw_candidates = loaded.get("candidates")
     if not isinstance(raw_candidates, list):
@@ -122,6 +134,8 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
         version=ENGINE_TUNING_STATE_VERSION,
         update_count=max(0, _mapping_int(loaded, "update_count") or 0),
         candidates=candidates,
+        objective=_objective(loaded.get("objective")) or "finish_time",
+        reward_fingerprint=_mapping_optional_str(loaded, "reward_fingerprint"),
         model_state=model_state,
     )
 
@@ -140,11 +154,17 @@ def _migrate_percent_candidates_to_slider_steps(
                 course_key=candidate.course_key,
                 vehicle_id=candidate.vehicle_id,
                 engine_setting_raw_value=slider_step,
+                score_count=candidate.score_count,
+                episode_count=candidate.episode_count,
                 finish_count=candidate.finish_count,
                 decayed_count=candidate.decayed_count,
                 decayed_score_total=candidate.decayed_score_total,
                 score_total=candidate.score_total,
                 best_score=candidate.best_score,
+                finish_score_total=candidate.finish_score_total,
+                best_finish_score=candidate.best_finish_score,
+                return_score_total=candidate.return_score_total,
+                best_return_score=candidate.best_return_score,
                 best_time_ms=candidate.best_time_ms,
             ),
         )
@@ -182,11 +202,17 @@ def _merge_candidate(
         course_key=existing.course_key,
         vehicle_id=existing.vehicle_id,
         engine_setting_raw_value=existing.engine_setting_raw_value,
+        score_count=existing.score_count + source.score_count,
+        episode_count=existing.episode_count + source.episode_count,
         finish_count=existing.finish_count + source.finish_count,
         decayed_count=existing.decayed_count + source.decayed_count,
         decayed_score_total=existing.decayed_score_total + source.decayed_score_total,
         score_total=existing.score_total + source.score_total,
         best_score=_max_optional_score(existing.best_score, source.best_score),
+        finish_score_total=existing.finish_score_total + source.finish_score_total,
+        best_finish_score=_max_optional_score(existing.best_finish_score, source.best_finish_score),
+        return_score_total=existing.return_score_total + source.return_score_total,
+        best_return_score=_max_optional_score(existing.best_return_score, source.best_return_score),
         best_time_ms=_min_optional_time(existing.best_time_ms, source.best_time_ms),
     )
 
@@ -240,16 +266,28 @@ def _candidate_from_mapping(raw: object) -> EngineTuningCandidateState | None:
         or engine_setting_raw_value is None
     ):
         return None
+    finish_count = max(0, _mapping_int(raw, "finish_count") or 0)
+    score_count = _mapping_int(raw, "score_count")
+    score_total = _mapping_float(raw, "score_total") or 0.0
+    best_score = _mapping_optional_float(raw, "best_score")
+    finish_score_total = _mapping_float(raw, "finish_score_total")
+    best_finish_score = _mapping_optional_float(raw, "best_finish_score")
     return EngineTuningCandidateState(
         context_key=context_key,
         course_key=course_key,
         vehicle_id=vehicle_id,
         engine_setting_raw_value=engine_setting_raw_value,
-        finish_count=max(0, _mapping_int(raw, "finish_count") or 0),
+        score_count=max(0, score_count if score_count is not None else finish_count),
+        episode_count=max(0, _mapping_int(raw, "episode_count") or 0),
+        finish_count=finish_count,
         decayed_count=max(0.0, _mapping_float(raw, "decayed_count") or 0.0),
         decayed_score_total=_mapping_float(raw, "decayed_score_total") or 0.0,
-        score_total=_mapping_float(raw, "score_total") or 0.0,
-        best_score=_mapping_optional_float(raw, "best_score"),
+        score_total=score_total,
+        best_score=best_score,
+        finish_score_total=finish_score_total if finish_score_total is not None else score_total,
+        best_finish_score=best_finish_score if best_finish_score is not None else best_score,
+        return_score_total=_mapping_float(raw, "return_score_total") or 0.0,
+        best_return_score=_mapping_optional_float(raw, "best_return_score"),
         best_time_ms=_mapping_optional_int(raw, "best_time_ms"),
     )
 
@@ -392,6 +430,14 @@ def _backend(raw: object) -> EngineTunerBackend | None:
     return None
 
 
+def _objective(raw: object) -> EngineTunerObjective | None:
+    if raw == "finish_time":
+        return "finish_time"
+    if raw == "episode_return":
+        return "episode_return"
+    return None
+
+
 def _string_tuple(raw: object) -> tuple[str, ...] | None:
     if not isinstance(raw, list):
         return None
@@ -405,6 +451,15 @@ def _string_tuple(raw: object) -> tuple[str, ...] | None:
 
 def _mapping_str(raw: Mapping[object, object], key: str) -> str | None:
     value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    return value
+
+
+def _mapping_optional_str(raw: Mapping[object, object], key: str) -> str | None:
+    value = raw.get(key)
+    if value is None:
+        return None
     if not isinstance(value, str) or not value:
         return None
     return value

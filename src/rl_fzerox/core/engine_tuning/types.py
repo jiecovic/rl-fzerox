@@ -13,6 +13,7 @@ from rl_fzerox.core.domain.engine_setting import (
 )
 
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
+EngineTunerObjective = Literal["finish_time", "episode_return"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +21,7 @@ class EngineTunerDefaults:
     """Default scale values for adaptive engine tuning."""
 
     backend: EngineTunerBackend = "bandit"
+    objective: EngineTunerObjective = "finish_time"
     bandit_slider_spacing: int = engine_percent_to_slider_step(10)
     stat_decay: float = 0.995
     prior_finish_time_seconds: float = 200.0
@@ -55,6 +57,8 @@ class BanditEngineTunerSettings(EngineTunerCommonSettings):
     """Static knobs used by the aggregate bandit backend."""
 
     backend: Literal["bandit"] = "bandit"
+    objective: EngineTunerObjective = ENGINE_TUNER_DEFAULTS.objective
+    reward_fingerprint: str | None = None
     slider_spacing: int = ENGINE_TUNER_DEFAULTS.bandit_slider_spacing
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
 
@@ -114,6 +118,8 @@ class EngineTuningChoice:
     finish_count: int
     estimated_finish_time_ms: int
     best_finish_time_ms: int | None
+    score_count: int = 0
+    best_score: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,8 +131,10 @@ class EngineTuningCandidateEstimate:
     mean_score: float
     uncertainty_score: float
     estimated_finish_time_ms: int
-    finish_count: int
-    best_finish_time_ms: int | None
+    finish_count: int = 0
+    best_finish_time_ms: int | None = None
+    score_count: int = 0
+    best_score: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +148,7 @@ class EngineTuningEpisodeOutcome:
     race_time_ms: int | None = None
     finish_position: int | None = None
     total_racers: int | None = None
+    episode_return: float | None = None
 
 
 def engine_candidates(*, minimum: int, maximum: int) -> tuple[int, ...]:
@@ -167,6 +176,12 @@ def finish_time_score(race_time_ms: int) -> float:
     """Return a higher-is-better score in negative seconds."""
 
     return -(max(1.0, float(race_time_ms)) * 0.001)
+
+
+def episode_return_score(episode_return: float) -> float:
+    """Return total episode reward as a higher-is-better tuner score."""
+
+    return float(episode_return)
 
 
 def finish_time_ms_from_score(score: float) -> int:

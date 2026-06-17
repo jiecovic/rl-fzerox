@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import json
+from hashlib import blake2b
+
 from rl_fzerox.core.engine_tuning.config import (
     engine_tuning_episode_horizon_prior_seconds,
     engine_tuning_uncertainty_scale_seconds,
@@ -43,6 +46,8 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
     if vehicle.adaptive_engine_tuner_backend == "bandit":
         payload.update(
             {
+                "objective": vehicle.adaptive_engine_tuner_objective,
+                "reward_fingerprint": _reward_fingerprint(config),
                 "slider_spacing": vehicle.adaptive_engine_bandit_slider_spacing,
                 "exploration_scale": uncertainty_scale_seconds,
             }
@@ -65,3 +70,11 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
             }
         )
     return AdaptiveEngineTuningConfig.model_validate(payload)
+
+
+def _reward_fingerprint(config: ManagedRunConfig) -> str:
+    """Return a stable key for reward-dependent engine-tuner observations."""
+
+    payload = {"reward": config.reward.model_dump(mode="json")}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return blake2b(encoded, digest_size=12).hexdigest()

@@ -177,8 +177,10 @@ class MlpEnsembleEngineTuner:
                 estimated_finish_time_ms=finish_time_ms_from_score(
                     projection.estimates[engine_raw].mean_score
                 ),
+                score_count=projection.estimates[engine_raw].exact_finish_count,
                 finish_count=projection.estimates[engine_raw].exact_finish_count,
                 best_finish_time_ms=projection.estimates[engine_raw].best_finish_time_ms,
+                best_score=None,
             )
             for engine_raw in candidates
         )
@@ -258,9 +260,11 @@ class MlpEnsembleEngineTuner:
             engine_setting_raw_value=engine_raw,
             sampled_score=estimate.mean_score if sampled_score is None else sampled_score,
             mean_score=estimate.mean_score,
+            score_count=estimate.exact_finish_count,
             finish_count=estimate.exact_finish_count,
             estimated_finish_time_ms=finish_time_ms_from_score(estimate.mean_score),
             best_finish_time_ms=estimate.best_finish_time_ms,
+            best_score=None,
         )
 
     def _context_projection(
@@ -729,8 +733,10 @@ def _projection_candidate_estimates(
             estimated_finish_time_ms=finish_time_ms_from_score(
                 projection.estimates[engine_raw].mean_score
             ),
+            score_count=projection.estimates[engine_raw].exact_finish_count,
             finish_count=projection.estimates[engine_raw].exact_finish_count,
             best_finish_time_ms=projection.estimates[engine_raw].best_finish_time_ms,
+            best_score=None,
         )
         for engine_raw in candidates
     )

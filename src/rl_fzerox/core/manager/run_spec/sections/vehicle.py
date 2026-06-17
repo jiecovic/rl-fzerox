@@ -21,6 +21,7 @@ from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS, engine_buc
 from rl_fzerox.core.manager.run_spec.common import (
     EngineSettingMode,
     EngineTunerBackend,
+    EngineTunerObjective,
     VehicleSelectionMode,
 )
 from rl_fzerox.core.runtime_spec.vehicle_catalog import known_vehicle_ids
@@ -47,6 +48,7 @@ class ManagedVehicleConfig(BaseModel):
         le=ENGINE_SLIDER_STEP_MAX,
     )
     adaptive_engine_tuner_backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
+    adaptive_engine_tuner_objective: EngineTunerObjective = ENGINE_TUNER_DEFAULTS.objective
     adaptive_engine_bandit_slider_spacing: int = Field(
         default=ENGINE_TUNER_DEFAULTS.bandit_slider_spacing,
         ge=1,
@@ -102,6 +104,7 @@ class ManagedVehicleConfig(BaseModel):
     def _serialize_vehicle(self, handler: SerializerFunctionWrapHandler) -> object:
         data = handler(self)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "bandit":
+            data.pop("adaptive_engine_tuner_objective", None)
             data.pop("adaptive_engine_bandit_slider_spacing", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "gaussian_process":
             data.pop("adaptive_engine_stat_decay", None)

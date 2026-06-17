@@ -75,6 +75,7 @@ class EngineTuningTrainingController:
                             probability=estimate.probability,
                             mean_score=estimate.mean_score,
                             sampled_score=estimate.uncertainty_score,
+                            score_count=estimate.score_count,
                             finish_count=estimate.finish_count,
                             estimated_finish_time_ms=estimate.estimated_finish_time_ms,
                             best_finish_time_ms=estimate.best_finish_time_ms,
@@ -122,6 +123,7 @@ class EngineTuningTrainingController:
             suffix = f"{key}/engine_{candidate.engine_setting_raw_value}"
             if candidate.mean_score is not None:
                 values[f"engine_tuning/{suffix}/mean_score"] = candidate.mean_score
+            values[f"engine_tuning/{suffix}/samples"] = float(candidate.score_count)
             if candidate.best_time_ms is not None:
                 values[f"engine_tuning/{suffix}/best_time_ms"] = float(candidate.best_time_ms)
             values[f"engine_tuning/{suffix}/finishes"] = float(candidate.finish_count)
@@ -156,7 +158,15 @@ def engine_tuning_outcome_from_episode(
         race_time_ms=_mapping_optional_int(episode, "race_time_ms"),
         finish_position=_mapping_optional_int(episode, "position"),
         total_racers=_mapping_optional_int(episode, "total_racers"),
+        episode_return=_episode_return(episode),
     )
+
+
+def _episode_return(episode: Mapping[str, object]) -> float | None:
+    value = _mapping_float(episode, "episode_return")
+    if value is not None:
+        return value
+    return _mapping_float(episode, "r")
 
 
 def _episode_completion_fraction(episode: Mapping[str, object]) -> float:

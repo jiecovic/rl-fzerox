@@ -1553,6 +1553,7 @@
       "adaptive_engine_bandit_slider_spacing": 13,
       "adaptive_engine_greedy_plateau_seconds": 1.0,
       "adaptive_engine_tuner_backend": "bandit",
+      "adaptive_engine_tuner_objective": "finish_time",
       "adaptive_engine_uniform_exploration": 0.05,
       "engine_mode": "fixed",
       "engine_setting_max_raw_value": 102,

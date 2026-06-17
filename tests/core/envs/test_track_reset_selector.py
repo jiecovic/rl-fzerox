@@ -213,6 +213,7 @@ def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
                         probability=1.0,
                         mean_score=-80.0,
                         sampled_score=-80.0,
+                        score_count=2,
                         finish_count=2,
                         estimated_finish_time_ms=80_000,
                         best_finish_time_ms=80_000,

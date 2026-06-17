@@ -68,20 +68,118 @@ def test_bandit_reset_sampler_uses_best_observed_bucket_as_greedy() -> None:
     assert snapshot.contexts[0].greedy_engine_setting_raw_value == 25
 
 
+def test_bandit_return_objective_records_failed_episode_returns() -> None:
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            objective="episode_return",
+            reward_fingerprint="reward-a",
+            min_raw_value=0,
+            max_raw_value=128,
+            slider_spacing=13,
+            uniform_exploration=0.0,
+        )
+    )
+
+    assert controller.record_episodes(
+        (
+            _engine_episode(
+                engine_raw=25,
+                episode_return=12.5,
+                termination_reason="retired",
+            ),
+        )
+    )
+
+    candidate = controller.runtime_state.candidates[0]
+    assert candidate.score_count == 1
+    assert candidate.episode_count == 1
+    assert candidate.finish_count == 0
+    assert candidate.mean_score == 12.5
+    assert (
+        controller.reset_sampler_snapshot((context,)).contexts[0].greedy_engine_setting_raw_value
+        == 25
+    )
+
+
+def test_bandit_can_switch_to_collected_return_objective_without_recollecting() -> None:
+    finish_controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            objective="finish_time",
+            reward_fingerprint="reward-a",
+            min_raw_value=0,
+            max_raw_value=128,
+            slider_spacing=13,
+            uniform_exploration=0.0,
+        )
+    )
+    assert finish_controller.record_episodes(
+        (
+            _successful_engine_episode(engine_raw=25, race_time_ms=80_000, episode_return=20.0),
+            _successful_engine_episode(engine_raw=90, race_time_ms=78_000, episode_return=10.0),
+        )
+    )
+
+    return_controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            objective="episode_return",
+            reward_fingerprint="reward-a",
+            min_raw_value=0,
+            max_raw_value=128,
+            slider_spacing=13,
+            uniform_exploration=0.0,
+        ),
+        state=finish_controller.runtime_state,
+    )
+
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    assert (
+        return_controller.reset_sampler_snapshot((context,))
+        .contexts[0]
+        .greedy_engine_setting_raw_value
+        == 25
+    )
+
+
 def _successful_engine_episode(
     *,
     alt_baseline_id: str | None = None,
     engine_raw: int = 50,
     race_time_ms: int = 90_000,
+    episode_return: float = 1.0,
+) -> dict[str, object]:
+    return _engine_episode(
+        alt_baseline_id=alt_baseline_id,
+        engine_raw=engine_raw,
+        episode_return=episode_return,
+        race_time_ms=race_time_ms,
+        termination_reason="finished",
+    )
+
+
+def _engine_episode(
+    *,
+    alt_baseline_id: str | None = None,
+    engine_raw: int = 50,
+    episode_return: float = 1.0,
+    race_time_ms: int | None = 90_000,
+    termination_reason: str = "finished",
 ) -> dict[str, object]:
     episode: dict[str, object] = {
         "engine_tuning_context_key": "mute_city|blue_falcon",
         "engine_tuning_course_key": "mute_city",
         "engine_tuning_vehicle_id": "blue_falcon",
-        "episode_completion_fraction": 1.0,
+        "episode_completion_fraction": 1.0 if termination_reason == "finished" else 0.5,
+        "episode_return": episode_return,
         "position": 1,
         "race_time_ms": race_time_ms,
-        "termination_reason": "finished",
+        "termination_reason": termination_reason,
         "total_racers": 30,
         "track_engine_setting_raw_value": engine_raw,
     }
