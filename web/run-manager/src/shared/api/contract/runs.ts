@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { managedRunConfigSchema } from "@/shared/api/contract/config";
 import {
+  deficitBudgetDifficultyMetricSchema,
   engineSettingModeSchema,
   engineTunerObjectiveSchema,
   runCommandSchema,
@@ -126,6 +127,8 @@ export const trackSamplingRuntimeEntrySchema = z.object({
   step_share: z.number().min(0).max(1),
   ema_episode_frames: z.number().nonnegative().nullable(),
   ema_completion_fraction: z.number().min(0).max(1).nullable(),
+  ema_finish_rate: z.number().min(0).max(1).nullable(),
+  current_problem_score: z.number().min(0).max(1),
   generated_course_slot: z.number().int().nonnegative().nullable(),
   generated_course_generation: z.number().int().positive().nullable(),
 });
@@ -140,6 +143,8 @@ export const trackSamplingRuntimeStateSchema = z.object({
   adaptive_target_completion: z.number().min(0).max(1),
   adaptive_min_confidence_episodes: z.number().int().positive(),
   adaptive_confidence_scale: z.number().min(1),
+  deficit_budget_difficulty_metric: deficitBudgetDifficultyMetricSchema,
+  deficit_budget_warmup_min_episodes_per_course: z.number().int().nonnegative(),
   update_count: z.number().int().nonnegative(),
   episodes_since_update: z.number().int().nonnegative(),
   entries: z.array(trackSamplingRuntimeEntrySchema),

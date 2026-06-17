@@ -6,6 +6,7 @@ import {
   displaySuccessRate,
   formatOptionalPercent,
   formatPercent,
+  samplerSignalSummary,
   shortCupLabel,
   successLabel,
   successSummary,
@@ -16,15 +17,13 @@ import { cn } from "@/shared/ui/cn";
 import { AppTooltip } from "@/shared/ui/Tooltip";
 
 interface DistributionBarProps {
-  completionValue?: number | null;
-  kind: "sample" | "success" | "episodes" | "steps";
+  kind: "sample" | "success" | "completion" | "finish-ema" | "episodes" | "steps" | "signal";
   label: string;
   targetValue?: number | null;
   value: number;
 }
 
 export const DistributionBar = memo(function DistributionBar({
-  completionValue,
   kind,
   label,
   targetValue,
@@ -34,10 +33,6 @@ export const DistributionBar = memo(function DistributionBar({
     targetValue === undefined || targetValue === null
       ? null
       : Math.max(0, Math.min(targetValue, 1));
-  const clampedCompletion =
-    completionValue === undefined || completionValue === null
-      ? null
-      : Math.max(0, Math.min(completionValue, 1));
   return (
     <AppTooltip content={label}>
       <button aria-label={label} className="grid h-full items-end" type="button">
@@ -55,12 +50,6 @@ export const DistributionBar = memo(function DistributionBar({
               style={{ bottom: `${clampedTarget * 100}%` }}
             />
           )}
-          {clampedCompletion === null ? null : (
-            <div
-              className="run-track-distribution-completion-marker pointer-events-none absolute -left-px -right-px z-[2] translate-y-1/2"
-              style={{ bottom: `${clampedCompletion * 100}%` }}
-            />
-          )}
         </div>
       </button>
     </AppTooltip>
@@ -68,7 +57,15 @@ export const DistributionBar = memo(function DistributionBar({
 });
 
 interface LegendItemProps {
-  kind: "sample" | "success" | "episodes" | "steps" | "completion" | "target";
+  kind:
+    | "sample"
+    | "success"
+    | "episodes"
+    | "steps"
+    | "signal"
+    | "finish-ema"
+    | "completion"
+    | "target";
   label: string;
 }
 
@@ -152,6 +149,8 @@ export function CupTabs({
 
 export function TrackPoolBody({
   activeCup,
+  deficitBudgetDifficultyMetric,
+  deficitBudgetWarmupMinEpisodesPerCourse,
   sampleBarUsesTargetShare,
   stepMetricLabel,
   showStepTarget,
@@ -159,13 +158,17 @@ export function TrackPoolBody({
   xCupRegenerationThreshold,
 }: {
   activeCup: TrackPoolCupView;
+  deficitBudgetDifficultyMetric: string | null;
+  deficitBudgetWarmupMinEpisodesPerCourse: number | null;
   sampleBarUsesTargetShare: boolean;
   stepMetricLabel: string;
   showStepTarget: boolean;
   xCupRegenerationMinEpisodes: number | null;
   xCupRegenerationThreshold: number | null;
 }) {
-  const shareLabel = sampleBarUsesTargetShare ? "Target" : "Sample";
+  const shareLabel = sampleBarUsesTargetShare ? "Target step share" : "Sample";
+  const signalLabel = deficitBudgetSignalLabel(deficitBudgetDifficultyMetric);
+  const usesDeficitBudget = signalLabel !== null;
   return (
     <div className="px-3.5 py-3">
       <div className="mb-3 flex items-baseline justify-between gap-3 max-[760px]:grid">
@@ -182,14 +185,106 @@ export function TrackPoolBody({
           <span>Finish {formatOptionalPercent(activeCup.successRate)}</span>
           <span>Episodes {formatPercent(activeCup.episodeShare)}</span>
           <span>Env steps {formatPercent(activeCup.stepShare)}</span>
+          {usesDeficitBudget ? (
+            <span>
+              Problem score {signalLabel}
+              {deficitBudgetWarmupMinEpisodesPerCourse === null
+                ? ""
+                : ` · warmup ${deficitBudgetWarmupMinEpisodesPerCourse}/course`}
+            </span>
+          ) : null}
         </div>
       </div>
-      <div className="mb-3 flex flex-wrap gap-3">
-        <LegendItem kind="sample" label={shareLabel} />
-        <LegendItem kind="success" label="Finish" />
-        <LegendItem kind="episodes" label="Episodes" />
-        <LegendItem kind="steps" label="Env steps" />
-        <LegendItem kind="completion" label="Completion" />
+      {usesDeficitBudget ? (
+        <div className="grid gap-4">
+          <TrackPoolChart
+            activeCup={activeCup}
+            heading="Global statistics"
+            sampleBarUsesTargetShare={sampleBarUsesTargetShare}
+            samplerSignalLabel={signalLabel}
+            showStepTarget={showStepTarget}
+            stepMetricLabel="env steps"
+            variant="global"
+            xCupRegenerationMinEpisodes={xCupRegenerationMinEpisodes}
+            xCupRegenerationThreshold={xCupRegenerationThreshold}
+          />
+          <TrackPoolChart
+            activeCup={activeCup}
+            heading="EMA adaptive signals"
+            sampleBarUsesTargetShare={sampleBarUsesTargetShare}
+            samplerSignalLabel={signalLabel}
+            showStepTarget={false}
+            stepMetricLabel={stepMetricLabel}
+            variant="ema"
+            xCupRegenerationMinEpisodes={xCupRegenerationMinEpisodes}
+            xCupRegenerationThreshold={xCupRegenerationThreshold}
+          />
+        </div>
+      ) : (
+        <TrackPoolChart
+          activeCup={activeCup}
+          heading={null}
+          sampleBarUsesTargetShare={sampleBarUsesTargetShare}
+          samplerSignalLabel={null}
+          showStepTarget={showStepTarget}
+          stepMetricLabel={stepMetricLabel}
+          variant="combined"
+          xCupRegenerationMinEpisodes={xCupRegenerationMinEpisodes}
+          xCupRegenerationThreshold={xCupRegenerationThreshold}
+        />
+      )}
+    </div>
+  );
+}
+
+function TrackPoolChart({
+  activeCup,
+  heading,
+  sampleBarUsesTargetShare,
+  samplerSignalLabel,
+  showStepTarget,
+  stepMetricLabel,
+  variant,
+  xCupRegenerationMinEpisodes,
+  xCupRegenerationThreshold,
+}: {
+  activeCup: TrackPoolCupView;
+  heading: string | null;
+  sampleBarUsesTargetShare: boolean;
+  samplerSignalLabel: string | null;
+  showStepTarget: boolean;
+  stepMetricLabel: string;
+  variant: TrackPoolChartVariant;
+  xCupRegenerationMinEpisodes: number | null;
+  xCupRegenerationThreshold: number | null;
+}) {
+  const shareLabel = sampleBarUsesTargetShare ? "Target step share" : "Sample";
+  return (
+    <section className="grid gap-3">
+      {heading === null ? null : (
+        <div className="flex items-baseline justify-between gap-3 border-t border-app-border pt-3">
+          <strong className="text-sm">{heading}</strong>
+          <span className="text-xs text-app-muted">
+            {variant === "global" ? "episode and step accounting" : "scheduler input signals"}
+          </span>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3">
+        {variant === "combined" ? <LegendItem kind="sample" label={shareLabel} /> : null}
+        {variant !== "ema" ? (
+          <>
+            <LegendItem kind="success" label="Finish" />
+            <LegendItem kind="episodes" label="Episodes" />
+          </>
+        ) : null}
+        {variant !== "ema" ? <LegendItem kind="steps" label="Env steps" /> : null}
+        {variant === "ema" ? (
+          <>
+            <LegendItem kind="completion" label="Completion EMA" />
+            <LegendItem kind="finish-ema" label="Finish EMA" />
+            <LegendItem kind="signal" label="Problem score" />
+          </>
+        ) : null}
         {showStepTarget ? <LegendItem kind="target" label="Step target" /> : null}
       </div>
       <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2.5">
@@ -207,67 +302,67 @@ export function TrackPoolBody({
               entry={entry}
               key={entry.id}
               sampleBarUsesTargetShare={sampleBarUsesTargetShare}
+              samplerSignalLabel={samplerSignalLabel}
               stepMetricLabel={stepMetricLabel}
               showStepTarget={showStepTarget}
+              variant={variant}
               xCupRegenerationMinEpisodes={xCupRegenerationMinEpisodes}
               xCupRegenerationThreshold={xCupRegenerationThreshold}
             />
           ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 }
+
+type TrackPoolChartVariant = "combined" | "global" | "ema";
 
 const TrackPoolColumn = memo(function TrackPoolColumn({
   entry,
   sampleBarUsesTargetShare,
+  samplerSignalLabel,
   stepMetricLabel,
   showStepTarget,
+  variant,
   xCupRegenerationMinEpisodes,
   xCupRegenerationThreshold,
 }: {
   entry: TrackPoolCourseView;
   sampleBarUsesTargetShare: boolean;
+  samplerSignalLabel: string | null;
   stepMetricLabel: string;
   showStepTarget: boolean;
+  variant: TrackPoolChartVariant;
   xCupRegenerationMinEpisodes: number | null;
   xCupRegenerationThreshold: number | null;
 }) {
   const completion = completionSummary(entry);
+  const samplerSignal = samplerSignalSummary(entry);
+  const showSamplerSignalText = variant === "ema";
   const generation = xCupGenerationSummary(entry);
   const regeneration = xCupRegenerationSummary(
     entry,
     xCupRegenerationThreshold,
     xCupRegenerationMinEpisodes,
   );
-  const shareLabel = sampleBarUsesTargetShare ? "Target" : "Sample";
+  const shareLabel = sampleBarUsesTargetShare ? "Target step share" : "Sample";
   const shareValue = effectiveCourseShare(entry, sampleBarUsesTargetShare);
+  const bars = trackPoolBars({
+    entry,
+    samplerSignalLabel,
+    shareLabel,
+    shareValue,
+    showStepTarget,
+    stepMetricLabel,
+    variant,
+  });
   return (
     <div className="grid min-w-0 gap-2">
-      <div className="grid h-44 grid-cols-4 items-center gap-1.5">
-        <DistributionBar
-          kind="sample"
-          label={`${shareLabel} ${formatPercent(shareValue)}`}
-          value={shareValue}
-        />
-        <DistributionBar
-          completionValue={entry.emaCompletionFraction}
-          kind="success"
-          label={successLabel(entry)}
-          value={displaySuccessRate(entry) ?? 0}
-        />
-        <DistributionBar
-          kind="episodes"
-          label={`${(entry.episodeCount ?? 0).toLocaleString()} episodes · ${formatPercent(entry.episodeShare ?? 0)}`}
-          value={entry.episodeShare ?? 0}
-        />
-        <DistributionBar
-          kind="steps"
-          label={stepShareLabel(entry, stepMetricLabel, showStepTarget)}
-          targetValue={showStepTarget ? entry.targetStepShare : null}
-          value={entry.stepShare ?? 0}
-        />
+      <div className={cn("grid h-44 items-center gap-1.5", columnClassForBarCount(bars.length))}>
+        {bars.map((bar) => (
+          <DistributionBar {...bar} key={bar.kind} />
+        ))}
       </div>
       <div className="grid gap-0.5">
         <strong className="block text-[13px] leading-tight [overflow-wrap:anywhere]">
@@ -277,6 +372,7 @@ const TrackPoolColumn = memo(function TrackPoolColumn({
           {generation === null ? "" : `${generation} · sampling: `}
           {successSummary(entry)}
           {completion === null ? "" : ` · ${completion}`}
+          {showSamplerSignalText && samplerSignal !== null ? ` · ${samplerSignal}` : ""}
           {" · "}
           {(entry.completedEnvSteps ?? 0).toLocaleString()} steps
         </span>
@@ -289,6 +385,90 @@ const TrackPoolColumn = memo(function TrackPoolColumn({
     </div>
   );
 }, sameTrackPoolColumnProps);
+
+function trackPoolBars({
+  entry,
+  samplerSignalLabel,
+  shareLabel,
+  shareValue,
+  showStepTarget,
+  stepMetricLabel,
+  variant,
+}: {
+  entry: TrackPoolCourseView;
+  samplerSignalLabel: string | null;
+  shareLabel: string;
+  shareValue: number;
+  showStepTarget: boolean;
+  stepMetricLabel: string;
+  variant: TrackPoolChartVariant;
+}): DistributionBarProps[] {
+  if (variant === "global") {
+    return globalStatisticBars(entry, stepMetricLabel, showStepTarget);
+  }
+  if (variant === "ema") {
+    return [
+      {
+        kind: "completion",
+        label: `completion EMA ${formatOptionalPercent(entry.emaCompletionFraction)}`,
+        value: entry.emaCompletionFraction ?? 0,
+      },
+      {
+        kind: "finish-ema",
+        label: `finish EMA ${formatOptionalPercent(entry.emaFinishRate)}`,
+        value: entry.emaFinishRate ?? 0,
+      },
+      {
+        kind: "signal",
+        label: `${samplerSignalLabel ?? "sampler"} problem score ${formatPercent(entry.currentProblemScore ?? 0)}`,
+        value: entry.currentProblemScore ?? 0,
+      },
+    ];
+  }
+  return [
+    {
+      kind: "sample",
+      label: `${shareLabel} ${formatPercent(shareValue)}`,
+      value: shareValue,
+    },
+    ...globalStatisticBars(entry, stepMetricLabel, showStepTarget),
+  ];
+}
+
+function globalStatisticBars(
+  entry: TrackPoolCourseView,
+  stepMetricLabel: string,
+  showStepTarget: boolean,
+): DistributionBarProps[] {
+  return [
+    {
+      kind: "success",
+      label: successLabel(entry),
+      value: displaySuccessRate(entry) ?? 0,
+    },
+    {
+      kind: "episodes",
+      label: `${(entry.episodeCount ?? 0).toLocaleString()} episodes · ${formatPercent(entry.episodeShare ?? 0)}`,
+      value: entry.episodeShare ?? 0,
+    },
+    {
+      kind: "steps",
+      label: stepShareLabel(entry, stepMetricLabel, showStepTarget),
+      targetValue: showStepTarget ? entry.targetStepShare : null,
+      value: entry.stepShare ?? 0,
+    },
+  ];
+}
+
+function columnClassForBarCount(count: number) {
+  if (count <= 3) {
+    return "grid-cols-3";
+  }
+  if (count === 4) {
+    return "grid-cols-4";
+  }
+  return "grid-cols-5";
+}
 
 function effectiveCupShare(cup: TrackPoolCupView, sampleBarUsesTargetShare: boolean) {
   if (!sampleBarUsesTargetShare) {
@@ -310,7 +490,9 @@ function effectiveCourseShare(entry: TrackPoolCourseView, sampleBarUsesTargetSha
 const TRACK_POOL_COURSE_RENDER_KEYS = [
   "completedEnvSteps",
   "currentProbability",
+  "currentProblemScore",
   "emaCompletionFraction",
+  "emaFinishRate",
   "episodeCount",
   "episodeShare",
   "finishedEpisodeCount",
@@ -333,28 +515,47 @@ function sameTrackPoolColumnProps(
   left: {
     entry: TrackPoolCourseView;
     sampleBarUsesTargetShare: boolean;
+    samplerSignalLabel: string | null;
     stepMetricLabel: string;
     showStepTarget: boolean;
+    variant: TrackPoolChartVariant;
     xCupRegenerationMinEpisodes: number | null;
     xCupRegenerationThreshold: number | null;
   },
   right: {
     entry: TrackPoolCourseView;
     sampleBarUsesTargetShare: boolean;
+    samplerSignalLabel: string | null;
     stepMetricLabel: string;
     showStepTarget: boolean;
+    variant: TrackPoolChartVariant;
     xCupRegenerationMinEpisodes: number | null;
     xCupRegenerationThreshold: number | null;
   },
 ) {
   return (
     left.sampleBarUsesTargetShare === right.sampleBarUsesTargetShare &&
+    left.samplerSignalLabel === right.samplerSignalLabel &&
     left.stepMetricLabel === right.stepMetricLabel &&
     left.showStepTarget === right.showStepTarget &&
+    left.variant === right.variant &&
     left.xCupRegenerationMinEpisodes === right.xCupRegenerationMinEpisodes &&
     left.xCupRegenerationThreshold === right.xCupRegenerationThreshold &&
     TRACK_POOL_COURSE_RENDER_KEYS.every((key) => left.entry[key] === right.entry[key])
   );
+}
+
+function deficitBudgetSignalLabel(metric: string | null) {
+  if (metric === "finish_ema") {
+    return "finish EMA";
+  }
+  if (metric === "mixed") {
+    return "mixed";
+  }
+  if (metric === "completion_ema") {
+    return "completion EMA";
+  }
+  return null;
 }
 
 function stepShareLabel(

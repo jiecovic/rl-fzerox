@@ -26,7 +26,10 @@ from rl_fzerox.core.engine_tuning.types import (
     EngineTunerObjective,
     engine_bucket_candidates,
 )
-from rl_fzerox.core.runtime_spec.schema.common import TrackSamplingMode
+from rl_fzerox.core.runtime_spec.schema.common import (
+    DeficitBudgetDifficultyMetric,
+    TrackSamplingMode,
+)
 
 
 class TrackRecordEntryConfig(BaseModel):
@@ -274,6 +277,8 @@ class TrackSamplingConfig(BaseModel):
     deficit_budget_focus_sharpness: float = Field(default=1.0, ge=0.0)
     deficit_budget_ema_alpha: float = Field(default=0.02, gt=0.0, le=1.0)
     deficit_budget_weight_update_rollouts: PositiveInt = 20
+    deficit_budget_difficulty_metric: DeficitBudgetDifficultyMetric = "completion_ema"
+    deficit_budget_warmup_min_episodes_per_course: int = Field(default=10, ge=0)
     step_balance_log_details: bool = False
     x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
     engine_tuning: AdaptiveEngineTuningConfig = Field(default_factory=AdaptiveEngineTuningConfig)

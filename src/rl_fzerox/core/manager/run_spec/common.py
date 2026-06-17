@@ -24,10 +24,13 @@ GpDifficulty = RaceDifficultyName
 TrackSamplingMode = Literal[
     "equal",
     "step_balanced",
+    # Hidden from new manager UI metadata, but still accepted for legacy saved
+    # run configs. Remove after compatibility migration.
     "adaptive_step_balanced",
     "fixed_env",
     "deficit_budget",
 ]
+DeficitBudgetDifficultyMetric = Literal["completion_ema", "finish_ema", "mixed"]
 VehicleSelectionMode = Literal["fixed", "pool"]
 EngineSettingMode = Literal["fixed", "random_range", "adaptive_tuner"]
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]

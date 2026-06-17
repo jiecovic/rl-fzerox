@@ -75,7 +75,6 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
         track_sampling_modes=_options(
             (
                 "step_balanced",
-                "adaptive_step_balanced",
                 "deficit_budget",
                 "fixed_env",
                 "equal",

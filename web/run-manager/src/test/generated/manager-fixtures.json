@@ -959,10 +959,6 @@
         "value": "step_balanced"
       },
       {
-        "label": "adaptive step balanced",
-        "value": "adaptive_step_balanced"
-      },
-      {
         "label": "deficit budget",
         "value": "deficit_budget"
       },
@@ -1458,9 +1454,11 @@
       "adaptive_step_balance_confidence_scale": 4.0,
       "adaptive_step_balance_min_confidence_episodes": 24,
       "adaptive_step_balance_target_completion": 0.9,
+      "deficit_budget_difficulty_metric": "completion_ema",
       "deficit_budget_ema_alpha": 0.02,
       "deficit_budget_focus_sharpness": 1.0,
       "deficit_budget_uniform_fraction": 0.7,
+      "deficit_budget_warmup_min_episodes_per_course": 10,
       "deficit_budget_weight_update_rollouts": 20,
       "include_x_cup": false,
       "race_mode": "time_attack",

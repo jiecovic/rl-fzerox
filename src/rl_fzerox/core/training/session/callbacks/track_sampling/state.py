@@ -18,6 +18,8 @@ class TrackSamplingRuntimeEntry:
     success_sample_count: int
     ema_episode_frames: float | None
     ema_completion_fraction: float | None
+    ema_finish_rate: float | None = None
+    current_problem_score: float = 0.0
     generation_episode_count: int = 0
     generation_finished_episode_count: int = 0
     generation_success_sample_count: int = 0
@@ -46,6 +48,8 @@ class TrackSamplingRuntimeState:
     update_count: int
     episodes_since_update: int
     entries: tuple[TrackSamplingRuntimeEntry, ...]
+    deficit_budget_difficulty_metric: str = "completion_ema"
+    deficit_budget_warmup_min_episodes_per_course: int = 0
 
 
 @dataclass(slots=True)
@@ -57,6 +61,8 @@ class TrackStepStats:
     success_sample_count: int = 0
     ema_episode_frames: float | None = None
     ema_completion_fraction: float | None = None
+    ema_finish_rate: float | None = None
+    current_problem_score: float = 0.0
     generation_episode_count: int = 0
     generation_finished_episode_count: int = 0
     generation_success_sample_count: int = 0
@@ -77,6 +83,13 @@ class TrackStepStats:
         self.success_sample_count += 1
         if finished:
             self.finished_episode_count += 1
+        finish_value = 1.0 if finished else 0.0
+        if self.ema_finish_rate is None:
+            self.ema_finish_rate = finish_value
+        else:
+            self.ema_finish_rate = (1.0 - ema_alpha) * self.ema_finish_rate + (
+                ema_alpha * finish_value
+            )
         if self.ema_episode_frames is None:
             self.ema_episode_frames = float(frame_count)
         else:
@@ -146,6 +159,8 @@ def aggregate_runtime_entries(
                 success_sample_count=entry.success_sample_count,
                 ema_episode_frames=entry.ema_episode_frames,
                 ema_completion_fraction=entry.ema_completion_fraction,
+                ema_finish_rate=entry.ema_finish_rate,
+                current_problem_score=entry.current_problem_score,
                 generation_episode_count=entry.generation_episode_count,
                 generation_finished_episode_count=entry.generation_finished_episode_count,
                 generation_success_sample_count=entry.generation_success_sample_count,
@@ -172,6 +187,8 @@ def aggregate_runtime_entries(
             success_sample_count=existing.success_sample_count + entry.success_sample_count,
             ema_episode_frames=_merged_ema_episode_frames(existing, entry),
             ema_completion_fraction=_merged_ema_completion_fraction(existing, entry),
+            ema_finish_rate=_merged_ema_finish_rate(existing, entry),
+            current_problem_score=_merged_problem_score(existing, entry),
             generation_episode_count=(
                 existing.generation_episode_count + entry.generation_episode_count
             ),
@@ -321,6 +338,38 @@ def _merged_ema_completion_fraction(
         return None
     return (
         left.ema_completion_fraction * left_weight + right.ema_completion_fraction * right_weight
+    ) / total_weight
+
+
+def _merged_ema_finish_rate(
+    left: TrackSamplingRuntimeEntry,
+    right: TrackSamplingRuntimeEntry,
+) -> float | None:
+    if left.ema_finish_rate is None:
+        return right.ema_finish_rate
+    if right.ema_finish_rate is None:
+        return left.ema_finish_rate
+    left_weight = max(left.episode_count, 1)
+    right_weight = max(right.episode_count, 1)
+    total_weight = left_weight + right_weight
+    if total_weight <= 0:
+        return None
+    return (
+        left.ema_finish_rate * left_weight + right.ema_finish_rate * right_weight
+    ) / total_weight
+
+
+def _merged_problem_score(
+    left: TrackSamplingRuntimeEntry,
+    right: TrackSamplingRuntimeEntry,
+) -> float:
+    left_weight = max(left.episode_count, 1)
+    right_weight = max(right.episode_count, 1)
+    total_weight = left_weight + right_weight
+    if total_weight <= 0:
+        return 0.0
+    return (
+        left.current_problem_score * left_weight + right.current_problem_score * right_weight
     ) / total_weight
 
 

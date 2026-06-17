@@ -17,6 +17,7 @@ from rl_fzerox.core.manager.db.models import (
     RunTrackSamplingArtifactModel,
     RunTrackSamplingEntryModel,
     RunTrackSamplingGeneratedSlotModel,
+    RunTrackSamplingRuntimeModel,
     SaveGameAttemptModel,
     SaveGameCourseSetupModel,
     SaveGameCupSetupModel,
@@ -29,7 +30,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -60,6 +61,20 @@ SAVE_GAME_RUNNER_REPLAY_COLUMNS = (
     ("runner_target_clear_goal", "INTEGER NOT NULL DEFAULT 1"),
     ("runner_keep_failed_recordings", "BOOLEAN NOT NULL DEFAULT 0"),
 )
+TRACK_SAMPLING_RUNTIME_ADAPTIVE_SIGNAL_COLUMNS = (
+    (
+        "run_track_sampling_runtime",
+        "deficit_budget_difficulty_metric",
+        "VARCHAR NOT NULL DEFAULT 'completion_ema'",
+    ),
+    (
+        "run_track_sampling_runtime",
+        "deficit_budget_warmup_min_episodes_per_course",
+        "INTEGER NOT NULL DEFAULT 0",
+    ),
+    ("run_track_sampling_entries", "ema_finish_rate", "FLOAT"),
+    ("run_track_sampling_entries", "current_problem_score", "FLOAT NOT NULL DEFAULT 0.0"),
+)
 
 
 def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
@@ -71,6 +86,10 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
         table_names = set(inspect(engine).get_table_names())
         if _has_manager_schema(table_names):
             _upgrade_save_game_runner_replay_columns(engine=engine, table_names=table_names)
+            _upgrade_track_sampling_adaptive_signal_columns(
+                engine=engine,
+                table_names=table_names,
+            )
             _assert_current_schema(engine=engine, table_names=table_names)
         else:
             ManagerBase.metadata.create_all(engine)
@@ -160,6 +179,7 @@ def _assert_current_schema(
     _assert_run_foreign_keys(inspector=inspector, table_names=table_names)
     _assert_track_sampling_artifact_columns(inspector=inspector)
     _assert_alt_baseline_columns(inspector=inspector)
+    _assert_track_sampling_runtime_columns(inspector=inspector)
     _assert_track_sampling_entry_columns(inspector=inspector)
     _assert_track_sampling_generated_slot_columns(inspector=inspector)
 
@@ -190,6 +210,30 @@ def _upgrade_save_game_runner_replay_columns(
         for column_name, definition in missing_columns:
             connection.execute(
                 text(f"ALTER TABLE save_games ADD COLUMN {column_name} {definition}")
+            )
+
+
+def _upgrade_track_sampling_adaptive_signal_columns(
+    *,
+    engine: Engine,
+    table_names: set[str],
+) -> None:
+    """Add deficit-budget adaptive-signal fields to pre-metric manager DBs."""
+
+    inspector = inspect(engine)
+    missing_columns: list[tuple[str, str, str]] = []
+    for table_name, column_name, definition in TRACK_SAMPLING_RUNTIME_ADAPTIVE_SIGNAL_COLUMNS:
+        if table_name not in table_names:
+            continue
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if column_name not in columns:
+            missing_columns.append((table_name, column_name, definition))
+    if not missing_columns:
+        return
+    with engine.begin() as connection:
+        for table_name, column_name, definition in missing_columns:
+            connection.execute(
+                text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
             )
 
 
@@ -240,6 +284,17 @@ def _assert_track_sampling_entry_columns(*, inspector: Inspector) -> None:
         joined_columns = ", ".join(sorted(missing_columns))
         raise RuntimeError(
             f"manager DB is not current: run_track_sampling_entries is missing {joined_columns}"
+        )
+
+
+def _assert_track_sampling_runtime_columns(*, inspector: Inspector) -> None:
+    columns = {column["name"] for column in inspector.get_columns("run_track_sampling_runtime")}
+    required_columns = {column.name for column in RunTrackSamplingRuntimeModel.__table__.columns}
+    missing_columns = required_columns.difference(columns)
+    if missing_columns:
+        joined_columns = ", ".join(sorted(missing_columns))
+        raise RuntimeError(
+            f"manager DB is not current: run_track_sampling_runtime is missing {joined_columns}"
         )
 
 

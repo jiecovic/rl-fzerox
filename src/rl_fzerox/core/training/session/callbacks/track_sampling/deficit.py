@@ -32,6 +32,8 @@ class DeficitBudgetSettings:
     focus_sharpness: float
     ema_alpha: float
     weight_update_rollouts: int
+    difficulty_metric: str = "completion_ema"
+    warmup_min_episodes_per_course: int = 10
     x_cup_generation_ema_alpha: float = 0.3
 
 
@@ -127,6 +129,10 @@ class DeficitBudgetTrackSamplingController:
                 focus_sharpness=settings_source.deficit_budget_focus_sharpness,
                 ema_alpha=settings_source.deficit_budget_ema_alpha,
                 weight_update_rollouts=settings_source.deficit_budget_weight_update_rollouts,
+                difficulty_metric=settings_source.deficit_budget_difficulty_metric,
+                warmup_min_episodes_per_course=(
+                    settings_source.deficit_budget_warmup_min_episodes_per_course
+                ),
                 x_cup_generation_ema_alpha=settings_source.x_cup_rotation.ema_alpha,
             ),
             restored_state=restored_state,
@@ -262,6 +268,7 @@ class DeficitBudgetTrackSamplingController:
                 course_key
             ]
             values[f"track_sampling/{key}/problem_ema"] = self._ema_problem[course_key]
+            values[f"track_sampling/{key}/problem_score"] = stats.current_problem_score
             values[f"track_sampling/{key}/adaptive_weight"] = stats.current_weight
             values[f"track_sampling/{key}/finish_rate"] = (
                 stats.finished_episode_count / success_count
@@ -270,6 +277,7 @@ class DeficitBudgetTrackSamplingController:
                 self._crash_episode_count[course_key] / success_count
             )
             values[f"track_sampling/{key}/avg_completion"] = stats.ema_completion_fraction or 0.0
+            values[f"track_sampling/{key}/ema_finish_rate"] = stats.ema_finish_rate or 0.0
         return values
 
     def runtime_state(self) -> TrackSamplingRuntimeState:
@@ -283,6 +291,10 @@ class DeficitBudgetTrackSamplingController:
             adaptive_target_completion=1.0,
             adaptive_min_confidence_episodes=1,
             adaptive_confidence_scale=max(1.0, self._settings.focus_sharpness),
+            deficit_budget_difficulty_metric=self._settings.difficulty_metric,
+            deficit_budget_warmup_min_episodes_per_course=(
+                self._settings.warmup_min_episodes_per_course
+            ),
             update_count=self.update_count,
             episodes_since_update=self._rollouts_since_weight_update,
             entries=tuple(
@@ -313,6 +325,8 @@ class DeficitBudgetTrackSamplingController:
             stats.success_sample_count = max(0, int(entry.success_sample_count))
             stats.ema_episode_frames = entry.ema_episode_frames
             stats.ema_completion_fraction = entry.ema_completion_fraction
+            stats.ema_finish_rate = entry.ema_finish_rate
+            stats.current_problem_score = entry.current_problem_score
             stats.generation_episode_count = max(0, int(entry.generation_episode_count))
             stats.generation_finished_episode_count = max(
                 0,
@@ -348,13 +362,25 @@ class DeficitBudgetTrackSamplingController:
             self._ema_problem[course_key] = self._raw_problem_score(stats)
 
     def _raw_problem_score(self, stats: TrackStepStats) -> float:
-        avg_completion = stats.ema_completion_fraction or 0.0
-        return max(0.0, 1.0 - avg_completion)
+        metric = self._settings.difficulty_metric
+        completion_problem = _completion_problem_score(stats)
+        finish_problem = _finish_problem_score(stats)
+        if metric == "finish_ema":
+            return finish_problem
+        if metric == "mixed":
+            return max(completion_problem, finish_problem)
+        return completion_problem
 
     def _recompute_target_weights(self) -> None:
         sharpness = max(0.0, float(self._settings.focus_sharpness))
+        if self._in_warmup():
+            for stats in self._stats.values():
+                stats.current_problem_score = 1.0
+                stats.current_weight = 1.0
+            return
         for course_key, stats in self._stats.items():
             problem = max(0.0, self._ema_problem[course_key])
+            stats.current_problem_score = problem
             stats.current_weight = 1.0 if sharpness <= 0.0 else problem**sharpness
 
     def _target_fractions(self) -> dict[str, float]:
@@ -377,6 +403,12 @@ class DeficitBudgetTrackSamplingController:
             + adaptive_fraction * adaptive_fractions[course_key]
             for course_key in self._course_keys
         }
+
+    def _in_warmup(self) -> bool:
+        minimum = max(0, int(self._settings.warmup_min_episodes_per_course))
+        if minimum <= 0:
+            return False
+        return any(stats.success_sample_count < minimum for stats in self._stats.values())
 
     def _rebuild_deficits_from_completed_steps(self) -> None:
         """Derive live scheduler debt from durable per-course step totals."""
@@ -429,3 +461,19 @@ def _needs_first_generation_backfill(entry: TrackSamplingRuntimeEntry) -> bool:
         and entry.generation_success_sample_count == 0
         and entry.generation_ema_completion_fraction is None
     )
+
+
+def _completion_problem_score(stats: TrackStepStats) -> float:
+    avg_completion = stats.ema_completion_fraction or 0.0
+    return max(0.0, 1.0 - avg_completion)
+
+
+def _finish_problem_score(stats: TrackStepStats) -> float:
+    finish_rate = stats.ema_finish_rate
+    if finish_rate is None:
+        finish_rate = (
+            0.0
+            if stats.success_sample_count <= 0
+            else stats.finished_episode_count / stats.success_sample_count
+        )
+    return max(0.0, 1.0 - max(0.0, min(1.0, finish_rate)))

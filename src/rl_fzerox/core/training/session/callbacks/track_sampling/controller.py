@@ -224,6 +224,7 @@ class StepBalancedTrackSamplingController:
             adaptive_target_completion=self._adaptive_target_completion,
             adaptive_min_confidence_episodes=self._adaptive_min_confidence_episodes,
             adaptive_confidence_scale=self._adaptive_confidence_scale,
+            deficit_budget_difficulty_metric="completion_ema",
             update_count=self.update_count,
             episodes_since_update=self._episodes_since_update,
             entries=tuple(

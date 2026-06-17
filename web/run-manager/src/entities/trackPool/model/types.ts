@@ -21,7 +21,9 @@ export interface RunTrackPoolPanelProps {
 export type TrackPoolCourseView = {
   completedEnvSteps: number | null;
   currentProbability: number | null;
+  currentProblemScore: number | null;
   emaCompletionFraction: number | null;
+  emaFinishRate: number | null;
   episodeCount: number | null;
   episodeShare: number | null;
   finishedEpisodeCount: number | null;
@@ -56,6 +58,8 @@ export type TrackPoolCupView = {
 
 export type TrackPoolView = {
   cups: TrackPoolCupView[];
+  deficitBudgetDifficultyMetric: string | null;
+  deficitBudgetWarmupMinEpisodesPerCourse: number | null;
   sampleBarUsesTargetShare: boolean;
   stepMetricLabel: string;
   showStepTarget: boolean;

@@ -89,6 +89,10 @@ export function RunTrackPoolPanel({
           ) : activeCup === null ? null : (
             <TrackPoolBody
               activeCup={activeCup}
+              deficitBudgetDifficultyMetric={poolView.deficitBudgetDifficultyMetric}
+              deficitBudgetWarmupMinEpisodesPerCourse={
+                poolView.deficitBudgetWarmupMinEpisodesPerCourse
+              }
               sampleBarUsesTargetShare={poolView.sampleBarUsesTargetShare}
               stepMetricLabel={poolView.stepMetricLabel}
               showStepTarget={poolView.showStepTarget}

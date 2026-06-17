@@ -45,8 +45,10 @@ interface CourseSamplingPanelProps {
     | "adaptive_step_balance_min_confidence_episodes"
     | "adaptive_step_balance_target_completion"
     | "deficit_budget_ema_alpha"
+    | "deficit_budget_difficulty_metric"
     | "deficit_budget_focus_sharpness"
     | "deficit_budget_uniform_fraction"
+    | "deficit_budget_warmup_min_episodes_per_course"
     | "deficit_budget_weight_update_rollouts"
     | "step_balance_ema_alpha"
     | "step_balance_max_weight_scale"
@@ -370,6 +372,27 @@ function DeficitBudgetFields({
 
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+      <div className="col-span-full">
+        <ChoiceStrip
+          description={deficitBudgetMetricDescription(
+            config.tracks.deficit_budget_difficulty_metric,
+          )}
+          options={[
+            { key: "completion_ema", label: "Completion EMA" },
+            { key: "finish_ema", label: "Finish EMA" },
+            { key: "mixed", label: "Mixed" },
+          ].map((option) => ({
+            active: config.tracks.deficit_budget_difficulty_metric === option.key,
+            key: option.key,
+            label: option.label,
+            onClick: () =>
+              updateTracks({
+                deficit_budget_difficulty_metric:
+                  option.key as TracksConfig["deficit_budget_difficulty_metric"],
+              }),
+          }))}
+        />
+      </div>
       <NumberField
         help="Fraction of each rollout step budget reserved as equal coverage for every active course."
         label="Equal coverage share"
@@ -392,7 +415,7 @@ function DeficitBudgetFields({
         </span>
       </div>
       <NumberField
-        help="Exponent applied to completion-gap scores before splitting the difficulty-focus budget. 0 is uniform, 1 is proportional, larger values concentrate harder on low-completion courses."
+        help="Exponent applied to the selected difficulty signal before splitting the difficulty-focus budget. 0 is uniform, 1 is proportional, larger values concentrate harder."
         label="Focus sharpness"
         resetValue={defaultConfig.tracks.deficit_budget_focus_sharpness}
         step="0.1"
@@ -400,12 +423,20 @@ function DeficitBudgetFields({
         onChange={(value) => updateTracks({ deficit_budget_focus_sharpness: value })}
       />
       <NumberField
-        help="EMA smoothing for each course's completion gap before focus weights are recomputed."
+        help={`EMA smoothing for the selected difficulty signal before focus weights are recomputed. ${deficitBudgetEmaPreview(config.tracks.deficit_budget_ema_alpha)}`}
         label="Difficulty EMA"
         resetValue={defaultConfig.tracks.deficit_budget_ema_alpha}
         step="0.005"
         value={config.tracks.deficit_budget_ema_alpha}
         onChange={(value) => updateTracks({ deficit_budget_ema_alpha: value })}
+      />
+      <IntegerField
+        help="Episode samples required on every active course before adaptive focus weights are allowed. Alt baselines spend budget but do not count toward warmup."
+        label="Warmup episodes/course"
+        min={0}
+        resetValue={defaultConfig.tracks.deficit_budget_warmup_min_episodes_per_course}
+        value={config.tracks.deficit_budget_warmup_min_episodes_per_course}
+        onChange={(value) => updateTracks({ deficit_budget_warmup_min_episodes_per_course: value })}
       />
       <IntegerField
         help="Rollouts between difficulty-weight recomputations. Step deficits still update every rollout."
@@ -417,6 +448,23 @@ function DeficitBudgetFields({
       />
     </div>
   );
+}
+
+function deficitBudgetEmaPreview(alpha: number) {
+  if (!Number.isFinite(alpha) || alpha <= 0) {
+    return "";
+  }
+  return `~${Math.round(1 / alpha).toLocaleString()} episodes.`;
+}
+
+function deficitBudgetMetricDescription(metric: TracksConfig["deficit_budget_difficulty_metric"]) {
+  if (metric === "finish_ema") {
+    return "Focus on courses with low full-course finish rate after warmup samples exist for every active course.";
+  }
+  if (metric === "mixed") {
+    return "Focus on the harder of completion gap and finish-rate gap after warmup samples exist for every active course.";
+  }
+  return "Focus on courses with low full-course completion progress after warmup samples exist for every active course.";
 }
 
 function formatPercent(value: number) {

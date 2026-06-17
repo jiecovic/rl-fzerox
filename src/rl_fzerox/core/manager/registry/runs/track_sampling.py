@@ -80,6 +80,10 @@ def get_run_track_sampling_state(
         update_count=runtime.update_count,
         episodes_since_update=runtime.episodes_since_update,
         entries=tuple(_track_sampling_entry_from_model(entry) for entry in entries),
+        deficit_budget_difficulty_metric=runtime.deficit_budget_difficulty_metric,
+        deficit_budget_warmup_min_episodes_per_course=(
+            runtime.deficit_budget_warmup_min_episodes_per_course
+        ),
     )
 
 
@@ -229,6 +233,10 @@ def _runtime_values(
         "adaptive_target_completion": state.adaptive_target_completion,
         "adaptive_min_confidence_episodes": state.adaptive_min_confidence_episodes,
         "adaptive_confidence_scale": state.adaptive_confidence_scale,
+        "deficit_budget_difficulty_metric": state.deficit_budget_difficulty_metric,
+        "deficit_budget_warmup_min_episodes_per_course": (
+            state.deficit_budget_warmup_min_episodes_per_course
+        ),
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
         "updated_at": updated_at,
@@ -250,6 +258,8 @@ def _track_sampling_entry_from_model(
         success_sample_count=entry.success_sample_count,
         ema_episode_frames=entry.ema_episode_frames,
         ema_completion_fraction=entry.ema_completion_fraction,
+        ema_finish_rate=entry.ema_finish_rate,
+        current_problem_score=entry.current_problem_score,
         generation_episode_count=entry.generation_episode_count,
         generation_finished_episode_count=entry.generation_finished_episode_count,
         generation_success_sample_count=entry.generation_success_sample_count,
@@ -283,6 +293,8 @@ def _track_sampling_entry_values(
         "success_sample_count": entry.success_sample_count,
         "ema_episode_frames": entry.ema_episode_frames,
         "ema_completion_fraction": entry.ema_completion_fraction,
+        "ema_finish_rate": entry.ema_finish_rate,
+        "current_problem_score": entry.current_problem_score,
         "generation_episode_count": entry.generation_episode_count,
         "generation_finished_episode_count": entry.generation_finished_episode_count,
         "generation_success_sample_count": entry.generation_success_sample_count,

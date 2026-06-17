@@ -160,6 +160,7 @@ def test_deficit_budget_focus_uses_completion_gap_with_sharpness(
             focus_sharpness=focus_sharpness,
             ema_alpha=1.0,
             weight_update_rollouts=1,
+            warmup_min_episodes_per_course=0,
         ),
         seed=7,
     )
@@ -193,6 +194,117 @@ def test_deficit_budget_focus_uses_completion_gap_with_sharpness(
         course_key: values[f"track_sampling/{course_key}/target_step_share"]
         for course_key in expected
     } == pytest.approx(expected)
+
+
+def test_deficit_budget_warmup_keeps_targets_uniform_until_all_courses_have_samples() -> None:
+    controller = DeficitBudgetTrackSamplingController(
+        resolved_courses=resolved_track_sampling_courses(
+            {"easy": 1.0, "hard": 1.0},
+            course_keys={"easy": "easy", "hard": "hard"},
+            log_keys={"easy": "easy", "hard": "hard"},
+            labels={"easy": "Easy", "hard": "Hard"},
+            log_enabled={"easy": True, "hard": True},
+        ),
+        action_repeat=1,
+        settings=DeficitBudgetSettings(
+            uniform_fraction=0.0,
+            focus_sharpness=1.0,
+            ema_alpha=1.0,
+            weight_update_rollouts=1,
+            warmup_min_episodes_per_course=2,
+        ),
+        seed=7,
+    )
+
+    controller.record_episodes(
+        (
+            {
+                "track_id": "easy",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "hard",
+                "episode_step": 100,
+                "episode_completion_fraction": 0.0,
+                "termination_reason": "crashed",
+            },
+        )
+    )
+    controller.maybe_update_weights()
+
+    values = controller.log_values()
+    assert values["track_sampling/easy/target_step_share"] == pytest.approx(0.5)
+    assert values["track_sampling/hard/target_step_share"] == pytest.approx(0.5)
+
+    controller.record_episodes(
+        (
+            {
+                "track_id": "easy",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "hard",
+                "episode_step": 100,
+                "episode_completion_fraction": 0.0,
+                "termination_reason": "crashed",
+            },
+        )
+    )
+    controller.maybe_update_weights()
+
+    values = controller.log_values()
+    assert values["track_sampling/hard/target_step_share"] > 0.99
+    assert values["track_sampling/easy/target_step_share"] < 0.01
+
+
+def test_deficit_budget_finish_metric_can_focus_failed_finish_with_high_completion() -> None:
+    controller = DeficitBudgetTrackSamplingController(
+        resolved_courses=resolved_track_sampling_courses(
+            {"finished": 1.0, "retired": 1.0},
+            course_keys={"finished": "finished", "retired": "retired"},
+            log_keys={"finished": "finished", "retired": "retired"},
+            labels={"finished": "Finished", "retired": "Retired"},
+            log_enabled={"finished": True, "retired": True},
+        ),
+        action_repeat=1,
+        settings=DeficitBudgetSettings(
+            uniform_fraction=0.0,
+            focus_sharpness=1.0,
+            ema_alpha=1.0,
+            weight_update_rollouts=1,
+            difficulty_metric="finish_ema",
+            warmup_min_episodes_per_course=0,
+        ),
+        seed=7,
+    )
+
+    controller.record_episodes(
+        (
+            {
+                "track_id": "finished",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "retired",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "retired",
+            },
+        )
+    )
+    controller.maybe_update_weights()
+    values = controller.log_values()
+
+    assert values["track_sampling/retired/problem_score"] == pytest.approx(1.0)
+    assert values["track_sampling/finished/problem_score"] == pytest.approx(0.0)
+    assert values["track_sampling/retired/target_step_share"] > 0.99
+    assert values["track_sampling/finished/target_step_share"] < 0.01
 
 
 def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
@@ -482,6 +594,7 @@ def test_deficit_budget_controller_raises_target_share_for_problem_course() -> N
             focus_sharpness=1.0,
             ema_alpha=1.0,
             weight_update_rollouts=1,
+            warmup_min_episodes_per_course=0,
         ),
         seed=7,
     )
@@ -569,6 +682,7 @@ def test_deficit_budget_controller_restores_runtime_stats() -> None:
             focus_sharpness=1.0,
             ema_alpha=0.02,
             weight_update_rollouts=20,
+            warmup_min_episodes_per_course=0,
         ),
         restored_state=restored,
         seed=7,

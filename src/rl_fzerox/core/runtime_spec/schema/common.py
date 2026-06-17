@@ -17,9 +17,16 @@ TrackSamplingMode: TypeAlias = Literal[
     "random",
     "balanced",
     "step_balanced",
+    # Hidden from new manager UI metadata, but still accepted for legacy
+    # train manifests and saved configs. Remove after compatibility migration.
     "adaptive_step_balanced",
     "fixed_env",
     "deficit_budget",
+]
+DeficitBudgetDifficultyMetric: TypeAlias = Literal[
+    "completion_ema",
+    "finish_ema",
+    "mixed",
 ]
 ObservationPresetName: TypeAlias = DomainObservationPresetName
 ObservationResizeFilter: TypeAlias = DomainObservationResizeFilter

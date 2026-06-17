@@ -9,6 +9,7 @@ import {
   cameraSettingSchema,
   convProfileSchema,
   customCnnActivationSchema,
+  deficitBudgetDifficultyMetricSchema,
   engineSettingModeSchema,
   engineTunerBackendSchema,
   engineTunerObjectiveSchema,
@@ -145,6 +146,8 @@ const tracksConfigSchema = z
     deficit_budget_focus_sharpness: z.number().nonnegative(),
     deficit_budget_ema_alpha: z.number().gt(0).max(1),
     deficit_budget_weight_update_rollouts: z.number().int().positive(),
+    deficit_budget_difficulty_metric: deficitBudgetDifficultyMetricSchema,
+    deficit_budget_warmup_min_episodes_per_course: z.number().int().nonnegative(),
     selected_course_ids: z.array(z.string()),
   })
   .transform(({ gp_difficulties, ...tracks }) => ({

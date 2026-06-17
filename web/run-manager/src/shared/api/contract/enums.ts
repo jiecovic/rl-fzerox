@@ -16,9 +16,15 @@ export const gpDifficultySchema = z.enum(["novice", "standard", "expert", "maste
 export const trackSamplingModeSchema = z.enum([
   "equal",
   "step_balanced",
+  // Hidden from new backend metadata, but accepted for legacy saved configs.
   "adaptive_step_balanced",
   "deficit_budget",
   "fixed_env",
+]);
+export const deficitBudgetDifficultyMetricSchema = z.enum([
+  "completion_ema",
+  "finish_ema",
+  "mixed",
 ]);
 export const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
 export const engineSettingModeSchema = z.enum(["fixed", "random_range", "adaptive_tuner"]);

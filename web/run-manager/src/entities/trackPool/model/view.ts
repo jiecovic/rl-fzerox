@@ -94,6 +94,12 @@ export function buildTrackPoolView(
   const samplingMode = state?.sampling_mode ?? run.config.tracks.sampling_mode;
   return {
     cups: sortedCups,
+    deficitBudgetDifficultyMetric:
+      state?.sampling_mode === "deficit_budget" ? state.deficit_budget_difficulty_metric : null,
+    deficitBudgetWarmupMinEpisodesPerCourse:
+      state?.sampling_mode === "deficit_budget"
+        ? state.deficit_budget_warmup_min_episodes_per_course
+        : null,
     sampleBarUsesTargetShare: samplingMode === "deficit_budget",
     stepMetricLabel:
       samplingMode === "deficit_budget"
@@ -159,6 +165,17 @@ export function completionSummary(entry: TrackPoolCourseView) {
     return null;
   }
   return `${formatPercent(entry.emaCompletionFraction)} comp`;
+}
+
+export function samplerSignalSummary(entry: TrackPoolCourseView) {
+  if (entry.currentProblemScore === null) {
+    return null;
+  }
+  const parts = [`problem score ${formatPercent(entry.currentProblemScore)}`];
+  if (entry.emaFinishRate !== null) {
+    parts.push(`EMA finish ${formatPercent(entry.emaFinishRate)}`);
+  }
+  return parts.join(" · ");
 }
 
 export function xCupRegenerationSummary(
@@ -281,7 +298,9 @@ function courseViewFromRuntime({
   return {
     completedEnvSteps: runtimeEntry?.completed_env_steps ?? null,
     currentProbability: runtimeEntry?.current_probability ?? null,
+    currentProblemScore: runtimeEntry?.current_problem_score ?? null,
     emaCompletionFraction: runtimeEntry?.ema_completion_fraction ?? null,
+    emaFinishRate: runtimeEntry?.ema_finish_rate ?? null,
     episodeCount: runtimeEntry?.episode_count ?? null,
     episodeShare: runtimeEntry?.episode_share ?? null,
     finishedEpisodeCount: runtimeEntry?.finished_episode_count ?? null,

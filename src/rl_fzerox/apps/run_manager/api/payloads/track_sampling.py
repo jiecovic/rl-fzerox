@@ -25,6 +25,10 @@ def track_sampling_state_payload(
         "adaptive_target_completion": state.adaptive_target_completion,
         "adaptive_min_confidence_episodes": state.adaptive_min_confidence_episodes,
         "adaptive_confidence_scale": state.adaptive_confidence_scale,
+        "deficit_budget_difficulty_metric": state.deficit_budget_difficulty_metric,
+        "deficit_budget_warmup_min_episodes_per_course": (
+            state.deficit_budget_warmup_min_episodes_per_course
+        ),
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
         "entries": [
@@ -63,6 +67,8 @@ def track_sampling_state_payload(
                 "step_share": (0.0 if total_frames <= 0 else entry.completed_frames / total_frames),
                 "ema_episode_frames": entry.ema_episode_frames,
                 "ema_completion_fraction": entry.ema_completion_fraction,
+                "ema_finish_rate": entry.ema_finish_rate,
+                "current_problem_score": entry.current_problem_score,
                 "generated_course_slot": entry.generated_course_slot,
                 "generated_course_generation": entry.generated_course_generation,
             }

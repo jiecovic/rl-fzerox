@@ -79,6 +79,10 @@ def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
         "adaptive_target_completion": state.adaptive_target_completion,
         "adaptive_min_confidence_episodes": state.adaptive_min_confidence_episodes,
         "adaptive_confidence_scale": state.adaptive_confidence_scale,
+        "deficit_budget_difficulty_metric": state.deficit_budget_difficulty_metric,
+        "deficit_budget_warmup_min_episodes_per_course": (
+            state.deficit_budget_warmup_min_episodes_per_course
+        ),
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
         "entries": [
@@ -94,6 +98,8 @@ def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
                 "success_sample_count": entry.success_sample_count,
                 "ema_episode_frames": entry.ema_episode_frames,
                 "ema_completion_fraction": entry.ema_completion_fraction,
+                "ema_finish_rate": entry.ema_finish_rate,
+                "current_problem_score": entry.current_problem_score,
                 "generation_episode_count": entry.generation_episode_count,
                 "generation_finished_episode_count": entry.generation_finished_episode_count,
                 "generation_success_sample_count": entry.generation_success_sample_count,
@@ -145,6 +151,14 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
     adaptive_target_completion = _mapping_optional_float(loaded, "adaptive_target_completion")
     adaptive_min_confidence_episodes = _mapping_int(loaded, "adaptive_min_confidence_episodes")
     adaptive_confidence_scale = _mapping_optional_float(loaded, "adaptive_confidence_scale")
+    deficit_budget_difficulty_metric = _mapping_optional_str(
+        loaded,
+        "deficit_budget_difficulty_metric",
+    )
+    deficit_budget_warmup_min_episodes_per_course = _mapping_int(
+        loaded,
+        "deficit_budget_warmup_min_episodes_per_course",
+    )
     update_count = _mapping_int(loaded, "update_count")
     episodes_since_update = _mapping_int(loaded, "episodes_since_update")
     if (
@@ -181,6 +195,14 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
         update_count=update_count,
         episodes_since_update=episodes_since_update,
         entries=tuple(entries),
+        deficit_budget_difficulty_metric=_deficit_budget_difficulty_metric(
+            deficit_budget_difficulty_metric,
+        ),
+        deficit_budget_warmup_min_episodes_per_course=(
+            0
+            if deficit_budget_warmup_min_episodes_per_course is None
+            else max(0, deficit_budget_warmup_min_episodes_per_course)
+        ),
     )
 
 
@@ -200,6 +222,8 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
         success_sample_count = _mapping_int(raw_entry, "success_sample_count")
         ema_episode_frames = _mapping_optional_float(raw_entry, "ema_episode_frames")
         ema_completion_fraction = _mapping_optional_float(raw_entry, "ema_completion_fraction")
+        ema_finish_rate = _mapping_optional_float(raw_entry, "ema_finish_rate")
+        current_problem_score = _mapping_optional_float(raw_entry, "current_problem_score")
         generation_episode_count = _mapping_int(raw_entry, "generation_episode_count")
         generation_finished_episode_count = _mapping_int(
             raw_entry,
@@ -264,6 +288,14 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
                     None
                     if ema_completion_fraction is None
                     else max(0.0, min(1.0, ema_completion_fraction))
+                ),
+                ema_finish_rate=(
+                    None if ema_finish_rate is None else max(0.0, min(1.0, ema_finish_rate))
+                ),
+                current_problem_score=(
+                    0.0
+                    if current_problem_score is None
+                    else max(0.0, min(1.0, current_problem_score))
                 ),
                 generation_episode_count=(
                     0 if generation_episode_count is None else max(0, generation_episode_count)
@@ -362,3 +394,9 @@ def _mapping_optional_float(mapping: Mapping[str, Any], key: str) -> float | Non
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value)
+
+
+def _deficit_budget_difficulty_metric(value: str | None) -> str:
+    if value in {"completion_ema", "finish_ema", "mixed"}:
+        return value
+    return "completion_ema"

@@ -134,6 +134,8 @@ class ResolvedTrackSamplingCourse:
             success_sample_count=stats.success_sample_count,
             ema_episode_frames=stats.ema_episode_frames,
             ema_completion_fraction=stats.ema_completion_fraction,
+            ema_finish_rate=stats.ema_finish_rate,
+            current_problem_score=stats.current_problem_score,
             generation_episode_count=stats.generation_episode_count,
             generation_finished_episode_count=stats.generation_finished_episode_count,
             generation_success_sample_count=stats.generation_success_sample_count,

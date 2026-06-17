@@ -16,10 +16,16 @@
   background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
 }
 
+.run-track-distribution-legend-swatch-signal {
+  background: color-mix(in srgb, #e879f9 70%, white);
+}
+
 .run-track-distribution-legend-swatch-completion {
-  width: 14px;
-  height: 0;
-  border-top: 2px dashed color-mix(in srgb, #f8fafc 86%, var(--accent));
+  background: color-mix(in srgb, #f8fafc 70%, var(--accent));
+}
+
+.run-track-distribution-legend-swatch-finish-ema {
+  background: color-mix(in srgb, #2cbe7f 44%, var(--accent));
 }
 
 .run-track-distribution-legend-swatch-target {
@@ -36,12 +42,6 @@
   border-top: 2px solid color-mix(in srgb, #f5c542 82%, white);
 }
 
-.run-track-distribution-completion-marker {
-  height: 0;
-  border-top: 2px dashed color-mix(in srgb, #f8fafc 86%, var(--accent));
-  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 34%, transparent));
-}
-
 .run-track-distribution-bar-fill-sample {
   background: color-mix(in srgb, var(--accent) 78%, white);
 }
@@ -54,6 +54,18 @@
   background: color-mix(in srgb, #2cbe7f 76%, white);
 }
 
+.run-track-distribution-bar-fill-completion {
+  background: color-mix(in srgb, #f8fafc 70%, var(--accent));
+}
+
+.run-track-distribution-bar-fill-finish-ema {
+  background: color-mix(in srgb, #2cbe7f 44%, var(--accent));
+}
+
 .run-track-distribution-bar-fill-steps {
   background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
+}
+
+.run-track-distribution-bar-fill-signal {
+  background: color-mix(in srgb, #e879f9 70%, white);
 }

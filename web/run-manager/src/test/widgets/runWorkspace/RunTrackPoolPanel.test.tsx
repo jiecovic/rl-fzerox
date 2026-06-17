@@ -27,6 +27,16 @@ const emptyGenerationStats = {
   generated_course_generation: null,
 } as const;
 
+const defaultDeficitBudgetState = {
+  deficit_budget_difficulty_metric: "completion_ema",
+  deficit_budget_warmup_min_episodes_per_course: 10,
+} as const;
+
+const emptySamplerSignal = {
+  ema_finish_rate: null,
+  current_problem_score: 0,
+} as const;
+
 describe("RunTrackPoolPanel", () => {
   afterEach(() => {
     cleanup();
@@ -122,6 +132,7 @@ describe("RunTrackPoolPanel", () => {
       adaptive_target_completion: 0.9,
       adaptive_min_confidence_episodes: 24,
       adaptive_confidence_scale: 4,
+      ...defaultDeficitBudgetState,
       update_count: 3,
       episodes_since_update: 17,
       entries: selectedCourses.map((course, index) => ({
@@ -136,6 +147,7 @@ describe("RunTrackPoolPanel", () => {
         episode_share: 0.25,
         success_rate: index / Math.max(index + 1, 1),
         ...emptyGenerationStats,
+        ...emptySamplerSignal,
         target_step_share: 0.25,
         completed_frames: (index + 1) * 600,
         completed_env_steps: (index + 1) * 300,
@@ -247,6 +259,7 @@ describe("RunTrackPoolPanel", () => {
       adaptive_target_completion: 0.9,
       adaptive_min_confidence_episodes: 24,
       adaptive_confidence_scale: 4,
+      ...defaultDeficitBudgetState,
       update_count: 1,
       episodes_since_update: 0,
       entries: selectedCourses.map((course) => ({
@@ -261,6 +274,7 @@ describe("RunTrackPoolPanel", () => {
         episode_share: 0.5,
         success_rate: 1,
         ...emptyGenerationStats,
+        ...emptySamplerSignal,
         target_step_share: 0.5,
         completed_frames: 600,
         completed_env_steps: 300,
@@ -660,6 +674,7 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
     adaptive_target_completion: 0.9,
     adaptive_min_confidence_episodes: 24,
     adaptive_confidence_scale: 4,
+    ...defaultDeficitBudgetState,
     update_count: 1,
     episodes_since_update: 0,
     entries: selectedCourses.map((course) => ({
@@ -674,6 +689,7 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
       episode_share: probability,
       success_rate: 0,
       ...emptyGenerationStats,
+      ...emptySamplerSignal,
       target_step_share: probability,
       completed_frames: 600,
       completed_env_steps: 300,
@@ -695,6 +711,7 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
     adaptive_target_completion: 0.9,
     adaptive_min_confidence_episodes: 24,
     adaptive_confidence_scale: 4,
+    ...defaultDeficitBudgetState,
     update_count: 1,
     episodes_since_update: 0,
     entries: ["abcd1234", "ef567890"].map((hash, index) => ({
@@ -709,6 +726,7 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
       episode_share: 0.5,
       success_rate: index / Math.max(index + 1, 1),
       ...emptyGenerationStats,
+      ...emptySamplerSignal,
       generated_course_slot: index,
       generated_course_generation: index + 1,
       target_step_share: 0.5,
