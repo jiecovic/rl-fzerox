@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
-from rl_fzerox.core.career_mode.runner.menu import POST_GP_RECORDING_END_MODES
+from rl_fzerox.core.career_mode.runner.menu import (
+    POST_GP_COMPLETION_MODES,
+    POST_GP_RECORDING_END_MODES,
+)
 from rl_fzerox.core.career_mode.runner.race import (
     SaveRaceExecutionPlan,
     build_save_race_execution_plan,
@@ -170,6 +173,9 @@ class CareerAttemptProgress:
     ) -> CareerProgressTransition:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
+
+        if _is_post_gp_success_screen(info):
+            self._observed_target_terminal_success = True
 
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
@@ -413,6 +419,13 @@ def _is_post_gp_completion(info: dict[str, object]) -> bool:
         "main_menu",
         "course_select",
     }
+
+
+def _is_post_gp_success_screen(info: dict[str, object]) -> bool:
+    mode = info.get("game_mode")
+    if not isinstance(mode, str) or not mode:
+        mode = info.get("game_mode_name")
+    return mode in POST_GP_COMPLETION_MODES
 
 
 def _is_failed_gp_exit(info: dict[str, object]) -> bool:

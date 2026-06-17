@@ -659,6 +659,39 @@ def test_replayed_target_success_waits_for_post_gp_recording_boundary(tmp_path: 
     assert store.started_next_attempt_count == 0
 
 
+def test_replayed_target_success_counts_post_gp_without_final_course_metadata(
+    tmp_path: Path,
+) -> None:
+    store = _ReplayTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        target_clear_goal=1,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    credits_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert credits_transition.attempt_finished is True
+    assert credits_transition.next_plan is None
+    assert credits_transition.finished_status == "succeeded"
+    assert progress.attempt_id is None
+    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert store.status_updates == ["paused"]
+    assert store.started_next_attempt_count == 0
+
+
 def test_replayed_target_success_does_not_finish_after_nonfinal_course(
     tmp_path: Path,
 ) -> None:

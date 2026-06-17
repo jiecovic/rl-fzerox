@@ -850,7 +850,6 @@ class CareerModeController:
         self._last_progress_sync_continue_pulse = -1
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
-        self._recording.reset()
 
     def _enter_continue_after_race(self) -> None:
         self._pending_steps.clear()

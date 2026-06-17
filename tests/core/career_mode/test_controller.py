@@ -25,6 +25,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     observed_menu_screen,
 )
 from rl_fzerox.core.career_mode.runner.progress import CareerProgressTransition
+from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan, SaveRaceSetup
 from rl_fzerox.core.career_mode.runner.terminal import post_terminal_progress_screen
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
@@ -201,6 +202,24 @@ def test_recording_segment_close_is_not_downgraded_by_credit_reset() -> None:
     assert close.status == "succeeded"
 
 
+def test_recording_segment_close_survives_next_plan_application(tmp_path: Path) -> None:
+    controller = _controller(tmp_path)
+    controller.__dict__["_progress"] = _PostGpProgressStub(next_plan=True)
+    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
+    controller._observed_terminal_race_result = True
+    controller._recording.observe_terminal_result({"termination_reason": "finished"})
+
+    handled = controller.before_step(
+        session=_ControllerSession(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
+    close = controller.pop_recording_segment_close()
+
+    assert handled is True
+    assert close is not None
+    assert close.status == "succeeded"
+
+
 def test_controller_does_not_reset_or_close_recording_at_winning_ceremony(
     tmp_path: Path,
 ) -> None:
@@ -290,6 +309,13 @@ class _PolicyResolverStub:
 class _PostGpProgressStub:
     attempt_id = "attempt-1"
 
+    def __init__(self, *, next_plan: bool = False) -> None:
+        self._next_plan = next_plan
+        self.course_setups = ()
+
+    def apply_execution_plan(self, plan: object) -> None:
+        self.attempt_id = getattr(plan, "attempt_id", self.attempt_id)
+
     def sync_post_terminal_progress(
         self,
         *,
@@ -303,6 +329,7 @@ class _PostGpProgressStub:
                 attempt_finished=True,
                 finished_attempt_id="attempt-1",
                 finished_status="succeeded",
+                next_plan=_execution_plan() if self._next_plan else None,
                 reset_emulator=True,
             )
         return CareerProgressTransition(attempt_finished=False)
@@ -363,4 +390,28 @@ def _race_setup() -> CareerModeRaceSetupConfig:
         machine_select_row=0,
         machine_select_column=0,
         engine_setting_raw_value=50,
+    )
+
+
+def _execution_plan() -> SaveRaceExecutionPlan:
+    race_setup = _race_setup()
+    return SaveRaceExecutionPlan(
+        attempt_id="attempt-2",
+        policy_run_id="run-1",
+        policy_run_dir=Path("runs/run-1"),
+        policy_artifact="best",
+        policy_algorithm="ppo",
+        policy_path=Path("runs/run-1/checkpoints/best/policy.zip"),
+        race_setup=SaveRaceSetup(
+            difficulty=race_setup.difficulty,
+            cup_id=race_setup.cup_id,
+            course_id=race_setup.course_id,
+            vehicle_id=race_setup.vehicle_id,
+            vehicle_display_name=race_setup.vehicle_display_name,
+            character_index=race_setup.character_index,
+            machine_select_slot=race_setup.machine_select_slot,
+            machine_select_row=race_setup.machine_select_row,
+            machine_select_column=race_setup.machine_select_column,
+            engine_setting_raw_value=race_setup.engine_setting_raw_value,
+        ),
     )
