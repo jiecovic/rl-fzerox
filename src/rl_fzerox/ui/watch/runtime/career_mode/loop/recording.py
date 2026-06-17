@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/loop/recording.py
 from __future__ import annotations
 
-from rl_fzerox.core.career_mode.runner.controller import CareerModeController
+from rl_fzerox.core.career_mode.controller import CareerModeController
 from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
 
 

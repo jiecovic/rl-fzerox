@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/runner/controller/recording.py
+# src/rl_fzerox/core/career_mode/controller/recording.py
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from multiprocessing.queues import Queue as ProcessQueue
 
-from rl_fzerox.core.career_mode.runner.controller import CareerModeController
+from rl_fzerox.core.career_mode.controller import CareerModeController
 from rl_fzerox.core.career_mode.runner.save_file import (
     load_save_ram,
     persist_save_ram,

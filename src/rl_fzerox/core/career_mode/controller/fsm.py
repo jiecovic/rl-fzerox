@@ -1,10 +1,23 @@
-# src/rl_fzerox/core/career_mode/runner/controller/fsm.py
+# src/rl_fzerox/core/career_mode/controller/fsm.py
 from __future__ import annotations
 
 from collections import deque
 from pathlib import Path
 from typing import Protocol
 
+from rl_fzerox.core.career_mode.controller.menu_flow import (
+    cup_selection_input,
+    engine_adjust_tap_count,
+    is_neutral_settle_step,
+    pending_step_matches_observed_screen,
+)
+from rl_fzerox.core.career_mode.controller.post_gp import PostGpCutsceneTracker
+from rl_fzerox.core.career_mode.controller.recording import (
+    CareerRecordingSegmentClose,
+    CareerRecordingSegmentStatus,
+    CareerRecordingSegmentTracker,
+    recording_status_from_attempt_status,
+)
 from rl_fzerox.core.career_mode.navigation import (
     GP_MENU_ORDER,
     MENU_TIMING,
@@ -25,19 +38,6 @@ from rl_fzerox.core.career_mode.navigation import (
     raw_step,
 )
 from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
-from rl_fzerox.core.career_mode.runner.controller.menu_flow import (
-    cup_selection_input,
-    engine_adjust_tap_count,
-    is_neutral_settle_step,
-    pending_step_matches_observed_screen,
-)
-from rl_fzerox.core.career_mode.runner.controller.post_gp import PostGpCutsceneTracker
-from rl_fzerox.core.career_mode.runner.controller.recording import (
-    CareerRecordingSegmentClose,
-    CareerRecordingSegmentStatus,
-    CareerRecordingSegmentTracker,
-    recording_status_from_attempt_status,
-)
 from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.career_mode.runner.policy_resolver import CareerPolicyResolver
 from rl_fzerox.core.career_mode.runner.progress import (
