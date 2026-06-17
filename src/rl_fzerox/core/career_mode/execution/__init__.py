@@ -7,6 +7,7 @@ from rl_fzerox.core.career_mode.execution.race import (
     SaveRaceSetup,
     build_save_race_execution_plan,
 )
+from rl_fzerox.core.career_mode.execution.reports import save_race_execution_plan_report
 from rl_fzerox.core.career_mode.execution.save_file import (
     SaveRamGameStore,
     SaveRamRuntimeSession,
@@ -40,5 +41,6 @@ __all__ = [
     "save_game_id_from_config",
     "save_path_from_config",
     "save_race_setup_from_config",
+    "save_race_execution_plan_report",
     "store_from_config",
 ]

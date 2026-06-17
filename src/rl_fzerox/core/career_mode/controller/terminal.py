@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/runner/terminal.py
+# src/rl_fzerox/core/career_mode/controller/terminal.py
 from __future__ import annotations
 
 from typing import Protocol

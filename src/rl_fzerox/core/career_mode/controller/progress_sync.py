@@ -10,9 +10,9 @@ from rl_fzerox.core.career_mode.attempts import (
 from rl_fzerox.core.career_mode.controller.post_gp import PostGpCutsceneTracker
 from rl_fzerox.core.career_mode.controller.post_race import PostRaceContinuation
 from rl_fzerox.core.career_mode.controller.recording import CareerRecordingSegmentTracker
+from rl_fzerox.core.career_mode.controller.terminal import post_terminal_progress_screen
 from rl_fzerox.core.career_mode.execution.save_file import SaveRamRuntimeSession
 from rl_fzerox.core.career_mode.navigation import MenuFacts
-from rl_fzerox.core.career_mode.runner.terminal import post_terminal_progress_screen
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
