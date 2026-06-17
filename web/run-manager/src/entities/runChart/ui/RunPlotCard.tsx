@@ -12,7 +12,13 @@ import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 export type { RunPlotPoint, RunPlotSeries };
 
-export function RunPlotCard({ emptyText, formatValue, series, title }: RunPlotCardProps) {
+export function RunPlotCard({
+  emptyText,
+  formatValue,
+  series,
+  seriesUnit = "runs",
+  title,
+}: RunPlotCardProps) {
   const { hasZoom, plotData, plotRef, resetZoom, setShellNode, tooltip, visibleSeries } =
     useRunPlot({
       formatValue,
@@ -35,7 +41,9 @@ export function RunPlotCard({ emptyText, formatValue, series, title }: RunPlotCa
             </TooltipIconButton>
           ) : null}
           <span className="text-xs text-app-muted">
-            {visibleSeries.length === 0 ? "n/a" : `${visibleSeries.length} runs`}
+            {visibleSeries.length === 0
+              ? "n/a"
+              : seriesCountLabel(visibleSeries.length, seriesUnit)}
           </span>
         </div>
       </div>
@@ -76,4 +84,21 @@ export function RunPlotCard({ emptyText, formatValue, series, title }: RunPlotCa
       )}
     </div>
   );
+}
+
+function seriesCountLabel(count: number, unit: string) {
+  return `${count} ${count === 1 ? singularSeriesUnit(unit) : unit}`;
+}
+
+function singularSeriesUnit(unit: string) {
+  if (unit === "branches") {
+    return "branch";
+  }
+  if (unit === "lineages") {
+    return "lineage";
+  }
+  if (unit === "runs") {
+    return "run";
+  }
+  return unit.replace(/s$/, "");
 }

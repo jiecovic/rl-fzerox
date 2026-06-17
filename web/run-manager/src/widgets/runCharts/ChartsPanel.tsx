@@ -30,7 +30,10 @@ import { FieldSelect } from "@/shared/ui/Field";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RunChartLegend } from "@/widgets/runCharts/chartsPanel/RunChartLegend";
 import { RunChartSelectionPanel } from "@/widgets/runCharts/chartsPanel/RunChartSelectionPanel";
-import { RunComparisonChart } from "@/widgets/runCharts/chartsPanel/RunComparisonChart";
+import {
+  RunComparisonChart,
+  type RunComparisonSeriesGroup,
+} from "@/widgets/runCharts/chartsPanel/RunComparisonChart";
 
 interface ChartsPanelProps {
   focusedRunId?: string | null;
@@ -174,6 +177,19 @@ export function ChartsPanel({
     () => buildBranchRunGroups(selectedRuns, colorByRunId),
     [colorByRunId, selectedRuns],
   );
+  const comparisonSeriesGroups = useMemo(
+    () =>
+      comparisonGroupsForMode({
+        branchGroups: selectedBranchGroups,
+        colorByRunId,
+        colorMode,
+        lineageGroups: selectedLineageGroups,
+        selectedRuns,
+      }),
+    [colorByRunId, colorMode, selectedBranchGroups, selectedLineageGroups, selectedRuns],
+  );
+  const comparisonSeriesUnit =
+    colorMode === "branch" ? "branches" : colorMode === "lineage" ? "lineages" : "runs";
   const chartGroups = useMemo(
     () => buildChartGroups(selectedRuns, metricsByRun),
     [metricsByRun, selectedRuns],
@@ -342,10 +358,11 @@ export function ChartsPanel({
                       <RunComparisonChart
                         key={chart.id}
                         buildPoints={chart.buildPoints}
-                        colorByRunId={colorByRunId}
                         emptyText={chart.emptyText}
                         metricsByRun={metricsByRun}
                         runs={selectedRuns}
+                        seriesGroups={comparisonSeriesGroups}
+                        seriesUnit={comparisonSeriesUnit}
                         title={chart.title}
                       />
                     ))}
@@ -379,6 +396,43 @@ function chartGroupOptions(runs: readonly ManagedRun[]) {
       }
       return left.label.localeCompare(right.label);
     });
+}
+
+function comparisonGroupsForMode({
+  branchGroups,
+  colorByRunId,
+  colorMode,
+  lineageGroups,
+  selectedRuns,
+}: {
+  branchGroups: ReturnType<typeof buildBranchRunGroups>;
+  colorByRunId: ReadonlyMap<string, string>;
+  colorMode: ChartColorMode;
+  lineageGroups: ReturnType<typeof buildLineageRunGroups>;
+  selectedRuns: readonly ManagedRun[];
+}): RunComparisonSeriesGroup[] {
+  if (colorMode === "branch") {
+    return branchGroups.map((group) => ({
+      color: group.color,
+      id: group.id,
+      label: group.label,
+      runIds: group.runs.map((run) => run.id),
+    }));
+  }
+  if (colorMode === "lineage") {
+    return lineageGroups.map((group) => ({
+      color: colorByRunId.get(group.runs[0]?.id ?? "") ?? "var(--accent)",
+      id: group.lineageId,
+      label: group.label,
+      runIds: group.runs.map((run) => run.id),
+    }));
+  }
+  return selectedRuns.map((run) => ({
+    color: colorByRunId.get(run.id) ?? "var(--accent)",
+    id: run.id,
+    label: run.name,
+    runIds: [run.id],
+  }));
 }
 
 function sameRunIdList(left: readonly string[], right: readonly string[]) {

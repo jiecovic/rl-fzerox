@@ -4,36 +4,51 @@ import { chartSeriesColor, formatChartValue, latestPointValue } from "@/entities
 import { RunPlotCard, type RunPlotPoint } from "@/entities/runChart/ui/RunPlotCard";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
 
+export interface RunComparisonSeriesGroup {
+  color: string;
+  id: string;
+  label: string;
+  runIds: readonly string[];
+}
+
 interface RunComparisonChartProps {
   buildPoints: (run: ManagedRun, samples: ManagedRunMetricSample[]) => RunPlotPoint[];
-  colorByRunId: ReadonlyMap<string, string>;
   emptyText: string;
   metricsByRun: Record<string, ManagedRunMetricSample[]>;
   runs: ManagedRun[];
+  seriesGroups: readonly RunComparisonSeriesGroup[];
+  seriesUnit: string;
   title: string;
 }
 
 export function RunComparisonChart({
   buildPoints,
-  colorByRunId,
   emptyText,
   metricsByRun,
   runs,
+  seriesGroups,
+  seriesUnit,
   title,
 }: RunComparisonChartProps) {
+  const runById = useMemo(() => new Map(runs.map((run) => [run.id, run])), [runs]);
   const series = useMemo(
     () =>
-      runs.map((run, index) => {
-        const points = buildPoints(run, metricsByRun[run.id] ?? []);
+      seriesGroups.map((group, index) => {
+        const points = group.runIds
+          .flatMap((runId) => {
+            const run = runById.get(runId);
+            return run === undefined ? [] : buildPoints(run, metricsByRun[run.id] ?? []);
+          })
+          .sort((left, right) => left.step - right.step);
         return {
-          color: colorByRunId.get(run.id) ?? chartSeriesColor(index),
+          color: group.color || chartSeriesColor(index),
           latest: latestPointValue(points),
-          name: run.name,
+          name: group.label,
           points,
-          runId: run.id,
+          runId: group.id,
         };
       }),
-    [buildPoints, colorByRunId, metricsByRun, runs],
+    [buildPoints, metricsByRun, runById, seriesGroups],
   );
   const formatValue = useMemo(
     () => (value: number | null) => formatChartValue(value, title),
@@ -41,6 +56,12 @@ export function RunComparisonChart({
   );
 
   return (
-    <RunPlotCard emptyText={emptyText} formatValue={formatValue} series={series} title={title} />
+    <RunPlotCard
+      emptyText={emptyText}
+      formatValue={formatValue}
+      series={series}
+      seriesUnit={seriesUnit}
+      title={title}
+    />
   );
 }

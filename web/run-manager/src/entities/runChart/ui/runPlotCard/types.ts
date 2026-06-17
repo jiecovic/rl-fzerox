@@ -15,6 +15,7 @@ export interface RunPlotCardProps {
   emptyText: string;
   formatValue: (value: number | null) => string;
   series: readonly RunPlotSeries[];
+  seriesUnit?: string;
   title: string;
 }
 
