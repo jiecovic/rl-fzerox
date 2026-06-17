@@ -174,17 +174,12 @@ class CareerAttemptProgress:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
 
-        if _is_post_gp_success_screen(info):
+        if _is_post_gp_winning_screen(info):
             self._observed_target_terminal_success = True
 
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
         if _target_succeeded(progress.targets, setup):
-            if (
-                self._target_succeeded_before_attempt(setup)
-                and not self._observed_target_terminal_success
-            ):
-                return CareerProgressTransition(attempt_finished=False)
             final_rank = _gp_final_rank(info)
             if final_rank is not None and final_rank > 1:
                 return self._finish_and_advance(
@@ -194,6 +189,8 @@ class CareerAttemptProgress:
                     failure_reason=f"gp cup final rank {final_rank}",
                     reset_emulator=True,
                 )
+            if self._target_succeeded_before_attempt(setup) and final_rank != 1:
+                return CareerProgressTransition(attempt_finished=False)
             if not _is_post_gp_completion(info):
                 return CareerProgressTransition(attempt_finished=False)
             return self._finish_and_advance(
@@ -444,6 +441,8 @@ def _is_post_gp_completion(info: dict[str, object]) -> bool:
     mode = info.get("game_mode")
     if not isinstance(mode, str) or not mode:
         mode = info.get("game_mode_name")
+    if mode == "gp_end_cutscene":
+        return info.get("career_mode_post_gp_cutscene_complete") is True
     return mode in POST_GP_RECORDING_END_MODES or mode in {
         "title",
         "main_menu",
@@ -451,11 +450,11 @@ def _is_post_gp_completion(info: dict[str, object]) -> bool:
     }
 
 
-def _is_post_gp_success_screen(info: dict[str, object]) -> bool:
+def _is_post_gp_winning_screen(info: dict[str, object]) -> bool:
     mode = info.get("game_mode")
     if not isinstance(mode, str) or not mode:
         mode = info.get("game_mode_name")
-    return mode in POST_GP_COMPLETION_MODES
+    return mode in POST_GP_COMPLETION_MODES and _gp_final_rank(info) == 1
 
 
 def _is_failed_gp_exit(info: dict[str, object]) -> bool:
@@ -477,11 +476,15 @@ def _positive_int_info(info: dict[str, object], key: str) -> int | None:
 
 
 def _gp_final_rank(info: dict[str, object]) -> int | None:
-    # The native `gp_final_rank` telemetry is not a trusted post-GP source here:
-    # depending on the screen it may still carry race-position-like data. Only a
-    # career-owned explicit final-rank value is allowed to turn a post-GP success
-    # screen into a failed attempt.
-    return _positive_int_info(info, "career_mode_gp_final_rank")
+    explicit_rank = _positive_int_info(info, "career_mode_gp_final_rank")
+    if explicit_rank is not None:
+        return explicit_rank
+    mode = info.get("game_mode")
+    if not isinstance(mode, str) or not mode:
+        mode = info.get("game_mode_name")
+    if mode not in POST_GP_COMPLETION_MODES:
+        return None
+    return _positive_int_info(info, "gp_final_rank")
 
 
 def _int_info(info: dict[str, object], key: str) -> int | None:

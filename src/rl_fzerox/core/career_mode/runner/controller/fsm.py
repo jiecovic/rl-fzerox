@@ -151,6 +151,9 @@ class CareerModeController:
         self._last_finished_attempt_failure_reason: str | None = None
         self._refresh_policy_artifact_on_next_handoff = False
         self._emulator_reset_requested = False
+        self._post_gp_cutscene_start_frame: int | None = None
+        self._post_gp_cutscene_polls = 0
+        self._last_progress_sync_key: tuple[str | None, bool] | None = None
         self._recording = CareerRecordingSegmentTracker()
         self._policy_resolver = CareerPolicyResolver(
             store=store,
@@ -857,6 +860,7 @@ class CareerModeController:
         self._observed_terminal_race_result = True
         self._continue_after_race_pulses = 0
         self._last_progress_sync_continue_pulse = -1
+        self._last_progress_sync_key = None
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
@@ -873,6 +877,7 @@ class CareerModeController:
         self._observed_terminal_race_result = True
         self._continue_after_race_pulses = 0
         self._last_progress_sync_continue_pulse = -1
+        self._last_progress_sync_key = None
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
@@ -911,16 +916,23 @@ class CareerModeController:
             return False
         facts = MenuFacts.from_info(info)
         if not post_terminal_progress_screen(facts):
+            self._reset_post_gp_cutscene_tracking()
             return False
-        if self._last_progress_sync_continue_pulse == self._continue_after_race_pulses:
+        progress_info = self._post_terminal_progress_info(facts=facts, info=info)
+        sync_key = (
+            facts.game_mode,
+            progress_info.get("career_mode_post_gp_cutscene_complete") is True,
+        )
+        if self._last_progress_sync_key == sync_key:
             return False
 
-        self._recording.observe_progress_screen(facts, info)
+        self._recording.observe_progress_screen(facts, progress_info)
         self._last_progress_sync_continue_pulse = self._continue_after_race_pulses
+        self._last_progress_sync_key = sync_key
         transition = self._progress.sync_post_terminal_progress(
             session=session,
             setup=self._setup,
-            info=info,
+            info=progress_info,
         )
         self._remember_finished_attempt(transition)
         self._close_recording_from_transition(transition)
@@ -931,6 +943,38 @@ class CareerModeController:
                 recording_status=_transition_recording_status(transition.finished_status),
             )
         return transition.attempt_finished
+
+    def _post_terminal_progress_info(
+        self,
+        *,
+        facts: MenuFacts,
+        info: dict[str, object],
+    ) -> dict[str, object]:
+        if not facts.is_gp_end_cutscene:
+            self._reset_post_gp_cutscene_tracking()
+            return info
+
+        frame_index = _int_info(info, "frame_index")
+        if self._post_gp_cutscene_start_frame is None:
+            self._post_gp_cutscene_start_frame = frame_index
+            self._post_gp_cutscene_polls = 0
+        self._post_gp_cutscene_polls += 1
+
+        elapsed_frames = (
+            frame_index - self._post_gp_cutscene_start_frame
+            if frame_index is not None and self._post_gp_cutscene_start_frame is not None
+            else self._post_gp_cutscene_polls * MENU_TIMING.menu_hold_frames
+        )
+        if elapsed_frames < MENU_TIMING.post_gp_cutscene_record_frames:
+            return info
+
+        annotated = dict(info)
+        annotated["career_mode_post_gp_cutscene_complete"] = True
+        return annotated
+
+    def _reset_post_gp_cutscene_tracking(self) -> None:
+        self._post_gp_cutscene_start_frame = None
+        self._post_gp_cutscene_polls = 0
 
     def _request_emulator_reset_for_next_attempt(
         self,
@@ -952,6 +996,8 @@ class CareerModeController:
         self._observed_terminal_race_result = False
         self._continue_after_race_pulses = 0
         self._last_progress_sync_continue_pulse = -1
+        self._last_progress_sync_key = None
+        self._reset_post_gp_cutscene_tracking()
         self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
@@ -1051,3 +1097,10 @@ def _cup_selection_input(*, selected_cup_index: int | None, target_cup_index: in
 
 def _engine_adjust_tap_count(steps: tuple[RawMenuStep, ...]) -> int:
     return sum(step.menu_input is not MenuInput.NEUTRAL for step in steps)
+
+
+def _int_info(info: dict[str, object], key: str) -> int | None:
+    value = info.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value

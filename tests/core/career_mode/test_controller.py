@@ -245,7 +245,7 @@ def test_controller_does_not_sync_stale_gp_race_terminal_result(tmp_path: Path) 
     assert controller.pop_recording_segment_close() is None
 
 
-def test_controller_does_not_reset_or_close_recording_at_winning_ceremony(
+def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
     tmp_path: Path,
 ) -> None:
     controller = _controller(tmp_path)
@@ -256,14 +256,59 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony(
 
     handled = controller.before_step(
         session=_ControllerSession(),
-        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+        info={
+            "game_mode": "gp_end_cutscene",
+            "termination_reason": "finished",
+            "frame_index": 100,
+        },
     )
 
     assert handled is False
     assert controller.pop_recording_segment_close() is None
     assert controller.pop_emulator_reset_request() is False
 
+
+def test_controller_closes_recording_after_winning_ceremony_grace_window(
+    tmp_path: Path,
+) -> None:
+    controller = _controller(tmp_path)
+    controller.__dict__["_progress"] = _PostGpProgressStub()
+    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
+    controller._observed_terminal_race_result = True
+    controller._continue_after_race_pulses = 1
+
+    controller.before_step(
+        session=_ControllerSession(),
+        info={
+            "game_mode": "gp_end_cutscene",
+            "termination_reason": "finished",
+            "frame_index": 100,
+            "gp_final_rank": 1,
+        },
+    )
+    handled = controller.before_step(
+        session=_ControllerSession(),
+        info={
+            "game_mode": "gp_end_cutscene",
+            "termination_reason": "finished",
+            "frame_index": 100 + MENU_TIMING.post_gp_cutscene_record_frames,
+            "gp_final_rank": 1,
+        },
+    )
+    close = controller.pop_recording_segment_close()
+
+    assert handled is True
+    assert close is not None
+    assert close.status == "succeeded"
+
+
+def test_controller_closes_recording_on_credits(tmp_path: Path) -> None:
+    controller = _controller(tmp_path)
+    controller.__dict__["_progress"] = _PostGpProgressStub()
+    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
+    controller._observed_terminal_race_result = True
     controller._continue_after_race_pulses = 2
+
     handled = controller.before_step(
         session=_ControllerSession(),
         info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
@@ -329,7 +374,10 @@ class _PostGpProgressStub:
     ) -> CareerProgressTransition:
         del session, setup
         self.sync_calls.append(dict(info))
-        if info.get("game_mode") == "unskippable_credits":
+        if info.get("game_mode") == "unskippable_credits" or (
+            info.get("career_mode_post_gp_cutscene_complete") is True
+            and info.get("gp_final_rank") == 1
+        ):
             return CareerProgressTransition(
                 attempt_finished=True,
                 finished_attempt_id="attempt-1",

@@ -284,7 +284,7 @@ def test_single_target_explicit_post_gp_rank_two_counts_as_failed_attempt(
     assert store.started_next_attempt_count == 1
 
 
-def test_single_target_generic_post_gp_rank_does_not_fail_success(
+def test_single_target_generic_post_gp_rank_two_counts_as_failed_attempt(
     tmp_path: Path,
 ) -> None:
     store = _SingleTargetCompletionStore(tmp_path)
@@ -310,21 +310,10 @@ def test_single_target_generic_post_gp_rank_does_not_fail_success(
             "gp_final_rank": 2,
         },
     )
-    credits_transition = progress.sync_post_terminal_progress(
-        session=_Session(),
-        setup=_race_setup(),
-        info={
-            "game_mode": "unskippable_credits",
-            "termination_reason": "finished",
-            "gp_final_rank": 2,
-        },
-    )
-
-    assert post_gp_transition.attempt_finished is False
-    assert credits_transition.attempt_finished is True
-    assert credits_transition.finished_status == "succeeded"
-    assert progress.attempt_id is None
-    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert post_gp_transition.attempt_finished is True
+    assert post_gp_transition.finished_status == "failed"
+    assert post_gp_transition.finished_failure_reason == "gp cup final rank 2"
+    assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank 2")]
 
 
 def test_single_target_post_gp_course_position_does_not_count_as_final_rank(
@@ -446,12 +435,20 @@ def test_single_target_success_stops_after_target_clear_goal(tmp_path: Path) -> 
     second_post_gp = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
-        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+        info={
+            "game_mode": "gp_end_cutscene",
+            "termination_reason": "finished",
+            "gp_final_rank": 1,
+        },
     )
     second_clear = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
-        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+        info={
+            "game_mode": "unskippable_credits",
+            "termination_reason": "finished",
+            "gp_final_rank": 1,
+        },
     )
 
     assert first_clear.attempt_finished is True
@@ -683,12 +680,20 @@ def test_replayed_target_success_waits_for_post_gp_recording_boundary(tmp_path: 
     post_gp_transition = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
-        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+        info={
+            "game_mode": "gp_end_cutscene",
+            "termination_reason": "finished",
+            "gp_final_rank": 1,
+        },
     )
     credits_transition = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
-        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+        info={
+            "game_mode": "unskippable_credits",
+            "termination_reason": "finished",
+            "gp_final_rank": 1,
+        },
     )
 
     assert terminal_transition.attempt_finished is False
@@ -722,7 +727,11 @@ def test_replayed_target_success_counts_post_gp_without_final_course_metadata(
     credits_transition = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
-        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+        info={
+            "game_mode": "unskippable_credits",
+            "termination_reason": "finished",
+            "gp_final_rank": 1,
+        },
     )
 
     assert terminal_transition.attempt_finished is False
