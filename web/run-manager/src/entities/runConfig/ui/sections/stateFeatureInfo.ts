@@ -62,8 +62,8 @@ const FEATURE_INFO: Record<string, FeatureInfo> = {
     help: "Whether manual boost is currently active in game state.",
   },
   "vehicle_state.boost_unlocked": {
-    label: "Boost available",
-    help: "Whether the game currently allows manual boost.",
+    label: "Boost unlocked",
+    help: "Whether manual boost has been unlocked by race progress, before action masks and energy checks.",
   },
   "vehicle_state.energy_frac": {
     label: "Energy",

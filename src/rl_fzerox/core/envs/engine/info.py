@@ -168,7 +168,11 @@ def _episode_completion_fraction(telemetry: FZeroXTelemetry) -> float:
 
 
 def telemetry_can_boost(telemetry: FZeroXTelemetry | None) -> bool:
-    """Return whether the game currently allows manual boost."""
+    """Return the game's manual-boost unlock flag.
+
+    This is the post-lap game state, not the stricter action-mask decision for
+    whether a boost request should be accepted on the current frame.
+    """
 
     if telemetry is None:
         return False
