@@ -14,6 +14,7 @@ import {
   centeredEngineBuckets,
   ENGINE_SLIDER_STEP_MAX,
   enginePercentToSliderStep,
+  engineSliderStepPercentLabel,
 } from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
 import { cn } from "@/shared/ui/cn";
@@ -61,9 +62,9 @@ export function VehicleSection({
     row.vehicles.some((vehicle) => selectedVehicleSet.has(vehicle.id)),
   ).length;
   const engineTicks = [
-    { value: 0, label: "ENG 0" },
-    { value: enginePercentToSliderStep(50), label: "ENG 50" },
-    { value: ENGINE_SLIDER_STEP_MAX, label: "ENG 100" },
+    { value: 0, label: "0%" },
+    { value: enginePercentToSliderStep(50), label: "50%" },
+    { value: ENGINE_SLIDER_STEP_MAX, label: "100%" },
   ] as const;
 
   const updateVehicle = (patch: Partial<ManagedRunConfig["vehicle"]>) => {
@@ -485,8 +486,8 @@ function AdaptiveEngineControls({
       <div className="grid gap-3 lg:grid-cols-3">
         {isBanditBackend ? (
           <NumberField
-            help="Distance in engine slider steps between bandit candidates. Range endpoints are always included."
-            label="Engine slider spacing"
+            help="Distance between bandit candidates in internal slider steps. Range endpoints are always included."
+            label="Bucket spacing"
             resetValue={defaultVehicle.adaptive_engine_bandit_slider_spacing}
             step="1"
             value={vehicle.adaptive_engine_bandit_slider_spacing}
@@ -618,10 +619,10 @@ function BanditBucketPreview({ buckets }: { buckets: readonly number[] }) {
         <div className="flex flex-wrap gap-1.5">
           {buckets.map((bucket) => (
             <span
-              className="min-w-8 border border-app-border bg-app-surface px-2 py-1 text-center text-xs tabular-nums text-app-text"
+              className="min-w-11 border border-app-border bg-app-surface px-2 py-1 text-center text-xs font-semibold tabular-nums text-app-text"
               key={bucket}
             >
-              {bucket}
+              {engineSliderStepPercentLabel(bucket)}
             </span>
           ))}
         </div>

@@ -5,6 +5,7 @@ import {
   type CourseSetupDraftMap,
   courseSetupKey,
   resetCourseEngineDrafts,
+  sharedPolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 
 describe("resetCourseEngineDrafts", () => {
@@ -32,7 +33,7 @@ describe("resetCourseEngineDrafts", () => {
 
     expect(next[courseSetupKey(muteCity)]).toEqual({
       ...muteCity,
-      engineSettingRawValue: 50,
+      engineSettingRawValue: 64,
       policyArtifact: "latest",
       policyRunId: "run-a",
       vehicleId: "blue_falcon",
@@ -47,10 +48,67 @@ describe("resetCourseEngineDrafts", () => {
 
     expect(next[courseSetupKey(portTown)]).toEqual({
       ...portTown,
-      engineSettingRawValue: 50,
+      engineSettingRawValue: 64,
       policyArtifact: "best",
       policyRunId: "",
       vehicleId: "blue_falcon",
     });
+  });
+});
+
+describe("sharedPolicySelectionDraft", () => {
+  it("keeps a shared policy selection when course engines differ", () => {
+    expect(
+      sharedPolicySelectionDraft(
+        [
+          {
+            courseId: "mute_city",
+            cupId: "jack",
+            engineSettingRawValue: 80,
+            policyArtifact: "latest",
+            policyRunId: "run-a",
+            vehicleId: "blue_falcon",
+          },
+          {
+            courseId: "silence",
+            cupId: "jack",
+            engineSettingRawValue: 103,
+            policyArtifact: "latest",
+            policyRunId: "run-a",
+            vehicleId: "blue_falcon",
+          },
+        ],
+        2,
+      ),
+    ).toEqual({
+      policyArtifact: "latest",
+      policyRunId: "run-a",
+    });
+  });
+
+  it("returns null when the cup has mixed policy selections", () => {
+    expect(
+      sharedPolicySelectionDraft(
+        [
+          {
+            courseId: "mute_city",
+            cupId: "jack",
+            engineSettingRawValue: 80,
+            policyArtifact: "latest",
+            policyRunId: "run-a",
+            vehicleId: "blue_falcon",
+          },
+          {
+            courseId: "silence",
+            cupId: "jack",
+            engineSettingRawValue: 80,
+            policyArtifact: "latest",
+            policyRunId: "run-b",
+            vehicleId: "blue_falcon",
+          },
+        ],
+        2,
+      ),
+    ).toBeNull();
   });
 });

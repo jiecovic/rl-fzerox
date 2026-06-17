@@ -50,9 +50,13 @@ export function engineSliderStepToPercent(step: number) {
 }
 
 export function engineSliderStepToDisplayPercent(step: number) {
-  return Math.floor(engineSliderStepToPercent(step) + 0.5);
+  return engineSliderStepToPercent(step);
+}
+
+export function engineSliderStepPercentLabel(step: number) {
+  return `${engineSliderStepToDisplayPercent(step).toFixed(1)}%`;
 }
 
 export function engineSliderStepLabel(step: number) {
-  return `ENG ${engineSliderStepToDisplayPercent(step)}`;
+  return `ENG ${engineSliderStepToDisplayPercent(step).toFixed(1)}`;
 }

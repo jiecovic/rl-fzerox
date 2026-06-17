@@ -1,6 +1,6 @@
 // web/run-manager/src/entities/runConfig/ui/sections/vehicle/model.ts
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
-import { engineSliderStepLabel } from "@/shared/domain/engineBuckets";
+import { engineSliderStepPercentLabel } from "@/shared/domain/engineBuckets";
 
 export interface VehicleRow {
   id: string;
@@ -63,7 +63,7 @@ export function engineSettingSummary(config: ManagedRunConfig["vehicle"]) {
 }
 
 function engineSettingStepSummary(step: number) {
-  return `${engineSliderStepLabel(step)} (${step})`;
+  return engineSliderStepPercentLabel(step);
 }
 
 export function vehicleSlotLabel(machineSelectSlot: number) {

@@ -125,10 +125,10 @@ export function exactCourseSetupDraft(
   return courseSetupDrafts[courseSetupKey(values)] ?? null;
 }
 
-export function sharedCourseDraft(
+export function sharedPolicySelectionDraft(
   drafts: readonly CourseSetupDraft[],
   expectedCount: number,
-): CourseSetupDraft | null {
+): PolicySelectionDraft | null {
   if (expectedCount === 0 || drafts.length !== expectedCount) {
     return null;
   }
@@ -136,7 +136,12 @@ export function sharedCourseDraft(
   if (firstDraft === undefined) {
     return null;
   }
-  return drafts.every((draft) => policyArtifactDraftsEqual(draft, firstDraft)) ? firstDraft : null;
+  return drafts.every((draft) => policySelectionDraftsEqual(draft, firstDraft))
+    ? {
+        policyArtifact: firstDraft.policyArtifact,
+        policyRunId: firstDraft.policyRunId,
+      }
+    : null;
 }
 
 export function countDirtyCourseSetups(
@@ -266,12 +271,11 @@ export function cupSetupKey(values: CupSetupValues): string {
   return [values.difficulty ?? "", values.cupId].join(":");
 }
 
-function policyArtifactDraftsEqual(left: PolicyArtifactDraft, right: PolicyArtifactDraft): boolean {
-  return (
-    left.policyRunId === right.policyRunId &&
-    left.policyArtifact === right.policyArtifact &&
-    left.engineSettingRawValue === right.engineSettingRawValue
-  );
+function policySelectionDraftsEqual(
+  left: PolicySelectionDraft,
+  right: PolicySelectionDraft,
+): boolean {
+  return left.policyRunId === right.policyRunId && left.policyArtifact === right.policyArtifact;
 }
 
 function preferredEngineSetting(run: ManagedRun): number {
@@ -282,7 +286,7 @@ function preferredEngineSetting(run: ManagedRun): number {
   if (vehicle.engine_setting_min_raw_value === vehicle.engine_setting_max_raw_value) {
     return vehicle.engine_setting_min_raw_value;
   }
-  return 50;
+  return NEUTRAL_ENGINE_SETTING_RAW_VALUE;
 }
 
 function resolveSavedCourseSetupForCourse(

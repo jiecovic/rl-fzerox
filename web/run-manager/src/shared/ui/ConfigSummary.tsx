@@ -54,7 +54,7 @@ function displayEngineRange(config: ManagedRunConfig) {
 }
 
 function displayEngineStep(step: number) {
-  return `${engineSliderStepLabel(step)} (${step})`;
+  return engineSliderStepLabel(step);
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {

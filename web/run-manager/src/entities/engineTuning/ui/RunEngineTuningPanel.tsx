@@ -638,7 +638,7 @@ function formatPercent(value: number | null) {
 }
 
 function engineStepLabel(step: number) {
-  return `${engineSliderStepLabel(step)} (${step})`;
+  return engineSliderStepLabel(step);
 }
 
 function formatOptionalRaceTime(value: number | null) {

@@ -1,13 +1,17 @@
 // web/run-manager/src/features/saveGameCourseSetup/ui/CourseSetupFields.tsx
 import { memo, useMemo } from "react";
+import { SingleSlider } from "@/entities/runConfig/ui/sections/vehicle/engineSetting/SingleSlider";
 import type {
   PolicyArtifactDraft,
   PolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import { preferredVehicleSetup } from "@/features/saveGameCourseSetup/model/courseSetup";
 import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
-import { ENGINE_SLIDER_STEP_MAX, engineSliderStepLabel } from "@/shared/domain/engineBuckets";
-import { IntegerTextInput } from "@/shared/ui/configFields";
+import {
+  ENGINE_SLIDER_STEP_MAX,
+  enginePercentToSliderStep,
+  engineSliderStepPercentLabel,
+} from "@/shared/domain/engineBuckets";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 
 export function PolicySelectionSelect({
@@ -208,26 +212,34 @@ export function EngineDraftInput({
   onDraftChange: (draft: PolicyArtifactDraft) => void;
   visibleLabel?: string;
 }) {
+  const engineTicks = [
+    { value: 0, label: "0%" },
+    { value: enginePercentToSliderStep(50), label: "50%" },
+    { value: ENGINE_SLIDER_STEP_MAX, label: "100%" },
+  ] as const;
   return (
     <FieldShell>
       <span>{visibleLabel ?? label}</span>
-      <IntegerTextInput
-        aria-label={label}
-        className="h-[34px] indent-0 tabular-nums"
+      <SingleSlider
         disabled={disabled}
+        label={label}
         max={ENGINE_SLIDER_STEP_MAX}
         min={0}
+        step={1}
+        ticks={engineTicks}
         value={draft.engineSettingRawValue}
-        onChange={(value) => {
+        onChange={(engineSettingRawValue) => {
           onDraftChange({
             ...draft,
-            engineSettingRawValue: value,
+            engineSettingRawValue,
           });
         }}
       />
-      <small className="m-0 text-[11px] leading-snug text-app-muted">
-        {engineSliderStepLabel(draft.engineSettingRawValue)} - step {draft.engineSettingRawValue}
-      </small>
+      <div className="grid justify-end gap-0.5 text-right tabular-nums">
+        <span className="text-sm font-semibold text-app-text">
+          {engineSliderStepPercentLabel(draft.engineSettingRawValue)}
+        </span>
+      </div>
     </FieldShell>
   );
 }

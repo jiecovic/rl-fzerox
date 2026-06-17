@@ -10,9 +10,14 @@ import {
   tickStyle,
 } from "@/entities/runConfig/ui/sections/vehicle/engineSetting/styles";
 import type { SliderTick } from "@/entities/runConfig/ui/sections/vehicle/engineSetting/types";
+import { engineSliderStepPercentLabel } from "@/shared/domain/engineBuckets";
+import { IconButton } from "@/shared/ui/Button";
+import { cn } from "@/shared/ui/cn";
 import { clamp } from "@/shared/ui/configFields/format";
+import { ChevronIcon } from "@/shared/ui/icons";
 
 interface SingleSliderProps {
+  disabled?: boolean;
   label: string;
   max: number;
   min: number;
@@ -22,10 +27,21 @@ interface SingleSliderProps {
   onChange: (value: number) => void;
 }
 
-export function SingleSlider({ label, max, min, step, ticks, value, onChange }: SingleSliderProps) {
+export function SingleSlider({
+  disabled = false,
+  label,
+  max,
+  min,
+  step,
+  ticks,
+  value,
+  onChange,
+}: SingleSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const ratio = sliderRatio(value, min, max);
+  const decreaseValue = () => onChange(clamp(value - step, min, max));
+  const increaseValue = () => onChange(clamp(value + step, min, max));
 
   useEffect(() => {
     if (!dragging) {
@@ -49,54 +65,83 @@ export function SingleSlider({ label, max, min, step, ticks, value, onChange }: 
   }, [dragging, max, min, onChange, step]);
 
   return (
-    <div
-      className="vehicle-engine-slider"
-      ref={trackRef}
-      onPointerDown={(event) => {
-        onChange(valueFromClientX(trackRef.current, event.clientX, min, max, step));
-        setDragging(true);
-      }}
-    >
-      <div aria-hidden="true" className="vehicle-engine-slider-rail" />
+    <div className="grid grid-cols-[28px_minmax(0,1fr)_28px] items-start gap-2">
+      <IconButton
+        aria-label={`Decrease ${label}`}
+        className="mt-px"
+        disabled={disabled || value <= min}
+        size="small"
+        onClick={decreaseValue}
+      >
+        <span className="rotate-180">
+          <ChevronIcon />
+        </span>
+      </IconButton>
       <div
-        aria-hidden="true"
-        className="vehicle-engine-slider-fill"
-        style={singleFillStyle(ratio)}
-      />
-      <button
-        aria-label={`${label} slider`}
-        aria-valuemax={max}
-        aria-valuemin={min}
-        aria-valuenow={value}
-        className={dragging ? "vehicle-engine-slider-thumb sliding" : "vehicle-engine-slider-thumb"}
-        role="slider"
-        style={thumbStyle(ratio)}
-        type="button"
-        onKeyDown={(event) => {
-          if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
-            event.preventDefault();
-            onChange(clamp(value - step, min, max));
-          }
-          if (event.key === "ArrowRight" || event.key === "ArrowUp") {
-            event.preventDefault();
-            onChange(clamp(value + step, min, max));
-          }
-        }}
+        className={cn("vehicle-engine-slider", disabled && "pointer-events-none opacity-60")}
+        ref={trackRef}
         onPointerDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
+          if (disabled) {
+            return;
+          }
+          onChange(valueFromClientX(trackRef.current, event.clientX, min, max, step));
           setDragging(true);
         }}
-      />
-      <div className="vehicle-engine-slider-ticks" aria-hidden="true">
-        {ticks.map((tick) => (
-          <span
-            data-label={tick.label}
-            key={`${tick.value}-${tick.label}`}
-            style={tickStyle(sliderRatio(tick.value, min, max))}
-          />
-        ))}
+      >
+        <div aria-hidden="true" className="vehicle-engine-slider-rail" />
+        <div
+          aria-hidden="true"
+          className="vehicle-engine-slider-fill"
+          style={singleFillStyle(ratio)}
+        />
+        <button
+          aria-label={`${label} slider`}
+          aria-valuemax={max}
+          aria-valuemin={min}
+          aria-valuenow={value}
+          aria-valuetext={engineSliderStepPercentLabel(value)}
+          className={
+            dragging ? "vehicle-engine-slider-thumb sliding" : "vehicle-engine-slider-thumb"
+          }
+          disabled={disabled}
+          role="slider"
+          style={thumbStyle(ratio)}
+          type="button"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+              event.preventDefault();
+              decreaseValue();
+            }
+            if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+              event.preventDefault();
+              increaseValue();
+            }
+          }}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setDragging(true);
+          }}
+        />
+        <div className="vehicle-engine-slider-ticks" aria-hidden="true">
+          {ticks.map((tick) => (
+            <span
+              data-label={tick.label}
+              key={`${tick.value}-${tick.label}`}
+              style={tickStyle(sliderRatio(tick.value, min, max))}
+            />
+          ))}
+        </div>
       </div>
+      <IconButton
+        aria-label={`Increase ${label}`}
+        className="mt-px"
+        disabled={disabled || value >= max}
+        size="small"
+        onClick={increaseValue}
+      >
+        <ChevronIcon />
+      </IconButton>
     </div>
   );
 }

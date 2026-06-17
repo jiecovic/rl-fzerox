@@ -1,5 +1,5 @@
 // web/run-manager/src/features/saveGameCourseSetup/ui/CourseSetupPanels.tsx
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { courseCardClass } from "@/entities/runConfig/ui/sections/tracks/coursePoolStyle";
 import { TrackCupBanner } from "@/entities/runConfig/ui/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/entities/runConfig/ui/sections/tracks/TrackMinimap";
@@ -15,14 +15,17 @@ import type {
   PolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
+  courseSetupKey,
   courseSetupsForCups,
   courseSetupValues,
   cupSetupKey,
   cupSetupValues,
+  dirtyCourseSetupDrafts,
+  dirtyCupSetupDrafts,
   EMPTY_COURSE_SETUP_DRAFT,
   EMPTY_CUP_SETUP_DRAFT,
   exactCourseSetupDraft,
-  sharedCourseDraft,
+  sharedPolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   EngineDraftInput,
@@ -32,14 +35,21 @@ import {
   VehicleDraftSelect,
 } from "@/features/saveGameCourseSetup/ui/CourseSetupFields";
 import type { ConfigMetadata, ManagedRun } from "@/shared/api/contract";
+import { clampRawEngineValue } from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
+import { cn } from "@/shared/ui/cn";
 import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
-import { ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
+import { ChevronIcon, ImportIcon, ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
 
 const EMPTY_POLICY_SELECTION_DRAFT: PolicySelectionDraft = {
   policyArtifact: "best",
   policyRunId: "",
 };
+
+export interface CourseSetupSaveScope {
+  courseSetups: readonly CourseSetupValues[];
+  cupSetups: readonly CupSetupValues[];
+}
 
 export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
   assignableRuns,
@@ -131,10 +141,13 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
   metadata,
   onCourseSetupDraftChange,
   onCupSetupDraftChange,
+  onImportEngineTuning,
   onResetEngineSetups,
   onSaveSetups,
   courseSetupDrafts,
+  savedCourseSetupDrafts,
   cupSetupDrafts,
+  savedCupSetupDrafts,
   savingCourseSetups,
   updating,
   unlockedVehicleIds,
@@ -146,10 +159,16 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
   metadata: ConfigMetadata;
   onCourseSetupDraftChange: (values: CourseSetupValues, draft: PolicyArtifactDraft) => void;
   onCupSetupDraftChange: (values: CupSetupValues, vehicleId: string) => void;
+  onImportEngineTuning: (
+    draft: PolicySelectionDraft,
+    scope?: CourseSetupSaveScope,
+  ) => Promise<void>;
   onResetEngineSetups: (setups: readonly CourseSetupValues[]) => void;
-  onSaveSetups: () => void;
+  onSaveSetups: (scope?: CourseSetupSaveScope) => void;
   courseSetupDrafts: CourseSetupDraftMap;
+  savedCourseSetupDrafts: CourseSetupDraftMap;
   cupSetupDrafts: CupSetupDraftMap;
+  savedCupSetupDrafts: CupSetupDraftMap;
   savingCourseSetups: boolean;
   updating: boolean;
   unlockedVehicleIds: readonly string[];
@@ -191,7 +210,7 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
           />
           <ResetEngineSetupsButton
             disabled={updating || savingCourseSetups}
-            label="Reset all engines to ENG 50"
+            label="Reset engines to default"
             setups={allCourseSetups}
             onResetEngineSetups={onResetEngineSetups}
           />
@@ -200,7 +219,7 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
             disabled={saveDisabled}
             type="button"
             variant={dirtySetupCount > 0 ? "primary" : "secondary"}
-            onClick={onSaveSetups}
+            onClick={() => onSaveSetups()}
           >
             <SaveDraftIcon />
             <span>
@@ -223,12 +242,16 @@ export const CourseSetupPanel = memo(function CourseSetupPanel({
             courseSetupDrafts={courseSetupDrafts}
             cupSetupDrafts={cupSetupDrafts}
             metadata={metadata}
+            savedCourseSetupDrafts={savedCourseSetupDrafts}
+            savedCupSetupDrafts={savedCupSetupDrafts}
             updating={updating || savingCourseSetups}
             unlockedVehicleIds={unlockedVehicleIds}
             onCollapsedChange={setCupCollapsed}
             onCourseSetupDraftChange={onCourseSetupDraftChange}
             onCupSetupDraftChange={onCupSetupDraftChange}
+            onImportEngineTuning={onImportEngineTuning}
             onResetEngineSetups={onResetEngineSetups}
+            onSaveSetups={onSaveSetups}
           />
         ))}
       </div>
@@ -252,8 +275,12 @@ const CupSetupBlock = memo(function CupSetupBlock({
   onCollapsedChange,
   onCourseSetupDraftChange,
   onCupSetupDraftChange,
+  onImportEngineTuning,
   onResetEngineSetups,
+  onSaveSetups,
   courseSetupDrafts,
+  savedCourseSetupDrafts,
+  savedCupSetupDrafts,
   updating,
   unlockedVehicleIds,
 }: {
@@ -265,8 +292,15 @@ const CupSetupBlock = memo(function CupSetupBlock({
   onCollapsedChange: (cupId: string, collapsed: boolean) => void;
   onCourseSetupDraftChange: (values: CourseSetupValues, draft: PolicyArtifactDraft) => void;
   onCupSetupDraftChange: (values: CupSetupValues, vehicleId: string) => void;
+  onImportEngineTuning: (
+    draft: PolicySelectionDraft,
+    scope?: CourseSetupSaveScope,
+  ) => Promise<void>;
   onResetEngineSetups: (setups: readonly CourseSetupValues[]) => void;
+  onSaveSetups: (scope?: CourseSetupSaveScope) => void;
   courseSetupDrafts: CourseSetupDraftMap;
+  savedCourseSetupDrafts: CourseSetupDraftMap;
+  savedCupSetupDrafts: CupSetupDraftMap;
   updating: boolean;
   unlockedVehicleIds: readonly string[];
 }) {
@@ -276,6 +310,21 @@ const CupSetupBlock = memo(function CupSetupBlock({
     () => cup.courses.map((course) => courseSetupValues(cup, course.id)),
     [cup],
   );
+  const saveScope = useMemo(
+    () => ({ courseSetups: courseValuesList, cupSetups: [cupValues] }),
+    [courseValuesList, cupValues],
+  );
+  const [importingEngines, setImportingEngines] = useState(false);
+  const cupDirtyCount = useMemo(() => {
+    const dirtyCourseCount = dirtyCourseSetupDrafts(
+      courseSetupDrafts,
+      savedCourseSetupDrafts,
+    ).filter((draft) => draft.cupId === cup.id).length;
+    const dirtyCupCount = dirtyCupSetupDrafts(cupSetupDrafts, savedCupSetupDrafts).filter(
+      (draft) => draft.cupId === cup.id,
+    ).length;
+    return dirtyCourseCount + dirtyCupCount;
+  }, [courseSetupDrafts, cup.id, cupSetupDrafts, savedCourseSetupDrafts, savedCupSetupDrafts]);
   const courseDrafts = useMemo(
     () =>
       courseValuesList
@@ -290,24 +339,18 @@ const CupSetupBlock = memo(function CupSetupBlock({
     }),
     [cupDraft.vehicleId],
   );
-  const sharedDraft = useMemo(
-    () => sharedCourseDraft(courseDrafts, courseValuesList.length) ?? fallbackDraft,
-    [courseDrafts, courseValuesList.length, fallbackDraft],
-  );
-  const bulkDraft = useMemo<PolicyArtifactDraft>(
-    () => ({
-      ...sharedDraft,
-      vehicleId: cupDraft.vehicleId,
-    }),
-    [cupDraft.vehicleId, sharedDraft],
-  );
   const bulkPolicyDraft = useMemo<PolicySelectionDraft>(
-    () => ({
-      policyArtifact: bulkDraft.policyArtifact,
-      policyRunId: bulkDraft.policyRunId,
-    }),
-    [bulkDraft.policyArtifact, bulkDraft.policyRunId],
+    () =>
+      sharedPolicySelectionDraft(courseDrafts, courseValuesList.length) ??
+      EMPTY_POLICY_SELECTION_DRAFT,
+    [courseDrafts, courseValuesList.length],
   );
+  const [selectedCourseKey, setSelectedCourseKey] = useState<string | null>(null);
+  const selectedRun = useMemo(
+    () => assignableRuns.find((run) => run.id === bulkPolicyDraft.policyRunId) ?? null,
+    [assignableRuns, bulkPolicyDraft.policyRunId],
+  );
+  const canImportEngines = !updating && selectedRun?.vehicle_setup.engine_mode === "adaptive_tuner";
 
   function applyBulkCoursePolicy(nextDraft: PolicySelectionDraft) {
     for (const values of courseValuesList) {
@@ -320,6 +363,54 @@ const CupSetupBlock = memo(function CupSetupBlock({
       });
     }
   }
+
+  useEffect(() => {
+    if (selectedCourseKey === null) {
+      return undefined;
+    }
+
+    function adjustSelectedCourseEngine(delta: number) {
+      const selectedValues = courseValuesList.find(
+        (values) => courseSetupKey(values) === selectedCourseKey,
+      );
+      if (selectedValues === undefined) {
+        return;
+      }
+      const currentDraft = {
+        ...(exactCourseSetupDraft(courseSetupDrafts, selectedValues) ?? fallbackDraft),
+        vehicleId: cupDraft.vehicleId,
+      };
+      onCourseSetupDraftChange(selectedValues, {
+        ...currentDraft,
+        engineSettingRawValue: clampRawEngineValue(currentDraft.engineSettingRawValue + delta),
+      });
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (isFormControlTarget(event.target) || updating) {
+        return;
+      }
+      if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+        event.preventDefault();
+        adjustSelectedCourseEngine(-1);
+      }
+      if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+        event.preventDefault();
+        adjustSelectedCourseEngine(1);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    courseSetupDrafts,
+    courseValuesList,
+    cupDraft.vehicleId,
+    fallbackDraft,
+    onCourseSetupDraftChange,
+    selectedCourseKey,
+    updating,
+  ]);
 
   return (
     <details
@@ -338,7 +429,7 @@ const CupSetupBlock = memo(function CupSetupBlock({
       </summary>
       {collapsed ? null : (
         <div className="config-disclosure-body gap-3">
-          <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_130px_minmax(180px,240px)] md:items-end">
+          <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_120px_minmax(170px,220px)_auto] xl:items-end">
             <PolicySelectionSelect
               assignableRuns={assignableRuns}
               disabled={updating}
@@ -363,14 +454,51 @@ const CupSetupBlock = memo(function CupSetupBlock({
               visibleLabel="Vehicle"
               onDraftChange={(nextDraft) => onCupSetupDraftChange(cupValues, nextDraft.vehicleId)}
             />
-          </div>
-          <div className="flex justify-end">
-            <ResetEngineSetupsButton
-              disabled={updating}
-              label={`Reset ${cup.label} engines to ENG 50`}
-              setups={courseValuesList}
-              onResetEngineSetups={onResetEngineSetups}
-            />
+            <div className="flex flex-wrap gap-2 xl:flex-nowrap xl:justify-end">
+              <Button
+                className="min-w-[96px] gap-2 px-3"
+                disabled={updating || bulkPolicyDraft.policyRunId === ""}
+                type="button"
+                onClick={() => applyBulkCoursePolicy(bulkPolicyDraft)}
+              >
+                <ChevronIcon />
+                <span>Apply</span>
+              </Button>
+              <Button
+                aria-label={`Save ${cup.label} setup`}
+                className="min-w-[92px] gap-2 px-3"
+                disabled={updating || cupDirtyCount === 0}
+                type="button"
+                variant={cupDirtyCount > 0 ? "primary" : "secondary"}
+                onClick={() => onSaveSetups(saveScope)}
+              >
+                <SaveDraftIcon />
+                <span>Save</span>
+              </Button>
+              <Button
+                className="min-w-[142px] gap-2 px-3"
+                disabled={!canImportEngines || importingEngines}
+                type="button"
+                onClick={async () => {
+                  setImportingEngines(true);
+                  try {
+                    await onImportEngineTuning(bulkPolicyDraft, saveScope);
+                  } finally {
+                    setImportingEngines(false);
+                  }
+                }}
+              >
+                <ImportIcon />
+                <span>{importingEngines ? "Importing" : "Import engines"}</span>
+              </Button>
+              <ResetEngineSetupsButton
+                disabled={updating}
+                label="Reset engines to default"
+                className="px-3"
+                setups={courseValuesList}
+                onResetEngineSetups={onResetEngineSetups}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-3 border-t border-app-border pt-3 xl:grid-cols-2 2xl:grid-cols-3">
             {cup.courses.map((course, courseIndex) => {
@@ -384,11 +512,25 @@ const CupSetupBlock = memo(function CupSetupBlock({
                   ...nextDraft,
                   vehicleId: cupDraft.vehicleId,
                 });
+              const currentCourseKey = courseSetupKey(values);
               return (
                 <div
                   key={course.id}
-                  className={courseCardClass(false, "min-h-[172px] content-start gap-3 p-3")}
+                  className={courseCardClass(
+                    selectedCourseKey === currentCourseKey,
+                    cn(
+                      "min-h-[172px] content-start gap-3 p-3",
+                      selectedCourseKey === currentCourseKey &&
+                        "shadow-[inset_0_0_0_1px_var(--accent)]",
+                    ),
+                  )}
                   data-cup={cup.id}
+                  onPointerDown={(event) => {
+                    if (isFormControlTarget(event.target)) {
+                      return;
+                    }
+                    setSelectedCourseKey(currentCourseKey);
+                  }}
                 >
                   <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] items-start gap-3">
                     <TrackMinimap
@@ -405,28 +547,32 @@ const CupSetupBlock = memo(function CupSetupBlock({
                           {course.display_name}
                         </strong>
                       </div>
-                      <span className="text-xs text-app-muted">Course {courseIndex + 1}</span>
+                      <span className="text-xs text-app-muted">
+                        Course {course.course_index + 1}
+                      </span>
                     </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_112px_96px]">
-                    <PolicyDraftSelect
-                      assignableRuns={assignableRuns}
-                      disabled={updating}
-                      draft={courseDraft}
-                      label={`${course.display_name} policy`}
-                      lockedVehicleId={cupDraft.vehicleId}
-                      metadata={metadata}
-                      unlockedVehicleIds={unlockedVehicleIds}
-                      visibleLabel="Policy"
-                      onDraftChange={updateCourseDraft}
-                    />
-                    <PolicyArtifactSelect
-                      disabled={updating}
-                      draft={courseDraft}
-                      label={`${course.display_name} artifact`}
-                      visibleLabel="Artifact"
-                      onDraftChange={updateCourseDraft}
-                    />
+                  <div className="grid gap-3">
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_112px]">
+                      <PolicyDraftSelect
+                        assignableRuns={assignableRuns}
+                        disabled={updating}
+                        draft={courseDraft}
+                        label={`${course.display_name} policy`}
+                        lockedVehicleId={cupDraft.vehicleId}
+                        metadata={metadata}
+                        unlockedVehicleIds={unlockedVehicleIds}
+                        visibleLabel="Policy"
+                        onDraftChange={updateCourseDraft}
+                      />
+                      <PolicyArtifactSelect
+                        disabled={updating}
+                        draft={courseDraft}
+                        label={`${course.display_name} artifact`}
+                        visibleLabel="Artifact"
+                        onDraftChange={updateCourseDraft}
+                      />
+                    </div>
                     <EngineDraftInput
                       disabled={updating}
                       draft={courseDraft}
@@ -454,12 +600,21 @@ function cupSetupDraft(drafts: CupSetupDraftMap, values: CupSetupValues): CupSet
   );
 }
 
+function isFormControlTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest("a, button, input, select, textarea, [role='slider']") !== null
+  );
+}
+
 function ResetEngineSetupsButton({
+  className,
   disabled,
   label,
   onResetEngineSetups,
   setups,
 }: {
+  className?: string;
   disabled: boolean;
   label: string;
   onResetEngineSetups: (setups: readonly CourseSetupValues[]) => void;
@@ -467,7 +622,7 @@ function ResetEngineSetupsButton({
 }) {
   return (
     <Button
-      className="gap-2"
+      className={`gap-2 ${className ?? ""}`}
       disabled={disabled}
       type="button"
       onClick={() => onResetEngineSetups(setups)}

@@ -32,6 +32,7 @@ import {
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   CourseSetupPanel,
+  type CourseSetupSaveScope,
   GlobalPolicyPanel,
 } from "@/features/saveGameCourseSetup/ui/CourseSetupPanels";
 import type {
@@ -222,15 +223,31 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
   }, []);
 
   const importEngineTuningForDraft = useCallback(
-    async (draft: PolicySelectionDraft) => {
+    async (draft: PolicySelectionDraft, scope?: CourseSetupSaveScope) => {
       if (draft.policyRunId === "") {
         return;
       }
-      const courseSetups = courseSetupRecommendationRequests({
+      const requestedSetups = courseSetupRecommendationRequests({
         courseSetupDrafts,
         cupSetupDrafts,
         cups,
       });
+      const scopeKeys =
+        scope === undefined
+          ? null
+          : new Set(scope.courseSetups.map((setup) => courseSetupKey(setup)));
+      const courseSetups =
+        scopeKeys === null
+          ? requestedSetups
+          : requestedSetups.filter((setup) =>
+              scopeKeys.has(
+                courseSetupKey({
+                  courseId: setup.courseId,
+                  cupId: setup.cupId,
+                  difficulty: setup.difficulty,
+                }),
+              ),
+            );
       const recommendations = await onImportEngineTuning({
         courseSetups,
         policyArtifact: draft.policyArtifact,
@@ -248,51 +265,69 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
     [courseSetupDrafts, cupSetupDrafts, cups, onImportEngineTuning, saveGame.id],
   );
 
-  const saveCourseSetups = useCallback(async () => {
-    if (dirtySetupCount === 0 || savingCourseSetups) {
-      return;
-    }
-    setSavingSetups(true);
-    try {
-      for (const draft of dirtyCourseSetupDrafts(courseSetupDrafts, savedCourseSetupDrafts)) {
-        if (draft.policyRunId === "") {
-          continue;
+  const saveCourseSetups = useCallback(
+    async (scope?: CourseSetupSaveScope) => {
+      const courseScopeKeys =
+        scope === undefined
+          ? null
+          : new Set(scope.courseSetups.map((setup) => courseSetupKey(setup)));
+      const cupScopeKeys =
+        scope === undefined ? null : new Set(scope.cupSetups.map((setup) => cupSetupKey(setup)));
+      const dirtyCourseDrafts = dirtyCourseSetupDrafts(
+        courseSetupDrafts,
+        savedCourseSetupDrafts,
+      ).filter((draft) => courseScopeKeys === null || courseScopeKeys.has(courseSetupKey(draft)));
+      const dirtyCupDrafts = dirtyCupSetupDrafts(cupSetupDrafts, savedCupSetupDrafts).filter(
+        (draft) => cupScopeKeys === null || cupScopeKeys.has(cupSetupKey(draft)),
+      );
+      if (savingCourseSetups || (dirtyCourseDrafts.length === 0 && dirtyCupDrafts.length === 0)) {
+        return;
+      }
+      setSavingSetups(true);
+      try {
+        for (const draft of dirtyCourseDrafts) {
+          if (draft.policyRunId === "") {
+            continue;
+          }
+          await onUpsertCourseSetup({
+            courseId: draft.courseId ?? null,
+            cupId: draft.cupId ?? null,
+            difficulty: draft.difficulty ?? null,
+            engineSettingRawValue: draft.engineSettingRawValue,
+            policyArtifact: draft.policyArtifact,
+            policyRunId: draft.policyRunId,
+            saveGameId: saveGame.id,
+          });
         }
-        await onUpsertCourseSetup({
-          courseId: draft.courseId ?? null,
-          cupId: draft.cupId ?? null,
-          difficulty: draft.difficulty ?? null,
-          engineSettingRawValue: draft.engineSettingRawValue,
-          policyArtifact: draft.policyArtifact,
-          policyRunId: draft.policyRunId,
-          saveGameId: saveGame.id,
-        });
+        for (const draft of dirtyCupDrafts) {
+          await onUpsertCupSetup({
+            cupId: draft.cupId,
+            difficulty: draft.difficulty ?? null,
+            saveGameId: saveGame.id,
+            vehicleId: draft.vehicleId,
+          });
+        }
+      } finally {
+        setSavingSetups(false);
       }
-      for (const draft of dirtyCupSetupDrafts(cupSetupDrafts, savedCupSetupDrafts)) {
-        await onUpsertCupSetup({
-          cupId: draft.cupId,
-          difficulty: draft.difficulty ?? null,
-          saveGameId: saveGame.id,
-          vehicleId: draft.vehicleId,
-        });
-      }
-    } finally {
-      setSavingSetups(false);
-    }
-  }, [
-    courseSetupDrafts,
-    cupSetupDrafts,
-    dirtySetupCount,
-    onUpsertCourseSetup,
-    onUpsertCupSetup,
-    saveGame.id,
-    savedCourseSetupDrafts,
-    savedCupSetupDrafts,
-    savingCourseSetups,
-  ]);
-  const triggerSaveCourseSetups = useCallback(() => {
-    void saveCourseSetups();
-  }, [saveCourseSetups]);
+    },
+    [
+      courseSetupDrafts,
+      cupSetupDrafts,
+      onUpsertCourseSetup,
+      onUpsertCupSetup,
+      saveGame.id,
+      savedCourseSetupDrafts,
+      savedCupSetupDrafts,
+      savingCourseSetups,
+    ],
+  );
+  const triggerSaveCourseSetups = useCallback(
+    (scope?: CourseSetupSaveScope) => {
+      void saveCourseSetups(scope);
+    },
+    [saveCourseSetups],
+  );
 
   return (
     <section className="grid gap-5 border border-app-border bg-app-surface p-5">
@@ -335,11 +370,14 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
         courseSetupDrafts={courseSetupDrafts}
         metadata={metadata}
         savingCourseSetups={savingCourseSetups}
+        savedCourseSetupDrafts={savedCourseSetupDrafts}
+        savedCupSetupDrafts={savedCupSetupDrafts}
         cupSetupDrafts={cupSetupDrafts}
         updating={updating}
         unlockedVehicleIds={unlockedVehicleIds}
         onCourseSetupDraftChange={updateCourseSetupDraft}
         onCupSetupDraftChange={updateCupSetupDraft}
+        onImportEngineTuning={importEngineTuningForDraft}
         onResetEngineSetups={resetEngineSetups}
         onSaveSetups={triggerSaveCourseSetups}
       />

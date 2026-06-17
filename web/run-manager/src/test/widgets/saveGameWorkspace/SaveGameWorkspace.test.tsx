@@ -135,7 +135,7 @@ describe("SaveGameWorkspace", () => {
       courseId: "mute_city",
       cupId: "jack",
       difficulty: null,
-      engineSettingRawValue: 50,
+      engineSettingRawValue: 64,
       policyArtifact: "best",
       policyRunId: "run-policy",
       saveGameId: "save-001",
@@ -216,8 +216,14 @@ describe("SaveGameWorkspace", () => {
     });
     expect(onUpsertCourseSetup).not.toHaveBeenCalled();
     expect(onRefreshStatus).not.toHaveBeenCalled();
-    expect(await screen.findByRole("textbox", { name: "Mute City engine" })).toHaveValue("73");
-    expect(screen.getByRole("textbox", { name: "Silence engine" })).toHaveValue("88");
+    expect(await screen.findByRole("slider", { name: "Mute City engine slider" })).toHaveAttribute(
+      "aria-valuenow",
+      "73",
+    );
+    expect(screen.getByRole("slider", { name: "Silence engine slider" })).toHaveAttribute(
+      "aria-valuenow",
+      "88",
+    );
     expect(screen.getByRole("button", { name: "Save 2 changes" })).toBeEnabled();
   });
 
@@ -233,12 +239,16 @@ describe("SaveGameWorkspace", () => {
       onUpsertCourseSetup,
     });
 
-    const muteCityEngine = screen.getByRole("textbox", { name: "Mute City engine" });
-    await user.clear(muteCityEngine);
-    await user.type(muteCityEngine, "40");
-    await user.tab();
+    const muteCityEngine = screen.getByRole("slider", { name: "Mute City engine slider" });
+    muteCityEngine.focus();
+    for (let index = 0; index < 10; index += 1) {
+      await user.keyboard("{ArrowLeft}");
+    }
 
-    expect(screen.getByRole("textbox", { name: "Silence engine" })).toHaveValue("50");
+    expect(screen.getByRole("slider", { name: "Silence engine slider" })).toHaveAttribute(
+      "aria-valuenow",
+      "64",
+    );
 
     await user.click(await screen.findByRole("button", { name: "Save 1 change" }));
 

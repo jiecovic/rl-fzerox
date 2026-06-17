@@ -6,15 +6,9 @@ import type {
   EngineMode,
   SliderTick,
 } from "@/entities/runConfig/ui/sections/vehicle/engineSetting/types";
-import { engineSliderStepLabel } from "@/shared/domain/engineBuckets";
+import { engineSliderStepPercentLabel } from "@/shared/domain/engineBuckets";
 import { FieldLabel } from "@/shared/ui/configFields/label";
-import {
-  blurOnEnter,
-  editableNumberInputProps,
-  parseSafeIntegerInput,
-  useEditableNumberInput,
-} from "@/shared/ui/configFields/numberInput";
-import { FieldInput, FieldShell } from "@/shared/ui/Field";
+import { FieldShell } from "@/shared/ui/Field";
 
 interface EngineSettingControlProps {
   defaultFixedValue: number;
@@ -57,32 +51,10 @@ export function EngineSettingControl({
       : rangeMin === defaultRangeMin && rangeMax === defaultRangeMax
         ? undefined
         : () => onRangeChange({ max: defaultRangeMax, min: defaultRangeMin });
-  const fixedInput = useEditableNumberInput({
-    format: String,
-    formattedValue: String(fixedValue),
-    normalize: (nextValue) => clampInteger(nextValue, min, max),
-    onCommit: onFixedChange,
-    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max, min }),
-  });
-  const rangeMinInput = useEditableNumberInput({
-    format: String,
-    formattedValue: String(rangeMin),
-    normalize: (nextValue) => clampInteger(nextValue, min, rangeMax),
-    onCommit: (nextMin) => onRangeChange({ max: rangeMax, min: nextMin }),
-    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max: rangeMax, min }),
-  });
-  const rangeMaxInput = useEditableNumberInput({
-    format: String,
-    formattedValue: String(rangeMax),
-    normalize: (nextValue) => clampInteger(nextValue, rangeMin, max),
-    onCommit: (nextMax) => onRangeChange({ max: nextMax, min: rangeMin }),
-    parse: (rawValue) => parseSafeIntegerInput(rawValue, { max, min: rangeMin }),
-  });
-
   return (
     <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler} />
-      <div className="grid grid-cols-[minmax(0,1fr)_176px] items-center gap-3 max-[720px]:grid-cols-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_150px] items-center gap-3 max-[720px]:grid-cols-1">
         <div className="min-w-0">
           {mode === "fixed" ? (
             <SingleSlider
@@ -107,57 +79,11 @@ export function EngineSettingControl({
             />
           )}
         </div>
-        <div className="w-[176px] max-[720px]:w-full">
+        <div className="w-[150px] max-[720px]:w-full">
           {mode === "fixed" ? (
-            <div className="grid justify-end gap-1 max-[720px]:justify-start">
-              <FieldInput
-                aria-label={label}
-                className="!h-[34px] !w-[176px] text-center tabular-nums"
-                max={max}
-                min={min}
-                step={1}
-                {...editableNumberInputProps("integer")}
-                value={fixedInput.rawValue}
-                onBlur={fixedInput.commitRawValue}
-                onChange={(event) => fixedInput.changeRawValue(event.target.value)}
-                onKeyDown={blurOnEnter}
-              />
-              <small className="m-0 text-right text-[11px] leading-snug text-app-muted max-[720px]:text-left">
-                {engineSliderStepLabel(fixedValue)} - step {fixedValue}
-              </small>
-            </div>
+            <EngineStepReadout value={fixedValue} />
           ) : (
-            <div className="grid justify-end gap-1 max-[720px]:justify-start">
-              <div className="grid grid-cols-[repeat(2,84px)] gap-2">
-                <FieldInput
-                  aria-label={`${label} minimum`}
-                  className="!h-[34px] !w-[84px] text-center tabular-nums"
-                  max={rangeMax}
-                  min={min}
-                  step={1}
-                  {...editableNumberInputProps("integer")}
-                  value={rangeMinInput.rawValue}
-                  onBlur={rangeMinInput.commitRawValue}
-                  onChange={(event) => rangeMinInput.changeRawValue(event.target.value)}
-                  onKeyDown={blurOnEnter}
-                />
-                <FieldInput
-                  aria-label={`${label} maximum`}
-                  className="!h-[34px] !w-[84px] text-center tabular-nums"
-                  max={max}
-                  min={rangeMin}
-                  step={1}
-                  {...editableNumberInputProps("integer")}
-                  value={rangeMaxInput.rawValue}
-                  onBlur={rangeMaxInput.commitRawValue}
-                  onChange={(event) => rangeMaxInput.changeRawValue(event.target.value)}
-                  onKeyDown={blurOnEnter}
-                />
-              </div>
-              <small className="m-0 text-right text-[11px] leading-snug text-app-muted max-[720px]:text-left">
-                {engineSliderStepLabel(rangeMin)}-{engineSliderStepLabel(rangeMax)}
-              </small>
-            </div>
+            <EngineRangeReadout max={rangeMax} min={rangeMin} />
           )}
         </div>
       </div>
@@ -165,6 +91,22 @@ export function EngineSettingControl({
   );
 }
 
-function clampInteger(value: number, min: number, max: number) {
-  return Math.min(Math.max(Math.round(value), min), max);
+function EngineStepReadout({ value }: { value: number }) {
+  return (
+    <div className="grid justify-end text-right tabular-nums max-[720px]:justify-start max-[720px]:text-left">
+      <div className="text-lg font-semibold leading-none text-app-text">
+        {engineSliderStepPercentLabel(value)}
+      </div>
+    </div>
+  );
+}
+
+function EngineRangeReadout({ max, min }: { max: number; min: number }) {
+  return (
+    <div className="grid justify-end text-right tabular-nums max-[720px]:justify-start max-[720px]:text-left">
+      <div className="text-lg font-semibold leading-none text-app-text">
+        {engineSliderStepPercentLabel(min)}-{engineSliderStepPercentLabel(max)}
+      </div>
+    </div>
+  );
 }

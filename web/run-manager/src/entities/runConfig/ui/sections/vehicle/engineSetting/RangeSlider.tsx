@@ -13,9 +13,12 @@ import type {
   RangeHandle,
   SliderTick,
 } from "@/entities/runConfig/ui/sections/vehicle/engineSetting/types";
+import { engineSliderStepPercentLabel } from "@/shared/domain/engineBuckets";
+import { cn } from "@/shared/ui/cn";
 import { clamp } from "@/shared/ui/configFields/format";
 
 interface RangeSliderProps {
+  disabled?: boolean;
   label: string;
   max: number;
   min: number;
@@ -27,6 +30,7 @@ interface RangeSliderProps {
 }
 
 export function RangeSlider({
+  disabled = false,
   label,
   max,
   min,
@@ -76,9 +80,12 @@ export function RangeSlider({
 
   return (
     <div
-      className="vehicle-engine-slider"
+      className={cn("vehicle-engine-slider", disabled && "pointer-events-none opacity-60")}
       ref={trackRef}
       onPointerDown={(event) => {
+        if (disabled) {
+          return;
+        }
         const nextValue = valueFromClientX(trackRef.current, event.clientX, min, max, step);
         const handle =
           Math.abs(nextValue - valueMin) <= Math.abs(nextValue - valueMax) ? "min" : "max";
@@ -93,6 +100,7 @@ export function RangeSlider({
         style={rangeFillStyle(minRatio, maxRatio)}
       />
       <RangeThumb
+        disabled={disabled}
         label={`${label} minimum`}
         max={valueMax}
         min={min}
@@ -104,6 +112,7 @@ export function RangeSlider({
         onPointerDown={() => setDragging("min")}
       />
       <RangeThumb
+        disabled={disabled}
         label={`${label} maximum`}
         max={max}
         min={valueMin}
@@ -128,6 +137,7 @@ export function RangeSlider({
 }
 
 interface RangeThumbProps {
+  disabled: boolean;
   label: string;
   max: number;
   min: number;
@@ -140,6 +150,7 @@ interface RangeThumbProps {
 }
 
 function RangeThumb({
+  disabled,
   label,
   max,
   min,
@@ -156,7 +167,9 @@ function RangeThumb({
       aria-valuemax={max}
       aria-valuemin={min}
       aria-valuenow={value}
+      aria-valuetext={engineSliderStepPercentLabel(value)}
       className={sliding ? "vehicle-engine-slider-thumb sliding" : "vehicle-engine-slider-thumb"}
+      disabled={disabled}
       role="slider"
       style={thumbStyle(ratio)}
       type="button"
