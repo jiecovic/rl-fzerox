@@ -182,6 +182,25 @@ def test_recording_segment_close_waits_until_post_gp_recording_boundary() -> Non
     assert tracker.pop_close() is None
 
 
+def test_recording_segment_close_is_not_downgraded_by_credit_reset() -> None:
+    tracker = CareerRecordingSegmentTracker()
+
+    tracker.observe_terminal_result({"termination_reason": "finished"})
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "gp_end_cutscene"}),
+        {"game_mode": "gp_end_cutscene"},
+    )
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "unskippable_credits"}),
+        {"game_mode": "unskippable_credits"},
+    )
+    tracker.force_close(status="failed")
+    close = tracker.pop_close()
+
+    assert close is not None
+    assert close.status == "succeeded"
+
+
 def test_controller_does_not_reset_or_close_recording_at_winning_ceremony(
     tmp_path: Path,
 ) -> None:

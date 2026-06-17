@@ -261,7 +261,7 @@ class CareerModeFrameRecorder:
             self._clear_segment_state()
             return
         self._rename_failed_segment()
-        if self._segment_path is not None:
+        if self._segment_path is not None and self._segment_path.exists():
             summary = (
                 None
                 if self._segment_summary is None

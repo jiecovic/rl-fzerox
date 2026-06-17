@@ -48,6 +48,8 @@ class CareerRecordingSegmentTracker:
         if not self.terminal_result_seen:
             return
         if facts.is_post_gp_screen:
+            if self.pending_close is not None:
+                return
             self.post_gp_seen = True
             final_rank = _post_gp_final_rank(info)
             if final_rank not in {None, 1}:
@@ -74,6 +76,8 @@ class CareerRecordingSegmentTracker:
     def force_close(self, *, status: CareerRecordingSegmentStatus) -> None:
         """Close the current segment when the FSM resets the emulator itself."""
 
+        if self.pending_close is not None:
+            return
         self.pending_close = CareerRecordingSegmentClose(status=status)
         self.reset()
 

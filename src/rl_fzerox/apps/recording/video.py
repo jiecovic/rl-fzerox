@@ -206,6 +206,10 @@ def remux_recording_to_mp4(
     output_path: Path | None = None,
 ) -> Path:
     source_path = input_path.expanduser()
+    if not source_path.exists():
+        raise FileNotFoundError(f"recording source does not exist: {source_path}")
+    if source_path.stat().st_size <= 0:
+        raise RuntimeError(f"recording source is empty: {source_path}")
     if source_path.suffix.lower() == ".mp4" and output_path is None:
         return source_path
     requested_target_path = (output_path or source_path.with_suffix(".mp4")).expanduser()
