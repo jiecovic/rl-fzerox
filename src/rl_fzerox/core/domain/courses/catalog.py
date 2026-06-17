@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from .model import CourseInfo, course_record
 
+# Reference times are from F-Zero X WR History. Each course_record stores the
+# track-specific URL used by the watch HUD, plus the non-aggregate best/worst
+# entries copied into this built-in metadata table.
 BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
     CourseInfo(
         id="mute_city",
