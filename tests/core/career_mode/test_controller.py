@@ -214,7 +214,7 @@ def test_recording_segment_close_survives_next_plan_application(tmp_path: Path) 
     controller = _controller(tmp_path)
     controller.__dict__["_progress"] = _PostGpProgressStub(next_plan=True)
     controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._observed_terminal_race_result = True
+    controller._post_race.observed_terminal_race_result = True
     controller._recording.observe_terminal_result({"termination_reason": "finished"})
 
     handled = controller.before_step(
@@ -233,7 +233,7 @@ def test_controller_does_not_sync_stale_gp_race_terminal_result(tmp_path: Path) 
     progress = _PostGpProgressStub()
     controller.__dict__["_progress"] = progress
     controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._observed_terminal_race_result = True
+    controller._post_race.observed_terminal_race_result = True
 
     handled = controller.before_step(
         session=_ControllerSession(),
@@ -251,8 +251,8 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
     controller = _controller(tmp_path)
     controller.__dict__["_progress"] = _PostGpProgressStub()
     controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._observed_terminal_race_result = True
-    controller._continue_after_race_pulses = 1
+    controller._post_race.observed_terminal_race_result = True
+    controller._post_race.continue_pulses = 1
 
     handled = controller.before_step(
         session=_ControllerSession(),
@@ -274,8 +274,8 @@ def test_controller_closes_recording_after_winning_ceremony_grace_window(
     controller = _controller(tmp_path)
     controller.__dict__["_progress"] = _PostGpProgressStub()
     controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._observed_terminal_race_result = True
-    controller._continue_after_race_pulses = 1
+    controller._post_race.observed_terminal_race_result = True
+    controller._post_race.continue_pulses = 1
 
     controller.before_step(
         session=_ControllerSession(),
@@ -306,8 +306,8 @@ def test_controller_closes_recording_on_credits(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
     controller.__dict__["_progress"] = _PostGpProgressStub()
     controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._observed_terminal_race_result = True
-    controller._continue_after_race_pulses = 2
+    controller._post_race.observed_terminal_race_result = True
+    controller._post_race.continue_pulses = 2
 
     handled = controller.before_step(
         session=_ControllerSession(),

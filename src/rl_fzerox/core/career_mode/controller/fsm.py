@@ -12,6 +12,7 @@ from rl_fzerox.core.career_mode.controller.menu_flow import (
     pending_step_matches_observed_screen,
 )
 from rl_fzerox.core.career_mode.controller.post_gp import PostGpCutsceneTracker
+from rl_fzerox.core.career_mode.controller.post_race import PostRaceContinuation
 from rl_fzerox.core.career_mode.controller.recording import (
     CareerRecordingSegmentClose,
     CareerRecordingSegmentStatus,
@@ -27,7 +28,6 @@ from rl_fzerox.core.career_mode.navigation import (
     MenuInput,
     ObservedMenuScreen,
     RawMenuStep,
-    continue_after_race_step,
     continue_next_course_step,
     course_id_from_info,
     engine_adjust_steps,
@@ -148,12 +148,7 @@ class CareerModeController:
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
-        self._awaiting_new_race_after_terminal = False
-        self._continuing_race_result = False
-        self._observed_terminal_race_result = False
-        self._continue_after_race_pulses = 0
-        self._last_progress_sync_continue_pulse = -1
-        self._fresh_race_ready_frames = 0
+        self._post_race = PostRaceContinuation()
         self._last_finished_attempt_id: str | None = None
         self._last_finished_attempt_status: SaveAttemptStatus | None = None
         self._last_finished_attempt_failure_reason: str | None = None
@@ -232,10 +227,8 @@ class CareerModeController:
                 return step
             if facts.is_gp_result_screen:
                 if facts.terminal_race_result:
-                    self._observed_terminal_race_result = True
-                    self._continuing_race_result = True
-                if self._observed_terminal_race_result:
-                    self._continuing_race_result = True
+                    self._post_race.observe_terminal_result()
+                if self._post_race.continue_observed_result():
                     return self._continue_after_race_pulse()
                 self._pending_steps.clear()
                 return raw_step(
@@ -245,16 +238,18 @@ class CareerModeController:
                 )
             if facts.in_gp_race:
                 if facts.terminal_race_result:
-                    self._observed_terminal_race_result = True
-                    self._continuing_race_result = True
-                if self._continuing_race_result and self._observed_terminal_race_result:
-                    if self._new_race_ready_for_policy(info):
-                        self._continuing_race_result = False
+                    self._post_race.observe_terminal_result()
+                if (
+                    self._post_race.continuing_race_result
+                    and self._post_race.observed_terminal_race_result
+                ):
+                    if self._post_race.new_race_ready_for_policy(info):
+                        self._post_race.stop_result_continuation()
                     else:
                         return self._continue_after_race_pulse()
-                self._continuing_race_result = False
+                self._post_race.stop_result_continuation()
                 self._pending_steps.clear()
-                if not self._new_race_ready_for_policy(info):
+                if not self._post_race.new_race_ready_for_policy(info):
                     return raw_step(
                         MenuInput.NEUTRAL,
                         1,
@@ -288,7 +283,10 @@ class CareerModeController:
             self._advance_presses_in_phase = 0
             if facts.terminal_race_result:
                 return self._continue_terminal_race_result_step()
-            if self._awaiting_new_race_after_terminal and not self._new_race_ready_for_policy(info):
+            if (
+                self._post_race.awaiting_new_race_after_terminal
+                and not self._post_race.new_race_ready_for_policy(info)
+            ):
                 return raw_step(
                     MenuInput.NEUTRAL,
                     1,
@@ -486,9 +484,9 @@ class CareerModeController:
             difficulty_popup_state=self._difficulty_popup_state,
             camera_synced=self._camera.synced,
             camera_setting=self._camera.target,
-            awaiting_new_race_after_terminal=self._awaiting_new_race_after_terminal,
-            continuing_race_result=self._continuing_race_result,
-            fresh_race_ready_frames=self._fresh_race_ready_frames,
+            awaiting_new_race_after_terminal=self._post_race.awaiting_new_race_after_terminal,
+            continuing_race_result=self._post_race.continuing_race_result,
+            fresh_race_ready_frames=self._post_race.fresh_race_ready_frames,
             last_finished_attempt_id=self._last_finished_attempt_id,
             last_finished_attempt_status=self._last_finished_attempt_status,
             last_finished_attempt_failure_reason=self._last_finished_attempt_failure_reason,
@@ -862,13 +860,8 @@ class CareerModeController:
             setup=self._setup,
             course_setups=self._progress.course_setups,
         )
-        self._awaiting_new_race_after_terminal = True
-        self._continuing_race_result = True
-        self._observed_terminal_race_result = True
-        self._continue_after_race_pulses = 0
-        self._last_progress_sync_continue_pulse = -1
+        self._post_race.enter_continue_after_race()
         self._last_progress_sync_key = None
-        self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
     def _enter_continue_after_race(self) -> None:
@@ -879,13 +872,8 @@ class CareerModeController:
         self._reset_engine_confirmation()
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
-        self._awaiting_new_race_after_terminal = True
-        self._continuing_race_result = True
-        self._observed_terminal_race_result = True
-        self._continue_after_race_pulses = 0
-        self._last_progress_sync_continue_pulse = -1
+        self._post_race.enter_continue_after_race()
         self._last_progress_sync_key = None
-        self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
     def _camera_ready(self, info: dict[str, object]) -> bool:
@@ -918,7 +906,7 @@ class CareerModeController:
         if (
             self._phase != CareerPhase.CONTINUE_AFTER_RACE
             or self._progress.attempt_id is None
-            or not self._observed_terminal_race_result
+            or not self._post_race.observed_terminal_race_result
         ):
             return False
         facts = MenuFacts.from_info(info)
@@ -934,7 +922,7 @@ class CareerModeController:
             return False
 
         self._recording.observe_progress_screen(facts, progress_info)
-        self._last_progress_sync_continue_pulse = self._continue_after_race_pulses
+        self._post_race.mark_progress_synced()
         self._last_progress_sync_key = sync_key
         transition = self._progress.sync_post_terminal_progress(
             session=session,
@@ -966,50 +954,16 @@ class CareerModeController:
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
-        self._awaiting_new_race_after_terminal = False
-        self._continuing_race_result = False
-        self._observed_terminal_race_result = False
-        self._continue_after_race_pulses = 0
-        self._last_progress_sync_continue_pulse = -1
+        self._post_race.reset()
         self._last_progress_sync_key = None
         self._post_gp_cutscene.reset()
-        self._fresh_race_ready_frames = 0
         self._reset_camera_sync()
 
     def _reset_camera_sync(self) -> None:
         self._camera.reset()
 
-    def _new_race_ready_for_policy(self, info: dict[str, object]) -> bool:
-        facts = MenuFacts.from_info(info)
-        if not self._awaiting_new_race_after_terminal:
-            return not facts.terminal_race_result
-
-        fresh_race_ready = facts.fresh_race_ready_for_policy or (
-            self._observed_terminal_race_result and facts.has_fresh_race_shape
-        )
-        if not fresh_race_ready:
-            self._fresh_race_ready_frames = 0
-            return False
-
-        self._fresh_race_ready_frames += 1
-        if self._fresh_race_ready_frames < MENU_TIMING.fresh_race_ready_frames:
-            return False
-
-        self._awaiting_new_race_after_terminal = False
-        self._continuing_race_result = False
-        self._observed_terminal_race_result = False
-        self._fresh_race_ready_frames = 0
-        return True
-
     def _continue_after_race_pulse(self) -> RawMenuStep:
         self._pending_steps.clear()
-        step = continue_after_race_step(self._continue_after_race_pulses)
-        self._continue_after_race_pulses += 1
-        self._pending_steps.append(
-            raw_step(
-                MenuInput.NEUTRAL,
-                MENU_TIMING.result_continue_settle_frames,
-                phase=f"{step.phase}:settle",
-            )
-        )
+        step, settle_step = self._post_race.continue_after_race_pulse()
+        self._pending_steps.append(settle_step)
         return step
