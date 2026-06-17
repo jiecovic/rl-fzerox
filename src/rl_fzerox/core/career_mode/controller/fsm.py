@@ -12,8 +12,8 @@ from rl_fzerox.core.career_mode.controller.menu_flow import (
     is_neutral_settle_step,
     pending_step_matches_observed_screen,
 )
-from rl_fzerox.core.career_mode.controller.post_gp import PostGpCutsceneTracker
 from rl_fzerox.core.career_mode.controller.post_race import PostRaceContinuation
+from rl_fzerox.core.career_mode.controller.progress_sync import CareerPostTerminalProgressSync
 from rl_fzerox.core.career_mode.controller.recording import (
     CareerRecordingSegmentStatus,
     CareerRecordingSegmentTracker,
@@ -50,7 +50,6 @@ from rl_fzerox.core.career_mode.runner.setup import (
     save_race_setup_from_config,
 )
 from rl_fzerox.core.career_mode.runner.terminal import (
-    post_terminal_progress_screen,
     race_terminal_reason,
     terminal_info,
 )
@@ -149,8 +148,7 @@ class CareerModeController:
         self._last_finished_attempt_failure_reason: str | None = None
         self._refresh_policy_artifact_on_next_handoff = False
         self._emulator_reset_requested = False
-        self._post_gp_cutscene = PostGpCutsceneTracker()
-        self._last_progress_sync_key: tuple[str | None, bool] | None = None
+        self._post_terminal_progress = CareerPostTerminalProgressSync()
         self._recording = CareerRecordingSegmentTracker()
         self._policy_resolver = CareerPolicyResolver(
             store=store,
@@ -763,10 +761,7 @@ class CareerModeController:
             setup=self._setup,
             info=resolved_terminal_info,
         )
-        self._remember_finished_attempt(transition)
-        self._close_recording_from_transition(transition)
-        if transition.next_plan is not None:
-            self._apply_execution_plan(transition.next_plan)
+        self._apply_progress_transition(transition)
         if transition.reset_emulator:
             self._request_emulator_reset_for_next_attempt(
                 recording_status=recording_status_from_attempt_status(transition.finished_status),
@@ -777,6 +772,12 @@ class CareerModeController:
             return True
         self._enter_continue_after_race()
         return True
+
+    def _apply_progress_transition(self, transition: CareerProgressTransition) -> None:
+        self._remember_finished_attempt(transition)
+        self._close_recording_from_transition(transition)
+        if transition.next_plan is not None:
+            self._apply_execution_plan(transition.next_plan)
 
     def _remember_finished_attempt(self, transition: object) -> None:
         finished_attempt_id = getattr(transition, "finished_attempt_id", None)
@@ -815,7 +816,7 @@ class CareerModeController:
             course_setups=self._progress.course_setups,
         )
         self._post_race.enter_continue_after_race()
-        self._last_progress_sync_key = None
+        self._post_terminal_progress.reset()
         self._reset_camera_sync()
 
     def _enter_continue_after_race(self) -> None:
@@ -826,7 +827,7 @@ class CareerModeController:
         self._difficulty_popup_state = DifficultyPopupState.CLOSED
         self._machine_selection_applied = False
         self._post_race.enter_continue_after_race()
-        self._last_progress_sync_key = None
+        self._post_terminal_progress.reset()
         self._reset_camera_sync()
 
     def _camera_ready(self, info: dict[str, object]) -> bool:
@@ -863,29 +864,19 @@ class CareerModeController:
         ):
             return False
         facts = MenuFacts.from_info(info)
-        if not post_terminal_progress_screen(facts):
-            self._post_gp_cutscene.reset()
-            return False
-        progress_info = self._post_gp_cutscene.progress_info(facts=facts, info=info)
-        sync_key = (
-            facts.game_mode,
-            progress_info.get("career_mode_post_gp_cutscene_complete") is True,
-        )
-        if self._last_progress_sync_key == sync_key:
-            return False
-
-        self._recording.observe_progress_screen(facts, progress_info)
-        self._post_race.mark_progress_synced()
-        self._last_progress_sync_key = sync_key
-        transition = self._progress.sync_post_terminal_progress(
+        transition = self._post_terminal_progress.sync(
             session=session,
             setup=self._setup,
-            info=progress_info,
+            progress=self._progress,
+            recording=self._recording,
+            post_race=self._post_race,
+            facts=facts,
+            info=info,
         )
-        self._remember_finished_attempt(transition)
-        self._close_recording_from_transition(transition)
-        if transition.next_plan is not None:
-            self._apply_execution_plan(transition.next_plan)
+        if transition is None:
+            return False
+
+        self._apply_progress_transition(transition)
         if transition.reset_emulator:
             self._request_emulator_reset_for_next_attempt(
                 recording_status=recording_status_from_attempt_status(transition.finished_status),
@@ -908,8 +899,7 @@ class CareerModeController:
         self._machine_selection_applied = False
         self._advance_presses_in_phase = 0
         self._post_race.reset()
-        self._last_progress_sync_key = None
-        self._post_gp_cutscene.reset()
+        self._post_terminal_progress.reset()
         self._reset_camera_sync()
 
     def _reset_camera_sync(self) -> None:
