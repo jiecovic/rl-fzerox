@@ -6,8 +6,8 @@ from typing import Literal
 
 import pytest
 
-from rl_fzerox.core.career_mode.runner import policy_resolver as resolver_module
-from rl_fzerox.core.career_mode.runner.policy_resolver import CareerPolicyResolver
+from rl_fzerox.core.career_mode.policy import CareerPolicyResolver
+from rl_fzerox.core.career_mode.policy import resolver as resolver_module
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig

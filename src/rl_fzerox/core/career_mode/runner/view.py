@@ -11,7 +11,7 @@ from rl_fzerox.core.career_mode.navigation import (
     camera_setting,
     course_id_from_info,
 )
-from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
+from rl_fzerox.core.career_mode.policy import CareerModePolicyControl
 from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.manager.models import ManagedSaveUnlockProgress, SaveAttemptStatus
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig

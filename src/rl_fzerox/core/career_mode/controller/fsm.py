@@ -36,9 +36,8 @@ from rl_fzerox.core.career_mode.navigation import (
     phase_from_step,
     raw_step,
 )
+from rl_fzerox.core.career_mode.policy import CareerModePolicyControl, CareerPolicyResolver
 from rl_fzerox.core.career_mode.runner.camera import CareerCameraSync
-from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
-from rl_fzerox.core.career_mode.runner.policy_resolver import CareerPolicyResolver
 from rl_fzerox.core.career_mode.runner.progress import (
     CareerAttemptProgress,
     CareerProgressTransition,

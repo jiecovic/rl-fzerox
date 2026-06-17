@@ -4,10 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from fzerox_emulator.arrays import BoolArray, PolicyState
-from rl_fzerox.core.career_mode.runner.policy import (
-    CareerModePolicyControl,
-    _policy_train_config,
-)
+from rl_fzerox.core.career_mode.policy import CareerModePolicyControl
+from rl_fzerox.core.career_mode.policy.runtime import _policy_train_config
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.manager import ManagedRunConfig, default_managed_run_config

@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/career_mode/runner/policy_resolver.py
+# src/rl_fzerox/core/career_mode/policy/resolver.py
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -10,7 +10,7 @@ from rl_fzerox.core.career_mode.course_setup import (
     resolve_course_setup,
 )
 from rl_fzerox.core.career_mode.navigation import course_id_from_info
-from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
+from rl_fzerox.core.career_mode.policy.runtime import CareerModePolicyControl
 from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm

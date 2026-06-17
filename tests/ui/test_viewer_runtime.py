@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from fzerox_emulator.arrays import Float32Array, UInt8Array
-from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
+from rl_fzerox.core.career_mode.policy import CareerModePolicyControl
 from rl_fzerox.core.domain.observation_image import CustomResolutionChoice
 from rl_fzerox.core.envs.observations import (
     ImageStateObservation,

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from fzerox_emulator import Emulator, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.core.career_mode.runner.policy import (
+from rl_fzerox.core.career_mode.policy import (
     CareerModePolicyControl,
     CareerPolicyRaceDriver,
 )
