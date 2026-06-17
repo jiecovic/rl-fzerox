@@ -36,12 +36,9 @@ struct EngineCurveRange {
 struct EnginePhysicsFormula {
     acceleration_curve_high: EngineCurveRange,
     acceleration_curve_low: EngineCurveRange,
-    acceleration_target: EngineCurveRange,
     acceleration_transition_speed: EngineCurveRange,
     boost_reserve: EngineCurveRange,
     boost_decay_denominator: EngineCurveRange,
-    grip_primary: EngineCurveRange,
-    grip_secondary: EngineCurveRange,
     boost_base: EngineCurveRange,
 }
 
@@ -90,17 +87,6 @@ const ENGINE_PHYSICS_FORMULA: EnginePhysicsFormula = EnginePhysicsFormula {
         },
         midpoint_bias: -0.2,
     },
-    acceleration_target: EngineCurveRange {
-        low_engine: WeightRange {
-            light: 0.100,
-            heavy: 0.102,
-        },
-        high_engine: WeightRange {
-            light: 0.129,
-            heavy: 0.131,
-        },
-        midpoint_bias: 0.0,
-    },
     acceleration_transition_speed: EngineCurveRange {
         low_engine: WeightRange {
             light: 33.0,
@@ -133,28 +119,6 @@ const ENGINE_PHYSICS_FORMULA: EnginePhysicsFormula = EnginePhysicsFormula {
             heavy: 50.0,
         },
         midpoint_bias: 0.2,
-    },
-    grip_primary: EngineCurveRange {
-        low_engine: WeightRange {
-            light: 0.020,
-            heavy: 0.000,
-        },
-        high_engine: WeightRange {
-            light: 0.040,
-            heavy: 0.020,
-        },
-        midpoint_bias: 0.0,
-    },
-    grip_secondary: EngineCurveRange {
-        low_engine: WeightRange {
-            light: 0.015,
-            heavy: 0.000,
-        },
-        high_engine: WeightRange {
-            light: 0.030,
-            heavy: 0.015,
-        },
-        midpoint_bias: 0.0,
     },
     boost_base: EngineCurveRange {
         low_engine: WeightRange {
@@ -320,9 +284,7 @@ fn compute_engine_physics_fields(
     let acceleration_curve_low = ENGINE_PHYSICS_FORMULA
         .acceleration_curve_low
         .value(weight_ratio, engine_curve);
-    let acceleration_target = ENGINE_PHYSICS_FORMULA
-        .acceleration_target
-        .value(weight_ratio, engine_curve);
+    let acceleration_target = acceleration_target_value(weight_ratio, engine_curve);
     let acceleration_transition_speed = ENGINE_PHYSICS_FORMULA
         .acceleration_transition_speed
         .value(weight_ratio, engine_curve);
@@ -354,14 +316,16 @@ fn compute_engine_physics_fields(
         boost_reserve,
         boost_decay: boost_reserve / boost_decay_denominator,
         acceleration_smoothing_floor,
-        grip_primary: GRIP_PRIMARY_BASE[machine.grip_stat]
-            + ENGINE_PHYSICS_FORMULA
-                .grip_primary
-                .value(weight_ratio, engine_curve),
-        grip_secondary: GRIP_SECONDARY_BASE[machine.grip_stat]
-            + ENGINE_PHYSICS_FORMULA
-                .grip_secondary
-                .value(weight_ratio, engine_curve),
+        grip_primary: grip_primary_value(
+            GRIP_PRIMARY_BASE[machine.grip_stat],
+            weight_ratio,
+            engine_curve,
+        ),
+        grip_secondary: grip_secondary_value(
+            GRIP_SECONDARY_BASE[machine.grip_stat],
+            weight_ratio,
+            engine_curve,
+        ),
         dash_multiplier_offset: dash_multiplier - 1.0,
         engine_curve_bias: (0.5 - engine_curve) * 0.5,
         acceleration_transition_scale: 1.0 / (2.0 * acceleration_transition_speed),
@@ -375,6 +339,34 @@ fn engine_curve_to_setting_value(engine_curve: f32) -> f32 {
     } else {
         (1.0 + ENGINE_CURVE_MAGIC) / ((1.0 / engine_curve) + ENGINE_CURVE_MAGIC)
     }
+}
+
+fn acceleration_target_value(weight_ratio: f32, engine_curve: f32) -> f32 {
+    // Match `Racer_InitMachineStats`: these values are produced by integer
+    // ROM reads multiplied by `0.001f`, not by pre-rounded decimal literals.
+    let low_engine = ((milli(102) - milli(100)) * weight_ratio) + milli(100);
+    let high_engine = ((milli(131) - milli(129)) * weight_ratio) + milli(129);
+    ((high_engine - low_engine) * engine_curve) + low_engine
+}
+
+fn grip_primary_value(base: f32, weight_ratio: f32, engine_curve: f32) -> f32 {
+    let low_engine = ((0.0 - centi(2)) * weight_ratio) + centi(2);
+    let high_engine = ((centi(2) - centi(4)) * weight_ratio) + centi(4);
+    (base + ((high_engine - low_engine) * engine_curve)) + low_engine
+}
+
+fn grip_secondary_value(base: f32, weight_ratio: f32, engine_curve: f32) -> f32 {
+    let low_engine = ((0.0 - milli(15)) * weight_ratio) + milli(15);
+    let high_engine = ((milli(15) - centi(3)) * weight_ratio) + centi(3);
+    (base + ((high_engine - low_engine) * engine_curve)) + low_engine
+}
+
+fn centi(value: u16) -> f32 {
+    (value as f32) * 0.01
+}
+
+fn milli(value: u16) -> f32 {
+    (value as f32) * 0.001
 }
 
 impl WeightRange {
