@@ -34,6 +34,7 @@ from rl_fzerox.core.career_mode.runner.policy import CareerModePolicyControl
 from rl_fzerox.core.career_mode.runner.policy_resolver import CareerPolicyResolver
 from rl_fzerox.core.career_mode.runner.progress import (
     CareerAttemptProgress,
+    CareerProgressTransition,
 )
 from rl_fzerox.core.career_mode.runner.race import SaveRaceExecutionPlan
 from rl_fzerox.core.career_mode.runner.save_file import SaveRamSession
@@ -206,7 +207,7 @@ class CareerModeController:
     def next_raw_step(self, *, info: dict[str, object]) -> RawMenuStep | None:
         facts = MenuFacts.from_info(info)
         if self._progress.attempt_id is None:
-            raise RuntimeError("Career Mode has no active save attempt")
+            return None
         if self._phase == CareerPhase.POLICY_RACE:
             if facts.in_gp_race:
                 if facts.terminal_race_result:
@@ -801,6 +802,7 @@ class CareerModeController:
             info=resolved_terminal_info,
         )
         self._remember_finished_attempt(transition)
+        self._close_recording_from_transition(transition)
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         if transition.reset_emulator:
@@ -829,6 +831,13 @@ class CareerModeController:
             failure_reason if isinstance(failure_reason, str) else None
         )
         self._refresh_policy_artifact_on_next_handoff = True
+
+    def _close_recording_from_transition(self, transition: CareerProgressTransition) -> None:
+        if not transition.attempt_finished:
+            return
+        self._recording.close(
+            status=_transition_recording_status(transition.finished_status),
+        )
 
     def _apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:
         self._progress.apply_execution_plan(plan)
@@ -903,10 +912,10 @@ class CareerModeController:
         facts = MenuFacts.from_info(info)
         if not post_terminal_progress_screen(facts):
             return False
-        self._recording.observe_progress_screen(facts, info)
         if self._last_progress_sync_continue_pulse == self._continue_after_race_pulses:
             return False
 
+        self._recording.observe_progress_screen(facts, info)
         self._last_progress_sync_continue_pulse = self._continue_after_race_pulses
         transition = self._progress.sync_post_terminal_progress(
             session=session,
@@ -914,6 +923,7 @@ class CareerModeController:
             info=info,
         )
         self._remember_finished_attempt(transition)
+        self._close_recording_from_transition(transition)
         if transition.next_plan is not None:
             self._apply_execution_plan(transition.next_plan)
         if transition.reset_emulator:

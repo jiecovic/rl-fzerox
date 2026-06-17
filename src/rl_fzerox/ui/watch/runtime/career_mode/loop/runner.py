@@ -519,6 +519,9 @@ def _run_career_mode_loop_body(
                     publish_snapshot(policy_visible=False)
                     if not controller.has_active_attempt():
                         raise _CareerModeWorkerQuit()
+            if not controller.has_active_attempt():
+                publish_snapshot(policy_visible=False)
+                raise _CareerModeWorkerQuit()
             menu_step = controller.next_raw_step(info=info)
             if menu_step is not None:
                 last_menu_step = menu_step

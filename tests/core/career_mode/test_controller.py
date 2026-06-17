@@ -4,8 +4,6 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from rl_fzerox.core.career_mode.runner.controller import (
     CareerModeController,
@@ -41,6 +39,13 @@ def test_cup_selection_moves_right_when_target_is_after_selected_cup() -> None:
 
 def test_cup_selection_moves_right_until_selected_cup_is_known() -> None:
     assert _cup_selection_input(selected_cup_index=None, target_cup_index=0) is MenuInput.RIGHT
+
+
+def test_menu_facts_accept_game_mode_name_fallback() -> None:
+    facts = MenuFacts.from_info({"game_mode_name": "unskippable_credits"})
+
+    assert facts.is_post_gp_screen
+    assert post_terminal_progress_screen(facts)
 
 
 def test_engine_adjust_steps_use_fast_bounded_right_burst() -> None:
@@ -104,15 +109,22 @@ def test_returned_main_menu_is_post_terminal_progress_screen() -> None:
     assert post_terminal_progress_screen(MenuFacts.from_info({"game_mode": "main_menu"}))
 
 
-def test_no_active_attempt_rejects_menu_navigation(tmp_path: Path) -> None:
+def test_stale_gp_race_terminal_is_not_post_terminal_progress_screen() -> None:
+    assert not post_terminal_progress_screen(
+        MenuFacts.from_info({"game_mode": "gp_race", "termination_reason": "finished"})
+    )
+
+
+def test_no_active_attempt_emits_no_menu_navigation(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
     controller._progress._attempt_id = None
     controller._phase = CareerPhase.WAIT_FOR_GP_RACE
 
-    with pytest.raises(RuntimeError, match="no active save attempt"):
-        controller.next_raw_step(
-            info={"game_mode": "gp_race", "termination_reason": "finished"},
-        )
+    step = controller.next_raw_step(
+        info={"game_mode": "gp_race", "termination_reason": "finished"},
+    )
+
+    assert step is None
 
 
 def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path) -> None:
@@ -144,7 +156,7 @@ def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path)
     assert resolver.refresh_requests == [False, True, False]
 
 
-def test_recording_segment_close_waits_until_post_gp_recording_boundary() -> None:
+def test_recording_segment_tracker_waits_for_explicit_close() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "finished"})
@@ -170,10 +182,6 @@ def test_recording_segment_close_waits_until_post_gp_recording_boundary() -> Non
         MenuFacts.from_info({"game_mode": "unskippable_credits"}),
         {"game_mode": "unskippable_credits"},
     )
-    close = tracker.pop_close()
-
-    assert close is not None
-    assert close.status == "succeeded"
     assert tracker.pop_close() is None
 
     tracker.observe_progress_screen(
@@ -182,19 +190,19 @@ def test_recording_segment_close_waits_until_post_gp_recording_boundary() -> Non
     )
     assert tracker.pop_close() is None
 
+    tracker.close(status="succeeded")
+    close = tracker.pop_close()
+
+    assert close is not None
+    assert close.status == "succeeded"
+    assert tracker.pop_close() is None
+
 
 def test_recording_segment_close_is_not_downgraded_by_credit_reset() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "finished"})
-    tracker.observe_progress_screen(
-        MenuFacts.from_info({"game_mode": "gp_end_cutscene"}),
-        {"game_mode": "gp_end_cutscene"},
-    )
-    tracker.observe_progress_screen(
-        MenuFacts.from_info({"game_mode": "unskippable_credits"}),
-        {"game_mode": "unskippable_credits"},
-    )
+    tracker.close(status="succeeded")
     tracker.force_close(status="failed")
     close = tracker.pop_close()
 
@@ -218,6 +226,23 @@ def test_recording_segment_close_survives_next_plan_application(tmp_path: Path) 
     assert handled is True
     assert close is not None
     assert close.status == "succeeded"
+
+
+def test_controller_does_not_sync_stale_gp_race_terminal_result(tmp_path: Path) -> None:
+    controller = _controller(tmp_path)
+    progress = _PostGpProgressStub()
+    controller.__dict__["_progress"] = progress
+    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
+    controller._observed_terminal_race_result = True
+
+    handled = controller.before_step(
+        session=_ControllerSession(),
+        info={"game_mode": "gp_race", "termination_reason": "finished"},
+    )
+
+    assert handled is False
+    assert progress.sync_calls == []
+    assert controller.pop_recording_segment_close() is None
 
 
 def test_controller_does_not_reset_or_close_recording_at_winning_ceremony(
@@ -251,35 +276,13 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony(
     assert controller.pop_emulator_reset_request() is True
 
 
-def test_recording_segment_close_marks_losing_post_gp_rank_failed() -> None:
-    tracker = CareerRecordingSegmentTracker()
-
-    tracker.observe_terminal_result({"termination_reason": "finished"})
-    tracker.observe_progress_screen(
-        MenuFacts.from_info({"game_mode": "gp_end_cutscene"}),
-        {"game_mode": "gp_end_cutscene", "career_mode_gp_final_rank": 2},
-    )
-    close = tracker.pop_close()
-
-    assert close is not None
-    assert close.status == "failed"
-    assert tracker.pop_close() is None
-
-
 def test_recording_segment_close_marks_game_over_failed() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "retired"})
-    tracker.observe_progress_screen(
-        MenuFacts.from_info({"game_mode": "results"}),
-        {"game_mode": "results"},
-    )
     assert tracker.pop_close() is None
 
-    tracker.observe_progress_screen(
-        MenuFacts.from_info({"game_mode": "game_over"}),
-        {"game_mode": "game_over"},
-    )
+    tracker.force_close(status="failed")
     close = tracker.pop_close()
 
     assert close is not None
@@ -312,6 +315,7 @@ class _PostGpProgressStub:
     def __init__(self, *, next_plan: bool = False) -> None:
         self._next_plan = next_plan
         self.course_setups = ()
+        self.sync_calls: list[dict[str, object]] = []
 
     def apply_execution_plan(self, plan: object) -> None:
         self.attempt_id = getattr(plan, "attempt_id", self.attempt_id)
@@ -324,6 +328,7 @@ class _PostGpProgressStub:
         info: dict[str, object],
     ) -> CareerProgressTransition:
         del session, setup
+        self.sync_calls.append(dict(info))
         if info.get("game_mode") == "unskippable_credits":
             return CareerProgressTransition(
                 attempt_finished=True,

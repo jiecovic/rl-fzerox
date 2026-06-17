@@ -21,15 +21,21 @@ class TerminalRaceSession(Protocol):
 
 
 def post_terminal_progress_screen(facts: MenuFacts) -> bool:
+    """Return true for visible screens where a whole GP attempt can end.
+
+    Result and next-course screens are still inside the current GP attempt.
+    Stale `gp_race` terminal frames are also intentionally excluded; the
+    controller handles those once through `observe_step()` and then advances
+    the game until a post-GP, menu, title, course-select, or game-over state is
+    actually visible.
+    """
+
     return (
-        facts.is_gp_result_screen
-        or facts.is_gp_next_course_screen
-        or facts.is_post_gp_screen
+        facts.is_post_gp_screen
         or facts.is_title
         or facts.is_mode_select
         or facts.is_course_select
         or facts.game_mode == "game_over"
-        or (facts.in_gp_race and facts.terminal_race_result)
     )
 
 

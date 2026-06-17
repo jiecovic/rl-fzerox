@@ -373,14 +373,26 @@ def _target_terminal_succeeded(
     final_course = _target_final_course(setup)
     if final_course is None:
         return False
-    return _info_matches_course(info, final_course)
+    return _info_matches_course(info, final_course) or _info_matches_final_cup_slot(
+        info,
+        setup,
+    )
 
 
 def _target_final_course(setup: CareerModeRaceSetupConfig) -> CourseInfo | None:
-    courses = tuple(course for course in BUILT_IN_COURSES if course.cup == setup.cup_id)
+    courses = _target_cup_courses(setup)
     if not courses:
         return None
     return max(courses, key=lambda course: course.course_index)
+
+
+def _target_cup_courses(setup: CareerModeRaceSetupConfig) -> tuple[CourseInfo, ...]:
+    return tuple(
+        sorted(
+            (course for course in BUILT_IN_COURSES if course.cup == setup.cup_id),
+            key=lambda course: course.course_index,
+        )
+    )
 
 
 def _info_matches_course(info: dict[str, object], course: CourseInfo) -> bool:
@@ -394,6 +406,24 @@ def _info_matches_course(info: dict[str, object], course: CourseInfo) -> bool:
     if course_id is None:
         course_id = _str_info(info, "course_id")
     return course_id in {course.id, course.ref}
+
+
+def _info_matches_final_cup_slot(
+    info: dict[str, object],
+    setup: CareerModeRaceSetupConfig,
+) -> bool:
+    courses = _target_cup_courses(setup)
+    if not courses:
+        return False
+    final_slot = len(courses) - 1
+
+    # On live GP result handoff some native fields expose the cup-local slot
+    # instead of the global built-in course index. Accept that only as terminal
+    # final-course evidence; post-GP success/failure still owns the cup result.
+    for key in ("career_mode_cup_course_index", "cup_course_index", "course_index"):
+        if _int_info(info, key) == final_slot:
+            return True
+    return False
 
 
 def _failure_reason(info: dict[str, object]) -> str:
@@ -447,11 +477,11 @@ def _positive_int_info(info: dict[str, object], key: str) -> int | None:
 
 
 def _gp_final_rank(info: dict[str, object]) -> int | None:
-    for key in ("career_mode_gp_final_rank", "gp_final_rank"):
-        value = _positive_int_info(info, key)
-        if value is not None:
-            return value
-    return None
+    # The native `gp_final_rank` telemetry is not a trusted post-GP source here:
+    # depending on the screen it may still carry race-position-like data. Only a
+    # career-owned explicit final-rank value is allowed to turn a post-GP success
+    # screen into a failed attempt.
+    return _positive_int_info(info, "career_mode_gp_final_rank")
 
 
 def _int_info(info: dict[str, object], key: str) -> int | None:

@@ -510,6 +510,8 @@ def phase_from_step(step: RawMenuStep) -> CareerPhase:
 
 def game_mode(info: dict[str, object]) -> str | None:
     value = info.get("game_mode")
+    if not isinstance(value, str) or not value:
+        value = info.get("game_mode_name")
     return value if isinstance(value, str) and value else None
 
 
@@ -541,7 +543,7 @@ def course_id_from_info(info: dict[str, object]) -> str | None:
 
 
 def in_gp_race(info: dict[str, object]) -> bool:
-    return info.get("game_mode") == "gp_race"
+    return game_mode(info) == "gp_race"
 
 
 def camera_setting(info: dict[str, object]) -> str | None:
