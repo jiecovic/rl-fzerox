@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/loop/recording.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from rl_fzerox.core.career_mode.controller import CareerModeController
 from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
 
@@ -11,43 +13,33 @@ def drain_recording_notices(frame_recorder: FrameRecorder | None) -> tuple[str, 
     return frame_recorder.drain_notices()
 
 
-def record_controller_event(
+@dataclass(frozen=True, slots=True)
+class ControllerLifecycleResult:
+    reset_requested: bool
+    has_active_attempt: bool
+
+
+def handle_controller_lifecycle(
     *,
     controller: CareerModeController,
     frame_recorder: FrameRecorder | None,
     info: dict[str, object],
-) -> None:
-    """Record one FSM event, closing the segment when the FSM says it ended.
+    record_event: bool = False,
+) -> ControllerLifecycleResult:
+    """Drain controller lifecycle signals and apply runtime side effects.
 
     The controller owns cup-attempt lifecycle because it sees the menu/race FSM.
-    The recorder owns only bytes on disk. This bridge is the single place where
-    an FSM close signal becomes a recorder `finish_segment()` side effect.
+    The recorder and emulator live in the watch runtime. Draining all lifecycle
+    signals in one place prevents recording, reset, and runner-exit decisions
+    from being consumed by different branches.
     """
 
-    if frame_recorder is None:
-        return
-    close = controller.pop_recording_segment_close()
-    if close is None:
+    events = controller.drain_lifecycle_events()
+    if frame_recorder is not None and events.recording_close is not None:
+        frame_recorder.finish_segment(status=events.recording_close.status, info=info)
+    elif frame_recorder is not None and record_event:
         frame_recorder.record_event(info=info)
-        return
-    frame_recorder.finish_segment(status=close.status, info=info)
-
-
-def finish_pending_recording_segment(
-    *,
-    controller: CareerModeController,
-    frame_recorder: FrameRecorder | None,
-    info: dict[str, object],
-) -> None:
-    """Consume a deferred segment close after menu-progress FSM polling.
-
-    `CareerModeController.before_step()` can observe the exit screen before the
-    worker records a normal terminal event. This keeps that path explicit
-    without making the recorder infer lifecycle from DB progress fields.
-    """
-
-    if frame_recorder is None:
-        return
-    close = controller.pop_recording_segment_close()
-    if close is not None:
-        frame_recorder.finish_segment(status=close.status, info=info)
+    return ControllerLifecycleResult(
+        reset_requested=events.emulator_reset_requested,
+        has_active_attempt=events.has_active_attempt,
+    )

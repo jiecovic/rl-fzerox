@@ -22,8 +22,7 @@ from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.career_mode.loop.recording import (
     drain_recording_notices,
-    finish_pending_recording_segment,
-    record_controller_event,
+    handle_controller_lifecycle,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.state import (
     CareerModeLoopState,
@@ -416,34 +415,34 @@ def _run_career_mode_loop_body(
                     info=info,
                     active_policy_control=active_policy_control,
                 )
-            finish_pending_recording_segment(
+            lifecycle = handle_controller_lifecycle(
                 controller=controller,
                 frame_recorder=frame_recorder,
                 info=info,
             )
+            if lifecycle.reset_requested:
+                raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
+                    config=config,
+                    session=session,
+                    controller=controller,
+                )
+                reset_info = dict(info)
+                active_policy_control = None
+                active_policy_started = False
+                current_policy_action = None
+                current_control_state = RaceControlState()
+                current_gas_level = 0.0
+                boost_lamp_level = 0.0
+                cnn_activations = None
+                current_auxiliary_predictions = None
+                current_auxiliary_targets = None
+                manual_control_enabled = False
+                reset_track_records_if_attempt_changed()
+                publish_snapshot(policy_visible=False)
+                continue
             if before_step_handled:
                 reset_info = dict(info)
-                if controller.pop_emulator_reset_request():
-                    raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
-                        config=config,
-                        session=session,
-                        controller=controller,
-                    )
-                    reset_info = dict(info)
-                    active_policy_control = None
-                    active_policy_started = False
-                    current_policy_action = None
-                    current_control_state = RaceControlState()
-                    current_gas_level = 0.0
-                    boost_lamp_level = 0.0
-                    cnn_activations = None
-                    current_auxiliary_predictions = None
-                    current_auxiliary_targets = None
-                    manual_control_enabled = False
-                    reset_track_records_if_attempt_changed()
-                    publish_snapshot(policy_visible=False)
-                    continue
-                if not controller.has_active_attempt():
+                if not lifecycle.has_active_attempt:
                     publish_snapshot(policy_visible=False)
                     raise _CareerModeWorkerQuit()
             policy_owns_control = controller.policy_owns_control()
@@ -463,12 +462,13 @@ def _run_career_mode_loop_body(
                         info=info,
                         active_policy_control=active_policy_control,
                     )
-                    record_controller_event(
+                    lifecycle = handle_controller_lifecycle(
                         controller=controller,
                         frame_recorder=frame_recorder,
                         info=terminal_info,
+                        record_event=True,
                     )
-                    if controller.pop_emulator_reset_request():
+                    if lifecycle.reset_requested:
                         raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
                             config=config,
                             session=session,
@@ -517,7 +517,7 @@ def _run_career_mode_loop_body(
                     current_auxiliary_targets = None
                     manual_control_enabled = False
                     publish_snapshot(policy_visible=False)
-                    if not controller.has_active_attempt():
+                    if not lifecycle.has_active_attempt:
                         raise _CareerModeWorkerQuit()
             if not controller.has_active_attempt():
                 publish_snapshot(policy_visible=False)
@@ -708,12 +708,13 @@ def _run_career_mode_loop_body(
                         info=info,
                         active_policy_control=active_policy_control,
                     )
-                    record_controller_event(
+                    lifecycle = handle_controller_lifecycle(
                         controller=controller,
                         frame_recorder=frame_recorder,
                         info=terminal_info,
+                        record_event=True,
                     )
-                    if controller.pop_emulator_reset_request():
+                    if lifecycle.reset_requested:
                         raw_info, info, current_telemetry = _reset_emulator_for_next_attempt(
                             config=config,
                             session=session,
@@ -763,7 +764,7 @@ def _run_career_mode_loop_body(
                     current_auxiliary_targets = None
                     manual_control_enabled = False
                     publish_snapshot(policy_visible=False)
-                    if not controller.has_active_attempt():
+                    if not lifecycle.has_active_attempt:
                         raise _CareerModeWorkerQuit()
 
             if current_step_seconds is not None:

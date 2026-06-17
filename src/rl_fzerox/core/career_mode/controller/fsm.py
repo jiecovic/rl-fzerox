@@ -5,6 +5,7 @@ from collections import deque
 from pathlib import Path
 from typing import Protocol
 
+from rl_fzerox.core.career_mode.controller.events import CareerControllerLifecycleEvents
 from rl_fzerox.core.career_mode.controller.menu_flow import (
     cup_selection_input,
     engine_adjust_tap_count,
@@ -14,7 +15,6 @@ from rl_fzerox.core.career_mode.controller.menu_flow import (
 from rl_fzerox.core.career_mode.controller.post_gp import PostGpCutsceneTracker
 from rl_fzerox.core.career_mode.controller.post_race import PostRaceContinuation
 from rl_fzerox.core.career_mode.controller.recording import (
-    CareerRecordingSegmentClose,
     CareerRecordingSegmentStatus,
     CareerRecordingSegmentTracker,
     recording_status_from_attempt_status,
@@ -466,10 +466,14 @@ class CareerModeController:
     def debug_context(self, info: dict[str, object]) -> str:
         return career_debug_context(info=info, state=self._view_state())
 
-    def pop_recording_segment_close(self) -> CareerRecordingSegmentClose | None:
-        return self._recording.pop_close()
+    def drain_lifecycle_events(self) -> CareerControllerLifecycleEvents:
+        return CareerControllerLifecycleEvents(
+            recording_close=self._recording.pop_close(),
+            emulator_reset_requested=self._consume_emulator_reset_request(),
+            has_active_attempt=self.has_active_attempt(),
+        )
 
-    def pop_emulator_reset_request(self) -> bool:
+    def _consume_emulator_reset_request(self) -> bool:
         requested = self._emulator_reset_requested
         self._emulator_reset_requested = False
         return requested

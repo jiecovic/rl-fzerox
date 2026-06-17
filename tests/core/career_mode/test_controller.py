@@ -221,11 +221,11 @@ def test_recording_segment_close_survives_next_plan_application(tmp_path: Path) 
         session=_ControllerSession(),
         info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
     )
-    close = controller.pop_recording_segment_close()
+    events = controller.drain_lifecycle_events()
 
     assert handled is True
-    assert close is not None
-    assert close.status == "succeeded"
+    assert events.recording_close is not None
+    assert events.recording_close.status == "succeeded"
 
 
 def test_controller_does_not_sync_stale_gp_race_terminal_result(tmp_path: Path) -> None:
@@ -242,7 +242,7 @@ def test_controller_does_not_sync_stale_gp_race_terminal_result(tmp_path: Path) 
 
     assert handled is False
     assert progress.sync_calls == []
-    assert controller.pop_recording_segment_close() is None
+    assert controller.drain_lifecycle_events().recording_close is None
 
 
 def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
@@ -264,8 +264,9 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
     )
 
     assert handled is False
-    assert controller.pop_recording_segment_close() is None
-    assert controller.pop_emulator_reset_request() is False
+    events = controller.drain_lifecycle_events()
+    assert events.recording_close is None
+    assert events.emulator_reset_requested is False
 
 
 def test_controller_closes_recording_after_winning_ceremony_grace_window(
@@ -295,11 +296,11 @@ def test_controller_closes_recording_after_winning_ceremony_grace_window(
             "gp_final_rank": 1,
         },
     )
-    close = controller.pop_recording_segment_close()
+    events = controller.drain_lifecycle_events()
 
     assert handled is True
-    assert close is not None
-    assert close.status == "succeeded"
+    assert events.recording_close is not None
+    assert events.recording_close.status == "succeeded"
 
 
 def test_controller_closes_recording_on_credits(tmp_path: Path) -> None:
@@ -313,12 +314,12 @@ def test_controller_closes_recording_on_credits(tmp_path: Path) -> None:
         session=_ControllerSession(),
         info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
     )
-    close = controller.pop_recording_segment_close()
+    events = controller.drain_lifecycle_events()
 
     assert handled is True
-    assert close is not None
-    assert close.status == "succeeded"
-    assert controller.pop_emulator_reset_request() is True
+    assert events.recording_close is not None
+    assert events.recording_close.status == "succeeded"
+    assert events.emulator_reset_requested is True
 
 
 def test_recording_segment_close_marks_game_over_failed() -> None:

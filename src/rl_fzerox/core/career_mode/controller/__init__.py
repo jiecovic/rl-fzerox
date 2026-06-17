@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/career_mode/controller/__init__.py
 from __future__ import annotations
 
+from rl_fzerox.core.career_mode.controller.events import CareerControllerLifecycleEvents
 from rl_fzerox.core.career_mode.controller.fsm import (
     CareerModeController,
     CareerRuntimeEmulator,
@@ -16,6 +17,7 @@ from rl_fzerox.core.career_mode.controller.recording import (
 
 __all__ = [
     "CareerModeController",
+    "CareerControllerLifecycleEvents",
     "CareerRecordingSegmentClose",
     "CareerRecordingSegmentStatus",
     "CareerRuntimeEmulator",
