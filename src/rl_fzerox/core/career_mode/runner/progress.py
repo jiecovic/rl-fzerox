@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from rl_fzerox.core.career_mode.runner.context import SaveAttemptExecutionContext
-from rl_fzerox.core.career_mode.runner.menu import POST_GP_COMPLETION_MODES
+from rl_fzerox.core.career_mode.runner.menu import POST_GP_RECORDING_END_MODES
 from rl_fzerox.core.career_mode.runner.race import (
     SaveRaceExecutionPlan,
     build_save_race_execution_plan,
@@ -179,8 +179,6 @@ class CareerAttemptProgress:
                 and not self._observed_target_terminal_success
             ):
                 return CareerProgressTransition(attempt_finished=False)
-            if not _is_post_gp_completion(info):
-                return CareerProgressTransition(attempt_finished=False)
             final_rank = _gp_final_rank(info)
             if final_rank is not None and final_rank > 1:
                 return self._finish_and_advance(
@@ -188,7 +186,10 @@ class CareerAttemptProgress:
                     setup=setup,
                     status="failed",
                     failure_reason=f"gp cup final rank {final_rank}",
+                    reset_emulator=True,
                 )
+            if not _is_post_gp_completion(info):
+                return CareerProgressTransition(attempt_finished=False)
             return self._finish_and_advance(
                 info=info,
                 setup=setup,
@@ -407,7 +408,7 @@ def _is_post_gp_completion(info: dict[str, object]) -> bool:
     mode = info.get("game_mode")
     if not isinstance(mode, str) or not mode:
         mode = info.get("game_mode_name")
-    return mode in POST_GP_COMPLETION_MODES or mode in {
+    return mode in POST_GP_RECORDING_END_MODES or mode in {
         "title",
         "main_menu",
         "course_select",

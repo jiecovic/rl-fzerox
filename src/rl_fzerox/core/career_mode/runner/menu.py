@@ -147,6 +147,12 @@ POST_GP_COMPLETION_MODES = frozenset(
         "unskippable_credits",
     }
 )
+POST_GP_RECORDING_END_MODES = frozenset(
+    {
+        "skippable_credits",
+        "unskippable_credits",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)

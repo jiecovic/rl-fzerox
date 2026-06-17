@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from fzerox_emulator import ControllerState, FZeroXTelemetry
 from rl_fzerox.core.career_mode.runner.controller import (
     CareerModeController,
     _cup_selection_input,
@@ -23,6 +24,7 @@ from rl_fzerox.core.career_mode.runner.menu import (
     engine_adjust_steps,
     observed_menu_screen,
 )
+from rl_fzerox.core.career_mode.runner.progress import CareerProgressTransition
 from rl_fzerox.core.career_mode.runner.terminal import post_terminal_progress_screen
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
@@ -141,7 +143,7 @@ def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path)
     assert resolver.refresh_requests == [False, True, False]
 
 
-def test_recording_segment_close_ends_at_post_gp_completion() -> None:
+def test_recording_segment_close_waits_until_post_gp_recording_boundary() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "finished"})
@@ -161,6 +163,12 @@ def test_recording_segment_close_ends_at_post_gp_completion() -> None:
         MenuFacts.from_info({"game_mode": "gp_end_cutscene"}),
         {"game_mode": "gp_end_cutscene"},
     )
+    assert tracker.pop_close() is None
+
+    tracker.observe_progress_screen(
+        MenuFacts.from_info({"game_mode": "unskippable_credits"}),
+        {"game_mode": "unskippable_credits"},
+    )
     close = tracker.pop_close()
 
     assert close is not None
@@ -172,6 +180,37 @@ def test_recording_segment_close_ends_at_post_gp_completion() -> None:
         {"game_mode": "main_menu"},
     )
     assert tracker.pop_close() is None
+
+
+def test_controller_does_not_reset_or_close_recording_at_winning_ceremony(
+    tmp_path: Path,
+) -> None:
+    controller = _controller(tmp_path)
+    controller.__dict__["_progress"] = _PostGpProgressStub()
+    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
+    controller._observed_terminal_race_result = True
+    controller._continue_after_race_pulses = 1
+
+    handled = controller.before_step(
+        session=_ControllerSession(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+
+    assert handled is False
+    assert controller.pop_recording_segment_close() is None
+    assert controller.pop_emulator_reset_request() is False
+
+    controller._continue_after_race_pulses = 2
+    handled = controller.before_step(
+        session=_ControllerSession(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
+    close = controller.pop_recording_segment_close()
+
+    assert handled is True
+    assert close is not None
+    assert close.status == "succeeded"
+    assert controller.pop_emulator_reset_request() is True
 
 
 def test_recording_segment_close_marks_losing_post_gp_rank_failed() -> None:
@@ -227,6 +266,48 @@ class _PolicyResolverStub:
             camera_setting=None,
             control="control",
         )
+
+
+class _PostGpProgressStub:
+    attempt_id = "attempt-1"
+
+    def sync_post_terminal_progress(
+        self,
+        *,
+        session: object,
+        setup: object,
+        info: dict[str, object],
+    ) -> CareerProgressTransition:
+        del session, setup
+        if info.get("game_mode") == "unskippable_credits":
+            return CareerProgressTransition(
+                attempt_finished=True,
+                finished_attempt_id="attempt-1",
+                finished_status="succeeded",
+                reset_emulator=True,
+            )
+        return CareerProgressTransition(attempt_finished=False)
+
+
+class _ControllerEmulator:
+    def read_save_ram(self) -> bytes:
+        return b"save-ram"
+
+    def write_save_ram(self, data: bytes) -> None:
+        del data
+
+    def set_controller_state(self, controller_state: ControllerState) -> None:
+        del controller_state
+
+    def step_frames(self, count: int, *, capture_video: bool = True) -> None:
+        del count, capture_video
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None:
+        return None
+
+
+class _ControllerSession:
+    emulator = _ControllerEmulator()
 
 
 def _controller(tmp_path: Path) -> CareerModeController:

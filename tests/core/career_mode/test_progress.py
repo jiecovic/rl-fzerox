@@ -167,7 +167,7 @@ def test_crashed_race_keeps_current_gp_attempt(tmp_path: Path) -> None:
     assert store.save_game.save_path.read_bytes() == b"save-ram"
 
 
-def test_single_target_success_waits_for_post_gp_screen(tmp_path: Path) -> None:
+def test_single_target_success_waits_for_post_gp_recording_boundary(tmp_path: Path) -> None:
     store = _SingleTargetCompletionStore(tmp_path)
     progress = CareerAttemptProgress(
         store=store,
@@ -192,13 +192,19 @@ def test_single_target_success_waits_for_post_gp_screen(tmp_path: Path) -> None:
         setup=_race_setup(),
         info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
     )
+    credits_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
 
     assert terminal_transition.attempt_finished is False
     assert result_transition.attempt_finished is False
-    assert post_gp_transition.attempt_finished is True
-    assert post_gp_transition.next_plan is None
-    assert post_gp_transition.finished_attempt_id == "attempt-1"
-    assert post_gp_transition.finished_status == "succeeded"
+    assert post_gp_transition.attempt_finished is False
+    assert credits_transition.attempt_finished is True
+    assert credits_transition.next_plan is None
+    assert credits_transition.finished_attempt_id == "attempt-1"
+    assert credits_transition.finished_status == "succeeded"
     assert progress.attempt_id is None
     assert store.finished_attempts == [("attempt-1", "succeeded", None)]
     assert store.status_updates == ["paused"]
@@ -300,9 +306,15 @@ def test_single_target_post_gp_course_position_does_not_count_as_final_rank(
         setup=_race_setup(),
         info={"game_mode": "gp_end_cutscene", "termination_reason": "finished", "position": 2},
     )
+    credits_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished", "position": 2},
+    )
 
-    assert post_gp_transition.attempt_finished is True
-    assert post_gp_transition.finished_status == "succeeded"
+    assert post_gp_transition.attempt_finished is False
+    assert credits_transition.attempt_finished is True
+    assert credits_transition.finished_status == "succeeded"
     assert store.finished_attempts == [("attempt-1", "succeeded", None)]
 
 
@@ -327,16 +339,22 @@ def test_single_target_success_repeats_target_without_clear_goal(
         setup=_race_setup(),
         info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
     )
+    credits_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
 
     assert terminal_transition.attempt_finished is False
-    assert post_gp_transition.attempt_finished is True
-    assert post_gp_transition.next_plan is not None
-    assert post_gp_transition.next_plan.attempt_id == "attempt-2"
-    assert post_gp_transition.finished_attempt_id == "attempt-1"
-    assert post_gp_transition.finished_status == "succeeded"
-    assert post_gp_transition.reset_emulator is True
+    assert post_gp_transition.attempt_finished is False
+    assert credits_transition.attempt_finished is True
+    assert credits_transition.next_plan is not None
+    assert credits_transition.next_plan.attempt_id == "attempt-2"
+    assert credits_transition.finished_attempt_id == "attempt-1"
+    assert credits_transition.finished_status == "succeeded"
+    assert credits_transition.reset_emulator is True
     assert progress.attempt_id == "attempt-1"
-    progress.apply_execution_plan(post_gp_transition.next_plan)
+    progress.apply_execution_plan(credits_transition.next_plan)
     assert progress.attempt_id == "attempt-2"
     assert store.finished_attempts == [("attempt-1", "succeeded", None)]
     assert store.status_updates == []
@@ -358,11 +376,17 @@ def test_single_target_success_stops_after_target_clear_goal(tmp_path: Path) -> 
         setup=_race_setup(),
         info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
     )
-    first_clear = progress.sync_post_terminal_progress(
+    first_post_gp = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
         info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
     )
+    first_clear = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
+    assert first_post_gp.attempt_finished is False
     assert first_clear.next_plan is not None
     progress.apply_execution_plan(first_clear.next_plan)
 
@@ -376,15 +400,21 @@ def test_single_target_success_stops_after_target_clear_goal(tmp_path: Path) -> 
             "course_index": 5,
         },
     )
-    second_clear = progress.sync_post_terminal_progress(
+    second_post_gp = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
         info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+    second_clear = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
     )
 
     assert first_clear.attempt_finished is True
     assert first_clear.finished_status == "succeeded"
     assert first_clear.next_plan.attempt_id == "attempt-2"
+    assert second_post_gp.attempt_finished is False
     assert second_clear.attempt_finished is True
     assert second_clear.finished_status == "succeeded"
     assert second_clear.next_plan is None
@@ -582,7 +612,7 @@ def test_perfect_run_failure_retries_cup_target_when_setup_has_course_id(
     assert store.next_attempt.course_id is None
 
 
-def test_replayed_target_success_waits_for_post_gp_screen(tmp_path: Path) -> None:
+def test_replayed_target_success_waits_for_post_gp_recording_boundary(tmp_path: Path) -> None:
     store = _ReplayTargetStore(tmp_path)
     progress = CareerAttemptProgress(
         store=store,
@@ -612,11 +642,17 @@ def test_replayed_target_success_waits_for_post_gp_screen(tmp_path: Path) -> Non
         setup=_race_setup(),
         info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
     )
+    credits_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "unskippable_credits", "termination_reason": "finished"},
+    )
 
     assert terminal_transition.attempt_finished is False
     assert result_transition.attempt_finished is False
-    assert post_gp_transition.attempt_finished is True
-    assert post_gp_transition.finished_status == "succeeded"
+    assert post_gp_transition.attempt_finished is False
+    assert credits_transition.attempt_finished is True
+    assert credits_transition.finished_status == "succeeded"
     assert progress.attempt_id is None
     assert store.finished_attempts == [("attempt-1", "succeeded", None)]
     assert store.status_updates == ["paused"]

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from rl_fzerox.core.career_mode.runner.menu import MenuFacts
+from rl_fzerox.core.career_mode.runner.menu import POST_GP_RECORDING_END_MODES, MenuFacts
 
 CareerRecordingSegmentStatus = Literal["succeeded", "failed"]
 
@@ -25,11 +25,10 @@ class CareerRecordingSegmentTracker:
     any terminal result failed, whether the post-GP success ceremony appeared,
     and whether the flow exited to menu/title/course-select/game-over.
 
-    A successful GP cup does not naturally return to the menu after the ceremony
-    and credits; the final "See you again" screen requires a console reset.
-    Therefore post-GP completion is the segment end for successful cup attempts.
-    Menu/title/course-select/game-over exits are failure exits unless a post-GP
-    completion already closed the segment.
+    `gp_end_cutscene` is the winning ceremony, so it is part of the attempt
+    recording. Credits or a return to menu/title/course-select is the segment
+    boundary. Some credits screens never return to the menu, so the controller
+    may force an emulator reset after the boundary is observed.
     """
 
     terminal_result_seen: bool = False
@@ -53,6 +52,11 @@ class CareerRecordingSegmentTracker:
             final_rank = _post_gp_final_rank(info)
             if final_rank not in {None, 1}:
                 self.failed_result_seen = True
+                self.pending_close = CareerRecordingSegmentClose(status="failed")
+                self.reset()
+                return
+            if facts.game_mode not in POST_GP_RECORDING_END_MODES:
+                return
             status: CareerRecordingSegmentStatus = (
                 "failed" if self.failed_result_seen else "succeeded"
             )
