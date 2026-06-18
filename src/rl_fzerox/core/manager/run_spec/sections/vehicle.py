@@ -125,6 +125,9 @@ class ManagedVehicleConfig(BaseModel):
             return next_data
         next_data.setdefault("engine_setting_min_raw_value", ENGINE_SLIDER.min_step)
         next_data.setdefault("engine_setting_max_raw_value", ENGINE_SLIDER.max_step)
+        if _uses_default_random_range_with_default_bandit_buckets(next_data):
+            next_data["engine_setting_min_raw_value"] = ENGINE_SLIDER.min_step
+            next_data["engine_setting_max_raw_value"] = ENGINE_SLIDER.max_step
         return next_data
 
     @model_validator(mode="after")
@@ -172,3 +175,19 @@ class ManagedVehicleConfig(BaseModel):
                     f"outside the selected engine range: {joined}"
                 )
         return self
+
+
+def _uses_default_random_range_with_default_bandit_buckets(data: dict[str, object]) -> bool:
+    """Detect default fixed/random range values carried into adaptive mode."""
+
+    if data.get("engine_setting_min_raw_value") != engine_percent_to_slider_step(20):
+        return False
+    if data.get("engine_setting_max_raw_value") != engine_percent_to_slider_step(80):
+        return False
+    raw_values = data.get("adaptive_engine_bandit_bucket_raw_values")
+    if raw_values is None:
+        raw_values = ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
+    if not isinstance(raw_values, list | tuple):
+        return False
+    bucket_values = tuple(int(value) for value in raw_values)
+    return bucket_values == ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values

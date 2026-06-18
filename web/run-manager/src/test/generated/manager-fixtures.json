@@ -1426,6 +1426,8 @@
       "manual_boost_reward_full_energy_fraction": 1.0,
       "manual_boost_reward_min_energy_fraction": 0.0,
       "manual_boost_reward_min_energy_value": 0.0,
+      "outside_track_dip_height_threshold": 0.0,
+      "outside_track_dip_penalty": 0.0,
       "outside_track_recovery_airborne_grace_frames": 30,
       "outside_track_recovery_reward": 0.0,
       "outside_track_recovery_reward_cap": 0.1,

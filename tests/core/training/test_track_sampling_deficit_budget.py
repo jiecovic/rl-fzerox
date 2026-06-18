@@ -68,6 +68,8 @@ def test_fixed_env_controller_tracks_runtime_stats_without_reweighting(tmp_path:
         assert isinstance(course_key, str)
         payload_entries[course_key] = entry
     assert payload_entries["mute"]["success_rate"] == pytest.approx(1.0)
+    assert payload_entries["mute"]["completion_rate"] == pytest.approx(1.0)
+    assert payload_entries["silence"]["completion_rate"] == pytest.approx(0.25)
     assert payload_entries["silence"]["ema_completion_fraction"] == pytest.approx(0.25)
 
     state_path = tmp_path / "track_sampling_state.json"

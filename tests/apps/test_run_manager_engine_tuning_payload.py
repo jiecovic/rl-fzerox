@@ -76,6 +76,14 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
                 decayed_score_total=-200.0,
                 score_total=-200.0,
                 best_score=-90.0,
+                episode_count=2,
+                return_count=2,
+                completion_score_total=2.0,
+                best_completion_score=1.0,
+                finish_score_total=-200.0,
+                best_finish_score=-90.0,
+                return_score_total=30.0,
+                best_return_score=20.0,
                 best_time_ms=90_000,
             ),
             EngineTuningCandidateState(
@@ -88,6 +96,14 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
                 decayed_score_total=-80.0,
                 score_total=-80.0,
                 best_score=-80.0,
+                episode_count=1,
+                return_count=1,
+                completion_score_total=1.0,
+                best_completion_score=1.0,
+                finish_score_total=-80.0,
+                best_finish_score=-80.0,
+                return_score_total=10.0,
+                best_return_score=10.0,
                 best_time_ms=80_000,
             ),
         ),
@@ -117,6 +133,13 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
         74,
         84,
     ]
+    bucket_44 = contexts[0]["candidates"][0]
+    assert bucket_44["mean_finish_time_ms"] == 100_000
+    assert bucket_44["mean_return_score"] == 15.0
+    assert bucket_44["best_return_score"] == 20.0
+    assert bucket_44["mean_completion_score"] == 1.0
+    assert bucket_44["finish_rate"] == 1.0
+    assert bucket_44["failure_rate"] == 0.0
     assert contexts[0]["recommended_engine_setting_raw_value"] == 84
 
 

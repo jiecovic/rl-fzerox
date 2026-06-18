@@ -539,11 +539,24 @@ function AdaptiveEngineControls({
                 label: "Episode return",
                 onClick: () => onChange({ adaptive_engine_tuner_objective: "episode_return" }),
               },
+              {
+                active: vehicle.adaptive_engine_tuner_objective === "completion",
+                key: "completion",
+                label: "Completion",
+                onClick: () => onChange({ adaptive_engine_tuner_objective: "completion" }),
+              },
+              {
+                active: vehicle.adaptive_engine_tuner_objective === "finish_rate",
+                key: "finish_rate",
+                label: "Finish rate",
+                onClick: () => onChange({ adaptive_engine_tuner_objective: "finish_rate" }),
+              },
             ]}
           />
           <small className="m-0 text-xs leading-snug text-app-muted">
-            Finish time uses successful races only. Episode return uses default-baseline episodes,
-            including failed and retired attempts, and is tied to the reward settings.
+            Finish time uses successful races only. Episode return, completion, and finish rate use
+            default-baseline attempts, including failed and retired attempts. Return mode is tied to
+            the reward settings.
           </small>
         </div>
       ) : null}

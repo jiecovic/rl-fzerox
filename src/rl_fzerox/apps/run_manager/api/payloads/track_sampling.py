@@ -41,9 +41,12 @@ def track_sampling_state_payload(
                 "episode_count": entry.episode_count,
                 "finished_episode_count": entry.finished_episode_count,
                 "success_sample_count": entry.success_sample_count,
+                "completion_sample_count": entry.completion_sample_count,
+                "completion_fraction_total": entry.completion_fraction_total,
                 "episode_share": (
                     0.0 if total_episodes <= 0 else entry.episode_count / total_episodes
                 ),
+                "completion_rate": _completion_rate(entry),
                 "success_rate": (
                     None
                     if entry.success_sample_count <= 0
@@ -85,6 +88,12 @@ def _current_probabilities(state: TrackSamplingRuntimeState) -> dict[str, float]
     if total_weight <= 0.0:
         return {entry.course_key: 0.0 for entry in state.entries}
     return {entry.course_key: entry.current_weight / total_weight for entry in state.entries}
+
+
+def _completion_rate(entry: TrackSamplingRuntimeEntry) -> float | None:
+    if entry.completion_sample_count <= 0:
+        return None
+    return max(0.0, min(1.0, entry.completion_fraction_total / entry.completion_sample_count))
 
 
 def _target_step_shares(state: TrackSamplingRuntimeState) -> dict[str, float]:

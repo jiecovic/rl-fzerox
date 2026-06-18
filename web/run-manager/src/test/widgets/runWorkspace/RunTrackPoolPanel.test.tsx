@@ -37,6 +37,12 @@ const emptySamplerSignal = {
   current_problem_score: 0,
 } as const;
 
+const emptyCompletionStats = {
+  completion_sample_count: 0,
+  completion_fraction_total: 0,
+  completion_rate: null,
+} as const;
+
 describe("RunTrackPoolPanel", () => {
   afterEach(() => {
     cleanup();
@@ -144,6 +150,7 @@ describe("RunTrackPoolPanel", () => {
         episode_count: index + 1,
         finished_episode_count: index,
         success_sample_count: index + 1,
+        ...emptyCompletionStats,
         episode_share: 0.25,
         success_rate: index / Math.max(index + 1, 1),
         ...emptyGenerationStats,
@@ -271,6 +278,7 @@ describe("RunTrackPoolPanel", () => {
         episode_count: 1,
         finished_episode_count: 1,
         success_sample_count: 1,
+        ...emptyCompletionStats,
         episode_share: 0.5,
         success_rate: 1,
         ...emptyGenerationStats,
@@ -638,13 +646,13 @@ describe("RunTrackPoolPanel", () => {
 
     expect(screen.getByText("Track pool")).toBeInTheDocument();
     expect(screen.getByText(/deficit budget/i)).toBeInTheDocument();
-    expect(screen.getByText("Target")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Target 50.0%" })).toHaveLength(2);
+    expect(screen.getByText(/Target step share/i)).toBeInTheDocument();
+    expect(screen.getByText("Completion")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sample 0.0%" })).not.toBeInTheDocument();
     expect(screen.getByText(/step target/i)).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: /tracked scheduler env steps/i }).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /env steps .* target/i }).length).toBeGreaterThan(
+      0,
+    );
   });
 });
 
@@ -686,6 +694,7 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
       episode_count: 1,
       finished_episode_count: 0,
       success_sample_count: 1,
+      ...emptyCompletionStats,
       episode_share: probability,
       success_rate: 0,
       ...emptyGenerationStats,
@@ -723,6 +732,7 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
       episode_count: index + 1,
       finished_episode_count: index,
       success_sample_count: index + 1,
+      ...emptyCompletionStats,
       episode_share: 0.5,
       success_rate: index / Math.max(index + 1, 1),
       ...emptyGenerationStats,

@@ -96,6 +96,8 @@ def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
                 "episode_count": entry.episode_count,
                 "finished_episode_count": entry.finished_episode_count,
                 "success_sample_count": entry.success_sample_count,
+                "completion_sample_count": entry.completion_sample_count,
+                "completion_fraction_total": entry.completion_fraction_total,
                 "ema_episode_frames": entry.ema_episode_frames,
                 "ema_completion_fraction": entry.ema_completion_fraction,
                 "ema_finish_rate": entry.ema_finish_rate,
@@ -220,6 +222,11 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
         episode_count = _mapping_int(raw_entry, "episode_count")
         finished_episode_count = _mapping_int(raw_entry, "finished_episode_count")
         success_sample_count = _mapping_int(raw_entry, "success_sample_count")
+        raw_completion_sample_count = _mapping_int(raw_entry, "completion_sample_count")
+        completion_fraction_total = _mapping_optional_float(
+            raw_entry,
+            "completion_fraction_total",
+        )
         ema_episode_frames = _mapping_optional_float(raw_entry, "ema_episode_frames")
         ema_completion_fraction = _mapping_optional_float(raw_entry, "ema_completion_fraction")
         ema_finish_rate = _mapping_optional_float(raw_entry, "ema_finish_rate")
@@ -254,6 +261,20 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
             raw_entry,
             "generated_course_length",
         )
+        normalized_completion_sample_count = (
+            0 if success_sample_count is None else max(0, success_sample_count)
+        )
+        completion_sample_count = (
+            normalized_completion_sample_count
+            if raw_completion_sample_count is None
+            else raw_completion_sample_count
+        )
+        if completion_fraction_total is None:
+            completion_fraction_total = (
+                0.0
+                if ema_completion_fraction is None
+                else max(0.0, min(1.0, ema_completion_fraction)) * max(0, completion_sample_count)
+            )
         if (
             track_id is None
             or course_key is None
@@ -264,6 +285,7 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
             or episode_count is None
         ):
             continue
+        clamped_completion_sample_count = max(0, min(completion_sample_count, episode_count))
         entries.append(
             TrackSamplingRuntimeEntry(
                 track_id=track_id,
@@ -282,6 +304,11 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
                     0
                     if success_sample_count is None
                     else max(0, min(success_sample_count, episode_count))
+                ),
+                completion_sample_count=clamped_completion_sample_count,
+                completion_fraction_total=max(
+                    0.0,
+                    min(float(clamped_completion_sample_count), completion_fraction_total),
                 ),
                 ema_episode_frames=ema_episode_frames,
                 ema_completion_fraction=(

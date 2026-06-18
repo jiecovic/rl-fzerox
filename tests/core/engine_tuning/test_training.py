@@ -98,11 +98,98 @@ def test_bandit_return_objective_records_failed_episode_returns() -> None:
     candidate = controller.runtime_state.candidates[0]
     assert candidate.score_count == 1
     assert candidate.episode_count == 1
+    assert candidate.return_count == 1
     assert candidate.finish_count == 0
     assert candidate.mean_score == 12.5
     assert (
         controller.reset_sampler_snapshot((context,)).contexts[0].greedy_engine_setting_raw_value
         == 26
+    )
+
+
+def test_bandit_finish_time_records_failed_episode_metrics_without_scoring_them() -> None:
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            objective="finish_time",
+            min_raw_value=0,
+            max_raw_value=128,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
+            uniform_exploration=0.0,
+        )
+    )
+
+    assert controller.record_episodes(
+        (
+            _engine_episode(
+                engine_raw=26,
+                episode_return=-5.0,
+                termination_reason="retired",
+            ),
+            _successful_engine_episode(engine_raw=90, race_time_ms=80_000, episode_return=8.0),
+        )
+    )
+
+    candidates = controller.runtime_state.candidate_map()
+    failed_candidate = candidates[(context.key, 26)]
+    assert failed_candidate.active_score_count == 0
+    assert failed_candidate.episode_count == 1
+    assert failed_candidate.finish_count == 0
+    assert failed_candidate.mean_completion_score == 0.5
+    assert failed_candidate.finish_rate_score == 0.0
+    assert (
+        controller.reset_sampler_snapshot((context,)).contexts[0].greedy_engine_setting_raw_value
+        == 90
+    )
+
+
+@pytest.mark.parametrize(
+    ("objective", "expected_engine_raw"),
+    [
+        ("completion", 26),
+        ("finish_rate", 90),
+    ],
+)
+def test_bandit_can_score_completion_and_finish_rate_objectives(
+    objective: Literal["completion", "finish_rate"],
+    expected_engine_raw: int,
+) -> None:
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            objective=objective,
+            min_raw_value=0,
+            max_raw_value=128,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
+            uniform_exploration=0.0,
+        )
+    )
+
+    assert controller.record_episodes(
+        (
+            _engine_episode(
+                engine_raw=26,
+                episode_completion_fraction=0.8,
+                episode_return=-5.0,
+                termination_reason="retired",
+            ),
+            _engine_episode(
+                engine_raw=90,
+                episode_completion_fraction=0.6,
+                episode_return=5.0,
+                race_time_ms=80_000,
+                termination_reason="finished",
+            ),
+        )
+    )
+
+    assert (
+        controller.reset_sampler_snapshot((context,)).contexts[0].greedy_engine_setting_raw_value
+        == expected_engine_raw
     )
 
 
@@ -169,6 +256,7 @@ def _engine_episode(
     *,
     alt_baseline_id: str | None = None,
     engine_raw: int = 50,
+    episode_completion_fraction: float | None = None,
     episode_return: float = 1.0,
     race_time_ms: int | None = 90_000,
     termination_reason: str = "finished",
@@ -177,7 +265,11 @@ def _engine_episode(
         "engine_tuning_context_key": "mute_city|blue_falcon",
         "engine_tuning_course_key": "mute_city",
         "engine_tuning_vehicle_id": "blue_falcon",
-        "episode_completion_fraction": 1.0 if termination_reason == "finished" else 0.5,
+        "episode_completion_fraction": (
+            episode_completion_fraction
+            if episode_completion_fraction is not None
+            else (1.0 if termination_reason == "finished" else 0.5)
+        ),
         "episode_return": episode_return,
         "position": 1,
         "race_time_ms": race_time_ms,

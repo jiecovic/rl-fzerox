@@ -131,26 +131,25 @@ class BanditEngineTuner:
     ) -> EngineTuningRuntimeState:
         """Update aggregate observations once from one rollout batch."""
 
-        scored = tuple(_objective_score(outcome, settings=self._settings) for outcome in outcomes)
-        scored = tuple(item for item in scored if item is not None)
-        if not scored:
+        if not outcomes:
             return self._state
         next_state = self._state
         candidates = self._candidates()
         changed = False
-        for outcome, score, finish_time_ms, episode_return in scored:
+        for outcome in outcomes:
             bucket = _exact_bucket(outcome.engine_setting_raw_value, candidates)
             if bucket is None:
                 continue
+            score, finish_time_ms = _objective_score(outcome, settings=self._settings)
             candidate = _candidate_from_state(
                 next_state,
                 outcome.context,
                 bucket,
             ).record(
-                objective=self._settings.objective,
                 score=score,
+                completion_fraction=outcome.completion_fraction,
                 finish_time_ms=finish_time_ms,
-                episode_return=episode_return,
+                episode_return=outcome.episode_return,
             )
             next_state = next_state.with_candidate(candidate)
             changed = True
@@ -165,8 +164,8 @@ class BanditEngineTuner:
     def score(self, outcome: EngineTuningEpisodeOutcome) -> float:
         """Return the configured higher-is-better objective score."""
 
-        scored = _objective_score(outcome, settings=self._settings)
-        return self._prior_score() if scored is None else scored[1]
+        score, _finish_time_ms = _objective_score(outcome, settings=self._settings)
+        return self._prior_score() if score is None else score
 
     def _choice_for(
         self,
@@ -233,7 +232,7 @@ class BanditEngineTuner:
         return engine_bucket_candidates(bucket_raw_values=self._settings.bucket_raw_values)
 
     def _prior_score(self) -> float:
-        if self._settings.objective == "episode_return":
+        if self._settings.objective in {"episode_return", "completion", "finish_rate"}:
             return 0.0
         return -max(1.0, float(self._settings.prior_finish_time_seconds))
 
@@ -262,7 +261,7 @@ def _bucket_candidates(
 ) -> dict[int, EngineTuningCandidateState]:
     buckets: dict[int, EngineTuningCandidateState] = {}
     for candidate in state.candidates:
-        if candidate.context_key != context.key or candidate.active_score_count <= 0:
+        if candidate.context_key != context.key or candidate.observation_count <= 0:
             continue
         bucket = _exact_bucket(candidate.engine_setting_raw_value, candidates)
         if bucket is None:
@@ -290,7 +289,7 @@ def _canonical_bandit_state(
     candidates = engine_bucket_candidates(bucket_raw_values=settings.bucket_raw_values)
     buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
     for candidate in state.candidates:
-        if candidate.active_score_count <= 0:
+        if candidate.observation_count <= 0:
             continue
         bucket = _exact_bucket(candidate.engine_setting_raw_value, candidates)
         if bucket is None:
@@ -334,10 +333,13 @@ def _bucketed_candidate(
             score_count=max(0, int(source.active_score_count)),
             episode_count=max(0, int(source.episode_count)),
             finish_count=max(0, int(source.finish_count)),
+            return_count=max(0, int(source.return_count)),
             decayed_count=max(0.0, float(source.decayed_count)),
             decayed_score_total=float(source.decayed_score_total),
             score_total=float(source.score_total),
             best_score=source.best_score,
+            completion_score_total=float(source.completion_score_total),
+            best_completion_score=source.best_completion_score,
             finish_score_total=float(source.finish_score_total),
             best_finish_score=source.best_finish_score,
             return_score_total=float(source.return_score_total),
@@ -352,10 +354,18 @@ def _bucketed_candidate(
         score_count=existing.active_score_count + max(0, int(source.active_score_count)),
         episode_count=existing.episode_count + max(0, int(source.episode_count)),
         finish_count=existing.finish_count + max(0, int(source.finish_count)),
+        return_count=existing.return_count + max(0, int(source.return_count)),
         decayed_count=existing.decayed_count + max(0.0, float(source.decayed_count)),
         decayed_score_total=existing.decayed_score_total + float(source.decayed_score_total),
         score_total=existing.score_total + float(source.score_total),
         best_score=_max_optional_score(existing.best_score, source.best_score),
+        completion_score_total=(
+            existing.completion_score_total + float(source.completion_score_total)
+        ),
+        best_completion_score=_max_optional_score(
+            existing.best_completion_score,
+            source.best_completion_score,
+        ),
         finish_score_total=existing.finish_score_total + float(source.finish_score_total),
         best_finish_score=_max_optional_score(existing.best_finish_score, source.best_finish_score),
         return_score_total=existing.return_score_total + float(source.return_score_total),
@@ -400,20 +410,23 @@ def _objective_score(
     outcome: EngineTuningEpisodeOutcome,
     *,
     settings: BanditEngineTunerSettings,
-) -> tuple[EngineTuningEpisodeOutcome, float, int | None, float | None] | None:
+) -> tuple[float | None, int | None]:
     finish_time_ms = successful_finish_time_ms(outcome)
     if settings.objective == "finish_time":
-        if finish_time_ms is None:
-            return None
-        return outcome, finish_time_score(finish_time_ms), finish_time_ms, outcome.episode_return
-    if outcome.episode_return is None:
-        return None
-    return (
-        outcome,
-        episode_return_score(outcome.episode_return),
-        finish_time_ms,
-        outcome.episode_return,
-    )
+        return (
+            None if finish_time_ms is None else finish_time_score(finish_time_ms),
+            finish_time_ms,
+        )
+    if settings.objective == "episode_return":
+        return (
+            None
+            if outcome.episode_return is None
+            else episode_return_score(outcome.episode_return),
+            finish_time_ms,
+        )
+    if settings.objective == "completion":
+        return (max(0.0, min(1.0, float(outcome.completion_fraction))), finish_time_ms)
+    return (1.0 if finish_time_ms is not None else 0.0, finish_time_ms)
 
 
 def _selection_probabilities(
@@ -554,7 +567,7 @@ def _bandit_greedy_key(
     midpoint: float,
     objective: EngineTunerObjective,
 ) -> tuple[float, float, int, float, int]:
-    if objective == "episode_return":
+    if objective in {"episode_return", "completion", "finish_rate"}:
         return (
             estimate.mean_score,
             estimate.best_score if estimate.best_score is not None else float("-inf"),

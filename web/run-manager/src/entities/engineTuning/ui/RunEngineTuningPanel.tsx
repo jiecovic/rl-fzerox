@@ -16,6 +16,26 @@ import { ResetIcon } from "@/shared/ui/icons";
 
 const ENGINE_TUNING_TABLE_ROW_LIMIT = 12;
 
+type EngineBanditSortKey =
+  | "rank"
+  | "bucket"
+  | "mean_time"
+  | "best_time"
+  | "mean_return"
+  | "best_return"
+  | "completion"
+  | "finish_rate"
+  | "failure_rate"
+  | "probability"
+  | "samples"
+  | "episodes";
+type EngineBanditSortDirection = "asc" | "desc";
+
+interface EngineBanditSortState {
+  direction: EngineBanditSortDirection;
+  key: EngineBanditSortKey;
+}
+
 interface RunEngineTuningPanelProps {
   artifact: "latest" | "best" | "final";
   canReset: boolean;
@@ -231,6 +251,9 @@ function objectiveCountLabel(
   if (objective === "episode_return") {
     return `${context.score_count.toLocaleString()} samples`;
   }
+  if (objective === "completion" || objective === "finish_rate") {
+    return `${context.episode_count.toLocaleString()} episodes`;
+  }
   return `${context.finish_count.toLocaleString()} successful finishes`;
 }
 
@@ -285,11 +308,9 @@ function EngineSamplingProbabilityBars({
           {mode !== "model" ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
-              {mode === "bandit" && objective === "episode_return"
-                ? "bucket return aggregate"
-                : mode === "bandit"
-                  ? "bucket finish aggregate"
-                  : "successful finish aggregate"}
+              {mode === "bandit"
+                ? `bucket ${objectiveNoun(objective)} aggregate`
+                : "successful finish aggregate"}
             </span>
           ) : null}
           <span className="inline-flex items-center gap-1.5">
@@ -326,23 +347,20 @@ function EngineSamplingProbabilityBars({
           const rawLabel = mode === "bandit" ? "bucket" : "engine";
           const engineLabel = engineStepLabel(candidate.engine_setting_raw_value);
           const estimateLabel =
-            mode === "bandit" && objective === "episode_return"
-              ? "mean return"
+            mode === "bandit" && isHigherScoreObjective(objective)
+              ? `mean ${objectiveNoun(objective)}`
               : mode === "bandit"
                 ? "mean"
                 : "estimated";
           const estimateValue =
-            mode === "bandit" && objective === "episode_return"
-              ? formatScore(candidate.mean_score)
+            mode === "bandit" && isHigherScoreObjective(objective)
+              ? formatObjectiveScore(candidate.mean_score, objective)
               : formatRaceTime(candidate.estimated_finish_time_ms);
           const bestValue =
-            mode === "bandit" && objective === "episode_return"
-              ? formatOptionalScore(candidate.best_score)
+            mode === "bandit" && isHigherScoreObjective(objective)
+              ? formatOptionalObjectiveScore(candidate.best_score, objective)
               : formatOptionalRaceTime(candidate.best_finish_time_ms);
-          const sampleLabel =
-            objective === "episode_return"
-              ? `${candidate.score_count} samples`
-              : `${candidate.finish_count} successful finishes`;
+          const sampleLabel = objectiveSampleLabel(candidate, objective);
           return (
             <rect
               fill={fill}
@@ -389,7 +407,7 @@ function EngineMeanPerformanceBars({
   const bestReturn = Math.max(...returnScores, 0);
   const worstReturn = Math.min(...returnScores, bestReturn - 1);
   const returnSpan = Math.max(0.000001, bestReturn - worstReturn);
-  const showsReturn = mode === "bandit" && objective === "episode_return";
+  const showsScore = mode === "bandit" && isHigherScoreObjective(objective);
 
   return (
     <div className="grid gap-1">
@@ -397,8 +415,8 @@ function EngineMeanPerformanceBars({
         <div className="flex flex-wrap gap-3">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-3 bg-app-accent/45" aria-hidden="true" />
-            {showsReturn
-              ? "bucket mean return"
+            {showsScore
+              ? `bucket mean ${objectiveNoun(objective)}`
               : mode === "bandit"
                 ? "bucket mean finish"
                 : "predicted mean performance"}
@@ -409,8 +427,8 @@ function EngineMeanPerformanceBars({
           </span>
         </div>
         <span className="tabular-nums">
-          {showsReturn
-            ? `bucket mean return ${formatScore(worstReturn)}-${formatScore(bestReturn)}`
+          {showsScore
+            ? `bucket mean ${objectiveNoun(objective)} ${formatObjectiveScore(worstReturn, objective)}-${formatObjectiveScore(bestReturn, objective)}`
             : `${mode === "bandit" ? "bucket mean finish time" : "estimated finish time"} ${formatRaceTime(fastestEstimate)}-${formatRaceTime(slowestEstimate)}`}
         </span>
       </div>
@@ -423,15 +441,15 @@ function EngineMeanPerformanceBars({
       >
         <title>
           {mode === "bandit"
-            ? showsReturn
-              ? "Measured bucket mean return"
+            ? showsScore
+              ? `Measured bucket mean ${objectiveNoun(objective)}`
               : "Measured bucket mean finish time"
             : "Predicted mean performance from estimated finish time"}
         </title>
         {candidates.map((candidate, index) => {
           const isRecommended =
             candidate.engine_setting_raw_value === recommendedEngineSettingRawValue;
-          const height = showsReturn
+          const height = showsScore
             ? 3 + ((candidate.mean_score - worstReturn) / returnSpan) * 93
             : 3 + ((slowestEstimate - candidate.estimated_finish_time_ms) / timeSpan) * 93;
           const width = Math.max(0.2, barWidth * 0.86);
@@ -439,21 +457,18 @@ function EngineMeanPerformanceBars({
           const y = 100 - height;
           const rawLabel = mode === "bandit" ? "bucket" : "engine";
           const engineLabel = engineStepLabel(candidate.engine_setting_raw_value);
-          const estimateLabel = showsReturn
-            ? "mean return"
+          const estimateLabel = showsScore
+            ? `mean ${objectiveNoun(objective)}`
             : mode === "bandit"
               ? "mean"
               : "estimated";
-          const estimateValue = showsReturn
-            ? formatScore(candidate.mean_score)
+          const estimateValue = showsScore
+            ? formatObjectiveScore(candidate.mean_score, objective)
             : formatRaceTime(candidate.estimated_finish_time_ms);
-          const bestValue = showsReturn
-            ? formatOptionalScore(candidate.best_score)
+          const bestValue = showsScore
+            ? formatOptionalObjectiveScore(candidate.best_score, objective)
             : formatOptionalRaceTime(candidate.best_finish_time_ms);
-          const sampleLabel =
-            objective === "episode_return"
-              ? `${candidate.score_count} samples`
-              : `${candidate.finish_count} successful finishes`;
+          const sampleLabel = objectiveSampleLabel(candidate, objective);
           return (
             <rect
               fill={
@@ -477,8 +492,8 @@ function EngineMeanPerformanceBars({
         <span>{engineStepLabel(firstCandidate)}</span>
         <span>
           engine slider step · taller means faster{" "}
-          {showsReturn
-            ? "bucket mean return"
+          {showsScore
+            ? `bucket mean ${objectiveNoun(objective)}`
             : mode === "bandit"
               ? "bucket mean finish"
               : "estimated finish"}
@@ -496,29 +511,108 @@ function EngineBanditBucketTable({
   candidates: readonly EngineTuningRuntimeCandidateEstimate[];
   objective: EngineTuningRuntimeState["objective"];
 }) {
+  const [sortState, setSortState] = useState<EngineBanditSortState>({
+    direction: "asc",
+    key: "rank",
+  });
   if (candidates.length === 0) {
     return null;
   }
   const rows = [...candidates].sort((left, right) =>
-    compareBanditBucketCandidates(left, right, objective),
+    compareBanditBucketCandidatesForSort(left, right, objective, sortState),
   );
+  const bestValues = engineBanditBestColumnValues(candidates, objective);
+  function setSortKey(key: EngineBanditSortKey) {
+    setSortState((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: defaultBanditSortDirection(key) },
+    );
+  }
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full border-collapse text-left text-xs tabular-nums">
         <caption className="sr-only">Measured bandit bucket samples</caption>
         <thead className="text-app-muted">
           <tr className="border-b border-app-border">
-            <th className="py-1.5 pr-3 font-semibold">Bucket</th>
-            <th className="py-1.5 pr-3 font-semibold">
-              {objective === "episode_return" ? "Mean return" : "Mean"}
-            </th>
-            <th className="py-1.5 pr-3 font-semibold">
-              {objective === "episode_return" ? "Best return" : "Best"}
-            </th>
-            <th className="py-1.5 pr-3 font-semibold">Prob</th>
-            <th className="py-1.5 font-semibold">
-              {objective === "episode_return" ? "Samples" : "Finishes"}
-            </th>
+            <SortableEngineBanditHeader
+              active={sortState.key === "bucket"}
+              direction={sortState.direction}
+              label="Bucket"
+              sortKey="bucket"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "mean_time"}
+              direction={sortState.direction}
+              label="Mean time"
+              sortKey="mean_time"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "best_time"}
+              direction={sortState.direction}
+              label="Best time"
+              sortKey="best_time"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "mean_return"}
+              direction={sortState.direction}
+              label="Mean return"
+              sortKey="mean_return"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "best_return"}
+              direction={sortState.direction}
+              label="Best return"
+              sortKey="best_return"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "completion"}
+              direction={sortState.direction}
+              label="Completion"
+              sortKey="completion"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "finish_rate"}
+              direction={sortState.direction}
+              label="Finish"
+              sortKey="finish_rate"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "failure_rate"}
+              direction={sortState.direction}
+              label="Fail"
+              sortKey="failure_rate"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "probability"}
+              direction={sortState.direction}
+              label="Prob"
+              sortKey="probability"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "samples"}
+              direction={sortState.direction}
+              label="Samples"
+              sortKey="samples"
+              onSort={setSortKey}
+            />
+            <SortableEngineBanditHeader
+              active={sortState.key === "episodes"}
+              direction={sortState.direction}
+              label="Episodes"
+              sortKey="episodes"
+              onSort={setSortKey}
+              trailing
+            />
           </tr>
         </thead>
         <tbody>
@@ -530,23 +624,77 @@ function EngineBanditBucketTable({
               <td className="py-1.5 pr-3 text-app-text">
                 {engineStepLabel(candidate.engine_setting_raw_value)}
               </td>
-              <td className="py-1.5 pr-3 text-app-text">
-                {candidate.score_count <= 0
-                  ? "-"
-                  : objective === "episode_return"
-                    ? formatScore(candidate.mean_score)
-                    : formatRaceTime(candidate.estimated_finish_time_ms)}
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.mean_finish_time_ms, bestValues.meanTime),
+                )}
+              >
+                {formatOptionalRaceTime(candidate.mean_finish_time_ms)}
               </td>
-              <td className="py-1.5 pr-3 text-app-text">
-                {objective === "episode_return"
-                  ? formatOptionalScore(candidate.best_score)
-                  : formatOptionalRaceTime(candidate.best_finish_time_ms)}
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.best_finish_time_ms, bestValues.bestTime),
+                )}
+              >
+                {formatOptionalRaceTime(candidate.best_finish_time_ms)}
               </td>
-              <td className="py-1.5 pr-3 text-app-text">
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.mean_return_score, bestValues.meanReturn),
+                )}
+              >
+                {formatOptionalScore(candidate.mean_return_score)}
+              </td>
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.best_return_score, bestValues.bestReturn),
+                )}
+              >
+                {formatOptionalScore(candidate.best_return_score)}
+              </td>
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.mean_completion_score, bestValues.completion),
+                )}
+              >
+                {formatPercent(candidate.mean_completion_score)}
+              </td>
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.finish_rate, bestValues.finishRate),
+                )}
+              >
+                {formatPercent(candidate.finish_rate)}
+              </td>
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.failure_rate, bestValues.failureRate),
+                )}
+              >
+                {formatPercent(candidate.failure_rate)}
+              </td>
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.selection_probability, bestValues.probability),
+                )}
+              >
                 {formatPercent(candidate.selection_probability)}
               </td>
-              <td className="py-1.5 text-app-text">
-                {objective === "episode_return" ? candidate.score_count : candidate.finish_count}
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidateSampleCount(candidate, objective), bestValues.samples),
+                  true,
+                )}
+              >
+                {candidateSampleCount(candidate, objective)}
+              </td>
+              <td
+                className={engineBanditValueCellClass(
+                  isBestBanditValue(candidate.episode_count, bestValues.episodes),
+                  true,
+                )}
+              >
+                {candidate.episode_count}
               </td>
             </tr>
           ))}
@@ -556,13 +704,247 @@ function EngineBanditBucketTable({
   );
 }
 
+interface EngineBanditBestColumnValues {
+  bestReturn: number | null;
+  bestTime: number | null;
+  completion: number | null;
+  episodes: number | null;
+  failureRate: number | null;
+  finishRate: number | null;
+  meanReturn: number | null;
+  meanTime: number | null;
+  probability: number | null;
+  samples: number | null;
+}
+
+function engineBanditBestColumnValues(
+  candidates: readonly EngineTuningRuntimeCandidateEstimate[],
+  objective: EngineTuningRuntimeState["objective"],
+): EngineBanditBestColumnValues {
+  return {
+    bestReturn: maxNullable(candidates.map((candidate) => candidate.best_return_score)),
+    bestTime: minNullable(candidates.map((candidate) => candidate.best_finish_time_ms)),
+    completion: maxNullable(candidates.map((candidate) => candidate.mean_completion_score)),
+    episodes: positiveMaxNullable(candidates.map((candidate) => candidate.episode_count)),
+    failureRate: minNullable(candidates.map((candidate) => candidate.failure_rate)),
+    finishRate: maxNullable(candidates.map((candidate) => candidate.finish_rate)),
+    meanReturn: maxNullable(candidates.map((candidate) => candidate.mean_return_score)),
+    meanTime: minNullable(candidates.map((candidate) => candidate.mean_finish_time_ms)),
+    probability: maxNullable(candidates.map((candidate) => candidate.selection_probability)),
+    samples: positiveMaxNullable(
+      candidates.map((candidate) => candidateSampleCount(candidate, objective)),
+    ),
+  };
+}
+
+function engineBanditValueCellClass(isBest: boolean, trailing = false) {
+  return `${trailing ? "py-1.5" : "py-1.5 pr-3"} text-app-text${isBest ? " font-semibold" : ""}`;
+}
+
+function isBestBanditValue(value: number | null, best: number | null) {
+  return best !== null && value === best;
+}
+
+function SortableEngineBanditHeader({
+  active,
+  direction,
+  label,
+  sortKey,
+  trailing = false,
+  onSort,
+}: {
+  active: boolean;
+  direction: EngineBanditSortDirection;
+  label: string;
+  sortKey: EngineBanditSortKey;
+  trailing?: boolean;
+  onSort: (key: EngineBanditSortKey) => void;
+}) {
+  return (
+    <th
+      aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
+      className={trailing ? "py-1.5 font-semibold" : "py-1.5 pr-3 font-semibold"}
+    >
+      <button
+        className="inline-flex items-center gap-1 text-left text-inherit hover:text-app-text"
+        type="button"
+        onClick={() => onSort(sortKey)}
+      >
+        <span>{label}</span>
+        <span className="min-w-7 text-[10px] font-semibold text-app-muted" aria-hidden="true">
+          {active ? direction : ""}
+        </span>
+      </button>
+    </th>
+  );
+}
+
+function compareBanditBucketCandidatesForSort(
+  left: EngineTuningRuntimeCandidateEstimate,
+  right: EngineTuningRuntimeCandidateEstimate,
+  objective: EngineTuningRuntimeState["objective"],
+  sortState: EngineBanditSortState,
+) {
+  if (sortState.key === "rank") {
+    return compareBanditBucketCandidates(left, right, objective);
+  }
+  const compared = compareBanditBucketSortValue(left, right, objective, sortState);
+  if (compared !== 0) {
+    return compared;
+  }
+  return compareBanditBucketCandidates(left, right, objective);
+}
+
+function compareBanditBucketSortValue(
+  left: EngineTuningRuntimeCandidateEstimate,
+  right: EngineTuningRuntimeCandidateEstimate,
+  objective: EngineTuningRuntimeState["objective"],
+  sortState: EngineBanditSortState,
+) {
+  if (sortState.key === "bucket") {
+    return (
+      sortDirectionMultiplier(sortState.direction) *
+      numericCompare(left.engine_setting_raw_value, right.engine_setting_raw_value)
+    );
+  }
+  if (sortState.key === "probability") {
+    return (
+      sortDirectionMultiplier(sortState.direction) *
+      numericCompare(left.selection_probability, right.selection_probability)
+    );
+  }
+  if (sortState.key === "samples") {
+    return (
+      sortDirectionMultiplier(sortState.direction) *
+      numericCompare(candidateSampleCount(left, objective), candidateSampleCount(right, objective))
+    );
+  }
+  if (sortState.key === "episodes") {
+    return (
+      sortDirectionMultiplier(sortState.direction) *
+      numericCompare(left.episode_count, right.episode_count)
+    );
+  }
+  return compareNullableSortValues(
+    banditSortMetricValue(left, objective, sortState.key),
+    banditSortMetricValue(right, objective, sortState.key),
+    sortState.direction,
+  );
+}
+
+function banditSortMetricValue(
+  candidate: EngineTuningRuntimeCandidateEstimate,
+  objective: EngineTuningRuntimeState["objective"],
+  key: EngineBanditSortKey,
+) {
+  if (banditMetricObservationCount(candidate, objective, key) <= 0) {
+    return null;
+  }
+  if (key === "mean_time") {
+    return candidate.mean_finish_time_ms;
+  }
+  if (key === "best_time") {
+    return candidate.best_finish_time_ms;
+  }
+  if (key === "mean_return") {
+    return candidate.mean_return_score;
+  }
+  if (key === "best_return") {
+    return candidate.best_return_score;
+  }
+  if (key === "completion") {
+    return candidate.mean_completion_score;
+  }
+  if (key === "finish_rate") {
+    return candidate.finish_rate;
+  }
+  if (key === "failure_rate") {
+    return candidate.failure_rate;
+  }
+  return null;
+}
+
+function banditMetricObservationCount(
+  candidate: EngineTuningRuntimeCandidateEstimate,
+  objective: EngineTuningRuntimeState["objective"],
+  key: EngineBanditSortKey,
+) {
+  if (key === "mean_time" || key === "best_time") {
+    return candidate.finish_count;
+  }
+  if (key === "mean_return" || key === "best_return") {
+    return candidate.return_count;
+  }
+  if (key === "completion" || key === "finish_rate" || key === "failure_rate") {
+    return candidate.episode_count;
+  }
+  return candidateSampleCount(candidate, objective);
+}
+
+function candidateSampleCount(
+  candidate: EngineTuningRuntimeCandidateEstimate,
+  objective: EngineTuningRuntimeState["objective"],
+) {
+  if (objective === "completion" || objective === "finish_rate") {
+    return candidate.episode_count;
+  }
+  return objective === "episode_return" ? candidate.score_count : candidate.finish_count;
+}
+
+function compareNullableSortValues(
+  left: number | null,
+  right: number | null,
+  direction: EngineBanditSortDirection,
+) {
+  if (left === null && right === null) {
+    return 0;
+  }
+  if (left === null) {
+    return 1;
+  }
+  if (right === null) {
+    return -1;
+  }
+  return sortDirectionMultiplier(direction) * numericCompare(left, right);
+}
+
+function defaultBanditSortDirection(key: EngineBanditSortKey): EngineBanditSortDirection {
+  if (key === "bucket" || key === "mean_time" || key === "best_time" || key === "failure_rate") {
+    return "asc";
+  }
+  return "desc";
+}
+
+function sortDirectionMultiplier(direction: EngineBanditSortDirection) {
+  return direction === "asc" ? 1 : -1;
+}
+
+function numericCompare(left: number, right: number) {
+  return left - right;
+}
+
+function minNullable(values: readonly (number | null)[]) {
+  const measured = values.filter((value): value is number => value !== null);
+  return measured.length === 0 ? null : Math.min(...measured);
+}
+
+function maxNullable(values: readonly (number | null)[]) {
+  const measured = values.filter((value): value is number => value !== null);
+  return measured.length === 0 ? null : Math.max(...measured);
+}
+
+function positiveMaxNullable(values: readonly number[]) {
+  const maxValue = Math.max(...values, 0);
+  return maxValue <= 0 ? null : maxValue;
+}
+
 function compareBanditBucketCandidates(
   left: EngineTuningRuntimeCandidateEstimate,
   right: EngineTuningRuntimeCandidateEstimate,
   objective: EngineTuningRuntimeState["objective"],
 ) {
-  const leftCount = objective === "episode_return" ? left.score_count : left.finish_count;
-  const rightCount = objective === "episode_return" ? right.score_count : right.finish_count;
+  const leftCount = candidateSampleCount(left, objective);
+  const rightCount = candidateSampleCount(right, objective);
   if (leftCount <= 0 && rightCount <= 0) {
     return left.engine_setting_raw_value - right.engine_setting_raw_value;
   }
@@ -572,10 +954,10 @@ function compareBanditBucketCandidates(
   if (rightCount <= 0) {
     return -1;
   }
-  if (objective === "episode_return" && left.mean_score !== right.mean_score) {
+  if (isHigherScoreObjective(objective) && left.mean_score !== right.mean_score) {
     return right.mean_score - left.mean_score;
   }
-  if (objective === "episode_return" && left.best_score !== right.best_score) {
+  if (isHigherScoreObjective(objective) && left.best_score !== right.best_score) {
     return nullableScoreSortValue(right.best_score) - nullableScoreSortValue(left.best_score);
   }
   if (left.estimated_finish_time_ms !== right.estimated_finish_time_ms) {
@@ -746,6 +1128,53 @@ function formatPercent(value: number | null) {
   }
   const percent = value * 100;
   return `${percent.toFixed(Math.abs(percent) < 1 ? 2 : 1)}%`;
+}
+
+function isHigherScoreObjective(objective: EngineTuningRuntimeState["objective"]) {
+  return objective !== "finish_time";
+}
+
+function objectiveNoun(objective: EngineTuningRuntimeState["objective"]) {
+  if (objective === "episode_return") {
+    return "return";
+  }
+  if (objective === "completion") {
+    return "completion";
+  }
+  if (objective === "finish_rate") {
+    return "finish rate";
+  }
+  return "finish";
+}
+
+function formatObjectiveScore(value: number, objective: EngineTuningRuntimeState["objective"]) {
+  if (objective === "completion" || objective === "finish_rate") {
+    return formatPercent(value);
+  }
+  return formatScore(value);
+}
+
+function formatOptionalObjectiveScore(
+  value: number | null,
+  objective: EngineTuningRuntimeState["objective"],
+) {
+  if (value === null) {
+    return objective === "completion" || objective === "finish_rate" ? "-" : "no score yet";
+  }
+  return formatObjectiveScore(value, objective);
+}
+
+function objectiveSampleLabel(
+  candidate: EngineTuningRuntimeCandidateEstimate,
+  objective: EngineTuningRuntimeState["objective"],
+) {
+  if (objective === "episode_return") {
+    return `${candidate.score_count} return samples`;
+  }
+  if (objective === "completion" || objective === "finish_rate") {
+    return `${candidate.episode_count} episodes`;
+  }
+  return `${candidate.finish_count} successful finishes`;
 }
 
 function engineStepLabel(step: number) {

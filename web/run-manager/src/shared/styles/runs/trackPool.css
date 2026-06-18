@@ -24,6 +24,10 @@
   background: color-mix(in srgb, #f8fafc 70%, var(--accent));
 }
 
+.run-track-distribution-legend-swatch-completion-ema {
+  background: color-mix(in srgb, #f8fafc 45%, var(--accent));
+}
+
 .run-track-distribution-legend-swatch-finish-ema {
   background: color-mix(in srgb, #2cbe7f 44%, var(--accent));
 }
@@ -56,6 +60,10 @@
 
 .run-track-distribution-bar-fill-completion {
   background: color-mix(in srgb, #f8fafc 70%, var(--accent));
+}
+
+.run-track-distribution-bar-fill-completion-ema {
+  background: color-mix(in srgb, #f8fafc 45%, var(--accent));
 }
 
 .run-track-distribution-bar-fill-finish-ema {

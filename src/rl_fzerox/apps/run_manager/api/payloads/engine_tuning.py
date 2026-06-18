@@ -17,7 +17,10 @@ from rl_fzerox.core.engine_tuning import (
     MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
-from rl_fzerox.core.engine_tuning.types import engine_bucket_candidates
+from rl_fzerox.core.engine_tuning.types import (
+    engine_bucket_candidates,
+    finish_time_ms_from_score,
+)
 
 ENGINE_TUNING_DISTRIBUTION_DRAWS = 128
 
@@ -63,7 +66,7 @@ def _bandit_payload_state(
     candidates = engine_bucket_candidates(bucket_raw_values=settings.bucket_raw_values)
     buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
     for candidate in state.candidates:
-        if candidate.active_score_count <= 0:
+        if candidate.observation_count <= 0:
             continue
         bucket = _exact_bucket(candidate.engine_setting_raw_value, candidates)
         if bucket is None:
@@ -114,10 +117,13 @@ def _bucketed_payload_candidate(
             score_count=max(0, int(source.active_score_count)),
             episode_count=max(0, int(source.episode_count)),
             finish_count=max(0, int(source.finish_count)),
+            return_count=max(0, int(source.return_count)),
             decayed_count=max(0.0, float(source.decayed_count)),
             decayed_score_total=float(source.decayed_score_total),
             score_total=float(source.score_total),
             best_score=source.best_score,
+            completion_score_total=float(source.completion_score_total),
+            best_completion_score=source.best_completion_score,
             finish_score_total=float(source.finish_score_total),
             best_finish_score=source.best_finish_score,
             return_score_total=float(source.return_score_total),
@@ -132,10 +138,18 @@ def _bucketed_payload_candidate(
         score_count=existing.active_score_count + max(0, int(source.active_score_count)),
         episode_count=existing.episode_count + max(0, int(source.episode_count)),
         finish_count=existing.finish_count + max(0, int(source.finish_count)),
+        return_count=existing.return_count + max(0, int(source.return_count)),
         decayed_count=existing.decayed_count + max(0.0, float(source.decayed_count)),
         decayed_score_total=existing.decayed_score_total + float(source.decayed_score_total),
         score_total=existing.score_total + float(source.score_total),
         best_score=_max_optional_score(existing.best_score, source.best_score),
+        completion_score_total=(
+            existing.completion_score_total + float(source.completion_score_total)
+        ),
+        best_completion_score=_max_optional_score(
+            existing.best_completion_score,
+            source.best_completion_score,
+        ),
         finish_score_total=existing.finish_score_total + float(source.finish_score_total),
         best_finish_score=_max_optional_score(existing.best_finish_score, source.best_finish_score),
         return_score_total=existing.return_score_total + float(source.return_score_total),
@@ -181,12 +195,18 @@ def _engine_tuning_candidate_payload(
         "engine_setting_raw_value": candidate.engine_setting_raw_value,
         "score_count": candidate.active_score_count,
         "episode_count": candidate.episode_count,
+        "return_count": candidate.return_count,
         "finish_count": candidate.finish_count,
         "mean_score": candidate.mean_score,
         "raw_mean_score": candidate.raw_mean_score,
         "best_score": candidate.best_score,
+        "mean_completion_score": candidate.mean_completion_score,
+        "best_completion_score": candidate.best_completion_score,
+        "finish_rate": candidate.finish_rate_score,
+        "failure_rate": candidate.failure_rate_score,
         "mean_finish_score": candidate.mean_finish_score,
         "mean_return_score": candidate.mean_return_score,
+        "best_return_score": candidate.best_return_score,
         "best_finish_time_ms": candidate.best_time_ms,
     }
 
@@ -207,6 +227,7 @@ def _engine_tuning_context_payloads(
                     vehicle_id=context.vehicle_id,
                 ),
                 score_count=context.finish_count,
+                episode_count=context.finish_count,
                 finish_count=context.finish_count,
                 observed_candidate_count=0,
             )
@@ -219,9 +240,10 @@ def _engine_tuning_context_payloads(
             tuner=tuner,
             context=context,
             score_count=sum(candidate.active_score_count for candidate in candidates),
+            episode_count=sum(candidate.episode_count for candidate in candidates),
             finish_count=sum(candidate.finish_count for candidate in candidates),
             observed_candidate_count=sum(
-                1 for candidate in candidates if candidate.active_score_count > 0
+                1 for candidate in candidates if candidate.observation_count > 0
             ),
         )
         for context, candidates in _observed_contexts(state)
@@ -235,6 +257,7 @@ def _engine_tuning_context_payload(
     tuner: OrderedEngineTuner,
     context: EngineTuningContext,
     score_count: int,
+    episode_count: int,
     finish_count: int,
     observed_candidate_count: int,
 ) -> dict[str, object]:
@@ -251,6 +274,7 @@ def _engine_tuning_context_payload(
         "course_key": context.course_key,
         "vehicle_id": context.vehicle_id,
         "score_count": score_count,
+        "episode_count": episode_count,
         "finish_count": finish_count,
         "observed_candidate_count": observed_candidate_count,
         "model_ready": model_ready,
@@ -287,9 +311,22 @@ def _engine_tuning_candidate_estimate_payload(
         "mean_score": probability.mean_score,
         "uncertainty_score": probability.uncertainty_score,
         "estimated_finish_time_ms": probability.estimated_finish_time_ms,
+        "mean_finish_time_ms": (
+            None
+            if candidate is None or candidate.mean_finish_score is None
+            else finish_time_ms_from_score(candidate.mean_finish_score)
+        ),
+        "mean_completion_score": None if candidate is None else candidate.mean_completion_score,
+        "best_completion_score": None if candidate is None else candidate.best_completion_score,
+        "finish_rate": None if candidate is None else candidate.finish_rate_score,
+        "failure_rate": None if candidate is None else candidate.failure_rate_score,
+        "mean_return_score": None if candidate is None else candidate.mean_return_score,
         "best_finish_time_ms": probability.best_finish_time_ms,
+        "best_return_score": None if candidate is None else candidate.best_return_score,
         "best_score": probability.best_score,
         "score_count": probability.score_count,
+        "episode_count": 0 if candidate is None else candidate.episode_count,
+        "return_count": 0 if candidate is None else candidate.return_count,
         "finish_count": 0 if candidate is None else candidate.finish_count,
     }
 
@@ -299,7 +336,7 @@ def _observed_contexts(
 ) -> Iterable[tuple[EngineTuningContext, tuple[EngineTuningCandidateState, ...]]]:
     grouped: dict[str, list[EngineTuningCandidateState]] = {}
     for candidate in state.candidates:
-        if candidate.active_score_count <= 0:
+        if candidate.observation_count <= 0:
             continue
         grouped.setdefault(candidate.context_key, []).append(candidate)
     contexts = []
@@ -314,7 +351,7 @@ def _observed_contexts(
     return sorted(
         contexts,
         key=lambda item: (
-            -sum(candidate.active_score_count for candidate in item[1]),
+            -sum(candidate.observation_count for candidate in item[1]),
             item[0].course_key,
             item[0].vehicle_id,
         ),

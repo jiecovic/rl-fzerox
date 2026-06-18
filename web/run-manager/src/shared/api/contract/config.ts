@@ -405,6 +405,8 @@ const rewardConfigSchema = z
     outside_track_recovery_reward: z.number().nonnegative(),
     outside_track_recovery_reward_cap: z.number().nonnegative(),
     outside_track_recovery_airborne_grace_frames: z.number().int().nonnegative(),
+    outside_track_dip_penalty: z.number().max(0),
+    outside_track_dip_height_threshold: z.number().max(0),
     lap_completion_bonus: z.number().nonnegative(),
     lap_position_scale: z.number().nonnegative(),
     ko_star_reward: z.number().nonnegative(),

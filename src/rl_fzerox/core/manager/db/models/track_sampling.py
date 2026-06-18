@@ -46,6 +46,8 @@ class RunTrackSamplingEntryModel(ManagerBase):
     episode_count: Mapped[int]
     finished_episode_count: Mapped[int]
     success_sample_count: Mapped[int]
+    completion_sample_count: Mapped[int]
+    completion_fraction_total: Mapped[float]
     ema_episode_frames: Mapped[float | None]
     ema_completion_fraction: Mapped[float | None]
     ema_finish_rate: Mapped[float | None]

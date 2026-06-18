@@ -126,7 +126,14 @@ class EngineTuningTrainingController:
             values[f"engine_tuning/{suffix}/samples"] = float(candidate.score_count)
             if candidate.best_time_ms is not None:
                 values[f"engine_tuning/{suffix}/best_time_ms"] = float(candidate.best_time_ms)
+            values[f"engine_tuning/{suffix}/episodes"] = float(candidate.episode_count)
             values[f"engine_tuning/{suffix}/finishes"] = float(candidate.finish_count)
+            if candidate.mean_completion_score is not None:
+                values[f"engine_tuning/{suffix}/mean_completion"] = candidate.mean_completion_score
+            if candidate.finish_rate_score is not None:
+                values[f"engine_tuning/{suffix}/finish_rate"] = candidate.finish_rate_score
+            if candidate.mean_return_score is not None:
+                values[f"engine_tuning/{suffix}/mean_return"] = candidate.mean_return_score
         values["engine_tuning/update_count"] = float(self.runtime_state.update_count)
         return values
 

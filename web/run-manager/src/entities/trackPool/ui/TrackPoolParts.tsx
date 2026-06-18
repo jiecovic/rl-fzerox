@@ -2,6 +2,7 @@
 import { type KeyboardEvent, memo } from "react";
 import type { TrackPoolCourseView, TrackPoolCupView } from "@/entities/trackPool/model/types";
 import {
+  completionLabel,
   completionSummary,
   displaySuccessRate,
   formatOptionalPercent,
@@ -17,7 +18,15 @@ import { cn } from "@/shared/ui/cn";
 import { AppTooltip } from "@/shared/ui/Tooltip";
 
 interface DistributionBarProps {
-  kind: "sample" | "success" | "completion" | "finish-ema" | "episodes" | "steps" | "signal";
+  kind:
+    | "sample"
+    | "success"
+    | "completion"
+    | "completion-ema"
+    | "finish-ema"
+    | "episodes"
+    | "steps"
+    | "signal";
   label: string;
   targetValue?: number | null;
   value: number;
@@ -65,6 +74,7 @@ interface LegendItemProps {
     | "signal"
     | "finish-ema"
     | "completion"
+    | "completion-ema"
     | "target";
   label: string;
 }
@@ -274,13 +284,14 @@ function TrackPoolChart({
         {variant !== "ema" ? (
           <>
             <LegendItem kind="success" label="Finish" />
+            <LegendItem kind="completion" label="Completion" />
             <LegendItem kind="episodes" label="Episodes" />
           </>
         ) : null}
         {variant !== "ema" ? <LegendItem kind="steps" label="Env steps" /> : null}
         {variant === "ema" ? (
           <>
-            <LegendItem kind="completion" label="Completion EMA" />
+            <LegendItem kind="completion-ema" label="Completion EMA" />
             <LegendItem kind="finish-ema" label="Finish EMA" />
             <LegendItem kind="signal" label="Problem score" />
           </>
@@ -409,7 +420,7 @@ function trackPoolBars({
   if (variant === "ema") {
     return [
       {
-        kind: "completion",
+        kind: "completion-ema",
         label: `completion EMA ${formatOptionalPercent(entry.emaCompletionFraction)}`,
         value: entry.emaCompletionFraction ?? 0,
       },
@@ -445,6 +456,11 @@ function globalStatisticBars(
       kind: "success",
       label: successLabel(entry),
       value: displaySuccessRate(entry) ?? 0,
+    },
+    {
+      kind: "completion",
+      label: completionLabel(entry),
+      value: entry.completionRate ?? 0,
     },
     {
       kind: "episodes",
@@ -489,6 +505,9 @@ function effectiveCourseShare(entry: TrackPoolCourseView, sampleBarUsesTargetSha
 
 const TRACK_POOL_COURSE_RENDER_KEYS = [
   "completedEnvSteps",
+  "completionFractionTotal",
+  "completionRate",
+  "completionSampleCount",
   "currentProbability",
   "currentProblemScore",
   "emaCompletionFraction",

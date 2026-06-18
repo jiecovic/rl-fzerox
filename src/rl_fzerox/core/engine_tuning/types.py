@@ -15,7 +15,7 @@ from rl_fzerox.core.domain.engine_setting import (
 )
 
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
-EngineTunerObjective = Literal["finish_time", "episode_return"]
+EngineTunerObjective = Literal["finish_time", "episode_return", "completion", "finish_rate"]
 
 
 @dataclass(frozen=True, slots=True)

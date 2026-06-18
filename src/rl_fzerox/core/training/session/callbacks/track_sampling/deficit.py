@@ -276,7 +276,11 @@ class DeficitBudgetTrackSamplingController:
             values[f"track_sampling/{key}/crash_rate"] = (
                 self._crash_episode_count[course_key] / success_count
             )
-            values[f"track_sampling/{key}/avg_completion"] = stats.ema_completion_fraction or 0.0
+            values[f"track_sampling/{key}/avg_completion"] = (
+                0.0
+                if stats.completion_sample_count <= 0
+                else stats.completion_fraction_total / stats.completion_sample_count
+            )
             values[f"track_sampling/{key}/ema_finish_rate"] = stats.ema_finish_rate or 0.0
         return values
 
@@ -323,6 +327,8 @@ class DeficitBudgetTrackSamplingController:
             stats.episode_count = max(0, int(entry.episode_count))
             stats.finished_episode_count = max(0, int(entry.finished_episode_count))
             stats.success_sample_count = max(0, int(entry.success_sample_count))
+            stats.completion_sample_count = max(0, int(entry.completion_sample_count))
+            stats.completion_fraction_total = max(0.0, float(entry.completion_fraction_total))
             stats.ema_episode_frames = entry.ema_episode_frames
             stats.ema_completion_fraction = entry.ema_completion_fraction
             stats.ema_finish_rate = entry.ema_finish_rate

@@ -365,6 +365,8 @@ class StepBalancedTrackSamplingController:
             stats.episode_count = max(0, int(entry.episode_count))
             stats.finished_episode_count = max(0, int(entry.finished_episode_count))
             stats.success_sample_count = max(0, int(entry.success_sample_count))
+            stats.completion_sample_count = max(0, int(entry.completion_sample_count))
+            stats.completion_fraction_total = max(0.0, float(entry.completion_fraction_total))
             stats.ema_episode_frames = (
                 None
                 if entry.ema_episode_frames is None

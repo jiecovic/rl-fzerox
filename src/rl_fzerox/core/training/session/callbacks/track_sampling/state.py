@@ -18,6 +18,8 @@ class TrackSamplingRuntimeEntry:
     success_sample_count: int
     ema_episode_frames: float | None
     ema_completion_fraction: float | None
+    completion_sample_count: int = 0
+    completion_fraction_total: float = 0.0
     ema_finish_rate: float | None = None
     current_problem_score: float = 0.0
     generation_episode_count: int = 0
@@ -59,6 +61,8 @@ class TrackStepStats:
     episode_count: int = 0
     finished_episode_count: int = 0
     success_sample_count: int = 0
+    completion_sample_count: int = 0
+    completion_fraction_total: float = 0.0
     ema_episode_frames: float | None = None
     ema_completion_fraction: float | None = None
     ema_finish_rate: float | None = None
@@ -105,6 +109,8 @@ class TrackStepStats:
                 )
             return
         clamped_completion = max(0.0, min(1.0, float(completion_fraction)))
+        self.completion_sample_count += 1
+        self.completion_fraction_total += clamped_completion
         if self.ema_completion_fraction is None:
             self.ema_completion_fraction = clamped_completion
         else:
@@ -159,6 +165,8 @@ def aggregate_runtime_entries(
                 success_sample_count=entry.success_sample_count,
                 ema_episode_frames=entry.ema_episode_frames,
                 ema_completion_fraction=entry.ema_completion_fraction,
+                completion_sample_count=entry.completion_sample_count,
+                completion_fraction_total=entry.completion_fraction_total,
                 ema_finish_rate=entry.ema_finish_rate,
                 current_problem_score=entry.current_problem_score,
                 generation_episode_count=entry.generation_episode_count,
@@ -187,6 +195,12 @@ def aggregate_runtime_entries(
             success_sample_count=existing.success_sample_count + entry.success_sample_count,
             ema_episode_frames=_merged_ema_episode_frames(existing, entry),
             ema_completion_fraction=_merged_ema_completion_fraction(existing, entry),
+            completion_sample_count=(
+                existing.completion_sample_count + entry.completion_sample_count
+            ),
+            completion_fraction_total=(
+                existing.completion_fraction_total + entry.completion_fraction_total
+            ),
             ema_finish_rate=_merged_ema_finish_rate(existing, entry),
             current_problem_score=_merged_problem_score(existing, entry),
             generation_episode_count=(

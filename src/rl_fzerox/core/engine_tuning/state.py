@@ -23,10 +23,13 @@ class EngineTuningCandidateState:
     score_count: int = 0
     episode_count: int = 0
     finish_count: int = 0
+    return_count: int = 0
     decayed_count: float = 0.0
     decayed_score_total: float = 0.0
     score_total: float = 0.0
     best_score: float | None = None
+    completion_score_total: float = 0.0
+    best_completion_score: float | None = None
     finish_score_total: float = 0.0
     best_finish_score: float | None = None
     return_score_total: float = 0.0
@@ -38,6 +41,10 @@ class EngineTuningCandidateState:
         if self.score_count > 0:
             return self.score_count
         return self.finish_count
+
+    @property
+    def observation_count(self) -> int:
+        return max(self.active_score_count, self.episode_count, self.finish_count)
 
     @property
     def mean_score(self) -> float | None:
@@ -58,20 +65,37 @@ class EngineTuningCandidateState:
         return self.finish_score_total / self.finish_count
 
     @property
-    def mean_return_score(self) -> float | None:
+    def mean_completion_score(self) -> float | None:
         if self.episode_count <= 0:
             return None
-        return self.return_score_total / self.episode_count
+        return self.completion_score_total / self.episode_count
+
+    @property
+    def finish_rate_score(self) -> float | None:
+        if self.episode_count <= 0:
+            return None
+        return self.finish_count / self.episode_count
+
+    @property
+    def failure_rate_score(self) -> float | None:
+        finish_rate = self.finish_rate_score
+        return None if finish_rate is None else 1.0 - finish_rate
+
+    @property
+    def mean_return_score(self) -> float | None:
+        if self.return_count <= 0:
+            return None
+        return self.return_score_total / self.return_count
 
     def record(
         self,
         *,
-        objective: EngineTunerObjective,
-        score: float,
+        score: float | None,
+        completion_fraction: float,
         finish_time_ms: int | None,
         episode_return: float | None,
     ) -> EngineTuningCandidateState:
-        """Return state after one objective-scored episode observation."""
+        """Return state after one default-baseline episode observation."""
 
         next_finish_count = self.finish_count
         next_finish_score_total = self.finish_score_total
@@ -93,28 +117,53 @@ class EngineTuningCandidateState:
                 else min(next_best_time_ms, clamped_finish_time_ms)
             )
         next_episode_count = self.episode_count
+        next_completion = max(0.0, min(1.0, float(completion_fraction)))
+        next_completion_score_total = self.completion_score_total + next_completion
+        next_best_completion_score = (
+            next_completion
+            if self.best_completion_score is None
+            else max(self.best_completion_score, next_completion)
+        )
+        next_return_count = self.return_count
         next_return_score_total = self.return_score_total
         next_best_return_score = self.best_return_score
         if episode_return is not None:
             return_score = float(episode_return)
-            next_episode_count += 1
+            next_return_count += 1
             next_return_score_total += return_score
             next_best_return_score = (
                 return_score
                 if next_best_return_score is None
                 else max(next_best_return_score, return_score)
             )
+        active_score_count = self.score_count
+        active_decayed_count = self.decayed_count
+        active_decayed_score_total = self.decayed_score_total
+        active_score_total = self.score_total
+        active_best_score = self.best_score
+        if score is not None:
+            objective_score = float(score)
+            active_score_count += 1
+            active_decayed_count += 1.0
+            active_decayed_score_total += objective_score
+            active_score_total += objective_score
+            active_best_score = (
+                objective_score
+                if active_best_score is None
+                else max(active_best_score, objective_score)
+            )
         return replace(
             self,
-            score_count=self.score_count + 1,
-            episode_count=next_episode_count,
+            score_count=active_score_count,
+            episode_count=next_episode_count + 1,
             finish_count=next_finish_count,
-            decayed_count=self.decayed_count + 1.0,
-            decayed_score_total=self.decayed_score_total + float(score),
-            score_total=self.score_total + float(score),
-            best_score=(
-                float(score) if self.best_score is None else max(self.best_score, float(score))
-            ),
+            return_count=next_return_count,
+            decayed_count=active_decayed_count,
+            decayed_score_total=active_decayed_score_total,
+            score_total=active_score_total,
+            best_score=active_best_score,
+            completion_score_total=next_completion_score_total,
+            best_completion_score=next_best_completion_score,
             finish_score_total=next_finish_score_total,
             best_finish_score=next_best_finish_score,
             return_score_total=next_return_score_total,
@@ -141,15 +190,39 @@ class EngineTuningCandidateState:
         """Return this candidate with active scoring rebuilt for an objective."""
 
         if objective == "episode_return":
+            if self.return_count <= 0:
+                return None
+            return replace(
+                self,
+                score_count=self.return_count,
+                decayed_count=float(self.return_count),
+                decayed_score_total=self.return_score_total,
+                score_total=self.return_score_total,
+                best_score=self.best_return_score,
+            )
+        if objective == "completion":
             if self.episode_count <= 0:
                 return None
             return replace(
                 self,
                 score_count=self.episode_count,
                 decayed_count=float(self.episode_count),
-                decayed_score_total=self.return_score_total,
-                score_total=self.return_score_total,
-                best_score=self.best_return_score,
+                decayed_score_total=self.completion_score_total,
+                score_total=self.completion_score_total,
+                best_score=self.best_completion_score,
+            )
+        if objective == "finish_rate":
+            if self.episode_count <= 0:
+                return None
+            best_score = 1.0 if self.finish_count > 0 else 0.0
+            finish_score_total = float(self.finish_count)
+            return replace(
+                self,
+                score_count=self.episode_count,
+                decayed_count=float(self.episode_count),
+                decayed_score_total=finish_score_total,
+                score_total=finish_score_total,
+                best_score=best_score,
             )
         if self.finish_count <= 0:
             return None
@@ -175,7 +248,7 @@ class EngineTuningCandidateState:
 
         return replace(
             self,
-            episode_count=0,
+            return_count=0,
             return_score_total=0.0,
             best_return_score=None,
         )

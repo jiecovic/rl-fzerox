@@ -30,7 +30,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 33
+SCHEMA_VERSION = 34
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -76,6 +76,16 @@ TRACK_SAMPLING_RUNTIME_ADAPTIVE_SIGNAL_COLUMNS = (
     ("run_track_sampling_entries", "ema_finish_rate", "FLOAT"),
     ("run_track_sampling_entries", "current_problem_score", "FLOAT NOT NULL DEFAULT 0.0"),
 )
+TRACK_SAMPLING_ENTRY_COMPLETION_COLUMNS = (
+    (
+        "completion_sample_count",
+        "INTEGER NOT NULL DEFAULT 0",
+    ),
+    (
+        "completion_fraction_total",
+        "FLOAT NOT NULL DEFAULT 0.0",
+    ),
+)
 
 
 def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
@@ -88,6 +98,10 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
         if _has_manager_schema(table_names):
             _upgrade_save_game_runner_replay_columns(engine=engine, table_names=table_names)
             _upgrade_track_sampling_adaptive_signal_columns(
+                engine=engine,
+                table_names=table_names,
+            )
+            _upgrade_track_sampling_completion_columns(
                 engine=engine,
                 table_names=table_names,
             )
@@ -236,6 +250,46 @@ def _upgrade_track_sampling_adaptive_signal_columns(
             connection.execute(
                 text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
             )
+
+
+def _upgrade_track_sampling_completion_columns(
+    *,
+    engine: Engine,
+    table_names: set[str],
+) -> None:
+    """Add lifetime completion averages to pre-global-completion manager DBs."""
+
+    table_name = "run_track_sampling_entries"
+    if table_name not in table_names:
+        return
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns(table_name)}
+    missing_columns = [
+        (column_name, definition)
+        for column_name, definition in TRACK_SAMPLING_ENTRY_COMPLETION_COLUMNS
+        if column_name not in columns
+    ]
+    if not missing_columns:
+        return
+    with engine.begin() as connection:
+        for column_name, definition in missing_columns:
+            connection.execute(
+                text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+            )
+        connection.execute(
+            text(
+                """
+                UPDATE run_track_sampling_entries
+                SET
+                    completion_sample_count = success_sample_count,
+                    completion_fraction_total =
+                        COALESCE(ema_completion_fraction, 0.0) * success_sample_count
+                WHERE success_sample_count > 0
+                  AND completion_sample_count = 0
+                  AND completion_fraction_total = 0.0
+                """,
+            )
+        )
 
 
 def _assert_save_game_columns(*, inspector: Inspector) -> None:

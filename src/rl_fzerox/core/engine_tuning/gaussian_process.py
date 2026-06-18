@@ -187,8 +187,8 @@ class GaussianProcessEngineTuner:
                 outcome.context,
                 outcome.engine_setting_raw_value,
             ).record(
-                objective="finish_time",
                 score=score,
+                completion_fraction=outcome.completion_fraction,
                 finish_time_ms=finish_time_ms,
                 episode_return=outcome.episode_return,
             )

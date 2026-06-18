@@ -20,6 +20,9 @@ export interface RunTrackPoolPanelProps {
 
 export type TrackPoolCourseView = {
   completedEnvSteps: number | null;
+  completionFractionTotal: number | null;
+  completionRate: number | null;
+  completionSampleCount: number | null;
   currentProbability: number | null;
   currentProblemScore: number | null;
   emaCompletionFraction: number | null;

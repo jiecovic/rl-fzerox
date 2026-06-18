@@ -29,7 +29,12 @@ export const deficitBudgetDifficultyMetricSchema = z.enum([
 export const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
 export const engineSettingModeSchema = z.enum(["fixed", "random_range", "adaptive_tuner"]);
 export const engineTunerBackendSchema = z.enum(["bandit", "gaussian_process", "mlp_ensemble"]);
-export const engineTunerObjectiveSchema = z.enum(["finish_time", "episode_return"]);
+export const engineTunerObjectiveSchema = z.enum([
+  "finish_time",
+  "episode_return",
+  "completion",
+  "finish_rate",
+]);
 export const engineTuningSourceActionSchema = z.enum(["convert", "discard"]);
 export const actionAxisModeSchema = z.enum(["continuous", "discrete"]);
 export const actionDriveModeSchema = z.enum(["pwm", "on_off"]);

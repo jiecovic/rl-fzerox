@@ -153,6 +153,14 @@ export function successLabel(entry: TrackPoolCourseView) {
   }`;
 }
 
+export function completionLabel(entry: TrackPoolCourseView) {
+  const sampleCount = entry.completionSampleCount ?? 0;
+  if (sampleCount <= 0 || entry.completionRate === null) {
+    return "No completion samples yet";
+  }
+  return `${sampleCount.toLocaleString()} completion samples · ${formatPercent(entry.completionRate)} completion`;
+}
+
 export function successSummary(entry: TrackPoolCourseView) {
   if ((entry.successSampleCount ?? 0) <= 0 || entry.successRate === null) {
     return "no episode samples";
@@ -161,10 +169,10 @@ export function successSummary(entry: TrackPoolCourseView) {
 }
 
 export function completionSummary(entry: TrackPoolCourseView) {
-  if (entry.emaCompletionFraction === null) {
+  if (entry.completionRate === null) {
     return null;
   }
-  return `${formatPercent(entry.emaCompletionFraction)} comp`;
+  return `${formatPercent(entry.completionRate)} comp`;
 }
 
 export function samplerSignalSummary(entry: TrackPoolCourseView) {
@@ -297,6 +305,9 @@ function courseViewFromRuntime({
 }): TrackPoolCourseView {
   return {
     completedEnvSteps: runtimeEntry?.completed_env_steps ?? null,
+    completionFractionTotal: runtimeEntry?.completion_fraction_total ?? null,
+    completionRate: runtimeEntry?.completion_rate ?? null,
+    completionSampleCount: runtimeEntry?.completion_sample_count ?? null,
     currentProbability: runtimeEntry?.current_probability ?? null,
     currentProblemScore: runtimeEntry?.current_problem_score ?? null,
     emaCompletionFraction: runtimeEntry?.ema_completion_fraction ?? null,
