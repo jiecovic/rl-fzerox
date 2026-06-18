@@ -84,7 +84,6 @@ class CareerMenuTiming:
     max_engine_adjust_taps: int = 128
     fresh_race_ready_frames: int = 2
     new_race_ready_time_ms: int = 1_000
-    post_gp_cutscene_record_frames: int = 900
 
     def __post_init__(self) -> None:
         values = (
@@ -103,7 +102,6 @@ class CareerMenuTiming:
             self.max_engine_adjust_taps,
             self.fresh_race_ready_frames,
             self.new_race_ready_time_ms,
-            self.post_gp_cutscene_record_frames,
         )
         if any(value <= 0 for value in values):
             raise ValueError("Career menu timing values must be positive")

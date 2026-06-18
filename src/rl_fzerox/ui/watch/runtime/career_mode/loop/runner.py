@@ -234,6 +234,45 @@ def _run_career_mode_loop_body(
             now=time.perf_counter(),
         )
 
+    def step_idle_after_runner_complete() -> None:
+        nonlocal last_menu_step, current_step_seconds, raw_observation, observation
+        nonlocal raw_info, info, reset_info, current_telemetry
+
+        clear_policy_runtime_state(reset_episode_reward=True)
+        step = RawMenuStep(
+            menu_input=MenuInput.NEUTRAL,
+            frames=1,
+            phase="career_complete:idle",
+        )
+        last_menu_step = step
+        step_menu(
+            config=config,
+            session=session,
+            controller=controller,
+            snapshot_queue=snapshot_queue,
+            step=step,
+            info=info,
+            reset_info=reset_info,
+            episode=episode,
+            episode_reward=episode_reward,
+            control_rate=control_rate,
+            target_control_fps=target_control_fps,
+            native_frame_seconds=native_frame_seconds,
+            deterministic_policy=deterministic_policy,
+            track_record_book=track_record_book,
+            frame_recorder=frame_recorder,
+        )
+        current_step_seconds = None
+        raw_observation = None
+        observation = None
+        raw_info = menu_viewer_info(session)
+        info = controller.viewer_info(
+            info=dict(raw_info),
+            active_policy_control=None,
+        )
+        reset_info = dict(info)
+        current_telemetry = _read_live_telemetry(session.emulator)
+
     try:
         while True:
             previous_cnn_visualization_enabled = cnn_visualization_enabled
@@ -393,8 +432,8 @@ def _run_career_mode_loop_body(
             if before_step_handled:
                 reset_info = dict(info)
                 if not lifecycle.has_active_attempt:
-                    publish_snapshot(policy_visible=False)
-                    raise _CareerModeWorkerQuit()
+                    step_idle_after_runner_complete()
+                    continue
             policy_owns_control = controller.policy_owns_control()
             if should_observe_policy_transition(
                 policy_owns_control=policy_owns_control,
@@ -450,10 +489,11 @@ def _run_career_mode_loop_body(
                     clear_policy_runtime_state()
                     publish_snapshot(policy_visible=False)
                     if not lifecycle.has_active_attempt:
-                        raise _CareerModeWorkerQuit()
+                        step_idle_after_runner_complete()
+                        continue
             if not controller.has_active_attempt():
-                publish_snapshot(policy_visible=False)
-                raise _CareerModeWorkerQuit()
+                step_idle_after_runner_complete()
+                continue
             menu_step = controller.next_raw_step(info=info)
             if menu_step is not None:
                 last_menu_step = menu_step
@@ -671,7 +711,8 @@ def _run_career_mode_loop_body(
                     clear_policy_runtime_state()
                     publish_snapshot(policy_visible=False)
                     if not lifecycle.has_active_attempt:
-                        raise _CareerModeWorkerQuit()
+                        step_idle_after_runner_complete()
+                        continue
 
             if current_step_seconds is not None:
                 now = time.perf_counter()

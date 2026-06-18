@@ -802,6 +802,8 @@ def test_career_recorder_finishes_clean_cup_after_menu_exit_frame(
         info={
             "career_mode_attempt_id": None,
             "career_mode_target_label": "Clear Master Joker Cup",
+            "career_mode_last_finished_attempt_id": "attempt-final",
+            "career_mode_last_finished_attempt_status": "succeeded",
             "game_mode": "main_menu",
         },
     )
@@ -810,6 +812,8 @@ def test_career_recorder_finishes_clean_cup_after_menu_exit_frame(
         info={
             "career_mode_attempt_id": None,
             "career_mode_target_label": "Clear Master Joker Cup",
+            "career_mode_last_finished_attempt_id": "attempt-final",
+            "career_mode_last_finished_attempt_status": "succeeded",
             "game_mode": "main_menu",
         },
     )

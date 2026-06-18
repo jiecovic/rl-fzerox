@@ -3,15 +3,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.core.career_mode.navigation import MENU_TIMING, MenuFacts
+from rl_fzerox.core.career_mode.navigation import MenuFacts
 
 
 @dataclass(slots=True)
 class PostGpCutsceneTracker:
-    """Delay post-GP completion until the winning ceremony has been recorded."""
+    """Track the post-GP ceremony without cutting the recording early.
 
-    start_frame: int | None = None
-    polls: int = 0
+    Completion is the visible FSM transition out of `gp_end_cutscene` into
+    credits/menu/title flow. The controller must not infer this from elapsed
+    frames because GP ceremonies vary and the full ceremony belongs in the
+    recording.
+    """
+
+    seen: bool = False
 
     def progress_info(
         self,
@@ -19,35 +24,16 @@ class PostGpCutsceneTracker:
         facts: MenuFacts,
         info: dict[str, object],
     ) -> dict[str, object]:
-        if not facts.is_gp_end_cutscene:
-            self.reset()
+        if facts.is_gp_end_cutscene:
+            self.seen = True
+            return info
+        if not self.seen:
             return info
 
-        frame_index = _int_info(info, "frame_index")
-        if self.start_frame is None:
-            self.start_frame = frame_index
-            self.polls = 0
-        self.polls += 1
-
-        elapsed_frames = (
-            frame_index - self.start_frame
-            if frame_index is not None and self.start_frame is not None
-            else self.polls * MENU_TIMING.menu_hold_frames
-        )
-        if elapsed_frames < MENU_TIMING.post_gp_cutscene_record_frames:
-            return info
-
+        self.reset()
         annotated = dict(info)
         annotated["career_mode_post_gp_cutscene_complete"] = True
         return annotated
 
     def reset(self) -> None:
-        self.start_frame = None
-        self.polls = 0
-
-
-def _int_info(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
+        self.seen = False
