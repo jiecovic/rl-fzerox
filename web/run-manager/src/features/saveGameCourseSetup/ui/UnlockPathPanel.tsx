@@ -78,11 +78,13 @@ interface UnlockPathPanelProps {
   onCourseSetupDirtyChange: (dirty: boolean) => void;
   onKeepFailedPerfectRunVideosChange: (keepFailedPerfectRunVideos: boolean) => void;
   onPerfectRunChange: (perfectRun: boolean) => void;
+  onReloadPolicyBetweenAttemptsChange: (reloadPolicyBetweenAttempts: boolean) => void;
   onStartTarget: (target: ManagedSaveUnlockTarget) => void;
   onTargetClearGoalTextChange: (targetClearGoalText: string) => void;
   perfectRun: boolean;
   keepFailedPerfectRunVideos: boolean;
   recordingEnabled: boolean;
+  reloadPolicyBetweenAttempts: boolean;
   saveGame: ManagedSaveGame;
   startableTargetKeys: ReadonlySet<string>;
   targetClearGoalText: string;
@@ -100,12 +102,14 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
   onStartTarget,
   onImportEngineTuning,
   onPerfectRunChange,
+  onReloadPolicyBetweenAttemptsChange,
   onTargetClearGoalTextChange,
   onUpsertCourseSetup,
   onUpsertCupSetup,
   perfectRun,
   keepFailedPerfectRunVideos,
   recordingEnabled,
+  reloadPolicyBetweenAttempts,
   saveGame,
   startableTargetKeys,
   targetClearGoalText,
@@ -343,9 +347,11 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
         keepFailedPerfectRunVideos={keepFailedPerfectRunVideos}
         perfectRun={perfectRun}
         recordingEnabled={recordingEnabled}
+        reloadPolicyBetweenAttempts={reloadPolicyBetweenAttempts}
         targetClearGoalText={targetClearGoalText}
         onKeepFailedPerfectRunVideosChange={onKeepFailedPerfectRunVideosChange}
         onPerfectRunChange={onPerfectRunChange}
+        onReloadPolicyBetweenAttemptsChange={onReloadPolicyBetweenAttemptsChange}
         onTargetClearGoalTextChange={onTargetClearGoalTextChange}
       />
       <TargetMatrix
@@ -390,18 +396,22 @@ const TargetReplayOptions = memo(function TargetReplayOptions({
   keepFailedPerfectRunVideos,
   onKeepFailedPerfectRunVideosChange,
   onPerfectRunChange,
+  onReloadPolicyBetweenAttemptsChange,
   onTargetClearGoalTextChange,
   perfectRun,
   recordingEnabled,
+  reloadPolicyBetweenAttempts,
   targetClearGoalText,
 }: {
   disabled: boolean;
   keepFailedPerfectRunVideos: boolean;
   onKeepFailedPerfectRunVideosChange: (keepFailedPerfectRunVideos: boolean) => void;
   onPerfectRunChange: (perfectRun: boolean) => void;
+  onReloadPolicyBetweenAttemptsChange: (reloadPolicyBetweenAttempts: boolean) => void;
   onTargetClearGoalTextChange: (targetClearGoalText: string) => void;
   perfectRun: boolean;
   recordingEnabled: boolean;
+  reloadPolicyBetweenAttempts: boolean;
   targetClearGoalText: string;
 }) {
   const recordingOptionDisabled = disabled || !recordingEnabled;
@@ -445,6 +455,19 @@ const TargetReplayOptions = memo(function TargetReplayOptions({
             onChange={onKeepFailedPerfectRunVideosChange}
           />
           <span className="text-sm font-semibold text-app-text">Keep recordings</span>
+        </span>
+      </FieldShell>
+      <FieldShell className="gap-2">
+        <span>Checkpoint</span>
+        <span className="flex min-h-9 items-center gap-2 whitespace-nowrap">
+          <ToggleSwitch
+            checked={reloadPolicyBetweenAttempts}
+            disabled={disabled}
+            hideLabel
+            label="Reload checkpoint between attempts"
+            onChange={onReloadPolicyBetweenAttemptsChange}
+          />
+          <span className="text-sm font-semibold text-app-text">Reload between attempts</span>
         </span>
       </FieldShell>
     </div>

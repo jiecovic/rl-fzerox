@@ -102,6 +102,7 @@ class _LauncherStub:
         perfect_run: bool,
         keep_failed_recordings: bool,
         target_clear_goal: int,
+        reload_policy_between_attempts: bool,
     ) -> Literal["started", "already_running"]:
         del (
             save_game_id,
@@ -121,6 +122,7 @@ class _LauncherStub:
             perfect_run,
             keep_failed_recordings,
             target_clear_goal,
+            reload_policy_between_attempts,
         )
         raise AssertionError("career mode runner should not be called")
 

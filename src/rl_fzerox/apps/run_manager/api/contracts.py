@@ -58,6 +58,7 @@ class StartCareerModeRequest(BaseModel):
     perfect_run: bool = False
     keep_failed_recordings: bool = True
     target_clear_goal: int = Field(default=0, ge=0)
+    reload_policy_between_attempts: bool = True
 
     @model_validator(mode="after")
     def _validate_target_fields(self) -> StartCareerModeRequest:
@@ -103,6 +104,7 @@ class UpdateSaveRunnerSettingsRequest(BaseModel):
     target_restart_on_retire: bool = False
     target_clear_goal: int = Field(default=1, ge=0)
     keep_failed_recordings: bool = False
+    reload_policy_between_attempts: bool = True
 
 
 class UpsertSaveCourseSetupRequest(BaseModel):
@@ -276,4 +278,5 @@ class RunLauncher(Protocol):
         perfect_run: bool,
         keep_failed_recordings: bool,
         target_clear_goal: int,
+        reload_policy_between_attempts: bool,
     ) -> Literal["started", "already_running"]: ...

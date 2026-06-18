@@ -43,6 +43,7 @@ def launch_career_mode_runner(
     perfect_run: bool = False,
     keep_failed_recordings: bool = True,
     target_clear_goal: int = 0,
+    reload_policy_between_attempts: bool = True,
 ) -> WatchLaunchStatus:
     """Launch the visible Career Mode runner for one manager-owned save game."""
 
@@ -80,6 +81,10 @@ def launch_career_mode_runner(
         device=device,
         renderer=renderer,
         deterministic_policy=deterministic_policy,
+    )
+    overrides = (
+        *overrides,
+        f"watch.reload_policy_between_attempts={str(reload_policy_between_attempts).lower()}",
     )
     if recording_enabled:
         resolved_recording_path = recording_path or default_career_recording_path(

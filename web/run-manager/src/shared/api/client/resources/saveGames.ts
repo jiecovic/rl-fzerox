@@ -64,6 +64,7 @@ export async function updateSaveGameRunnerSettings({
   targetRestartOnRetire,
   targetClearGoal,
   keepFailedRecordings,
+  reloadPolicyBetweenAttempts,
 }: SaveGameRunnerSettingsUpdateRequest): Promise<ManagedSaveGame> {
   const response = await fetch(
     `/api/save-games/${encodeURIComponent(saveGameId)}/runner-settings`,
@@ -82,6 +83,7 @@ export async function updateSaveGameRunnerSettings({
         target_restart_on_retire: targetRestartOnRetire,
         target_clear_goal: targetClearGoal,
         keep_failed_recordings: keepFailedRecordings,
+        reload_policy_between_attempts: reloadPolicyBetweenAttempts,
       }),
     },
   );
@@ -120,6 +122,7 @@ export async function startCareerModeRunner({
   singleTarget,
   perfectRun,
   keepFailedRecordings,
+  reloadPolicyBetweenAttempts,
   targetClearGoal,
   target,
 }: CareerModeRunnerLaunchRequest): Promise<"started" | "already_running"> {
@@ -138,6 +141,7 @@ export async function startCareerModeRunner({
       single_target: singleTarget,
       perfect_run: perfectRun,
       keep_failed_recordings: keepFailedRecordings,
+      reload_policy_between_attempts: reloadPolicyBetweenAttempts,
       target_clear_goal: targetClearGoal,
       ...(target === null
         ? {}

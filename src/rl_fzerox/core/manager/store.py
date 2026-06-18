@@ -557,6 +557,7 @@ class ManagerStore:
         target_restart_on_retire: bool,
         target_clear_goal: int,
         keep_failed_recordings: bool,
+        reload_policy_between_attempts: bool,
     ) -> ManagedSaveGame | None:
         return save_game_registry.update_runner_settings(
             self,
@@ -572,6 +573,7 @@ class ManagerStore:
             target_restart_on_retire=target_restart_on_retire,
             target_clear_goal=target_clear_goal,
             keep_failed_recordings=keep_failed_recordings,
+            reload_policy_between_attempts=reload_policy_between_attempts,
         )
 
     def delete_save_game(self, save_game_id: str) -> bool:

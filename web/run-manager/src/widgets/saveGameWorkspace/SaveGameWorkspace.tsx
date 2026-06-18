@@ -260,6 +260,7 @@ export function SaveGameWorkspace({
       targetRestartOnRetire: session.perfectRun,
       targetClearGoal: parseTargetClearGoal(session.targetClearGoalText),
       keepFailedRecordings: session.keepFailedPerfectRunVideos,
+      reloadPolicyBetweenAttempts: session.reloadPolicyBetweenAttempts,
     };
   }
 
@@ -302,6 +303,7 @@ export function SaveGameWorkspace({
         perfectRun: settings.target_restart_on_retire,
         targetClearGoalText: String(settings.target_clear_goal),
         keepFailedPerfectRunVideos: settings.keep_failed_recordings,
+        reloadPolicyBetweenAttempts: settings.reload_policy_between_attempts,
       });
     },
     [onPatchSession, session.sessionId],
@@ -365,6 +367,7 @@ export function SaveGameWorkspace({
         singleTarget: requestedTarget !== null,
         perfectRun: requestedTarget !== null && settingsRequest.targetRestartOnRetire,
         keepFailedRecordings: !targetRecordingEnabled || settingsRequest.keepFailedRecordings,
+        reloadPolicyBetweenAttempts: settingsRequest.reloadPolicyBetweenAttempts,
         targetClearGoal: targetRecordingEnabled ? settingsRequest.targetClearGoal : 0,
         target: requestedTarget,
       });
@@ -631,6 +634,7 @@ export function SaveGameWorkspace({
           metadata={metadata}
           perfectRun={session.perfectRun}
           recordingEnabled={session.recordingEnabled}
+          reloadPolicyBetweenAttempts={session.reloadPolicyBetweenAttempts}
           saveGame={saveGame}
           targetClearGoalText={session.targetClearGoalText}
           targets={unlockTargets}
@@ -642,6 +646,9 @@ export function SaveGameWorkspace({
             onPatchSession(session.sessionId, { keepFailedPerfectRunVideos })
           }
           onPerfectRunChange={(perfectRun) => onPatchSession(session.sessionId, { perfectRun })}
+          onReloadPolicyBetweenAttemptsChange={(reloadPolicyBetweenAttempts) =>
+            onPatchSession(session.sessionId, { reloadPolicyBetweenAttempts })
+          }
           onStartTarget={handleStartTarget}
           onTargetClearGoalTextChange={(targetClearGoalText) =>
             onPatchSession(session.sessionId, { targetClearGoalText })
@@ -726,7 +733,8 @@ function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession
     settings.recording_path !== null ||
     settings.target_restart_on_retire !== session.perfectRun ||
     settings.target_clear_goal !== parseTargetClearGoal(session.targetClearGoalText) ||
-    settings.keep_failed_recordings !== session.keepFailedPerfectRunVideos
+    settings.keep_failed_recordings !== session.keepFailedPerfectRunVideos ||
+    settings.reload_policy_between_attempts !== session.reloadPolicyBetweenAttempts
   );
 }
 

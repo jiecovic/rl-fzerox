@@ -135,6 +135,7 @@ class ManagerRunLauncher:
         perfect_run: bool = False,
         keep_failed_recordings: bool = True,
         target_clear_goal: int = 0,
+        reload_policy_between_attempts: bool = True,
     ) -> WatchLaunchStatus:
         """Launch the visible Career Mode runner for one save game."""
 
@@ -157,6 +158,7 @@ class ManagerRunLauncher:
             perfect_run=perfect_run,
             keep_failed_recordings=keep_failed_recordings,
             target_clear_goal=target_clear_goal,
+            reload_policy_between_attempts=reload_policy_between_attempts,
         )
 
     def _spawn_worker(self, *, run_id: str, resume: bool) -> None:

@@ -149,6 +149,7 @@ export function saveGameFixture(overrides: Partial<ManagedSaveGame> = {}): Manag
       target_restart_on_retire: false,
       target_clear_goal: 1,
       keep_failed_recordings: false,
+      reload_policy_between_attempts: true,
       renderer: "gliden64",
     },
     unlock_progress: {

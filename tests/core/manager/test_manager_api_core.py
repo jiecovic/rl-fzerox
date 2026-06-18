@@ -76,6 +76,7 @@ async def test_manager_api_creates_save_game(tmp_path: Path) -> None:
         "target_restart_on_retire": False,
         "target_clear_goal": 1,
         "keep_failed_recordings": False,
+        "reload_policy_between_attempts": True,
         "renderer": "gliden64",
     }
     assert payload["save_game"]["unlock_progress"]["completed_count"] == 0
@@ -115,6 +116,7 @@ async def test_manager_api_returns_slim_save_game_status(tmp_path: Path) -> None
         "target_restart_on_retire": False,
         "target_clear_goal": 1,
         "keep_failed_recordings": False,
+        "reload_policy_between_attempts": True,
         "renderer": "gliden64",
     }
     assert save_payload["unlock_progress"]["completed_count"] == 0
@@ -141,6 +143,7 @@ async def test_manager_api_updates_save_game_runner_settings(tmp_path: Path) -> 
             "target_restart_on_retire": True,
             "target_clear_goal": 5,
             "keep_failed_recordings": True,
+            "reload_policy_between_attempts": False,
             "renderer": "angrylion",
         },
     )
@@ -158,6 +161,7 @@ async def test_manager_api_updates_save_game_runner_settings(tmp_path: Path) -> 
         "target_restart_on_retire": True,
         "target_clear_goal": 5,
         "keep_failed_recordings": True,
+        "reload_policy_between_attempts": False,
         "renderer": "angrylion",
     }
 
@@ -351,6 +355,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
             perfect_run: bool,
             keep_failed_recordings: bool,
             target_clear_goal: int,
+            reload_policy_between_attempts: bool,
         ) -> Literal["started", "already_running"]:
             self.request = {
                 "save_game_id": save_game_id,
@@ -370,6 +375,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
                 "perfect_run": perfect_run,
                 "keep_failed_recordings": keep_failed_recordings,
                 "target_clear_goal": target_clear_goal,
+                "reload_policy_between_attempts": reload_policy_between_attempts,
             }
             return "started"
 
@@ -395,6 +401,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
             "perfect_run": True,
             "keep_failed_recordings": False,
             "target_clear_goal": 3,
+            "reload_policy_between_attempts": False,
         },
     )
 
@@ -418,6 +425,7 @@ async def test_manager_api_starts_career_mode_for_selected_target(tmp_path: Path
         "perfect_run": True,
         "keep_failed_recordings": False,
         "target_clear_goal": 3,
+        "reload_policy_between_attempts": False,
     }
 
 

@@ -82,6 +82,7 @@ def insert_save_game(session: Session, save_game: ManagedSaveGame) -> None:
             runner_target_restart_on_retire=save_game.runner_target_restart_on_retire,
             runner_target_clear_goal=save_game.runner_target_clear_goal,
             runner_keep_failed_recordings=save_game.runner_keep_failed_recordings,
+            runner_reload_policy_between_attempts=(save_game.runner_reload_policy_between_attempts),
         )
     )
 
@@ -155,6 +156,7 @@ def update_save_game_runner_settings(
     target_restart_on_retire: bool,
     target_clear_goal: int,
     keep_failed_recordings: bool,
+    reload_policy_between_attempts: bool,
     updated_at: str,
 ) -> ManagedSaveGame | None:
     """Update saved Career runner launch settings."""
@@ -173,6 +175,7 @@ def update_save_game_runner_settings(
     row.runner_target_restart_on_retire = target_restart_on_retire
     row.runner_target_clear_goal = target_clear_goal
     row.runner_keep_failed_recordings = keep_failed_recordings
+    row.runner_reload_policy_between_attempts = reload_policy_between_attempts
     row.updated_at = updated_at
     return save_game_from_model(row)
 
@@ -492,6 +495,7 @@ def save_game_from_model(row: SaveGameModel) -> ManagedSaveGame:
         runner_target_restart_on_retire=bool(row.runner_target_restart_on_retire),
         runner_target_clear_goal=_required_target_clear_goal(row.runner_target_clear_goal),
         runner_keep_failed_recordings=bool(row.runner_keep_failed_recordings),
+        runner_reload_policy_between_attempts=bool(row.runner_reload_policy_between_attempts),
     )
 
 

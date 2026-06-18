@@ -129,6 +129,7 @@ def update_runner_settings(
     target_restart_on_retire: bool,
     target_clear_goal: int,
     keep_failed_recordings: bool,
+    reload_policy_between_attempts: bool,
 ) -> ManagedSaveGame | None:
     """Persist Career runner launch settings for one save game."""
 
@@ -154,6 +155,7 @@ def update_runner_settings(
             target_restart_on_retire=target_restart_on_retire,
             target_clear_goal=target_clear_goal,
             keep_failed_recordings=keep_failed_recordings,
+            reload_policy_between_attempts=reload_policy_between_attempts,
             updated_at=utc_now(),
         )
 

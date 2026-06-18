@@ -30,6 +30,7 @@ def start_career_mode_payload(
             perfect_run=request.perfect_run,
             keep_failed_recordings=request.keep_failed_recordings,
             target_clear_goal=request.target_clear_goal,
+            reload_policy_between_attempts=request.reload_policy_between_attempts,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

@@ -962,6 +962,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         recording_input_hud_enabled=True,
         recording_upscale_factor=3,
         recording_path=None,
+        reload_policy_between_attempts=False,
     )
 
     assert status == "started"
@@ -989,6 +990,7 @@ def test_start_career_mode_passes_viewer_lease_and_runtime_options(
         "watch.device=cpu",
         "watch.deterministic_policy=false",
         "emulator.renderer=angrylion",
+        "watch.reload_policy_between_attempts=false",
         "watch.recording.enabled=true",
         f"watch.recording.path={recording_path}",
         "watch.recording.session_mp4_enabled=true",

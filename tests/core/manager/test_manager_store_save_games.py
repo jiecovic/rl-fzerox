@@ -51,6 +51,7 @@ def test_manager_store_creates_save_game_record(tmp_path: Path) -> None:
     assert save_game.runner_target_restart_on_retire is False
     assert save_game.runner_target_clear_goal == 1
     assert save_game.runner_keep_failed_recordings is False
+    assert save_game.runner_reload_policy_between_attempts is True
     assert save_game.save_path.parent.is_dir()
     assert not save_game.save_path.exists()
 
@@ -89,6 +90,7 @@ def test_manager_store_updates_save_game_runner_settings(tmp_path: Path) -> None
         target_restart_on_retire=True,
         target_clear_goal=5,
         keep_failed_recordings=True,
+        reload_policy_between_attempts=False,
     )
 
     assert updated is not None
@@ -103,6 +105,7 @@ def test_manager_store_updates_save_game_runner_settings(tmp_path: Path) -> None
     assert updated.runner_target_restart_on_retire is True
     assert updated.runner_target_clear_goal == 5
     assert updated.runner_keep_failed_recordings is True
+    assert updated.runner_reload_policy_between_attempts is False
     assert store.get_save_game(save_game.id) == updated
 
 

@@ -92,6 +92,7 @@ describe("SaveGameWorkspace", () => {
       targetRestartOnRetire: false,
       targetClearGoal: 1,
       keepFailedRecordings: false,
+      reloadPolicyBetweenAttempts: true,
     });
     expect(await screen.findByText("Runner settings saved.")).toBeInTheDocument();
   });
@@ -299,6 +300,7 @@ describe("SaveGameWorkspace", () => {
       singleTarget: false,
       perfectRun: false,
       keepFailedRecordings: true,
+      reloadPolicyBetweenAttempts: true,
       targetClearGoal: 0,
       target: null,
     });
@@ -356,6 +358,7 @@ describe("SaveGameWorkspace", () => {
       singleTarget: false,
       perfectRun: false,
       keepFailedRecordings: true,
+      reloadPolicyBetweenAttempts: true,
       targetClearGoal: 0,
       target: null,
     });
@@ -407,6 +410,7 @@ describe("SaveGameWorkspace", () => {
       singleTarget: true,
       perfectRun: false,
       keepFailedRecordings: true,
+      reloadPolicyBetweenAttempts: true,
       targetClearGoal: 0,
       target: launchableSelectedTarget,
     });
@@ -464,6 +468,7 @@ describe("SaveGameWorkspace", () => {
       expect.objectContaining({
         keepFailedRecordings: false,
         perfectRun: true,
+        reloadPolicyBetweenAttempts: true,
         singleTarget: true,
         targetClearGoal: 1,
         target: launchableSelectedTarget,
@@ -515,6 +520,7 @@ describe("SaveGameWorkspace", () => {
         singleTarget: true,
         perfectRun: false,
         keepFailedRecordings: true,
+        reloadPolicyBetweenAttempts: true,
         targetClearGoal: 0,
         target: selectedTarget,
       }),
@@ -778,6 +784,7 @@ function newSaveGameSession(): SaveGameSession {
     recordingEnabled: false,
     recordingInputHudEnabled: false,
     recordingUpscaleFactor: 2,
+    reloadPolicyBetweenAttempts: true,
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId: null,
@@ -881,6 +888,7 @@ function existingSaveGameSession(saveGameId: string): SaveGameSession {
     recordingEnabled: false,
     recordingInputHudEnabled: false,
     recordingUpscaleFactor: 2,
+    reloadPolicyBetweenAttempts: true,
     runnerDevice: "cuda",
     runnerRenderer: "gliden64",
     saveGameId,

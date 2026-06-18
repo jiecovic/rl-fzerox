@@ -84,6 +84,7 @@ class WatchConfig(BaseModel):
     single_save_target: bool = False
     single_save_target_perfect: bool = False
     single_save_target_clear_goal: NonNegativeInt = 0
+    reload_policy_between_attempts: bool = True
     unlock_target_label: str | None = None
     start_manual_control: bool = False
     career_mode_race_setup: CareerModeRaceSetupConfig | None = None

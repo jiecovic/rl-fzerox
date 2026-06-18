@@ -189,6 +189,7 @@ class ManagedSaveGame:
     runner_target_restart_on_retire: bool = False
     runner_target_clear_goal: int = 1
     runner_keep_failed_recordings: bool = False
+    runner_reload_policy_between_attempts: bool = True
 
 
 @dataclass(frozen=True, slots=True)

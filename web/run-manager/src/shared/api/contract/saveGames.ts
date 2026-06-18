@@ -97,6 +97,7 @@ export const saveGameRunnerSettingsSchema = z.object({
   target_restart_on_retire: z.boolean().default(false),
   target_clear_goal: z.number().int().min(0).default(1),
   keep_failed_recordings: z.boolean().default(false),
+  reload_policy_between_attempts: z.boolean().default(true),
 });
 
 export const managedSaveGameSchema = z.object({
@@ -199,6 +200,7 @@ export interface CareerModeRunnerLaunchRequest {
   singleTarget: boolean;
   perfectRun: boolean;
   keepFailedRecordings: boolean;
+  reloadPolicyBetweenAttempts: boolean;
   targetClearGoal: number;
   target: ManagedSaveUnlockTarget | null;
 }
@@ -216,4 +218,5 @@ export interface SaveGameRunnerSettingsUpdateRequest {
   targetRestartOnRetire: boolean;
   targetClearGoal: number;
   keepFailedRecordings: boolean;
+  reloadPolicyBetweenAttempts: boolean;
 }

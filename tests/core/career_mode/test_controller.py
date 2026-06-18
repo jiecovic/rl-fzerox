@@ -156,6 +156,25 @@ def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path)
     assert resolver.refresh_requests == [False, True, False]
 
 
+def test_checkpoint_refresh_can_be_disabled_between_attempts(tmp_path: Path) -> None:
+    controller = _controller(tmp_path, reload_policy_between_attempts=False)
+    resolver = _PolicyResolverStub()
+    controller.__dict__["_policy_resolver"] = resolver
+
+    controller._remember_finished_attempt(
+        SimpleNamespace(
+            finished_attempt_id="attempt-a",
+            finished_status="succeeded",
+            finished_failure_reason=None,
+        )
+    )
+
+    assert (
+        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
+    )
+    assert resolver.refresh_requests == [False]
+
+
 def test_recording_segment_tracker_waits_for_explicit_close() -> None:
     tracker = CareerRecordingSegmentTracker()
 
@@ -462,7 +481,11 @@ class _ControllerSession:
     emulator = _ControllerEmulator()
 
 
-def _controller(tmp_path: Path) -> CareerModeController:
+def _controller(
+    tmp_path: Path,
+    *,
+    reload_policy_between_attempts: bool = True,
+) -> CareerModeController:
     db_path = tmp_path / "manager" / "runs.db"
     store = ManagerStore(db_path)
     save_game = store.create_save_game(
@@ -481,6 +504,7 @@ def _controller(tmp_path: Path) -> CareerModeController:
         save_game_id=save_game.id,
         attempt_id=attempt.id,
         device="cpu",
+        reload_policy_between_attempts=reload_policy_between_attempts,
     )
 
 

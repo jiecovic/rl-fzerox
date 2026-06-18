@@ -109,6 +109,7 @@ class CareerModeController(CareerMenuRoutingMixin):
         single_target: bool = False,
         perfect_run: bool = False,
         target_clear_goal: int = 0,
+        reload_policy_between_attempts: bool = True,
     ) -> None:
         self._setup = setup
         store = ManagerStore(db_path)
@@ -130,6 +131,7 @@ class CareerModeController(CareerMenuRoutingMixin):
         self._last_finished_attempt_id: str | None = None
         self._last_finished_attempt_status: SaveAttemptStatus | None = None
         self._last_finished_attempt_failure_reason: str | None = None
+        self._reload_policy_between_attempts = reload_policy_between_attempts
         self._refresh_policy_artifact_on_next_handoff = False
         self._emulator_reset_requested = False
         self._post_terminal_progress = CareerPostTerminalProgressSync()
@@ -159,6 +161,7 @@ class CareerModeController(CareerMenuRoutingMixin):
             single_target=config.watch.single_save_target,
             perfect_run=config.watch.single_save_target_perfect,
             target_clear_goal=config.watch.single_save_target_clear_goal,
+            reload_policy_between_attempts=config.watch.reload_policy_between_attempts,
         )
 
     def active_policy_control(
@@ -434,7 +437,7 @@ class CareerModeController(CareerMenuRoutingMixin):
         self._last_finished_attempt_failure_reason = (
             failure_reason if isinstance(failure_reason, str) else None
         )
-        self._refresh_policy_artifact_on_next_handoff = True
+        self._refresh_policy_artifact_on_next_handoff = self._reload_policy_between_attempts
 
     def _close_recording_from_transition(self, transition: CareerProgressTransition) -> None:
         if not transition.attempt_finished:

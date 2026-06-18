@@ -76,6 +76,7 @@ def save_game_runner_settings_payload(save_game: ManagedSaveGame) -> dict[str, o
         "target_restart_on_retire": save_game.runner_target_restart_on_retire,
         "target_clear_goal": save_game.runner_target_clear_goal,
         "keep_failed_recordings": save_game.runner_keep_failed_recordings,
+        "reload_policy_between_attempts": save_game.runner_reload_policy_between_attempts,
     }
 
 

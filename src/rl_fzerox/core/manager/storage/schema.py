@@ -30,7 +30,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 32
+SCHEMA_VERSION = 33
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -60,6 +60,7 @@ SAVE_GAME_RUNNER_REPLAY_COLUMNS = (
     ("runner_target_restart_on_retire", "BOOLEAN NOT NULL DEFAULT 0"),
     ("runner_target_clear_goal", "INTEGER NOT NULL DEFAULT 1"),
     ("runner_keep_failed_recordings", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("runner_reload_policy_between_attempts", "BOOLEAN NOT NULL DEFAULT 1"),
 )
 TRACK_SAMPLING_RUNTIME_ADAPTIVE_SIGNAL_COLUMNS = (
     (

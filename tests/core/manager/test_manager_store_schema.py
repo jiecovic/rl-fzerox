@@ -207,6 +207,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "runner_target_restart_on_retire",
         "runner_target_clear_goal",
         "runner_keep_failed_recordings",
+        "runner_reload_policy_between_attempts",
     }
     assert save_attempt_columns == {
         "id",

@@ -68,6 +68,7 @@ export interface SaveGameSession {
   recordingEnabled: boolean;
   recordingInputHudEnabled: boolean;
   recordingUpscaleFactor: number;
+  reloadPolicyBetweenAttempts: boolean;
   runnerDevice: WatchDevice;
   runnerRenderer: WatchRenderer;
   saveGameId: string | null;
