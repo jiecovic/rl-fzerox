@@ -1171,6 +1171,15 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
         (3, 82_910, 4, 0, 103),
         (4, 86_007, 1, 0, 103),
     ):
+        recorder.record_event(
+            info={
+                "career_mode_attempt_id": "attempt-a",
+                "career_mode_target_label": "Clear Master Jack Cup",
+                "game_mode": "gp_race",
+                "course_index": course_index,
+                "engine_setting_raw_value_ram": engine_raw,
+            }
+        )
         terminal_info = {
             "career_mode_attempt_id": "attempt-a",
             "career_mode_target_label": "Clear Master Jack Cup",
@@ -1186,9 +1195,18 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
             info={
                 **terminal_info,
                 "course_index": course_index,
-                "engine_setting_raw_value_ram": engine_raw,
+                "engine_setting_raw_value_ram": 50,
             }
         )
+    recorder.record_event(
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Jack Cup",
+            "game_mode": "gp_race",
+            "course_index": 5,
+            "engine_setting_raw_value_ram": 103,
+        }
+    )
     recorder.record_event(
         info={
             "career_mode_attempt_id": "attempt-a",
@@ -1216,7 +1234,7 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
             "race_laps_completed": 3,
             "total_lap_count": 3,
             "course_index": 5,
-            "engine_setting_raw_value_ram": 103,
+            "engine_setting_raw_value_ram": 50,
         }
     )
     recorder.finish_segment(

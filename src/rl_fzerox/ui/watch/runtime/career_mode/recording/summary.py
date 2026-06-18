@@ -85,6 +85,7 @@ class _SegmentSummaryBuilder:
     final_info: dict[str, object] | None = None
     course_results: list[dict[str, object]] = field(default_factory=list)
     policy_checkpoints: list[dict[str, object]] = field(default_factory=list)
+    observed_course_engine_raw_values: dict[tuple[str, object], int] = field(default_factory=dict)
     last_course_result_signature: tuple[object, ...] | None = None
     last_policy_checkpoint_signature: tuple[object, ...] | None = None
 
@@ -96,8 +97,12 @@ class _SegmentSummaryBuilder:
         if status := last_finished_attempt_status(info):
             self.status = status
         self.final_info = _selected_summary_info(info)
+        if engine_observation := _course_engine_observation(info):
+            identity, engine_raw = engine_observation
+            self.observed_course_engine_raw_values[identity] = engine_raw
         course_result = _course_result(info)
         if course_result is not None:
+            self._apply_observed_course_engine(course_result)
             existing_index = _existing_course_result_index(self.course_results, course_result)
             if existing_index is not None:
                 self.course_results[existing_index] = _merge_missing_course_result_fields(
@@ -118,6 +123,15 @@ class _SegmentSummaryBuilder:
             return
         self.policy_checkpoints.append(policy_checkpoint)
         self.last_policy_checkpoint_signature = signature
+
+    def _apply_observed_course_engine(self, course_result: dict[str, object]) -> None:
+        identity = _course_result_identity(course_result)
+        if identity is None:
+            return
+        engine_raw = self.observed_course_engine_raw_values.get(identity)
+        if engine_raw is None:
+            return
+        course_result["engine_setting_raw_value"] = engine_raw
 
     def snapshot(self, *, source_path: Path, status: str | None) -> _SegmentSummarySnapshot:
         return _SegmentSummarySnapshot(
@@ -449,6 +463,45 @@ def _course_result_identity(result: Mapping[str, object]) -> tuple[str, object] 
     return None
 
 
+def _course_engine_observation(
+    info: Mapping[str, object],
+) -> tuple[tuple[str, object], int] | None:
+    if info.get("game_mode") != "gp_race" and info.get("game_mode_name") != "gp_race":
+        return None
+    if _str_info(info, "termination_reason") in {"finished", "retired", "crashed"}:
+        return None
+    identity = _course_identity_from_info(info)
+    if identity is None:
+        return None
+    engine_raw = _int_mapping(info, "engine_setting_raw_value_ram")
+    if engine_raw is None:
+        engine_raw = _int_mapping(info, "track_engine_setting_raw_value")
+    if engine_raw is None:
+        engine_raw = _int_mapping(info, "engine_setting_raw_value")
+    if engine_raw is None:
+        return None
+    return identity, engine_raw
+
+
+def _course_identity_from_info(info: Mapping[str, object]) -> tuple[str, object] | None:
+    for key in ("track_course_id", "course_id", "track_id", "career_mode_policy_course_id"):
+        value = info.get(key)
+        if value is None:
+            continue
+        if key in {"track_course_id", "career_mode_policy_course_id"}:
+            return ("course_id", value)
+        return (key, value)
+    for key in ("track_course_index", "course_index"):
+        value = info.get(key)
+        if value is not None:
+            if isinstance(value, int) and not isinstance(value, bool):
+                course = BUILT_IN_COURSES_BY_INDEX.get(value)
+                if course is not None:
+                    return ("course_id", course.id)
+            return ("course_index", value)
+    return None
+
+
 def _existing_course_result_index(
     results: list[dict[str, object]],
     candidate: Mapping[str, object],
@@ -515,13 +568,6 @@ def _add_course_result_fallbacks(
             difficulty = _summary_json_value(info.get("difficulty"))
             if difficulty is not None:
                 result.setdefault("difficulty", difficulty)
-
-    if "engine_setting_raw_value" not in result:
-        engine = _int_mapping(info, "engine_setting_raw_value_ram")
-        if engine is None:
-            engine = _int_mapping(info, "engine_setting_raw_value")
-        if engine is not None:
-            result["engine_setting_raw_value"] = engine
 
 
 def _course_terminal_fingerprint(result: Mapping[str, object]) -> tuple[object, ...] | None:
