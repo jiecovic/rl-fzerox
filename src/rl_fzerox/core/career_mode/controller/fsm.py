@@ -206,6 +206,7 @@ class CareerModeController(CareerMenuRoutingMixin):
             if facts.is_gp_result_screen:
                 if facts.terminal_race_result:
                     self._post_race.observe_terminal_result()
+                self._progress.observe_post_race_screen(info=info, setup=self._setup)
                 if self._post_race.continue_observed_result():
                     return self._continue_after_race_pulse()
                 self._menu_steps.clear()

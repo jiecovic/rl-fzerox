@@ -787,6 +787,130 @@ def test_replayed_target_success_counts_when_ceremony_returns_to_menu(
     assert store.started_next_attempt_count == 0
 
 
+def test_replayed_target_success_counts_ceremony_when_rank_is_missing(
+    tmp_path: Path,
+) -> None:
+    store = _ReplayTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        target_clear_goal=1,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    post_gp_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+    menu_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "main_menu", "termination_reason": "finished"},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert post_gp_transition.attempt_finished is False
+    assert menu_transition.attempt_finished is True
+    assert menu_transition.finished_status == "succeeded"
+    assert progress.attempt_id is None
+    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert store.status_updates == ["paused"]
+    assert store.started_next_attempt_count == 0
+
+
+def test_replayed_target_uses_final_rank_observed_before_ceremony(
+    tmp_path: Path,
+) -> None:
+    store = _ReplayTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        target_clear_goal=1,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    progress.observe_post_race_screen(
+        info={
+            "game_mode": "results",
+            "termination_reason": "finished",
+            "course_index": 5,
+            "gp_final_rank": 1,
+        },
+        setup=_race_setup(),
+    )
+    post_gp_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "gp_end_cutscene", "termination_reason": "finished"},
+    )
+    menu_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "main_menu", "termination_reason": "finished"},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert post_gp_transition.attempt_finished is False
+    assert menu_transition.attempt_finished is True
+    assert menu_transition.finished_status == "succeeded"
+    assert progress.attempt_id is None
+    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
+    assert store.status_updates == ["paused"]
+    assert store.started_next_attempt_count == 0
+
+
+def test_replayed_target_uses_losing_rank_observed_before_ceremony(
+    tmp_path: Path,
+) -> None:
+    store = _ReplayTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        target_clear_goal=1,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    progress.observe_post_race_screen(
+        info={
+            "game_mode": "results",
+            "termination_reason": "finished",
+            "course_index": 5,
+            "gp_final_rank": 2,
+        },
+        setup=_race_setup(),
+    )
+    menu_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "main_menu", "termination_reason": "finished"},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert menu_transition.attempt_finished is True
+    assert menu_transition.finished_status == "failed"
+    assert menu_transition.finished_failure_reason == "gp cup final rank 2"
+    assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank 2")]
+
+
 def test_replayed_target_success_does_not_finish_after_nonfinal_course(
     tmp_path: Path,
 ) -> None:
