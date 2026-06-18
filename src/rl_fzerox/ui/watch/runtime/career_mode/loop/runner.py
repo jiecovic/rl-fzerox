@@ -13,6 +13,7 @@ from rl_fzerox.core.career_mode.navigation import (
     course_id_from_info,
     in_gp_race,
 )
+from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.records import TrackRecordBook
@@ -31,6 +32,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
     career_mode_attempt_id,
     career_runtime_error_context,
     fresh_menu_runtime_state,
+    policy_intro_wait_required,
     reset_emulator_for_next_attempt,
     should_observe_policy_transition,
 )
@@ -311,6 +313,58 @@ def _run_career_mode_loop_body(
         )
         reset_info = dict(info)
         current_telemetry = _read_live_telemetry(session.emulator)
+
+    def step_visible_policy_intro_wait(target_timer: int) -> None:
+        nonlocal last_menu_step, current_step_seconds, raw_observation, observation
+        nonlocal raw_info, info, reset_info, episode_reward, current_control_state
+        nonlocal current_gas_level, boost_lamp_level, current_telemetry
+
+        step = RawMenuStep(
+            menu_input=MenuInput.NEUTRAL,
+            frames=1,
+            phase=f"policy_intro:wait_until_timer_{target_timer}",
+        )
+        last_menu_step = step
+        step_menu(
+            config=config,
+            session=session,
+            controller=controller,
+            snapshot_queue=snapshot_queue,
+            step=step,
+            info=info,
+            reset_info=reset_info,
+            episode=episode,
+            episode_reward=episode_reward,
+            control_rate=control_rate,
+            target_control_fps=target_control_fps,
+            native_frame_seconds=native_frame_seconds,
+            deterministic_policy=deterministic_policy,
+            track_record_book=track_record_book,
+            frame_recorder=frame_recorder,
+        )
+        current_step_seconds = None
+        raw_observation = None
+        observation = None
+        episode_reward = 0.0
+        current_control_state = RaceControlState()
+        current_gas_level = 0.0
+        boost_lamp_level = 0.0
+        raw_info = menu_viewer_info(session)
+        info = controller.viewer_info(
+            info=dict(raw_info),
+            active_policy_control=None,
+        )
+        reset_info = dict(info)
+        current_telemetry = _read_live_telemetry(session.emulator)
+
+    def active_policy_intro_target_timer() -> int | None:
+        if active_policy_control is None:
+            return None
+        return build_managed_train_app_config(
+            active_policy_control.policy_run.config,
+            run_id=active_policy_control.policy_run.id,
+            run_dir=active_policy_control.policy_run.run_dir,
+        ).env.race_intro_target_timer
 
     try:
         while True:
@@ -652,6 +706,14 @@ def _run_career_mode_loop_body(
                     trace_career_state("after_policy_resolution_wait")
                     continue
                 if not active_policy_started:
+                    target_timer = active_policy_intro_target_timer()
+                    if target_timer is not None and policy_intro_wait_required(
+                        info=info,
+                        target_timer=target_timer,
+                    ):
+                        step_visible_policy_intro_wait(target_timer)
+                        trace_career_state("after_policy_intro_wait")
+                        continue
                     control_rate.reset()
                     raw_observation, raw_info = session.begin_policy_race(
                         policy_control=active_policy_control,

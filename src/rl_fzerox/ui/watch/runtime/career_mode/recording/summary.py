@@ -438,6 +438,8 @@ def _course_result(info: Mapping[str, object]) -> dict[str, object] | None:
         if value is not None:
             result[output_key] = value
     _add_course_result_fallbacks(result, info)
+    if reason == "finished" and _course_result_identity(result) is None:
+        return None
     return result
 
 

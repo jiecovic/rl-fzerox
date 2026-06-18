@@ -64,6 +64,19 @@ def should_observe_policy_transition(
     return not in_gp_race(info)
 
 
+def policy_intro_wait_required(
+    *,
+    info: Mapping[str, object],
+    target_timer: int | None,
+) -> bool:
+    """Keep countdown frames visible until policy starts at the training boundary."""
+
+    if target_timer is None:
+        return False
+    intro_timer = info.get("race_intro_timer")
+    return isinstance(intro_timer, int) and intro_timer > target_timer
+
+
 def career_mode_attempt_id(info: Mapping[str, object]) -> str | None:
     value = info.get("career_mode_attempt_id")
     return value if isinstance(value, str) and value else None

@@ -1237,6 +1237,20 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
             "engine_setting_raw_value_ram": 50,
         }
     )
+    recorder.record_event(
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Jack Cup",
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "failed",
+            "termination_reason": "finished",
+            "race_time_ms": 130_340,
+            "position": 1,
+            "ko_star_count": 0,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+        }
+    )
     recorder.finish_segment(
         status="failed",
         info={
