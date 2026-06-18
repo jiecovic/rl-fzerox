@@ -52,6 +52,11 @@ impl PyStepSummary {
                 damage_taken_frames,
                 impact_frames: resolved_impact_frames,
                 airborne_frames: optional_item(data, "airborne_frames", 0)?,
+                outside_track_min_height_above_ground: optional_item(
+                    data,
+                    "outside_track_min_height_above_ground",
+                    None,
+                )?,
                 spin_macro_started: optional_item(data, "spin_macro_started", false)?,
                 spin_macro_active_frames: optional_item(data, "spin_macro_active_frames", 0)?,
                 lean_macro_owned_frames: optional_item(data, "lean_macro_owned_frames", 0)?,
@@ -120,6 +125,11 @@ impl PyStepSummary {
     #[getter]
     fn airborne_frames(&self) -> usize {
         self.inner.airborne_frames
+    }
+
+    #[getter]
+    fn outside_track_min_height_above_ground(&self) -> Option<f32> {
+        self.inner.outside_track_min_height_above_ground
     }
 
     #[getter]
@@ -225,6 +235,10 @@ impl PyStepSummary {
         dict.set_item("damage_taken_frames", self.damage_taken_frames())?;
         dict.set_item("impact_frames", self.impact_frames())?;
         dict.set_item("airborne_frames", self.airborne_frames())?;
+        dict.set_item(
+            "outside_track_min_height_above_ground",
+            self.outside_track_min_height_above_ground(),
+        )?;
         dict.set_item("spin_macro_started", self.spin_macro_started())?;
         dict.set_item("spin_macro_active_frames", self.spin_macro_active_frames())?;
         dict.set_item("lean_macro_owned_frames", self.lean_macro_owned_frames())?;

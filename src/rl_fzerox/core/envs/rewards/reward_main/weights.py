@@ -25,6 +25,8 @@ class RewardMainWeights:
     outside_track_recovery_reward: float = 0.0
     outside_track_recovery_reward_cap: float = 0.1
     outside_track_recovery_airborne_grace_frames: int = 30
+    outside_track_dip_penalty: float = 0.0
+    outside_track_dip_height_threshold: float = 0.0
     time_penalty_per_frame: float = 0.0
     lap_completion_bonus: float = 5.0
     lap_position_scale: float = 1.0

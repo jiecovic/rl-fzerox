@@ -139,6 +139,44 @@ fn step_accumulator_counts_airborne_frames() {
 }
 
 #[test]
+fn step_accumulator_tracks_min_height_while_outside_track_bounds() {
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(
+        &telemetry_with_track(101.0, 100.0, 120.0, 12.0, 10.0, 10.0, 3.0),
+        21,
+    );
+    accumulator.observe(
+        &telemetry_with_track(102.0, 100.0, 120.0, 12.0, 10.0, 10.0, -9.0),
+        22,
+    );
+    accumulator.observe(
+        &telemetry_with_track(103.0, 100.0, 120.0, 0.0, 10.0, 10.0, -30.0),
+        23,
+    );
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.outside_track_min_height_above_ground, Some(-9.0));
+}
+
+#[test]
+fn step_accumulator_ignores_height_dips_inside_track_bounds() {
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(
+        &telemetry_with_track(101.0, 100.0, 120.0, 0.0, 10.0, 10.0, -30.0),
+        21,
+    );
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.outside_track_min_height_above_ground, None);
+}
+
+#[test]
 fn step_accumulator_counts_collision_recoil_active_frames() {
     let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
@@ -300,7 +338,29 @@ fn telemetry(
         speed_kph,
         energy,
         race_distance,
+        signed_lateral_offset: 0.0,
+        current_radius_left: 0.0,
+        current_radius_right: 0.0,
+        height_above_ground: 0.0,
         reverse_timer,
         damage_rumble_counter,
+    }
+}
+
+fn telemetry_with_track(
+    race_distance: f32,
+    energy: f32,
+    speed_kph: f32,
+    signed_lateral_offset: f32,
+    current_radius_left: f32,
+    current_radius_right: f32,
+    height_above_ground: f32,
+) -> StepTelemetrySample {
+    StepTelemetrySample {
+        signed_lateral_offset,
+        current_radius_left,
+        current_radius_right,
+        height_above_ground,
+        ..telemetry(race_distance, energy, speed_kph, STATE_FLAGS.active, 0, 0)
     }
 }

@@ -92,6 +92,10 @@ pub(crate) struct StepTelemetrySample {
     pub speed_kph: f32,
     pub energy: f32,
     pub race_distance: f32,
+    pub signed_lateral_offset: f32,
+    pub current_radius_left: f32,
+    pub current_radius_right: f32,
+    pub height_above_ground: f32,
     pub reverse_timer: i32,
     pub damage_rumble_counter: i32,
 }
@@ -108,6 +112,28 @@ impl StepTelemetrySample {
 
     pub(crate) fn airborne(&self) -> bool {
         (self.state_flags & RACER_STATE_FLAGS.airborne) != 0
+    }
+
+    pub(crate) fn outside_track_bounds(&self) -> bool {
+        outside_track_bounds(
+            self.signed_lateral_offset,
+            self.current_radius_left,
+            self.current_radius_right,
+        )
+    }
+}
+
+pub(crate) fn outside_track_bounds(
+    offset: f32,
+    current_radius_left: f32,
+    current_radius_right: f32,
+) -> bool {
+    // Mirrors the decomp-derived edge threshold used by the Python reward and
+    // observation code: 10% beyond the currently active side radius is outside.
+    if offset >= 0.0 {
+        current_radius_left > 0.0 && offset > current_radius_left * 1.10
+    } else {
+        current_radius_right > 0.0 && offset < -current_radius_right * 1.10
     }
 }
 

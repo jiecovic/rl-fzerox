@@ -42,6 +42,8 @@ pub struct StepSummary {
     pub impact_frames: usize,
     /// Number of internal frames where the player machine was airborne.
     pub airborne_frames: usize,
+    /// Minimum height seen while the player was outside track bounds during this step.
+    pub outside_track_min_height_above_ground: Option<f32>,
     /// Whether a spin macro began during this env step.
     pub spin_macro_started: bool,
     /// Number of internal frames where a spin macro controlled lean buttons.

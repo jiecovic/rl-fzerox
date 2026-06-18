@@ -54,6 +54,8 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "outside_track_recovery_reward": 0.125,
         "outside_track_recovery_reward_cap": 0.75,
         "outside_track_recovery_airborne_grace_frames": 11,
+        "outside_track_dip_penalty": -0.125,
+        "outside_track_dip_height_threshold": -5.0,
         "time_penalty_per_frame": -0.002,
         "lap_completion_bonus": 9.0,
         "lap_position_scale": 0.33,

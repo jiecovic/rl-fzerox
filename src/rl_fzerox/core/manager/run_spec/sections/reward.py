@@ -39,6 +39,8 @@ class ManagedRewardConfig(BaseModel):
     outside_track_recovery_reward: NonNegativeFloat = 0.0
     outside_track_recovery_reward_cap: NonNegativeFloat = 0.1
     outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
+    outside_track_dip_penalty: float = Field(default=0.0, le=0.0)
+    outside_track_dip_height_threshold: float = Field(default=0.0, le=0.0)
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     ko_star_reward: NonNegativeFloat = 0.0

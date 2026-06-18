@@ -68,6 +68,13 @@ impl StepAccumulator {
         if telemetry.airborne() {
             self.summary.airborne_frames += 1;
         }
+        if telemetry.outside_track_bounds() {
+            self.summary.outside_track_min_height_above_ground =
+                Some(match self.summary.outside_track_min_height_above_ground {
+                    Some(previous) => previous.min(telemetry.height_above_ground),
+                    None => telemetry.height_above_ground,
+                });
+        }
 
         let energy_delta = telemetry.energy - self.previous_energy;
         if energy_delta < -self.energy_loss_epsilon {

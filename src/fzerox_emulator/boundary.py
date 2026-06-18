@@ -211,6 +211,7 @@ class StepSummaryDict(TypedDict, total=False):
     entered_course_effects: int
     final_frame_index: int
     airborne_frames: int
+    outside_track_min_height_above_ground: float | None
     spin_macro_started: bool
     spin_macro_active_frames: int
     lean_macro_owned_frames: int

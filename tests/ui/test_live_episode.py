@@ -8,6 +8,8 @@ import pytest
 from rl_fzerox.ui.watch.live_series import LIVE_SERIES_LIMITS, EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.view.panels.visuals.live import (
     LIVE_CHART_STYLE,
+    _height_above_ground_reference_lines,
+    _height_above_ground_summary,
     _ko_star_events_summary,
     _plot_legend_rows,
     _plot_points,
@@ -211,6 +213,36 @@ def test_speed_summary_reports_current_episode_average() -> None:
 
     assert "now 900.0 km/h" in summary
     assert "avg 600.0" in summary
+
+
+def test_height_summary_tracks_episode_minimum() -> None:
+    tracker = EpisodeLiveSeriesTracker()
+    for step, height in ((2, 8.0), (4, -3.5), (6, 12.25)):
+        tracker.observe_snapshot(
+            _Snapshot(
+                episode=1,
+                policy_decision_frame=True,
+                info={
+                    "episode_step": step,
+                    "episode_completion_fraction": 0.2,
+                    "speed_kph": 300.0,
+                },
+                episode_reward=0.0,
+                telemetry_data={"player": {"height_above_ground": height}},
+            ),
+            action_repeat=1,
+        )
+
+    snapshot = tracker.snapshot()
+    summary = _height_above_ground_summary(snapshot)
+    reference_lines = _height_above_ground_reference_lines(snapshot)
+
+    assert "now 12.2" in summary
+    assert "min -3.5" in summary
+    assert "max 12.2" in summary
+    assert len(reference_lines) == 1
+    assert reference_lines[0].value == pytest.approx(-3.5)
+    assert reference_lines[0].label == "-3.50"
 
 
 def test_live_episode_tracker_computes_left_edge_excess_ratio() -> None:

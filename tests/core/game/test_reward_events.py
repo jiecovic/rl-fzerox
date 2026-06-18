@@ -477,6 +477,124 @@ def test_reward_main_requires_peak_height_for_landing_reward() -> None:
     assert shallow_landing.breakdown == {}
 
 
+def test_reward_main_penalizes_outside_track_dip_once_per_excursion() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            outside_track_dip_penalty=-0.1,
+            outside_track_dip_height_threshold=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    outside_above_track = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(
+            race_distance=0.0,
+            height_above_ground=3.0,
+            signed_lateral_offset=12.0,
+            current_radius_left=10.0,
+        ),
+    )
+    first_dip = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=2),
+        _telemetry(
+            race_distance=0.0,
+            height_above_ground=-0.5,
+            signed_lateral_offset=12.0,
+            current_radius_left=10.0,
+        ),
+    )
+    held_outside_dip = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=3),
+        _telemetry(
+            race_distance=0.0,
+            height_above_ground=-8.0,
+            signed_lateral_offset=12.0,
+            current_radius_left=10.0,
+        ),
+    )
+    back_inside = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=4),
+        _telemetry(race_distance=0.0, height_above_ground=-0.5),
+    )
+    next_outside_dip = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=5),
+        _telemetry(
+            race_distance=0.0,
+            height_above_ground=-0.5,
+            signed_lateral_offset=12.0,
+            current_radius_left=10.0,
+        ),
+    )
+
+    assert outside_above_track.reward == 0.0
+    assert outside_above_track.breakdown == {}
+    assert first_dip.reward == pytest.approx(-0.1)
+    assert first_dip.breakdown == {"outside_track_dip": -0.1}
+    assert held_outside_dip.reward == 0.0
+    assert held_outside_dip.breakdown == {}
+    assert back_inside.reward == 0.0
+    assert back_inside.breakdown == {}
+    assert next_outside_dip.reward == pytest.approx(-0.1)
+    assert next_outside_dip.breakdown == {"outside_track_dip": -0.1}
+
+
+def test_reward_main_does_not_penalize_below_track_height_inside_bounds() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            outside_track_dip_penalty=-0.1,
+            outside_track_dip_height_threshold=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, height_above_ground=-30.0),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
+
+
+def test_reward_main_penalizes_repeated_step_outside_track_dip() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            outside_track_dip_penalty=-0.1,
+            outside_track_dip_height_threshold=-8.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(
+            max_race_distance=0.0,
+            outside_track_min_height_above_ground=-9.0,
+        ),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, height_above_ground=2.0),
+    )
+
+    assert step.reward == pytest.approx(-0.1)
+    assert step.breakdown == {"outside_track_dip": -0.1}
+    assert step.debug_info["outside_track_dip_height"] == -9.0
+
+
 def _telemetry(
     *,
     race_distance: float,
@@ -491,6 +609,9 @@ def _telemetry(
     reverse_timer: int = 0,
     on_energy_refill: bool = False,
     height_above_ground: float = 0.0,
+    signed_lateral_offset: float = 0.0,
+    current_radius_left: float = 0.0,
+    current_radius_right: float = 0.0,
 ) -> FZeroXTelemetry:
     state_flags = encode_state_flags(state_labels)
     if on_energy_refill:
@@ -508,6 +629,9 @@ def _telemetry(
         lap=max(laps_completed + 1, 1) if lap is None else lap,
         reverse_timer=reverse_timer,
         height_above_ground=height_above_ground,
+        signed_lateral_offset=signed_lateral_offset,
+        current_radius_left=current_radius_left,
+        current_radius_right=current_radius_right,
     )
 
 
@@ -521,6 +645,7 @@ def _summary(
     damage_taken_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     airborne_frames: int = 0,
+    outside_track_min_height_above_ground: float | None = None,
 ) -> StepSummary:
     return make_step_summary(
         frames_run=frames_run,
@@ -532,6 +657,7 @@ def _summary(
         entered_state_labels=entered_state_labels,
         final_frame_index=frames_run,
         airborne_frames=airborne_frames,
+        outside_track_min_height_above_ground=outside_track_min_height_above_ground,
     )
 
 

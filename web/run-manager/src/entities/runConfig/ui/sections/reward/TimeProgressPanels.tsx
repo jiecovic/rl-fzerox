@@ -219,6 +219,24 @@ export function TimeProgressPanels({
             }
           />
           <NumberField
+            help="One-shot penalty applied once per outside-track excursion when height above ground is at or below the dip threshold. Set to 0 to disable."
+            label="Outside-track dip penalty"
+            resetValue={defaultConfig.reward.outside_track_dip_penalty}
+            step="0.01"
+            value={config.reward.outside_track_dip_penalty}
+            onChange={(value) => updateReward({ outside_track_dip_penalty: Math.min(value, 0) })}
+          />
+          <NumberField
+            help="Height-above-ground cutoff for the dip penalty. For example, -8 means only outside-track dips at or below -8 game units trigger."
+            label="Dip height threshold"
+            resetValue={defaultConfig.reward.outside_track_dip_height_threshold}
+            step="1"
+            value={config.reward.outside_track_dip_height_threshold}
+            onChange={(value) =>
+              updateReward({ outside_track_dip_height_threshold: Math.min(value, 0) })
+            }
+          />
+          <NumberField
             help="Reward paid when a jump lands after meeting the landing airborne grace."
             label="Landing reward"
             resetValue={defaultConfig.reward.airborne_landing_reward}

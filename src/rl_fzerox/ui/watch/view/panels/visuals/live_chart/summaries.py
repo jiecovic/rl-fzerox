@@ -128,7 +128,25 @@ def _outside_edge_excess_ratio_summary(
 
 def _height_above_ground_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     if live_series is None or not live_series.height_above_ground:
-        return "now - · max -"
+        return "now - · min - · max -"
     current_height = live_series.height_above_ground[-1]
-    max_height = _float_tuple_stats(live_series.height_above_ground).maximum
-    return f"now {current_height:.1f} · max {max_height:.1f}"
+    height_stats = _float_tuple_stats(live_series.height_above_ground)
+    return (
+        f"now {current_height:.1f} · min {height_stats.minimum:.1f} "
+        f"· max {height_stats.maximum:.1f}"
+    )
+
+
+def _height_above_ground_reference_lines(
+    live_series: EpisodeLiveSeriesSnapshot | None,
+) -> tuple[_PlotReferenceLine, ...]:
+    if live_series is None or not live_series.height_above_ground:
+        return ()
+    min_height = _float_tuple_stats(live_series.height_above_ground).minimum
+    return (
+        _PlotReferenceLine(
+            value=min_height,
+            color=LIVE_CHART_STYLE.min_height_color,
+            label=_format_axis_value(min_height),
+        ),
+    )

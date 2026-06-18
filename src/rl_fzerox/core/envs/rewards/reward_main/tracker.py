@@ -19,6 +19,8 @@ from rl_fzerox.core.envs.rewards.reward_main.controls import (
     lean_activation_penalty,
     lean_request_penalty,
     manual_boost_reward,
+    outside_track_dip_height,
+    outside_track_dip_penalty,
     outside_track_recovery_reward,
     spin_request_penalty,
 )
@@ -80,6 +82,7 @@ class RewardMainTracker:
         self._landing_airborne_peak_height = 0.0
         self._outside_track_recovery_airborne_frames = 0
         self._outside_track_recovery_armed = False
+        self._outside_track_dip_penalized = False
         self._previous_outside_recovery_distance: float | None = None
         self._previous_ko_star_count: int | None = None
         self._previous_lean_requested = False
@@ -111,6 +114,7 @@ class RewardMainTracker:
         )
         self._outside_track_recovery_airborne_frames = 0
         self._outside_track_recovery_armed = False
+        self._outside_track_dip_penalized = False
         self._previous_outside_recovery_distance = previous_outside_track_recovery_distance(
             telemetry
         )
@@ -142,6 +146,7 @@ class RewardMainTracker:
             self._landing_airborne_peak_height = 0.0
             self._outside_track_recovery_airborne_frames = 0
             self._outside_track_recovery_armed = False
+            self._outside_track_dip_penalized = False
             self._previous_outside_recovery_distance = None
             self._previous_ko_star_count = None
             self._previous_lean_requested = False
@@ -227,6 +232,22 @@ class RewardMainTracker:
         if recovery_reward:
             reward += recovery_reward
             breakdown["outside_track_recovery"] = recovery_reward
+
+        dip_height = outside_track_dip_height(
+            summary,
+            telemetry,
+            outside_track_bounds=outside_track_bounds,
+        )
+        dip_penalty = outside_track_dip_penalty(
+            dip_height=dip_height,
+            already_penalized=self._outside_track_dip_penalized,
+            weights=self._weights,
+        )
+        if dip_penalty:
+            reward += dip_penalty
+            breakdown["outside_track_dip"] = dip_penalty
+            debug_info["outside_track_dip_penalty_event"] = True
+            debug_info["outside_track_dip_height"] = dip_height
 
         lap_reward = self._laps.reward(
             telemetry,
@@ -374,6 +395,11 @@ class RewardMainTracker:
             recovery_airborne_frames if outside_track_bounds else 0
         )
         self._outside_track_recovery_armed = recovery_armed if outside_track_bounds else False
+        self._outside_track_dip_penalized = (
+            (self._outside_track_dip_penalized or bool(dip_penalty))
+            if outside_track_bounds or dip_height is not None
+            else False
+        )
         self._previous_outside_recovery_distance = previous_outside_track_recovery_distance(
             telemetry
         )

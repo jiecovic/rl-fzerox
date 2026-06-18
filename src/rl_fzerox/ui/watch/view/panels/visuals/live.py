@@ -13,6 +13,7 @@ from rl_fzerox.ui.watch.view.panels.visuals.live_chart.plot import (
 from rl_fzerox.ui.watch.view.panels.visuals.live_chart.style import LIVE_CHART_STYLE
 from rl_fzerox.ui.watch.view.panels.visuals.live_chart.summaries import (
     _edge_ratio_summary,
+    _height_above_ground_reference_lines,
     _height_above_ground_summary,
     _ko_star_events_summary,
     _multiplier_range,
@@ -168,6 +169,7 @@ def _draw_live_tab(
         fixed_range=None,
         zero_line=True,
         plot_height=plot_height,
+        reference_lines=_height_above_ground_reference_lines(live_series),
     )
     _draw_chart_block(
         pygame=pygame,

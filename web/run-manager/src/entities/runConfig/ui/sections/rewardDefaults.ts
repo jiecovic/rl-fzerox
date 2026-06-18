@@ -33,6 +33,8 @@ export function boundsDefaults(reward: RewardConfig): RewardPatch {
     airborne_landing_min_peak_height: reward.airborne_landing_min_peak_height,
     outside_track_recovery_airborne_grace_frames:
       reward.outside_track_recovery_airborne_grace_frames,
+    outside_track_dip_height_threshold: reward.outside_track_dip_height_threshold,
+    outside_track_dip_penalty: reward.outside_track_dip_penalty,
     outside_track_recovery_reward_cap: reward.outside_track_recovery_reward_cap,
     outside_track_recovery_reward: reward.outside_track_recovery_reward,
   };

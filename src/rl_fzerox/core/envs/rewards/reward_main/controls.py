@@ -26,6 +26,34 @@ def outside_track_recovery_reward(
     return max(-cap, min(cap, reward))
 
 
+def outside_track_dip_penalty(
+    *,
+    dip_height: float | None,
+    already_penalized: bool,
+    weights: RewardMainWeights,
+) -> float:
+    penalty = weights.outside_track_dip_penalty
+    if penalty >= 0.0 or already_penalized or dip_height is None:
+        return 0.0
+    if dip_height > float(weights.outside_track_dip_height_threshold):
+        return 0.0
+    return penalty
+
+
+def outside_track_dip_height(
+    summary: StepSummary,
+    telemetry: FZeroXTelemetry,
+    *,
+    outside_track_bounds: bool,
+) -> float | None:
+    height = getattr(summary, "outside_track_min_height_above_ground", None)
+    if height is not None:
+        return float(height)
+    if outside_track_bounds:
+        return float(telemetry.player.height_above_ground)
+    return None
+
+
 def lean_request_penalty(
     summary: StepSummary,
     action_context: RewardActionContext | None,

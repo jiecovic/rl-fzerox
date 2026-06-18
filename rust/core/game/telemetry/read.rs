@@ -15,7 +15,7 @@ use crate::core::telemetry::layout::{
 };
 use crate::core::telemetry::model::{
     MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry, StepTelemetrySample,
-    TelemetrySnapshot,
+    TelemetrySnapshot, outside_track_bounds,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -90,11 +90,20 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
 pub(crate) fn read_step_sample(system_ram: &[u8]) -> Result<StepTelemetrySample, CoreError> {
     let player_base = validate_snapshot_memory(system_ram)?;
     let reverse_timer_offset = player_reverse_timer_offset();
+    let segment_info_base = player_base + RACER.segment_position_info;
     Ok(StepTelemetrySample {
         state_flags: read_u32(system_ram, player_base + RACER.state_flags)?,
         speed_kph: read_f32(system_ram, player_base + RACER.speed)? * TELEMETRY_CONFIG.speed_to_kph,
         energy: read_f32(system_ram, player_base + RACER.energy)?,
         race_distance: read_f32(system_ram, player_base + RACER.race_distance)?,
+        signed_lateral_offset: read_signed_lateral_offset(
+            system_ram,
+            player_base,
+            segment_info_base,
+        )?,
+        current_radius_left: read_f32(system_ram, player_base + RACER.current_radius_left)?,
+        current_radius_right: read_f32(system_ram, player_base + RACER.current_radius_right)?,
+        height_above_ground: read_f32(system_ram, player_base + RACER.height_above_ground)?,
         reverse_timer: read_i32(system_ram, reverse_timer_offset)?,
         damage_rumble_counter: read_i32(system_ram, player_damage_rumble_counter_offset())?,
     })
@@ -306,14 +315,6 @@ fn future_local_nearest_segment(
         segment_offset = next_segment_offset;
     }
     Ok(best)
-}
-
-fn outside_track_bounds(offset: f32, current_radius_left: f32, current_radius_right: f32) -> bool {
-    if offset >= 0.0 {
-        current_radius_left > 0.0 && offset > current_radius_left * 1.10
-    } else {
-        current_radius_right > 0.0 && offset < -current_radius_right * 1.10
-    }
 }
 
 fn nearest_sample_on_segment(

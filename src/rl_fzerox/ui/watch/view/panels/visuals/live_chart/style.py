@@ -33,6 +33,7 @@ class _LiveChartStyle:
     edge_ratio_color: tuple[int, int, int] = (255, 132, 132)
     outside_edge_excess_ratio_color: tuple[int, int, int] = (175, 220, 135)
     height_above_ground_color: tuple[int, int, int] = (190, 165, 255)
+    min_height_color: tuple[int, int, int] = (255, 196, 91)
     grid_color: tuple[int, int, int] = PALETTE.panel_border
     zero_line_color: tuple[int, int, int] = PALETTE.text_muted
     reference_line_dash: int = 8
