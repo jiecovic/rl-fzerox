@@ -28,6 +28,7 @@ impl StdioSilencer {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
 
+        // SAFETY: Passing a null stream asks libc to flush all open output streams.
         let _ = unsafe { libc::fflush(std::ptr::null_mut()) };
 
         let Ok(dev_null) = OpenOptions::new().write(true).open("/dev/null") else {
@@ -38,13 +39,18 @@ impl StdioSilencer {
             };
         };
 
+        // SAFETY: Duplicating process stdio file descriptors is safe; failures
+        // are reported as negative fds and handled below.
         let saved_stdout = unsafe { libc::dup(libc::STDOUT_FILENO) };
+        // SAFETY: Same as stdout duplication above.
         let saved_stderr = unsafe { libc::dup(libc::STDERR_FILENO) };
 
         if saved_stdout >= 0 {
+            // SAFETY: `dev_null` is an open fd and stdout is a valid process fd.
             let _ = unsafe { libc::dup2(dev_null.as_raw_fd(), libc::STDOUT_FILENO) };
         }
         if saved_stderr >= 0 {
+            // SAFETY: `dev_null` is an open fd and stderr is a valid process fd.
             let _ = unsafe { libc::dup2(dev_null.as_raw_fd(), libc::STDERR_FILENO) };
         }
 
@@ -58,13 +64,18 @@ impl StdioSilencer {
 
 impl Drop for StdioSilencer {
     fn drop(&mut self) {
+        // SAFETY: Passing a null stream asks libc to flush all open output streams.
         let _ = unsafe { libc::fflush(std::ptr::null_mut()) };
         if self.saved_stdout >= 0 {
+            // SAFETY: `saved_stdout` was returned by `dup` and is restored once.
             let _ = unsafe { libc::dup2(self.saved_stdout, libc::STDOUT_FILENO) };
+            // SAFETY: `saved_stdout` is no longer needed after restore.
             let _ = unsafe { libc::close(self.saved_stdout) };
         }
         if self.saved_stderr >= 0 {
+            // SAFETY: `saved_stderr` was returned by `dup` and is restored once.
             let _ = unsafe { libc::dup2(self.saved_stderr, libc::STDERR_FILENO) };
+            // SAFETY: `saved_stderr` is no longer needed after restore.
             let _ = unsafe { libc::close(self.saved_stderr) };
         }
     }

@@ -72,6 +72,9 @@ pub struct StepSpinStatus {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct StepCounters {
     /// Total internal frames executed in the current episode.
+    ///
+    /// The Python API exposes this as `step_count` for historical reasons, but
+    /// the value is a native-frame count, not the count of outer RL env steps.
     pub step_count: usize,
     /// Consecutive low-speed internal frames at the current episode frontier.
     pub stalled_steps: usize,

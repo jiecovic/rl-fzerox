@@ -73,5 +73,7 @@ where
     if pointer.is_null() {
         return Err(format!("missing GL symbol {name}"));
     }
+    // SAFETY: EGL returned a non-null pointer for the requested GL symbol and
+    // the caller chooses `T` to match that exact symbol signature.
     Ok(unsafe { std::mem::transmute_copy::<*const c_void, T>(&pointer) })
 }

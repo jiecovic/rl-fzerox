@@ -40,6 +40,9 @@ pub(crate) fn convert_argb8888(
 ) -> Vec<u8> {
     let mut rgb = vec![0_u8; width * height * 3];
     for row in 0..height {
+        // SAFETY: The raw frame pointer comes from libretro's video callback.
+        // Callers pass the callback pitch/size, so each row has at least
+        // `width * 4` bytes available.
         let src =
             unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 4) };
         let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
@@ -60,6 +63,9 @@ pub(crate) fn convert_rgb565(
 ) -> Vec<u8> {
     let mut rgb = vec![0_u8; width * height * 3];
     for row in 0..height {
+        // SAFETY: The raw frame pointer comes from libretro's video callback.
+        // Callers pass the callback pitch/size, so each row has at least
+        // `width * 2` bytes available.
         let src =
             unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 2) };
         let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
@@ -85,6 +91,9 @@ pub(crate) fn convert_argb1555(
 ) -> Vec<u8> {
     let mut rgb = vec![0_u8; width * height * 3];
     for row in 0..height {
+        // SAFETY: The raw frame pointer comes from libretro's video callback.
+        // Callers pass the callback pitch/size, so each row has at least
+        // `width * 2` bytes available.
         let src =
             unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 2) };
         let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];

@@ -16,6 +16,7 @@ pub(super) unsafe extern "C" fn get_proc_address(sym: *const c_char) -> ProcAddr
     if sym.is_null() {
         return missing_proc_stub;
     }
+    // SAFETY: libretro passes a valid NUL-terminated symbol name when `sym` is non-null.
     let symbol_name = unsafe { CStr::from_ptr(sym) };
     let pointer = egl_fns()
         .map(|egl| egl.proc_address(symbol_name))
@@ -23,6 +24,7 @@ pub(super) unsafe extern "C" fn get_proc_address(sym: *const c_char) -> ProcAddr
     if pointer.is_null() {
         return missing_proc_stub;
     }
+    // SAFETY: EGL returned a GL procedure pointer for the requested symbol.
     unsafe { std::mem::transmute::<*const c_void, ProcAddressFn>(pointer) }
 }
 

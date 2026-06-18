@@ -17,6 +17,9 @@ pub fn capture_raw_frame(
         return None;
     }
 
+    // SAFETY: The raw pointer and geometry come from libretro's video callback.
+    // Null and hardware-framebuffer sentinels are rejected above, and the copy
+    // length is checked against `usize` overflow.
     let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>(), pitch.checked_mul(height)?) };
     Some(RawVideoFrame {
         width,
@@ -41,6 +44,8 @@ pub fn capture_raw_frame_into(
     let Some(byte_len) = pitch.checked_mul(height) else {
         return false;
     };
+    // SAFETY: Same callback-owned source buffer as `capture_raw_frame`; the
+    // checked byte length covers the frame payload copied immediately below.
     let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>(), byte_len) };
     frame.width = width;
     frame.height = height;

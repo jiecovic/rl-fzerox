@@ -205,13 +205,15 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
             "damage_taken_frames": 1,
             "impact_frames": 2,
             "consecutive_low_speed_frames": 2,
-            "entered_state_flags": (1 << 13) | (1 << 25),
+            "entered_state_flags": (1 << 13) | (1 << 14) | (1 << 25),
             "entered_course_effects": 1 << 3,
             "final_frame_index": 12,
         }
     )
 
     assert summary.entered_finished is True
+    assert summary.entered_spinning_out is True
+    assert callable(summary.entered_spinning_out) is False
     assert summary.entered_crashed is False
     assert summary.max_race_distance_speed_kph == 930.0
     assert summary.energy_gain_total == 2.5
@@ -220,7 +222,11 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     assert summary.reverse_active_frames == 1
     assert summary.collision_recoil_active_frames == 2
     assert summary.low_speed_frames == 2
-    assert summary.entered_state_labels == ("collision_recoil", "finished")
+    assert summary.entered_state_labels == (
+        "collision_recoil",
+        "spinning_out",
+        "finished",
+    )
     assert summary.entered_course_effects == 1 << 3
     assert summary.entered_dash_surface is True
 

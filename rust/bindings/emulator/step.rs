@@ -167,6 +167,7 @@ impl PyStepSummary {
         PyTuple::new(py, state_flag_labels(self.inner.entered_state_flags))
     }
 
+    #[getter]
     fn entered_spinning_out(&self) -> bool {
         has_state_flag(
             self.inner.entered_state_flags,
