@@ -7,11 +7,11 @@ use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
 use crate::core::video::plan::{ProcessedFramePlanRequest, build_processed_frame_plan};
 use crate::core::video::{ImageResizeScratch, ResizeRequest, resize_rgb, resize_rgb_into};
 use crate::core::video::{
-    PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, rgb_to_luma_in_place,
+    RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, rgb_to_luma_in_place,
     rgb_to_luma_into, rgb_to_luma_vec,
 };
 
-use super::convert::{expand_5_to_8, expand_6_to_8};
+use super::convert::{decode_rgb_row, pixel_layout_bytes_per_pixel};
 
 pub fn processed_frame(
     frame: &VideoFrame,
@@ -237,64 +237,20 @@ fn write_raw_rgb_row(
     width: usize,
     dst: &mut [u8],
 ) -> Result<(), CoreError> {
-    match frame.pixel_layout {
-        PixelLayout::Argb8888 => {
-            let row_offset = y
-                .checked_mul(frame.pitch)
-                .and_then(|offset| offset.checked_add(start_x.checked_mul(4)?))
-                .ok_or(CoreError::NoFrameAvailable)?;
-            let row_bytes = frame
-                .bytes
-                .get(row_offset..row_offset + (width * 4))
-                .ok_or(CoreError::NoFrameAvailable)?;
-            for (src_pixel, dst_pixel) in row_bytes.chunks_exact(4).zip(dst.chunks_exact_mut(3)) {
-                dst_pixel[0] = src_pixel[2];
-                dst_pixel[1] = src_pixel[1];
-                dst_pixel[2] = src_pixel[0];
-            }
-            Ok(())
-        }
-        PixelLayout::Rgb565 => {
-            let row_offset = y
-                .checked_mul(frame.pitch)
-                .and_then(|offset| offset.checked_add(start_x.checked_mul(2)?))
-                .ok_or(CoreError::NoFrameAvailable)?;
-            let row_bytes = frame
-                .bytes
-                .get(row_offset..row_offset + (width * 2))
-                .ok_or(CoreError::NoFrameAvailable)?;
-            for (src_pixel, dst_pixel) in row_bytes.chunks_exact(2).zip(dst.chunks_exact_mut(3)) {
-                let pixel = u16::from_le_bytes([src_pixel[0], src_pixel[1]]);
-                let red = ((pixel >> 11) & 0x1f) as u8;
-                let green = ((pixel >> 5) & 0x3f) as u8;
-                let blue = (pixel & 0x1f) as u8;
-                dst_pixel[0] = expand_5_to_8(red);
-                dst_pixel[1] = expand_6_to_8(green);
-                dst_pixel[2] = expand_5_to_8(blue);
-            }
-            Ok(())
-        }
-        PixelLayout::Argb1555 => {
-            let row_offset = y
-                .checked_mul(frame.pitch)
-                .and_then(|offset| offset.checked_add(start_x.checked_mul(2)?))
-                .ok_or(CoreError::NoFrameAvailable)?;
-            let row_bytes = frame
-                .bytes
-                .get(row_offset..row_offset + (width * 2))
-                .ok_or(CoreError::NoFrameAvailable)?;
-            for (src_pixel, dst_pixel) in row_bytes.chunks_exact(2).zip(dst.chunks_exact_mut(3)) {
-                let pixel = u16::from_le_bytes([src_pixel[0], src_pixel[1]]);
-                let red = ((pixel >> 10) & 0x1f) as u8;
-                let green = ((pixel >> 5) & 0x1f) as u8;
-                let blue = (pixel & 0x1f) as u8;
-                dst_pixel[0] = expand_5_to_8(red);
-                dst_pixel[1] = expand_5_to_8(green);
-                dst_pixel[2] = expand_5_to_8(blue);
-            }
-            Ok(())
-        }
-    }
+    let bytes_per_pixel = pixel_layout_bytes_per_pixel(frame.pixel_layout);
+    let row_offset = y
+        .checked_mul(frame.pitch)
+        .and_then(|offset| offset.checked_add(start_x.checked_mul(bytes_per_pixel)?))
+        .ok_or(CoreError::NoFrameAvailable)?;
+    let row_len = width
+        .checked_mul(bytes_per_pixel)
+        .ok_or(CoreError::NoFrameAvailable)?;
+    let row_bytes = frame
+        .bytes
+        .get(row_offset..row_offset + row_len)
+        .ok_or(CoreError::NoFrameAvailable)?;
+    decode_rgb_row(frame.pixel_layout, row_bytes, dst);
+    Ok(())
 }
 
 fn crop_rgb(

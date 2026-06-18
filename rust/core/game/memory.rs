@@ -45,6 +45,20 @@ pub(crate) fn read_word_swapped_u8(memory: &[u8], logical_offset: usize) -> Resu
     read_u8(memory, logical_offset ^ 0x03)
 }
 
+pub(crate) fn read_word_swapped_i8(memory: &[u8], logical_offset: usize) -> Result<i8, CoreError> {
+    Ok(read_word_swapped_u8(memory, logical_offset)? as i8)
+}
+
+pub(crate) fn read_word_swapped_i16(
+    memory: &[u8],
+    logical_offset: usize,
+) -> Result<i16, CoreError> {
+    Ok(i16::from_be_bytes([
+        read_word_swapped_u8(memory, logical_offset)?,
+        read_word_swapped_u8(memory, logical_offset + 1)?,
+    ]))
+}
+
 fn read_u8(memory: &[u8], offset: usize) -> Result<u8, CoreError> {
     memory
         .get(offset)

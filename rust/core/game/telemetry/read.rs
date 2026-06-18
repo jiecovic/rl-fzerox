@@ -7,7 +7,8 @@ use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
 use crate::core::game::memory::{
-    read_f32, read_i8, read_i16, read_i32, read_u32, read_word_swapped_u8,
+    read_f32, read_i8, read_i16, read_i32, read_u32, read_word_swapped_i8, read_word_swapped_i16,
+    read_word_swapped_u8,
 };
 use crate::core::telemetry::layout::{
     CAMERA, COURSE_INFO, COURSE_SEGMENT, CameraRaceSetting, GLOBALS, GameMode, MACHINE_TABLE,
@@ -180,10 +181,10 @@ fn read_machine_context(system_ram: &[u8]) -> Result<MachineContextTelemetry, Co
         MACHINE_TABLE.machines + ((character_index as usize) * MACHINE_TABLE.machine_size);
     Ok(MachineContextTelemetry {
         character_index,
-        body_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.body_stat)?,
-        boost_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.boost_stat)?,
-        grip_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.grip_stat)?,
-        weight: read_machine_i16(system_ram, machine_base + MACHINE_TABLE.weight)?,
+        body_stat: read_word_swapped_i8(system_ram, machine_base + MACHINE_TABLE.body_stat)?,
+        boost_stat: read_word_swapped_i8(system_ram, machine_base + MACHINE_TABLE.boost_stat)?,
+        grip_stat: read_word_swapped_i8(system_ram, machine_base + MACHINE_TABLE.grip_stat)?,
+        weight: read_word_swapped_i16(system_ram, machine_base + MACHINE_TABLE.weight)?,
         engine_setting,
     })
 }
@@ -517,17 +518,6 @@ fn resolve_difficulty(difficulty_raw: i32) -> Option<RaceDifficulty> {
 
 fn resolve_camera_setting(camera_setting_raw: i32) -> Option<CameraRaceSetting> {
     CameraRaceSetting::try_from(camera_setting_raw).ok()
-}
-
-fn read_machine_i8(memory: &[u8], offset: usize) -> Result<i8, CoreError> {
-    Ok(read_word_swapped_u8(memory, offset)? as i8)
-}
-
-fn read_machine_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {
-    Ok(i16::from_be_bytes([
-        read_word_swapped_u8(memory, offset)?,
-        read_word_swapped_u8(memory, offset + 1)?,
-    ]))
 }
 
 fn read_vec3_magnitude(memory: &[u8], offset: usize) -> Result<f32, CoreError> {

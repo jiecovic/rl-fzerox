@@ -2,7 +2,7 @@
 //! Recompute live racer engine physics after reset-time engine RAM patches.
 
 use crate::core::error::CoreError;
-use crate::core::game::memory::{read_f32, read_word_swapped_u8, write_f32};
+use crate::core::game::memory::{read_f32, read_word_swapped_i8, read_word_swapped_i16, write_f32};
 use crate::core::game::race_start::invalid_setup;
 use crate::core::game::telemetry::layout::{MACHINE_TABLE, RACER, RACER_ENGINE};
 
@@ -238,7 +238,8 @@ fn read_machine_physics_context(
         MACHINE_TABLE.machines + ((character_index as usize) * MACHINE_TABLE.machine_size);
     let boost_stat = read_machine_stat(system_ram, machine_base + MACHINE_TABLE.boost_stat)?;
     let grip_stat = read_machine_stat(system_ram, machine_base + MACHINE_TABLE.grip_stat)?;
-    let table_weight = read_machine_i16(system_ram, machine_base + MACHINE_TABLE.weight)? as f32;
+    let table_weight =
+        read_word_swapped_i16(system_ram, machine_base + MACHINE_TABLE.weight)? as f32;
     let live_weight = read_f32(system_ram, player_base + RACER_ENGINE.machine_weight)?;
     Ok(MachinePhysicsContext {
         weight: if table_weight > 0.0 {
@@ -252,7 +253,7 @@ fn read_machine_physics_context(
 }
 
 fn read_machine_stat(system_ram: &[u8], offset: usize) -> Result<usize, CoreError> {
-    let stat = read_machine_i8(system_ram, offset)?;
+    let stat = read_word_swapped_i8(system_ram, offset)?;
     if (0..BOOST_STAT_ACCELERATION.len() as i8).contains(&stat) {
         return Ok(stat as usize);
     }
@@ -260,17 +261,6 @@ fn read_machine_stat(system_ram: &[u8], offset: usize) -> Result<usize, CoreErro
         "machine stat must be in [0, {}), got {stat}",
         BOOST_STAT_ACCELERATION.len()
     )))
-}
-
-fn read_machine_i8(memory: &[u8], offset: usize) -> Result<i8, CoreError> {
-    Ok(read_word_swapped_u8(memory, offset)? as i8)
-}
-
-fn read_machine_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {
-    Ok(i16::from_be_bytes([
-        read_word_swapped_u8(memory, offset)?,
-        read_word_swapped_u8(memory, offset + 1)?,
-    ]))
 }
 
 fn compute_engine_physics_fields(
