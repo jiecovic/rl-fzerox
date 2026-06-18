@@ -4,9 +4,122 @@ from __future__ import annotations
 from fzerox_emulator import (
     FZeroXTelemetry,
     PlayerTelemetry,
+    StepStatus,
     StepSummary,
     encode_state_flags,
 )
+
+PLAYER_TELEMETRY_TO_DICT_KEYS = {
+    "acceleration_force",
+    "acceleration_magnitude",
+    "boost_timer",
+    "collision_mass",
+    "course_effect_name",
+    "course_effect_raw",
+    "current_radius_left",
+    "current_radius_right",
+    "damage_rumble_counter",
+    "drift_attack_force",
+    "energy",
+    "engine_setting",
+    "future_local_nearest_segment_distance",
+    "future_local_nearest_segment_index",
+    "height_above_ground",
+    "ko_star_count",
+    "lap",
+    "lap_distance",
+    "laps_completed",
+    "lateral_displacement_magnitude",
+    "lateral_distance",
+    "local_lateral_velocity",
+    "machine_body_stat",
+    "machine_boost_stat",
+    "machine_character_index",
+    "machine_grip_stat",
+    "machine_weight",
+    "max_energy",
+    "on_energy_refill",
+    "position",
+    "race_distance",
+    "race_time_ms",
+    "recoil_tilt_magnitude",
+    "reverse_timer",
+    "segment_center_x",
+    "segment_center_y",
+    "segment_center_z",
+    "segment_index",
+    "segment_length_proportion",
+    "segment_t",
+    "signed_lateral_offset",
+    "speed_kph",
+    "state_flags",
+    "state_labels",
+    "velocity_magnitude",
+    "world_pos_x",
+    "world_pos_y",
+    "world_pos_z",
+}
+
+TELEMETRY_TO_DICT_KEYS = {
+    "camera_setting_name",
+    "camera_setting_raw",
+    "course_index",
+    "course_length",
+    "course_segment_count",
+    "difficulty_name",
+    "difficulty_raw",
+    "game_mode_name",
+    "game_mode_raw",
+    "gp_final_rank",
+    "in_race_mode",
+    "menu_current_ghost_type_raw",
+    "menu_difficulty_cursor_raw",
+    "menu_difficulty_state_raw",
+    "menu_selected_mode_raw",
+    "menu_transition_state_raw",
+    "player",
+    "queued_game_mode_raw",
+    "race_intro_timer",
+    "total_lap_count",
+    "total_racers",
+}
+
+STEP_SUMMARY_TO_DICT_KEYS = {
+    "airborne_frames",
+    "collision_recoil_active_frames",
+    "consecutive_low_speed_frames",
+    "damage_taken_frames",
+    "energy_gain_total",
+    "energy_loss_total",
+    "entered_course_effects",
+    "entered_state_flags",
+    "entered_state_labels",
+    "final_frame_index",
+    "frames_run",
+    "impact_frames",
+    "lean_macro_owned_frames",
+    "low_speed_frames",
+    "max_race_distance",
+    "max_race_distance_speed_kph",
+    "outside_track_min_height_above_ground",
+    "reverse_active_frames",
+    "spin_macro_active_frames",
+    "spin_macro_started",
+}
+
+STEP_STATUS_TO_DICT_KEYS = {
+    "progress_frontier_stalled_frames",
+    "reverse_timer",
+    "spin_macro_active",
+    "spin_macro_cooldown_frames",
+    "spin_macro_frames_remaining",
+    "stalled_steps",
+    "step_count",
+    "terminated",
+    "termination_reason",
+    "truncated",
+    "truncation_reason",
+}
 
 
 def test_native_player_telemetry_exposes_state_helpers() -> None:
@@ -155,6 +268,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
 
     payload = telemetry.to_dict()
 
+    assert set(payload) == TELEMETRY_TO_DICT_KEYS
     assert payload["total_lap_count"] == 3
     assert payload["difficulty_raw"] == 2
     assert payload["difficulty_name"] == "expert"
@@ -174,6 +288,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     assert payload["course_length"] == 80_000.0
     player_payload = payload["player"]
     assert isinstance(player_payload, dict)
+    assert set(player_payload) == PLAYER_TELEMETRY_TO_DICT_KEYS
     assert player_payload["recoil_tilt_magnitude"] == 0.5
     assert player_payload["ko_star_count"] == 4
     assert player_payload["machine_character_index"] == 4
@@ -211,6 +326,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
         }
     )
 
+    assert set(summary.to_dict()) == STEP_SUMMARY_TO_DICT_KEYS
     assert summary.entered_finished is True
     assert summary.entered_spinning_out is True
     assert callable(summary.entered_spinning_out) is False
@@ -229,6 +345,28 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     )
     assert summary.entered_course_effects == 1 << 3
     assert summary.entered_dash_surface is True
+
+
+def test_native_step_status_to_dict_key_surface() -> None:
+    status = StepStatus(
+        {
+            "step_count": 3,
+            "stalled_steps": 1,
+            "reverse_timer": 2,
+            "progress_frontier_stalled_frames": 4,
+            "termination_reason": "finished",
+            "truncation_reason": None,
+            "spin_macro_active": True,
+            "spin_macro_frames_remaining": 5,
+            "spin_macro_cooldown_frames": 6,
+        }
+    )
+
+    payload = status.to_dict()
+
+    assert set(payload) == STEP_STATUS_TO_DICT_KEYS
+    assert payload["terminated"] is True
+    assert payload["truncated"] is False
 
 
 def test_native_step_summary_dict_constructor_preserves_impact_frames() -> None:

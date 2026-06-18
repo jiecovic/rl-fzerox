@@ -5,6 +5,17 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
+macro_rules! set_py_dict_items {
+    ($dict:expr, { $($key:literal => $value:expr),* $(,)? }) => {{
+        $(
+            $dict.set_item($key, $value)?;
+        )*
+        Ok::<(), pyo3::PyErr>(())
+    }};
+}
+
+pub(crate) use set_py_dict_items;
+
 pub(crate) fn required_item<'py>(
     data: &Bound<'py, PyDict>,
     context: &str,

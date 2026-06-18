@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::bindings::emulator::telemetry::PyPlayerTelemetry;
-use crate::bindings::payload::{optional_item, required_item};
+use crate::bindings::payload::{optional_item, required_item, set_py_dict_items};
 use crate::core::telemetry::TelemetrySnapshot;
 
 const TELEMETRY_PAYLOAD: &str = "telemetry snapshot";
@@ -180,41 +180,31 @@ impl PyTelemetry {
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        dict.set_item("total_lap_count", self.total_lap_count())?;
-        dict.set_item("difficulty_raw", self.difficulty_raw())?;
-        dict.set_item("difficulty_name", self.difficulty_name())?;
-        dict.set_item("camera_setting_raw", self.camera_setting_raw())?;
-        dict.set_item("camera_setting_name", self.camera_setting_name())?;
-        dict.set_item("race_intro_timer", self.race_intro_timer())?;
-        dict.set_item("game_mode_raw", self.game_mode_raw())?;
-        dict.set_item("game_mode_name", self.game_mode_name())?;
-        dict.set_item("menu_selected_mode_raw", self.menu_selected_mode_raw())?;
-        dict.set_item(
-            "menu_difficulty_state_raw",
-            self.menu_difficulty_state_raw(),
-        )?;
-        dict.set_item(
-            "menu_difficulty_cursor_raw",
-            self.menu_difficulty_cursor_raw(),
-        )?;
-        dict.set_item(
-            "menu_transition_state_raw",
-            self.menu_transition_state_raw(),
-        )?;
-        dict.set_item(
-            "menu_current_ghost_type_raw",
-            self.menu_current_ghost_type_raw(),
-        )?;
-        dict.set_item("queued_game_mode_raw", self.queued_game_mode_raw())?;
-        dict.set_item("in_race_mode", self.in_race_mode())?;
-        dict.set_item("total_racers", self.total_racers())?;
-        dict.set_item("gp_final_rank", self.gp_final_rank())?;
-        dict.set_item("course_index", self.course_index())?;
-        dict.set_item("course_segment_count", self.course_segment_count())?;
-        dict.set_item("course_length", self.course_length())?;
         let player_handle = self.player(py);
         let player = player_handle.bind(py);
-        dict.set_item("player", player.call_method0("to_dict")?)?;
+        set_py_dict_items!(dict, {
+            "total_lap_count" => self.total_lap_count(),
+            "difficulty_raw" => self.difficulty_raw(),
+            "difficulty_name" => self.difficulty_name(),
+            "camera_setting_raw" => self.camera_setting_raw(),
+            "camera_setting_name" => self.camera_setting_name(),
+            "race_intro_timer" => self.race_intro_timer(),
+            "game_mode_raw" => self.game_mode_raw(),
+            "game_mode_name" => self.game_mode_name(),
+            "menu_selected_mode_raw" => self.menu_selected_mode_raw(),
+            "menu_difficulty_state_raw" => self.menu_difficulty_state_raw(),
+            "menu_difficulty_cursor_raw" => self.menu_difficulty_cursor_raw(),
+            "menu_transition_state_raw" => self.menu_transition_state_raw(),
+            "menu_current_ghost_type_raw" => self.menu_current_ghost_type_raw(),
+            "queued_game_mode_raw" => self.queued_game_mode_raw(),
+            "in_race_mode" => self.in_race_mode(),
+            "total_racers" => self.total_racers(),
+            "gp_final_rank" => self.gp_final_rank(),
+            "course_index" => self.course_index(),
+            "course_segment_count" => self.course_segment_count(),
+            "course_length" => self.course_length(),
+            "player" => player.call_method0("to_dict")?,
+        })?;
         Ok(dict)
     }
 }

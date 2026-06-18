@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
-use crate::bindings::payload::{optional_item, required_item};
+use crate::bindings::payload::{optional_item, required_item, set_py_dict_items};
 use crate::core::telemetry::{MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry};
 
 const PLAYER_TELEMETRY_PAYLOAD: &str = "player telemetry";
@@ -411,66 +411,58 @@ impl PyPlayerTelemetry {
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        dict.set_item("state_flags", self.state_flags())?;
-        dict.set_item("state_labels", self.state_labels(py)?)?;
-        dict.set_item("speed_kph", self.speed_kph())?;
-        dict.set_item("energy", self.energy())?;
-        dict.set_item("max_energy", self.max_energy())?;
-        dict.set_item("ko_star_count", self.ko_star_count())?;
-        dict.set_item("boost_timer", self.boost_timer())?;
-        dict.set_item("recoil_tilt_magnitude", self.recoil_tilt_magnitude())?;
-        dict.set_item("damage_rumble_counter", self.damage_rumble_counter())?;
-        dict.set_item("reverse_timer", self.reverse_timer())?;
-        dict.set_item("race_distance", self.race_distance())?;
-        dict.set_item("lap_distance", self.lap_distance())?;
-        dict.set_item("race_time_ms", self.race_time_ms())?;
-        dict.set_item("lap", self.lap())?;
-        dict.set_item("laps_completed", self.laps_completed())?;
-        dict.set_item("position", self.position())?;
-        dict.set_item("segment_index", self.segment_index())?;
-        dict.set_item("segment_t", self.segment_t())?;
-        dict.set_item(
-            "segment_length_proportion",
-            self.segment_length_proportion(),
-        )?;
-        dict.set_item("world_pos_x", self.world_pos_x())?;
-        dict.set_item("world_pos_y", self.world_pos_y())?;
-        dict.set_item("world_pos_z", self.world_pos_z())?;
-        dict.set_item("segment_center_x", self.segment_center_x())?;
-        dict.set_item("segment_center_y", self.segment_center_y())?;
-        dict.set_item("segment_center_z", self.segment_center_z())?;
-        dict.set_item("local_lateral_velocity", self.local_lateral_velocity())?;
-        dict.set_item("signed_lateral_offset", self.signed_lateral_offset())?;
-        dict.set_item("lateral_distance", self.lateral_distance())?;
-        dict.set_item(
-            "lateral_displacement_magnitude",
-            self.lateral_displacement_magnitude(),
-        )?;
-        dict.set_item("current_radius_left", self.current_radius_left())?;
-        dict.set_item("current_radius_right", self.current_radius_right())?;
-        dict.set_item("height_above_ground", self.height_above_ground())?;
-        dict.set_item(
-            "future_local_nearest_segment_index",
-            self.future_local_nearest_segment_index(),
-        )?;
-        dict.set_item(
-            "future_local_nearest_segment_distance",
-            self.future_local_nearest_segment_distance(),
-        )?;
-        dict.set_item("velocity_magnitude", self.velocity_magnitude())?;
-        dict.set_item("acceleration_magnitude", self.acceleration_magnitude())?;
-        dict.set_item("acceleration_force", self.acceleration_force())?;
-        dict.set_item("drift_attack_force", self.drift_attack_force())?;
-        dict.set_item("collision_mass", self.collision_mass())?;
-        dict.set_item("machine_character_index", self.machine_character_index())?;
-        dict.set_item("machine_body_stat", self.machine_body_stat())?;
-        dict.set_item("machine_boost_stat", self.machine_boost_stat())?;
-        dict.set_item("machine_grip_stat", self.machine_grip_stat())?;
-        dict.set_item("machine_weight", self.machine_weight())?;
-        dict.set_item("engine_setting", self.engine_setting())?;
-        dict.set_item("course_effect_raw", self.course_effect_raw())?;
-        dict.set_item("course_effect_name", self.course_effect_name())?;
-        dict.set_item("on_energy_refill", self.on_energy_refill())?;
+        set_py_dict_items!(dict, {
+            "state_flags" => self.state_flags(),
+            "state_labels" => self.state_labels(py)?,
+            "speed_kph" => self.speed_kph(),
+            "energy" => self.energy(),
+            "max_energy" => self.max_energy(),
+            "ko_star_count" => self.ko_star_count(),
+            "boost_timer" => self.boost_timer(),
+            "recoil_tilt_magnitude" => self.recoil_tilt_magnitude(),
+            "damage_rumble_counter" => self.damage_rumble_counter(),
+            "reverse_timer" => self.reverse_timer(),
+            "race_distance" => self.race_distance(),
+            "lap_distance" => self.lap_distance(),
+            "race_time_ms" => self.race_time_ms(),
+            "lap" => self.lap(),
+            "laps_completed" => self.laps_completed(),
+            "position" => self.position(),
+            "segment_index" => self.segment_index(),
+            "segment_t" => self.segment_t(),
+            "segment_length_proportion" => self.segment_length_proportion(),
+            "world_pos_x" => self.world_pos_x(),
+            "world_pos_y" => self.world_pos_y(),
+            "world_pos_z" => self.world_pos_z(),
+            "segment_center_x" => self.segment_center_x(),
+            "segment_center_y" => self.segment_center_y(),
+            "segment_center_z" => self.segment_center_z(),
+            "local_lateral_velocity" => self.local_lateral_velocity(),
+            "signed_lateral_offset" => self.signed_lateral_offset(),
+            "lateral_distance" => self.lateral_distance(),
+            "lateral_displacement_magnitude" => self.lateral_displacement_magnitude(),
+            "current_radius_left" => self.current_radius_left(),
+            "current_radius_right" => self.current_radius_right(),
+            "height_above_ground" => self.height_above_ground(),
+            "future_local_nearest_segment_index" =>
+                self.future_local_nearest_segment_index(),
+            "future_local_nearest_segment_distance" =>
+                self.future_local_nearest_segment_distance(),
+            "velocity_magnitude" => self.velocity_magnitude(),
+            "acceleration_magnitude" => self.acceleration_magnitude(),
+            "acceleration_force" => self.acceleration_force(),
+            "drift_attack_force" => self.drift_attack_force(),
+            "collision_mass" => self.collision_mass(),
+            "machine_character_index" => self.machine_character_index(),
+            "machine_body_stat" => self.machine_body_stat(),
+            "machine_boost_stat" => self.machine_boost_stat(),
+            "machine_grip_stat" => self.machine_grip_stat(),
+            "machine_weight" => self.machine_weight(),
+            "engine_setting" => self.engine_setting(),
+            "course_effect_raw" => self.course_effect_raw(),
+            "course_effect_name" => self.course_effect_name(),
+            "on_energy_refill" => self.on_energy_refill(),
+        })?;
         Ok(dict)
     }
 }

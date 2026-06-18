@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
-use crate::bindings::payload::{optional_item, required_item};
+use crate::bindings::payload::{optional_item, required_item, set_py_dict_items};
 use crate::core::host::{StepStatus, StepSummary};
 use crate::core::telemetry::CourseEffect;
 
@@ -219,38 +219,29 @@ impl PyStepSummary {
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        dict.set_item("frames_run", self.frames_run())?;
-        dict.set_item("max_race_distance", self.max_race_distance())?;
-        dict.set_item(
-            "max_race_distance_speed_kph",
-            self.max_race_distance_speed_kph(),
-        )?;
-        dict.set_item("reverse_active_frames", self.reverse_active_frames())?;
-        dict.set_item(
-            "collision_recoil_active_frames",
-            self.collision_recoil_active_frames(),
-        )?;
-        dict.set_item("low_speed_frames", self.low_speed_frames())?;
-        dict.set_item("energy_loss_total", self.energy_loss_total())?;
-        dict.set_item("energy_gain_total", self.energy_gain_total())?;
-        dict.set_item("damage_taken_frames", self.damage_taken_frames())?;
-        dict.set_item("impact_frames", self.impact_frames())?;
-        dict.set_item("airborne_frames", self.airborne_frames())?;
-        dict.set_item(
-            "outside_track_min_height_above_ground",
-            self.outside_track_min_height_above_ground(),
-        )?;
-        dict.set_item("spin_macro_started", self.spin_macro_started())?;
-        dict.set_item("spin_macro_active_frames", self.spin_macro_active_frames())?;
-        dict.set_item("lean_macro_owned_frames", self.lean_macro_owned_frames())?;
-        dict.set_item(
-            "consecutive_low_speed_frames",
-            self.consecutive_low_speed_frames(),
-        )?;
-        dict.set_item("entered_state_flags", self.entered_state_flags())?;
-        dict.set_item("entered_state_labels", self.entered_state_labels(py)?)?;
-        dict.set_item("entered_course_effects", self.entered_course_effects())?;
-        dict.set_item("final_frame_index", self.final_frame_index())?;
+        set_py_dict_items!(dict, {
+            "frames_run" => self.frames_run(),
+            "max_race_distance" => self.max_race_distance(),
+            "max_race_distance_speed_kph" => self.max_race_distance_speed_kph(),
+            "reverse_active_frames" => self.reverse_active_frames(),
+            "collision_recoil_active_frames" => self.collision_recoil_active_frames(),
+            "low_speed_frames" => self.low_speed_frames(),
+            "energy_loss_total" => self.energy_loss_total(),
+            "energy_gain_total" => self.energy_gain_total(),
+            "damage_taken_frames" => self.damage_taken_frames(),
+            "impact_frames" => self.impact_frames(),
+            "airborne_frames" => self.airborne_frames(),
+            "outside_track_min_height_above_ground" =>
+                self.outside_track_min_height_above_ground(),
+            "spin_macro_started" => self.spin_macro_started(),
+            "spin_macro_active_frames" => self.spin_macro_active_frames(),
+            "lean_macro_owned_frames" => self.lean_macro_owned_frames(),
+            "consecutive_low_speed_frames" => self.consecutive_low_speed_frames(),
+            "entered_state_flags" => self.entered_state_flags(),
+            "entered_state_labels" => self.entered_state_labels(py)?,
+            "entered_course_effects" => self.entered_course_effects(),
+            "final_frame_index" => self.final_frame_index(),
+        })?;
         Ok(dict)
     }
 }
@@ -367,26 +358,19 @@ impl PyStepStatus {
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        dict.set_item("step_count", self.step_count())?;
-        dict.set_item("stalled_steps", self.stalled_steps())?;
-        dict.set_item("reverse_timer", self.reverse_timer())?;
-        dict.set_item(
-            "progress_frontier_stalled_frames",
-            self.progress_frontier_stalled_frames(),
-        )?;
-        dict.set_item("terminated", self.terminated())?;
-        dict.set_item("truncated", self.truncated())?;
-        dict.set_item("termination_reason", self.termination_reason())?;
-        dict.set_item("truncation_reason", self.truncation_reason())?;
-        dict.set_item("spin_macro_active", self.spin_macro_active())?;
-        dict.set_item(
-            "spin_macro_frames_remaining",
-            self.spin_macro_frames_remaining(),
-        )?;
-        dict.set_item(
-            "spin_macro_cooldown_frames",
-            self.spin_macro_cooldown_frames(),
-        )?;
+        set_py_dict_items!(dict, {
+            "step_count" => self.step_count(),
+            "stalled_steps" => self.stalled_steps(),
+            "reverse_timer" => self.reverse_timer(),
+            "progress_frontier_stalled_frames" => self.progress_frontier_stalled_frames(),
+            "terminated" => self.terminated(),
+            "truncated" => self.truncated(),
+            "termination_reason" => self.termination_reason(),
+            "truncation_reason" => self.truncation_reason(),
+            "spin_macro_active" => self.spin_macro_active(),
+            "spin_macro_frames_remaining" => self.spin_macro_frames_remaining(),
+            "spin_macro_cooldown_frames" => self.spin_macro_cooldown_frames(),
+        })?;
         Ok(dict)
     }
 }
