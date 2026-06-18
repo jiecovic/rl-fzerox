@@ -995,11 +995,12 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_completion(
             "position": 1,
             "race_time_ms": 92_345,
             "termination_reason": "finished",
+            "track_id": "big_hand",
             "vehicle_name": "Blue Falcon",
         }
     ]
-    assert "| Big Hand | finished | 1:32.345 | 1 | 3 | 80 |" in summary_md_path.read_text(
-        encoding="utf-8"
+    assert "| Big Hand | finished | 1:32.345 | 1 | 3 | Engine 63 |" in (
+        summary_md_path.read_text(encoding="utf-8")
     )
 
     recorder.close()
@@ -1132,8 +1133,8 @@ def test_career_recorder_summary_captures_terminal_events_between_frames(
         },
     ]
     markdown = summary_md_path.read_text(encoding="utf-8")
-    assert "| Mute City | finished | 1:21.234 | 1 | 2 | 50 |" in markdown
-    assert "| Silence | finished | 1:25.678 | 2 | 4 | 60 |" in markdown
+    assert "| Mute City | finished | 1:21.234 | 1 | 2 | Engine 39 |" in markdown
+    assert "| Silence | finished | 1:25.678 | 2 | 4 | Engine 47 |" in markdown
     assert "| Run A | latest | mute_city | 14820470 | 660000 | 2025-12-10T12:00:00Z |" in markdown
 
 
@@ -1163,28 +1164,31 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
             "career_mode_target_label": "Clear Master Jack Cup",
         },
     )
-    for course_index, course_id, course_name, race_time_ms, first_position, later_position in (
-        (0, "mute_city", "Mute City", 86_136, 7, 24),
-        (1, "silence", "Silence", 78_655, 11, 20),
-        (2, "sand_ocean", "Sand Ocean", 70_828, 1, 30),
-        (3, "devils_forest", "Devil's Forest", 82_910, 4, 27),
-        (4, "big_blue", "Big Blue", 86_007, 1, 30),
+    for course_index, race_time_ms, position, ko_stars, engine_raw in (
+        (0, 86_136, 7, 0, 103),
+        (1, 78_655, 11, 0, 103),
+        (2, 70_828, 1, 0, 103),
+        (3, 82_910, 4, 0, 103),
+        (4, 86_007, 1, 0, 103),
     ):
-        for position in (first_position, later_position):
-            recorder.record_event(
-                info={
-                    "career_mode_attempt_id": "attempt-a",
-                    "career_mode_target_label": "Clear Master Jack Cup",
-                    "termination_reason": "finished",
-                    "race_time_ms": race_time_ms,
-                    "position": position,
-                    "ko_star_count": 0,
-                    "track_course_id": course_id,
-                    "track_course_index": course_index,
-                    "track_course_name": course_name,
-                    "track_gp_difficulty": "master",
-                }
-            )
+        terminal_info = {
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Jack Cup",
+            "termination_reason": "finished",
+            "race_time_ms": race_time_ms,
+            "position": position,
+            "ko_star_count": ko_stars,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+        }
+        recorder.record_event(info=terminal_info)
+        recorder.record_event(
+            info={
+                **terminal_info,
+                "course_index": course_index,
+                "engine_setting_raw_value_ram": engine_raw,
+            }
+        )
     recorder.record_event(
         info={
             "career_mode_attempt_id": "attempt-a",
@@ -1195,10 +1199,24 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
             "race_time_ms": 85_673,
             "position": 1,
             "ko_star_count": 1,
-            "track_course_id": "port_town",
-            "track_course_index": 5,
-            "track_course_name": "Port Town",
-            "track_gp_difficulty": "master",
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+        }
+    )
+    recorder.record_event(
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Jack Cup",
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "failed",
+            "termination_reason": "finished",
+            "race_time_ms": 85_673,
+            "position": 1,
+            "ko_star_count": 1,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+            "course_index": 5,
+            "engine_setting_raw_value_ram": 103,
         }
     )
     recorder.finish_segment(
@@ -1231,9 +1249,10 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
         "Port Town",
     ]
     assert [course["position"] for course in summary["courses"]] == [7, 11, 1, 4, 1, 1]
+    assert {course["engine_setting_raw_value"] for course in summary["courses"]} == {103}
     markdown = summary_md_path.read_text(encoding="utf-8")
     assert "| - | finished |" not in markdown
-    assert "| Mute City | finished | 1:26.136 | 7 | 0 | - |" in markdown
+    assert "| Mute City | finished | 1:26.136 | 7 | 0 | Engine 80 |" in markdown
 
 
 def test_career_segment_recording_path_sanitizes_label() -> None:

@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rl_fzerox.core.career_mode.navigation import BUILT_IN_COURSES_BY_INDEX
+from rl_fzerox.core.runtime_spec.vehicle_catalog import engine_setting_display_name_for_raw
 from rl_fzerox.ui.watch.runtime.career_mode.recording.paths import (
     career_session_summary_path,
     segment_summary_path,
@@ -96,8 +98,7 @@ class _SegmentSummaryBuilder:
         self.final_info = _selected_summary_info(info)
         course_result = _course_result(info)
         if course_result is not None:
-            identity = _course_result_identity(course_result)
-            existing_index = _existing_course_result_index(self.course_results, identity)
+            existing_index = _existing_course_result_index(self.course_results, course_result)
             if existing_index is not None:
                 self.course_results[existing_index] = _merge_missing_course_result_fields(
                     self.course_results[existing_index],
@@ -301,7 +302,7 @@ def _segment_summary_markdown(payload: Mapping[str, object]) -> str:
                     _format_summary_time(course.get("race_time_ms")),
                     _summary_text(course.get("position")),
                     _summary_text(course.get("ko_star_count")),
-                    _summary_text(course.get("engine_setting_raw_value")),
+                    _format_summary_engine(course.get("engine_setting_raw_value")),
                 )
             )
             + " |"
@@ -419,7 +420,10 @@ def _course_result(info: Mapping[str, object]) -> dict[str, object] | None:
     ):
         if key not in info:
             continue
-        result[output_key] = _summary_json_value(info[key])
+        value = _summary_json_value(info[key])
+        if value is not None:
+            result[output_key] = value
+    _add_course_result_fallbacks(result, info)
     return result
 
 
@@ -442,22 +446,45 @@ def _course_result_identity(result: Mapping[str, object]) -> tuple[str, object] 
         value = result.get(key)
         if value is not None:
             return (key, value)
-    race_time_ms = result.get("race_time_ms")
-    if race_time_ms is not None:
-        return ("race_time_ms", race_time_ms)
     return None
 
 
 def _existing_course_result_index(
     results: list[dict[str, object]],
-    identity: tuple[str, object] | None,
+    candidate: Mapping[str, object],
 ) -> int | None:
-    if identity is None:
-        return None
     for index, result in enumerate(results):
-        if _course_result_identity(result) == identity:
+        if _course_results_match(result, candidate):
             return index
     return None
+
+
+def _course_results_match(
+    current: Mapping[str, object],
+    candidate: Mapping[str, object],
+) -> bool:
+    current_identity = _course_result_identity(current)
+    candidate_identity = _course_result_identity(candidate)
+    if (
+        current_identity is not None
+        and candidate_identity is not None
+        and current_identity == candidate_identity
+    ):
+        return True
+
+    # Live Career Mode can observe the same terminal result twice: once before
+    # course metadata has been enriched and once after. Match that ordering on
+    # the immutable terminal fields so the later event fills the missing course
+    # name/index/engine instead of appending a duplicate row.
+    if current_identity is not None and candidate_identity is not None:
+        return False
+    current_fingerprint = _course_terminal_fingerprint(current)
+    candidate_fingerprint = _course_terminal_fingerprint(candidate)
+    return (
+        current_fingerprint is not None
+        and candidate_fingerprint is not None
+        and current_fingerprint == candidate_fingerprint
+    )
 
 
 def _merge_missing_course_result_fields(
@@ -469,6 +496,46 @@ def _merge_missing_course_result_fields(
         if key not in merged or merged[key] is None:
             merged[key] = value
     return merged
+
+
+def _add_course_result_fallbacks(
+    result: dict[str, object],
+    info: Mapping[str, object],
+) -> None:
+    course_index = _int_mapping(result, "course_index")
+    if course_index is None:
+        course_index = _int_mapping(info, "course_index")
+    if course_index is not None:
+        result.setdefault("course_index", course_index)
+        course = BUILT_IN_COURSES_BY_INDEX.get(course_index)
+        if course is not None:
+            result.setdefault("track_id", course.id)
+            result.setdefault("course_id", course.id)
+            result.setdefault("course_name", course.display_name)
+            difficulty = _summary_json_value(info.get("difficulty"))
+            if difficulty is not None:
+                result.setdefault("difficulty", difficulty)
+
+    if "engine_setting_raw_value" not in result:
+        engine = _int_mapping(info, "engine_setting_raw_value_ram")
+        if engine is None:
+            engine = _int_mapping(info, "engine_setting_raw_value")
+        if engine is not None:
+            result["engine_setting_raw_value"] = engine
+
+
+def _course_terminal_fingerprint(result: Mapping[str, object]) -> tuple[object, ...] | None:
+    race_time_ms = result.get("race_time_ms")
+    if race_time_ms is None:
+        return None
+    return (
+        result.get("termination_reason"),
+        race_time_ms,
+        result.get("position"),
+        result.get("ko_star_count"),
+        result.get("laps_completed"),
+        result.get("total_laps"),
+    )
 
 
 def _policy_checkpoint_summary(info: Mapping[str, object]) -> dict[str, object] | None:
@@ -531,12 +598,28 @@ def _format_summary_time(value: object) -> str:
     return f"{minutes}:{seconds:02d}.{millis:03d}"
 
 
+def _format_summary_engine(value: object) -> str:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return "-"
+    try:
+        return engine_setting_display_name_for_raw(value)
+    except ValueError:
+        return _summary_text(value)
+
+
 def _str_info(info: Mapping[str, object], key: str) -> str | None:
     value = info.get(key)
     if not isinstance(value, str):
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _int_mapping(info: Mapping[str, object], key: str) -> int | None:
+    value = info.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
 
 
 _SUMMARY_INFO_FIELDS = (
