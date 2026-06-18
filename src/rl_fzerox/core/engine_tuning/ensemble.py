@@ -11,7 +11,7 @@ from random import Random
 import torch
 
 from rl_fzerox.core.domain.engine_setting import (
-    ENGINE_SLIDER_STEP_MAX,
+    ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )
 from rl_fzerox.core.engine_tuning.sampling import (
@@ -502,7 +502,7 @@ def _training_tensors(
         ).long(),
         engine_values=torch.Tensor(
             [
-                outcome.engine_setting_raw_value / float(ENGINE_SLIDER_STEP_MAX)
+                outcome.engine_setting_raw_value / float(ENGINE_SLIDER.max_step)
                 for outcome, _, _ in successful
             ]
         ),
@@ -582,7 +582,7 @@ def _predict_member_scores(
     course_indices = torch.Tensor(len(candidates)).fill_(course_index).long()
     vehicle_indices = torch.Tensor(len(candidates)).fill_(vehicle_index).long()
     engine_values = torch.Tensor(
-        [candidate / float(ENGINE_SLIDER_STEP_MAX) for candidate in candidates]
+        [candidate / float(ENGINE_SLIDER.max_step) for candidate in candidates]
     )
     scores_by_engine = {candidate: [] for candidate in candidates}
     for member_index, member_state in enumerate(state.members):
@@ -830,7 +830,7 @@ def _engine_basis(engine_values: torch.Tensor, shape: EngineTuningEnsembleShape)
     centers = engine_values.new_tensor(
         [index / (center_count - 1) for index in range(center_count)]
     )
-    width = max(0.001, float(shape.engine_basis_width_raw) / float(ENGINE_SLIDER_STEP_MAX))
+    width = max(0.001, float(shape.engine_basis_width_raw) / float(ENGINE_SLIDER.max_step))
     distances = (engine_values.unsqueeze(-1) - centers) / width
     basis = (-0.5 * distances.pow(2)).exp()
     return basis / basis.sum(dim=-1, keepdim=True).clamp_min(1.0e-6)

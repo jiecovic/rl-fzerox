@@ -3,17 +3,36 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
 from rl_fzerox.core.domain.engine_setting import (
+    ENGINE_SLIDER,
     centered_engine_slider_buckets,
     engine_percent_to_slider_step,
     engine_slider_steps,
+    validate_engine_slider_bucket_values,
 )
 
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
 EngineTunerObjective = Literal["finish_time", "episode_return"]
+
+
+@dataclass(frozen=True, slots=True)
+class EngineTunerBucketDefaults:
+    """Default explicit bucket list generated for the bandit tuner."""
+
+    side_count: int = 5
+    min_raw_value: int = ENGINE_SLIDER.min_step
+    max_raw_value: int = ENGINE_SLIDER.max_step
+
+    @property
+    def raw_values(self) -> tuple[int, ...]:
+        return centered_engine_slider_buckets(
+            minimum=self.min_raw_value,
+            maximum=self.max_raw_value,
+            side_count=self.side_count,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +41,7 @@ class EngineTunerDefaults:
 
     backend: EngineTunerBackend = "bandit"
     objective: EngineTunerObjective = "finish_time"
-    bandit_slider_spacing: int = engine_percent_to_slider_step(10)
+    bandit_buckets: EngineTunerBucketDefaults = field(default_factory=EngineTunerBucketDefaults)
     stat_decay: float = 0.995
     prior_finish_time_seconds: float = 200.0
     exploration_seconds: float = 30.0
@@ -38,6 +57,12 @@ class EngineTunerDefaults:
     uniform_exploration: float = 0.05
     greedy_plateau_tolerance_seconds: float = 1.0
 
+    @property
+    def bandit_bucket_raw_values(self) -> tuple[int, ...]:
+        """Return the default centered bandit bucket list."""
+
+        return self.bandit_buckets.raw_values
+
 
 ENGINE_TUNER_DEFAULTS = EngineTunerDefaults()
 
@@ -46,8 +71,8 @@ ENGINE_TUNER_DEFAULTS = EngineTunerDefaults()
 class EngineTunerCommonSettings:
     """Backend-independent knobs for one adaptive engine-tuning run."""
 
-    min_raw_value: int = 0
-    max_raw_value: int = 128
+    min_raw_value: int = ENGINE_SLIDER.min_step
+    max_raw_value: int = ENGINE_SLIDER.max_step
     prior_finish_time_seconds: float = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     uniform_exploration: float = ENGINE_TUNER_DEFAULTS.uniform_exploration
 
@@ -59,7 +84,7 @@ class BanditEngineTunerSettings(EngineTunerCommonSettings):
     backend: Literal["bandit"] = "bandit"
     objective: EngineTunerObjective = ENGINE_TUNER_DEFAULTS.objective
     reward_fingerprint: str | None = None
-    slider_spacing: int = ENGINE_TUNER_DEFAULTS.bandit_slider_spacing
+    bucket_raw_values: tuple[int, ...] = ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
 
 
@@ -159,17 +184,11 @@ def engine_candidates(*, minimum: int, maximum: int) -> tuple[int, ...]:
 
 def engine_bucket_candidates(
     *,
-    minimum: int,
-    maximum: int,
-    slider_spacing: int,
+    bucket_raw_values: tuple[int, ...],
 ) -> tuple[int, ...]:
-    """Return engine buckets mirrored around neutral step 64 and clipped to range."""
+    """Return validated bandit engine bucket candidates."""
 
-    return centered_engine_slider_buckets(
-        minimum=minimum,
-        maximum=maximum,
-        slider_spacing=slider_spacing,
-    )
+    return validate_engine_slider_bucket_values(bucket_raw_values)
 
 
 def finish_time_score(race_time_ms: int) -> float:

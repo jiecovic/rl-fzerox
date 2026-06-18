@@ -167,7 +167,7 @@ describe("Configurator", () => {
         engine_setting_min_raw_value: 0,
         engine_setting_max_raw_value: 100,
         adaptive_engine_tuner_backend: "bandit",
-        adaptive_engine_bandit_slider_spacing: 10,
+        adaptive_engine_bandit_bucket_raw_values: [0, 50, 100],
       },
     };
 
@@ -179,7 +179,7 @@ describe("Configurator", () => {
         forkSourceEngineTunerBackend="gaussian_process"
         forkSourceEngineTuning={{
           backend: "gaussian_process",
-          banditSliderSpacing: null,
+          banditBucketRawValues: null,
           objective: null,
           rewardFingerprint: null,
           minRawValue: 0,
@@ -232,7 +232,7 @@ describe("Configurator", () => {
         engine_setting_min_raw_value: 5,
         engine_setting_max_raw_value: 95,
         adaptive_engine_tuner_backend: "bandit",
-        adaptive_engine_bandit_slider_spacing: 15,
+        adaptive_engine_bandit_bucket_raw_values: [5, 35, 64, 80, 95],
       },
     };
 
@@ -244,7 +244,7 @@ describe("Configurator", () => {
         forkSourceEngineTunerBackend="bandit"
         forkSourceEngineTuning={{
           backend: "bandit",
-          banditSliderSpacing: 15,
+          banditBucketRawValues: [5, 35, 64, 80, 95],
           objective: "finish_time",
           rewardFingerprint: stableJson(managedRunConfigFixture.reward),
           minRawValue: 5,
@@ -275,7 +275,7 @@ describe("Configurator", () => {
         "bandit fork",
         expect.objectContaining({
           vehicle: expect.objectContaining({
-            adaptive_engine_bandit_slider_spacing: 15,
+            adaptive_engine_bandit_bucket_raw_values: [5, 35, 64, 80, 95],
             adaptive_engine_tuner_backend: "bandit",
             engine_mode: "adaptive_tuner",
           }),
@@ -569,13 +569,13 @@ describe("Configurator", () => {
     await user.click(screen.getByText("Auxiliary branches"));
     await user.click(screen.getByRole("checkbox", { name: "Spin in output" }));
 
-    expect(screen.getByText("logit 0 -> idle 33.3%, left/right 33.3% each")).toBeVisible();
+    expect(screen.getByText("delta 0 -> idle 33.3%, left/right 33.3% each")).toBeVisible();
 
-    const noSpinLogit = screen.getByRole("textbox", { name: "No-spin logit" });
+    const noSpinLogit = screen.getByRole("textbox", { name: "No-spin logit delta" });
     await user.clear(noSpinLogit);
     await user.type(noSpinLogit, "0.5");
 
-    expect(screen.getByText("logit +0.5 -> idle 45.2%, left/right 27.4% each")).toBeVisible();
+    expect(screen.getByText("delta +0.5 -> idle 45.2%, left/right 27.4% each")).toBeVisible();
   });
 
   it("locks only checkpoint-incompatible fork controls", async () => {

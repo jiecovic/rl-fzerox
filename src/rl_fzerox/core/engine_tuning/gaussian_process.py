@@ -11,7 +11,7 @@ import gpytorch
 import torch
 from linear_operator import LinearOperator
 
-from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER_STEP_MAX
+from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
 from rl_fzerox.core.engine_tuning.sampling import (
     StableGreedySelection,
     stable_greedy_engine_setting,
@@ -390,7 +390,7 @@ def _gp_posterior(
         train_y=train_y,
         likelihood=likelihood,
         prior_score=prior_score,
-        lengthscale=_smoothing_bandwidth(settings) / float(ENGINE_SLIDER_STEP_MAX),
+        lengthscale=_smoothing_bandwidth(settings) / float(ENGINE_SLIDER.max_step),
         outputscale=max(1.0, float(settings.exploration_seconds)) ** 2,
     )
     model.eval()
@@ -567,7 +567,7 @@ def _better_choice(
 
 
 def _normalize_engine_raw(raw_value: int) -> float:
-    return max(0.0, min(1.0, float(raw_value) / float(ENGINE_SLIDER_STEP_MAX)))
+    return max(0.0, min(1.0, float(raw_value) / float(ENGINE_SLIDER.max_step)))
 
 
 def _observation_noise_variance(

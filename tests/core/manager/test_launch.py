@@ -1079,7 +1079,7 @@ def _bandit_engine_config() -> ManagedRunConfig:
                     "engine_setting_min_raw_value": 44,
                     "engine_setting_max_raw_value": 84,
                     "adaptive_engine_tuner_backend": "bandit",
-                    "adaptive_engine_bandit_slider_spacing": 10,
+                    "adaptive_engine_bandit_bucket_raw_values": (44, 54, 64, 74, 84),
                 }
             )
         }

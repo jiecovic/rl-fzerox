@@ -9,7 +9,7 @@ from rl_fzerox.core.career_mode.navigation.types import (
     ObservedMenuScreen,
 )
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
-from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER_STEP_MAX
+from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
 
 BUILT_IN_COURSES_BY_INDEX = {course.course_index: course for course in BUILT_IN_COURSES}
 POST_GP_COMPLETION_MODES = frozenset(
@@ -199,7 +199,7 @@ class MenuFacts:
     def engine_setting_raw_value(self) -> int | None:
         if self.engine_setting_raw is None:
             return None
-        if not 0 <= self.engine_setting_raw <= ENGINE_SLIDER_STEP_MAX:
+        if not ENGINE_SLIDER.min_step <= self.engine_setting_raw <= ENGINE_SLIDER.max_step:
             return None
         return self.engine_setting_raw
 

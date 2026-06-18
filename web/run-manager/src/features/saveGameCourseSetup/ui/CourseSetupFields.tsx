@@ -8,7 +8,7 @@ import type {
 import { preferredVehicleSetup } from "@/features/saveGameCourseSetup/model/courseSetup";
 import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
 import {
-  ENGINE_SLIDER_STEP_MAX,
+  ENGINE_SLIDER,
   enginePercentToSliderStep,
   engineSliderStepPercentLabel,
 } from "@/shared/domain/engineBuckets";
@@ -215,7 +215,7 @@ export function EngineDraftInput({
   const engineTicks = [
     { value: 0, label: "0%" },
     { value: enginePercentToSliderStep(50), label: "50%" },
-    { value: ENGINE_SLIDER_STEP_MAX, label: "100%" },
+    { value: ENGINE_SLIDER.maxStep, label: "100%" },
   ] as const;
   return (
     <FieldShell>
@@ -223,8 +223,8 @@ export function EngineDraftInput({
       <SingleSlider
         disabled={disabled}
         label={label}
-        max={ENGINE_SLIDER_STEP_MAX}
-        min={0}
+        max={ENGINE_SLIDER.maxStep}
+        min={ENGINE_SLIDER.minStep}
         step={1}
         ticks={engineTicks}
         value={draft.engineSettingRawValue}

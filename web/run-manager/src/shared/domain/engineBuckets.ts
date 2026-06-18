@@ -1,14 +1,16 @@
 // web/run-manager/src/shared/domain/engineBuckets.ts
-export const ENGINE_SLIDER_STEP_MIN = 0;
-export const ENGINE_SLIDER_STEP_MAX = 128;
-export const ENGINE_SLIDER_STEP_CENTER = 64;
+export const ENGINE_SLIDER = {
+  minStep: 0,
+  maxStep: 128,
+  centerStep: 64,
+} as const;
 
 export function centeredEngineBuckets({
-  sliderSpacing,
+  sideCount,
   minimum,
   maximum,
 }: {
-  sliderSpacing: number;
+  sideCount: number;
   minimum: number;
   maximum: number;
 }) {
@@ -17,36 +19,44 @@ export function centeredEngineBuckets({
   if (lower > upper) {
     return [];
   }
-  const step = Math.max(1, Math.trunc(sliderSpacing));
-  const values = new Set<number>([lower, upper]);
-  for (let offset = 0; ; offset += step) {
-    const low = ENGINE_SLIDER_STEP_CENTER - offset;
-    const high = ENGINE_SLIDER_STEP_CENTER + offset;
-    if (lower <= low && low <= upper) {
-      values.add(low);
-    }
-    if (offset !== 0 && lower <= high && high <= upper) {
-      values.add(high);
-    }
-    if (low < lower && high > upper) {
-      break;
-    }
+  const count = Math.max(0, Math.trunc(sideCount));
+  if (ENGINE_SLIDER.centerStep < lower || ENGINE_SLIDER.centerStep > upper) {
+    return [];
   }
-  return [...values].sort((left, right) => left - right);
+  if (count === 0) {
+    return [ENGINE_SLIDER.centerStep];
+  }
+  const values = [
+    ...roundedStepSpan(lower, ENGINE_SLIDER.centerStep, count).slice(0, -1),
+    ...roundedStepSpan(ENGINE_SLIDER.centerStep, upper, count),
+  ];
+  const uniqueValues = [...new Set(values)].sort((left, right) => left - right);
+  return uniqueValues.length === count * 2 + 1 ? uniqueValues : [];
+}
+
+export function bucketSideCountFromRawValues(bucketRawValues: readonly number[]) {
+  const normalized = [...new Set(bucketRawValues.map((value) => Math.trunc(value)))].sort(
+    (left, right) => left - right,
+  );
+  const centerIndex = normalized.indexOf(ENGINE_SLIDER.centerStep);
+  if (centerIndex < 0) {
+    return 0;
+  }
+  return Math.min(centerIndex, normalized.length - centerIndex - 1);
 }
 
 export function clampRawEngineValue(value: number) {
-  return Math.max(ENGINE_SLIDER_STEP_MIN, Math.min(ENGINE_SLIDER_STEP_MAX, value));
+  return Math.max(ENGINE_SLIDER.minStep, Math.min(ENGINE_SLIDER.maxStep, value));
 }
 
 export function enginePercentToSliderStep(percent: number) {
   return clampRawEngineValue(
-    Math.floor((Math.max(0, Math.min(100, percent)) / 100) * ENGINE_SLIDER_STEP_MAX + 0.5),
+    Math.floor((Math.max(0, Math.min(100, percent)) / 100) * ENGINE_SLIDER.maxStep + 0.5),
   );
 }
 
 export function engineSliderStepToPercent(step: number) {
-  return (clampRawEngineValue(step) / ENGINE_SLIDER_STEP_MAX) * 100;
+  return (clampRawEngineValue(step) / ENGINE_SLIDER.maxStep) * 100;
 }
 
 export function engineSliderStepToDisplayPercent(step: number) {
@@ -59,4 +69,10 @@ export function engineSliderStepPercentLabel(step: number) {
 
 export function engineSliderStepLabel(step: number) {
   return `ENG ${engineSliderStepToDisplayPercent(step).toFixed(1)}`;
+}
+
+function roundedStepSpan(start: number, end: number, intervalCount: number) {
+  return Array.from({ length: intervalCount + 1 }, (_, index) =>
+    Math.floor(start + ((end - start) * index) / intervalCount + 0.5),
+  );
 }

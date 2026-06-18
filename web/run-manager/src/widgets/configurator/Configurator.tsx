@@ -377,7 +377,10 @@ export function Configurator({
       return false;
     }
     if (
-      forkSourceEngineTuning.banditSliderSpacing !== vehicle.adaptive_engine_bandit_slider_spacing
+      !sameNumberList(
+        forkSourceEngineTuning.banditBucketRawValues,
+        vehicle.adaptive_engine_bandit_bucket_raw_values,
+      )
     ) {
       return true;
     }
@@ -388,6 +391,13 @@ export function Configurator({
       vehicle.adaptive_engine_tuner_objective === "episode_return" &&
       forkSourceEngineTuning.rewardFingerprint !== stableJson(candidateConfig.reward)
     );
+  }
+
+  function sameNumberList(left: readonly number[] | null, right: readonly number[]) {
+    if (left === null || left.length !== right.length) {
+      return false;
+    }
+    return left.every((value, index) => value === right[index]);
   }
 
   function randomizeSeed() {

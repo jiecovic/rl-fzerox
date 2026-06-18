@@ -13,6 +13,9 @@ from rl_fzerox.core.engine_tuning import (
     GaussianProcessEngineTunerSettings,
 )
 
+DEFAULT_BANDIT_BUCKETS = (0, 13, 26, 38, 51, 64, 77, 90, 102, 115, 128)
+NARROW_BANDIT_BUCKETS = (44, 54, 64, 74, 84)
+
 
 def test_engine_tuning_payload_reports_gp_backend_from_settings() -> None:
     context = EngineTuningContext(
@@ -95,7 +98,7 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
         settings=BanditEngineTunerSettings(
             min_raw_value=44,
             max_raw_value=84,
-            slider_spacing=10,
+            bucket_raw_values=NARROW_BANDIT_BUCKETS,
             prior_finish_time_seconds=200.0,
         ),
     )
@@ -130,7 +133,7 @@ def test_engine_tuning_payload_uses_bandit_bucket_recommendation() -> None:
                 context_key=context.key,
                 course_key=context.course_key,
                 vehicle_id=context.vehicle_id,
-                engine_setting_raw_value=25,
+                engine_setting_raw_value=26,
                 finish_count=1,
                 decayed_count=1.0,
                 decayed_score_total=-80.0,
@@ -158,11 +161,11 @@ def test_engine_tuning_payload_uses_bandit_bucket_recommendation() -> None:
         settings=BanditEngineTunerSettings(
             min_raw_value=0,
             max_raw_value=128,
-            slider_spacing=13,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
             prior_finish_time_seconds=200.0,
         ),
     )
 
     contexts = payload["contexts"]
     assert isinstance(contexts, list)
-    assert contexts[0]["recommended_engine_setting_raw_value"] == 25
+    assert contexts[0]["recommended_engine_setting_raw_value"] == 26

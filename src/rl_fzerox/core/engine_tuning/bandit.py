@@ -230,11 +230,7 @@ class BanditEngineTuner:
         )
 
     def _candidates(self) -> tuple[int, ...]:
-        return engine_bucket_candidates(
-            minimum=self._settings.min_raw_value,
-            maximum=self._settings.max_raw_value,
-            slider_spacing=self._settings.slider_spacing,
-        )
+        return engine_bucket_candidates(bucket_raw_values=self._settings.bucket_raw_values)
 
     def _prior_score(self) -> float:
         if self._settings.objective == "episode_return":
@@ -291,11 +287,7 @@ def _canonical_bandit_state(
     *,
     settings: BanditEngineTunerSettings,
 ) -> EngineTuningRuntimeState:
-    candidates = engine_bucket_candidates(
-        minimum=settings.min_raw_value,
-        maximum=settings.max_raw_value,
-        slider_spacing=settings.slider_spacing,
-    )
+    candidates = engine_bucket_candidates(bucket_raw_values=settings.bucket_raw_values)
     buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
     for candidate in state.candidates:
         if candidate.active_score_count <= 0:

@@ -135,7 +135,7 @@ def test_bandit_engine_tuner_snapshot_omits_experimental_backend_fields() -> Non
                 update={
                     "engine_mode": "adaptive_tuner",
                     "adaptive_engine_tuner_backend": "bandit",
-                    "adaptive_engine_bandit_slider_spacing": 10,
+                    "adaptive_engine_bandit_bucket_raw_values": (44, 54, 64, 74, 84),
                 }
             )
         }
@@ -144,7 +144,7 @@ def test_bandit_engine_tuner_snapshot_omits_experimental_backend_fields() -> Non
     vehicle = json.loads(config_json(config))["vehicle"]
 
     assert vehicle["adaptive_engine_tuner_backend"] == "bandit"
-    assert vehicle["adaptive_engine_bandit_slider_spacing"] == 10
+    assert vehicle["adaptive_engine_bandit_bucket_raw_values"] == [44, 54, 64, 74, 84]
     assert "adaptive_engine_uniform_exploration" in vehicle
     assert "adaptive_engine_stat_decay" not in vehicle
     assert "adaptive_engine_ensemble_members" not in vehicle

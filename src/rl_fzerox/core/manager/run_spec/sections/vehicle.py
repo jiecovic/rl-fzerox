@@ -14,7 +14,7 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.engine_setting import (
-    ENGINE_SLIDER_STEP_MAX,
+    ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )
 from rl_fzerox.core.engine_tuning.types import ENGINE_TUNER_DEFAULTS, engine_bucket_candidates
@@ -37,22 +37,20 @@ class ManagedVehicleConfig(BaseModel):
     engine_mode: EngineSettingMode = "fixed"
     engine_setting_raw_value: NonNegativeInt = Field(
         default=engine_percent_to_slider_step(50),
-        le=ENGINE_SLIDER_STEP_MAX,
+        le=ENGINE_SLIDER.max_step,
     )
     engine_setting_min_raw_value: NonNegativeInt = Field(
         default=engine_percent_to_slider_step(20),
-        le=ENGINE_SLIDER_STEP_MAX,
+        le=ENGINE_SLIDER.max_step,
     )
     engine_setting_max_raw_value: NonNegativeInt = Field(
         default=engine_percent_to_slider_step(80),
-        le=ENGINE_SLIDER_STEP_MAX,
+        le=ENGINE_SLIDER.max_step,
     )
     adaptive_engine_tuner_backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
     adaptive_engine_tuner_objective: EngineTunerObjective = ENGINE_TUNER_DEFAULTS.objective
-    adaptive_engine_bandit_slider_spacing: int = Field(
-        default=ENGINE_TUNER_DEFAULTS.bandit_slider_spacing,
-        ge=1,
-        le=ENGINE_SLIDER_STEP_MAX,
+    adaptive_engine_bandit_bucket_raw_values: tuple[NonNegativeInt, ...] = (
+        ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
     )
     adaptive_engine_stat_decay: float = Field(
         default=ENGINE_TUNER_DEFAULTS.stat_decay,
@@ -105,7 +103,7 @@ class ManagedVehicleConfig(BaseModel):
         data = handler(self)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "bandit":
             data.pop("adaptive_engine_tuner_objective", None)
-            data.pop("adaptive_engine_bandit_slider_spacing", None)
+            data.pop("adaptive_engine_bandit_bucket_raw_values", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "gaussian_process":
             data.pop("adaptive_engine_stat_decay", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "mlp_ensemble":
@@ -123,13 +121,10 @@ class ManagedVehicleConfig(BaseModel):
         if not isinstance(data, dict):
             return data
         next_data = dict(data)
-        old_spacing = next_data.pop("adaptive_engine_bandit_bucket_size", None)
-        if old_spacing is not None:
-            next_data.setdefault("adaptive_engine_bandit_slider_spacing", old_spacing)
         if next_data.get("engine_mode") != "adaptive_tuner":
             return next_data
-        next_data.setdefault("engine_setting_min_raw_value", 0)
-        next_data.setdefault("engine_setting_max_raw_value", ENGINE_SLIDER_STEP_MAX)
+        next_data.setdefault("engine_setting_min_raw_value", ENGINE_SLIDER.min_step)
+        next_data.setdefault("engine_setting_max_raw_value", ENGINE_SLIDER.max_step)
         return next_data
 
     @model_validator(mode="after")
@@ -152,10 +147,28 @@ class ManagedVehicleConfig(BaseModel):
                 "vehicle.engine_setting_min_raw_value must be <= "
                 "vehicle.engine_setting_max_raw_value"
             )
-        if self.engine_mode == "adaptive_tuner" and self.adaptive_engine_tuner_backend == "bandit":
-            engine_bucket_candidates(
-                minimum=self.engine_setting_min_raw_value,
-                maximum=self.engine_setting_max_raw_value,
-                slider_spacing=self.adaptive_engine_bandit_slider_spacing,
+        if self.adaptive_engine_tuner_backend == "bandit":
+            raw_values = tuple(
+                int(value) for value in self.adaptive_engine_bandit_bucket_raw_values
             )
+            buckets = engine_bucket_candidates(
+                bucket_raw_values=raw_values,
+            )
+        else:
+            buckets = ()
+        if self.engine_mode == "adaptive_tuner" and self.adaptive_engine_tuner_backend == "bandit":
+            out_of_range = [
+                bucket
+                for bucket in buckets
+                if (
+                    bucket < self.engine_setting_min_raw_value
+                    or bucket > self.engine_setting_max_raw_value
+                )
+            ]
+            if out_of_range:
+                joined = ", ".join(str(bucket) for bucket in out_of_range)
+                raise ValueError(
+                    "vehicle.adaptive_engine_bandit_bucket_raw_values contains value(s) "
+                    f"outside the selected engine range: {joined}"
+                )
         return self

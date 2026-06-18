@@ -34,7 +34,7 @@ export interface ForkSource {
 
 export interface ForkSourceEngineTuning {
   backend: EngineTunerBackend;
-  banditSliderSpacing: number | null;
+  banditBucketRawValues: readonly number[] | null;
   objective: EngineTunerObjective | null;
   rewardFingerprint: string | null;
   maxRawValue: number;

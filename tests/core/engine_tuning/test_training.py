@@ -12,6 +12,8 @@ from rl_fzerox.core.engine_tuning.training import (
 )
 from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
 
+DEFAULT_BANDIT_BUCKETS = (0, 13, 26, 38, 51, 64, 77, 90, 102, 115, 128)
+
 
 @pytest.mark.parametrize("backend", ["bandit", "gaussian_process", "mlp_ensemble"])
 def test_engine_tuning_controller_ignores_alt_baseline_episodes(
@@ -52,20 +54,20 @@ def test_bandit_reset_sampler_uses_best_observed_bucket_as_greedy() -> None:
             backend="bandit",
             min_raw_value=0,
             max_raw_value=128,
-            slider_spacing=13,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
             uniform_exploration=0.0,
         )
     )
     assert controller.record_episodes(
         (
-            _successful_engine_episode(engine_raw=25, race_time_ms=80_000),
+            _successful_engine_episode(engine_raw=26, race_time_ms=80_000),
             _successful_engine_episode(engine_raw=90, race_time_ms=80_500),
         )
     )
 
     snapshot = controller.reset_sampler_snapshot((context,))
 
-    assert snapshot.contexts[0].greedy_engine_setting_raw_value == 25
+    assert snapshot.contexts[0].greedy_engine_setting_raw_value == 26
 
 
 def test_bandit_return_objective_records_failed_episode_returns() -> None:
@@ -78,7 +80,7 @@ def test_bandit_return_objective_records_failed_episode_returns() -> None:
             reward_fingerprint="reward-a",
             min_raw_value=0,
             max_raw_value=128,
-            slider_spacing=13,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
             uniform_exploration=0.0,
         )
     )
@@ -86,7 +88,7 @@ def test_bandit_return_objective_records_failed_episode_returns() -> None:
     assert controller.record_episodes(
         (
             _engine_episode(
-                engine_raw=25,
+                engine_raw=26,
                 episode_return=12.5,
                 termination_reason="retired",
             ),
@@ -100,7 +102,7 @@ def test_bandit_return_objective_records_failed_episode_returns() -> None:
     assert candidate.mean_score == 12.5
     assert (
         controller.reset_sampler_snapshot((context,)).contexts[0].greedy_engine_setting_raw_value
-        == 25
+        == 26
     )
 
 
@@ -113,13 +115,13 @@ def test_bandit_can_switch_to_collected_return_objective_without_recollecting() 
             reward_fingerprint="reward-a",
             min_raw_value=0,
             max_raw_value=128,
-            slider_spacing=13,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
             uniform_exploration=0.0,
         )
     )
     assert finish_controller.record_episodes(
         (
-            _successful_engine_episode(engine_raw=25, race_time_ms=80_000, episode_return=20.0),
+            _successful_engine_episode(engine_raw=26, race_time_ms=80_000, episode_return=20.0),
             _successful_engine_episode(engine_raw=90, race_time_ms=78_000, episode_return=10.0),
         )
     )
@@ -132,7 +134,7 @@ def test_bandit_can_switch_to_collected_return_objective_without_recollecting() 
             reward_fingerprint="reward-a",
             min_raw_value=0,
             max_raw_value=128,
-            slider_spacing=13,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
             uniform_exploration=0.0,
         ),
         state=finish_controller.runtime_state,
@@ -143,7 +145,7 @@ def test_bandit_can_switch_to_collected_return_objective_without_recollecting() 
         return_controller.reset_sampler_snapshot((context,))
         .contexts[0]
         .greedy_engine_setting_raw_value
-        == 25
+        == 26
     )
 
 

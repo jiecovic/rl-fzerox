@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from rl_fzerox.core.domain.engine_setting import centered_engine_slider_buckets
 from rl_fzerox.core.engine_tuning import (
     ENGINE_TUNING_STATE_VERSION,
     BanditEngineTunerSettings,
@@ -22,14 +23,17 @@ from rl_fzerox.core.engine_tuning.sampling import (
 from rl_fzerox.core.engine_tuning.tuner import engine_candidates
 from rl_fzerox.core.engine_tuning.types import engine_bucket_candidates
 
+DEFAULT_BANDIT_BUCKETS = (0, 13, 26, 38, 51, 64, 77, 90, 102, 115, 128)
+NARROW_BANDIT_BUCKETS = (44, 54, 64, 74, 84)
+
 
 def test_engine_candidates_are_inclusive_and_clamped() -> None:
     assert engine_candidates(minimum=-10, maximum=3) == (0, 1, 2, 3)
     assert engine_candidates(minimum=126, maximum=140) == (126, 127, 128)
 
 
-def test_engine_bucket_candidates_are_inclusive_centered_on_neutral_step() -> None:
-    assert engine_bucket_candidates(minimum=0, maximum=128, slider_spacing=16) == (
+def test_centered_engine_slider_buckets_are_centered_on_neutral_step() -> None:
+    assert centered_engine_slider_buckets(minimum=0, maximum=128, side_count=4) == (
         0,
         16,
         32,
@@ -40,39 +44,31 @@ def test_engine_bucket_candidates_are_inclusive_centered_on_neutral_step() -> No
         112,
         128,
     )
-    assert engine_bucket_candidates(minimum=0, maximum=128, slider_spacing=32) == (
+    assert centered_engine_slider_buckets(minimum=0, maximum=128, side_count=2) == (
         0,
         32,
         64,
         96,
         128,
     )
-    assert engine_bucket_candidates(minimum=0, maximum=128, slider_spacing=20) == (
-        0,
-        4,
-        24,
-        44,
-        64,
-        84,
-        104,
-        124,
-        128,
+    assert (
+        centered_engine_slider_buckets(minimum=0, maximum=128, side_count=5)
+        == DEFAULT_BANDIT_BUCKETS
     )
-    assert engine_bucket_candidates(minimum=44, maximum=84, slider_spacing=10) == (
-        44,
-        54,
-        64,
-        74,
-        84,
+    assert (
+        centered_engine_slider_buckets(minimum=44, maximum=84, side_count=2)
+        == NARROW_BANDIT_BUCKETS
     )
-    assert engine_bucket_candidates(minimum=26, maximum=102, slider_spacing=32) == (
-        26,
-        32,
-        64,
-        96,
-        102,
-    )
-    assert engine_bucket_candidates(minimum=65, maximum=70, slider_spacing=10) == (65, 70)
+    with pytest.raises(ValueError, match="include 50%"):
+        centered_engine_slider_buckets(minimum=65, maximum=70, side_count=2)
+
+
+def test_engine_bucket_candidates_validate_explicit_bucket_values() -> None:
+    assert engine_bucket_candidates(bucket_raw_values=(84, 44, 64)) == (44, 64, 84)
+    with pytest.raises(ValueError, match="duplicates"):
+        engine_bucket_candidates(bucket_raw_values=(44, 44, 64))
+    with pytest.raises(ValueError, match="must be in"):
+        engine_bucket_candidates(bucket_raw_values=(44, 129))
 
 
 def test_engine_candidates_reject_inverted_range() -> None:
@@ -204,7 +200,7 @@ def test_bandit_backend_records_aggregate_candidates() -> None:
         settings=BanditEngineTunerSettings(
             min_raw_value=44,
             max_raw_value=84,
-            slider_spacing=10,
+            bucket_raw_values=NARROW_BANDIT_BUCKETS,
             prior_finish_time_seconds=200.0,
             uniform_exploration=0.0,
         ),
@@ -243,7 +239,7 @@ def test_bandit_recommendation_uses_best_observed_bucket() -> None:
         settings=BanditEngineTunerSettings(
             min_raw_value=0,
             max_raw_value=128,
-            slider_spacing=13,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
             prior_finish_time_seconds=200.0,
             uniform_exploration=0.0,
         ),
@@ -252,7 +248,7 @@ def test_bandit_recommendation_uses_best_observed_bucket() -> None:
         (
             EngineTuningEpisodeOutcome(
                 context=context,
-                engine_setting_raw_value=25,
+                engine_setting_raw_value=26,
                 completion_fraction=1.0,
                 finished=True,
                 race_time_ms=80_000,
@@ -269,7 +265,7 @@ def test_bandit_recommendation_uses_best_observed_bucket() -> None:
 
     choice = tuner.recommendation(context)
 
-    assert choice.engine_setting_raw_value == 25
+    assert choice.engine_setting_raw_value == 26
     assert choice.estimated_finish_time_ms == pytest.approx(80_000, abs=1)
 
 
@@ -282,7 +278,7 @@ def test_bandit_recommendation_tiebreaks_equal_means_by_best_time() -> None:
         settings=BanditEngineTunerSettings(
             min_raw_value=0,
             max_raw_value=128,
-            slider_spacing=13,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
             prior_finish_time_seconds=200.0,
             uniform_exploration=0.0,
         ),
@@ -291,14 +287,14 @@ def test_bandit_recommendation_tiebreaks_equal_means_by_best_time() -> None:
         (
             EngineTuningEpisodeOutcome(
                 context=context,
-                engine_setting_raw_value=25,
+                engine_setting_raw_value=26,
                 completion_fraction=1.0,
                 finished=True,
                 race_time_ms=90_000,
             ),
             EngineTuningEpisodeOutcome(
                 context=context,
-                engine_setting_raw_value=25,
+                engine_setting_raw_value=26,
                 completion_fraction=1.0,
                 finished=True,
                 race_time_ms=100_000,
@@ -329,7 +325,7 @@ def test_bandit_recommendation_tiebreaks_equal_means_by_best_time() -> None:
 
     choice = tuner.recommendation(context)
 
-    assert choice.engine_setting_raw_value == 25
+    assert choice.engine_setting_raw_value == 26
     assert choice.estimated_finish_time_ms == 95_000
     assert choice.best_finish_time_ms == 90_000
 
@@ -343,7 +339,7 @@ def test_bandit_backend_explores_unobserved_buckets_before_resampling() -> None:
         settings=BanditEngineTunerSettings(
             min_raw_value=54,
             max_raw_value=74,
-            slider_spacing=10,
+            bucket_raw_values=(54, 64, 74),
             prior_finish_time_seconds=200.0,
             uniform_exploration=0.0,
         ),
@@ -429,7 +425,7 @@ def test_bandit_backend_discards_off_grid_aggregate_candidates() -> None:
         settings=BanditEngineTunerSettings(
             min_raw_value=44,
             max_raw_value=84,
-            slider_spacing=10,
+            bucket_raw_values=NARROW_BANDIT_BUCKETS,
             prior_finish_time_seconds=200.0,
             uniform_exploration=0.0,
         ),

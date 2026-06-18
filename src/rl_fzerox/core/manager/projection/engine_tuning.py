@@ -48,7 +48,7 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
             {
                 "objective": vehicle.adaptive_engine_tuner_objective,
                 "reward_fingerprint": _reward_fingerprint(config),
-                "slider_spacing": vehicle.adaptive_engine_bandit_slider_spacing,
+                "bucket_raw_values": vehicle.adaptive_engine_bandit_bucket_raw_values,
                 "exploration_scale": uncertainty_scale_seconds,
             }
         )

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.engine_setting import (
-    ENGINE_SLIDER_STEP_MAX,
+    ENGINE_SLIDER,
     engine_value_to_slider_step,
 )
 from rl_fzerox.core.domain.race_difficulty import is_race_difficulty_name
@@ -467,7 +467,7 @@ def _finish_engine_setting_raw(
         engine_setting = telemetry.player.engine_setting
         if math.isfinite(float(engine_setting)):
             raw_value = engine_value_to_slider_step(float(engine_setting))
-            if 0 <= raw_value <= ENGINE_SLIDER_STEP_MAX:
+            if 0 <= raw_value <= ENGINE_SLIDER.max_step:
                 return raw_value
 
     for key in (
@@ -476,7 +476,7 @@ def _finish_engine_setting_raw(
         "track_engine_setting_raw_value",
     ):
         raw_value = _int_setup_value(info.get(key))
-        if raw_value is not None and 0 <= raw_value <= ENGINE_SLIDER_STEP_MAX:
+        if raw_value is not None and 0 <= raw_value <= ENGINE_SLIDER.max_step:
             return raw_value
     return None
 

@@ -10,15 +10,23 @@ import {
   runStatusSchema,
   vehicleSelectionModeSchema,
 } from "@/shared/api/contract/enums";
-import { ENGINE_SLIDER_STEP_MAX } from "@/shared/domain/engineBuckets";
+import { ENGINE_SLIDER } from "@/shared/domain/engineBuckets";
 
 const managedRunVehicleSetupSchema = z.object({
   selection_mode: vehicleSelectionModeSchema,
   selected_vehicle_ids: z.array(z.string()).min(1),
   engine_mode: engineSettingModeSchema,
-  engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
-  engine_setting_min_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
-  engine_setting_max_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+  engine_setting_raw_value: z.number().int().min(ENGINE_SLIDER.minStep).max(ENGINE_SLIDER.maxStep),
+  engine_setting_min_raw_value: z
+    .number()
+    .int()
+    .min(ENGINE_SLIDER.minStep)
+    .max(ENGINE_SLIDER.maxStep),
+  engine_setting_max_raw_value: z
+    .number()
+    .int()
+    .min(ENGINE_SLIDER.minStep)
+    .max(ENGINE_SLIDER.maxStep),
 });
 
 export const managedTemplateSchema = z.object({
@@ -166,7 +174,7 @@ export const engineTuningRuntimeCandidateSchema = z.object({
   context_key: z.string(),
   course_key: z.string(),
   vehicle_id: z.string(),
-  engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+  engine_setting_raw_value: z.number().int().min(ENGINE_SLIDER.minStep).max(ENGINE_SLIDER.maxStep),
   score_count: z.number().int().nonnegative().default(0),
   episode_count: z.number().int().nonnegative().default(0),
   finish_count: z.number().int().nonnegative(),
@@ -179,7 +187,7 @@ export const engineTuningRuntimeCandidateSchema = z.object({
 });
 
 export const engineTuningRuntimeCandidateEstimateSchema = z.object({
-  engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+  engine_setting_raw_value: z.number().int().min(ENGINE_SLIDER.minStep).max(ENGINE_SLIDER.maxStep),
   selection_probability: z.number().min(0).max(1),
   mean_score: z.number(),
   uncertainty_score: z.number().nonnegative(),
@@ -200,7 +208,11 @@ export const engineTuningRuntimeContextSchema = z.object({
   model_ready: z.boolean().default(true),
   warmup_successes: z.number().int().nonnegative().default(0),
   warmup_remaining: z.number().int().nonnegative().default(0),
-  recommended_engine_setting_raw_value: z.number().int().min(0).max(ENGINE_SLIDER_STEP_MAX),
+  recommended_engine_setting_raw_value: z
+    .number()
+    .int()
+    .min(ENGINE_SLIDER.minStep)
+    .max(ENGINE_SLIDER.maxStep),
   candidates: z.array(engineTuningRuntimeCandidateEstimateSchema),
 });
 

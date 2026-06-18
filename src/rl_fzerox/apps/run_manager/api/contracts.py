@@ -7,7 +7,7 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from rl_fzerox.core.domain.engine_setting import (
-    ENGINE_SLIDER_STEP_MAX,
+    ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
@@ -116,8 +116,8 @@ class UpsertSaveCourseSetupRequest(BaseModel):
     policy_artifact: Literal["latest", "best"] = "best"
     engine_setting_raw_value: int = Field(
         default=engine_percent_to_slider_step(50),
-        ge=0,
-        le=ENGINE_SLIDER_STEP_MAX,
+        ge=ENGINE_SLIDER.min_step,
+        le=ENGINE_SLIDER.max_step,
     )
     difficulty: str | None = None
     cup_id: str | None = None

@@ -8,7 +8,7 @@ import type {
   EngineTuningRuntimeContext,
   EngineTuningRuntimeState,
 } from "@/shared/api/contract";
-import { ENGINE_SLIDER_STEP_MAX, engineSliderStepLabel } from "@/shared/domain/engineBuckets";
+import { ENGINE_SLIDER, engineSliderStepLabel } from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { ConfigDisclosure } from "@/shared/ui/config/ConfigDisclosure";
@@ -271,7 +271,7 @@ function EngineSamplingProbabilityBars({
   objective: EngineTuningRuntimeState["objective"];
 }) {
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
-  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? ENGINE_SLIDER_STEP_MAX;
+  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? ENGINE_SLIDER.maxStep;
   const barWidth = 100 / Math.max(1, candidates.length);
   const maxProbability = Math.max(
     ...candidates.map((candidate) => candidate.selection_probability),
@@ -379,7 +379,7 @@ function EngineMeanPerformanceBars({
   recommendedEngineSettingRawValue: number;
 }) {
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
-  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? ENGINE_SLIDER_STEP_MAX;
+  const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? ENGINE_SLIDER.maxStep;
   const barWidth = 100 / Math.max(1, candidates.length);
   const estimatedTimes = candidates.map((candidate) => candidate.estimated_finish_time_ms);
   const fastestEstimate = Math.min(...estimatedTimes, Number.POSITIVE_INFINITY);

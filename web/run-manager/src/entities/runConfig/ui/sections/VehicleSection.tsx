@@ -11,8 +11,9 @@ import {
 } from "@/entities/runConfig/ui/sections/vehicle/model";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 import {
+  bucketSideCountFromRawValues,
   centeredEngineBuckets,
-  ENGINE_SLIDER_STEP_MAX,
+  ENGINE_SLIDER,
   enginePercentToSliderStep,
   engineSliderStepPercentLabel,
 } from "@/shared/domain/engineBuckets";
@@ -64,7 +65,7 @@ export function VehicleSection({
   const engineTicks = [
     { value: 0, label: "0%" },
     { value: enginePercentToSliderStep(50), label: "50%" },
-    { value: ENGINE_SLIDER_STEP_MAX, label: "100%" },
+    { value: ENGINE_SLIDER.maxStep, label: "100%" },
   ] as const;
 
   const updateVehicle = (patch: Partial<ManagedRunConfig["vehicle"]>) => {
@@ -88,14 +89,26 @@ export function VehicleSection({
       setConfig,
       "vehicle",
       (currentConfig): Partial<ManagedRunConfig["vehicle"]> => {
+        const bucketSideCount =
+          bucketSideCountFromRawValues(
+            currentConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
+          ) ||
+          bucketSideCountFromRawValues(
+            defaultConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
+          );
         if (mode === "fixed") {
           return { engine_mode: mode };
         }
         if (mode === "adaptive_tuner") {
           return {
+            adaptive_engine_bandit_bucket_raw_values: centeredEngineBuckets({
+              sideCount: bucketSideCount,
+              minimum: ENGINE_SLIDER.minStep,
+              maximum: ENGINE_SLIDER.maxStep,
+            }),
             engine_mode: mode,
-            engine_setting_min_raw_value: 0,
-            engine_setting_max_raw_value: ENGINE_SLIDER_STEP_MAX,
+            engine_setting_min_raw_value: ENGINE_SLIDER.minStep,
+            engine_setting_max_raw_value: ENGINE_SLIDER.maxStep,
           };
         }
         if (currentConfig.vehicle.engine_mode !== "fixed") {
@@ -201,6 +214,8 @@ export function VehicleSection({
                 defaultConfig.vehicle.adaptive_engine_uniform_exploration,
               adaptive_engine_greedy_plateau_seconds:
                 defaultConfig.vehicle.adaptive_engine_greedy_plateau_seconds,
+              adaptive_engine_bandit_bucket_raw_values:
+                defaultConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
               engine_mode: defaultConfig.vehicle.engine_mode,
               engine_setting_raw_value: defaultConfig.vehicle.engine_setting_raw_value,
               engine_setting_min_raw_value: defaultConfig.vehicle.engine_setting_min_raw_value,
@@ -254,19 +269,34 @@ export function VehicleSection({
                     : "Candidate engine slider-step range used by the adaptive tuner at episode reset."
               }
               label={config.vehicle.engine_mode === "fixed" ? "Engine slider" : "Engine range"}
-              max={ENGINE_SLIDER_STEP_MAX}
-              min={0}
+              max={ENGINE_SLIDER.maxStep}
+              min={ENGINE_SLIDER.minStep}
               mode={config.vehicle.engine_mode}
               rangeMax={config.vehicle.engine_setting_max_raw_value}
               rangeMin={config.vehicle.engine_setting_min_raw_value}
               ticks={engineTicks}
               onFixedChange={(value) => updateVehicle({ engine_setting_raw_value: value })}
-              onRangeChange={(value) =>
+              onRangeChange={(value) => {
+                const bucketSideCount =
+                  bucketSideCountFromRawValues(
+                    config.vehicle.adaptive_engine_bandit_bucket_raw_values,
+                  ) ||
+                  bucketSideCountFromRawValues(
+                    defaultConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
+                  );
+                const adaptive_engine_bandit_bucket_raw_values = centeredEngineBuckets({
+                  sideCount: bucketSideCount,
+                  minimum: value.min,
+                  maximum: value.max,
+                });
                 updateVehicle({
+                  ...(adaptive_engine_bandit_bucket_raw_values.length > 0
+                    ? { adaptive_engine_bandit_bucket_raw_values }
+                    : {}),
                   engine_setting_max_raw_value: value.max,
                   engine_setting_min_raw_value: value.min,
-                })
-              }
+                });
+              }}
             />
             {config.vehicle.engine_mode === "adaptive_tuner" ? (
               <AdaptiveEngineControls
@@ -433,19 +463,25 @@ function AdaptiveEngineControls({
   const isBanditBackend = vehicle.adaptive_engine_tuner_backend === "bandit";
   const isGaussianProcessBackend = vehicle.adaptive_engine_tuner_backend === "gaussian_process";
   const isMlpEnsembleBackend = vehicle.adaptive_engine_tuner_backend === "mlp_ensemble";
+  const banditBucketSideCount =
+    bucketSideCountFromRawValues(vehicle.adaptive_engine_bandit_bucket_raw_values) ||
+    bucketSideCountFromRawValues(defaultVehicle.adaptive_engine_bandit_bucket_raw_values);
   const banditBuckets = useMemo(
-    () =>
-      centeredEngineBuckets({
-        sliderSpacing: vehicle.adaptive_engine_bandit_slider_spacing,
-        minimum: vehicle.engine_setting_min_raw_value,
-        maximum: vehicle.engine_setting_max_raw_value,
-      }),
-    [
-      vehicle.adaptive_engine_bandit_slider_spacing,
-      vehicle.engine_setting_max_raw_value,
-      vehicle.engine_setting_min_raw_value,
-    ],
+    () => vehicle.adaptive_engine_bandit_bucket_raw_values,
+    [vehicle.adaptive_engine_bandit_bucket_raw_values],
   );
+
+  function setBanditBucketSideCount(sideCount: number) {
+    const adaptive_engine_bandit_bucket_raw_values = centeredEngineBuckets({
+      sideCount,
+      minimum: vehicle.engine_setting_min_raw_value,
+      maximum: vehicle.engine_setting_max_raw_value,
+    });
+    if (adaptive_engine_bandit_bucket_raw_values.length > 0) {
+      onChange({ adaptive_engine_bandit_bucket_raw_values });
+    }
+  }
+
   return (
     <div className="grid gap-3 border-t border-app-border pt-3">
       <div className="grid gap-1">
@@ -514,14 +550,14 @@ function AdaptiveEngineControls({
       <div className="grid gap-3 lg:grid-cols-3">
         {isBanditBackend ? (
           <NumberField
-            help="Distance between bandit candidates in internal slider steps. Range endpoints are always included."
-            label="Bucket spacing"
-            resetValue={defaultVehicle.adaptive_engine_bandit_slider_spacing}
+            help="Generates explicit centered engine buckets. 5 means five values below 50%, 50%, and five values above 50%."
+            label="Buckets per side"
+            resetValue={bucketSideCountFromRawValues(
+              defaultVehicle.adaptive_engine_bandit_bucket_raw_values,
+            )}
             step="1"
-            value={vehicle.adaptive_engine_bandit_slider_spacing}
-            onChange={(adaptive_engine_bandit_slider_spacing) =>
-              onChange({ adaptive_engine_bandit_slider_spacing })
-            }
+            value={banditBucketSideCount}
+            onChange={setBanditBucketSideCount}
           />
         ) : null}
         {isGaussianProcessBackend ? (

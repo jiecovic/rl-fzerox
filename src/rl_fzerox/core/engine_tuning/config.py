@@ -40,7 +40,7 @@ def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSett
             uniform_exploration=config.uniform_exploration,
             objective=config.objective,
             reward_fingerprint=config.reward_fingerprint,
-            slider_spacing=config.slider_spacing,
+            bucket_raw_values=config.bucket_raw_values,
             exploration_seconds=float(config.exploration_scale),
         )
     if config.backend == "mlp_ensemble":

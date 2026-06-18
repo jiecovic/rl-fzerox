@@ -9,7 +9,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER_STEP_MAX
+from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
 from rl_fzerox.core.manager.db.models.metadata import LineageGroupModel
 from rl_fzerox.core.manager.db.models.runs import (
     RunDraftModel,
@@ -479,4 +479,4 @@ def _string_value(value: object, *, fallback: str) -> str:
 def _bounded_int(value: object, *, fallback: int) -> int:
     if not isinstance(value, int | float):
         return fallback
-    return max(0, min(ENGINE_SLIDER_STEP_MAX, int(value)))
+    return max(ENGINE_SLIDER.min_step, min(ENGINE_SLIDER.max_step, int(value)))

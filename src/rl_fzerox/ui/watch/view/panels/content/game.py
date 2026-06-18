@@ -6,7 +6,7 @@ from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.engine_setting import (
-    ENGINE_SLIDER_STEP_MAX,
+    ENGINE_SLIDER,
     engine_percent_to_slider_step,
     engine_value_to_slider_step,
 )
@@ -184,7 +184,7 @@ def _format_telemetry_vehicle_setup(telemetry: _VehicleSetupTelemetry) -> str | 
     engine_setting = getattr(telemetry.player, "engine_setting", None)
     engine_raw = None if engine_setting is None else engine_value_to_slider_step(engine_setting)
     parts = [vehicle.display_name]
-    if engine_raw is not None and 0 <= engine_raw <= ENGINE_SLIDER_STEP_MAX:
+    if engine_raw is not None and 0 <= engine_raw <= ENGINE_SLIDER.max_step:
         parts.append(_format_engine_setting_raw(engine_raw))
     return " / ".join(parts)
 
@@ -199,7 +199,7 @@ def _format_live_vehicle_setup(info: dict[str, object]) -> str | None:
         )
     )
     engine_raw = _live_engine_setting_raw(info)
-    if engine_raw is not None and not 0 <= engine_raw <= ENGINE_SLIDER_STEP_MAX:
+    if engine_raw is not None and not 0 <= engine_raw <= ENGINE_SLIDER.max_step:
         engine_raw = None
     parts: list[str] = []
     if character_index is not None:

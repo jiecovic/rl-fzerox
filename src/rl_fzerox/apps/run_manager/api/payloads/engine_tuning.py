@@ -60,11 +60,7 @@ def _bandit_payload_state(
     state: EngineTuningRuntimeState,
     settings: BanditEngineTunerSettings,
 ) -> EngineTuningRuntimeState:
-    candidates = engine_bucket_candidates(
-        minimum=settings.min_raw_value,
-        maximum=settings.max_raw_value,
-        slider_spacing=settings.slider_spacing,
-    )
+    candidates = engine_bucket_candidates(bucket_raw_values=settings.bucket_raw_values)
     buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
     for candidate in state.candidates:
         if candidate.active_score_count <= 0:

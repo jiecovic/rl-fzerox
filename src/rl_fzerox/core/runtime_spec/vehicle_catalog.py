@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from rl_fzerox.core.domain.engine_setting import (
-    ENGINE_SLIDER_STEP_MAX,
+    ENGINE_SLIDER,
     engine_slider_step_to_display_percent,
     validate_engine_slider_step,
 )
@@ -134,7 +134,7 @@ def resolve_engine_setting(raw_engine_setting: object, *, context: str) -> Engin
     if isinstance(raw_engine_setting, bool) or not isinstance(raw_engine_setting, int):
         raise ValueError(
             f"{context} engine_setting_raw_value must be a raw integer in "
-            f"[0, {ENGINE_SLIDER_STEP_MAX}]"
+            f"[{ENGINE_SLIDER.min_step}, {ENGINE_SLIDER.max_step}]"
         )
     _validate_engine_setting_raw_value(raw_engine_setting, context=context)
     return EngineSetting(raw_value=raw_engine_setting)

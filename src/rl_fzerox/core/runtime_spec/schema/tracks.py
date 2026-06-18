@@ -17,7 +17,7 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER_STEP_MAX
+from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, XCupGeneratedCourseKind
 from rl_fzerox.core.engine_tuning.types import (
@@ -172,18 +172,15 @@ class AdaptiveEngineTuningConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
-    min_raw_value: NonNegativeInt = Field(default=0, le=ENGINE_SLIDER_STEP_MAX)
+    min_raw_value: NonNegativeInt = Field(default=ENGINE_SLIDER.min_step, le=ENGINE_SLIDER.max_step)
     max_raw_value: NonNegativeInt = Field(
-        default=ENGINE_SLIDER_STEP_MAX,
-        le=ENGINE_SLIDER_STEP_MAX,
+        default=ENGINE_SLIDER.max_step,
+        le=ENGINE_SLIDER.max_step,
     )
     backend: EngineTunerBackend = ENGINE_TUNER_DEFAULTS.backend
     objective: EngineTunerObjective = ENGINE_TUNER_DEFAULTS.objective
     reward_fingerprint: str | None = None
-    slider_spacing: PositiveInt = Field(
-        default=ENGINE_TUNER_DEFAULTS.bandit_slider_spacing,
-        le=ENGINE_SLIDER_STEP_MAX,
-    )
+    bucket_raw_values: tuple[NonNegativeInt, ...] = ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
     stat_decay: float = Field(default=ENGINE_TUNER_DEFAULTS.stat_decay, gt=0.0, lt=1.0)
     prior_finish_time_seconds: PositiveFloat = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     exploration_scale: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.exploration_seconds
@@ -215,7 +212,7 @@ class AdaptiveEngineTuningConfig(BaseModel):
         if isinstance(data, dict) and self.backend != "bandit":
             data.pop("objective", None)
             data.pop("reward_fingerprint", None)
-            data.pop("slider_spacing", None)
+            data.pop("bucket_raw_values", None)
         if isinstance(data, dict) and self.backend == "bandit":
             data.pop("greedy_plateau_tolerance_seconds", None)
         if isinstance(data, dict) and self.backend != "gaussian_process":
@@ -234,27 +231,12 @@ class AdaptiveEngineTuningConfig(BaseModel):
             data.pop("warmup_successes", None)
         return data
 
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate_legacy_bandit_spacing(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        next_data = dict(data)
-        old_spacing = next_data.pop("bucket_size", None)
-        if old_spacing is not None:
-            next_data.setdefault("slider_spacing", old_spacing)
-        return next_data
-
     @model_validator(mode="after")
     def _validate_engine_range(self) -> AdaptiveEngineTuningConfig:
         if self.min_raw_value > self.max_raw_value:
             raise ValueError("engine_tuning.min_raw_value must be <= max_raw_value")
         if self.enabled and self.backend == "bandit":
-            engine_bucket_candidates(
-                minimum=self.min_raw_value,
-                maximum=self.max_raw_value,
-                slider_spacing=self.slider_spacing,
-            )
+            engine_bucket_candidates(bucket_raw_values=self.bucket_raw_values)
         return self
 
 

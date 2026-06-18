@@ -10,10 +10,6 @@ from pathlib import Path
 
 import torch
 
-from rl_fzerox.core.domain.engine_setting import (
-    centered_engine_slider_buckets,
-    engine_percent_to_slider_step,
-)
 from rl_fzerox.core.engine_tuning.state import (
     ENGINE_TUNING_STATE_VERSION,
     EngineTuningCandidateState,
@@ -24,16 +20,8 @@ from rl_fzerox.core.engine_tuning.state import (
     EngineTuningTensorState,
 )
 from rl_fzerox.core.engine_tuning.types import (
-    ENGINE_TUNER_DEFAULTS,
     EngineTunerBackend,
     EngineTunerObjective,
-)
-
-_LEGACY_BANDIT_PERCENT_BUCKETS = tuple(range(0, 101, 10))
-_DEFAULT_BANDIT_SLIDER_BUCKETS = centered_engine_slider_buckets(
-    minimum=0,
-    maximum=128,
-    slider_spacing=ENGINE_TUNER_DEFAULTS.bandit_slider_spacing,
 )
 
 
@@ -118,7 +106,7 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
     if not isinstance(loaded, Mapping):
         return None
     version = _mapping_int(loaded, "version") or 1
-    if version not in {5, 6, ENGINE_TUNING_STATE_VERSION}:
+    if version != ENGINE_TUNING_STATE_VERSION:
         return None
     raw_candidates = loaded.get("candidates")
     if not isinstance(raw_candidates, list):
@@ -126,10 +114,6 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
     candidates = tuple(_candidate_from_mapping(raw_candidate) for raw_candidate in raw_candidates)
     candidates = tuple(candidate for candidate in candidates if candidate is not None)
     model_state = _model_state_from_mapping(loaded.get("model_state"))
-    if version == 5:
-        candidates = _migrate_percent_candidates_to_slider_steps(candidates)
-        if model_state is not None and model_state.backend == "mlp_ensemble":
-            model_state = None
     return EngineTuningRuntimeState(
         version=ENGINE_TUNING_STATE_VERSION,
         update_count=max(0, _mapping_int(loaded, "update_count") or 0),
@@ -138,99 +122,6 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
         reward_fingerprint=_mapping_optional_str(loaded, "reward_fingerprint"),
         model_state=model_state,
     )
-
-
-def _migrate_percent_candidates_to_slider_steps(
-    candidates: tuple[EngineTuningCandidateState, ...],
-) -> tuple[EngineTuningCandidateState, ...]:
-    merged: dict[tuple[str, int], EngineTuningCandidateState] = {}
-    for candidate in candidates:
-        slider_step = _legacy_percent_candidate_to_slider_step(candidate.engine_setting_raw_value)
-        key = (candidate.context_key, slider_step)
-        merged[key] = _merge_candidate(
-            existing=merged.get(key),
-            source=EngineTuningCandidateState(
-                context_key=candidate.context_key,
-                course_key=candidate.course_key,
-                vehicle_id=candidate.vehicle_id,
-                engine_setting_raw_value=slider_step,
-                score_count=candidate.score_count,
-                episode_count=candidate.episode_count,
-                finish_count=candidate.finish_count,
-                decayed_count=candidate.decayed_count,
-                decayed_score_total=candidate.decayed_score_total,
-                score_total=candidate.score_total,
-                best_score=candidate.best_score,
-                finish_score_total=candidate.finish_score_total,
-                best_finish_score=candidate.best_finish_score,
-                return_score_total=candidate.return_score_total,
-                best_return_score=candidate.best_return_score,
-                best_time_ms=candidate.best_time_ms,
-            ),
-        )
-    return tuple(
-        sorted(
-            merged.values(),
-            key=lambda candidate: (candidate.context_key, candidate.engine_setting_raw_value),
-        )
-    )
-
-
-def _legacy_percent_candidate_to_slider_step(value: int) -> int:
-    """Map old bandit percent buckets onto the centered 0..128 slider grid.
-
-    Version 5 bandit checkpoints stored the old 0, 10, ..., 100 buckets as
-    percent-like labels. Treat those as ordinal bucket identities instead of
-    nearest displayed ENG percentages, so the default 11-bucket tuner keeps the
-    same shape after moving to game-representable slider steps.
-    """
-
-    if value in _LEGACY_BANDIT_PERCENT_BUCKETS:
-        return _DEFAULT_BANDIT_SLIDER_BUCKETS[_LEGACY_BANDIT_PERCENT_BUCKETS.index(value)]
-    return engine_percent_to_slider_step(value)
-
-
-def _merge_candidate(
-    *,
-    existing: EngineTuningCandidateState | None,
-    source: EngineTuningCandidateState,
-) -> EngineTuningCandidateState:
-    if existing is None:
-        return source
-    return EngineTuningCandidateState(
-        context_key=existing.context_key,
-        course_key=existing.course_key,
-        vehicle_id=existing.vehicle_id,
-        engine_setting_raw_value=existing.engine_setting_raw_value,
-        score_count=existing.score_count + source.score_count,
-        episode_count=existing.episode_count + source.episode_count,
-        finish_count=existing.finish_count + source.finish_count,
-        decayed_count=existing.decayed_count + source.decayed_count,
-        decayed_score_total=existing.decayed_score_total + source.decayed_score_total,
-        score_total=existing.score_total + source.score_total,
-        best_score=_max_optional_score(existing.best_score, source.best_score),
-        finish_score_total=existing.finish_score_total + source.finish_score_total,
-        best_finish_score=_max_optional_score(existing.best_finish_score, source.best_finish_score),
-        return_score_total=existing.return_score_total + source.return_score_total,
-        best_return_score=_max_optional_score(existing.best_return_score, source.best_return_score),
-        best_time_ms=_min_optional_time(existing.best_time_ms, source.best_time_ms),
-    )
-
-
-def _max_optional_score(left: float | None, right: float | None) -> float | None:
-    if left is None:
-        return right
-    if right is None:
-        return left
-    return max(left, right)
-
-
-def _min_optional_time(left: int | None, right: int | None) -> int | None:
-    if left is None:
-        return right
-    if right is None:
-        return left
-    return min(left, right)
 
 
 def _model_state_payload(state: EngineTuningModelState | None) -> dict[str, object] | None:
