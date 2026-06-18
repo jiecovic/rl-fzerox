@@ -47,6 +47,8 @@ def retarget_gp_race_baseline(
 def _needs_gp_race_retarget(selected_track: SelectedTrack) -> bool:
     if selected_track.mode != "gp_race":
         return False
+    if selected_track.alt_baseline_id is not None:
+        return selected_track.engine_setting_raw_value is not None
     return bool(
         selected_track.engine_setting_raw_value != selected_track.source_engine_setting_raw_value
     )

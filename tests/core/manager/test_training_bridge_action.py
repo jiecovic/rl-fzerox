@@ -449,6 +449,8 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
     config.reward.outside_track_recovery_reward = 0.0025
     config.reward.outside_track_recovery_reward_cap = 0.075
     config.reward.outside_track_recovery_airborne_grace_frames = 45
+    config.reward.outside_track_dip_penalty = -0.125
+    config.reward.outside_track_dip_height_threshold = -8.0
     config.reward.airborne_landing_grace_frames = 60
     config.reward.position_progress_min_multiplier = 0.95
     config.reward.position_progress_max_multiplier = 1.15
@@ -462,6 +464,8 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
     assert train_config.reward.outside_track_recovery_reward == pytest.approx(0.0025)
     assert train_config.reward.outside_track_recovery_reward_cap == pytest.approx(0.075)
     assert train_config.reward.outside_track_recovery_airborne_grace_frames == 45
+    assert train_config.reward.outside_track_dip_penalty == pytest.approx(-0.125)
+    assert train_config.reward.outside_track_dip_height_threshold == pytest.approx(-8.0)
     assert train_config.reward.airborne_landing_grace_frames == 60
     assert train_config.reward.position_progress_min_multiplier == pytest.approx(0.95)
     assert train_config.reward.position_progress_max_multiplier == pytest.approx(1.15)

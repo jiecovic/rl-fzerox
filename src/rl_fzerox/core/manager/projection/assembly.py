@@ -98,6 +98,8 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "outside_track_recovery_airborne_grace_frames": (
             reward.outside_track_recovery_airborne_grace_frames
         ),
+        "outside_track_dip_penalty": reward.outside_track_dip_penalty,
+        "outside_track_dip_height_threshold": reward.outside_track_dip_height_threshold,
         "lap_completion_bonus": reward.lap_completion_bonus,
         "lap_position_scale": reward.lap_position_scale,
         "ko_star_reward": reward.ko_star_reward,
