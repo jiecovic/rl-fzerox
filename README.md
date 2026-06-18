@@ -11,9 +11,9 @@ Teaser video: the current policy can unlock everything by completing all cups on
 Master, the hardest F-Zero X difficulty. This run shows one example: winning the
 full Joker Cup on Master.
 
-[![rl-fzerox teaser video - click to watch on YouTube](https://img.youtube.com/vi/aWTHONOQbAg/maxresdefault.jpg)](https://www.youtube.com/watch?v=aWTHONOQbAg)
+[![rl-fzerox teaser video - click to watch on YouTube](https://img.youtube.com/vi/r_4lAayCBBo/maxresdefault.jpg)](https://www.youtube.com/watch?v=r_4lAayCBBo)
 
-<https://www.youtube.com/watch?v=aWTHONOQbAg>
+<https://www.youtube.com/watch?v=r_4lAayCBBo>
 
 ## Requirements
 
