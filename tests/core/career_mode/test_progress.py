@@ -787,7 +787,7 @@ def test_replayed_target_success_counts_when_ceremony_returns_to_menu(
     assert store.started_next_attempt_count == 0
 
 
-def test_replayed_target_success_counts_ceremony_when_rank_is_missing(
+def test_replayed_target_missing_rank_at_ceremony_exit_fails_attempt(
     tmp_path: Path,
 ) -> None:
     store = _ReplayTargetStore(tmp_path)
@@ -802,7 +802,12 @@ def test_replayed_target_success_counts_ceremony_when_rank_is_missing(
     terminal_transition = progress.handle_terminal_race(
         session=_Session(),
         setup=_race_setup(),
-        info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+        info={
+            "termination_reason": "finished",
+            "position": 1,
+            "race_time_ms": 88_333,
+            "course_index": 5,
+        },
     )
     post_gp_transition = progress.sync_post_terminal_progress(
         session=_Session(),
@@ -818,11 +823,51 @@ def test_replayed_target_success_counts_ceremony_when_rank_is_missing(
     assert terminal_transition.attempt_finished is False
     assert post_gp_transition.attempt_finished is False
     assert menu_transition.attempt_finished is True
-    assert menu_transition.finished_status == "succeeded"
-    assert progress.attempt_id is None
-    assert store.finished_attempts == [("attempt-1", "succeeded", None)]
-    assert store.status_updates == ["paused"]
-    assert store.started_next_attempt_count == 0
+    assert menu_transition.finished_status == "failed"
+    assert menu_transition.finished_failure_reason == "gp cup final rank missing"
+    assert menu_transition.next_plan is not None
+    assert menu_transition.next_plan.attempt_id == "attempt-2"
+    assert progress.attempt_id == "attempt-1"
+    assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank missing")]
+    assert store.status_updates == []
+    assert store.started_next_attempt_count == 1
+
+
+def test_replayed_target_ignores_stale_final_rank_from_race_terminal_frame(
+    tmp_path: Path,
+) -> None:
+    store = _ReplayTargetStore(tmp_path)
+    progress = CareerAttemptProgress(
+        store=store,
+        save_game_id=store.save_game.id,
+        attempt_id="attempt-1",
+        single_target=True,
+        target_clear_goal=1,
+    )
+
+    terminal_transition = progress.handle_terminal_race(
+        session=_Session(),
+        setup=_race_setup(),
+        info={
+            "game_mode": "gp_race",
+            "termination_reason": "finished",
+            "position": 1,
+            "race_time_ms": 88_333,
+            "course_index": 5,
+            "gp_final_rank": 1,
+        },
+    )
+    menu_transition = progress.sync_post_terminal_progress(
+        session=_Session(),
+        setup=_race_setup(),
+        info={"game_mode": "main_menu", "termination_reason": "finished"},
+    )
+
+    assert terminal_transition.attempt_finished is False
+    assert menu_transition.attempt_finished is True
+    assert menu_transition.finished_status == "failed"
+    assert menu_transition.finished_failure_reason == "gp cup final rank missing"
+    assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank missing")]
 
 
 def test_replayed_target_uses_final_rank_observed_before_ceremony(
@@ -974,11 +1019,13 @@ def test_replayed_target_final_course_without_gp_win_does_not_count_as_clear(
     )
 
     assert terminal_transition.attempt_finished is False
-    assert menu_transition.attempt_finished is False
+    assert menu_transition.attempt_finished is True
+    assert menu_transition.finished_status == "failed"
+    assert menu_transition.finished_failure_reason == "gp cup final rank missing"
     assert progress.attempt_id == "attempt-1"
-    assert store.finished_attempts == []
+    assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank missing")]
     assert store.status_updates == []
-    assert store.started_next_attempt_count == 0
+    assert store.started_next_attempt_count == 1
 
 
 def _logical_sra(cup_progress: dict[str, int]) -> bytes:
