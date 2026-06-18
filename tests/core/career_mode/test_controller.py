@@ -269,6 +269,29 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
     assert events.emulator_reset_requested is False
 
 
+def test_controller_annotates_post_gp_position_as_final_rank(tmp_path: Path) -> None:
+    controller = _controller(tmp_path)
+    progress = _PostGpProgressStub()
+    controller.__dict__["_progress"] = progress
+    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
+    controller._post_race.observed_terminal_race_result = True
+    controller._post_race.continue_pulses = 1
+
+    handled = controller.before_step(
+        session=_ControllerSession(),
+        info={
+            "game_mode": "gp_end_cutscene",
+            "termination_reason": "finished",
+            "position": 1,
+            "gp_final_rank": -15533,
+        },
+    )
+
+    assert handled is False
+    assert progress.sync_calls[0]["career_mode_gp_final_rank"] == 1
+    assert progress.sync_calls[0]["gp_final_rank"] == -15533
+
+
 def test_controller_keeps_recording_while_winning_ceremony_remains_visible(
     tmp_path: Path,
 ) -> None:
@@ -406,7 +429,7 @@ class _PostGpProgressStub:
         self.sync_calls.append(dict(info))
         if info.get("game_mode") in {"main_menu", "unskippable_credits"} or (
             info.get("career_mode_post_gp_cutscene_complete") is True
-            and info.get("gp_final_rank") == 1
+            and (info.get("career_mode_gp_final_rank") == 1 or info.get("gp_final_rank") == 1)
         ):
             return CareerProgressTransition(
                 attempt_finished=True,

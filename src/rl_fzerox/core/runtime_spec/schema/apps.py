@@ -59,6 +59,7 @@ class WatchCareerDebugConfig(BaseModel):
 
     enabled: bool = False
     screenshots: bool = True
+    screenshot_limit: NonNegativeInt = 256
 
 
 class WatchConfig(BaseModel):

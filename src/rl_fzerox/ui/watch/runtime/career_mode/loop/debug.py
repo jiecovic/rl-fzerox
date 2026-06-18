@@ -66,6 +66,7 @@ _TRACE_FIELDS = (
     "total_lap_count",
     "episode_completion_fraction",
     "position",
+    "career_mode_gp_final_rank",
     "gp_final_rank",
     "termination_reason",
     "finished",
@@ -78,7 +79,6 @@ _TRACE_FIELDS = (
 
 _CHANGE_FIELDS = (
     "career_mode_attempt_id",
-    "career_mode_phase",
     "career_mode_last_finished_attempt_id",
     "career_mode_last_finished_attempt_status",
     "career_mode_post_gp_cutscene_complete",
@@ -88,14 +88,11 @@ _CHANGE_FIELDS = (
     "career_mode_fsm_fresh_race_ready",
     "career_mode_fsm_continuing_result",
     "career_mode_fsm_awaiting_fresh_race",
-    "career_mode_fsm_pending_steps",
     "game_mode",
-    "game_mode_raw",
-    "queued_game_mode_raw",
-    "menu_transition_state_raw",
     "course_index",
     "race_laps_completed",
     "total_lap_count",
+    "career_mode_gp_final_rank",
     "gp_final_rank",
     "termination_reason",
     "finished",
@@ -124,9 +121,11 @@ class CareerModeDebugTrace:
 
     directory: Path
     screenshots: bool = True
+    screenshot_limit: int = 256
     trace_path: Path = field(init=False)
     frame_dir: Path = field(init=False)
     _event_index: int = field(default=0, init=False)
+    _screenshot_count: int = field(default=0, init=False)
     _last_change_key: tuple[object, ...] | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
@@ -147,7 +146,7 @@ class CareerModeDebugTrace:
         force: bool = False,
     ) -> None:
         values = _trace_values(info)
-        change_key = _change_key(values, controller=controller)
+        change_key = _change_key(values)
         if not force and change_key == self._last_change_key:
             return
 
@@ -178,7 +177,11 @@ class CareerModeDebugTrace:
         info: dict[str, object],
         frame_source: CareerDebugFrameSource | None,
     ) -> str | None:
-        if not self.screenshots or frame_source is None:
+        if (
+            not self.screenshots
+            or frame_source is None
+            or self._screenshot_count >= self.screenshot_limit
+        ):
             return None
         frame = frame_source()
         filename = _screenshot_filename(
@@ -188,6 +191,7 @@ class CareerModeDebugTrace:
         )
         path = self.frame_dir / filename
         _write_rgb_png(path, frame)
+        self._screenshot_count += 1
         return str(path.relative_to(self.directory))
 
 
@@ -202,7 +206,10 @@ def open_career_mode_debug_trace(config: WatchAppConfig) -> CareerModeDebugTrace
         directory = career_debug_dir(recording_path)
     return CareerModeDebugTrace(
         directory=directory,
-        screenshots=config.watch.career_debug.screenshots,
+        screenshots=(
+            config.watch.career_debug.screenshots and config.watch.career_debug.screenshot_limit > 0
+        ),
+        screenshot_limit=config.watch.career_debug.screenshot_limit,
     )
 
 
@@ -219,15 +226,8 @@ def _trace_values(info: dict[str, object]) -> dict[str, object]:
     return values
 
 
-def _change_key(
-    values: dict[str, object],
-    *,
-    controller: CareerModeController,
-) -> tuple[object, ...]:
-    return (
-        controller.phase.value,
-        *(values.get(field_name) for field_name in _CHANGE_FIELDS),
-    )
+def _change_key(values: dict[str, object]) -> tuple[object, ...]:
+    return tuple(values.get(field_name) for field_name in _CHANGE_FIELDS)
 
 
 def _json_safe(value: object) -> object:
