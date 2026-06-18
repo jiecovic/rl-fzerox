@@ -32,6 +32,10 @@ def career_session_video_path(path: Path) -> Path:
     return path.with_name(f"{path.stem}.session.mp4")
 
 
+def career_debug_dir(path: Path) -> Path:
+    return path.with_name(f"{path.stem}.debug")
+
+
 def segment_summary_path(video_path: Path, suffix: str) -> Path:
     return video_path.with_name(f"{video_path.stem}.summary{suffix}")
 

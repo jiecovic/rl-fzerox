@@ -52,6 +52,15 @@ class WatchRecordingConfig(BaseModel):
     upscale_factor: int = Field(default=1, ge=1, le=4)
 
 
+class WatchCareerDebugConfig(BaseModel):
+    """Optional Career Mode controller trace output."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    screenshots: bool = True
+
+
 class WatchConfig(BaseModel):
     """Human-facing watch UI settings."""
 
@@ -79,6 +88,7 @@ class WatchConfig(BaseModel):
     career_mode_race_setup: CareerModeRaceSetupConfig | None = None
     policy_observation_layout_shape_hint: tuple[PositiveInt, PositiveInt, PositiveInt] | None = None
     recording: WatchRecordingConfig = Field(default_factory=WatchRecordingConfig)
+    career_debug: WatchCareerDebugConfig = Field(default_factory=WatchCareerDebugConfig)
 
     @model_validator(mode="after")
     def _default_split_fps(self) -> WatchConfig:

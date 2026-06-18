@@ -19,6 +19,10 @@ from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.career_mode.loop.commands import (
     apply_control_timing_command,
 )
+from rl_fzerox.ui.watch.runtime.career_mode.loop.debug import (
+    CareerModeDebugTrace,
+    open_career_mode_debug_trace,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.loop.recording import (
     drain_recording_notices,
     handle_controller_lifecycle,
@@ -93,6 +97,7 @@ def run_loaded_career_mode_loop(
         native_fps=session.native_fps,
         native_sample_rate=session.native_sample_rate,
     )
+    debug_trace = open_career_mode_debug_trace(config)
 
     try:
         publish_initial_career_snapshot(
@@ -102,6 +107,17 @@ def run_loaded_career_mode_loop(
             state=state,
             frame_recorder=recorder,
         )
+        if debug_trace is not None:
+            try:
+                debug_trace.observe(
+                    stage="initial",
+                    info=state.info,
+                    controller=controller,
+                    frame_source=session.render,
+                    force=True,
+                )
+            except Exception as exc:
+                print(f"Career debug trace failed: {exc}", flush=True)
         _run_career_mode_loop_body(
             config=config,
             session=session,
@@ -110,6 +126,7 @@ def run_loaded_career_mode_loop(
             snapshot_queue=snapshot_queue,
             state=state,
             frame_recorder=recorder,
+            debug_trace=debug_trace,
         )
     except _CareerModeWorkerQuit:
         return
@@ -131,6 +148,7 @@ def _run_career_mode_loop_body(
     snapshot_queue: ProcessQueue,
     state: CareerModeLoopState,
     frame_recorder: FrameRecorder | None = None,
+    debug_trace: CareerModeDebugTrace | None = None,
 ) -> None:
     control_rate = state.control_rate
     native_control_fps = state.native_control_fps
@@ -173,6 +191,27 @@ def _run_career_mode_loop_body(
     last_menu_step = state.last_menu_step
     manual_spin_request: SpinRequest = "none"
     recording_notice = TimedRecordingNotice()
+
+    def trace_career_state(
+        stage: str,
+        *,
+        event: str | None = None,
+        force: bool = False,
+        trace_info: dict[str, object] | None = None,
+    ) -> None:
+        if debug_trace is None:
+            return
+        try:
+            debug_trace.observe(
+                stage=stage,
+                info=info if trace_info is None else trace_info,
+                controller=controller,
+                frame_source=session.render,
+                event=event,
+                force=force,
+            )
+        except Exception as exc:
+            print(f"Career debug trace failed: {exc}", flush=True)
 
     def clear_policy_runtime_state(*, reset_episode_reward: bool = False) -> None:
         nonlocal active_policy_control, active_policy_started, manual_control_enabled
@@ -404,12 +443,22 @@ def _run_career_mode_loop_body(
                     info=info,
                     active_policy_control=active_policy_control,
                 )
+                trace_career_state("after_before_step")
             lifecycle = handle_controller_lifecycle(
                 controller=controller,
                 frame_recorder=frame_recorder,
                 info=info,
             )
+            if lifecycle.recording_close_status is not None:
+                trace_career_state(
+                    "lifecycle",
+                    event=f"recording_close:{lifecycle.recording_close_status}",
+                    force=True,
+                )
+            elif lifecycle.recorded_event:
+                trace_career_state("lifecycle", event="record_event", force=True)
             if lifecycle.reset_requested:
+                trace_career_state("before_emulator_reset", event="reset_requested", force=True)
                 raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
                     config=config,
                     session=session,
@@ -427,6 +476,7 @@ def _run_career_mode_loop_body(
                 current_auxiliary_targets = None
                 manual_control_enabled = False
                 reset_track_records_if_attempt_changed()
+                trace_career_state("after_emulator_reset", event="reset_complete", force=True)
                 publish_snapshot(policy_visible=False)
                 continue
             if before_step_handled:
@@ -447,6 +497,11 @@ def _run_career_mode_loop_body(
                 if not terminal_handled and not in_gp_race(info):
                     raise RuntimeError("Career Mode left a race before observing a game result")
                 if terminal_handled:
+                    trace_career_state(
+                        "terminal_handled",
+                        event="policy_start_terminal",
+                        force=True,
+                    )
                     terminal_info = controller.viewer_info(
                         info=info,
                         active_policy_control=active_policy_control,
@@ -457,7 +512,26 @@ def _run_career_mode_loop_body(
                         info=terminal_info,
                         record_event=True,
                     )
+                    if lifecycle.recording_close_status is not None:
+                        trace_career_state(
+                            "lifecycle",
+                            event=f"recording_close:{lifecycle.recording_close_status}",
+                            force=True,
+                            trace_info=terminal_info,
+                        )
+                    elif lifecycle.recorded_event:
+                        trace_career_state(
+                            "lifecycle",
+                            event="record_event",
+                            force=True,
+                            trace_info=terminal_info,
+                        )
                     if lifecycle.reset_requested:
+                        trace_career_state(
+                            "before_emulator_reset",
+                            event="reset_requested",
+                            force=True,
+                        )
                         raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
                             config=config,
                             session=session,
@@ -466,6 +540,11 @@ def _run_career_mode_loop_body(
                         reset_info = dict(info)
                         clear_policy_runtime_state()
                         reset_track_records_if_attempt_changed()
+                        trace_career_state(
+                            "after_emulator_reset",
+                            event="reset_complete",
+                            force=True,
+                        )
                         publish_snapshot(policy_visible=False)
                         continue
                     track_record_book = track_record_book.update(
@@ -487,6 +566,7 @@ def _run_career_mode_loop_body(
                     reset_info = dict(info)
                     reset_track_records_if_attempt_changed()
                     clear_policy_runtime_state()
+                    trace_career_state("after_terminal_refresh")
                     publish_snapshot(policy_visible=False)
                     if not lifecycle.has_active_attempt:
                         step_idle_after_runner_complete()
@@ -525,6 +605,7 @@ def _run_career_mode_loop_body(
                 )
                 reset_info = dict(info)
                 current_telemetry = _read_live_telemetry(session.emulator)
+                trace_career_state("after_menu_step")
             else:
                 active_policy_control = controller.active_policy_control(
                     session=session,
@@ -568,6 +649,7 @@ def _run_career_mode_loop_body(
                         active_policy_control=None,
                     )
                     reset_info = dict(info)
+                    trace_career_state("after_policy_resolution_wait")
                     continue
                 if not active_policy_started:
                     control_rate.reset()
@@ -600,6 +682,7 @@ def _run_career_mode_loop_body(
                     current_auxiliary_targets = None
                     _reset_policy_runner(active_policy_control.runner)
                     active_policy_started = True
+                    trace_career_state("begin_policy_race", force=True)
                     publish_snapshot(policy_visible=True)
                     continue
 
@@ -663,11 +746,17 @@ def _run_career_mode_loop_body(
                 current_auxiliary_predictions = policy_step.auxiliary_predictions
                 current_auxiliary_targets = policy_step.auxiliary_targets
                 last_live_series_publish_time = policy_step.last_live_series_publish_time
+                trace_career_state("policy_step")
                 terminal_handled = controller.observe_step(
                     session=session,
                     info=info,
                 )
                 if terminal_handled and not controller.policy_owns_control():
+                    trace_career_state(
+                        "terminal_handled",
+                        event="race_terminal",
+                        force=True,
+                    )
                     terminal_info = controller.viewer_info(
                         info=info,
                         active_policy_control=active_policy_control,
@@ -678,7 +767,26 @@ def _run_career_mode_loop_body(
                         info=terminal_info,
                         record_event=True,
                     )
+                    if lifecycle.recording_close_status is not None:
+                        trace_career_state(
+                            "lifecycle",
+                            event=f"recording_close:{lifecycle.recording_close_status}",
+                            force=True,
+                            trace_info=terminal_info,
+                        )
+                    elif lifecycle.recorded_event:
+                        trace_career_state(
+                            "lifecycle",
+                            event="record_event",
+                            force=True,
+                            trace_info=terminal_info,
+                        )
                     if lifecycle.reset_requested:
+                        trace_career_state(
+                            "before_emulator_reset",
+                            event="reset_requested",
+                            force=True,
+                        )
                         raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
                             config=config,
                             session=session,
@@ -687,6 +795,11 @@ def _run_career_mode_loop_body(
                         reset_info = dict(info)
                         clear_policy_runtime_state()
                         reset_track_records_if_attempt_changed()
+                        trace_career_state(
+                            "after_emulator_reset",
+                            event="reset_complete",
+                            force=True,
+                        )
                         publish_snapshot(policy_visible=False)
                         continue
                     track_record_book = track_record_book.update(
@@ -709,6 +822,7 @@ def _run_career_mode_loop_body(
                     reset_info = dict(info)
                     reset_track_records_if_attempt_changed()
                     clear_policy_runtime_state()
+                    trace_career_state("after_terminal_refresh")
                     publish_snapshot(policy_visible=False)
                     if not lifecycle.has_active_attempt:
                         step_idle_after_runner_complete()
@@ -720,6 +834,11 @@ def _run_career_mode_loop_body(
     except _CareerModeWorkerQuit:
         raise
     except Exception as exc:
+        trace_career_state(
+            "worker_exception",
+            event=type(exc).__name__,
+            force=True,
+        )
         raise RuntimeError(
             career_runtime_error_context(
                 exc,
