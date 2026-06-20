@@ -33,6 +33,8 @@ TrackSamplingMode = Literal[
 DeficitBudgetDifficultyMetric = Literal["completion_ema", "finish_ema", "mixed"]
 VehicleSelectionMode = Literal["fixed", "pool"]
 EngineSettingMode = Literal["fixed", "random_range", "adaptive_tuner"]
+# Bandit is the maintained manager-facing backend. The model-backed values are
+# accepted for legacy configs and experiments, but hidden from new UI flows.
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
 EngineTunerObjective = Literal["finish_time", "safe_finish_time", "finish_rate"]
 ActionAxisMode = Literal["continuous", "discrete"]

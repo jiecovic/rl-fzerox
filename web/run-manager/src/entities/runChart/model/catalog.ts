@@ -131,9 +131,14 @@ const METRIC_TITLE_OVERRIDES: Record<string, string> = {
   "train/loss": "Loss",
   "train/n_updates": "Updates",
   "train/policy_gradient_loss": "Policy gradient loss",
-  "train/std": "Policy std",
   "train/value_loss": "Value loss",
 };
+
+const HIDDEN_METRIC_KEYS = new Set<string>([
+  // Replaced by train_std/<action-group>. Keep old TensorBoard logs readable
+  // without adding another redundant chart to the run-manager view.
+  "train/std",
+]);
 
 export function buildChartGroups(
   runs: ManagedRun[],
@@ -159,7 +164,11 @@ function buildMetricCharts(
     const samples = metricsByRun[run.id] ?? [];
     for (const sample of samples) {
       for (const key of Object.keys(sample.metrics)) {
-        if (key !== "time/total_timesteps" && !explicitMetricKeys.has(key)) {
+        if (
+          key !== "time/total_timesteps" &&
+          !explicitMetricKeys.has(key) &&
+          !HIDDEN_METRIC_KEYS.has(key)
+        ) {
           metricKeys.add(key);
         }
       }
@@ -183,6 +192,9 @@ function chartGroupForMetricKey(key: string): RunChartGroupId {
     return "timing";
   }
   if (key.startsWith("train/")) {
+    return "optimization";
+  }
+  if (key.startsWith("train_")) {
     return "optimization";
   }
   if (key.startsWith("train_aux/")) {
@@ -212,6 +224,15 @@ function chartGroupForMetricKey(key: string): RunChartGroupId {
 function metricTitle(key: string) {
   if (key.startsWith("train_aux/")) {
     return `Aux: ${humanizeAuxiliaryMetricKey(key.slice("train_aux/".length))}`;
+  }
+  if (key.startsWith("train_std/")) {
+    return `Policy std: ${humanizeMetricToken(key.slice("train_std/".length))}`;
+  }
+  if (key.startsWith("train_entropy/")) {
+    return `Entropy: ${humanizeMetricToken(key.slice("train_entropy/".length))}`;
+  }
+  if (key.startsWith("train_entropy_weight/")) {
+    return `Entropy weight: ${humanizeMetricToken(key.slice("train_entropy_weight/".length))}`;
   }
   const override = METRIC_TITLE_OVERRIDES[key];
   if (override !== undefined) {

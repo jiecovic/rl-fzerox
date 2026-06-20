@@ -14,6 +14,9 @@ from rl_fzerox.core.domain.engine_setting import (
     validate_engine_slider_bucket_values,
 )
 
+# Bandit is the maintained run-manager backend. GP and MLP remain loadable for
+# old configs and future experiments, but are not exposed for new managed runs
+# until their telemetry and reset-distribution contracts are redesigned.
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
 EngineTunerObjective = Literal["finish_time", "safe_finish_time", "finish_rate"]
 
@@ -92,7 +95,7 @@ class BanditEngineTunerSettings(EngineTunerCommonSettings):
 
 @dataclass(frozen=True, slots=True)
 class GaussianProcessEngineTunerSettings(EngineTunerCommonSettings):
-    """Static knobs used only by the Gaussian-process backend."""
+    """Static knobs used only by the experimental Gaussian-process backend."""
 
     backend: Literal["gaussian_process"] = "gaussian_process"
     greedy_plateau_tolerance_seconds: float = ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
@@ -104,7 +107,7 @@ class GaussianProcessEngineTunerSettings(EngineTunerCommonSettings):
 
 @dataclass(frozen=True, slots=True)
 class MlpEnsembleEngineTunerSettings(EngineTunerCommonSettings):
-    """Static knobs used only by the MLP ensemble backend."""
+    """Static knobs used only by the experimental MLP ensemble backend."""
 
     backend: Literal["mlp_ensemble"] = "mlp_ensemble"
     greedy_plateau_tolerance_seconds: float = ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds

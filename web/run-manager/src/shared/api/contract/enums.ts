@@ -28,6 +28,8 @@ export const deficitBudgetDifficultyMetricSchema = z.enum([
 ]);
 export const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
 export const engineSettingModeSchema = z.enum(["fixed", "random_range", "adaptive_tuner"]);
+// GP/MLP are accepted so old configs and runtime payloads keep parsing. New
+// run-manager controls expose only Bandit until those backends are redesigned.
 export const engineTunerBackendSchema = z.enum(["bandit", "gaussian_process", "mlp_ensemble"]);
 export const engineTunerObjectiveSchema = z.enum([
   "finish_time",
