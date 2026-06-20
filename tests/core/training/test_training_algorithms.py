@@ -549,21 +549,22 @@ def test_maskable_hybrid_action_ppo_learns_with_auxiliary_state_loss() -> None:
             ),
         )
     )
+    env_config = EnvConfig(
+        action=configured_hybrid_action(
+            continuous_axes=("steer", "drive"),
+            discrete_axes=("boost", "lean"),
+        ),
+        observation=ObservationConfig(
+            mode="image_state",
+            state_components=_VEHICLE_STATE_COMPONENT,
+        ),
+    )
     env = DummyVecEnv(
         vec_env_fns(
             lambda: maybe_wrap_training_auxiliary_state_observation(
                 FZeroXEnv(
                     backend=SyntheticBackend(),
-                    config=EnvConfig(
-                        action=configured_hybrid_action(
-                            continuous_axes=("steer", "drive"),
-                            discrete_axes=("boost", "lean"),
-                        ),
-                        observation=ObservationConfig(
-                            mode="image_state",
-                            state_components=_VEHICLE_STATE_COMPONENT,
-                        ),
-                    ),
+                    config=env_config,
                 ),
                 policy_config=policy_config,
             )
@@ -580,6 +581,7 @@ def test_maskable_hybrid_action_ppo_learns_with_auxiliary_state_loss() -> None:
                 device="cpu",
             ),
             policy_config=policy_config,
+            env_config=env_config,
             tensorboard_log=None,
         )
         # On-policy training metrics are recorded during train() and dumped on the
@@ -678,21 +680,22 @@ def test_auxiliary_state_losses_are_logged_to_tensorboard(tmp_path: Path) -> Non
             ),
         )
     )
+    env_config = EnvConfig(
+        action=configured_hybrid_action(
+            continuous_axes=("steer", "drive"),
+            discrete_axes=("boost", "lean"),
+        ),
+        observation=ObservationConfig(
+            mode="image_state",
+            state_components=_VEHICLE_STATE_COMPONENT,
+        ),
+    )
     env = DummyVecEnv(
         vec_env_fns(
             lambda: maybe_wrap_training_auxiliary_state_observation(
                 FZeroXEnv(
                     backend=SyntheticBackend(),
-                    config=EnvConfig(
-                        action=configured_hybrid_action(
-                            continuous_axes=("steer", "drive"),
-                            discrete_axes=("boost", "lean"),
-                        ),
-                        observation=ObservationConfig(
-                            mode="image_state",
-                            state_components=_VEHICLE_STATE_COMPONENT,
-                        ),
-                    ),
+                    config=env_config,
                 ),
                 policy_config=policy_config,
             )
@@ -710,6 +713,7 @@ def test_auxiliary_state_losses_are_logged_to_tensorboard(tmp_path: Path) -> Non
                 device="cpu",
             ),
             policy_config=policy_config,
+            env_config=env_config,
             tensorboard_log=None,
         )
         model.set_logger(sb3_logger.configure(str(tensorboard_dir), ["tensorboard"]))
@@ -733,6 +737,12 @@ def test_auxiliary_state_losses_are_logged_to_tensorboard(tmp_path: Path) -> Non
     assert "train/aux_loss" in scalar_tags
     assert "train_aux/track_position.edge_ratio" in scalar_tags
     assert "train_aux/vehicle_state.airborne" in scalar_tags
+    assert "train_std/steer" in scalar_tags
+    assert "train_std/drive" in scalar_tags
+    assert "train_entropy/boost" in scalar_tags
+    assert "train_entropy/lean" in scalar_tags
+    assert "train_entropy/steer" not in scalar_tags
+    assert "train_entropy/drive" not in scalar_tags
 
 
 def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:

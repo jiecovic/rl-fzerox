@@ -146,6 +146,7 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
             entropy=entropy,
             aux_loss=aux_loss,
             entropy_components=distribution.entropy_components() or {},
+            std_components=distribution.std_components(),
         )
 
     def predict_auxiliary_state(
@@ -260,6 +261,7 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
             entropy=entropy,
             aux_loss=aux_loss,
             entropy_components=distribution.entropy_components() or {},
+            std_components=distribution.std_components(),
         )
 
     def predict_auxiliary_state(
