@@ -309,12 +309,9 @@ def test_deficit_budget_focus_uses_completion_gap_with_sharpness(
         )
     )
     controller.maybe_update_weights()
-    values = controller.log_values()
+    values = _target_step_shares(controller)
 
-    assert {
-        course_key: values[f"track_sampling/{course_key}/target_step_share"]
-        for course_key in expected
-    } == pytest.approx(expected)
+    assert {course_key: values[course_key] for course_key in expected} == pytest.approx(expected)
 
 
 def test_deficit_budget_warmup_keeps_targets_uniform_until_all_courses_have_samples() -> None:
@@ -355,9 +352,9 @@ def test_deficit_budget_warmup_keeps_targets_uniform_until_all_courses_have_samp
     )
     controller.maybe_update_weights()
 
-    values = controller.log_values()
-    assert values["track_sampling/easy/target_step_share"] == pytest.approx(0.5)
-    assert values["track_sampling/hard/target_step_share"] == pytest.approx(0.5)
+    target_shares = _target_step_shares(controller)
+    assert target_shares["easy"] == pytest.approx(0.5)
+    assert target_shares["hard"] == pytest.approx(0.5)
 
     controller.record_episodes(
         (
@@ -377,9 +374,9 @@ def test_deficit_budget_warmup_keeps_targets_uniform_until_all_courses_have_samp
     )
     controller.maybe_update_weights()
 
-    values = controller.log_values()
-    assert values["track_sampling/hard/target_step_share"] > 0.99
-    assert values["track_sampling/easy/target_step_share"] < 0.01
+    target_shares = _target_step_shares(controller)
+    assert target_shares["hard"] > 0.99
+    assert target_shares["easy"] < 0.01
 
 
 def test_deficit_budget_finish_metric_can_focus_failed_finish_with_high_completion() -> None:
@@ -420,12 +417,13 @@ def test_deficit_budget_finish_metric_can_focus_failed_finish_with_high_completi
         )
     )
     controller.maybe_update_weights()
-    values = controller.log_values()
+    entries = _runtime_entries(controller)
+    target_shares = _target_step_shares(controller)
 
-    assert values["track_sampling/retired/problem_score"] == pytest.approx(1.0)
-    assert values["track_sampling/finished/problem_score"] == pytest.approx(0.0)
-    assert values["track_sampling/retired/target_step_share"] > 0.99
-    assert values["track_sampling/finished/target_step_share"] < 0.01
+    assert entries["retired"].current_problem_score == pytest.approx(1.0)
+    assert entries["finished"].current_problem_score == pytest.approx(0.0)
+    assert target_shares["retired"] > 0.99
+    assert target_shares["finished"] < 0.01
 
 
 def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
@@ -745,20 +743,14 @@ def test_deficit_budget_controller_charges_steps_to_their_queue_lane() -> None:
     )
 
     controller.add_rollout_budget(total_steps=200)
-    before = controller.log_values()
+    before = _scheduler_entries(controller)
     controller.record_step_infos(
         ({"track_id": "mute", "track_sampling_deficit_lane": "uniform"},) * 25
     )
-    after = controller.log_values()
+    after = _scheduler_entries(controller)
 
-    assert (
-        after["track_sampling/mute/uniform_deficit_steps"]
-        == before["track_sampling/mute/uniform_deficit_steps"] - 25
-    )
-    assert (
-        after["track_sampling/mute/adaptive_deficit_steps"]
-        == before["track_sampling/mute/adaptive_deficit_steps"]
-    )
+    assert after["mute"].uniform_deficit_steps == before["mute"].uniform_deficit_steps - 25
+    assert after["mute"].adaptive_deficit_steps == before["mute"].adaptive_deficit_steps
 
 
 def test_deficit_budget_controller_keeps_alt_baselines_out_of_runtime_stats() -> None:
@@ -1086,14 +1078,12 @@ def test_deficit_budget_controller_raises_target_share_for_problem_course() -> N
         )
     )
     controller.maybe_update_weights()
-    values = controller.log_values()
+    entries = _runtime_entries(controller)
+    target_shares = _target_step_shares(controller)
 
-    assert values["track_sampling/hard/problem_ema"] > values["track_sampling/easy/problem_ema"]
-    assert (
-        values["track_sampling/hard/target_step_share"]
-        > values["track_sampling/easy/target_step_share"]
-    )
-    assert values["track_sampling/hard/target_step_share"] < 0.7
+    assert entries["hard"].current_problem_score > entries["easy"].current_problem_score
+    assert target_shares["hard"] > target_shares["easy"]
+    assert target_shares["hard"] < 0.7
 
 
 def test_deficit_budget_controller_restores_runtime_stats() -> None:
@@ -1166,11 +1156,8 @@ def test_deficit_budget_controller_restores_runtime_stats() -> None:
         "mute": 300,
         "silence": 100,
     }
-    values = controller.log_values()
-    assert (
-        values["track_sampling/silence/target_step_share"]
-        > values["track_sampling/mute/target_step_share"]
-    )
+    target_shares = _target_step_shares(controller)
+    assert target_shares["silence"] > target_shares["mute"]
 
 
 def test_deficit_budget_controller_backfills_first_x_cup_generation_stats() -> None:
@@ -1246,3 +1233,34 @@ def test_deficit_budget_controller_backfills_first_x_cup_generation_stats() -> N
     assert entry.generation_finished_episode_count == 10
     assert entry.generation_success_sample_count == 40
     assert entry.generation_ema_completion_fraction == pytest.approx(0.686)
+
+
+def _target_step_shares(
+    controller: DeficitBudgetTrackSamplingController,
+) -> dict[str, float]:
+    payload = track_sampling_state_payload(controller.runtime_state())
+    raw_entries = payload["entries"]
+    assert isinstance(raw_entries, list)
+    shares: dict[str, float] = {}
+    for raw_entry in raw_entries:
+        assert isinstance(raw_entry, dict)
+        course_key = raw_entry["course_key"]
+        target_step_share = raw_entry["target_step_share"]
+        assert isinstance(course_key, str)
+        assert isinstance(target_step_share, float)
+        shares[course_key] = target_step_share
+    return shares
+
+
+def _runtime_entries(
+    controller: DeficitBudgetTrackSamplingController,
+) -> dict[str, TrackSamplingRuntimeEntry]:
+    return {entry.course_key: entry for entry in controller.runtime_state().entries}
+
+
+def _scheduler_entries(
+    controller: DeficitBudgetTrackSamplingController,
+) -> dict[str, DeficitBudgetCourseSchedulerState]:
+    scheduler = controller.runtime_state().deficit_budget_scheduler
+    assert scheduler is not None
+    return {entry.course_key: entry for entry in scheduler.entries}

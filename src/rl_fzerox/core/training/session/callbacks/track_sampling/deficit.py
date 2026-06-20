@@ -299,55 +299,18 @@ class DeficitBudgetTrackSamplingController:
         return TrackSamplingQueuedReset(course_id=course_key, deficit_lane=lane)
 
     def log_values(self) -> dict[str, float]:
-        values: dict[str, float] = {}
-        values["track_sampling/lane/uniform_deficit_steps"] = self._lane_deficit_steps["uniform"]
-        values["track_sampling/lane/adaptive_deficit_steps"] = self._lane_deficit_steps["adaptive"]
-        values["track_sampling/lane/uniform_stale_course_count"] = (
-            self._uniform_stale_course_count()
-        )
-        values["track_sampling/lane/uniform_staleness_max_assignment_gap"] = (
-            self._uniform_staleness_max_assignment_gap()
-        )
-        target_fractions = self._target_fractions()
-        rollout_total = sum(self._rollout_steps.values())
-        for course_key, stats in self._stats.items():
-            course = self._courses[course_key]
-            if not course.log_enabled:
-                continue
-            key = course.log_key
-            success_count = max(stats.success_sample_count, 1)
-            values[f"track_sampling/{key}/target_step_share"] = target_fractions[course_key]
-            values[f"track_sampling/{key}/actual_step_share"] = (
-                0.0 if rollout_total <= 0 else self._rollout_steps[course_key] / rollout_total
-            )
-            values[f"track_sampling/{key}/deficit_steps"] = sum(
-                self._deficit_steps[lane][course_key] for lane in _DEFICIT_LANES
-            )
-            values[f"track_sampling/{key}/reserved_reset_steps"] = sum(
-                self._reserved_reset_steps[lane][course_key] for lane in _DEFICIT_LANES
-            )
-            values[f"track_sampling/{key}/uniform_deficit_steps"] = self._deficit_steps["uniform"][
-                course_key
-            ]
-            values[f"track_sampling/{key}/adaptive_deficit_steps"] = self._deficit_steps[
-                "adaptive"
-            ][course_key]
-            values[f"track_sampling/{key}/problem_ema"] = self._ema_problem[course_key]
-            values[f"track_sampling/{key}/problem_score"] = stats.current_problem_score
-            values[f"track_sampling/{key}/adaptive_weight"] = stats.current_weight
-            values[f"track_sampling/{key}/finish_rate"] = (
-                stats.finished_episode_count / success_count
-            )
-            values[f"track_sampling/{key}/crash_rate"] = (
-                self._crash_episode_count[course_key] / success_count
-            )
-            values[f"track_sampling/{key}/avg_completion"] = (
-                0.0
-                if stats.completion_sample_count <= 0
-                else stats.completion_fraction_total / stats.completion_sample_count
-            )
-            values[f"track_sampling/{key}/ema_finish_rate"] = stats.ema_finish_rate or 0.0
-        return values
+        return {
+            "track_sampling/update_count": float(self.update_count),
+            "track_sampling/course_count": float(len(self._stats)),
+            "track_sampling/lane/uniform_deficit_steps": self._lane_deficit_steps["uniform"],
+            "track_sampling/lane/adaptive_deficit_steps": self._lane_deficit_steps["adaptive"],
+            "track_sampling/lane/uniform_stale_course_count": float(
+                self._uniform_stale_course_count()
+            ),
+            "track_sampling/lane/uniform_staleness_max_assignment_gap": float(
+                self._uniform_staleness_max_assignment_gap()
+            ),
+        }
 
     def runtime_state(self) -> TrackSamplingRuntimeState:
         return TrackSamplingRuntimeState(

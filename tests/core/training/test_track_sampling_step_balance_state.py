@@ -41,7 +41,7 @@ def test_step_balance_controller_builds_from_env_config() -> None:
     assert controller.record_episodes(({"track_id": "mute", "episode_step": 100},)) is None
 
 
-def test_step_balance_controller_logs_unique_courses_by_course_id() -> None:
+def test_step_balance_controller_compacts_tensorboard_course_logs() -> None:
     controller = StepBalancedTrackSamplingController.from_configs(
         env_config=EnvConfig(
             track_sampling=TrackSamplingConfig(
@@ -68,8 +68,12 @@ def test_step_balance_controller_logs_unique_courses_by_course_id() -> None:
     assert controller is not None
     values = controller.log_values()
 
-    assert "track_sampling/big_blue/prob" in values
-    assert "track_sampling/silence/prob" in values
+    assert values == {
+        "track_sampling/course_count": 2.0,
+        "track_sampling/update_count": 0.0,
+    }
+    assert "track_sampling/big_blue/prob" not in values
+    assert "track_sampling/silence/prob" not in values
     assert "track_sampling/big_blue_time_attack_blue_falcon_balanced/prob" not in values
 
 
@@ -120,7 +124,12 @@ def test_step_balance_controller_can_suppress_generated_course_logs() -> None:
 
     assert weights is not None
     assert set(weights) == {"x_cup_a", "x_cup_b"}
-    assert controller.log_values() == {}
+    values = controller.log_values()
+    assert values == {
+        "track_sampling/course_count": 2.0,
+        "track_sampling/update_count": 1.0,
+    }
+    assert not any(key.startswith("track_sampling/x_cup_") for key in values)
 
 
 def test_step_balance_controller_aggregates_duplicate_courses() -> None:

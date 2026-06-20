@@ -167,38 +167,10 @@ class StepBalancedTrackSamplingController:
             return {}
         if not self._log_details:
             return {}
-
-        total_weight = sum(stats.current_weight for stats in self._stats.values())
-        sampling_weights = self._course_sampling_weights()
-        total_target_frame_weight = sum(
-            weights.target_frame_weight for weights in sampling_weights.values()
-        )
-        expected_frame_weights = {
-            course_key: weights.reset_weight * weights.expected_episode_frames
-            for course_key, weights in sampling_weights.items()
+        return {
+            "track_sampling/update_count": float(self.update_count),
+            "track_sampling/course_count": float(len(self._stats)),
         }
-        total_expected_frame_weight = sum(expected_frame_weights.values())
-        values: dict[str, float] = {}
-        for course_key, stats in self._stats.items():
-            course = self._courses[course_key]
-            if not course.log_enabled:
-                continue
-            key = course.log_key
-            values[f"track_sampling/{key}/prob"] = (
-                stats.current_weight / total_weight if total_weight > 0.0 else 0.0
-            )
-            weights = sampling_weights[course_key]
-            values[f"track_sampling/{key}/target_frame_share"] = (
-                0.0
-                if total_target_frame_weight <= 0.0
-                else weights.target_frame_weight / total_target_frame_weight
-            )
-            values[f"track_sampling/{key}/expected_frame_share"] = (
-                0.0
-                if total_expected_frame_weight <= 0.0
-                else expected_frame_weights[course_key] / total_expected_frame_weight
-            )
-        return values
 
     def current_weights(self) -> dict[str, float]:
         weights: dict[str, float] = {}

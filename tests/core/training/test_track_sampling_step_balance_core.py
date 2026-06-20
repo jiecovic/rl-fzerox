@@ -68,7 +68,7 @@ def test_step_balance_controller_skips_tensorboard_track_logs_by_default() -> No
     assert values == {}
 
 
-def test_step_balance_controller_can_log_detailed_distribution_shares() -> None:
+def test_step_balance_controller_keeps_tensorboard_logs_compact() -> None:
     controller = StepBalancedTrackSamplingController(
         resolved_courses=resolved_track_sampling_courses({"mute": 1.0, "silence": 1.0}),
         action_repeat=1,
@@ -86,19 +86,12 @@ def test_step_balance_controller_can_log_detailed_distribution_shares() -> None:
     )
     values = controller.log_values()
 
-    assert values["track_sampling/mute/prob"] == pytest.approx(0.95)
-    assert values["track_sampling/silence/prob"] == pytest.approx(0.05)
-    assert values["track_sampling/mute/prob"] + values["track_sampling/silence/prob"] == (
-        pytest.approx(1.0)
-    )
-    assert values["track_sampling/mute/expected_frame_share"] + values[
-        "track_sampling/silence/expected_frame_share"
-    ] == pytest.approx(1.0)
-    assert values["track_sampling/mute/target_frame_share"] == pytest.approx(
-        values["track_sampling/silence/target_frame_share"]
-    )
-    assert "track_sampling/mute/frame_share" not in values
-    assert "track_sampling/silence/ema_episode_frames" not in values
+    assert values == {
+        "track_sampling/course_count": 2.0,
+        "track_sampling/update_count": 1.0,
+    }
+    assert not any(key.startswith("track_sampling/mute/") for key in values)
+    assert not any(key.startswith("track_sampling/silence/") for key in values)
 
 
 def test_step_balance_controller_tracks_finished_episode_counts() -> None:
