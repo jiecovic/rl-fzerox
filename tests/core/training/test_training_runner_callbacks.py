@@ -187,7 +187,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.finished_episode_metrics["race_time_ms"].mean() == 123.4
     assert accumulator.finished_episode_metrics["episode_step"].mean() == 7404.0
     assert accumulator.finished_episode_metrics["position"].mean() == 2.0
-    assert accumulator.course_finish_times_s["mute_city"].mean() == 123.4
     assert accumulator.episode_count == 2
     assert accumulator.airborne_episode_count == 2
     assert accumulator.airborne_finished_count == 1
@@ -229,7 +228,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["episode/boost_pad_entries_mean"] == 3.5
     assert logger.records["episode/boost_pad_entries_per_lap_mean"] == 1.5
     assert logger.records["episode/finish_time_s_mean"] == 123.4
-    assert logger.records["episode/by_course/mute_city/finish_time_s_mean"] == 123.4
+    assert "episode/by_course/mute_city/finish_time_s_mean" not in logger.records
     assert logger.records["episode/finish_steps_mean"] == 7404.0
     assert logger.records["episode/finish_position_mean"] == 2.0
     assert logger.records["episode/airborne_episode_rate"] == 1.0

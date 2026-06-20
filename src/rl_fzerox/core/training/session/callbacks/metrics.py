@@ -197,7 +197,6 @@ class RolloutInfoAccumulator:
             for spec in ROLLOUT_INFO_LOG_SPECS.finished_episode_metrics
         }
     )
-    course_finish_times_s: dict[str, _MeanAccumulator] = field(default_factory=dict)
     airborne_episode_count: int = 0
     airborne_finished_count: int = 0
     airborne_failed_count: int = 0
@@ -252,8 +251,6 @@ class RolloutInfoAccumulator:
             if values:
                 scaled_values = [value * spec.scale for value in values]
                 self.finished_episode_metrics[spec.info_key].add_many(scaled_values)
-        for episode in finished_episodes:
-            self._add_course_finish_time(episode)
 
         for episode in episodes:
             if episode.get("lean_episode_masked") is True:
@@ -304,10 +301,6 @@ class RolloutInfoAccumulator:
             mean = self.finished_episode_metrics[spec.info_key].mean()
             if mean is not None:
                 logger.record(spec.log_key, mean)
-        for course_key, accumulator in sorted(self.course_finish_times_s.items()):
-            mean = accumulator.mean()
-            if mean is not None:
-                logger.record(f"episode/by_course/{course_key}/finish_time_s_mean", mean)
 
         if self.episode_count == 0:
             return
@@ -348,17 +341,6 @@ class RolloutInfoAccumulator:
             self.spin_masked_episode_count / self.episode_count,
         )
 
-    def _add_course_finish_time(self, episode: dict[str, object]) -> None:
-        course_key = course_log_key(episode)
-        if course_key is None:
-            return
-        race_time_ms = episode.get("race_time_ms")
-        if not isinstance(race_time_ms, int | float):
-            return
-        self.course_finish_times_s.setdefault(course_key, _MeanAccumulator()).add_many(
-            [float(race_time_ms) * 0.001]
-        )
-
 
 def info_sequence(infos: object) -> Sequence[Mapping[str, object]] | None:
     if isinstance(infos, tuple):
@@ -388,20 +370,6 @@ def _episode_was_airborne(episode: dict[str, object]) -> bool:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return False
     return float(value) > 0.0
-
-
-def course_log_key(episode: dict[str, object]) -> str | None:
-    if episode.get("track_log_per_course") is False:
-        return None
-    for key in ("track_course_id", "track_id", "track_course_name", "course_index"):
-        value = episode.get(key)
-        if isinstance(value, int):
-            return f"course_{value}"
-        if isinstance(value, str) and value.strip():
-            sanitized = _sanitize_log_component(value)
-            if sanitized:
-                return sanitized
-    return None
 
 
 def _numeric_values(infos: Sequence[object], key: str) -> list[float]:
@@ -464,10 +432,3 @@ def _numeric_episode_values(
         if isinstance(value, int | float):
             values.append(float(value))
     return values
-
-
-def _sanitize_log_component(value: str) -> str:
-    normalized = value.strip().lower()
-    characters = [character if character.isalnum() else "_" for character in normalized]
-    collapsed = "_".join(part for part in "".join(characters).split("_") if part)
-    return collapsed
