@@ -353,6 +353,13 @@ def test_fork_converts_engine_tuning_source_to_bandit_buckets(tmp_path: Path) ->
     assert child_state is not None
     assert [candidate.engine_setting_raw_value for candidate in child_state.candidates] == [44, 84]
     assert [candidate.finish_count for candidate in child_state.candidates] == [2, 1]
+    assert [candidate.episode_count for candidate in child_state.candidates] == [3, 2]
+    assert [candidate.return_count for candidate in child_state.candidates] == [3, 2]
+    assert [candidate.mean_completion_score for candidate in child_state.candidates] == [
+        2.5 / 3,
+        0.625,
+    ]
+    assert [candidate.mean_return_score for candidate in child_state.candidates] == [10.0, 9.0]
     assert child_state.model_state is None
     assert not engine_tuning_model_path(child_policy_path).exists()
     assert parent_state is not None
@@ -1115,11 +1122,17 @@ def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
                     engine_setting_raw_value=44,
+                    episode_count=3,
                     finish_count=2,
+                    return_count=3,
                     decayed_count=2.0,
                     decayed_score_total=-200.0,
                     score_total=-200.0,
                     best_score=-90.0,
+                    completion_score_total=2.5,
+                    best_completion_score=1.0,
+                    return_score_total=30.0,
+                    best_return_score=15.0,
                     best_time_ms=90_000,
                 ),
                 EngineTuningCandidateState(
@@ -1151,11 +1164,17 @@ def _write_off_grid_engine_tuning_state(state_path: Path) -> None:
                     course_key=context.course_key,
                     vehicle_id=context.vehicle_id,
                     engine_setting_raw_value=84,
+                    episode_count=2,
                     finish_count=1,
+                    return_count=2,
                     decayed_count=1.0,
                     decayed_score_total=-80.0,
                     score_total=-80.0,
                     best_score=-80.0,
+                    completion_score_total=1.25,
+                    best_completion_score=1.0,
+                    return_score_total=18.0,
+                    best_return_score=12.0,
                     best_time_ms=80_000,
                 ),
             ),

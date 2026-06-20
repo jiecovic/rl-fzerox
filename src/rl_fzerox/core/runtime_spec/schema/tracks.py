@@ -181,6 +181,11 @@ class AdaptiveEngineTuningConfig(BaseModel):
     objective: EngineTunerObjective = ENGINE_TUNER_DEFAULTS.objective
     reward_fingerprint: str | None = None
     bucket_raw_values: tuple[NonNegativeInt, ...] = ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
+    safe_finish_rate_threshold: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.safe_finish_rate_threshold,
+        ge=0.0,
+        le=1.0,
+    )
     stat_decay: float = Field(default=ENGINE_TUNER_DEFAULTS.stat_decay, gt=0.0, lt=1.0)
     prior_finish_time_seconds: PositiveFloat = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     exploration_scale: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.exploration_seconds
@@ -206,6 +211,18 @@ class AdaptiveEngineTuningConfig(BaseModel):
         ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_engine_tuner_objective(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        next_data = dict(data)
+        # Transitional config compatibility. Remove after local run specs have
+        # been migrated away from removed non-finish tuner objectives.
+        if next_data.get("objective") in {"episode_return", "completion"}:
+            next_data["objective"] = "finish_time"
+        return next_data
+
     @model_serializer(mode="wrap")
     def _serialize_engine_tuning(self, handler: SerializerFunctionWrapHandler) -> object:
         data = handler(self)
@@ -213,6 +230,7 @@ class AdaptiveEngineTuningConfig(BaseModel):
             data.pop("objective", None)
             data.pop("reward_fingerprint", None)
             data.pop("bucket_raw_values", None)
+            data.pop("safe_finish_rate_threshold", None)
         if isinstance(data, dict) and self.backend == "bandit":
             data.pop("greedy_plateau_tolerance_seconds", None)
         if isinstance(data, dict) and self.backend != "gaussian_process":
@@ -261,6 +279,7 @@ class TrackSamplingConfig(BaseModel):
     deficit_budget_weight_update_rollouts: PositiveInt = 20
     deficit_budget_difficulty_metric: DeficitBudgetDifficultyMetric = "completion_ema"
     deficit_budget_warmup_min_episodes_per_course: int = Field(default=10, ge=0)
+    deficit_budget_uniform_staleness_rotations: float = Field(default=2.0, ge=0.0)
     step_balance_log_details: bool = False
     x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
     engine_tuning: AdaptiveEngineTuningConfig = Field(default_factory=AdaptiveEngineTuningConfig)

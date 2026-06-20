@@ -101,6 +101,7 @@ class ManagedTracksConfig(BaseModel):
     deficit_budget_weight_update_rollouts: int = Field(default=20, ge=1)
     deficit_budget_difficulty_metric: DeficitBudgetDifficultyMetric = "completion_ema"
     deficit_budget_warmup_min_episodes_per_course: int = Field(default=10, ge=0)
+    deficit_budget_uniform_staleness_rotations: float = Field(default=2.0, ge=0.0)
     selected_course_ids: tuple[str, ...] = Field(default_factory=default_selected_course_ids)
 
     def active_course_count(self) -> int:

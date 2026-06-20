@@ -201,7 +201,7 @@ def _engine_tuning_candidate_payload(
         "raw_mean_score": candidate.raw_mean_score,
         "best_score": candidate.best_score,
         "mean_completion_score": candidate.mean_completion_score,
-        "best_completion_score": candidate.best_completion_score,
+        "best_completion_score": _unit_score(candidate.best_completion_score),
         "finish_rate": candidate.finish_rate_score,
         "failure_rate": candidate.failure_rate_score,
         "mean_finish_score": candidate.mean_finish_score,
@@ -317,7 +317,9 @@ def _engine_tuning_candidate_estimate_payload(
             else finish_time_ms_from_score(candidate.mean_finish_score)
         ),
         "mean_completion_score": None if candidate is None else candidate.mean_completion_score,
-        "best_completion_score": None if candidate is None else candidate.best_completion_score,
+        "best_completion_score": (
+            None if candidate is None else _unit_score(candidate.best_completion_score)
+        ),
         "finish_rate": None if candidate is None else candidate.finish_rate_score,
         "failure_rate": None if candidate is None else candidate.failure_rate_score,
         "mean_return_score": None if candidate is None else candidate.mean_return_score,
@@ -329,6 +331,12 @@ def _engine_tuning_candidate_estimate_payload(
         "return_count": 0 if candidate is None else candidate.return_count,
         "finish_count": 0 if candidate is None else candidate.finish_count,
     }
+
+
+def _unit_score(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return max(0.0, min(1.0, float(value)))
 
 
 def _observed_contexts(

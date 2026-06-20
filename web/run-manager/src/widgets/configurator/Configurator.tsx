@@ -384,13 +384,7 @@ export function Configurator({
     ) {
       return true;
     }
-    if (forkSourceEngineTuning.objective !== vehicle.adaptive_engine_tuner_objective) {
-      return true;
-    }
-    return (
-      vehicle.adaptive_engine_tuner_objective === "episode_return" &&
-      forkSourceEngineTuning.rewardFingerprint !== stableJson(candidateConfig.reward)
-    );
+    return false;
   }
 
   function sameNumberList(left: readonly number[] | null, right: readonly number[]) {

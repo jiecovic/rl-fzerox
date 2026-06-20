@@ -40,7 +40,7 @@ export function EngineTuningSourceDialog({
             This fork can take over engine-tuning history from {sourceLabel}, or start with a clean
             tuner.
             {lossy
-              ? " The tuner backend, engine range, slider spacing, objective, or reward settings changed, so taking over history can discard incompatible data."
+              ? " The tuner backend, engine range, or slider buckets changed, so taking over history can discard incompatible data."
               : ""}
           </Dialog.Description>
           <div className="flex flex-wrap justify-end gap-2.5">

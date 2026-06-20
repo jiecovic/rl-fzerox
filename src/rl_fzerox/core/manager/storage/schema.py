@@ -30,7 +30,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 34
+SCHEMA_VERSION = 35
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -102,6 +102,10 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
                 table_names=table_names,
             )
             _upgrade_track_sampling_completion_columns(
+                engine=engine,
+                table_names=table_names,
+            )
+            _upgrade_track_sampling_scheduler_columns(
                 engine=engine,
                 table_names=table_names,
             )
@@ -290,6 +294,29 @@ def _upgrade_track_sampling_completion_columns(
                 """,
             )
         )
+
+
+def _upgrade_track_sampling_scheduler_columns(
+    *,
+    engine: Engine,
+    table_names: set[str],
+) -> None:
+    """Add exact deficit-budget scheduler accounts to pre-35 manager DBs.
+
+    TEMP MIGRATION: remove this additive upgrade after local active DBs have
+    moved to schema 35 and only current-schema creation remains needed.
+    """
+
+    table_name = "run_track_sampling_runtime"
+    if table_name not in table_names:
+        return
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns(table_name)}
+    column_name = "deficit_budget_scheduler_json"
+    if column_name in columns:
+        return
+    with engine.begin() as connection:
+        connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} TEXT"))
 
 
 def _assert_save_game_columns(*, inspector: Inspector) -> None:

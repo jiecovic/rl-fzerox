@@ -13,6 +13,7 @@ from rl_fzerox.core.engine_tuning import (
 )
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
+from rl_fzerox.core.envs.engine.reset.track_sampling import TrackSamplingQueuedReset
 from rl_fzerox.core.envs.gym_runtime import FZeroXEnvRuntime
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.runtime_spec.schema import (
@@ -131,10 +132,18 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         self._runtime.set_engine_tuning_selection(selection)
 
-    def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
-        """Append externally scheduled course ids for deficit-budget resets."""
+    def extend_track_sampling_reset_queue(
+        self,
+        queued_resets: Sequence[TrackSamplingQueuedReset | str],
+    ) -> None:
+        """Append externally scheduled reset slots for deficit-budget sampling."""
 
-        self._runtime.extend_track_sampling_reset_queue(course_ids)
+        self._runtime.extend_track_sampling_reset_queue(queued_resets)
+
+    def clear_track_sampling_reset_queue(self) -> None:
+        """Drop unconsumed deficit-budget reset slots after scheduler replanning."""
+
+        self._runtime.clear_track_sampling_reset_queue()
 
     def track_sampling_reset_queue_length(self) -> int:
         """Return queued deficit-budget reset course count."""

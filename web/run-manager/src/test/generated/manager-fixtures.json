@@ -1460,6 +1460,7 @@
       "deficit_budget_ema_alpha": 0.02,
       "deficit_budget_focus_sharpness": 1.0,
       "deficit_budget_uniform_fraction": 0.7,
+      "deficit_budget_uniform_staleness_rotations": 2.0,
       "deficit_budget_warmup_min_episodes_per_course": 10,
       "deficit_budget_weight_update_rollouts": 20,
       "include_x_cup": false,
@@ -1552,6 +1553,7 @@
     "vehicle": {
       "adaptive_engine_bandit_bucket_raw_values": [0, 13, 26, 38, 51, 64, 77, 90, 102, 115, 128],
       "adaptive_engine_greedy_plateau_seconds": 1.0,
+      "adaptive_engine_safe_finish_rate_threshold": 0.9,
       "adaptive_engine_tuner_backend": "bandit",
       "adaptive_engine_tuner_objective": "finish_time",
       "adaptive_engine_uniform_exploration": 0.05,

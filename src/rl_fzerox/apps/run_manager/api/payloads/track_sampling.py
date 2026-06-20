@@ -13,8 +13,9 @@ def track_sampling_state_payload(
 ) -> dict[str, object]:
     current_probabilities = _current_probabilities(state)
     target_step_shares = _target_step_shares(state)
+    scheduler_env_steps = _scheduler_env_steps_by_course(state)
     total_episodes = sum(entry.episode_count for entry in state.entries)
-    total_frames = sum(entry.completed_frames for entry in state.entries)
+    total_scheduler_env_steps = sum(scheduler_env_steps.values())
     return {
         "sampling_mode": state.sampling_mode,
         "action_repeat": state.action_repeat,
@@ -64,10 +65,13 @@ def track_sampling_state_payload(
                 "generation_ema_completion_fraction": entry.generation_ema_completion_fraction,
                 "target_step_share": target_step_shares.get(entry.course_key, 0.0),
                 "completed_frames": entry.completed_frames,
-                "completed_env_steps": (
-                    0 if state.action_repeat <= 0 else entry.completed_frames // state.action_repeat
+                "completed_env_steps": scheduler_env_steps.get(entry.course_key, 0),
+                "measurement_env_steps": _measurement_env_steps(state, entry),
+                "step_share": (
+                    0.0
+                    if total_scheduler_env_steps <= 0
+                    else scheduler_env_steps.get(entry.course_key, 0) / total_scheduler_env_steps
                 ),
-                "step_share": (0.0 if total_frames <= 0 else entry.completed_frames / total_frames),
                 "ema_episode_frames": entry.ema_episode_frames,
                 "ema_completion_fraction": entry.ema_completion_fraction,
                 "ema_finish_rate": entry.ema_finish_rate,
@@ -78,6 +82,29 @@ def track_sampling_state_payload(
             for entry in state.entries
         ],
     }
+
+
+def _scheduler_env_steps_by_course(state: TrackSamplingRuntimeState) -> dict[str, int]:
+    scheduler = state.deficit_budget_scheduler
+    if scheduler is None:
+        return {entry.course_key: _measurement_env_steps(state, entry) for entry in state.entries}
+    scheduler_steps = {
+        entry.course_key: max(0, int(entry.scheduler_env_steps)) for entry in scheduler.entries
+    }
+    return {
+        entry.course_key: scheduler_steps.get(
+            entry.course_key,
+            _measurement_env_steps(state, entry),
+        )
+        for entry in state.entries
+    }
+
+
+def _measurement_env_steps(
+    state: TrackSamplingRuntimeState,
+    entry: TrackSamplingRuntimeEntry,
+) -> int:
+    return 0 if state.action_repeat <= 0 else entry.completed_frames // state.action_repeat
 
 
 def _current_probabilities(state: TrackSamplingRuntimeState) -> dict[str, float]:

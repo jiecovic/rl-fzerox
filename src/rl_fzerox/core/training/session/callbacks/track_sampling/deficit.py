@@ -3,8 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from math import ceil
 from random import Random
 
+from rl_fzerox.core.envs.engine.reset.track_sampling import (
+    TrackSamplingDeficitLane,
+    TrackSamplingQueuedReset,
+)
 from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
 from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
     ResolvedTrackSamplingCourses,
@@ -19,6 +24,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     uses_alt_baseline_sample,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
+    DeficitBudgetCourseSchedulerState,
+    DeficitBudgetSchedulerState,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
     TrackStepStats,
@@ -34,17 +41,20 @@ class DeficitBudgetSettings:
     weight_update_rollouts: int
     difficulty_metric: str = "completion_ema"
     warmup_min_episodes_per_course: int = 10
+    uniform_staleness_rotations: float = 2.0
     x_cup_generation_ema_alpha: float = 0.3
 
 
 @dataclass(frozen=True, slots=True)
 class DeficitQueueSettings:
-    initial_queue_length: int = 8
-    refill_low_watermark: int = 4
-    minimum_refill_size: int = 16
+    initial_queue_length: int = 2
+    refill_low_watermark: int = 0
+    minimum_refill_size: int = 1
 
 
 DEFICIT_QUEUE_SETTINGS = DeficitQueueSettings()
+
+_DEFICIT_LANES: tuple[TrackSamplingDeficitLane, ...] = ("uniform", "adaptive")
 
 _CRASH_TERMINATION_REASONS = frozenset(
     {
@@ -87,18 +97,28 @@ class DeficitBudgetTrackSamplingController:
             )
             for course_key in self._course_keys
         }
-        self._deficit_steps = {course_key: 0.0 for course_key in self._course_keys}
-        self._reserved_reset_steps = {course_key: 0.0 for course_key in self._course_keys}
+        self._deficit_steps = {
+            lane: {course_key: 0.0 for course_key in self._course_keys} for lane in _DEFICIT_LANES
+        }
+        self._reserved_reset_steps = {
+            lane: {course_key: 0.0 for course_key in self._course_keys} for lane in _DEFICIT_LANES
+        }
+        self._lane_deficit_steps = {lane: 0.0 for lane in _DEFICIT_LANES}
+        self._lane_reserved_reset_steps = {lane: 0.0 for lane in _DEFICIT_LANES}
+        self._uniform_assignment_count = 0
+        self._last_uniform_assignment_index = {course_key: 0 for course_key in self._course_keys}
         self._rollout_steps = {course_key: 0 for course_key in self._course_keys}
         self._accounted_env_steps = {course_key: 0 for course_key in self._course_keys}
+        self._scheduler_env_steps = {course_key: 0 for course_key in self._course_keys}
         self._ema_problem = {course_key: 0.0 for course_key in self._course_keys}
         self._crash_episode_count = {course_key: 0 for course_key in self._course_keys}
         self._rollouts_since_weight_update = 0
         self.update_count = 0
-        self._restore_state(restored_state)
+        restored = self._restore_state(restored_state)
         self._seed_problem_scores_from_restored_stats()
         self._recompute_target_weights()
-        self._rebuild_deficits_from_completed_steps()
+        if restored and not self._restore_scheduler_state(restored_state):
+            self._seed_legacy_deficit_steps_from_accounted_steps()
 
     @classmethod
     def from_configs(
@@ -133,6 +153,9 @@ class DeficitBudgetTrackSamplingController:
                 warmup_min_episodes_per_course=(
                     settings_source.deficit_budget_warmup_min_episodes_per_course
                 ),
+                uniform_staleness_rotations=(
+                    settings_source.deficit_budget_uniform_staleness_rotations
+                ),
                 x_cup_generation_ema_alpha=settings_source.x_cup_rotation.ema_alpha,
             ),
             restored_state=restored_state,
@@ -141,10 +164,22 @@ class DeficitBudgetTrackSamplingController:
     def add_rollout_budget(self, *, total_steps: int) -> None:
         """Add one rollout of target budget into each course deficit account."""
 
-        target_fractions = self._target_fractions()
-        for course_key, fraction in target_fractions.items():
-            self._deficit_steps[course_key] += max(0, int(total_steps)) * fraction
-            self._reserved_reset_steps[course_key] = 0.0
+        steps = max(0, int(total_steps))
+        uniform_fraction = _clamped_fraction(self._settings.uniform_fraction)
+        adaptive_fraction = 1.0 - uniform_fraction
+        uniform_share = 1.0 / len(self._course_keys)
+        adaptive_fractions = self._adaptive_target_fractions()
+        self._lane_deficit_steps["uniform"] += steps * uniform_fraction
+        self._lane_deficit_steps["adaptive"] += steps * adaptive_fraction
+        for lane in _DEFICIT_LANES:
+            self._lane_reserved_reset_steps[lane] = 0.0
+        for course_key in self._course_keys:
+            self._deficit_steps["uniform"][course_key] += steps * uniform_fraction * uniform_share
+            self._deficit_steps["adaptive"][course_key] += (
+                steps * adaptive_fraction * adaptive_fractions[course_key]
+            )
+            for lane in _DEFICIT_LANES:
+                self._reserved_reset_steps[lane][course_key] = 0.0
             self._rollout_steps[course_key] = 0
 
     def record_step_infos(self, infos: Sequence[Mapping[str, object]]) -> None:
@@ -154,9 +189,10 @@ class DeficitBudgetTrackSamplingController:
             if not isinstance(track_id, str):
                 continue
             course_key = self._entry_course_keys.get(track_id, track_id)
-            if course_key not in self._deficit_steps:
+            if course_key not in self._course_keys:
                 continue
-            self._deficit_steps[course_key] -= 1.0
+            self._scheduler_env_steps[course_key] += 1
+            self._record_step_for_deficit_lane(course_key, info)
             self._rollout_steps[course_key] += 1
             if not uses_alt_baseline:
                 self._accounted_env_steps[course_key] += 1
@@ -190,15 +226,23 @@ class DeficitBudgetTrackSamplingController:
             if _episode_crashed(episode):
                 self._crash_episode_count[course_key] += 1
 
-    def maybe_update_weights(self) -> None:
+    def maybe_update_weights(self) -> bool:
         self._rollouts_since_weight_update += 1
         if self._rollouts_since_weight_update < self._settings.weight_update_rollouts:
-            return
+            return False
         self._rollouts_since_weight_update = 0
         self.update_count += 1
         self._update_problem_scores()
         self._recompute_target_weights()
-        self._rebuild_deficits_from_completed_steps()
+        return True
+
+    def clear_reserved_assignments(self) -> None:
+        """Forget queued-but-unconsumed reset reservations after queue replacement."""
+
+        for lane in _DEFICIT_LANES:
+            self._lane_reserved_reset_steps[lane] = 0.0
+            for course_key in self._course_keys:
+                self._reserved_reset_steps[lane][course_key] = 0.0
 
     def initial_queues(
         self,
@@ -206,11 +250,11 @@ class DeficitBudgetTrackSamplingController:
         num_envs: int,
         queue_length: int,
         fallback_assignment_steps: float = 1.0,
-    ) -> dict[int, tuple[str, ...]]:
-        queues: dict[int, tuple[str, ...]] = {}
+    ) -> dict[int, tuple[TrackSamplingQueuedReset, ...]]:
+        queues: dict[int, tuple[TrackSamplingQueuedReset, ...]] = {}
         for env_index in range(max(0, int(num_envs))):
             queues[env_index] = tuple(
-                self.next_course_key(fallback_assignment_steps=fallback_assignment_steps)
+                self.next_queued_reset(fallback_assignment_steps=fallback_assignment_steps)
                 for _ in range(max(0, queue_length))
             )
         return queues
@@ -220,37 +264,50 @@ class DeficitBudgetTrackSamplingController:
         queue_lengths: Sequence[int],
         *,
         fallback_assignment_steps: float,
-    ) -> dict[int, tuple[str, ...]]:
+    ) -> dict[int, tuple[TrackSamplingQueuedReset, ...]]:
         refill_size = DEFICIT_QUEUE_SETTINGS.minimum_refill_size
-        refills: dict[int, tuple[str, ...]] = {}
+        refills: dict[int, tuple[TrackSamplingQueuedReset, ...]] = {}
         for env_index, queue_length in enumerate(queue_lengths):
             if int(queue_length) > DEFICIT_QUEUE_SETTINGS.refill_low_watermark:
                 continue
             refills[env_index] = tuple(
-                self.next_course_key(fallback_assignment_steps=fallback_assignment_steps)
+                self.next_queued_reset(fallback_assignment_steps=fallback_assignment_steps)
                 for _ in range(refill_size)
             )
         return refills
 
     def next_course_key(self, *, fallback_assignment_steps: float = 1.0) -> str:
-        course_key = max(
-            self._course_keys,
-            key=lambda course_key: (
-                self._deficit_steps[course_key] - self._reserved_reset_steps[course_key],
-                self._rng.random() * 1e-9,
-            ),
-        )
+        """Return only the scheduled course id for legacy tests and callers."""
+
+        return self.next_queued_reset(fallback_assignment_steps=fallback_assignment_steps).course_id
+
+    def next_queued_reset(
+        self,
+        *,
+        fallback_assignment_steps: float = 1.0,
+    ) -> TrackSamplingQueuedReset:
+        lane = self._next_deficit_lane()
+        course_key = self._next_course_key_for_lane(lane)
         self._reserve_course_assignment(
+            lane,
             course_key,
             assignment_cost=self._assignment_cost(
                 course_key,
                 fallback_assignment_steps=fallback_assignment_steps,
             ),
         )
-        return course_key
+        return TrackSamplingQueuedReset(course_id=course_key, deficit_lane=lane)
 
     def log_values(self) -> dict[str, float]:
         values: dict[str, float] = {}
+        values["track_sampling/lane/uniform_deficit_steps"] = self._lane_deficit_steps["uniform"]
+        values["track_sampling/lane/adaptive_deficit_steps"] = self._lane_deficit_steps["adaptive"]
+        values["track_sampling/lane/uniform_stale_course_count"] = (
+            self._uniform_stale_course_count()
+        )
+        values["track_sampling/lane/uniform_staleness_max_assignment_gap"] = (
+            self._uniform_staleness_max_assignment_gap()
+        )
         target_fractions = self._target_fractions()
         rollout_total = sum(self._rollout_steps.values())
         for course_key, stats in self._stats.items():
@@ -263,10 +320,18 @@ class DeficitBudgetTrackSamplingController:
             values[f"track_sampling/{key}/actual_step_share"] = (
                 0.0 if rollout_total <= 0 else self._rollout_steps[course_key] / rollout_total
             )
-            values[f"track_sampling/{key}/deficit_steps"] = self._deficit_steps[course_key]
-            values[f"track_sampling/{key}/reserved_reset_steps"] = self._reserved_reset_steps[
+            values[f"track_sampling/{key}/deficit_steps"] = sum(
+                self._deficit_steps[lane][course_key] for lane in _DEFICIT_LANES
+            )
+            values[f"track_sampling/{key}/reserved_reset_steps"] = sum(
+                self._reserved_reset_steps[lane][course_key] for lane in _DEFICIT_LANES
+            )
+            values[f"track_sampling/{key}/uniform_deficit_steps"] = self._deficit_steps["uniform"][
                 course_key
             ]
+            values[f"track_sampling/{key}/adaptive_deficit_steps"] = self._deficit_steps[
+                "adaptive"
+            ][course_key]
             values[f"track_sampling/{key}/problem_ema"] = self._ema_problem[course_key]
             values[f"track_sampling/{key}/problem_score"] = stats.current_problem_score
             values[f"track_sampling/{key}/adaptive_weight"] = stats.current_weight
@@ -308,22 +373,26 @@ class DeficitBudgetTrackSamplingController:
                 )
                 for course_key, stats in sorted(self._stats.items())
             ),
+            deficit_budget_scheduler=self._scheduler_state(),
         )
 
-    def _restore_state(self, restored_state: TrackSamplingRuntimeState | None) -> None:
+    def _restore_state(self, restored_state: TrackSamplingRuntimeState | None) -> bool:
         if restored_state is None or restored_state.sampling_mode != "deficit_budget":
-            return
+            return False
         restored_entries = {
             entry.course_key: entry for entry in aggregate_runtime_entries(restored_state.entries)
         }
+        restored_any = False
         for course_key, stats in self._stats.items():
             entry = restored_entries.get(course_key)
             if entry is None:
                 continue
+            restored_any = True
             stats.completed_frames = max(0, int(entry.completed_frames))
             self._accounted_env_steps[course_key] = (
                 max(0, int(entry.completed_frames)) // self._action_repeat
             )
+            self._scheduler_env_steps[course_key] = self._accounted_env_steps[course_key]
             stats.episode_count = max(0, int(entry.episode_count))
             stats.finished_episode_count = max(0, int(entry.finished_episode_count))
             stats.success_sample_count = max(0, int(entry.success_sample_count))
@@ -352,6 +421,70 @@ class DeficitBudgetTrackSamplingController:
             self._courses[course_key] = self._courses[course_key].with_runtime_generation(entry)
         self.update_count = max(0, int(restored_state.update_count))
         self._rollouts_since_weight_update = max(0, int(restored_state.episodes_since_update))
+        return restored_any
+
+    def _restore_scheduler_state(
+        self,
+        restored_state: TrackSamplingRuntimeState | None,
+    ) -> bool:
+        if restored_state is None or restored_state.deficit_budget_scheduler is None:
+            return False
+        scheduler = restored_state.deficit_budget_scheduler
+        restored_entries = {entry.course_key: entry for entry in scheduler.entries}
+        if not set(self._course_keys).issubset(restored_entries):
+            return False
+        restored_any = False
+        for course_key in self._course_keys:
+            entry = restored_entries.get(course_key)
+            if entry is None:
+                continue
+            restored_any = True
+            self._deficit_steps["uniform"][course_key] = float(entry.uniform_deficit_steps)
+            self._deficit_steps["adaptive"][course_key] = float(entry.adaptive_deficit_steps)
+            self._scheduler_env_steps[course_key] = max(0, int(entry.scheduler_env_steps))
+            self._last_uniform_assignment_index[course_key] = max(
+                0,
+                int(entry.last_uniform_assignment_index),
+            )
+        if not restored_any:
+            return False
+        self._lane_deficit_steps["uniform"] = float(scheduler.uniform_lane_deficit_steps)
+        self._lane_deficit_steps["adaptive"] = float(scheduler.adaptive_lane_deficit_steps)
+        self._uniform_assignment_count = max(0, int(scheduler.uniform_assignment_count))
+        return True
+
+    def _seed_legacy_deficit_steps_from_accounted_steps(self) -> None:
+        """Rebuild deficit debt from old runtime states without scheduler accounts.
+
+        LEGACY: remove after all active manager DBs have persisted
+        deficit_budget_scheduler state. This fallback is intentionally isolated
+        because aggregate measurement stats cannot reconstruct exact scheduler
+        debt, especially when alt baselines contributed reset steps.
+        """
+
+        total_steps = sum(self._accounted_env_steps.values())
+        if total_steps <= 0:
+            return
+        uniform_fraction = _clamped_fraction(self._settings.uniform_fraction)
+        adaptive_fraction = 1.0 - uniform_fraction
+        uniform_share = 1.0 / len(self._course_keys)
+        adaptive_fractions = self._adaptive_target_fractions()
+        self._lane_deficit_steps["uniform"] = 0.0
+        self._lane_deficit_steps["adaptive"] = 0.0
+        for course_key in self._course_keys:
+            actual_steps = float(self._accounted_env_steps[course_key])
+            self._deficit_steps["uniform"][course_key] = uniform_fraction * (
+                total_steps * uniform_share - actual_steps
+            )
+            self._deficit_steps["adaptive"][course_key] = adaptive_fraction * (
+                total_steps * adaptive_fractions[course_key] - actual_steps
+            )
+            self._lane_deficit_steps["uniform"] += self._deficit_steps["uniform"][course_key]
+            self._lane_deficit_steps["adaptive"] += self._deficit_steps["adaptive"][course_key]
+            self._scheduler_env_steps[course_key] = max(
+                self._scheduler_env_steps[course_key],
+                self._accounted_env_steps[course_key],
+            )
 
     def _update_problem_scores(self) -> None:
         alpha = self._settings.ema_alpha
@@ -364,8 +497,33 @@ class DeficitBudgetTrackSamplingController:
     def _seed_problem_scores_from_restored_stats(self) -> None:
         if not any(stats.success_sample_count > 0 for stats in self._stats.values()):
             return
+        has_persisted_problem = any(
+            stats.current_problem_score > 0.0 for stats in self._stats.values()
+        )
         for course_key, stats in self._stats.items():
-            self._ema_problem[course_key] = self._raw_problem_score(stats)
+            self._ema_problem[course_key] = max(
+                0.0,
+                float(stats.current_problem_score)
+                if has_persisted_problem
+                else self._raw_problem_score(stats),
+            )
+
+    def _scheduler_state(self) -> DeficitBudgetSchedulerState:
+        return DeficitBudgetSchedulerState(
+            uniform_lane_deficit_steps=self._lane_deficit_steps["uniform"],
+            adaptive_lane_deficit_steps=self._lane_deficit_steps["adaptive"],
+            uniform_assignment_count=self._uniform_assignment_count,
+            entries=tuple(
+                DeficitBudgetCourseSchedulerState(
+                    course_key=course_key,
+                    uniform_deficit_steps=self._deficit_steps["uniform"][course_key],
+                    adaptive_deficit_steps=self._deficit_steps["adaptive"][course_key],
+                    scheduler_env_steps=self._scheduler_env_steps[course_key],
+                    last_uniform_assignment_index=self._last_uniform_assignment_index[course_key],
+                )
+                for course_key in self._course_keys
+            ),
+        )
 
     def _raw_problem_score(self, stats: TrackStepStats) -> float:
         metric = self._settings.difficulty_metric
@@ -390,11 +548,22 @@ class DeficitBudgetTrackSamplingController:
             stats.current_weight = 1.0 if sharpness <= 0.0 else problem**sharpness
 
     def _target_fractions(self) -> dict[str, float]:
+        uniform_fraction = _clamped_fraction(self._settings.uniform_fraction)
+        adaptive_fraction = 1.0 - uniform_fraction
+        uniform_share = 1.0 / len(self._course_keys)
+        adaptive_fractions = self._adaptive_target_fractions()
+        return {
+            course_key: uniform_fraction * uniform_share
+            + adaptive_fraction * adaptive_fractions[course_key]
+            for course_key in self._course_keys
+        }
+
+    def _adaptive_target_fractions(self) -> dict[str, float]:
         uniform_share = 1.0 / len(self._course_keys)
         total_weight = sum(
             self._stats[course_key].current_weight for course_key in self._course_keys
         )
-        adaptive_fractions = {
+        return {
             course_key: (
                 uniform_share
                 if total_weight <= 0.0
@@ -402,31 +571,107 @@ class DeficitBudgetTrackSamplingController:
             )
             for course_key in self._course_keys
         }
-        uniform_fraction = self._settings.uniform_fraction
-        adaptive_fraction = 1.0 - uniform_fraction
-        return {
-            course_key: uniform_fraction * uniform_share
-            + adaptive_fraction * adaptive_fractions[course_key]
+
+    def _record_step_for_deficit_lane(
+        self,
+        course_key: str,
+        info: Mapping[str, object],
+    ) -> None:
+        lane = _deficit_lane_value(info.get("track_sampling_deficit_lane"))
+        if lane is not None:
+            self._lane_deficit_steps[lane] -= 1.0
+            self._deficit_steps[lane][course_key] -= 1.0
+            self._consume_reserved_step(lane, course_key)
+            return
+        uniform_fraction = _clamped_fraction(self._settings.uniform_fraction)
+        self._lane_deficit_steps["uniform"] -= uniform_fraction
+        self._lane_deficit_steps["adaptive"] -= 1.0 - uniform_fraction
+        self._deficit_steps["uniform"][course_key] -= uniform_fraction
+        self._deficit_steps["adaptive"][course_key] -= 1.0 - uniform_fraction
+
+    def _consume_reserved_step(
+        self,
+        lane: TrackSamplingDeficitLane,
+        course_key: str,
+    ) -> None:
+        course_reserved = self._reserved_reset_steps[lane][course_key]
+        if course_reserved > 0.0:
+            self._reserved_reset_steps[lane][course_key] = max(0.0, course_reserved - 1.0)
+        lane_reserved = self._lane_reserved_reset_steps[lane]
+        if lane_reserved > 0.0:
+            self._lane_reserved_reset_steps[lane] = max(0.0, lane_reserved - 1.0)
+
+    def _next_deficit_lane(self) -> TrackSamplingDeficitLane:
+        uniform_fraction = _clamped_fraction(self._settings.uniform_fraction)
+        if uniform_fraction >= 1.0:
+            return "uniform"
+        if uniform_fraction <= 0.0:
+            return "adaptive"
+        return max(
+            _DEFICIT_LANES,
+            key=lambda lane: (
+                self._lane_deficit_steps[lane] - self._lane_reserved_reset_steps[lane],
+                1.0 if lane == "uniform" else 0.0,
+            ),
+        )
+
+    def _next_course_key_for_lane(self, lane: TrackSamplingDeficitLane) -> str:
+        stale_course_key = self._stale_uniform_course_key() if lane == "uniform" else None
+        if stale_course_key is not None:
+            return stale_course_key
+        return max(
+            self._course_keys,
+            key=lambda course_key: (
+                self._deficit_steps[lane][course_key]
+                - self._reserved_reset_steps[lane][course_key],
+                self._rng.random() * 1e-9,
+            ),
+        )
+
+    def _stale_uniform_course_key(self) -> str | None:
+        max_gap = self._uniform_staleness_max_assignment_gap()
+        if max_gap <= 0:
+            return None
+        candidates = tuple(
+            course_key
             for course_key in self._course_keys
-        }
+            if self._uniform_assignment_count - self._last_uniform_assignment_index[course_key]
+            >= max_gap
+        )
+        if not candidates:
+            return None
+        return max(
+            candidates,
+            key=lambda course_key: (
+                self._uniform_assignment_count - self._last_uniform_assignment_index[course_key],
+                self._deficit_steps["uniform"][course_key]
+                - self._reserved_reset_steps["uniform"][course_key],
+                self._rng.random() * 1e-9,
+            ),
+        )
+
+    def _uniform_stale_course_count(self) -> int:
+        max_gap = self._uniform_staleness_max_assignment_gap()
+        if max_gap <= 0:
+            return 0
+        return sum(
+            1
+            for course_key in self._course_keys
+            if self._uniform_assignment_count - self._last_uniform_assignment_index[course_key]
+            >= max_gap
+        )
+
+    def _uniform_staleness_max_assignment_gap(self) -> int:
+        rotations = max(0.0, float(self._settings.uniform_staleness_rotations))
+        if rotations <= 0.0:
+            return 0
+        return max(len(self._course_keys), ceil(len(self._course_keys) * rotations))
 
     def _in_warmup(self) -> bool:
         minimum = max(0, int(self._settings.warmup_min_episodes_per_course))
         if minimum <= 0:
             return False
         return any(stats.success_sample_count < minimum for stats in self._stats.values())
-
-    def _rebuild_deficits_from_completed_steps(self) -> None:
-        """Derive live scheduler debt from durable per-course step totals."""
-
-        total_steps = sum(self._accounted_env_steps.values())
-        if total_steps <= 0:
-            return
-        target_fractions = self._target_fractions()
-        for course_key in self._course_keys:
-            target_steps = total_steps * target_fractions[course_key]
-            self._deficit_steps[course_key] = target_steps - self._accounted_env_steps[course_key]
-            self._reserved_reset_steps[course_key] = 0.0
 
     def _assignment_cost(
         self,
@@ -447,8 +692,19 @@ class DeficitBudgetTrackSamplingController:
             return max(1.0, sum(known_costs) / len(known_costs))
         return max(1.0, float(fallback_assignment_steps))
 
-    def _reserve_course_assignment(self, course_key: str, *, assignment_cost: float) -> None:
-        self._reserved_reset_steps[course_key] += max(1.0, float(assignment_cost))
+    def _reserve_course_assignment(
+        self,
+        lane: TrackSamplingDeficitLane,
+        course_key: str,
+        *,
+        assignment_cost: float,
+    ) -> None:
+        cost = max(1.0, float(assignment_cost))
+        self._reserved_reset_steps[lane][course_key] += cost
+        self._lane_reserved_reset_steps[lane] += cost
+        if lane == "uniform":
+            self._uniform_assignment_count += 1
+            self._last_uniform_assignment_index[course_key] = self._uniform_assignment_count
 
 
 def _episode_crashed(episode: Mapping[str, object]) -> bool:
@@ -456,6 +712,18 @@ def _episode_crashed(episode: Mapping[str, object]) -> bool:
     if not isinstance(reason, str):
         return False
     return reason in _CRASH_TERMINATION_REASONS
+
+
+def _clamped_fraction(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _deficit_lane_value(value: object) -> TrackSamplingDeficitLane | None:
+    if value == "uniform":
+        return "uniform"
+    if value == "adaptive":
+        return "adaptive"
+    return None
 
 
 def _needs_first_generation_backfill(entry: TrackSamplingRuntimeEntry) -> bool:

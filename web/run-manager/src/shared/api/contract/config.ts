@@ -150,6 +150,7 @@ const tracksConfigSchema = z
     deficit_budget_weight_update_rollouts: z.number().int().positive(),
     deficit_budget_difficulty_metric: deficitBudgetDifficultyMetricSchema,
     deficit_budget_warmup_min_episodes_per_course: z.number().int().nonnegative(),
+    deficit_budget_uniform_staleness_rotations: z.number().nonnegative().default(2),
     selected_course_ids: z.array(z.string()),
   })
   .transform(({ gp_difficulties, ...tracks }) => ({
@@ -182,6 +183,7 @@ const vehicleConfigSchema = z
       .max(ENGINE_SLIDER.maxStep),
     adaptive_engine_tuner_backend: engineTunerBackendSchema.default("bandit"),
     adaptive_engine_tuner_objective: engineTunerObjectiveSchema.default("finish_time"),
+    adaptive_engine_safe_finish_rate_threshold: z.number().min(0).max(1).default(0.9),
     adaptive_engine_bandit_bucket_raw_values: z
       .array(z.number().int().min(ENGINE_SLIDER.minStep).max(ENGINE_SLIDER.maxStep))
       .min(1)

@@ -18,6 +18,7 @@ from rl_fzerox.core.envs.engine.controls import (
     ActionMaskSnapshot,
 )
 from rl_fzerox.core.envs.engine.reset import EngineResetCoordinator
+from rl_fzerox.core.envs.engine.reset.track_sampling import TrackSamplingQueuedReset
 from rl_fzerox.core.envs.engine.stepping import WatchEnvStep
 from rl_fzerox.core.envs.gym_runtime.reset import reset_gym_episode
 from rl_fzerox.core.envs.gym_runtime.stepping import GymStepRuntime
@@ -139,10 +140,18 @@ class FZeroXEnvRuntime:
 
         self._reset_coordinator.set_engine_tuning_selection(selection)
 
-    def extend_track_sampling_reset_queue(self, course_ids: Sequence[str]) -> None:
-        """Append externally scheduled course ids for deficit-budget resets."""
+    def extend_track_sampling_reset_queue(
+        self,
+        queued_resets: Sequence[TrackSamplingQueuedReset | str],
+    ) -> None:
+        """Append externally scheduled reset slots for deficit-budget sampling."""
 
-        self._reset_coordinator.extend_track_sampling_reset_queue(course_ids)
+        self._reset_coordinator.extend_track_sampling_reset_queue(queued_resets)
+
+    def clear_track_sampling_reset_queue(self) -> None:
+        """Drop unconsumed deficit-budget reset slots after scheduler replanning."""
+
+        self._reset_coordinator.clear_track_sampling_reset_queue()
 
     def track_sampling_reset_queue_length(self) -> int:
         """Return queued deficit-budget reset course count."""

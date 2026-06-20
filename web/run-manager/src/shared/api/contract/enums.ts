@@ -31,8 +31,7 @@ export const engineSettingModeSchema = z.enum(["fixed", "random_range", "adaptiv
 export const engineTunerBackendSchema = z.enum(["bandit", "gaussian_process", "mlp_ensemble"]);
 export const engineTunerObjectiveSchema = z.enum([
   "finish_time",
-  "episode_return",
-  "completion",
+  "safe_finish_time",
   "finish_rate",
 ]);
 export const engineTuningSourceActionSchema = z.enum(["convert", "discard"]);

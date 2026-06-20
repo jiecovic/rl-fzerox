@@ -135,6 +135,7 @@ export const trackSamplingRuntimeEntrySchema = z.object({
   target_step_share: z.number().min(0).max(1),
   completed_frames: z.number().int().nonnegative(),
   completed_env_steps: z.number().int().nonnegative(),
+  measurement_env_steps: z.number().int().nonnegative(),
   step_share: z.number().min(0).max(1),
   ema_episode_frames: z.number().nonnegative().nullable(),
   ema_completion_fraction: z.number().min(0).max(1).nullable(),

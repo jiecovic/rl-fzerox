@@ -49,6 +49,7 @@ def adaptive_engine_tuning_config(config: ManagedRunConfig) -> AdaptiveEngineTun
                 "objective": vehicle.adaptive_engine_tuner_objective,
                 "reward_fingerprint": _reward_fingerprint(config),
                 "bucket_raw_values": vehicle.adaptive_engine_bandit_bucket_raw_values,
+                "safe_finish_rate_threshold": (vehicle.adaptive_engine_safe_finish_rate_threshold),
                 "exploration_scale": uncertainty_scale_seconds,
             }
         )

@@ -18,6 +18,10 @@ from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
     TrackSamplingMaterializedArtifact,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.persistence import (
+    deficit_budget_scheduler_state_json,
+    load_deficit_budget_scheduler_state_json,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
@@ -83,6 +87,9 @@ def get_run_track_sampling_state(
         deficit_budget_difficulty_metric=runtime.deficit_budget_difficulty_metric,
         deficit_budget_warmup_min_episodes_per_course=(
             runtime.deficit_budget_warmup_min_episodes_per_course
+        ),
+        deficit_budget_scheduler=load_deficit_budget_scheduler_state_json(
+            runtime.deficit_budget_scheduler_json,
         ),
     )
 
@@ -236,6 +243,9 @@ def _runtime_values(
         "deficit_budget_difficulty_metric": state.deficit_budget_difficulty_metric,
         "deficit_budget_warmup_min_episodes_per_course": (
             state.deficit_budget_warmup_min_episodes_per_course
+        ),
+        "deficit_budget_scheduler_json": deficit_budget_scheduler_state_json(
+            state.deficit_budget_scheduler,
         ),
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,

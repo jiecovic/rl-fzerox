@@ -210,6 +210,8 @@ export function VehicleSection({
               adaptive_engine_tuner_backend: defaultConfig.vehicle.adaptive_engine_tuner_backend,
               adaptive_engine_tuner_objective:
                 defaultConfig.vehicle.adaptive_engine_tuner_objective,
+              adaptive_engine_safe_finish_rate_threshold:
+                defaultConfig.vehicle.adaptive_engine_safe_finish_rate_threshold,
               adaptive_engine_uniform_exploration:
                 defaultConfig.vehicle.adaptive_engine_uniform_exploration,
               adaptive_engine_greedy_plateau_seconds:
@@ -530,33 +532,27 @@ function AdaptiveEngineControls({
               {
                 active: vehicle.adaptive_engine_tuner_objective === "finish_time",
                 key: "finish_time",
-                label: "Finish time",
+                label: "Fastest",
                 onClick: () => onChange({ adaptive_engine_tuner_objective: "finish_time" }),
               },
               {
-                active: vehicle.adaptive_engine_tuner_objective === "episode_return",
-                key: "episode_return",
-                label: "Episode return",
-                onClick: () => onChange({ adaptive_engine_tuner_objective: "episode_return" }),
-              },
-              {
-                active: vehicle.adaptive_engine_tuner_objective === "completion",
-                key: "completion",
-                label: "Completion",
-                onClick: () => onChange({ adaptive_engine_tuner_objective: "completion" }),
+                active: vehicle.adaptive_engine_tuner_objective === "safe_finish_time",
+                key: "safe_finish_time",
+                label: "Safe fastest",
+                onClick: () => onChange({ adaptive_engine_tuner_objective: "safe_finish_time" }),
               },
               {
                 active: vehicle.adaptive_engine_tuner_objective === "finish_rate",
                 key: "finish_rate",
-                label: "Finish rate",
+                label: "Safest",
                 onClick: () => onChange({ adaptive_engine_tuner_objective: "finish_rate" }),
               },
             ]}
           />
           <small className="m-0 text-xs leading-snug text-app-muted">
-            Finish time uses successful races only. Episode return, completion, and finish rate use
-            default-baseline attempts, including failed and retired attempts. Return mode is tied to
-            the reward settings.
+            Fastest ranks successful finish times. Safe fastest requires a minimum finish rate, then
+            ranks by finish time. Safest ranks only finish rate. Return and completion stay recorded
+            as diagnostics.
           </small>
         </div>
       ) : null}
@@ -571,6 +567,21 @@ function AdaptiveEngineControls({
             step="1"
             value={banditBucketSideCount}
             onChange={setBanditBucketSideCount}
+          />
+        ) : null}
+        {isBanditBackend && vehicle.adaptive_engine_tuner_objective === "safe_finish_time" ? (
+          <RangeNumberField
+            help="Minimum observed finish rate required before a bucket is ranked by finish time."
+            label="Safe finish rate"
+            max={1}
+            min={0}
+            numberStep="0.01"
+            rangeStep={0.01}
+            resetValue={defaultVehicle.adaptive_engine_safe_finish_rate_threshold}
+            value={vehicle.adaptive_engine_safe_finish_rate_threshold}
+            onChange={(adaptive_engine_safe_finish_rate_threshold) =>
+              onChange({ adaptive_engine_safe_finish_rate_threshold })
+            }
           />
         ) : null}
         {isGaussianProcessBackend ? (

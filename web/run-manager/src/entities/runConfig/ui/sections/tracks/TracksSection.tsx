@@ -81,6 +81,8 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     deficit_budget_difficulty_metric: defaultConfig.tracks.deficit_budget_difficulty_metric,
     deficit_budget_focus_sharpness: defaultConfig.tracks.deficit_budget_focus_sharpness,
     deficit_budget_uniform_fraction: defaultConfig.tracks.deficit_budget_uniform_fraction,
+    deficit_budget_uniform_staleness_rotations:
+      defaultConfig.tracks.deficit_budget_uniform_staleness_rotations,
     deficit_budget_warmup_min_episodes_per_course:
       defaultConfig.tracks.deficit_budget_warmup_min_episodes_per_course,
     deficit_budget_weight_update_rollouts:
@@ -98,6 +100,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     | "deficit_budget_difficulty_metric"
     | "deficit_budget_focus_sharpness"
     | "deficit_budget_uniform_fraction"
+    | "deficit_budget_uniform_staleness_rotations"
     | "deficit_budget_warmup_min_episodes_per_course"
     | "deficit_budget_weight_update_rollouts"
     | "step_balance_ema_alpha"

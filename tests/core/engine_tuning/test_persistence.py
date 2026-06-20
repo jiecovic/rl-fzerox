@@ -64,6 +64,39 @@ def test_loader_rejects_legacy_state_versions_after_data_migration() -> None:
     assert load_engine_tuning_runtime_state_json(data) is None
 
 
+def test_loader_keeps_inconsistent_legacy_candidate_rates_unknown() -> None:
+    data = json.dumps(
+        {
+            "version": 7,
+            "update_count": 1,
+            "candidates": [
+                {
+                    "context_key": "silence|blue_falcon",
+                    "course_key": "silence",
+                    "vehicle_id": "blue_falcon",
+                    "engine_setting_raw_value": 50,
+                    "episode_count": 1,
+                    "finish_count": 3,
+                    "return_count": 2,
+                    "completion_score_total": 5.0,
+                    "best_completion_score": 1.4,
+                }
+            ],
+        }
+    )
+
+    state = load_engine_tuning_runtime_state_json(data)
+
+    assert state is not None
+    candidate = state.candidates[0]
+    assert candidate.episode_count == 1
+    assert candidate.finish_count == 3
+    assert candidate.finish_rate_score is None
+    assert candidate.failure_rate_score is None
+    assert candidate.mean_completion_score is None
+    assert candidate.best_completion_score == 1.0
+
+
 def test_mlp_model_weights_round_trip_through_pt_sidecar(tmp_path: Path) -> None:
     context = EngineTuningContext(
         course_key="big_blue_2",

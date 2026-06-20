@@ -7,7 +7,9 @@ from rl_fzerox.core.envs.engine.reset.track_sampling.models import (
     TRACK_SAMPLING_LIMITS,
     SelectedTrack,
     TrackBaselineCacheLimits,
+    TrackSamplingDeficitLane,
     TrackSamplingLimits,
+    TrackSamplingQueuedReset,
 )
 from rl_fzerox.core.envs.engine.reset.track_sampling.selection import (
     TrackResetSelector,
@@ -22,8 +24,10 @@ __all__ = (
     "SelectedTrack",
     "TrackBaselineCache",
     "TrackBaselineCacheLimits",
+    "TrackSamplingDeficitLane",
     "TrackResetSelector",
     "TrackSamplingLimits",
+    "TrackSamplingQueuedReset",
     "engine_tuning_context_for_entry",
     "select_reset_track",
     "select_reset_track_by_course_id",

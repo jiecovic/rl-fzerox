@@ -5,7 +5,10 @@ from collections.abc import Callable, Mapping, Sequence
 
 from rl_fzerox.core.engine_tuning import EngineTuningContext, EngineTuningRuntimeState
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
-from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
+from rl_fzerox.core.envs.engine.reset.track_sampling import (
+    TrackSamplingQueuedReset,
+    engine_tuning_context_for_entry,
+)
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -434,8 +437,11 @@ def build_callbacks(
             self._runtime_persistence = runtime_persistence
             self._alt_baseline_projection = alt_baseline_projection
             self._runtime_state_dirty = False
+            self._rollout_budget_bootstrapped = False
 
         def _on_training_start(self) -> None:
+            self._add_rollout_budget()
+            self._rollout_budget_bootstrapped = True
             self._extend_env_queues(
                 self._controller.initial_queues(
                     num_envs=train_config.num_envs,
@@ -446,10 +452,16 @@ def build_callbacks(
             self._save_runtime_state()
 
         def _on_rollout_start(self) -> None:
+            if self._rollout_budget_bootstrapped:
+                self._rollout_budget_bootstrapped = False
+            else:
+                self._add_rollout_budget()
+            self._replace_env_queues()
+
+        def _add_rollout_budget(self) -> None:
             self._controller.add_rollout_budget(
                 total_steps=train_config.num_envs * train_config.n_steps,
             )
-            self._refill_env_queues()
 
         def _on_step(self) -> bool:
             infos = info_sequence(self.locals.get("infos"))
@@ -466,7 +478,9 @@ def build_callbacks(
             return True
 
         def _on_rollout_end(self) -> None:
-            self._controller.maybe_update_weights()
+            if self._controller.maybe_update_weights():
+                self._replace_env_queues()
+                self._runtime_state_dirty = True
             for key, value in self._controller.log_values().items():
                 self.logger.record(key, value)
             if self._runtime_state_dirty:
@@ -508,13 +522,7 @@ def build_callbacks(
                 curriculum_config=self._curriculum_config,
                 restored_state=runtime_state,
             )
-            self._extend_env_queues(
-                self._controller.initial_queues(
-                    num_envs=train_config.num_envs,
-                    queue_length=DEFICIT_QUEUE_SETTINGS.initial_queue_length,
-                    fallback_assignment_steps=train_config.n_steps,
-                )
-            )
+            self._replace_env_queues()
             self._save_materialized_artifacts(rotation_update.materialized_artifacts)
             self._save_generated_x_cup_slots(rotation_update.generated_x_cup_slots)
             if rotation_manager is not None:
@@ -534,13 +542,27 @@ def build_callbacks(
                 )
             )
 
-        def _extend_env_queues(self, queues: Mapping[int, Sequence[str]]) -> None:
-            for env_index, course_ids in queues.items():
-                if not course_ids:
+        def _replace_env_queues(self) -> None:
+            self.training_env.env_method("clear_track_sampling_reset_queue")
+            self._controller.clear_reserved_assignments()
+            self._extend_env_queues(
+                self._controller.initial_queues(
+                    num_envs=train_config.num_envs,
+                    queue_length=DEFICIT_QUEUE_SETTINGS.initial_queue_length,
+                    fallback_assignment_steps=train_config.n_steps,
+                )
+            )
+
+        def _extend_env_queues(
+            self,
+            queues: Mapping[int, Sequence[TrackSamplingQueuedReset]],
+        ) -> None:
+            for env_index, queued_resets in queues.items():
+                if not queued_resets:
                     continue
                 self.training_env.env_method(
                     "extend_track_sampling_reset_queue",
-                    tuple(course_ids),
+                    tuple(queued_resets),
                     indices=[env_index],
                 )
 

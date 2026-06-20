@@ -12,6 +12,10 @@ from rl_fzerox.core.engine_tuning.types import EngineTunerBackend, EngineTunerOb
 ENGINE_TUNING_STATE_VERSION = 7
 
 
+def _clamp_unit_interval(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
 @dataclass(frozen=True, slots=True)
 class EngineTuningCandidateState:
     """Aggregated observations for one engine value in one context."""
@@ -44,7 +48,12 @@ class EngineTuningCandidateState:
 
     @property
     def observation_count(self) -> int:
-        return max(self.active_score_count, self.episode_count, self.finish_count)
+        return max(
+            self.active_score_count,
+            self.episode_count,
+            self.finish_count,
+            self.return_count,
+        )
 
     @property
     def mean_score(self) -> float | None:
@@ -66,20 +75,30 @@ class EngineTuningCandidateState:
 
     @property
     def mean_completion_score(self) -> float | None:
-        if self.episode_count <= 0:
+        if not self.has_valid_episode_statistics:
             return None
-        return self.completion_score_total / self.episode_count
+        return _clamp_unit_interval(self.completion_score_total / self.episode_count)
 
     @property
     def finish_rate_score(self) -> float | None:
-        if self.episode_count <= 0:
+        if not self.has_valid_episode_statistics:
             return None
-        return self.finish_count / self.episode_count
+        return _clamp_unit_interval(self.finish_count / self.episode_count)
 
     @property
     def failure_rate_score(self) -> float | None:
         finish_rate = self.finish_rate_score
-        return None if finish_rate is None else 1.0 - finish_rate
+        return None if finish_rate is None else _clamp_unit_interval(1.0 - finish_rate)
+
+    @property
+    def has_valid_episode_statistics(self) -> bool:
+        """Return whether episode-derived rates can be interpreted safely."""
+
+        return (
+            self.episode_count > 0
+            and self.finish_count <= self.episode_count
+            and self.completion_score_total <= float(self.episode_count) + 1e-9
+        )
 
     @property
     def mean_return_score(self) -> float | None:
@@ -186,33 +205,14 @@ class EngineTuningCandidateState:
     def with_active_objective(
         self,
         objective: EngineTunerObjective,
+        *,
+        safe_finish_rate_threshold: float = 0.9,
+        prior_finish_time_seconds: float = 200.0,
     ) -> EngineTuningCandidateState | None:
         """Return this candidate with active scoring rebuilt for an objective."""
 
-        if objective == "episode_return":
-            if self.return_count <= 0:
-                return None
-            return replace(
-                self,
-                score_count=self.return_count,
-                decayed_count=float(self.return_count),
-                decayed_score_total=self.return_score_total,
-                score_total=self.return_score_total,
-                best_score=self.best_return_score,
-            )
-        if objective == "completion":
-            if self.episode_count <= 0:
-                return None
-            return replace(
-                self,
-                score_count=self.episode_count,
-                decayed_count=float(self.episode_count),
-                decayed_score_total=self.completion_score_total,
-                score_total=self.completion_score_total,
-                best_score=self.best_completion_score,
-            )
         if objective == "finish_rate":
-            if self.episode_count <= 0:
+            if not self.has_valid_episode_statistics:
                 return None
             best_score = 1.0 if self.finish_count > 0 else 0.0
             finish_score_total = float(self.finish_count)
@@ -224,16 +224,42 @@ class EngineTuningCandidateState:
                 score_total=finish_score_total,
                 best_score=best_score,
             )
+        if objective == "safe_finish_time":
+            if not self.has_valid_episode_statistics:
+                return None
+            finish_rate = self.finish_rate_score or 0.0
+            threshold = _clamp_unit_interval(safe_finish_rate_threshold)
+            prior_penalty = max(1.0, float(prior_finish_time_seconds))
+            if finish_rate >= threshold and self.finish_count > 0:
+                mean_finish_score = self.finish_score_total / self.finish_count
+                score_total = mean_finish_score * self.episode_count
+                best_score = self.best_finish_score
+            else:
+                # Safe mode treats reliability as a hard gate. Below the gate, arms
+                # compete by finish-rate gap instead of raw speed.
+                gap = max(0.0, threshold - finish_rate)
+                score_total = -prior_penalty * float(self.episode_count) * (1.0 + gap)
+                best_score = -prior_penalty * (1.0 + gap)
+            return replace(
+                self,
+                score_count=self.episode_count,
+                decayed_count=float(self.episode_count),
+                decayed_score_total=score_total,
+                score_total=score_total,
+                best_score=best_score,
+            )
         if self.finish_count <= 0:
-            return None
-        finish_score_total = (
-            self.finish_score_total
-            if self.finish_score_total != 0.0 or self.best_finish_score is not None
-            else self.score_total
-        )
-        best_finish_score = (
-            self.best_finish_score if self.best_finish_score is not None else self.best_score
-        )
+            finish_score_total = 0.0
+            best_finish_score = None
+        else:
+            finish_score_total = (
+                self.finish_score_total
+                if self.finish_score_total != 0.0 or self.best_finish_score is not None
+                else self.score_total
+            )
+            best_finish_score = (
+                self.best_finish_score if self.best_finish_score is not None else self.best_score
+            )
         return replace(
             self,
             score_count=self.finish_count,
@@ -241,16 +267,6 @@ class EngineTuningCandidateState:
             decayed_score_total=finish_score_total,
             score_total=finish_score_total,
             best_score=best_finish_score,
-        )
-
-    def without_return_observations(self) -> EngineTuningCandidateState:
-        """Return this candidate with reward-dependent return aggregates removed."""
-
-        return replace(
-            self,
-            return_count=0,
-            return_score_total=0.0,
-            best_return_score=None,
         )
 
 
@@ -378,35 +394,21 @@ def engine_tuning_state_with_objective(
     *,
     objective: EngineTunerObjective,
     reward_fingerprint: str | None = None,
+    safe_finish_rate_threshold: float = 0.9,
+    prior_finish_time_seconds: float = 200.0,
 ) -> EngineTuningRuntimeState:
     """Return a state whose active aggregates match the requested objective."""
 
-    reward_changed = (
-        state.reward_fingerprint is not None and state.reward_fingerprint != reward_fingerprint
-    )
-    if reward_changed:
-        state = replace(
-            state,
-            candidates=tuple(
-                candidate.without_return_observations() for candidate in state.candidates
-            ),
-        )
-    if objective == "episode_return" and state.reward_fingerprint != reward_fingerprint:
-        return empty_engine_tuning_state_for(
-            objective=objective,
-            reward_fingerprint=reward_fingerprint,
-        )
-    if state.objective == objective and (
-        objective != "episode_return" or state.reward_fingerprint == reward_fingerprint
-    ):
-        return replace(
-            state,
-            version=ENGINE_TUNING_STATE_VERSION,
-            reward_fingerprint=reward_fingerprint,
-        )
     candidates = tuple(
         candidate
-        for candidate in (item.with_active_objective(objective) for item in state.candidates)
+        for candidate in (
+            item.with_active_objective(
+                objective,
+                safe_finish_rate_threshold=safe_finish_rate_threshold,
+                prior_finish_time_seconds=prior_finish_time_seconds,
+            )
+            for item in state.candidates
+        )
         if candidate is not None
     )
     return EngineTuningRuntimeState(

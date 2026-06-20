@@ -291,8 +291,8 @@ function TrackPoolChart({
         {variant !== "ema" ? <LegendItem kind="steps" label="Env steps" /> : null}
         {variant === "ema" ? (
           <>
-            <LegendItem kind="completion-ema" label="Completion EMA" />
             <LegendItem kind="finish-ema" label="Finish EMA" />
+            <LegendItem kind="completion-ema" label="Completion EMA" />
             <LegendItem kind="signal" label="Problem score" />
           </>
         ) : null}
@@ -420,14 +420,14 @@ function trackPoolBars({
   if (variant === "ema") {
     return [
       {
-        kind: "completion-ema",
-        label: `completion EMA ${formatOptionalPercent(entry.emaCompletionFraction)}`,
-        value: entry.emaCompletionFraction ?? 0,
-      },
-      {
         kind: "finish-ema",
         label: `finish EMA ${formatOptionalPercent(entry.emaFinishRate)}`,
         value: entry.emaFinishRate ?? 0,
+      },
+      {
+        kind: "completion-ema",
+        label: `completion EMA ${formatOptionalPercent(entry.emaCompletionFraction)}`,
+        value: entry.emaCompletionFraction ?? 0,
       },
       {
         kind: "signal",

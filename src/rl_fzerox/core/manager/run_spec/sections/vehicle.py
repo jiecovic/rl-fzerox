@@ -52,6 +52,11 @@ class ManagedVehicleConfig(BaseModel):
     adaptive_engine_bandit_bucket_raw_values: tuple[NonNegativeInt, ...] = (
         ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
     )
+    adaptive_engine_safe_finish_rate_threshold: float = Field(
+        default=ENGINE_TUNER_DEFAULTS.safe_finish_rate_threshold,
+        ge=0.0,
+        le=1.0,
+    )
     adaptive_engine_stat_decay: float = Field(
         default=ENGINE_TUNER_DEFAULTS.stat_decay,
         gt=0.0,
@@ -104,6 +109,7 @@ class ManagedVehicleConfig(BaseModel):
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "bandit":
             data.pop("adaptive_engine_tuner_objective", None)
             data.pop("adaptive_engine_bandit_bucket_raw_values", None)
+            data.pop("adaptive_engine_safe_finish_rate_threshold", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "gaussian_process":
             data.pop("adaptive_engine_stat_decay", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "mlp_ensemble":
@@ -121,6 +127,13 @@ class ManagedVehicleConfig(BaseModel):
         if not isinstance(data, dict):
             return data
         next_data = dict(data)
+        # Transitional config compatibility. Remove after local run specs have
+        # been migrated away from removed non-finish tuner objectives.
+        if next_data.get("adaptive_engine_tuner_objective") in {
+            "episode_return",
+            "completion",
+        }:
+            next_data["adaptive_engine_tuner_objective"] = "finish_time"
         if next_data.get("engine_mode") != "adaptive_tuner":
             return next_data
         next_data.setdefault("engine_setting_min_raw_value", ENGINE_SLIDER.min_step)

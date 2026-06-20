@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rl_fzerox.core.engine_tuning.bandit import BanditEngineTuner
-from rl_fzerox.core.engine_tuning.ensemble import MlpEnsembleEngineTuner
-from rl_fzerox.core.engine_tuning.gaussian_process import GaussianProcessEngineTuner
 from rl_fzerox.core.engine_tuning.state import (
     EngineTuningRuntimeState,
     empty_engine_tuning_state,
@@ -24,6 +24,10 @@ from rl_fzerox.core.engine_tuning.types import (
     finish_time_ms_from_score,
     finish_time_score,
 )
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.engine_tuning.ensemble import MlpEnsembleEngineTuner
+    from rl_fzerox.core.engine_tuning.gaussian_process import GaussianProcessEngineTuner
 
 
 class OrderedEngineTuner:
@@ -91,8 +95,12 @@ def _backend_for(
     if isinstance(settings, BanditEngineTunerSettings):
         return BanditEngineTuner(settings=settings, state=runtime_state)
     if isinstance(settings, MlpEnsembleEngineTunerSettings):
+        from rl_fzerox.core.engine_tuning.ensemble import MlpEnsembleEngineTuner
+
         return MlpEnsembleEngineTuner(settings=settings, state=runtime_state)
     if isinstance(settings, GaussianProcessEngineTunerSettings):
+        from rl_fzerox.core.engine_tuning.gaussian_process import GaussianProcessEngineTuner
+
         return GaussianProcessEngineTuner(settings=settings, state=runtime_state)
     raise TypeError(f"unsupported engine tuner settings: {type(settings).__name__}")
 

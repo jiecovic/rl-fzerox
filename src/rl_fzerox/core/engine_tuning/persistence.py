@@ -173,12 +173,12 @@ def _candidate_from_mapping(raw: object) -> EngineTuningCandidateState | None:
     best_completion_score = _mapping_optional_float(raw, "best_completion_score")
     return_score_total = _mapping_float(raw, "return_score_total") or 0.0
     best_return_score = _mapping_optional_float(raw, "best_return_score")
-    inferred_return_count = (episode_count or 0) if return_count is None else max(0, return_count)
-    inferred_episode_count = (
-        max(finish_count, inferred_return_count) if episode_count is None else episode_count
+    inferred_return_count = 0 if return_count is None else max(0, return_count)
+    inferred_episode_count = max(
+        0, inferred_return_count if episode_count is None else episode_count
     )
     inferred_completion_total = (
-        completion_score_total if completion_score_total is not None else float(finish_count)
+        completion_score_total if completion_score_total is not None else 0.0
     )
     resolved_finish_score_total = finish_score_total
     if resolved_finish_score_total is None:
@@ -197,11 +197,7 @@ def _candidate_from_mapping(raw: object) -> EngineTuningCandidateState | None:
         score_total=score_total,
         best_score=best_score,
         completion_score_total=max(0.0, inferred_completion_total),
-        best_completion_score=(
-            best_completion_score
-            if best_completion_score is not None or "best_completion_score" in raw
-            else (1.0 if finish_count > 0 else None)
-        ),
+        best_completion_score=_clamp_unit_score(best_completion_score),
         finish_score_total=resolved_finish_score_total,
         best_finish_score=(
             best_finish_score
@@ -212,6 +208,12 @@ def _candidate_from_mapping(raw: object) -> EngineTuningCandidateState | None:
         best_return_score=best_return_score,
         best_time_ms=_mapping_optional_int(raw, "best_time_ms"),
     )
+
+
+def _clamp_unit_score(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return max(0.0, min(1.0, float(value)))
 
 
 def _model_state_from_mapping(raw: object) -> EngineTuningModelState | None:
@@ -355,10 +357,12 @@ def _backend(raw: object) -> EngineTunerBackend | None:
 def _objective(raw: object) -> EngineTunerObjective | None:
     if raw == "finish_time":
         return "finish_time"
-    if raw == "episode_return":
-        return "episode_return"
-    if raw == "completion":
-        return "completion"
+    if raw == "safe_finish_time":
+        return "safe_finish_time"
+    # Transitional read compatibility for pre-safe-mode sidecars. Remove after
+    # local engine-tuning sidecars have been migrated or cleared.
+    if raw in {"episode_return", "completion"}:
+        return "finish_time"
     if raw == "finish_rate":
         return "finish_rate"
     return None

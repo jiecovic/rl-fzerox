@@ -542,6 +542,7 @@ def test_manager_training_bridge_projects_deficit_budget_track_sampling_settings
     config.tracks.deficit_budget_weight_update_rollouts = 30
     config.tracks.deficit_budget_difficulty_metric = "finish_ema"
     config.tracks.deficit_budget_warmup_min_episodes_per_course = 12
+    config.tracks.deficit_budget_uniform_staleness_rotations = 1.5
 
     train_config = build_managed_train_app_config(
         config,
@@ -556,6 +557,9 @@ def test_manager_training_bridge_projects_deficit_budget_track_sampling_settings
     assert train_config.env.track_sampling.deficit_budget_weight_update_rollouts == 30
     assert train_config.env.track_sampling.deficit_budget_difficulty_metric == "finish_ema"
     assert train_config.env.track_sampling.deficit_budget_warmup_min_episodes_per_course == 12
+    assert train_config.env.track_sampling.deficit_budget_uniform_staleness_rotations == (
+        pytest.approx(1.5)
+    )
 
 
 def test_manager_training_bridge_supports_continuous_air_brake_lane(

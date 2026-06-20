@@ -1,5 +1,5 @@
 // web/run-manager/src/shared/api/client/http.ts
-import type { ZodType } from "zod";
+import type { ZodIssue, ZodType } from "zod";
 
 import { ApiSchemaMismatchError } from "@/shared/api/client/errors";
 
@@ -15,9 +15,19 @@ export async function getJson(url: string, options: RequestOptions = {}): Promis
 export function parseApiPayload<T>(schema: ZodType<T>, payload: unknown): T {
   const parsed = schema.safeParse(payload);
   if (!parsed.success) {
-    throw new ApiSchemaMismatchError();
+    throw new ApiSchemaMismatchError(formatSchemaIssues(parsed.error.issues));
   }
   return parsed.data;
+}
+
+function formatSchemaIssues(issues: ZodIssue[]): string {
+  const visibleIssues = issues.slice(0, 3).map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return `${path}: ${issue.message}`;
+  });
+  const suffix =
+    issues.length > visibleIssues.length ? ` (+${issues.length - visibleIssues.length} more)` : "";
+  return `First issue${visibleIssues.length === 1 ? "" : "s"}: ${visibleIssues.join("; ")}${suffix}`;
 }
 
 export async function parseJson(response: Response): Promise<unknown> {

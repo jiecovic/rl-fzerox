@@ -143,6 +143,35 @@ def test_engine_tuning_payload_reports_bandit_backend_from_settings() -> None:
     assert contexts[0]["recommended_engine_setting_raw_value"] == 84
 
 
+def test_engine_tuning_payload_marks_inconsistent_candidate_rates_unknown() -> None:
+    state = EngineTuningRuntimeState(
+        version=ENGINE_TUNING_STATE_VERSION,
+        update_count=1,
+        candidates=(
+            EngineTuningCandidateState(
+                context_key="silence|blue_falcon",
+                course_key="silence",
+                vehicle_id="blue_falcon",
+                engine_setting_raw_value=50,
+                episode_count=1,
+                finish_count=3,
+                completion_score_total=4.0,
+                best_completion_score=1.25,
+            ),
+        ),
+    )
+
+    payload = engine_tuning_state_payload(state)
+
+    candidates = payload["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert candidate["mean_completion_score"] is None
+    assert candidate["best_completion_score"] == 1.0
+    assert candidate["finish_rate"] is None
+    assert candidate["failure_rate"] is None
+
+
 def test_engine_tuning_payload_uses_bandit_bucket_recommendation() -> None:
     context = EngineTuningContext(
         course_key="silence",

@@ -48,6 +48,7 @@ interface CourseSamplingPanelProps {
     | "deficit_budget_difficulty_metric"
     | "deficit_budget_focus_sharpness"
     | "deficit_budget_uniform_fraction"
+    | "deficit_budget_uniform_staleness_rotations"
     | "deficit_budget_warmup_min_episodes_per_course"
     | "deficit_budget_weight_update_rollouts"
     | "step_balance_ema_alpha"
@@ -429,6 +430,14 @@ function DeficitBudgetFields({
         step="0.005"
         value={config.tracks.deficit_budget_ema_alpha}
         onChange={(value) => updateTracks({ deficit_budget_ema_alpha: value })}
+      />
+      <NumberField
+        help="Rare guard for uniform coverage. If a course has missed this many full uniform-lane rotations, prioritize it once. 0 disables it."
+        label="Uniform staleness guard"
+        resetValue={defaultConfig.tracks.deficit_budget_uniform_staleness_rotations}
+        step="0.25"
+        value={config.tracks.deficit_budget_uniform_staleness_rotations}
+        onChange={(value) => updateTracks({ deficit_budget_uniform_staleness_rotations: value })}
       />
       <IntegerField
         help="Episode samples required on every active course before adaptive focus weights are allowed. Alt baselines spend budget but do not count toward warmup."

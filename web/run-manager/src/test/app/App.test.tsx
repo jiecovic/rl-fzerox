@@ -479,13 +479,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /^ppo_test_1 draft/i })).toBeInTheDocument();
   });
 
-  it("shows a generic restart message for backend schema mismatch", async () => {
-    loadManagerDataMock.mockRejectedValueOnce(new ApiSchemaMismatchError());
+  it("shows API contract details for backend schema mismatch", async () => {
+    loadManagerDataMock.mockRejectedValueOnce(
+      new ApiSchemaMismatchError("First issue: finish_rate: Too big"),
+    );
 
     render(<App />);
 
     expect(
-      await screen.findByText("Run-manager backend is outdated. Restart run-manager."),
+      await screen.findByText(
+        "Run-manager API response does not match the frontend contract. First issue: finish_rate: Too big",
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/\[\s*\{/)).not.toBeInTheDocument();
   });

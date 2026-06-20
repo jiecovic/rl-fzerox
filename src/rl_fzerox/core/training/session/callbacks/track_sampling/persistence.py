@@ -19,6 +19,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.episodes import (
     uses_track_sampling_runtime_mode,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
+    DeficitBudgetCourseSchedulerState,
+    DeficitBudgetSchedulerState,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
@@ -82,6 +84,9 @@ def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
         "deficit_budget_difficulty_metric": state.deficit_budget_difficulty_metric,
         "deficit_budget_warmup_min_episodes_per_course": (
             state.deficit_budget_warmup_min_episodes_per_course
+        ),
+        "deficit_budget_scheduler": _deficit_budget_scheduler_data(
+            state.deficit_budget_scheduler,
         ),
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
@@ -161,6 +166,9 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
         loaded,
         "deficit_budget_warmup_min_episodes_per_course",
     )
+    deficit_budget_scheduler = _deficit_budget_scheduler_from_data(
+        loaded.get("deficit_budget_scheduler"),
+    )
     update_count = _mapping_int(loaded, "update_count")
     episodes_since_update = _mapping_int(loaded, "episodes_since_update")
     if (
@@ -205,6 +213,7 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
             if deficit_budget_warmup_min_episodes_per_course is None
             else max(0, deficit_budget_warmup_min_episodes_per_course)
         ),
+        deficit_budget_scheduler=deficit_budget_scheduler,
     )
 
 
@@ -379,6 +388,107 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
             )
         )
     return entries
+
+
+def deficit_budget_scheduler_state_json(
+    state: DeficitBudgetSchedulerState | None,
+) -> str | None:
+    """Serialize deficit-budget scheduler internals for manager DB storage."""
+
+    data = _deficit_budget_scheduler_data(state)
+    return None if data is None else json.dumps(data, sort_keys=True)
+
+
+def load_deficit_budget_scheduler_state_json(
+    data: str | None,
+) -> DeficitBudgetSchedulerState | None:
+    """Load deficit-budget scheduler internals from manager DB storage."""
+
+    if not data:
+        return None
+    loaded = json.loads(data)
+    return _deficit_budget_scheduler_from_data(loaded)
+
+
+def _deficit_budget_scheduler_data(
+    state: DeficitBudgetSchedulerState | None,
+) -> dict[str, object] | None:
+    if state is None:
+        return None
+    return {
+        "uniform_lane_deficit_steps": state.uniform_lane_deficit_steps,
+        "adaptive_lane_deficit_steps": state.adaptive_lane_deficit_steps,
+        "uniform_assignment_count": state.uniform_assignment_count,
+        "entries": [
+            {
+                "course_key": entry.course_key,
+                "uniform_deficit_steps": entry.uniform_deficit_steps,
+                "adaptive_deficit_steps": entry.adaptive_deficit_steps,
+                "scheduler_env_steps": entry.scheduler_env_steps,
+                "last_uniform_assignment_index": entry.last_uniform_assignment_index,
+            }
+            for entry in state.entries
+        ],
+    }
+
+
+def _deficit_budget_scheduler_from_data(
+    data: object,
+) -> DeficitBudgetSchedulerState | None:
+    if not isinstance(data, Mapping):
+        return None
+    raw_entries = data.get("entries")
+    if not isinstance(raw_entries, list):
+        return None
+    entries: list[DeficitBudgetCourseSchedulerState] = []
+    for raw_entry in raw_entries:
+        if not isinstance(raw_entry, Mapping):
+            continue
+        course_key = _mapping_str(raw_entry, "course_key")
+        if course_key is None:
+            continue
+        entries.append(
+            DeficitBudgetCourseSchedulerState(
+                course_key=course_key,
+                uniform_deficit_steps=_mapping_optional_float(
+                    raw_entry,
+                    "uniform_deficit_steps",
+                )
+                or 0.0,
+                adaptive_deficit_steps=_mapping_optional_float(
+                    raw_entry,
+                    "adaptive_deficit_steps",
+                )
+                or 0.0,
+                scheduler_env_steps=max(
+                    0,
+                    _mapping_optional_int(raw_entry, "scheduler_env_steps") or 0,
+                ),
+                last_uniform_assignment_index=max(
+                    0,
+                    _mapping_optional_int(raw_entry, "last_uniform_assignment_index") or 0,
+                ),
+            )
+        )
+    if not entries:
+        return None
+    return DeficitBudgetSchedulerState(
+        uniform_lane_deficit_steps=_mapping_optional_float(
+            data,
+            "uniform_lane_deficit_steps",
+        )
+        or 0.0,
+        adaptive_lane_deficit_steps=_mapping_optional_float(
+            data,
+            "adaptive_lane_deficit_steps",
+        )
+        or 0.0,
+        uniform_assignment_count=max(
+            0,
+            _mapping_optional_int(data, "uniform_assignment_count") or 0,
+        ),
+        entries=tuple(sorted(entries, key=lambda entry: entry.course_key)),
+    )
 
 
 def _mapping_str(mapping: Mapping[str, Any], key: str) -> str | None:

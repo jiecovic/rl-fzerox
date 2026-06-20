@@ -42,6 +42,7 @@ def engine_tuner_settings(config: AdaptiveEngineTuningConfig) -> EngineTunerSett
             reward_fingerprint=config.reward_fingerprint,
             bucket_raw_values=config.bucket_raw_values,
             exploration_seconds=float(config.exploration_scale),
+            safe_finish_rate_threshold=config.safe_finish_rate_threshold,
         )
     if config.backend == "mlp_ensemble":
         return MlpEnsembleEngineTunerSettings(

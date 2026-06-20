@@ -44,6 +44,9 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
         "deficit_budget_warmup_min_episodes_per_course": (
             config.tracks.deficit_budget_warmup_min_episodes_per_course
         ),
+        "deficit_budget_uniform_staleness_rotations": (
+            config.tracks.deficit_budget_uniform_staleness_rotations
+        ),
         "x_cup_rotation": {
             "enabled": config.tracks.x_cup_auto_regeneration.enabled,
             "completion_threshold": (config.tracks.x_cup_auto_regeneration.completion_threshold),

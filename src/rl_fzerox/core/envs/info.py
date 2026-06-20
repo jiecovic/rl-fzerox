@@ -41,6 +41,7 @@ _MONITOR_INFO_FIELDS: tuple[_MonitorInfoField, ...] = (
     _MonitorInfoField("air_brake_pulse_active", False),
     _MonitorInfoField("air_brake_pulse_remaining_frames", 0),
     _MonitorInfoField("track_id", None),
+    _MonitorInfoField("track_sampling_deficit_lane", None),
     _MonitorInfoField("track_course_key", None),
     _MonitorInfoField("track_course_id", None),
     _MonitorInfoField("track_course_name", None),

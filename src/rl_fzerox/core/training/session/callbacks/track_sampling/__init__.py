@@ -28,13 +28,17 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.deficit import (
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.persistence import (
     TrackSamplingRuntimePersistence,
+    deficit_budget_scheduler_state_json,
     file_track_sampling_runtime_persistence,
+    load_deficit_budget_scheduler_state_json,
     load_track_sampling_runtime_state,
     load_track_sampling_runtime_state_json,
     save_track_sampling_runtime_state,
     track_sampling_runtime_state_json,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
+    DeficitBudgetCourseSchedulerState,
+    DeficitBudgetSchedulerState,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
     replace_runtime_generation,
@@ -53,6 +57,8 @@ __all__ = (
     "StepBalancedTrackSamplingController",
     "DEFICIT_QUEUE_SETTINGS",
     "DeficitBudgetTrackSamplingController",
+    "DeficitBudgetCourseSchedulerState",
+    "DeficitBudgetSchedulerState",
     "TrackSamplingRuntimeEntry",
     "GeneratedCourseMetadata",
     "TrackSamplingMaterializedArtifact",
@@ -67,7 +73,9 @@ __all__ = (
     "adaptive_target_bonus",
     "alt_baseline_signature",
     "apply_alt_baselines_to_track_sampling",
+    "deficit_budget_scheduler_state_json",
     "file_track_sampling_runtime_persistence",
+    "load_deficit_budget_scheduler_state_json",
     "load_track_sampling_runtime_state",
     "load_track_sampling_runtime_state_json",
     "materialized_track_sampling_artifacts",

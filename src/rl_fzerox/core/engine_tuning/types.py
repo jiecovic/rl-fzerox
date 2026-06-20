@@ -15,7 +15,7 @@ from rl_fzerox.core.domain.engine_setting import (
 )
 
 EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
-EngineTunerObjective = Literal["finish_time", "episode_return", "completion", "finish_rate"]
+EngineTunerObjective = Literal["finish_time", "safe_finish_time", "finish_rate"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +42,7 @@ class EngineTunerDefaults:
     backend: EngineTunerBackend = "bandit"
     objective: EngineTunerObjective = "finish_time"
     bandit_buckets: EngineTunerBucketDefaults = field(default_factory=EngineTunerBucketDefaults)
+    safe_finish_rate_threshold: float = 0.9
     stat_decay: float = 0.995
     prior_finish_time_seconds: float = 200.0
     exploration_seconds: float = 30.0
@@ -86,6 +87,7 @@ class BanditEngineTunerSettings(EngineTunerCommonSettings):
     reward_fingerprint: str | None = None
     bucket_raw_values: tuple[int, ...] = ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
+    safe_finish_rate_threshold: float = ENGINE_TUNER_DEFAULTS.safe_finish_rate_threshold
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,12 +197,6 @@ def finish_time_score(race_time_ms: int) -> float:
     """Return a higher-is-better score in negative seconds."""
 
     return -(max(1.0, float(race_time_ms)) * 0.001)
-
-
-def episode_return_score(episode_return: float) -> float:
-    """Return total episode reward as a higher-is-better tuner score."""
-
-    return float(episode_return)
 
 
 def finish_time_ms_from_score(score: float) -> int:

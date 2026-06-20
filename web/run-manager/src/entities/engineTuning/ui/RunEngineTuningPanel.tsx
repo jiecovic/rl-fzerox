@@ -27,7 +27,6 @@ type EngineBanditSortKey =
   | "finish_rate"
   | "failure_rate"
   | "probability"
-  | "samples"
   | "episodes";
 type EngineBanditSortDirection = "asc" | "desc";
 
@@ -248,10 +247,7 @@ function objectiveCountLabel(
   context: EngineTuningRuntimeContext,
   objective: EngineTuningRuntimeState["objective"],
 ) {
-  if (objective === "episode_return") {
-    return `${context.score_count.toLocaleString()} samples`;
-  }
-  if (objective === "completion" || objective === "finish_rate") {
+  if (objective === "safe_finish_time" || objective === "finish_rate") {
     return `${context.episode_count.toLocaleString()} episodes`;
   }
   return `${context.finish_count.toLocaleString()} successful finishes`;
@@ -346,19 +342,15 @@ function EngineSamplingProbabilityBars({
                 : "color-mix(in srgb, var(--accent) 70%, transparent)";
           const rawLabel = mode === "bandit" ? "bucket" : "engine";
           const engineLabel = engineStepLabel(candidate.engine_setting_raw_value);
-          const estimateLabel =
-            mode === "bandit" && isHigherScoreObjective(objective)
-              ? `mean ${objectiveNoun(objective)}`
-              : mode === "bandit"
-                ? "mean"
-                : "estimated";
+          const banditMetric = banditObservedPerformanceMetric(objective);
+          const estimateLabel = mode === "bandit" ? banditMetric.meanLabel : "estimated";
           const estimateValue =
-            mode === "bandit" && isHigherScoreObjective(objective)
-              ? formatObjectiveScore(candidate.mean_score, objective)
+            mode === "bandit"
+              ? banditMetric.format(banditMetric.value(candidate))
               : formatRaceTime(candidate.estimated_finish_time_ms);
           const bestValue =
-            mode === "bandit" && isHigherScoreObjective(objective)
-              ? formatOptionalObjectiveScore(candidate.best_score, objective)
+            mode === "bandit"
+              ? banditMetric.format(banditMetric.bestValue(candidate))
               : formatOptionalRaceTime(candidate.best_finish_time_ms);
           const sampleLabel = objectiveSampleLabel(candidate, objective);
           return (
@@ -399,15 +391,17 @@ function EngineMeanPerformanceBars({
   const firstCandidate = candidates[0]?.engine_setting_raw_value ?? 0;
   const lastCandidate = candidates.at(-1)?.engine_setting_raw_value ?? ENGINE_SLIDER.maxStep;
   const barWidth = 100 / Math.max(1, candidates.length);
-  const estimatedTimes = candidates.map((candidate) => candidate.estimated_finish_time_ms);
-  const fastestEstimate = Math.min(...estimatedTimes, Number.POSITIVE_INFINITY);
-  const slowestEstimate = Math.max(...estimatedTimes, 1);
-  const timeSpan = Math.max(1, slowestEstimate - fastestEstimate);
-  const returnScores = candidates.map((candidate) => candidate.mean_score);
-  const bestReturn = Math.max(...returnScores, 0);
-  const worstReturn = Math.min(...returnScores, bestReturn - 1);
-  const returnSpan = Math.max(0.000001, bestReturn - worstReturn);
-  const showsScore = mode === "bandit" && isHigherScoreObjective(objective);
+  const banditMetric = banditObservedPerformanceMetric(objective);
+  const values =
+    mode === "bandit"
+      ? candidates
+          .map((candidate) => banditMetric.value(candidate))
+          .filter((value): value is number => value !== null)
+      : candidates.map((candidate) => candidate.estimated_finish_time_ms);
+  const lowValue = Math.min(...values, Number.POSITIVE_INFINITY);
+  const highValue = Math.max(...values, Number.NEGATIVE_INFINITY);
+  const hasValues = values.length > 0;
+  const valueSpan = Math.max(0.000001, highValue - lowValue);
 
   return (
     <div className="grid gap-1">
@@ -415,11 +409,7 @@ function EngineMeanPerformanceBars({
         <div className="flex flex-wrap gap-3">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-3 bg-app-accent/45" aria-hidden="true" />
-            {showsScore
-              ? `bucket mean ${objectiveNoun(objective)}`
-              : mode === "bandit"
-                ? "bucket mean finish"
-                : "predicted mean performance"}
+            {mode === "bandit" ? banditMetric.legendLabel : "predicted mean performance"}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-3 bg-app-accent" aria-hidden="true" />
@@ -427,9 +417,9 @@ function EngineMeanPerformanceBars({
           </span>
         </div>
         <span className="tabular-nums">
-          {showsScore
-            ? `bucket mean ${objectiveNoun(objective)} ${formatObjectiveScore(worstReturn, objective)}-${formatObjectiveScore(bestReturn, objective)}`
-            : `${mode === "bandit" ? "bucket mean finish time" : "estimated finish time"} ${formatRaceTime(fastestEstimate)}-${formatRaceTime(slowestEstimate)}`}
+          {hasValues
+            ? `${mode === "bandit" ? banditMetric.rangeLabel : "estimated finish time"} ${banditMetric.format(lowValue)}-${banditMetric.format(highValue)}`
+            : `${mode === "bandit" ? banditMetric.rangeLabel : "estimated finish time"} no observations`}
         </span>
       </div>
       <svg
@@ -441,33 +431,34 @@ function EngineMeanPerformanceBars({
       >
         <title>
           {mode === "bandit"
-            ? showsScore
-              ? `Measured bucket mean ${objectiveNoun(objective)}`
-              : "Measured bucket mean finish time"
+            ? banditMetric.title
             : "Predicted mean performance from estimated finish time"}
         </title>
         {candidates.map((candidate, index) => {
           const isRecommended =
             candidate.engine_setting_raw_value === recommendedEngineSettingRawValue;
-          const height = showsScore
-            ? 3 + ((candidate.mean_score - worstReturn) / returnSpan) * 93
-            : 3 + ((slowestEstimate - candidate.estimated_finish_time_ms) / timeSpan) * 93;
+          const value =
+            mode === "bandit" ? banditMetric.value(candidate) : candidate.estimated_finish_time_ms;
+          const height =
+            value === null || !hasValues
+              ? 0
+              : 3 +
+                ((banditMetric.higherIsBetter ? value - lowValue : highValue - value) / valueSpan) *
+                  93;
           const width = Math.max(0.2, barWidth * 0.86);
           const x = index * barWidth + (barWidth - width) / 2;
           const y = 100 - height;
           const rawLabel = mode === "bandit" ? "bucket" : "engine";
           const engineLabel = engineStepLabel(candidate.engine_setting_raw_value);
-          const estimateLabel = showsScore
-            ? `mean ${objectiveNoun(objective)}`
-            : mode === "bandit"
-              ? "mean"
-              : "estimated";
-          const estimateValue = showsScore
-            ? formatObjectiveScore(candidate.mean_score, objective)
-            : formatRaceTime(candidate.estimated_finish_time_ms);
-          const bestValue = showsScore
-            ? formatOptionalObjectiveScore(candidate.best_score, objective)
-            : formatOptionalRaceTime(candidate.best_finish_time_ms);
+          const estimateLabel = mode === "bandit" ? banditMetric.meanLabel : "estimated";
+          const estimateValue =
+            mode === "bandit"
+              ? banditMetric.format(value)
+              : formatRaceTime(candidate.estimated_finish_time_ms);
+          const bestValue =
+            mode === "bandit"
+              ? banditMetric.format(banditMetric.bestValue(candidate))
+              : formatOptionalRaceTime(candidate.best_finish_time_ms);
           const sampleLabel = objectiveSampleLabel(candidate, objective);
           return (
             <rect
@@ -492,11 +483,7 @@ function EngineMeanPerformanceBars({
         <span>{engineStepLabel(firstCandidate)}</span>
         <span>
           engine slider step · taller means faster{" "}
-          {showsScore
-            ? `bucket mean ${objectiveNoun(objective)}`
-            : mode === "bandit"
-              ? "bucket mean finish"
-              : "estimated finish"}
+          {mode === "bandit" ? banditMetric.axisLabel : "estimated finish"}
         </span>
         <span>{engineStepLabel(lastCandidate)}</span>
       </div>
@@ -521,7 +508,7 @@ function EngineBanditBucketTable({
   const rows = [...candidates].sort((left, right) =>
     compareBanditBucketCandidatesForSort(left, right, objective, sortState),
   );
-  const bestValues = engineBanditBestColumnValues(candidates, objective);
+  const bestValues = engineBanditBestColumnValues(candidates);
   function setSortKey(key: EngineBanditSortKey) {
     setSortState((current) =>
       current.key === key
@@ -596,13 +583,6 @@ function EngineBanditBucketTable({
               direction={sortState.direction}
               label="Prob"
               sortKey="probability"
-              onSort={setSortKey}
-            />
-            <SortableEngineBanditHeader
-              active={sortState.key === "samples"}
-              direction={sortState.direction}
-              label="Samples"
-              sortKey="samples"
               onSort={setSortKey}
             />
             <SortableEngineBanditHeader
@@ -682,14 +662,6 @@ function EngineBanditBucketTable({
               </td>
               <td
                 className={engineBanditValueCellClass(
-                  isBestBanditValue(candidateSampleCount(candidate, objective), bestValues.samples),
-                  true,
-                )}
-              >
-                {candidateSampleCount(candidate, objective)}
-              </td>
-              <td
-                className={engineBanditValueCellClass(
                   isBestBanditValue(candidate.episode_count, bestValues.episodes),
                   true,
                 )}
@@ -714,12 +686,10 @@ interface EngineBanditBestColumnValues {
   meanReturn: number | null;
   meanTime: number | null;
   probability: number | null;
-  samples: number | null;
 }
 
 function engineBanditBestColumnValues(
   candidates: readonly EngineTuningRuntimeCandidateEstimate[],
-  objective: EngineTuningRuntimeState["objective"],
 ): EngineBanditBestColumnValues {
   return {
     bestReturn: maxNullable(candidates.map((candidate) => candidate.best_return_score)),
@@ -731,9 +701,6 @@ function engineBanditBestColumnValues(
     meanReturn: maxNullable(candidates.map((candidate) => candidate.mean_return_score)),
     meanTime: minNullable(candidates.map((candidate) => candidate.mean_finish_time_ms)),
     probability: maxNullable(candidates.map((candidate) => candidate.selection_probability)),
-    samples: positiveMaxNullable(
-      candidates.map((candidate) => candidateSampleCount(candidate, objective)),
-    ),
   };
 }
 
@@ -813,12 +780,6 @@ function compareBanditBucketSortValue(
       numericCompare(left.selection_probability, right.selection_probability)
     );
   }
-  if (sortState.key === "samples") {
-    return (
-      sortDirectionMultiplier(sortState.direction) *
-      numericCompare(candidateSampleCount(left, objective), candidateSampleCount(right, objective))
-    );
-  }
   if (sortState.key === "episodes") {
     return (
       sortDirectionMultiplier(sortState.direction) *
@@ -885,10 +846,10 @@ function candidateSampleCount(
   candidate: EngineTuningRuntimeCandidateEstimate,
   objective: EngineTuningRuntimeState["objective"],
 ) {
-  if (objective === "completion" || objective === "finish_rate") {
+  if (objective === "safe_finish_time" || objective === "finish_rate") {
     return candidate.episode_count;
   }
-  return objective === "episode_return" ? candidate.score_count : candidate.finish_count;
+  return candidate.finish_count;
 }
 
 function compareNullableSortValues(
@@ -981,6 +942,47 @@ function nullableRaceTimeSortValue(value: number | null) {
 
 function nullableScoreSortValue(value: number | null) {
   return value ?? Number.NEGATIVE_INFINITY;
+}
+
+interface BanditObservedPerformanceMetric {
+  axisLabel: string;
+  bestValue: (candidate: EngineTuningRuntimeCandidateEstimate) => number | null;
+  format: (value: number | null) => string;
+  higherIsBetter: boolean;
+  legendLabel: string;
+  meanLabel: string;
+  rangeLabel: string;
+  title: string;
+  value: (candidate: EngineTuningRuntimeCandidateEstimate) => number | null;
+}
+
+function banditObservedPerformanceMetric(
+  objective: EngineTuningRuntimeState["objective"],
+): BanditObservedPerformanceMetric {
+  if (objective === "finish_rate") {
+    return {
+      axisLabel: "measured finish rate",
+      bestValue: (candidate) => candidate.finish_rate,
+      format: formatPercent,
+      higherIsBetter: true,
+      legendLabel: "bucket finish rate",
+      meanLabel: "finish rate",
+      rangeLabel: "bucket finish rate",
+      title: "Measured bucket finish rate",
+      value: (candidate) => candidate.finish_rate,
+    };
+  }
+  return {
+    axisLabel: "measured mean finish",
+    bestValue: (candidate) => candidate.best_finish_time_ms,
+    format: formatOptionalRaceTime,
+    higherIsBetter: false,
+    legendLabel: "bucket mean finish",
+    meanLabel: "mean",
+    rangeLabel: "bucket mean finish time",
+    title: "Measured bucket mean finish time",
+    value: (candidate) => candidate.mean_finish_time_ms,
+  };
 }
 
 function EngineMeasuredCandidateTable({
@@ -1131,15 +1133,12 @@ function formatPercent(value: number | null) {
 }
 
 function isHigherScoreObjective(objective: EngineTuningRuntimeState["objective"]) {
-  return objective !== "finish_time";
+  return objective === "finish_rate";
 }
 
 function objectiveNoun(objective: EngineTuningRuntimeState["objective"]) {
-  if (objective === "episode_return") {
-    return "return";
-  }
-  if (objective === "completion") {
-    return "completion";
+  if (objective === "safe_finish_time") {
+    return "safe finish";
   }
   if (objective === "finish_rate") {
     return "finish rate";
@@ -1147,31 +1146,11 @@ function objectiveNoun(objective: EngineTuningRuntimeState["objective"]) {
   return "finish";
 }
 
-function formatObjectiveScore(value: number, objective: EngineTuningRuntimeState["objective"]) {
-  if (objective === "completion" || objective === "finish_rate") {
-    return formatPercent(value);
-  }
-  return formatScore(value);
-}
-
-function formatOptionalObjectiveScore(
-  value: number | null,
-  objective: EngineTuningRuntimeState["objective"],
-) {
-  if (value === null) {
-    return objective === "completion" || objective === "finish_rate" ? "-" : "no score yet";
-  }
-  return formatObjectiveScore(value, objective);
-}
-
 function objectiveSampleLabel(
   candidate: EngineTuningRuntimeCandidateEstimate,
   objective: EngineTuningRuntimeState["objective"],
 ) {
-  if (objective === "episode_return") {
-    return `${candidate.score_count} return samples`;
-  }
-  if (objective === "completion" || objective === "finish_rate") {
+  if (objective === "safe_finish_time" || objective === "finish_rate") {
     return `${candidate.episode_count} episodes`;
   }
   return `${candidate.finish_count} successful finishes`;

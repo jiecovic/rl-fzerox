@@ -20,7 +20,6 @@ from rl_fzerox.core.engine_tuning.types import (
     EngineTuningContext,
     EngineTuningEpisodeOutcome,
     engine_bucket_candidates,
-    episode_return_score,
     finish_time_ms_from_score,
     finish_time_score,
     successful_finish_time_ms,
@@ -57,27 +56,29 @@ class BanditEngineTuner:
         unobserved = tuple(
             engine_raw
             for engine_raw in candidates
-            if projection.estimates[engine_raw].exact_score_count <= 0
+            if _candidate_observation_count(
+                projection.estimates[engine_raw],
+                objective=projection.objective,
+            )
+            <= 0
         )
         if unobserved:
             selected = rng.choice(unobserved)
             estimate = projection.estimates[selected]
             return self._choice_for(context, selected, estimate=estimate, sampled_score=None)
 
-        sampled_scores = _sample_scores(projection=projection, candidates=candidates, rng=rng)
-        selected = max(
-            candidates,
-            key=lambda engine_raw: (
-                sampled_scores[engine_raw],
-                -abs(engine_raw - _candidate_midpoint(candidates)),
-                -engine_raw,
-            ),
+        selected, sampled_score = _sample_engine_setting(
+            projection=projection,
+            candidates=candidates,
+            rng=rng,
+            threshold=self._settings.safe_finish_rate_threshold,
+            prior_finish_time_seconds=self._settings.prior_finish_time_seconds,
         )
         return self._choice_for(
             context,
             selected,
             estimate=projection.estimates[selected],
-            sampled_score=sampled_scores[selected],
+            sampled_score=sampled_score,
         )
 
     def recommendation(self, context: EngineTuningContext) -> EngineTuningChoice:
@@ -85,7 +86,11 @@ class BanditEngineTuner:
 
         candidates = self._candidates()
         projection = self._context_projection(context, candidates)
-        engine_raw = _bandit_greedy_engine_setting(projection=projection, candidates=candidates)
+        engine_raw = _bandit_greedy_engine_setting(
+            projection=projection,
+            candidates=candidates,
+            safe_finish_rate_threshold=self._settings.safe_finish_rate_threshold,
+        )
         return self._choice_for(
             context,
             engine_raw,
@@ -108,6 +113,8 @@ class BanditEngineTuner:
             projection=projection,
             candidates=candidates,
             uniform_exploration=self._settings.uniform_exploration,
+            safe_finish_rate_threshold=self._settings.safe_finish_rate_threshold,
+            prior_finish_time_seconds=self._settings.prior_finish_time_seconds,
             seed=seed,
             draws=draws,
         )
@@ -207,15 +214,31 @@ class BanditEngineTuner:
         self,
         candidate: EngineTuningCandidateState | None,
     ) -> _EngineEstimate:
-        if candidate is None or candidate.mean_score is None or candidate.active_score_count <= 0:
+        if candidate is None:
             return _EngineEstimate(
                 mean_score=self._prior_score(),
                 uncertainty_score=max(0.0, float(self._settings.exploration_seconds)),
                 exact_score_count=0,
+                episode_count=0,
                 finish_count=0,
+                finish_rate=None,
+                mean_finish_score=None,
                 best_finish_time_ms=None,
                 best_score=None,
             )
+        if candidate.mean_score is None or candidate.active_score_count <= 0:
+            return _EngineEstimate(
+                mean_score=self._prior_score(),
+                uncertainty_score=max(0.0, float(self._settings.exploration_seconds)),
+                exact_score_count=0,
+                episode_count=candidate.episode_count,
+                finish_count=candidate.finish_count,
+                finish_rate=candidate.finish_rate_score,
+                mean_finish_score=candidate.mean_finish_score,
+                best_finish_time_ms=candidate.best_time_ms,
+                best_score=candidate.best_score,
+            )
+        finish_rate = candidate.finish_rate_score
         return _EngineEstimate(
             mean_score=candidate.mean_score,
             uncertainty_score=_candidate_uncertainty(
@@ -223,7 +246,10 @@ class BanditEngineTuner:
                 exploration_seconds=self._settings.exploration_seconds,
             ),
             exact_score_count=candidate.active_score_count,
+            episode_count=candidate.episode_count,
             finish_count=candidate.finish_count,
+            finish_rate=finish_rate,
+            mean_finish_score=candidate.mean_finish_score,
             best_finish_time_ms=candidate.best_time_ms,
             best_score=candidate.best_score,
         )
@@ -232,7 +258,7 @@ class BanditEngineTuner:
         return engine_bucket_candidates(bucket_raw_values=self._settings.bucket_raw_values)
 
     def _prior_score(self) -> float:
-        if self._settings.objective in {"episode_return", "completion", "finish_rate"}:
+        if self._settings.objective == "finish_rate":
             return 0.0
         return -max(1.0, float(self._settings.prior_finish_time_seconds))
 
@@ -242,7 +268,10 @@ class _EngineEstimate:
     mean_score: float
     uncertainty_score: float
     exact_score_count: int
+    episode_count: int
     finish_count: int
+    finish_rate: float | None
+    mean_finish_score: float | None
     best_finish_time_ms: int | None
     best_score: float | None
 
@@ -286,6 +315,13 @@ def _canonical_bandit_state(
     *,
     settings: BanditEngineTunerSettings,
 ) -> EngineTuningRuntimeState:
+    state = engine_tuning_state_with_objective(
+        state,
+        objective=settings.objective,
+        reward_fingerprint=settings.reward_fingerprint,
+        safe_finish_rate_threshold=settings.safe_finish_rate_threshold,
+        prior_finish_time_seconds=settings.prior_finish_time_seconds,
+    )
     candidates = engine_bucket_candidates(bucket_raw_values=settings.bucket_raw_values)
     buckets: dict[tuple[str, int], EngineTuningCandidateState] = {}
     for candidate in state.candidates:
@@ -412,20 +448,11 @@ def _objective_score(
     settings: BanditEngineTunerSettings,
 ) -> tuple[float | None, int | None]:
     finish_time_ms = successful_finish_time_ms(outcome)
-    if settings.objective == "finish_time":
+    if settings.objective in {"finish_time", "safe_finish_time"}:
         return (
             None if finish_time_ms is None else finish_time_score(finish_time_ms),
             finish_time_ms,
         )
-    if settings.objective == "episode_return":
-        return (
-            None
-            if outcome.episode_return is None
-            else episode_return_score(outcome.episode_return),
-            finish_time_ms,
-        )
-    if settings.objective == "completion":
-        return (max(0.0, min(1.0, float(outcome.completion_fraction))), finish_time_ms)
     return (1.0 if finish_time_ms is not None else 0.0, finish_time_ms)
 
 
@@ -434,6 +461,8 @@ def _selection_probabilities(
     projection: _EngineProjection,
     candidates: tuple[int, ...],
     uniform_exploration: float,
+    safe_finish_rate_threshold: float,
+    prior_finish_time_seconds: float,
     seed: int,
     draws: int,
 ) -> dict[int, float]:
@@ -444,6 +473,8 @@ def _selection_probabilities(
     model_probabilities = _model_probabilities(
         projection=projection,
         candidates=candidates,
+        safe_finish_rate_threshold=safe_finish_rate_threshold,
+        prior_finish_time_seconds=prior_finish_time_seconds,
         seed=seed,
         draws=draws,
     )
@@ -458,13 +489,19 @@ def _model_probabilities(
     *,
     projection: _EngineProjection,
     candidates: tuple[int, ...],
+    safe_finish_rate_threshold: float,
+    prior_finish_time_seconds: float,
     seed: int,
     draws: int,
 ) -> dict[int, float]:
     unobserved = tuple(
         engine_raw
         for engine_raw in candidates
-        if projection.estimates[engine_raw].exact_score_count <= 0
+        if _candidate_observation_count(
+            projection.estimates[engine_raw],
+            objective=projection.objective,
+        )
+        <= 0
     )
     if unobserved:
         return {
@@ -476,17 +513,119 @@ def _model_probabilities(
     draw_count = max(1, int(draws))
     counts = dict.fromkeys(candidates, 0)
     for _ in range(draw_count):
-        sampled_scores = _sample_scores(projection=projection, candidates=candidates, rng=rng)
-        selected = max(
-            candidates,
-            key=lambda engine_raw: (
-                sampled_scores[engine_raw],
-                -abs(engine_raw - _candidate_midpoint(candidates)),
-                -engine_raw,
-            ),
+        selected, _sampled_score = _sample_engine_setting(
+            projection=projection,
+            candidates=candidates,
+            rng=rng,
+            threshold=safe_finish_rate_threshold,
+            prior_finish_time_seconds=prior_finish_time_seconds,
         )
         counts[selected] += 1
     return {engine_raw: counts[engine_raw] / draw_count for engine_raw in candidates}
+
+
+def _sample_engine_setting(
+    *,
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+    rng: Random,
+    threshold: float = 0.9,
+    prior_finish_time_seconds: float = 200.0,
+) -> tuple[int, float]:
+    if projection.objective == "safe_finish_time":
+        return _sample_safe_finish_time_engine_setting(
+            projection=projection,
+            candidates=candidates,
+            rng=rng,
+            threshold=threshold,
+            prior_finish_time_seconds=prior_finish_time_seconds,
+        )
+    sampled_scores = _sample_scores(projection=projection, candidates=candidates, rng=rng)
+    selected = max(
+        candidates,
+        key=lambda engine_raw: (
+            sampled_scores[engine_raw],
+            -abs(engine_raw - _candidate_midpoint(candidates)),
+            -engine_raw,
+        ),
+    )
+    return selected, sampled_scores[selected]
+
+
+def _sample_safe_finish_time_engine_setting(
+    *,
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+    rng: Random,
+    threshold: float,
+    prior_finish_time_seconds: float,
+) -> tuple[int, float]:
+    sampled = {
+        engine_raw: _sample_safe_finish_time_candidate(
+            projection.estimates[engine_raw],
+            rng=rng,
+            prior_finish_time_seconds=prior_finish_time_seconds,
+        )
+        for engine_raw in candidates
+    }
+    safe_candidates = tuple(
+        engine_raw
+        for engine_raw in candidates
+        if (
+            sampled[engine_raw].finish_rate >= threshold
+            and projection.estimates[engine_raw].finish_count > 0
+        )
+    )
+    midpoint = _candidate_midpoint(candidates)
+    if safe_candidates:
+        selected = max(
+            safe_candidates,
+            key=lambda engine_raw: (
+                sampled[engine_raw].finish_time_score,
+                sampled[engine_raw].finish_rate,
+                projection.estimates[engine_raw].finish_count,
+                -abs(engine_raw - midpoint),
+                -engine_raw,
+            ),
+        )
+        return selected, sampled[selected].finish_time_score
+    selected = max(
+        candidates,
+        key=lambda engine_raw: (
+            sampled[engine_raw].finish_rate,
+            sampled[engine_raw].finish_time_score,
+            projection.estimates[engine_raw].episode_count,
+            -abs(engine_raw - midpoint),
+            -engine_raw,
+        ),
+    )
+    return selected, sampled[selected].finish_rate
+
+
+@dataclass(frozen=True, slots=True)
+class _SafeFinishTimeSample:
+    finish_rate: float
+    finish_time_score: float
+
+
+def _sample_safe_finish_time_candidate(
+    estimate: _EngineEstimate,
+    *,
+    rng: Random,
+    prior_finish_time_seconds: float,
+) -> _SafeFinishTimeSample:
+    failures = max(0, estimate.episode_count - estimate.finish_count)
+    finish_rate = rng.betavariate(1.0 + estimate.finish_count, 1.0 + failures)
+    mean_finish_score = (
+        estimate.mean_finish_score
+        if estimate.mean_finish_score is not None
+        else -max(1.0, float(prior_finish_time_seconds))
+    )
+    finish_time_score = mean_finish_score + estimate.uncertainty_score * rng.gauss(0.0, 1.0)
+    return _SafeFinishTimeSample(
+        finish_rate=finish_rate,
+        finish_time_score=finish_time_score,
+    )
 
 
 def _sample_scores(
@@ -521,6 +660,16 @@ def _candidate_estimate(
     )
 
 
+def _candidate_observation_count(
+    estimate: _EngineEstimate,
+    *,
+    objective: EngineTunerObjective,
+) -> int:
+    if objective in {"safe_finish_time", "finish_rate"}:
+        return estimate.episode_count
+    return estimate.exact_score_count
+
+
 def _candidate_uncertainty(
     candidate: EngineTuningCandidateState,
     *,
@@ -537,13 +686,18 @@ def _bandit_greedy_engine_setting(
     *,
     projection: _EngineProjection,
     candidates: tuple[int, ...],
+    safe_finish_rate_threshold: float,
 ) -> int:
     if not candidates:
         raise ValueError("adaptive engine tuning has no engine candidates")
     observed = tuple(
         engine_raw
         for engine_raw in candidates
-        if projection.estimates[engine_raw].exact_score_count > 0
+        if _candidate_observation_count(
+            projection.estimates[engine_raw],
+            objective=projection.objective,
+        )
+        > 0
     )
     if not observed:
         midpoint = _candidate_midpoint(candidates)
@@ -556,6 +710,7 @@ def _bandit_greedy_engine_setting(
             engine_raw=engine_raw,
             midpoint=midpoint,
             objective=projection.objective,
+            safe_finish_rate_threshold=safe_finish_rate_threshold,
         ),
     )
 
@@ -566,12 +721,44 @@ def _bandit_greedy_key(
     engine_raw: int,
     midpoint: float,
     objective: EngineTunerObjective,
-) -> tuple[float, float, int, float, int]:
-    if objective in {"episode_return", "completion", "finish_rate"}:
+    safe_finish_rate_threshold: float,
+) -> tuple[float, float, float, int, float, int]:
+    if objective == "finish_rate":
         return (
             estimate.mean_score,
             estimate.best_score if estimate.best_score is not None else float("-inf"),
+            estimate.finish_rate if estimate.finish_rate is not None else float("-inf"),
             estimate.exact_score_count,
+            -abs(engine_raw - midpoint),
+            -engine_raw,
+        )
+    if objective == "safe_finish_time":
+        finish_rate = estimate.finish_rate if estimate.finish_rate is not None else 0.0
+        is_safe = finish_rate >= safe_finish_rate_threshold and estimate.finish_count > 0
+        best_finish_time_ms = (
+            estimate.best_finish_time_ms
+            if estimate.best_finish_time_ms is not None
+            else 1_000_000_000
+        )
+        estimated_finish_time_ms = (
+            finish_time_ms_from_score(estimate.mean_finish_score)
+            if estimate.mean_finish_score is not None
+            else 1_000_000_000
+        )
+        if is_safe:
+            return (
+                1.0,
+                -estimated_finish_time_ms,
+                -best_finish_time_ms,
+                estimate.finish_count,
+                -abs(engine_raw - midpoint),
+                -engine_raw,
+            )
+        return (
+            0.0,
+            finish_rate,
+            -estimated_finish_time_ms,
+            estimate.episode_count,
             -abs(engine_raw - midpoint),
             -engine_raw,
         )
@@ -582,6 +769,7 @@ def _bandit_greedy_key(
     return (
         -estimated_finish_time_ms,
         -best_finish_time_ms,
+        estimate.mean_score,
         estimate.exact_score_count,
         -abs(engine_raw - midpoint),
         -engine_raw,
@@ -602,5 +790,7 @@ def _bandit_state_or_empty(
         state,
         objective=settings.objective,
         reward_fingerprint=settings.reward_fingerprint,
+        safe_finish_rate_threshold=settings.safe_finish_rate_threshold,
+        prior_finish_time_seconds=settings.prior_finish_time_seconds,
     )
     return _canonical_bandit_state(state, settings=settings)

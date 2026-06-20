@@ -26,6 +26,7 @@ class RunTrackSamplingRuntimeModel(ManagerBase):
     adaptive_confidence_scale: Mapped[float]
     deficit_budget_difficulty_metric: Mapped[str]
     deficit_budget_warmup_min_episodes_per_course: Mapped[int]
+    deficit_budget_scheduler_json: Mapped[str | None]
     update_count: Mapped[int]
     episodes_since_update: Mapped[int]
     updated_at: Mapped[str]

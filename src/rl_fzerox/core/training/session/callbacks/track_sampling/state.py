@@ -37,6 +37,23 @@ class TrackSamplingRuntimeEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class DeficitBudgetCourseSchedulerState:
+    course_key: str
+    uniform_deficit_steps: float = 0.0
+    adaptive_deficit_steps: float = 0.0
+    scheduler_env_steps: int = 0
+    last_uniform_assignment_index: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class DeficitBudgetSchedulerState:
+    uniform_lane_deficit_steps: float = 0.0
+    adaptive_lane_deficit_steps: float = 0.0
+    uniform_assignment_count: int = 0
+    entries: tuple[DeficitBudgetCourseSchedulerState, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class TrackSamplingRuntimeState:
     sampling_mode: str
     action_repeat: int
@@ -52,6 +69,7 @@ class TrackSamplingRuntimeState:
     entries: tuple[TrackSamplingRuntimeEntry, ...]
     deficit_budget_difficulty_metric: str = "completion_ema"
     deficit_budget_warmup_min_episodes_per_course: int = 0
+    deficit_budget_scheduler: DeficitBudgetSchedulerState | None = None
 
 
 @dataclass(slots=True)

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.runtime_spec.schema import TrackRecordsConfig
@@ -30,6 +31,17 @@ class TrackBaselineCacheLimits:
 
 
 TRACK_BASELINE_CACHE_LIMITS = TrackBaselineCacheLimits()
+
+
+TrackSamplingDeficitLane = Literal["uniform", "adaptive"]
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingQueuedReset:
+    """One externally scheduled reset slot for deficit-budget sampling."""
+
+    course_id: str
+    deficit_lane: TrackSamplingDeficitLane | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +90,7 @@ class SelectedTrack:
     records: TrackRecordsConfig | None
     sampling_mode: str
     cycle_position: int | None = None
+    deficit_budget_lane: TrackSamplingDeficitLane | None = None
 
     def info(self) -> dict[str, object]:
         source_entry_id = self.alt_baseline_source_entry_id or self.id
@@ -123,6 +136,7 @@ class SelectedTrack:
             "engine_tuning_mean_score": self.engine_tuning_mean_score,
             "engine_tuning_finish_count": self.engine_tuning_finish_count,
             "track_sampling_cycle_position": self.cycle_position,
+            "track_sampling_deficit_lane": self.deficit_budget_lane,
             "track_baseline_group_id": self.baseline_group_id,
             "track_baseline_group_weight": self.baseline_group_weight,
             "track_alt_baseline_id": self.alt_baseline_id,
