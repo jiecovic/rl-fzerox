@@ -463,8 +463,9 @@ function AdaptiveEngineControls({
   const vehicle = config.vehicle;
   const defaultVehicle = defaultConfig.vehicle;
   const isBanditBackend = vehicle.adaptive_engine_tuner_backend === "bandit";
-  const isGaussianProcessBackend = vehicle.adaptive_engine_tuner_backend === "gaussian_process";
-  const isMlpEnsembleBackend = vehicle.adaptive_engine_tuner_backend === "mlp_ensemble";
+  const experimentalBackendLabel = experimentalEngineTunerBackendLabel(
+    vehicle.adaptive_engine_tuner_backend,
+  );
   const banditBucketSideCount =
     bucketSideCountFromRawValues(vehicle.adaptive_engine_bandit_bucket_raw_values) ||
     bucketSideCountFromRawValues(defaultVehicle.adaptive_engine_bandit_bucket_raw_values);
@@ -495,32 +496,24 @@ function AdaptiveEngineControls({
       </div>
       <div className="grid gap-2">
         <strong className="text-[13px] text-app-text">Tuner backend</strong>
-        <SegmentedChoiceStrip
-          ariaLabel="Adaptive engine tuner backend"
-          options={[
-            {
-              active: vehicle.adaptive_engine_tuner_backend === "bandit",
-              key: "bandit",
-              label: "Bandit",
-              onClick: () => onChange({ adaptive_engine_tuner_backend: "bandit" }),
-            },
-            {
-              active: vehicle.adaptive_engine_tuner_backend === "gaussian_process",
-              key: "gaussian_process",
-              label: "GP (exp)",
-              onClick: () => onChange({ adaptive_engine_tuner_backend: "gaussian_process" }),
-            },
-            {
-              active: vehicle.adaptive_engine_tuner_backend === "mlp_ensemble",
-              key: "mlp_ensemble",
-              label: "MLP (exp)",
-              onClick: () => onChange({ adaptive_engine_tuner_backend: "mlp_ensemble" }),
-            },
-          ]}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex min-h-9 items-center border border-app-border bg-app-surface-muted px-3 text-sm font-semibold text-app-text">
+            Bandit
+          </span>
+          {experimentalBackendLabel !== null ? (
+            <>
+              <span className="inline-flex min-h-9 items-center border border-amber-400/45 bg-amber-400/10 px-3 text-sm font-semibold text-amber-200">
+                legacy {experimentalBackendLabel}
+              </span>
+              <Button onClick={() => onChange({ adaptive_engine_tuner_backend: "bandit" })}>
+                Use bandit
+              </Button>
+            </>
+          ) : null}
+        </div>
         <small className="m-0 text-xs leading-snug text-app-muted">
-          Bandit samples coarse measured buckets. GP and MLP are experimental model-backed
-          alternatives. Backend uncertainty scales are derived from the episode horizon.
+          Bandit is the maintained tuner path. GP and MLP remain loadable as experimental legacy
+          backends for old configs and future work, but they are not exposed for new tuning.
         </small>
       </div>
       {isBanditBackend ? (
@@ -584,115 +577,44 @@ function AdaptiveEngineControls({
             }
           />
         ) : null}
-        {isGaussianProcessBackend ? (
+        {isBanditBackend ? (
           <RangeNumberField
-            help="GP-only discount factor for old successful-finish aggregates. Higher values remember longer."
-            label="Stat decay"
-            max={0.999}
-            min={0.001}
-            numberStep="0.001"
-            rangeStep={0.001}
-            resetValue={defaultVehicle.adaptive_engine_stat_decay}
-            value={vehicle.adaptive_engine_stat_decay}
-            onChange={(adaptive_engine_stat_decay) => onChange({ adaptive_engine_stat_decay })}
-          />
-        ) : null}
-        {isMlpEnsembleBackend ? (
-          <>
-            <NumberField
-              help="Number of bootstrapped MLP members used for Thompson-style engine selection. More members improve uncertainty estimates but cost more CPU."
-              label="Ensemble members"
-              resetValue={defaultVehicle.adaptive_engine_ensemble_members}
-              step="1"
-              value={vehicle.adaptive_engine_ensemble_members}
-              onChange={(adaptive_engine_ensemble_members) =>
-                onChange({ adaptive_engine_ensemble_members })
-              }
-            />
-            <NumberField
-              help="Hidden width of each MLP ensemble member."
-              label="Hidden size"
-              resetValue={defaultVehicle.adaptive_engine_mlp_hidden_dim}
-              step="1"
-              value={vehicle.adaptive_engine_mlp_hidden_dim}
-              onChange={(adaptive_engine_mlp_hidden_dim) =>
-                onChange({ adaptive_engine_mlp_hidden_dim })
-              }
-            />
-            <NumberField
-              help="Adam optimization steps applied to each ensemble member after one PPO rollout."
-              label="Training steps"
-              resetValue={defaultVehicle.adaptive_engine_mlp_training_steps}
-              step="1"
-              value={vehicle.adaptive_engine_mlp_training_steps}
-              onChange={(adaptive_engine_mlp_training_steps) =>
-                onChange({ adaptive_engine_mlp_training_steps })
-              }
-            />
-            <NumberField
-              help="Adam learning rate for the MLP ensemble update."
-              label="Learning rate"
-              resetValue={defaultVehicle.adaptive_engine_mlp_learning_rate}
-              step="0.0005"
-              value={vehicle.adaptive_engine_mlp_learning_rate}
-              onChange={(adaptive_engine_mlp_learning_rate) =>
-                onChange({ adaptive_engine_mlp_learning_rate })
-              }
-            />
-            <RangeNumberField
-              help="Bootstrap probability that each successful rollout sample trains each member."
-              label="Bootstrap keep"
-              max={1}
-              min={0.01}
-              numberStep="0.01"
-              rangeStep={0.01}
-              resetValue={defaultVehicle.adaptive_engine_mlp_bootstrap_keep_probability}
-              value={vehicle.adaptive_engine_mlp_bootstrap_keep_probability}
-              onChange={(adaptive_engine_mlp_bootstrap_keep_probability) =>
-                onChange({ adaptive_engine_mlp_bootstrap_keep_probability })
-              }
-            />
-            <NumberField
-              help="Successful finishes required for one course and vehicle before the MLP sampler leaves uniform cold-start exploration."
-              label="Warmup finishes"
-              resetValue={defaultVehicle.adaptive_engine_mlp_warmup_successes}
-              step="1"
-              value={vehicle.adaptive_engine_mlp_warmup_successes}
-              onChange={(adaptive_engine_mlp_warmup_successes) =>
-                onChange({ adaptive_engine_mlp_warmup_successes })
-              }
-            />
-          </>
-        ) : null}
-        <RangeNumberField
-          help="Probability of taking a uniformly random engine value."
-          label="Uniform exploration"
-          max={1}
-          min={0}
-          numberStep="0.01"
-          rangeStep={0.01}
-          resetValue={defaultVehicle.adaptive_engine_uniform_exploration}
-          value={vehicle.adaptive_engine_uniform_exploration}
-          onChange={(adaptive_engine_uniform_exploration) =>
-            onChange({ adaptive_engine_uniform_exploration })
-          }
-        />
-        {!isBanditBackend ? (
-          <NumberField
-            help="Deterministic watch and career import treat predicted finish times within this many seconds of best as practically equal, then choose the soft plateau center."
-            label="Greedy plateau seconds"
-            resetValue={defaultVehicle.adaptive_engine_greedy_plateau_seconds}
-            step="0.1"
-            value={vehicle.adaptive_engine_greedy_plateau_seconds}
-            onChange={(adaptive_engine_greedy_plateau_seconds) =>
-              onChange({ adaptive_engine_greedy_plateau_seconds })
+            help="Probability of taking a uniformly random engine value."
+            label="Uniform exploration"
+            max={1}
+            min={0}
+            numberStep="0.01"
+            rangeStep={0.01}
+            resetValue={defaultVehicle.adaptive_engine_uniform_exploration}
+            value={vehicle.adaptive_engine_uniform_exploration}
+            onChange={(adaptive_engine_uniform_exploration) =>
+              onChange({ adaptive_engine_uniform_exploration })
             }
           />
         ) : null}
       </div>
       {isBanditBackend ? <BanditBucketPreview buckets={banditBuckets} /> : null}
+      {!isBanditBackend ? (
+        <p className="m-0 border border-amber-400/45 bg-amber-400/10 p-3 text-xs leading-normal text-amber-200">
+          This config uses the experimental {experimentalBackendLabel} backend. It remains accepted
+          for compatibility, but new run-manager tuning should use Bandit until the model-backed
+          tuners are redesigned around the current bandit telemetry.
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function experimentalEngineTunerBackendLabel(
+  backend: ManagedRunConfig["vehicle"]["adaptive_engine_tuner_backend"],
+) {
+  if (backend === "gaussian_process") {
+    return "GP";
+  }
+  if (backend === "mlp_ensemble") {
+    return "MLP";
+  }
+  return null;
 }
 
 function BanditBucketPreview({ buckets }: { buckets: readonly number[] }) {
