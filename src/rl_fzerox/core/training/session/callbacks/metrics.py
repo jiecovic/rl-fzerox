@@ -39,12 +39,8 @@ class _RolloutInfoLogSpecs:
 
 ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
     state_metrics=(
-        _MetricLogSpec("race_distance", "state/race_distance_mean"),
         _MetricLogSpec("speed_kph", "state/speed_kph_mean"),
-        _MetricLogSpec("position", "state/position_mean"),
         _MetricLogSpec("ko_star_count", "state/ko_star_count_mean"),
-        _MetricLogSpec("lap", "state/lap_mean"),
-        _MetricLogSpec("race_laps_completed", "state/race_laps_completed_mean"),
         _MetricLogSpec("step_reward_raw", "reward/step_raw_mean"),
         _MetricLogSpec("step_reward_clip_abs_excess", "reward_clip/abs_excess_mean"),
         _MetricLogSpec("gas_level", "action/gas_level_mean"),
@@ -61,12 +57,6 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("air_brake_used", "action/air_brake_used_step_rate"),
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
-        _MetricLogSpec("lean_episode_masked", "action/lean_episode_masked_step_rate"),
-        _MetricLogSpec(
-            "air_brake_episode_masked",
-            "action/air_brake_episode_masked_step_rate",
-        ),
-        _MetricLogSpec("spin_episode_masked", "action/spin_episode_masked_step_rate"),
         _MetricLogSpec("spin_requested", "action/spin_requested_step_rate"),
         _MetricLogSpec("spin_started", "action/spin_started_step_rate"),
         _MetricLogSpec(
@@ -75,8 +65,6 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
             missing_value=False,
         ),
         _MetricLogSpec("step_reward_clipped", "reward_clip/any_step_rate"),
-        _MetricLogSpec("step_reward_clip_positive", "reward_clip/positive_step_rate"),
-        _MetricLogSpec("step_reward_clip_negative", "reward_clip/negative_step_rate"),
     ),
     frame_ratios=(
         _FrameRatioLogSpec(
