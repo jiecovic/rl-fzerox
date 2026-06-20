@@ -115,27 +115,23 @@ class EngineTuningTrainingController:
         return self._tuner.record_many(outcomes) is not previous_state
 
     def log_values(self) -> dict[str, float]:
-        """Return compact TensorBoard metrics for successful engine observations."""
+        """Return compact TensorBoard metrics for engine-tuner activity.
 
-        values: dict[str, float] = {}
-        for candidate in self.runtime_state.candidates:
-            key = _sanitize_log_key(candidate.context_key)
-            suffix = f"{key}/engine_{candidate.engine_setting_raw_value}"
-            if candidate.mean_score is not None:
-                values[f"engine_tuning/{suffix}/mean_score"] = candidate.mean_score
-            values[f"engine_tuning/{suffix}/samples"] = float(candidate.score_count)
-            if candidate.best_time_ms is not None:
-                values[f"engine_tuning/{suffix}/best_time_ms"] = float(candidate.best_time_ms)
-            values[f"engine_tuning/{suffix}/episodes"] = float(candidate.episode_count)
-            values[f"engine_tuning/{suffix}/finishes"] = float(candidate.finish_count)
-            if candidate.mean_completion_score is not None:
-                values[f"engine_tuning/{suffix}/mean_completion"] = candidate.mean_completion_score
-            if candidate.finish_rate_score is not None:
-                values[f"engine_tuning/{suffix}/finish_rate"] = candidate.finish_rate_score
-            if candidate.mean_return_score is not None:
-                values[f"engine_tuning/{suffix}/mean_return"] = candidate.mean_return_score
-        values["engine_tuning/update_count"] = float(self.runtime_state.update_count)
-        return values
+        Per-context bucket stats are intentionally kept out of TensorBoard; the
+        run-manager engine tuner panel reads the persisted tuner state directly
+        and presents those dense tables without polluting scalar navigation.
+        """
+
+        state = self.runtime_state
+        scored_candidates = sum(1 for candidate in state.candidates if candidate.score_count > 0)
+        return {
+            "engine_tuning/update_count": float(state.update_count),
+            "engine_tuning/context_count": float(
+                len({candidate.context_key for candidate in state.candidates})
+            ),
+            "engine_tuning/candidate_count": float(len(state.candidates)),
+            "engine_tuning/scored_candidate_count": float(scored_candidates),
+        }
 
 
 def engine_tuning_outcome_from_episode(
@@ -214,11 +210,6 @@ def _mapping_float(raw: Mapping[str, object], key: str) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value)
-
-
-def _sanitize_log_key(value: str) -> str:
-    sanitized = "".join(char if char.isalnum() else "_" for char in value.strip().lower())
-    return sanitized.strip("_") or "unknown"
 
 
 def _unique_contexts(

@@ -254,6 +254,34 @@ def test_bandit_can_switch_to_safe_finish_time_without_recollecting() -> None:
     )
 
 
+def test_engine_tuning_tb_logs_stay_compact() -> None:
+    controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            min_raw_value=0,
+            max_raw_value=128,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
+        )
+    )
+    assert controller.record_episodes(
+        (
+            _successful_engine_episode(engine_raw=26),
+            _engine_episode(engine_raw=90, termination_reason="retired"),
+        )
+    )
+
+    values = controller.log_values()
+
+    assert values == {
+        "engine_tuning/candidate_count": 2.0,
+        "engine_tuning/context_count": 1.0,
+        "engine_tuning/scored_candidate_count": 1.0,
+        "engine_tuning/update_count": 2.0,
+    }
+    assert not any("/engine_" in key for key in values)
+
+
 def _successful_engine_episode(
     *,
     alt_baseline_id: str | None = None,
