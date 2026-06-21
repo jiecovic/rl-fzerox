@@ -1,11 +1,13 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/loop/runtime.py
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Mapping
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.career_mode.controller import CareerModeController
+from rl_fzerox.core.career_mode.execution.attempt_timing import (
+    career_attempt_menu_jitter_frames,
+)
 from rl_fzerox.core.career_mode.execution.save_file import load_save_ram
 from rl_fzerox.core.career_mode.navigation import RawMenuStep, in_gp_race
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
@@ -48,44 +50,39 @@ def reset_emulator_for_next_attempt(
 ) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
     load_save_ram(config, session)
     session.emulator.reset()
-    randomize_emulator_for_current_attempt(
+    jitter_frames = apply_career_attempt_menu_jitter(
         config=config,
         session=session,
         controller=controller,
     )
     raw_info, info, telemetry = fresh_menu_runtime_state(session)
-    return raw_info, controller.viewer_info(info=info, active_policy_control=None), telemetry
+    viewer_info = controller.viewer_info(info=info, active_policy_control=None)
+    if jitter_frames:
+        viewer_info["career_mode_attempt_menu_jitter_frames"] = jitter_frames
+    return raw_info, viewer_info, telemetry
 
 
-def randomize_emulator_for_current_attempt(
+def apply_career_attempt_menu_jitter(
     *,
     config: WatchAppConfig,
     session: CareerModeRuntimeSession,
     controller: CareerModeController,
-) -> int | None:
-    """Vary GP opponent shuffles per replay attempt without losing reproducibility."""
+) -> int:
+    """Advance neutral menu frames after reset without writing game RNG RAM.
 
-    seed = _career_attempt_game_rng_seed(
+    Career replay attempts should behave like normal console resets. The game
+    receives no direct RNG patch here; reproducible opponent variation comes
+    only from deterministic timing jitter before the menu FSM starts pressing
+    buttons.
+    """
+
+    frames = career_attempt_menu_jitter_frames(
         base_seed=config.watch.attempt_seed,
         attempt_id=controller.active_attempt_id(),
     )
-    if seed is not None:
-        session.emulator.randomize_game_rng(seed)
-    return seed
-
-
-def _career_attempt_game_rng_seed(
-    *,
-    base_seed: int | None,
-    attempt_id: str | None,
-) -> int | None:
-    if base_seed is None or attempt_id is None:
-        return None
-    digest = hashlib.blake2s(
-        f"career_attempt_rng|{base_seed}|{attempt_id}".encode(),
-        digest_size=8,
-    ).digest()
-    return int.from_bytes(digest, byteorder="big", signed=False)
+    if frames > 0:
+        session.emulator.step_frames(frames, capture_video=False)
+    return frames
 
 
 def should_observe_policy_transition(

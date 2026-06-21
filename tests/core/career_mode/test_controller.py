@@ -476,10 +476,6 @@ class _ControllerEmulator:
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         return None
 
-    def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]:
-        del seed
-        return (0, 0, 0, 0)
-
 
 class _ControllerSession:
     emulator = _ControllerEmulator()

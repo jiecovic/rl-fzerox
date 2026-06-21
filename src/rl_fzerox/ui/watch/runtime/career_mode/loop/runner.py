@@ -35,7 +35,6 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
     career_runtime_error_context,
     fresh_menu_runtime_state,
     policy_intro_wait_required,
-    randomize_emulator_for_current_attempt,
     reset_emulator_for_next_attempt,
     should_observe_policy_transition,
 )
@@ -185,7 +184,6 @@ def _run_career_mode_loop_body(
     raw_info = state.raw_info
     info = state.info
     track_record_attempt_id = career_mode_attempt_id(info)
-    game_rng_attempt_id = track_record_attempt_id
     reset_info = state.reset_info
     current_telemetry = state.current_telemetry
     current_auxiliary_predictions = state.current_auxiliary_predictions
@@ -252,29 +250,13 @@ def _run_career_mode_loop_body(
             episode_reward = 0.0
 
     def sync_attempt_change_side_effects() -> None:
-        nonlocal game_rng_attempt_id, track_record_attempt_id, track_record_book
+        nonlocal track_record_attempt_id, track_record_book
 
         current_attempt_id = career_mode_attempt_id(info)
         if current_attempt_id == track_record_attempt_id:
-            if current_attempt_id == game_rng_attempt_id:
-                return
-            randomize_game_rng_if_needed(current_attempt_id)
             return
         track_record_book = TrackRecordBook()
         track_record_attempt_id = current_attempt_id
-        randomize_game_rng_if_needed(current_attempt_id)
-
-    def randomize_game_rng_if_needed(attempt_id: str | None) -> None:
-        nonlocal game_rng_attempt_id
-
-        if attempt_id is None or attempt_id == game_rng_attempt_id:
-            return
-        randomize_emulator_for_current_attempt(
-            config=config,
-            session=session,
-            controller=controller,
-        )
-        game_rng_attempt_id = attempt_id
 
     def publish_snapshot(*, policy_visible: bool) -> None:
         publish_career_loop_snapshot(
@@ -309,7 +291,7 @@ def _run_career_mode_loop_body(
         )
 
     def reset_for_next_attempt_snapshot() -> None:
-        nonlocal game_rng_attempt_id, raw_info, info, current_telemetry, reset_info
+        nonlocal raw_info, info, current_telemetry, reset_info
 
         trace_career_state("before_emulator_reset", event="reset_requested", force=True)
         raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
@@ -317,7 +299,6 @@ def _run_career_mode_loop_body(
             session=session,
             controller=controller,
         )
-        game_rng_attempt_id = career_mode_attempt_id(info)
         reset_info = dict(info)
         clear_policy_runtime_state()
         sync_attempt_change_side_effects()

@@ -58,8 +58,6 @@ from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchA
 class CareerRuntimeEmulator(CameraSyncBackend, SaveRamSession, Protocol):
     """Emulator operations needed by the Career Mode controller."""
 
-    def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]: ...
-
 
 class CareerRuntimeSession(Protocol):
     """Narrow runtime surface Career Mode needs from its session loop."""

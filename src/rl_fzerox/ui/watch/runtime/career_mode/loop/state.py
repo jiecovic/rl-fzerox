@@ -16,7 +16,7 @@ from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
-    randomize_emulator_for_current_attempt,
+    apply_career_attempt_menu_jitter,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.menu import menu_viewer_info
 from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
@@ -108,7 +108,7 @@ def initial_career_mode_loop_state(
     controller: CareerModeController,
 ) -> CareerModeLoopState:
     target_control_seconds = session.target_control_seconds
-    randomize_emulator_for_current_attempt(
+    jitter_frames = apply_career_attempt_menu_jitter(
         config=config,
         session=session,
         controller=controller,
@@ -118,6 +118,8 @@ def initial_career_mode_loop_state(
         info=dict(raw_info),
         active_policy_control=None,
     )
+    if jitter_frames:
+        info["career_mode_attempt_menu_jitter_frames"] = jitter_frames
     return CareerModeLoopState(
         control_rate=RateMeter(window=60),
         native_control_fps=session.native_control_fps,
