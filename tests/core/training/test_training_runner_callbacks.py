@@ -173,20 +173,14 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.step_rates["step_reward_clipped"].rate() == 0.5
     assert accumulator.frame_ratios["state/airborne_frame_ratio"].ratio() == 0.8
     assert accumulator.frame_ratios["action/spin_macro_frame_ratio"].ratio() == 0.2
-    assert accumulator.episode_metrics["position"].mean() == 5.0
     assert accumulator.episode_metrics["race_laps_completed"].mean() == 2.0
-    assert accumulator.episode_metrics["boost_pad_entries"].mean() == 3.5
     assert accumulator.episode_metrics["boost_pad_entries_per_lap"].mean() == 1.5
     assert accumulator.finished_episode_metrics["race_time_ms"].mean() == 123.4
     assert accumulator.finished_episode_metrics["episode_step"].mean() == 7404.0
     assert accumulator.finished_episode_metrics["position"].mean() == 2.0
     assert accumulator.episode_count == 2
     assert accumulator.airborne_episode_count == 2
-    assert accumulator.airborne_finished_count == 1
     assert accumulator.airborne_failed_count == 1
-    assert accumulator.lean_masked_episode_count == 1
-    assert accumulator.air_brake_masked_episode_count == 1
-    assert accumulator.spin_masked_episode_count == 1
     assert accumulator.termination_counts["finished"] == 1
     assert accumulator.truncation_counts["progress_stalled"] == 1
 
@@ -218,18 +212,19 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert "action/spin_episode_masked_step_rate" not in logger.records
     assert "reward_clip/positive_step_rate" not in logger.records
     assert "reward_clip/negative_step_rate" not in logger.records
-    assert logger.records["episode/boost_pad_entries_mean"] == 3.5
+    assert "episode/final_position_mean" not in logger.records
+    assert "episode/boost_pad_entries_mean" not in logger.records
     assert logger.records["episode/boost_pad_entries_per_lap_mean"] == 1.5
     assert logger.records["episode/finish_time_s_mean"] == 123.4
     assert "episode/by_course/mute_city/finish_time_s_mean" not in logger.records
     assert logger.records["episode/finish_steps_mean"] == 7404.0
     assert logger.records["episode/finish_position_mean"] == 2.0
     assert logger.records["episode/airborne_episode_rate"] == 1.0
-    assert logger.records["episode/airborne_finish_rate"] == 0.5
+    assert "episode/airborne_finish_rate" not in logger.records
     assert logger.records["episode/airborne_failure_rate"] == 0.5
-    assert logger.records["episode/lean_episode_masked_rate"] == 0.5
-    assert logger.records["episode/air_brake_episode_masked_rate"] == 0.5
-    assert logger.records["episode/spin_episode_masked_rate"] == 0.5
+    assert "episode/lean_episode_masked_rate" not in logger.records
+    assert "episode/air_brake_episode_masked_rate" not in logger.records
+    assert "episode/spin_episode_masked_rate" not in logger.records
 
 
 def test_info_sequence_accepts_tuple_infos() -> None:

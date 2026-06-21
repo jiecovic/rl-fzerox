@@ -300,8 +300,6 @@ class DeficitBudgetTrackSamplingController:
 
     def log_values(self) -> dict[str, float]:
         return {
-            "track_sampling/update_count": float(self.update_count),
-            "track_sampling/course_count": float(len(self._stats)),
             "track_sampling/lane/uniform_deficit_steps": self._lane_deficit_steps["uniform"],
             "track_sampling/lane/adaptive_deficit_steps": self._lane_deficit_steps["adaptive"],
             "track_sampling/lane/uniform_stale_course_count": float(

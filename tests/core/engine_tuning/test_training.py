@@ -254,7 +254,7 @@ def test_bandit_can_switch_to_safe_finish_time_without_recollecting() -> None:
     )
 
 
-def test_engine_tuning_tb_logs_stay_compact() -> None:
+def test_engine_tuning_omits_tensorboard_logs() -> None:
     controller = EngineTuningTrainingController(
         AdaptiveEngineTuningConfig(
             enabled=True,
@@ -273,13 +273,7 @@ def test_engine_tuning_tb_logs_stay_compact() -> None:
 
     values = controller.log_values()
 
-    assert values == {
-        "engine_tuning/candidate_count": 2.0,
-        "engine_tuning/context_count": 1.0,
-        "engine_tuning/scored_candidate_count": 1.0,
-        "engine_tuning/update_count": 2.0,
-    }
-    assert not any("/engine_" in key for key in values)
+    assert values == {}
 
 
 def _successful_engine_episode(

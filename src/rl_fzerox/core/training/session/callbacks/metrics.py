@@ -79,9 +79,7 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         ),
     ),
     episode_metrics=(
-        _MetricLogSpec("position", "episode/final_position_mean"),
         _MetricLogSpec("race_laps_completed", "episode/race_laps_completed_mean"),
-        _MetricLogSpec("boost_pad_entries", "episode/boost_pad_entries_mean"),
         _MetricLogSpec("boost_pad_entries_per_lap", "episode/boost_pad_entries_per_lap_mean"),
     ),
     finished_episode_metrics=(
@@ -186,11 +184,7 @@ class RolloutInfoAccumulator:
         }
     )
     airborne_episode_count: int = 0
-    airborne_finished_count: int = 0
     airborne_failed_count: int = 0
-    lean_masked_episode_count: int = 0
-    air_brake_masked_episode_count: int = 0
-    spin_masked_episode_count: int = 0
     termination_counts: dict[str, int] = field(
         default_factory=lambda: {
             reason: 0 for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.termination
@@ -241,17 +235,9 @@ class RolloutInfoAccumulator:
                 self.finished_episode_metrics[spec.info_key].add_many(scaled_values)
 
         for episode in episodes:
-            if episode.get("lean_episode_masked") is True:
-                self.lean_masked_episode_count += 1
-            if episode.get("air_brake_episode_masked") is True:
-                self.air_brake_masked_episode_count += 1
-            if episode.get("spin_episode_masked") is True:
-                self.spin_masked_episode_count += 1
             if _episode_was_airborne(episode):
                 self.airborne_episode_count += 1
-                if episode.get("termination_reason") == "finished":
-                    self.airborne_finished_count += 1
-                else:
+                if episode.get("termination_reason") != "finished":
                     self.airborne_failed_count += 1
 
             termination_reason = episode.get("termination_reason")
@@ -309,25 +295,9 @@ class RolloutInfoAccumulator:
                 self.airborne_episode_count / self.episode_count,
             )
             logger.record(
-                "episode/airborne_finish_rate",
-                self.airborne_finished_count / self.airborne_episode_count,
-            )
-            logger.record(
                 "episode/airborne_failure_rate",
                 self.airborne_failed_count / self.airborne_episode_count,
             )
-        logger.record(
-            "episode/lean_episode_masked_rate",
-            self.lean_masked_episode_count / self.episode_count,
-        )
-        logger.record(
-            "episode/air_brake_episode_masked_rate",
-            self.air_brake_masked_episode_count / self.episode_count,
-        )
-        logger.record(
-            "episode/spin_episode_masked_rate",
-            self.spin_masked_episode_count / self.episode_count,
-        )
 
 
 def info_sequence(infos: object) -> Sequence[Mapping[str, object]] | None:

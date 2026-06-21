@@ -167,10 +167,7 @@ class StepBalancedTrackSamplingController:
             return {}
         if not self._log_details:
             return {}
-        return {
-            "track_sampling/update_count": float(self.update_count),
-            "track_sampling/course_count": float(len(self._stats)),
-        }
+        return {}
 
     def current_weights(self) -> dict[str, float]:
         weights: dict[str, float] = {}

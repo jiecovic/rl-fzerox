@@ -86,10 +86,7 @@ def test_step_balance_controller_keeps_tensorboard_logs_compact() -> None:
     )
     values = controller.log_values()
 
-    assert values == {
-        "track_sampling/course_count": 2.0,
-        "track_sampling/update_count": 1.0,
-    }
+    assert values == {}
     assert not any(key.startswith("track_sampling/mute/") for key in values)
     assert not any(key.startswith("track_sampling/silence/") for key in values)
 

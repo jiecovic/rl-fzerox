@@ -68,10 +68,7 @@ def test_step_balance_controller_compacts_tensorboard_course_logs() -> None:
     assert controller is not None
     values = controller.log_values()
 
-    assert values == {
-        "track_sampling/course_count": 2.0,
-        "track_sampling/update_count": 0.0,
-    }
+    assert values == {}
     assert "track_sampling/big_blue/prob" not in values
     assert "track_sampling/silence/prob" not in values
     assert "track_sampling/big_blue_time_attack_blue_falcon_balanced/prob" not in values
@@ -125,10 +122,7 @@ def test_step_balance_controller_can_suppress_generated_course_logs() -> None:
     assert weights is not None
     assert set(weights) == {"x_cup_a", "x_cup_b"}
     values = controller.log_values()
-    assert values == {
-        "track_sampling/course_count": 2.0,
-        "track_sampling/update_count": 1.0,
-    }
+    assert values == {}
     assert not any(key.startswith("track_sampling/x_cup_") for key in values)
 
 

@@ -115,23 +115,15 @@ class EngineTuningTrainingController:
         return self._tuner.record_many(outcomes) is not previous_state
 
     def log_values(self) -> dict[str, float]:
-        """Return compact TensorBoard metrics for engine-tuner activity.
+        """Return TensorBoard metrics for engine-tuner activity.
 
-        Per-context bucket stats are intentionally kept out of TensorBoard; the
-        run-manager engine tuner panel reads the persisted tuner state directly
-        and presents those dense tables without polluting scalar navigation.
+        The run-manager engine tuner panel reads the persisted tuner state
+        directly and is the source of truth for both dense bucket tables and
+        aggregate tuner status. Keeping this empty avoids duplicating that state
+        into noisy TensorBoard scalar groups.
         """
 
-        state = self.runtime_state
-        scored_candidates = sum(1 for candidate in state.candidates if candidate.score_count > 0)
-        return {
-            "engine_tuning/update_count": float(state.update_count),
-            "engine_tuning/context_count": float(
-                len({candidate.context_key for candidate in state.candidates})
-            ),
-            "engine_tuning/candidate_count": float(len(state.candidates)),
-            "engine_tuning/scored_candidate_count": float(scored_candidates),
-        }
+        return {}
 
 
 def engine_tuning_outcome_from_episode(
