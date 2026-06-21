@@ -412,6 +412,50 @@ def _run_career_mode_loop_body(
             run_dir=active_policy_control.policy_run.run_dir,
         ).env.race_intro_target_timer
 
+    def begin_active_policy_race() -> None:
+        nonlocal raw_observation, raw_info, watch_zeroed_state_features
+        nonlocal auxiliary_target_names, live_series, last_live_series_publish_time
+        nonlocal observation, info, reset_info, episode_reward, current_policy_action
+        nonlocal current_control_state, current_gas_level, current_telemetry
+        nonlocal current_auxiliary_predictions, current_auxiliary_targets
+        nonlocal active_policy_started
+
+        policy_control = active_policy_control
+        if policy_control is None:
+            raise RuntimeError("Career Mode policy control was not resolved.")
+        control_rate.reset()
+        raw_observation, raw_info = session.begin_policy_race(
+            policy_control=policy_control,
+            seed=config.watch.attempt_seed,
+            course_id=course_id_from_info(info),
+        )
+        watch_zeroed_state_features = session.watch_zeroed_state_features
+        auxiliary_target_names = session.auxiliary_target_names
+        live_series = EpisodeLiveSeriesTracker()
+        last_live_series_publish_time = 0.0
+        observation, info = apply_watch_state_feature_zeroing(
+            raw_observation,
+            raw_info,
+            watch_zeroed_features=watch_zeroed_state_features,
+        )
+        info = controller.viewer_info(
+            info=info,
+            active_policy_control=policy_control,
+        )
+        reset_info = dict(info)
+        reset_track_records_if_attempt_changed()
+        episode_reward = required_episode_return(info)
+        current_policy_action = None
+        current_control_state = session.last_requested_control_state
+        current_gas_level = session.last_gas_level
+        current_telemetry = _read_live_telemetry(session.emulator)
+        current_auxiliary_predictions = None
+        current_auxiliary_targets = None
+        _reset_policy_runner(policy_control.runner)
+        active_policy_started = True
+        trace_career_state("begin_policy_race", force=True)
+        publish_snapshot(policy_visible=True)
+
     try:
         while True:
             previous_cnn_visualization_enabled = cnn_visualization_enabled
@@ -631,38 +675,7 @@ def _run_career_mode_loop_body(
                         step_visible_policy_intro_wait(target_timer)
                         trace_career_state("after_policy_intro_wait")
                         continue
-                    control_rate.reset()
-                    raw_observation, raw_info = session.begin_policy_race(
-                        policy_control=active_policy_control,
-                        seed=config.watch.attempt_seed,
-                        course_id=course_id_from_info(info),
-                    )
-                    watch_zeroed_state_features = session.watch_zeroed_state_features
-                    auxiliary_target_names = session.auxiliary_target_names
-                    live_series = EpisodeLiveSeriesTracker()
-                    last_live_series_publish_time = 0.0
-                    observation, info = apply_watch_state_feature_zeroing(
-                        raw_observation,
-                        raw_info,
-                        watch_zeroed_features=watch_zeroed_state_features,
-                    )
-                    info = controller.viewer_info(
-                        info=info,
-                        active_policy_control=active_policy_control,
-                    )
-                    reset_info = dict(info)
-                    reset_track_records_if_attempt_changed()
-                    episode_reward = required_episode_return(info)
-                    current_policy_action = None
-                    current_control_state = session.last_requested_control_state
-                    current_gas_level = session.last_gas_level
-                    current_telemetry = _read_live_telemetry(session.emulator)
-                    current_auxiliary_predictions = None
-                    current_auxiliary_targets = None
-                    _reset_policy_runner(active_policy_control.runner)
-                    active_policy_started = True
-                    trace_career_state("begin_policy_race", force=True)
-                    publish_snapshot(policy_visible=True)
+                    begin_active_policy_race()
                     continue
 
                 if observation is None:
