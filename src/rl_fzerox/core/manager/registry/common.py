@@ -75,6 +75,8 @@ def run_status(value: object) -> RunStatus:
             return "finished"
         case "failed":
             return "failed"
+        case "archived":
+            return "archived"
     raise ValueError(f"Unsupported managed run status: {value!r}")
 
 

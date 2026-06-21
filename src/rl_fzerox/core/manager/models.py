@@ -7,7 +7,7 @@ from typing import Literal
 
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 
-RunStatus = Literal["created", "running", "paused", "stopped", "finished", "failed"]
+RunStatus = Literal["created", "running", "paused", "stopped", "finished", "failed", "archived"]
 RunCommand = Literal["pause", "stop"]
 SaveGameStatus = Literal["created", "running", "paused", "finished", "failed"]
 SaveAttemptStatus = Literal["running", "succeeded", "failed"]

@@ -744,7 +744,7 @@ function useStableAssignableRuns(runs: readonly ManagedRun[]): readonly ManagedR
   if (stableAssignableRuns.current?.key !== key) {
     stableAssignableRuns.current = {
       key,
-      runs: runs.filter((run) => run.status !== "created"),
+      runs: runs.filter((run) => run.status !== "created" && run.status !== "archived"),
     };
   }
   return stableAssignableRuns.current.runs;
@@ -790,7 +790,7 @@ function unlockTargetsKey(targets: readonly ManagedSaveUnlockTarget[]): string {
 
 function assignableRunsKey(runs: readonly ManagedRun[]): string {
   return runs
-    .filter((run) => run.status !== "created")
+    .filter((run) => run.status !== "created" && run.status !== "archived")
     .map((run) =>
       [
         run.id,

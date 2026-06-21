@@ -80,6 +80,53 @@ def test_manager_store_visible_runs_exclude_created_records(tmp_path: Path) -> N
     assert store.list_visible_runs() == ()
 
 
+def test_manager_store_hides_archived_runs_from_visible_views(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    archived_dir = tmp_path / "runs" / "archived"
+    active_dir = tmp_path / "runs" / "active"
+    (archived_dir / "tensorboard").mkdir(parents=True)
+    (active_dir / "tensorboard").mkdir(parents=True)
+    archived = store.create_run(
+        name="Archived Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=archived_dir,
+    )
+    active = store.create_run(
+        name="Active Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=active_dir,
+    )
+    archived_status = store.update_run_status(
+        run_id=archived.id,
+        status="archived",
+        message="run archived",
+    )
+    active_status = store.update_run_status(
+        run_id=active.id,
+        status="stopped",
+        message="run stopped",
+    )
+
+    assert archived_status is not None
+    assert active_status is not None
+    archived_run = store.get_run(archived.id)
+
+    assert archived_run is not None
+    assert archived_run.status == "archived"
+    assert tuple(run.id for run in store.list_visible_runs()) == (active.id,)
+    assert tuple(run.id for run in store.list_visible_run_summaries()) == (active.id,)
+    groups = store.rebuild_tensorboard_views()
+    tensorboard_targets = tuple(
+        path.resolve()
+        for path in store.tensorboard_views_root().rglob("*")
+        if path.is_symlink()
+    )
+
+    assert sum(group.run_count for group in groups) == 1
+    assert active_dir / "tensorboard" in tensorboard_targets
+    assert archived_dir / "tensorboard" not in tensorboard_targets
+
+
 def test_manager_store_persists_runtime_snapshots_and_metric_history(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(

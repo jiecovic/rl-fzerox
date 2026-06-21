@@ -519,6 +519,8 @@ def _imported_status(status: RunStatus) -> RunStatus:
     match status:
         case "running" | "paused" | "created":
             return "stopped"
+        case "archived":
+            return "archived"
         case "stopped" | "finished" | "failed":
             return status
 

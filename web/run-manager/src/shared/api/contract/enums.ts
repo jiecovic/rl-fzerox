@@ -8,6 +8,7 @@ export const runStatusSchema = z.enum([
   "stopped",
   "finished",
   "failed",
+  "archived",
 ]);
 export const runCommandSchema = z.enum(["pause", "stop"]);
 export const observationPresetSchema = z.enum(["crop_72x96", "crop_84x84"]);

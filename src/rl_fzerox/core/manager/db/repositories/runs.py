@@ -229,7 +229,7 @@ def list_visible_managed_run_summaries(session: Session) -> tuple[ManagedRunSumm
     runs = tuple(
         session.scalars(
             select(RunModel)
-            .where(RunModel.status != "created")
+            .where(RunModel.status.not_in(("created", "archived")))
             .order_by(RunModel.created_at.desc(), RunModel.id.desc())
         )
     )

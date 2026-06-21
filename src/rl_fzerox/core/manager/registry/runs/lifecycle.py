@@ -155,7 +155,7 @@ def list_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
 
 
 def list_visible_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
-    return tuple(run for run in list_runs(store) if run.status != "created")
+    return tuple(run for run in list_runs(store) if run.status not in {"created", "archived"})
 
 
 def list_visible_run_summaries(store: ManagerStore) -> tuple[ManagedRunSummary, ...]:
