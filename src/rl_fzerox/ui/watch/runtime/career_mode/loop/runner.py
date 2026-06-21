@@ -22,6 +22,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.commands import (
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.debug import (
     CareerModeDebugTrace,
+    observe_career_mode_debug_trace,
     open_career_mode_debug_trace,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.recording import (
@@ -109,17 +110,14 @@ def run_loaded_career_mode_loop(
             state=state,
             frame_recorder=recorder,
         )
-        if debug_trace is not None:
-            try:
-                debug_trace.observe(
-                    stage="initial",
-                    info=state.info,
-                    controller=controller,
-                    frame_source=session.render,
-                    force=True,
-                )
-            except Exception as exc:
-                print(f"Career debug trace failed: {exc}", flush=True)
+        observe_career_mode_debug_trace(
+            debug_trace,
+            stage="initial",
+            info=state.info,
+            controller=controller,
+            frame_source=session.render,
+            force=True,
+        )
         _run_career_mode_loop_body(
             config=config,
             session=session,
@@ -201,19 +199,15 @@ def _run_career_mode_loop_body(
         force: bool = False,
         trace_info: dict[str, object] | None = None,
     ) -> None:
-        if debug_trace is None:
-            return
-        try:
-            debug_trace.observe(
-                stage=stage,
-                info=info if trace_info is None else trace_info,
-                controller=controller,
-                frame_source=session.render,
-                event=event,
-                force=force,
-            )
-        except Exception as exc:
-            print(f"Career debug trace failed: {exc}", flush=True)
+        observe_career_mode_debug_trace(
+            debug_trace,
+            stage=stage,
+            info=info if trace_info is None else trace_info,
+            controller=controller,
+            frame_source=session.render,
+            event=event,
+            force=force,
+        )
 
     def clear_policy_runtime_state(*, reset_episode_reward: bool = False) -> None:
         nonlocal active_policy_control, active_policy_started, manual_control_enabled

@@ -213,6 +213,31 @@ def open_career_mode_debug_trace(config: WatchAppConfig) -> CareerModeDebugTrace
     )
 
 
+def observe_career_mode_debug_trace(
+    trace: CareerModeDebugTrace | None,
+    *,
+    stage: str,
+    info: dict[str, object],
+    controller: CareerModeController,
+    frame_source: CareerDebugFrameSource | None = None,
+    event: str | None = None,
+    force: bool = False,
+) -> None:
+    if trace is None:
+        return
+    try:
+        trace.observe(
+            stage=stage,
+            info=info,
+            controller=controller,
+            frame_source=frame_source,
+            event=event,
+            force=force,
+        )
+    except Exception as exc:
+        print(f"Career debug trace failed: {exc}", flush=True)
+
+
 def _debug_enabled(config: WatchAppConfig) -> bool:
     if config.watch.career_debug.enabled:
         return True
