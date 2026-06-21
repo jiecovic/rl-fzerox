@@ -1,5 +1,11 @@
 # src/rl_fzerox/core/engine_tuning/bandit.py
-"""Aggregate bandit backend for adaptive engine tuning."""
+"""Aggregate bandit backend for adaptive engine tuning.
+
+The bandit is the maintained reset-time tuner. It aggregates default-baseline
+episodes per course/vehicle/engine bucket and can optimize either raw finish
+time, finish rate, or a safe-finish-time objective that gates speed by
+reliability.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +33,7 @@ from rl_fzerox.core.engine_tuning.types import (
 
 
 class BanditEngineTuner:
-    """Choose from coarse engine buckets using measured finish aggregates."""
+    """Choose from coarse engine buckets using observed episode aggregates."""
 
     def __init__(
         self,

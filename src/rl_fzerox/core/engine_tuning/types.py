@@ -169,7 +169,11 @@ class EngineTuningCandidateEstimate:
 
 @dataclass(frozen=True, slots=True)
 class EngineTuningEpisodeOutcome:
-    """Episode result used to score one successful engine-setting sample."""
+    """Default-baseline episode result used to score one engine-setting sample.
+
+    Failed episodes intentionally still contribute to completion, finish-rate,
+    and return statistics. Finish-time objectives only score completed races.
+    """
 
     context: EngineTuningContext
     engine_setting_raw_value: int

@@ -231,13 +231,29 @@ def _change_key(values: dict[str, object]) -> tuple[object, ...]:
 
 
 def _json_safe(value: object) -> object:
-    if isinstance(value, np.generic):
-        return value.item()
+    if isinstance(value, np.bool_):
+        return _numpy_bool_to_python(value)
+    if isinstance(value, np.integer):
+        return _numpy_integer_to_python(value)
+    if isinstance(value, np.floating):
+        return _numpy_float_to_python(value)
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, int | float | str | bool) or value is None:
         return value
     return str(value)
+
+
+def _numpy_bool_to_python(value: np.bool_) -> bool:
+    return bool(value)
+
+
+def _numpy_float_to_python(value: np.floating[object]) -> float:
+    return float(value)
+
+
+def _numpy_integer_to_python(value: np.integer[object]) -> int:
+    return int(value)
 
 
 def _screenshot_filename(
