@@ -1,5 +1,6 @@
 // rust/core/host/video/process.rs
 use std::borrow::Cow;
+use std::ops::Range;
 
 use crate::core::error::CoreError;
 use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
@@ -241,16 +242,36 @@ fn write_raw_rgb_row(
     let row_offset = y
         .checked_mul(frame.pitch)
         .and_then(|offset| offset.checked_add(start_x.checked_mul(bytes_per_pixel)?))
-        .ok_or(CoreError::NoFrameAvailable)?;
+        .ok_or_else(|| invalid_video_buffer(usize::MAX, 0, frame.bytes.len()))?;
     let row_len = width
         .checked_mul(bytes_per_pixel)
-        .ok_or(CoreError::NoFrameAvailable)?;
-    let row_bytes = frame
-        .bytes
-        .get(row_offset..row_offset + row_len)
-        .ok_or(CoreError::NoFrameAvailable)?;
+        .ok_or_else(|| invalid_video_buffer(row_offset, usize::MAX, frame.bytes.len()))?;
+    let row_range = checked_video_buffer_range(row_offset, row_len, frame.bytes.len())?;
+    let row_bytes = &frame.bytes[row_range];
     decode_rgb_row(frame.pixel_layout, row_bytes, dst);
     Ok(())
+}
+
+fn checked_video_buffer_range(
+    offset: usize,
+    length: usize,
+    available: usize,
+) -> Result<Range<usize>, CoreError> {
+    let end = offset
+        .checked_add(length)
+        .ok_or_else(|| invalid_video_buffer(offset, length, available))?;
+    if end > available {
+        return Err(invalid_video_buffer(offset, length, available));
+    }
+    Ok(offset..end)
+}
+
+fn invalid_video_buffer(offset: usize, length: usize, available: usize) -> CoreError {
+    CoreError::InvalidVideoBuffer {
+        offset,
+        length,
+        available,
+    }
 }
 
 fn crop_rgb(

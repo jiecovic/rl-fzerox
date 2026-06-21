@@ -92,6 +92,11 @@ pub enum CoreError {
         left: usize,
         right: usize,
     },
+    InvalidVideoBuffer {
+        offset: usize,
+        length: usize,
+        available: usize,
+    },
     InvalidRaceStartSetup {
         message: String,
     },
@@ -242,6 +247,16 @@ impl Display for CoreError {
                 write!(
                     formatter,
                     "Invalid video crop for frame {frame_width}x{frame_height}: top={top}, bottom={bottom}, left={left}, right={right}"
+                )
+            }
+            Self::InvalidVideoBuffer {
+                offset,
+                length,
+                available,
+            } => {
+                write!(
+                    formatter,
+                    "Video buffer range is out of bounds: offset={offset}, length={length}, available={available}"
                 )
             }
             Self::InvalidRaceStartSetup { message } => {

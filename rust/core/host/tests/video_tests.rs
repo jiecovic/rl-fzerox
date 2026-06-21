@@ -2,6 +2,8 @@
 // Covers pixel conversion plus crop/aspect/resize behavior in the video path.
 use std::ffi::c_void;
 
+use crate::core::error::CoreError;
+
 use super::{
     PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, convert_argb1555,
     convert_argb8888, convert_rgb565, decode_frame, processed_frame, processed_frame_from_raw,
@@ -107,6 +109,37 @@ fn observation_frame_from_raw_matches_decoded_path() {
     .expect("decoded observation");
 
     assert_eq!(from_raw, from_decoded);
+}
+
+#[test]
+fn processed_frame_from_raw_reports_buffer_bounds_errors() {
+    let raw = RawVideoFrame {
+        width: 4,
+        height: 2,
+        pitch: 16,
+        pixel_layout: PixelLayout::Argb8888,
+        bytes: vec![0_u8; 15],
+    };
+
+    let error = processed_frame_from_raw(
+        &raw,
+        4.0 / 3.0,
+        4,
+        2,
+        true,
+        VideoCrop::default(),
+        VideoResizeFilter::Nearest,
+    )
+    .expect_err("short raw video buffer should fail");
+
+    assert!(matches!(
+        error,
+        CoreError::InvalidVideoBuffer {
+            offset: 0,
+            length: 16,
+            available: 15
+        }
+    ));
 }
 
 #[test]
