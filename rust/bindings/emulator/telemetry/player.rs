@@ -27,85 +27,7 @@ impl PyPlayerTelemetry {
     #[pyo3(signature = (data))]
     fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
         Ok(Self {
-            inner: PlayerTelemetry {
-                state_flags: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "state_flags")?
-                    .extract()?,
-                speed_kph: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "speed_kph")?.extract()?,
-                energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "energy")?.extract()?,
-                max_energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "max_energy")?
-                    .extract()?,
-                ko_star_count: optional_item(data, "ko_star_count", 0)?,
-                boost_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "boost_timer")?
-                    .extract()?,
-                recoil_tilt_magnitude: required_item(
-                    data,
-                    PLAYER_TELEMETRY_PAYLOAD,
-                    "recoil_tilt_magnitude",
-                )?
-                .extract()?,
-                damage_rumble_counter: optional_item(data, "damage_rumble_counter", 0)?,
-                reverse_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "reverse_timer")?
-                    .extract()?,
-                race_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_distance")?
-                    .extract()?,
-                lap_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap_distance")?
-                    .extract()?,
-                race_time_ms: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_time_ms")?
-                    .extract()?,
-                lap: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap")?.extract()?,
-                laps_completed: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "laps_completed")?
-                    .extract()?,
-                position: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "position")?.extract()?,
-                geometry: RacerGeometryTelemetry {
-                    segment_index: optional_item(data, "segment_index", None)?,
-                    segment_t: optional_item(data, "segment_t", 0.0)?,
-                    segment_length_proportion: optional_item(
-                        data,
-                        "segment_length_proportion",
-                        0.0,
-                    )?,
-                    world_pos_x: optional_item(data, "world_pos_x", 0.0)?,
-                    world_pos_y: optional_item(data, "world_pos_y", 0.0)?,
-                    world_pos_z: optional_item(data, "world_pos_z", 0.0)?,
-                    segment_center_x: optional_item(data, "segment_center_x", 0.0)?,
-                    segment_center_y: optional_item(data, "segment_center_y", 0.0)?,
-                    segment_center_z: optional_item(data, "segment_center_z", 0.0)?,
-                    local_lateral_velocity: optional_item(data, "local_lateral_velocity", 0.0)?,
-                    signed_lateral_offset: optional_item(data, "signed_lateral_offset", 0.0)?,
-                    lateral_distance: optional_item(data, "lateral_distance", 0.0)?,
-                    lateral_displacement_magnitude: optional_item(
-                        data,
-                        "lateral_displacement_magnitude",
-                        0.0,
-                    )?,
-                    current_radius_left: optional_item(data, "current_radius_left", 0.0)?,
-                    current_radius_right: optional_item(data, "current_radius_right", 0.0)?,
-                    height_above_ground: optional_item(data, "height_above_ground", 0.0)?,
-                    future_local_nearest_segment_index: optional_item(
-                        data,
-                        "future_local_nearest_segment_index",
-                        None,
-                    )?,
-                    future_local_nearest_segment_distance: optional_item(
-                        data,
-                        "future_local_nearest_segment_distance",
-                        0.0,
-                    )?,
-                    velocity_magnitude: optional_item(data, "velocity_magnitude", 0.0)?,
-                    acceleration_magnitude: optional_item(data, "acceleration_magnitude", 0.0)?,
-                    acceleration_force: optional_item(data, "acceleration_force", 0.0)?,
-                    drift_attack_force: optional_item(data, "drift_attack_force", 0.0)?,
-                    collision_mass: optional_item(data, "collision_mass", 0.0)?,
-                },
-                machine_context: MachineContextTelemetry {
-                    character_index: optional_item(data, "machine_character_index", -1)?,
-                    body_stat: optional_item(data, "machine_body_stat", 0)?,
-                    boost_stat: optional_item(data, "machine_boost_stat", 0)?,
-                    grip_stat: optional_item(data, "machine_grip_stat", 0)?,
-                    weight: optional_item(data, "machine_weight", 0)?,
-                    engine_setting: optional_item(data, "engine_setting", 0.0)?,
-                },
-            },
+            inner: player_telemetry_from_dict(data)?,
         })
     }
 
@@ -471,4 +393,79 @@ impl PyPlayerTelemetry {
     pub(super) fn from_native(player: &PlayerTelemetry) -> Self {
         Self { inner: *player }
     }
+}
+
+fn player_telemetry_from_dict(data: &Bound<'_, PyDict>) -> PyResult<PlayerTelemetry> {
+    Ok(PlayerTelemetry {
+        state_flags: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "state_flags")?.extract()?,
+        speed_kph: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "speed_kph")?.extract()?,
+        energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "energy")?.extract()?,
+        max_energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "max_energy")?.extract()?,
+        ko_star_count: optional_item(data, "ko_star_count", 0)?,
+        boost_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "boost_timer")?.extract()?,
+        recoil_tilt_magnitude: required_item(
+            data,
+            PLAYER_TELEMETRY_PAYLOAD,
+            "recoil_tilt_magnitude",
+        )?
+        .extract()?,
+        damage_rumble_counter: optional_item(data, "damage_rumble_counter", 0)?,
+        reverse_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "reverse_timer")?.extract()?,
+        race_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_distance")?.extract()?,
+        lap_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap_distance")?.extract()?,
+        race_time_ms: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_time_ms")?.extract()?,
+        lap: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap")?.extract()?,
+        laps_completed: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "laps_completed")?
+            .extract()?,
+        position: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "position")?.extract()?,
+        geometry: racer_geometry_from_dict(data)?,
+        machine_context: machine_context_from_dict(data)?,
+    })
+}
+
+fn racer_geometry_from_dict(data: &Bound<'_, PyDict>) -> PyResult<RacerGeometryTelemetry> {
+    Ok(RacerGeometryTelemetry {
+        segment_index: optional_item(data, "segment_index", None)?,
+        segment_t: optional_item(data, "segment_t", 0.0)?,
+        segment_length_proportion: optional_item(data, "segment_length_proportion", 0.0)?,
+        world_pos_x: optional_item(data, "world_pos_x", 0.0)?,
+        world_pos_y: optional_item(data, "world_pos_y", 0.0)?,
+        world_pos_z: optional_item(data, "world_pos_z", 0.0)?,
+        segment_center_x: optional_item(data, "segment_center_x", 0.0)?,
+        segment_center_y: optional_item(data, "segment_center_y", 0.0)?,
+        segment_center_z: optional_item(data, "segment_center_z", 0.0)?,
+        local_lateral_velocity: optional_item(data, "local_lateral_velocity", 0.0)?,
+        signed_lateral_offset: optional_item(data, "signed_lateral_offset", 0.0)?,
+        lateral_distance: optional_item(data, "lateral_distance", 0.0)?,
+        lateral_displacement_magnitude: optional_item(data, "lateral_displacement_magnitude", 0.0)?,
+        current_radius_left: optional_item(data, "current_radius_left", 0.0)?,
+        current_radius_right: optional_item(data, "current_radius_right", 0.0)?,
+        height_above_ground: optional_item(data, "height_above_ground", 0.0)?,
+        future_local_nearest_segment_index: optional_item(
+            data,
+            "future_local_nearest_segment_index",
+            None,
+        )?,
+        future_local_nearest_segment_distance: optional_item(
+            data,
+            "future_local_nearest_segment_distance",
+            0.0,
+        )?,
+        velocity_magnitude: optional_item(data, "velocity_magnitude", 0.0)?,
+        acceleration_magnitude: optional_item(data, "acceleration_magnitude", 0.0)?,
+        acceleration_force: optional_item(data, "acceleration_force", 0.0)?,
+        drift_attack_force: optional_item(data, "drift_attack_force", 0.0)?,
+        collision_mass: optional_item(data, "collision_mass", 0.0)?,
+    })
+}
+
+fn machine_context_from_dict(data: &Bound<'_, PyDict>) -> PyResult<MachineContextTelemetry> {
+    Ok(MachineContextTelemetry {
+        character_index: optional_item(data, "machine_character_index", -1)?,
+        body_stat: optional_item(data, "machine_body_stat", 0)?,
+        boost_stat: optional_item(data, "machine_boost_stat", 0)?,
+        grip_stat: optional_item(data, "machine_grip_stat", 0)?,
+        weight: optional_item(data, "machine_weight", 0)?,
+        engine_setting: optional_item(data, "engine_setting", 0.0)?,
+    })
 }
