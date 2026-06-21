@@ -334,16 +334,9 @@ def _run_career_mode_loop_body(
         trace_career_state("after_terminal_refresh")
         publish_snapshot(policy_visible=False)
 
-    def step_idle_after_runner_complete() -> None:
+    def run_menu_step(step: RawMenuStep) -> None:
         nonlocal last_menu_step, current_step_seconds, raw_observation, observation
-        nonlocal raw_info, info, reset_info, current_telemetry
 
-        clear_policy_runtime_state(reset_episode_reward=True)
-        step = RawMenuStep(
-            menu_input=MenuInput.NEUTRAL,
-            frames=1,
-            phase="career_complete:idle",
-        )
         last_menu_step = step
         step_menu(
             config=config,
@@ -365,56 +358,50 @@ def _run_career_mode_loop_body(
         current_step_seconds = None
         raw_observation = None
         observation = None
+
+    def refresh_menu_viewer_state(
+        *,
+        reset_controls: bool = False,
+        refresh_telemetry: bool = True,
+    ) -> None:
+        nonlocal raw_info, info, reset_info, current_telemetry
+        nonlocal episode_reward, current_control_state, current_gas_level
+        nonlocal boost_lamp_level
+
+        if reset_controls:
+            episode_reward = 0.0
+            current_control_state = RaceControlState()
+            current_gas_level = 0.0
+            boost_lamp_level = 0.0
         raw_info = menu_viewer_info(session)
         info = controller.viewer_info(
             info=dict(raw_info),
             active_policy_control=None,
         )
         reset_info = dict(info)
-        current_telemetry = _read_live_telemetry(session.emulator)
+        if refresh_telemetry:
+            current_telemetry = _read_live_telemetry(session.emulator)
+
+    def step_idle_after_runner_complete() -> None:
+        clear_policy_runtime_state(reset_episode_reward=True)
+        run_menu_step(
+            RawMenuStep(
+                menu_input=MenuInput.NEUTRAL,
+                frames=1,
+                phase="career_complete:idle",
+            )
+        )
+        refresh_menu_viewer_state()
 
     def step_visible_policy_intro_wait(target_timer: int) -> None:
-        nonlocal last_menu_step, current_step_seconds, raw_observation, observation
-        nonlocal raw_info, info, reset_info, episode_reward, current_control_state
-        nonlocal current_gas_level, boost_lamp_level, current_telemetry
-
-        step = RawMenuStep(
-            menu_input=MenuInput.NEUTRAL,
-            frames=1,
-            phase=f"policy_intro:wait_until_timer_{target_timer}",
+        run_menu_step(
+            RawMenuStep(
+                menu_input=MenuInput.NEUTRAL,
+                frames=1,
+                phase=f"policy_intro:wait_until_timer_{target_timer}",
+            )
         )
-        last_menu_step = step
-        step_menu(
-            config=config,
-            session=session,
-            controller=controller,
-            snapshot_queue=snapshot_queue,
-            step=step,
-            info=info,
-            reset_info=reset_info,
-            episode=episode,
-            episode_reward=episode_reward,
-            control_rate=control_rate,
-            target_control_fps=target_control_fps,
-            native_frame_seconds=native_frame_seconds,
-            deterministic_policy=deterministic_policy,
-            track_record_book=track_record_book,
-            frame_recorder=frame_recorder,
-        )
-        current_step_seconds = None
-        raw_observation = None
-        observation = None
-        episode_reward = 0.0
-        current_control_state = RaceControlState()
-        current_gas_level = 0.0
-        boost_lamp_level = 0.0
-        raw_info = menu_viewer_info(session)
-        info = controller.viewer_info(
-            info=dict(raw_info),
-            active_policy_control=None,
-        )
-        reset_info = dict(info)
-        current_telemetry = _read_live_telemetry(session.emulator)
+        refresh_menu_viewer_state(reset_controls=True)
 
     def active_policy_intro_target_timer() -> int | None:
         if active_policy_control is None:
@@ -612,35 +599,9 @@ def _run_career_mode_loop_body(
                 continue
             menu_step = controller.next_raw_step(info=info)
             if menu_step is not None:
-                last_menu_step = menu_step
                 clear_policy_runtime_state(reset_episode_reward=True)
-                step_menu(
-                    config=config,
-                    session=session,
-                    controller=controller,
-                    snapshot_queue=snapshot_queue,
-                    step=menu_step,
-                    info=info,
-                    reset_info=reset_info,
-                    episode=episode,
-                    episode_reward=episode_reward,
-                    control_rate=control_rate,
-                    target_control_fps=target_control_fps,
-                    native_frame_seconds=native_frame_seconds,
-                    deterministic_policy=deterministic_policy,
-                    track_record_book=track_record_book,
-                    frame_recorder=frame_recorder,
-                )
-                current_step_seconds = None
-                raw_observation = None
-                observation = None
-                raw_info = menu_viewer_info(session)
-                info = controller.viewer_info(
-                    info=dict(raw_info),
-                    active_policy_control=None,
-                )
-                reset_info = dict(info)
-                current_telemetry = _read_live_telemetry(session.emulator)
+                run_menu_step(menu_step)
+                refresh_menu_viewer_state()
                 trace_career_state("after_menu_step")
             else:
                 active_policy_control = controller.active_policy_control(
@@ -654,37 +615,11 @@ def _run_career_mode_loop_body(
                         frames=1,
                         phase="policy_resolution:wait",
                     )
-                    last_menu_step = step
-                    step_menu(
-                        config=config,
-                        session=session,
-                        controller=controller,
-                        snapshot_queue=snapshot_queue,
-                        step=step,
-                        info=info,
-                        reset_info=reset_info,
-                        episode=episode,
-                        episode_reward=episode_reward,
-                        control_rate=control_rate,
-                        target_control_fps=target_control_fps,
-                        native_frame_seconds=native_frame_seconds,
-                        deterministic_policy=deterministic_policy,
-                        track_record_book=track_record_book,
-                        frame_recorder=frame_recorder,
+                    run_menu_step(step)
+                    refresh_menu_viewer_state(
+                        reset_controls=True,
+                        refresh_telemetry=False,
                     )
-                    current_step_seconds = None
-                    raw_observation = None
-                    observation = None
-                    episode_reward = 0.0
-                    current_control_state = RaceControlState()
-                    current_gas_level = 0.0
-                    boost_lamp_level = 0.0
-                    raw_info = menu_viewer_info(session)
-                    info = controller.viewer_info(
-                        info=dict(raw_info),
-                        active_policy_control=None,
-                    )
-                    reset_info = dict(info)
                     trace_career_state("after_policy_resolution_wait")
                     continue
                 if not active_policy_started:
