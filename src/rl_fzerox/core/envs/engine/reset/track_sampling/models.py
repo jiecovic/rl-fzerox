@@ -76,6 +76,9 @@ class SelectedTrack:
     source_engine_setting_raw_value: int | None
     baseline_group_id: str | None
     baseline_group_weight: float | None
+    baseline_variant_index: int | None
+    baseline_variant_count: int | None
+    baseline_variant_seed: int | None
     alt_baseline_id: str | None
     alt_baseline_label: str | None
     alt_baseline_source_entry_id: str | None
@@ -139,6 +142,9 @@ class SelectedTrack:
             "track_sampling_deficit_lane": self.deficit_budget_lane,
             "track_baseline_group_id": self.baseline_group_id,
             "track_baseline_group_weight": self.baseline_group_weight,
+            "track_baseline_variant_index": self.baseline_variant_index,
+            "track_baseline_variant_count": self.baseline_variant_count,
+            "track_baseline_variant_seed": self.baseline_variant_seed,
             "track_alt_baseline_id": self.alt_baseline_id,
             "track_alt_baseline_label": self.alt_baseline_label,
             "track_alt_baseline_source_entry_id": self.alt_baseline_source_entry_id,

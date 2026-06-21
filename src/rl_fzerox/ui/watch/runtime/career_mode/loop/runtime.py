@@ -1,6 +1,7 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/loop/runtime.py
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 
 from fzerox_emulator import FZeroXTelemetry
@@ -47,8 +48,44 @@ def reset_emulator_for_next_attempt(
 ) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
     load_save_ram(config, session)
     session.emulator.reset()
+    randomize_emulator_for_current_attempt(
+        config=config,
+        session=session,
+        controller=controller,
+    )
     raw_info, info, telemetry = fresh_menu_runtime_state(session)
     return raw_info, controller.viewer_info(info=info, active_policy_control=None), telemetry
+
+
+def randomize_emulator_for_current_attempt(
+    *,
+    config: WatchAppConfig,
+    session: CareerModeRuntimeSession,
+    controller: CareerModeController,
+) -> int | None:
+    """Vary GP opponent shuffles per replay attempt without losing reproducibility."""
+
+    seed = _career_attempt_game_rng_seed(
+        base_seed=config.watch.attempt_seed,
+        attempt_id=controller.active_attempt_id(),
+    )
+    if seed is not None:
+        session.emulator.randomize_game_rng(seed)
+    return seed
+
+
+def _career_attempt_game_rng_seed(
+    *,
+    base_seed: int | None,
+    attempt_id: str | None,
+) -> int | None:
+    if base_seed is None or attempt_id is None:
+        return None
+    digest = hashlib.blake2s(
+        f"career_attempt_rng|{base_seed}|{attempt_id}".encode(),
+        digest_size=8,
+    ).digest()
+    return int.from_bytes(digest, byteorder="big", signed=False)
 
 
 def should_observe_policy_transition(

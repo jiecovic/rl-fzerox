@@ -29,6 +29,7 @@ interface RaceModePanelProps {
 
 interface GpDifficultyPanelProps {
   config: ManagedRunConfig;
+  defaultConfig: ManagedRunConfig;
   defaultGpDifficulties: readonly GpDifficulty[];
   metadata: ConfigMetadata;
   updateTracks: TrackUpdate;
@@ -75,6 +76,7 @@ export function RaceSetupPanels({
       />
       <GpDifficultyPanel
         config={config}
+        defaultConfig={defaultConfig}
         defaultGpDifficulties={defaultGpDifficulties}
         metadata={metadata}
         updateTracks={updateTracks}
@@ -114,6 +116,7 @@ export function RaceModePanel({
 
 export function GpDifficultyPanel({
   config,
+  defaultConfig,
   defaultGpDifficulties,
   metadata,
   updateTracks,
@@ -130,31 +133,44 @@ export function GpDifficultyPanel({
       onReset={() => updateTracks({ gp_difficulties: [...defaultGpDifficulties] })}
       title="GP difficulties"
     >
-      <ToggleChoiceStrip
-        description={
-          config.tracks.race_mode === "gp_race"
-            ? selectedLabels.join(", ")
-            : "Only used when GP race mode is selected."
-        }
-        options={metadata.gp_difficulties.map((option) => ({
-          active: selectedDifficulties.includes(option.value as GpDifficulty),
-          disabled: config.tracks.race_mode !== "gp_race",
-          key: option.value,
-          label: option.label,
-          tooltip:
-            config.tracks.race_mode !== "gp_race"
-              ? "GP difficulty is only applied to GP race baselines."
-              : undefined,
-          onClick: () => {
-            const difficulty = option.value as GpDifficulty;
-            const nextDifficulties = toggleGpDifficulty(selectedDifficulties, difficulty);
-            if (nextDifficulties === null) {
-              return;
-            }
-            updateTracks({ gp_difficulties: nextDifficulties });
-          },
-        }))}
-      />
+      <div className="grid gap-3">
+        <ToggleChoiceStrip
+          description={
+            config.tracks.race_mode === "gp_race"
+              ? selectedLabels.join(", ")
+              : "Only used when GP race mode is selected."
+          }
+          options={metadata.gp_difficulties.map((option) => ({
+            active: selectedDifficulties.includes(option.value as GpDifficulty),
+            disabled: config.tracks.race_mode !== "gp_race",
+            key: option.value,
+            label: option.label,
+            tooltip:
+              config.tracks.race_mode !== "gp_race"
+                ? "GP difficulty is only applied to GP race baselines."
+                : undefined,
+            onClick: () => {
+              const difficulty = option.value as GpDifficulty;
+              const nextDifficulties = toggleGpDifficulty(selectedDifficulties, difficulty);
+              if (nextDifficulties === null) {
+                return;
+              }
+              updateTracks({ gp_difficulties: nextDifficulties });
+            },
+          }))}
+        />
+        {config.tracks.race_mode === "gp_race" ? (
+          <IntegerField
+            help="Materialize this many GP race-start baselines per built-in course/difficulty/vehicle by varying the game RNG before race init. Time Attack and X Cup stay single-baseline."
+            label="Race-start variants"
+            min={1}
+            max={8}
+            resetValue={defaultConfig.tracks.baseline_variant_count}
+            value={config.tracks.baseline_variant_count}
+            onChange={(value) => updateTracks({ baseline_variant_count: value })}
+          />
+        ) : null}
+      </div>
     </ConfigPanel>
   );
 }

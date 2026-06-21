@@ -117,9 +117,7 @@ def test_manager_store_hides_archived_runs_from_visible_views(tmp_path: Path) ->
     assert tuple(run.id for run in store.list_visible_run_summaries()) == (active.id,)
     groups = store.rebuild_tensorboard_views()
     tensorboard_targets = tuple(
-        path.resolve()
-        for path in store.tensorboard_views_root().rglob("*")
-        if path.is_symlink()
+        path.resolve() for path in store.tensorboard_views_root().rglob("*") if path.is_symlink()
     )
 
     assert sum(group.run_count for group in groups) == 1

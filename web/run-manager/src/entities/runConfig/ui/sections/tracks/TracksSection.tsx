@@ -51,6 +51,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     if (nextTracks.race_mode !== "gp_race") {
       nextTracks.gp_difficulties = [];
       nextTracks.include_x_cup = false;
+      nextTracks.baseline_variant_count = 1;
       if (nextTracks.selected_course_ids.length === 0) {
         nextTracks.selected_course_ids = defaultCourseIds;
       }

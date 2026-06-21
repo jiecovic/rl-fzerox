@@ -26,6 +26,7 @@ def materialize_race_start_state(
     emulator.reset()
     _write_full_machine_settings(emulator, variant)
     _write_race_setup(emulator, variant)
+    _randomize_game_rng(emulator, variant)
     _force_race_reinit(emulator, variant)
     _step_until_ready(emulator, variant)
 
@@ -57,6 +58,12 @@ def _write_full_machine_settings(emulator: EmulatorBackend, variant: RaceStartVa
         total_lap_count=variant.total_lap_count,
         gp_difficulty_raw_value=race_start_gp_difficulty_raw_value(variant),
     )
+
+
+def _randomize_game_rng(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
+    if variant.rng_seed is None:
+        return
+    emulator.randomize_game_rng(variant.rng_seed)
 
 
 def _force_race_reinit(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:

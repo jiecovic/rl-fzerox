@@ -53,6 +53,9 @@ def ensure_course_vehicle_baseline(
     emulator_type: Callable[..., StateSavingEmulator],
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
     menu_seed_race_start_materializer: RaceStartMaterializer,
+    baseline_variant_index: int | None = None,
+    baseline_variant_count: int | None = None,
+    baseline_variant_seed: int | None = None,
 ) -> Path:
     payload = course_vehicle_cache_payload(
         mode=mode,
@@ -61,6 +64,9 @@ def ensure_course_vehicle_baseline(
         vehicle_id=vehicle_id,
         camera_setting=camera_setting,
         race_intro_target_timer=context.race_intro_target_timer,
+        baseline_variant_index=baseline_variant_index,
+        baseline_variant_count=baseline_variant_count,
+        baseline_variant_seed=baseline_variant_seed,
         context=context,
     )
     cache_key = sha256_json(payload)
@@ -90,6 +96,7 @@ def ensure_course_vehicle_baseline(
                 gp_difficulty=gp_difficulty,
                 vehicle_id=vehicle_id,
                 camera_setting=camera_setting,
+                baseline_variant_seed=baseline_variant_seed,
                 cache_state_path=cache_state_path,
                 cache_root=cache_root,
                 context=context,
@@ -296,6 +303,7 @@ def generate_course_vehicle_state(
     gp_difficulty: RaceDifficultyName | None,
     vehicle_id: str,
     camera_setting: str | None,
+    baseline_variant_seed: int | None,
     cache_state_path: Path,
     cache_root: Path,
     context: BaselineMaterializerContext,
@@ -333,6 +341,7 @@ def generate_course_vehicle_state(
                 gp_difficulty=gp_difficulty,
                 character_index=vehicle.character_index,
                 machine_select_slot=vehicle.machine_select_slot,
+                rng_seed=baseline_variant_seed,
                 engine_setting_raw_value=defaults.engine_setting_raw_value,
                 race_intro_target_timer=None,
             ),

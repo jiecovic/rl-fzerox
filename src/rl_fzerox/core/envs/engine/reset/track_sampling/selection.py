@@ -405,6 +405,9 @@ def _selected_track_from_entry(
         baseline_group_weight=(
             None if entry.baseline_group_weight is None else float(entry.baseline_group_weight)
         ),
+        baseline_variant_index=entry.baseline_variant_index,
+        baseline_variant_count=entry.baseline_variant_count,
+        baseline_variant_seed=entry.baseline_variant_seed,
         alt_baseline_id=entry.alt_baseline_id,
         alt_baseline_label=entry.alt_baseline_label,
         alt_baseline_source_entry_id=entry.alt_baseline_source_entry_id,
@@ -595,6 +598,9 @@ def _entry_fingerprint(
         entry.source_engine_setting_raw_value,
         entry.baseline_group_id,
         entry.baseline_group_weight,
+        entry.baseline_variant_index,
+        entry.baseline_variant_count,
+        entry.baseline_variant_seed,
         entry.alt_baseline_id,
         entry.alt_baseline_label,
         entry.alt_baseline_source_entry_id,

@@ -65,6 +65,9 @@ def materialize_baseline_impl(
         gp_difficulty=source_gp_difficulty,
         vehicle_id=source_vehicle_id,
         camera_setting=request.camera_setting,
+        baseline_variant_index=request.baseline_variant_index,
+        baseline_variant_count=request.baseline_variant_count,
+        baseline_variant_seed=request.baseline_variant_seed,
         cache_root=cache_root,
         context=context,
         emulator_type=emulator_type,
@@ -78,6 +81,9 @@ def materialize_baseline_impl(
         vehicle_id=source_vehicle_id,
         camera_setting=request.camera_setting,
         race_intro_target_timer=context.race_intro_target_timer,
+        baseline_variant_index=request.baseline_variant_index,
+        baseline_variant_count=request.baseline_variant_count,
+        baseline_variant_seed=request.baseline_variant_seed,
         context=context,
     )
     cache_key = sha256_json(payload)

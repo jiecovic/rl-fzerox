@@ -35,6 +35,9 @@ from rl_fzerox.core.runtime_spec.schema import (
 )
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.ui.watch.records import TrackRecordBook, track_record_key
+from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
+    _career_attempt_game_rng_seed,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.menu import reset_race_progress_info
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
@@ -402,6 +405,17 @@ def test_career_mode_session_seeds_only_from_runtime_attempt_seed(
     seeded_session.close()
 
     assert seeds == [1234]
+
+
+def test_career_attempt_game_rng_seed_is_stable_per_attempt() -> None:
+    first = _career_attempt_game_rng_seed(base_seed=1234, attempt_id="attempt-1")
+    repeated = _career_attempt_game_rng_seed(base_seed=1234, attempt_id="attempt-1")
+    next_attempt = _career_attempt_game_rng_seed(base_seed=1234, attempt_id="attempt-2")
+
+    assert first == repeated
+    assert first != next_attempt
+    assert _career_attempt_game_rng_seed(base_seed=None, attempt_id="attempt-1") is None
+    assert _career_attempt_game_rng_seed(base_seed=1234, attempt_id=None) is None
 
 
 def test_career_mode_session_uses_native_menu_cadence(

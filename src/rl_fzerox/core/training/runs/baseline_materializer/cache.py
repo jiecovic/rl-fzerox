@@ -49,10 +49,13 @@ def course_vehicle_cache_payload(
     camera_setting: str | None,
     race_intro_target_timer: int | None,
     context: BaselineMaterializerContext,
+    baseline_variant_index: int | None = None,
+    baseline_variant_count: int | None = None,
+    baseline_variant_seed: int | None = None,
 ) -> dict[str, object]:
     defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
     vehicle = vehicle_by_id(vehicle_id)
-    return {
+    payload: dict[str, object] = {
         "schema_version": BASELINE_MATERIALIZER_SETTINGS.schema_version,
         "materializer_mode": f"course_vehicle_seed_{mode}",
         "mode": mode,
@@ -66,6 +69,15 @@ def course_vehicle_cache_payload(
         "camera_setting": camera_setting,
         "race_intro_target_timer": race_intro_target_timer,
     }
+    if baseline_variant_index is not None:
+        payload.update(
+            {
+                "baseline_variant_index": baseline_variant_index,
+                "baseline_variant_count": baseline_variant_count,
+                "baseline_variant_seed": baseline_variant_seed,
+            }
+        )
+    return payload
 
 
 def x_cup_cache_payload(

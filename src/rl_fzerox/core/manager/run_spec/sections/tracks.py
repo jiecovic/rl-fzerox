@@ -79,6 +79,7 @@ class ManagedTracksConfig(BaseModel):
     race_mode: RaceMode = "time_attack"
     gp_difficulties: tuple[GpDifficulty, ...] = Field(default_factory=default_gp_difficulties)
     include_x_cup: bool = False
+    baseline_variant_count: int = Field(default=1, ge=1, le=8)
     x_cup_course_count: int = Field(
         default=X_CUP_COURSE.default_generated_count,
         ge=1,
@@ -114,6 +115,7 @@ class ManagedTracksConfig(BaseModel):
         if self.race_mode != "gp_race":
             self.gp_difficulties = ()
             self.include_x_cup = False
+            self.baseline_variant_count = 1
             self.x_cup_auto_regeneration.enabled = False
         else:
             self.gp_difficulties = _unique_gp_difficulties(
@@ -143,6 +145,7 @@ class ManagedTracksConfig(BaseModel):
         data = handler(self)
         if self.race_mode != "gp_race":
             data.pop("gp_difficulties", None)
+            data.pop("baseline_variant_count", None)
         return data
 
     def _active_x_cup_course_count(self) -> int:

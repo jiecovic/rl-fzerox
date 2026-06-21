@@ -58,6 +58,8 @@ from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchA
 class CareerRuntimeEmulator(CameraSyncBackend, SaveRamSession, Protocol):
     """Emulator operations needed by the Career Mode controller."""
 
+    def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]: ...
+
 
 class CareerRuntimeSession(Protocol):
     """Narrow runtime surface Career Mode needs from its session loop."""
@@ -295,6 +297,9 @@ class CareerModeController(CareerMenuRoutingMixin):
 
     def has_active_attempt(self) -> bool:
         return self._progress.attempt_id is not None
+
+    def active_attempt_id(self) -> str | None:
+        return self._progress.attempt_id
 
     @property
     def phase(self) -> CareerPhase:

@@ -30,6 +30,9 @@ class BaselineRequest:
     source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting_raw_value: int | None = None
     camera_setting: str | None = None
+    baseline_variant_index: int | None = None
+    baseline_variant_count: int | None = None
+    baseline_variant_seed: int | None = None
     generated_course_kind: XCupGeneratedCourseKind | None = None
     generated_course_seed: int | None = None
     generated_course_hash: str | None = None
@@ -60,6 +63,7 @@ class BaselineMaterializerContext:
     rom_path: Path
     renderer: str
     race_intro_target_timer: int | None
+    run_seed: int | None
 
 
 RaceStartMaterializer = Callable[..., None]

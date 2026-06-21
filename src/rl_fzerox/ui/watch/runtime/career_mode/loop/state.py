@@ -15,6 +15,9 @@ from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.records import TrackRecordBook
+from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
+    randomize_emulator_for_current_attempt,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.menu import menu_viewer_info
 from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
 from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
@@ -105,6 +108,11 @@ def initial_career_mode_loop_state(
     controller: CareerModeController,
 ) -> CareerModeLoopState:
     target_control_seconds = session.target_control_seconds
+    randomize_emulator_for_current_attempt(
+        config=config,
+        session=session,
+        controller=controller,
+    )
     raw_info = menu_viewer_info(session)
     info = controller.viewer_info(
         info=dict(raw_info),

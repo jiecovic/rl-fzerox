@@ -236,6 +236,7 @@ class XCupRotationManager:
             rom_path=self._config.emulator.rom_path,
             renderer=self._config.emulator.renderer,
             race_intro_target_timer=self._config.env.race_intro_target_timer,
+            run_seed=self._config.seed,
         )
         request = request_from_track_entry(
             entry,

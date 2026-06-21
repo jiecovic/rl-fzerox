@@ -19,6 +19,7 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
         "enabled": True,
         "sampling_mode": _runtime_track_sampling_mode(config),
         "entries": _track_sampling_entries(config),
+        "baseline_variant_count": config.tracks.baseline_variant_count,
         "step_balance_update_episodes": config.tracks.step_balance_update_episodes,
         "step_balance_ema_alpha": config.tracks.step_balance_ema_alpha,
         "step_balance_max_weight_scale": config.tracks.step_balance_max_weight_scale,

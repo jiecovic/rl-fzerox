@@ -32,6 +32,8 @@ def validate_variant(variant: RaceStartVariant) -> None:
         raise ValueError(
             f"machine_select_slot must be non-negative, got {variant.machine_select_slot}"
         )
+    if variant.rng_seed is not None and variant.rng_seed < 0:
+        raise ValueError(f"rng_seed must be non-negative, got {variant.rng_seed}")
     validate_engine_slider_step(variant.engine_setting_raw_value, label="engine_setting raw value")
     if variant.total_lap_count <= 0:
         raise ValueError(f"total_lap_count must be positive, got {variant.total_lap_count}")

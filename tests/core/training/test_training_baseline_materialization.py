@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from pytest import MonkeyPatch
 
 from rl_fzerox.core.runtime_spec.schema import (
@@ -221,3 +222,128 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
     assert second_baseline_path.with_suffix(".json").is_file()
     assert capture.generic_modes == ["time_attack"]
     assert [variant.course_index for variant in capture.variants] == [0, 1]
+
+
+def test_materialize_track_sampling_expands_gp_baseline_variants(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    capture = _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
+                baseline_variant_count=3,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city_gp",
+                        course_id="mute_city",
+                        runtime_course_key="mute_city",
+                        course_index=0,
+                        mode="gp_race",
+                        gp_difficulty="novice",
+                        vehicle="blue_falcon",
+                        engine_setting_raw_value=50,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    entries = materialized.env.track_sampling.entries
+    assert [entry.id for entry in entries] == [
+        "mute_city_gp",
+        "mute_city_gp__variant_2",
+        "mute_city_gp__variant_3",
+    ]
+    assert [entry.weight for entry in entries] == pytest.approx([1 / 3] * 3)
+    assert [entry.baseline_group_id for entry in entries] == ["mute_city_gp"] * 3
+    assert [entry.baseline_group_weight for entry in entries] == [1.0] * 3
+    assert [entry.baseline_variant_index for entry in entries] == [0, 1, 2]
+    assert [entry.baseline_variant_count for entry in entries] == [3, 3, 3]
+    assert entries[0].baseline_variant_seed is None
+    assert entries[1].baseline_variant_seed is not None
+    assert entries[2].baseline_variant_seed is not None
+    assert entries[1].baseline_variant_seed != entries[2].baseline_variant_seed
+
+    baseline_paths = {_required_baseline_path(entry) for entry in entries}
+    assert len(baseline_paths) == 3
+    assert all(path.parent == run_paths.baselines_dir for path in baseline_paths)
+    assert [variant.rng_seed for variant in capture.variants] == [
+        None,
+        entries[1].baseline_variant_seed,
+        entries[2].baseline_variant_seed,
+    ]
+
+
+def test_materialize_track_sampling_does_not_expand_time_attack_baselines(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    capture = _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
+                baseline_variant_count=4,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city_time_attack",
+                        course_id="mute_city",
+                        runtime_course_key="mute_city",
+                        course_index=0,
+                        mode="time_attack",
+                        vehicle="blue_falcon",
+                        engine_setting_raw_value=50,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    (entry,) = materialized.env.track_sampling.entries
+    assert entry.id == "mute_city_time_attack"
+    assert entry.baseline_variant_index is None
+    assert [variant.rng_seed for variant in capture.variants] == [None]

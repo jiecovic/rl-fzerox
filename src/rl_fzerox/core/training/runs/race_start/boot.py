@@ -316,6 +316,8 @@ def _apply_exact_race_start_setup(emulator: EmulatorBackend, variant: RaceStartV
         total_lap_count=variant.total_lap_count,
         gp_difficulty_raw_value=race_start_gp_difficulty_raw_value(variant),
     )
+    if variant.rng_seed is not None:
+        emulator.randomize_game_rng(variant.rng_seed)
     emulator.force_race_reinit(mode=variant.mode)
 
 

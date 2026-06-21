@@ -35,6 +35,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
     career_runtime_error_context,
     fresh_menu_runtime_state,
     policy_intro_wait_required,
+    randomize_emulator_for_current_attempt,
     reset_emulator_for_next_attempt,
     should_observe_policy_transition,
 )
@@ -184,6 +185,7 @@ def _run_career_mode_loop_body(
     raw_info = state.raw_info
     info = state.info
     track_record_attempt_id = career_mode_attempt_id(info)
+    game_rng_attempt_id = track_record_attempt_id
     reset_info = state.reset_info
     current_telemetry = state.current_telemetry
     current_auxiliary_predictions = state.current_auxiliary_predictions
@@ -249,14 +251,30 @@ def _run_career_mode_loop_body(
         if reset_episode_reward:
             episode_reward = 0.0
 
-    def reset_track_records_if_attempt_changed() -> None:
-        nonlocal track_record_attempt_id, track_record_book
+    def sync_attempt_change_side_effects() -> None:
+        nonlocal game_rng_attempt_id, track_record_attempt_id, track_record_book
 
         current_attempt_id = career_mode_attempt_id(info)
         if current_attempt_id == track_record_attempt_id:
+            if current_attempt_id == game_rng_attempt_id:
+                return
+            randomize_game_rng_if_needed(current_attempt_id)
             return
         track_record_book = TrackRecordBook()
         track_record_attempt_id = current_attempt_id
+        randomize_game_rng_if_needed(current_attempt_id)
+
+    def randomize_game_rng_if_needed(attempt_id: str | None) -> None:
+        nonlocal game_rng_attempt_id
+
+        if attempt_id is None or attempt_id == game_rng_attempt_id:
+            return
+        randomize_emulator_for_current_attempt(
+            config=config,
+            session=session,
+            controller=controller,
+        )
+        game_rng_attempt_id = attempt_id
 
     def publish_snapshot(*, policy_visible: bool) -> None:
         publish_career_loop_snapshot(
@@ -291,7 +309,7 @@ def _run_career_mode_loop_body(
         )
 
     def reset_for_next_attempt_snapshot() -> None:
-        nonlocal raw_info, info, current_telemetry, reset_info
+        nonlocal game_rng_attempt_id, raw_info, info, current_telemetry, reset_info
 
         trace_career_state("before_emulator_reset", event="reset_requested", force=True)
         raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
@@ -299,9 +317,10 @@ def _run_career_mode_loop_body(
             session=session,
             controller=controller,
         )
+        game_rng_attempt_id = career_mode_attempt_id(info)
         reset_info = dict(info)
         clear_policy_runtime_state()
-        reset_track_records_if_attempt_changed()
+        sync_attempt_change_side_effects()
         trace_career_state("after_emulator_reset", event="reset_complete", force=True)
         publish_snapshot(policy_visible=False)
 
@@ -329,7 +348,7 @@ def _run_career_mode_loop_body(
             active_policy_control=None,
         )
         reset_info = dict(info)
-        reset_track_records_if_attempt_changed()
+        sync_attempt_change_side_effects()
         clear_policy_runtime_state()
         trace_career_state("after_terminal_refresh")
         publish_snapshot(policy_visible=False)
@@ -381,6 +400,7 @@ def _run_career_mode_loop_body(
         reset_info = dict(info)
         if refresh_telemetry:
             current_telemetry = _read_live_telemetry(session.emulator)
+        sync_attempt_change_side_effects()
 
     def step_idle_after_runner_complete() -> None:
         clear_policy_runtime_state(reset_episode_reward=True)
@@ -443,7 +463,7 @@ def _run_career_mode_loop_body(
             active_policy_control=policy_control,
         )
         reset_info = dict(info)
-        reset_track_records_if_attempt_changed()
+        sync_attempt_change_side_effects()
         episode_reward = required_episode_return(info)
         current_policy_action = None
         current_control_state = session.last_requested_control_state
@@ -587,6 +607,7 @@ def _run_career_mode_loop_body(
                     info=info,
                     active_policy_control=active_policy_control,
                 )
+                sync_attempt_change_side_effects()
                 trace_career_state("after_before_step")
             lifecycle = handle_controller_lifecycle(
                 controller=controller,

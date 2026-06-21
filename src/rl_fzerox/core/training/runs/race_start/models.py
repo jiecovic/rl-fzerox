@@ -48,4 +48,5 @@ class RaceStartVariant:
     race_intro_target_timer: int | None
     gp_difficulty: RaceDifficultyName | None = None
     machine_select_slot: int | None = None
+    rng_seed: int | None = None
     total_lap_count: int = RACE_DEFAULTS.lap_count

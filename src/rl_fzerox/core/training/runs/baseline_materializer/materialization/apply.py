@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/materialization/apply.py
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -56,6 +57,7 @@ def materialize_run_baselines_impl(
         rom_path=config.emulator.rom_path,
         renderer=config.emulator.renderer,
         race_intro_target_timer=config.env.race_intro_target_timer,
+        run_seed=config.seed,
     )
     track_config = config.track
     emulator_baseline_path = config.emulator.baseline_state_path
@@ -230,14 +232,19 @@ def _materialize_track_sampling(
 ) -> TrackSamplingConfig:
     if not config.entries:
         return config
-    total_entries = len(config.entries)
+    entries_to_materialize = _expanded_baseline_variant_entries(
+        config.entries,
+        baseline_variant_count=config.baseline_variant_count,
+        run_seed=context.run_seed,
+    )
+    total_entries = len(entries_to_materialize)
     _report_startup(
         startup_reporter,
         "startup_materialize",
         f"Materializing {sampling_label} baselines for {total_entries} entries",
     )
     entries: list[TrackSamplingEntryConfig] = []
-    for entry_index, entry in enumerate(config.entries, start=1):
+    for entry_index, entry in enumerate(entries_to_materialize, start=1):
         _report_startup(
             startup_reporter,
             "startup_materialize",
@@ -261,6 +268,91 @@ def _materialize_track_sampling(
             )
         )
     return config.model_copy(update={"entries": tuple(entries)})
+
+
+def _expanded_baseline_variant_entries(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+    *,
+    baseline_variant_count: int,
+    run_seed: int | None,
+) -> tuple[TrackSamplingEntryConfig, ...]:
+    if baseline_variant_count <= 1:
+        return entries
+    expanded: list[TrackSamplingEntryConfig] = []
+    for entry in entries:
+        if not _entry_supports_baseline_variants(entry):
+            expanded.append(entry)
+            continue
+        expanded.extend(
+            _baseline_variant_entry(
+                entry,
+                baseline_variant_index=variant_index,
+                baseline_variant_count=baseline_variant_count,
+                run_seed=run_seed,
+            )
+            for variant_index in range(baseline_variant_count)
+        )
+    return tuple(expanded)
+
+
+def _entry_supports_baseline_variants(entry: TrackSamplingEntryConfig) -> bool:
+    # Only built-in GP race starts have shuffled opponent grids. Time Attack has
+    # no opponents, X Cup already gets course-generation seeds, and alt
+    # baselines should preserve the captured state exactly.
+    return (
+        entry.mode == "gp_race"
+        and entry.alt_baseline_id is None
+        and entry.generated_course_kind is None
+        and entry.course_index is not None
+        and entry.vehicle is not None
+    )
+
+
+def _baseline_variant_entry(
+    entry: TrackSamplingEntryConfig,
+    *,
+    baseline_variant_index: int,
+    baseline_variant_count: int,
+    run_seed: int | None,
+) -> TrackSamplingEntryConfig:
+    # Variant entries share a scheduler group, so course-level weight overrides
+    # still target one course while resets fan out across its materialized grids.
+    update: dict[str, object] = {
+        "weight": float(entry.weight) / baseline_variant_count,
+        "baseline_group_id": entry.baseline_group_id or entry.id,
+        "baseline_group_weight": 1.0,
+        "baseline_variant_index": baseline_variant_index,
+        "baseline_variant_count": baseline_variant_count,
+    }
+    if baseline_variant_index > 0:
+        update["id"] = f"{entry.id}__variant_{baseline_variant_index + 1}"
+        update["baseline_variant_seed"] = _baseline_variant_seed(
+            entry,
+            baseline_variant_index=baseline_variant_index,
+            run_seed=run_seed,
+        )
+    return entry.model_copy(update=update)
+
+
+def _baseline_variant_seed(
+    entry: TrackSamplingEntryConfig,
+    *,
+    baseline_variant_index: int,
+    run_seed: int | None,
+) -> int:
+    parts = (
+        "baseline_variant",
+        str(0 if run_seed is None else run_seed),
+        entry.id,
+        str(entry.course_id or ""),
+        str(entry.runtime_course_key or ""),
+        str(entry.course_index if entry.course_index is not None else ""),
+        str(entry.gp_difficulty or ""),
+        str(entry.vehicle or ""),
+        str(baseline_variant_index),
+    )
+    digest = hashlib.blake2s("|".join(parts).encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, byteorder="big", signed=False)
 
 
 def _materialized_track_sampling_entry(
