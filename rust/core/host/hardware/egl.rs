@@ -116,9 +116,12 @@ pub(super) struct EglFns {
 
 impl EglFns {
     fn load() -> Result<Self, String> {
+        // SAFETY: Loading process-global EGL/GL shared libraries is required to
+        // resolve the C entry points used by the hardware-render frontend.
         let library = Box::leak(Box::new(unsafe {
             Library::new("libEGL.so.1").map_err(|error| error.to_string())?
         }));
+        // SAFETY: Same as above for fallback GL symbols not exposed through EGL.
         let gl_library = Box::leak(Box::new(unsafe {
             Library::new("libGL.so.1").map_err(|error| error.to_string())?
         }));
@@ -142,10 +145,14 @@ impl EglFns {
     }
 
     pub(super) fn proc_address(&self, symbol_name: &CStr) -> *const c_void {
+        // SAFETY: `symbol_name` is NUL-terminated and comes from our GL loader
+        // or libretro's get-proc-address callback.
         let from_egl = unsafe { (self.get_proc_address)(symbol_name.as_ptr()) };
         if !from_egl.is_null() {
             return from_egl;
         }
+        // SAFETY: `libloading` validates the symbol lookup; the raw pointer is
+        // returned to the caller, which casts it to the expected GL signature.
         unsafe {
             self.gl_library
                 .get::<*const c_void>(symbol_name.to_bytes_with_nul())
@@ -155,6 +162,7 @@ impl EglFns {
     }
 
     fn error_hex(&self) -> String {
+        // SAFETY: `eglGetError` takes no arguments and is valid after EGL load.
         let code = unsafe { (self.get_error)() };
         format!("0x{code:04x}")
     }
@@ -167,6 +175,8 @@ pub(super) fn egl_fns() -> Result<&'static EglFns, String> {
 
 pub(super) fn create_display(egl: &EglFns) -> Result<EglDisplay, String> {
     if let Some(get_platform_display_ext) = egl.get_platform_display_ext {
+        // SAFETY: The optional platform-display entry point is resolved from
+        // EGL and accepts null native-display/attribute pointers for surfaceless.
         let display = unsafe {
             get_platform_display_ext(
                 EGL_VALUES.platform_surfaceless_mesa,
@@ -179,6 +189,8 @@ pub(super) fn create_display(egl: &EglFns) -> Result<EglDisplay, String> {
         }
     }
 
+    // SAFETY: `eglGetDisplay` accepts a null native display to request the
+    // default display.
     let display = unsafe { (egl.get_display)(ptr::null_mut()) };
     initialize_display(egl, display)?;
     Ok(display)
@@ -190,6 +202,8 @@ fn initialize_display(egl: &EglFns, display: EglDisplay) -> Result<(), String> {
     }
     let mut major = 0;
     let mut minor = 0;
+    // SAFETY: `display` was returned by EGL and the version output pointers are
+    // valid local variables.
     let ok = unsafe { (egl.initialize)(display, &mut major, &mut minor) };
     if ok == EGL_VALUES.false_value {
         return Err(format!("eglInitialize failed with {}", egl.error_hex()));
@@ -215,6 +229,8 @@ pub(super) fn choose_config(egl: &EglFns, display: EglDisplay) -> Result<EglConf
     ];
     let mut config = ptr::null_mut();
     let mut config_count = 0;
+    // SAFETY: Attribute and output pointers are valid for this call, and EGL
+    // writes at most one config because `config_size` is 1.
     let ok = unsafe {
         (egl.choose_config)(
             display,
@@ -242,6 +258,8 @@ pub(super) fn create_surface(
         PBUFFER_SIZE.height,
         EGL_VALUES.none,
     ];
+    // SAFETY: `display`/`config` were returned by EGL and attributes is
+    // NUL-terminated with EGL_NONE.
     let surface = unsafe { (egl.create_pbuffer_surface)(display, config, attributes.as_ptr()) };
     if surface.is_null() {
         return Err(format!(
@@ -253,6 +271,8 @@ pub(super) fn create_surface(
 }
 
 pub(super) fn bind_opengl_api(egl: &EglFns) -> Result<(), String> {
+    // SAFETY: Binding the OpenGL API is a process-local EGL operation with no
+    // borrowed pointers.
     let ok = unsafe { (egl.bind_api)(EGL_VALUES.opengl_api) };
     if ok == EGL_VALUES.false_value {
         return Err(format!(
@@ -270,6 +290,8 @@ pub(super) fn create_context(
     callback: &HwRenderCallback,
 ) -> Result<EglContext, String> {
     let attributes = context_attributes(callback);
+    // SAFETY: `display`/`config` were returned by EGL and attributes is
+    // NUL-terminated with EGL_NONE.
     let context =
         unsafe { (egl.create_context)(display, config, ptr::null_mut(), attributes.as_ptr()) };
     if context.is_null() {
@@ -299,6 +321,8 @@ pub(super) fn make_current(
     surface: EglSurface,
     context: EglContext,
 ) -> Result<(), String> {
+    // SAFETY: `display`, `surface`, and `context` are EGL handles owned by the
+    // hardware-render context.
     let ok = unsafe { (egl.make_current)(display, surface, surface, context) };
     if ok == EGL_VALUES.false_value {
         return Err(format!("eglMakeCurrent failed with {}", egl.error_hex()));
@@ -330,6 +354,8 @@ fn symbol<T>(library: &'static Library, name: &[u8]) -> Result<T, String>
 where
     T: Copy,
 {
+    // SAFETY: `name` is NUL-terminated and `T` is chosen by the caller to match
+    // the requested C symbol signature.
     unsafe {
         library
             .get::<T>(name)
@@ -342,5 +368,6 @@ fn optional_symbol<T>(library: &'static Library, name: &[u8]) -> Option<T>
 where
     T: Copy,
 {
+    // SAFETY: Same invariant as `symbol`; failure is represented as `None`.
     unsafe { library.get::<T>(name).map(|symbol| *symbol).ok() }
 }

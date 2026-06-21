@@ -55,6 +55,8 @@ impl CallbackState {
 
         let mut index = 0_usize;
         loop {
+            // SAFETY: SET_VARIABLES passes a null-key-terminated array of
+            // Variable entries that remains valid for the callback duration.
             let entry = unsafe { &*entries.add(index) };
             if entry.key.is_null() {
                 break;
@@ -80,6 +82,8 @@ impl CallbackState {
             return false;
         }
 
+        // SAFETY: GET_VARIABLE passes a valid Variable pointer when non-null.
+        // We only read the key pointer before writing the response below.
         let key_ptr = unsafe { (*variable).key };
         if key_ptr.is_null() {
             return false;
@@ -90,6 +94,9 @@ impl CallbackState {
             Some(value) => value.as_ptr(),
             None => ptr::null(),
         };
+        // SAFETY: `variable` was validated above and belongs to the current
+        // libretro callback. The value pointer references storage owned by
+        // `self.variables`, which outlives the callback.
         unsafe {
             (*variable).value = value;
         }
@@ -121,6 +128,8 @@ impl CallbackState {
         if data.is_null() {
             return;
         }
+        // SAFETY: SET_GEOMETRY passes a valid GameGeometry pointer when data is
+        // non-null. We copy only the scalar dimensions we need.
         let geometry = unsafe { &*data.cast::<GameGeometry>() };
         self.geometry = Some((geometry.base_width as usize, geometry.base_height as usize));
     }

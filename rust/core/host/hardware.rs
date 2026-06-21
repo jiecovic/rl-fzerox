@@ -76,6 +76,8 @@ impl HardwareRenderContext {
 
     pub fn reset_core_context(&self) -> Result<(), String> {
         make_current(self.egl, self.display, self.surface, self.context)?;
+        // SAFETY: The callback comes from libretro's hardware-render contract
+        // and is invoked after this host has made the matching EGL context current.
         unsafe {
             (self.context_reset)();
         }
@@ -86,6 +88,8 @@ impl HardwareRenderContext {
         if self.context_destroy as usize == 0 {
             return;
         }
+        // SAFETY: The core registered this optional destroy callback together
+        // with the hardware-render context and owns any core-side GL resources.
         unsafe {
             (self.context_destroy)();
         }
@@ -120,6 +124,9 @@ impl HardwareRenderContext {
             return false;
         };
         self.scratch.resize(byte_len, 0);
+        // SAFETY: `self.gl` contains loaded OpenGL function pointers with the
+        // declared signatures. The current EGL context is active above, and
+        // `scratch` is sized to hold width * height * RGB bytes.
         unsafe {
             (self.gl.finish)();
             (self.gl.pixel_storei)(GL_VALUES.pack_alignment, 1);
@@ -142,6 +149,9 @@ impl HardwareRenderContext {
 
 impl Drop for HardwareRenderContext {
     fn drop(&mut self) {
+        // SAFETY: These EGL handles were created by `from_callback` and remain
+        // owned by this context until drop. Null draw/read/context values are
+        // the EGL API's way to unbind the current context before destruction.
         unsafe {
             let _ = (self.egl.make_current)(
                 self.display,

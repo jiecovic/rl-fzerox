@@ -20,6 +20,8 @@ pub(super) fn c_string(value: *const i8) -> String {
         return String::new();
     }
 
+    // SAFETY: Libretro callback strings are expected to be valid
+    // NUL-terminated C strings for the duration of the callback.
     unsafe { CStr::from_ptr(value) }
         .to_string_lossy()
         .into_owned()
@@ -30,6 +32,8 @@ pub(super) fn read_u32(data: *mut c_void) -> Option<u32> {
         return None;
     }
 
+    // SAFETY: Environment callbacks pass a valid pointer to a u32 payload for
+    // commands handled through this helper. Null is rejected above.
     Some(unsafe { ptr::read(data.cast::<u32>()) })
 }
 
@@ -38,6 +42,8 @@ pub(super) fn write_ptr<T>(data: *mut c_void, value: T) -> bool {
         return false;
     }
 
+    // SAFETY: Environment callbacks pass writable storage matching the command
+    // payload type. The caller chooses `T` for the concrete command.
     unsafe {
         ptr::write(data.cast::<T>(), value);
     }
