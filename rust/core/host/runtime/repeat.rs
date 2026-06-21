@@ -108,9 +108,7 @@ impl Host {
                 if config.lean_timer_assist {
                     self.patch_lean_timers_for_slide_assist(controller_state)?;
                 }
-                self.call_core(|core| unsafe {
-                    core.run();
-                });
+                self.run_core_frame();
                 if capture_audio {
                     audio_frames.push_frame_samples(self.callbacks.drain_audio_samples());
                 }
@@ -185,9 +183,7 @@ impl Host {
                 if config.lean_timer_assist {
                     self.patch_lean_timers_for_slide_assist(controller_state)?;
                 }
-                self.call_core(|core| unsafe {
-                    core.run();
-                });
+                self.run_core_frame();
                 self.frame_index += 1;
 
                 let telemetry = self.telemetry_sample()?;

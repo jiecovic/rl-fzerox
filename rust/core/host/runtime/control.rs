@@ -46,9 +46,7 @@ impl Host {
         self.callbacks.clear_audio_samples();
         let run_frames = || {
             for _ in 0..count {
-                self.call_core(|core| unsafe {
-                    core.run();
-                });
+                self.run_core_frame();
             }
         };
         with_silenced_stdio(run_frames);

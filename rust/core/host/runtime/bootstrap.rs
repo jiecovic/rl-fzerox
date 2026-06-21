@@ -15,21 +15,19 @@ use crate::core::stdio::with_silenced_stdio;
 
 impl Host {
     pub(super) fn configure_callbacks(&mut self) {
-        self.call_core(|core| unsafe {
-            core.set_environment(environment_callback);
-            core.set_video_refresh(video_refresh_callback);
-            core.set_audio_sample(audio_sample_callback);
-            core.set_audio_sample_batch(audio_sample_batch_callback);
-            core.set_input_poll(input_poll_callback);
-            core.set_input_state(input_state_callback);
-        });
+        self.install_core_callbacks(
+            environment_callback,
+            video_refresh_callback,
+            audio_sample_callback,
+            audio_sample_batch_callback,
+            input_poll_callback,
+            input_state_callback,
+        );
     }
 
     pub(super) fn initialize(&mut self) {
         with_silenced_stdio(|| {
-            self.call_core(|core| unsafe {
-                core.init();
-            });
+            self.init_core();
         });
     }
 
@@ -41,11 +39,9 @@ impl Host {
             meta: ptr::null(),
         };
         let loaded = with_silenced_stdio(|| {
-            self.call_core(|core| unsafe {
-                core.set_controller_port_device(0, input_device());
-                core.set_controller_port_device(1, DEVICE_JOYPAD);
-                core.load_game(&game)
-            })
+            self.set_core_controller_port_device(0, input_device());
+            self.set_core_controller_port_device(1, DEVICE_JOYPAD);
+            self.load_core_game(&game)
         });
         if loaded {
             self.reset_hardware_context()
@@ -67,7 +63,7 @@ impl Host {
     }
 
     pub(super) fn refresh_av_info(&mut self) {
-        let av_info = self.call_core(|core| unsafe { core.system_av_info() });
+        let av_info = self.core_system_av_info();
         self.display_aspect_ratio = resolve_display_aspect_ratio(
             av_info.geometry.base_width as usize,
             av_info.geometry.base_height as usize,
@@ -98,9 +94,7 @@ impl Host {
         // stepping until the callback-side frame serial advances or we hit the
         // explicit wait limit.
         for _ in 0..limit {
-            self.call_core(|core| unsafe {
-                core.run();
-            });
+            self.run_core_frame();
             if self.callbacks.frame_serial() > baseline_serial {
                 return Ok(());
             }

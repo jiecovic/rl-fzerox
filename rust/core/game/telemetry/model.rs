@@ -2,16 +2,25 @@
 //! Public telemetry data structures.
 
 #[derive(Clone, Copy, Debug)]
-struct RacerStateFlags {
-    collision_recoil: u32,
-    retired: u32,
-    falling_off_track: u32,
-    finished: u32,
-    airborne: u32,
-    crashed: u32,
-    active: u32,
-    received_damage: u32,
-    spinning_out: u32,
+pub struct RacerStateFlagSpec {
+    pub mask: u32,
+    pub label: &'static str,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct RacerStateFlags {
+    pub collision_recoil: u32,
+    pub spinning_out: u32,
+    pub received_damage: u32,
+    pub retired: u32,
+    pub falling_off_track: u32,
+    pub can_boost: u32,
+    pub cpu_controlled: u32,
+    pub dash_pad_boost: u32,
+    pub finished: u32,
+    pub airborne: u32,
+    pub crashed: u32,
+    pub active: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -20,17 +29,67 @@ struct CourseEffectBits {
     pit: u32,
 }
 
-const RACER_STATE_FLAGS: RacerStateFlags = RacerStateFlags {
+pub const RACER_STATE_FLAGS: RacerStateFlags = RacerStateFlags {
     collision_recoil: 1 << 13,
+    spinning_out: 1 << 14,
+    received_damage: 1 << 17,
     retired: 1 << 18,
     falling_off_track: 1 << 19,
+    can_boost: 1 << 20,
+    cpu_controlled: 1 << 23,
+    dash_pad_boost: 1 << 24,
     finished: 1 << 25,
     airborne: 1 << 26,
     crashed: 1 << 27,
     active: 1 << 30,
-    received_damage: 1 << 17,
-    spinning_out: 1 << 14,
 };
+
+pub const RACER_STATE_FLAG_SPECS: [RacerStateFlagSpec; 11] = [
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.collision_recoil,
+        label: "collision_recoil",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.spinning_out,
+        label: "spinning_out",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.retired,
+        label: "retired",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.falling_off_track,
+        label: "falling_off_track",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.can_boost,
+        label: "can_boost",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.cpu_controlled,
+        label: "cpu_controlled",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.dash_pad_boost,
+        label: "dash_pad_boost",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.finished,
+        label: "finished",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.airborne,
+        label: "airborne",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.crashed,
+        label: "crashed",
+    },
+    RacerStateFlagSpec {
+        mask: RACER_STATE_FLAGS.active,
+        label: "active",
+    },
+];
 
 const COURSE_EFFECT_BITS: CourseEffectBits = CourseEffectBits { mask: 0xF, pit: 1 };
 

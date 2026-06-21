@@ -67,9 +67,7 @@ impl Host {
 
     fn initialize_running_state(&mut self) -> Result<(), CoreError> {
         let baseline_serial = self.callbacks.frame_serial();
-        self.call_core(|core| unsafe {
-            core.reset();
-        });
+        self.reset_core();
         self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)
     }
 
@@ -101,8 +99,7 @@ impl Host {
     }
 
     fn restore_state_bytes(&mut self, state: &[u8]) -> Result<(), CoreError> {
-        let restored =
-            self.call_core(|core| unsafe { core.unserialize(state.as_ptr().cast(), state.len()) });
+        let restored = self.unserialize_core_state(state);
         if restored {
             Ok(())
         } else {
@@ -111,14 +108,13 @@ impl Host {
     }
 
     fn serialize_state(&mut self) -> Result<Vec<u8>, CoreError> {
-        let size = self.call_core(|core| unsafe { core.serialize_size() });
+        let size = self.core_serialize_size();
         if size == 0 {
             return Err(CoreError::UnsupportedSaveState);
         }
 
         let mut state = vec![0_u8; size];
-        let serialized = self
-            .call_core(|core| unsafe { core.serialize(state.as_mut_ptr().cast(), state.len()) });
+        let serialized = self.serialize_core_state(&mut state);
         if !serialized {
             return Err(CoreError::SerializeFailed);
         }

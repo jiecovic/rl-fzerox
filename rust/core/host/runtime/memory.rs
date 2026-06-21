@@ -43,7 +43,7 @@ impl Host {
 
     pub(super) fn memory_size(&mut self, memory_id: u32) -> Result<usize, CoreError> {
         self.ensure_open()?;
-        let size = self.call_core(|core| unsafe { core.memory_size(memory_id) });
+        let size = self.core_memory_size(memory_id);
         if size == 0 {
             return Err(CoreError::MemoryUnavailable { memory_id });
         }
@@ -58,13 +58,10 @@ impl Host {
     pub(super) fn system_ram_slice(&mut self) -> Result<&[u8], CoreError> {
         self.ensure_open()?;
         let available = self.available_memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
-        let data =
-            self.call_core(|core| unsafe { core.memory_data(libretro_sys::MEMORY_SYSTEM_RAM) });
-        if data.is_null() {
-            return Err(CoreError::MemoryUnavailable {
-                memory_id: libretro_sys::MEMORY_SYSTEM_RAM,
-            });
-        }
+        let data = self.checked_memory_data(libretro_sys::MEMORY_SYSTEM_RAM)?;
+        // SAFETY: `checked_memory_data` guarantees a non-null core-owned RAM
+        // pointer, and `available` is bounded by the matching libretro memory
+        // size query.
         let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>(), available) };
         Ok(bytes)
     }
@@ -72,13 +69,11 @@ impl Host {
     pub(super) fn system_ram_slice_mut(&mut self) -> Result<&mut [u8], CoreError> {
         self.ensure_open()?;
         let available = self.available_memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
-        let data =
-            self.call_core(|core| unsafe { core.memory_data(libretro_sys::MEMORY_SYSTEM_RAM) });
-        if data.is_null() {
-            return Err(CoreError::MemoryUnavailable {
-                memory_id: libretro_sys::MEMORY_SYSTEM_RAM,
-            });
-        }
+        let data = self.checked_memory_data(libretro_sys::MEMORY_SYSTEM_RAM)?;
+        // SAFETY: `checked_memory_data` guarantees a non-null core-owned RAM
+        // pointer, and `available` is bounded by the matching libretro memory
+        // size query. The mutable borrow of `self` prevents another host borrow
+        // from aliasing this RAM slice through the safe API.
         let bytes = unsafe { slice::from_raw_parts_mut(data.cast::<u8>(), available) };
         Ok(bytes)
     }
@@ -110,11 +105,10 @@ impl Host {
             });
         }
 
-        let data = self.call_core(|core| unsafe { core.memory_data(memory_id) });
-        if data.is_null() {
-            return Err(CoreError::MemoryUnavailable { memory_id });
-        }
+        let data = self.checked_memory_data(memory_id)?;
 
+        // SAFETY: `end <= available`, `data` is non-null, and the slice starts
+        // at a checked offset inside the core-owned memory region.
         let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>().add(offset), length) };
         Ok(bytes.to_vec())
     }
@@ -145,11 +139,11 @@ impl Host {
             });
         }
 
-        let data = self.call_core(|core| unsafe { core.memory_data(memory_id) });
-        if data.is_null() {
-            return Err(CoreError::MemoryUnavailable { memory_id });
-        }
+        let data = self.checked_memory_data(memory_id)?;
 
+        // SAFETY: `end <= available`, `data` is non-null, and the mutable slice
+        // starts at a checked offset inside the core-owned memory region. The
+        // host's mutable borrow keeps this write exclusive through the safe API.
         let target = unsafe { slice::from_raw_parts_mut(data.cast::<u8>().add(offset), length) };
         target.copy_from_slice(bytes);
         Ok(())
@@ -160,5 +154,13 @@ impl Host {
             return Ok(self.system_ram_size);
         }
         self.memory_size(memory_id)
+    }
+
+    fn checked_memory_data(&mut self, memory_id: u32) -> Result<*mut std::ffi::c_void, CoreError> {
+        let data = self.core_memory_data(memory_id);
+        if data.is_null() {
+            return Err(CoreError::MemoryUnavailable { memory_id });
+        }
+        Ok(data)
     }
 }
