@@ -28,47 +28,8 @@ impl PyStepSummary {
     #[new]
     #[pyo3(signature = (data))]
     fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
-        let damage_taken_frames = optional_item(data, "damage_taken_frames", 0)?;
-        let collision_recoil_active_frames =
-            optional_item(data, "collision_recoil_active_frames", 0)?;
-        let impact_frames: Option<usize> = optional_item(data, "impact_frames", None)?;
-        let resolved_impact_frames =
-            impact_frames.unwrap_or(damage_taken_frames.max(collision_recoil_active_frames));
         Ok(Self {
-            inner: StepSummary {
-                frames_run: required_item(data, STEP_SUMMARY_PAYLOAD, "frames_run")?.extract()?,
-                max_race_distance: required_item(data, STEP_SUMMARY_PAYLOAD, "max_race_distance")?
-                    .extract()?,
-                max_race_distance_speed_kph: optional_item(
-                    data,
-                    "max_race_distance_speed_kph",
-                    0.0,
-                )?,
-                reverse_active_frames: optional_item(data, "reverse_active_frames", 0)?,
-                collision_recoil_active_frames,
-                low_speed_frames: optional_item(data, "low_speed_frames", 0)?,
-                energy_loss_total: optional_item(data, "energy_loss_total", 0.0)?,
-                energy_gain_total: optional_item(data, "energy_gain_total", 0.0)?,
-                damage_taken_frames,
-                impact_frames: resolved_impact_frames,
-                airborne_frames: optional_item(data, "airborne_frames", 0)?,
-                outside_track_min_height_above_ground: optional_item(
-                    data,
-                    "outside_track_min_height_above_ground",
-                    None,
-                )?,
-                spin_macro_started: optional_item(data, "spin_macro_started", false)?,
-                spin_macro_active_frames: optional_item(data, "spin_macro_active_frames", 0)?,
-                lean_macro_owned_frames: optional_item(data, "lean_macro_owned_frames", 0)?,
-                consecutive_low_speed_frames: optional_item(
-                    data,
-                    "consecutive_low_speed_frames",
-                    0,
-                )?,
-                entered_state_flags: optional_item(data, "entered_state_flags", 0)?,
-                entered_course_effects: optional_item(data, "entered_course_effects", 0)?,
-                final_frame_index: optional_item(data, "final_frame_index", 0)?,
-            },
+            inner: step_summary_from_dict(data)?,
         })
     }
 
@@ -270,34 +231,7 @@ impl PyStepStatus {
     #[pyo3(signature = (data))]
     fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
         Ok(Self {
-            inner: StepStatus {
-                counters: crate::core::host::StepCounters {
-                    step_count: required_item(data, STEP_STATUS_PAYLOAD, "step_count")?
-                        .extract()?,
-                    stalled_steps: optional_item(data, "stalled_steps", 0)?,
-                    progress_frontier_stalled_frames: optional_item(
-                        data,
-                        "progress_frontier_stalled_frames",
-                        0,
-                    )?,
-                    progress_frontier_distance: 0.0,
-                    progress_frontier_initialized: false,
-                },
-                reverse_timer: optional_item(data, "reverse_timer", 0)?,
-                termination_reason: parse_reason(optional_item(
-                    data,
-                    "termination_reason",
-                    None::<String>,
-                )?)?,
-                truncation_reason: parse_reason(optional_item(
-                    data,
-                    "truncation_reason",
-                    None::<String>,
-                )?)?,
-                spin_macro_active: optional_item(data, "spin_macro_active", false)?,
-                spin_macro_frames_remaining: optional_item(data, "spin_macro_frames_remaining", 0)?,
-                spin_macro_cooldown_frames: optional_item(data, "spin_macro_cooldown_frames", 0)?,
-            },
+            inner: step_status_from_dict(data)?,
         })
     }
 
@@ -377,6 +311,67 @@ impl PyStepStatus {
 
 pub(super) fn step_status_to_py(py: Python<'_>, status: &StepStatus) -> PyResult<Py<PyStepStatus>> {
     Py::new(py, PyStepStatus { inner: *status })
+}
+
+fn step_summary_from_dict(data: &Bound<'_, PyDict>) -> PyResult<StepSummary> {
+    let damage_taken_frames = optional_item(data, "damage_taken_frames", 0)?;
+    let collision_recoil_active_frames = optional_item(data, "collision_recoil_active_frames", 0)?;
+    let impact_frames: Option<usize> = optional_item(data, "impact_frames", None)?;
+    let resolved_impact_frames =
+        impact_frames.unwrap_or(damage_taken_frames.max(collision_recoil_active_frames));
+
+    Ok(StepSummary {
+        frames_run: required_item(data, STEP_SUMMARY_PAYLOAD, "frames_run")?.extract()?,
+        max_race_distance: required_item(data, STEP_SUMMARY_PAYLOAD, "max_race_distance")?
+            .extract()?,
+        max_race_distance_speed_kph: optional_item(data, "max_race_distance_speed_kph", 0.0)?,
+        reverse_active_frames: optional_item(data, "reverse_active_frames", 0)?,
+        collision_recoil_active_frames,
+        low_speed_frames: optional_item(data, "low_speed_frames", 0)?,
+        energy_loss_total: optional_item(data, "energy_loss_total", 0.0)?,
+        energy_gain_total: optional_item(data, "energy_gain_total", 0.0)?,
+        damage_taken_frames,
+        impact_frames: resolved_impact_frames,
+        airborne_frames: optional_item(data, "airborne_frames", 0)?,
+        outside_track_min_height_above_ground: optional_item(
+            data,
+            "outside_track_min_height_above_ground",
+            None,
+        )?,
+        spin_macro_started: optional_item(data, "spin_macro_started", false)?,
+        spin_macro_active_frames: optional_item(data, "spin_macro_active_frames", 0)?,
+        lean_macro_owned_frames: optional_item(data, "lean_macro_owned_frames", 0)?,
+        consecutive_low_speed_frames: optional_item(data, "consecutive_low_speed_frames", 0)?,
+        entered_state_flags: optional_item(data, "entered_state_flags", 0)?,
+        entered_course_effects: optional_item(data, "entered_course_effects", 0)?,
+        final_frame_index: optional_item(data, "final_frame_index", 0)?,
+    })
+}
+
+fn step_status_from_dict(data: &Bound<'_, PyDict>) -> PyResult<StepStatus> {
+    Ok(StepStatus {
+        counters: crate::core::host::StepCounters {
+            step_count: required_item(data, STEP_STATUS_PAYLOAD, "step_count")?.extract()?,
+            stalled_steps: optional_item(data, "stalled_steps", 0)?,
+            progress_frontier_stalled_frames: optional_item(
+                data,
+                "progress_frontier_stalled_frames",
+                0,
+            )?,
+            progress_frontier_distance: 0.0,
+            progress_frontier_initialized: false,
+        },
+        reverse_timer: optional_item(data, "reverse_timer", 0)?,
+        termination_reason: parse_reason(optional_item(
+            data,
+            "termination_reason",
+            None::<String>,
+        )?)?,
+        truncation_reason: parse_reason(optional_item(data, "truncation_reason", None::<String>)?)?,
+        spin_macro_active: optional_item(data, "spin_macro_active", false)?,
+        spin_macro_frames_remaining: optional_item(data, "spin_macro_frames_remaining", 0)?,
+        spin_macro_cooldown_frames: optional_item(data, "spin_macro_cooldown_frames", 0)?,
+    })
 }
 
 fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {
