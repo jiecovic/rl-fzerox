@@ -2,15 +2,76 @@
 //! Repeated-step host methods used by training and watch playback.
 
 use crate::core::error::CoreError;
+use crate::core::input::ControllerState;
 use crate::core::stdio::with_silenced_stdio;
 
 use super::host::Host;
+use super::spin::SpinStepStats;
 use super::step::{
     AudioFrameBatch, DisplayFrameBatch, NativeMultiObservationStepResult, NativeStepResult,
     NativeWatchStepResult, ObservationFrameBatch, ObservationRenderConfig, RepeatedStepConfig,
     StepStatus, StepSummary,
 };
 use super::step_accumulator::StepAccumulator;
+
+#[derive(Clone, Copy, Debug)]
+enum RepeatedStepCapture {
+    /// Training path: capture only the final framebuffer needed for the next
+    /// observation and avoid per-frame display/audio work.
+    FinalFrame,
+    /// Watch path: capture every repeated inner frame for smooth playback.
+    WatchFrames {
+        observation_config: ObservationRenderConfig,
+        capture_audio: bool,
+    },
+}
+
+#[derive(Debug)]
+struct RepeatedStepExecution {
+    summary: StepSummary,
+    display_frames: DisplayFrameBatch,
+    display_controller_masks: Vec<u16>,
+    audio_frames: AudioFrameBatch,
+}
+
+impl RepeatedStepCapture {
+    fn capture_video(self, repeat_index: usize, action_repeat: usize) -> bool {
+        match self {
+            Self::FinalFrame => repeat_index + 1 == action_repeat,
+            Self::WatchFrames { .. } => true,
+        }
+    }
+
+    fn capture_audio(self) -> Option<bool> {
+        match self {
+            Self::FinalFrame => None,
+            Self::WatchFrames { capture_audio, .. } => Some(capture_audio),
+        }
+    }
+
+    fn watch_observation_config(self) -> Option<ObservationRenderConfig> {
+        match self {
+            Self::FinalFrame => None,
+            Self::WatchFrames {
+                observation_config, ..
+            } => Some(observation_config),
+        }
+    }
+}
+
+impl RepeatedStepExecution {
+    fn new(summary: StepSummary, action_repeat: usize, capture: RepeatedStepCapture) -> Self {
+        Self {
+            summary,
+            display_frames: DisplayFrameBatch::default(),
+            display_controller_masks: match capture {
+                RepeatedStepCapture::FinalFrame => Vec::new(),
+                RepeatedStepCapture::WatchFrames { .. } => Vec::with_capacity(action_repeat),
+            },
+            audio_frames: AudioFrameBatch::default(),
+        }
+    }
+}
 
 impl Host {
     /// Execute one outer env step fully inside the host runtime.
@@ -29,12 +90,12 @@ impl Host {
         config: RepeatedStepConfig,
         observation_config: ObservationRenderConfig,
     ) -> Result<NativeStepResult<'_>, CoreError> {
-        let summary = self.execute_repeated_step_summary(config)?;
-        let (status, final_telemetry) = self.finalize_repeated_step(config, &summary)?;
+        let execution = self.execute_repeated_step(config, RepeatedStepCapture::FinalFrame)?;
+        let (status, final_telemetry) = self.finalize_repeated_step(config, &execution.summary)?;
         let observation = self.render_observation_from_config(observation_config)?;
         Ok(NativeStepResult {
             observation,
-            summary,
+            summary: execution.summary,
             status,
             final_telemetry,
         })
@@ -47,15 +108,15 @@ impl Host {
         config: RepeatedStepConfig,
         observation_configs: &[ObservationRenderConfig],
     ) -> Result<NativeMultiObservationStepResult, CoreError> {
-        let summary = self.execute_repeated_step_summary(config)?;
-        let (status, final_telemetry) = self.finalize_repeated_step(config, &summary)?;
+        let execution = self.execute_repeated_step(config, RepeatedStepCapture::FinalFrame)?;
+        let (status, final_telemetry) = self.finalize_repeated_step(config, &execution.summary)?;
         let mut observations = ObservationFrameBatch::with_capacity(observation_configs.len());
         for observation_config in observation_configs {
             observations.push_frame(self.render_observation_from_config(*observation_config)?);
         }
         Ok(NativeMultiObservationStepResult {
             observations,
-            summary,
+            summary: execution.summary,
             status,
             final_telemetry,
         })
@@ -72,6 +133,31 @@ impl Host {
         observation_config: ObservationRenderConfig,
         capture_audio: bool,
     ) -> Result<NativeWatchStepResult<'_>, CoreError> {
+        let execution = self.execute_repeated_step(
+            config,
+            RepeatedStepCapture::WatchFrames {
+                observation_config,
+                capture_audio,
+            },
+        )?;
+        let (status, final_telemetry) = self.finalize_repeated_step(config, &execution.summary)?;
+        let observation = self.render_observation_from_config(observation_config)?;
+        Ok(NativeWatchStepResult {
+            observation,
+            display_frames: execution.display_frames,
+            display_controller_masks: execution.display_controller_masks,
+            audio_frames: execution.audio_frames,
+            summary: execution.summary,
+            status,
+            final_telemetry,
+        })
+    }
+
+    fn execute_repeated_step(
+        &mut self,
+        config: RepeatedStepConfig,
+        capture: RepeatedStepCapture,
+    ) -> Result<RepeatedStepExecution, CoreError> {
         self.ensure_open()?;
         if config.action_repeat == 0 {
             return Err(CoreError::InvalidStepRepeatCount {
@@ -86,16 +172,19 @@ impl Host {
         if !spin_controls_active {
             self.callbacks.set_controller_state(base_controller_state);
         }
+        let watch_capture_audio = capture.capture_audio();
         let step_result = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
-            let mut display_frames = DisplayFrameBatch::default();
-            let mut display_controller_masks = Vec::with_capacity(config.action_repeat);
-            let mut audio_frames = AudioFrameBatch::default();
-            self.callbacks.set_capture_audio(capture_audio);
+            let mut execution =
+                RepeatedStepExecution::new(StepSummary::default(), config.action_repeat, capture);
+            if let Some(capture_audio) = watch_capture_audio {
+                self.callbacks.set_capture_audio(capture_audio);
+            }
 
-            for _ in 0..config.action_repeat {
-                self.callbacks.set_capture_video(true);
-                if capture_audio {
+            for repeat_index in 0..config.action_repeat {
+                self.callbacks
+                    .set_capture_video(capture.capture_video(repeat_index, config.action_repeat));
+                if watch_capture_audio.is_some_and(|enabled| enabled) {
                     self.callbacks.clear_audio_samples();
                 }
                 let controller_state = self.controller_for_repeated_frame(
@@ -104,102 +193,63 @@ impl Host {
                     &mut spin_stats,
                     config.spin_cooldown_frames,
                 );
-                display_controller_masks.push(controller_state.race_control_mask());
                 if config.lean_timer_assist {
                     self.patch_lean_timers_for_slide_assist(controller_state)?;
                 }
                 self.run_core_frame();
-                if capture_audio {
-                    audio_frames.push_frame_samples(self.callbacks.drain_audio_samples());
+                if watch_capture_audio.is_some_and(|enabled| enabled) {
+                    execution
+                        .audio_frames
+                        .push_frame_samples(self.callbacks.drain_audio_samples());
                 }
                 self.frame_index += 1;
 
                 let telemetry = self.telemetry_sample()?;
                 accumulator.observe(&telemetry, self.frame_index);
-                let display_frame = self.display_frame(observation_config.layout)?;
-                display_frames.reserve_frame_capacity(display_frame.len(), config.action_repeat);
-                display_frames.push_frame(display_frame);
+                self.capture_watch_frame_outputs(
+                    capture,
+                    controller_state,
+                    config.action_repeat,
+                    &mut execution,
+                )?;
             }
 
-            Ok((
-                self.finish_repeated_step(accumulator, spin_stats),
-                display_frames,
-                display_controller_masks,
-                audio_frames,
-            ))
+            execution.summary = self.finish_repeated_step(accumulator, spin_stats);
+            Ok(execution)
         });
-        self.callbacks.set_capture_audio(false);
+        if watch_capture_audio.is_some() {
+            self.callbacks.set_capture_audio(false);
+        }
         self.callbacks.set_capture_video(true);
         self.refresh_shape_from_frame();
 
-        let (summary, display_frames, display_controller_masks, audio_frames) = step_result?;
+        let execution = step_result?;
         if !self.callbacks.has_frame() {
             return Err(CoreError::NoFrameAvailable);
         }
-
-        let (status, final_telemetry) = self.finalize_repeated_step(config, &summary)?;
-        let observation = self.render_observation_from_config(observation_config)?;
-        Ok(NativeWatchStepResult {
-            observation,
-            display_frames,
-            display_controller_masks,
-            audio_frames,
-            summary,
-            status,
-            final_telemetry,
-        })
+        Ok(execution)
     }
 
-    fn execute_repeated_step_summary(
+    fn capture_watch_frame_outputs(
         &mut self,
-        config: RepeatedStepConfig,
-    ) -> Result<StepSummary, CoreError> {
-        self.ensure_open()?;
-        if config.action_repeat == 0 {
-            return Err(CoreError::InvalidStepRepeatCount {
-                count: config.action_repeat,
-            });
-        }
+        capture: RepeatedStepCapture,
+        controller_state: ControllerState,
+        action_repeat: usize,
+        execution: &mut RepeatedStepExecution,
+    ) -> Result<(), CoreError> {
+        let Some(observation_config) = capture.watch_observation_config() else {
+            return Ok(());
+        };
 
-        let initial_sample = self.telemetry_sample()?;
-        let mut spin_stats = self.spin_macro.begin_step(config.spin_request);
-        let spin_controls_active = self.spin_controls_active(spin_stats.started);
-        let base_controller_state = config.race_controls.to_controller_state();
-        if !spin_controls_active {
-            self.callbacks.set_controller_state(base_controller_state);
-        }
-        let step_result = with_silenced_stdio(|| {
-            let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
-
-            for repeat_index in 0..config.action_repeat {
-                let capture_video = repeat_index + 1 == config.action_repeat;
-                self.callbacks.set_capture_video(capture_video);
-                let controller_state = self.controller_for_repeated_frame(
-                    base_controller_state,
-                    spin_controls_active,
-                    &mut spin_stats,
-                    config.spin_cooldown_frames,
-                );
-                if config.lean_timer_assist {
-                    self.patch_lean_timers_for_slide_assist(controller_state)?;
-                }
-                self.run_core_frame();
-                self.frame_index += 1;
-
-                let telemetry = self.telemetry_sample()?;
-                accumulator.observe(&telemetry, self.frame_index);
-            }
-
-            Ok(self.finish_repeated_step(accumulator, spin_stats))
-        });
-        self.callbacks.set_capture_video(true);
-        self.refresh_shape_from_frame();
-
-        let summary = step_result?;
-        if !self.callbacks.has_frame() {
-            return Err(CoreError::NoFrameAvailable);
-        }
-        Ok(summary)
+        execution
+            .display_controller_masks
+            .push(controller_state.race_control_mask());
+        let display_frame = self.display_frame(observation_config.layout)?;
+        execution
+            .display_frames
+            .reserve_frame_capacity(display_frame.len(), action_repeat);
+        execution.display_frames.push_frame(display_frame);
+        Ok(())
     }
 
     fn spin_controls_active(&self, spin_started: bool) -> bool {
@@ -212,11 +262,11 @@ impl Host {
 
     fn controller_for_repeated_frame(
         &mut self,
-        base_controller_state: crate::core::input::ControllerState,
+        base_controller_state: ControllerState,
         spin_controls_active: bool,
-        spin_stats: &mut super::spin::SpinStepStats,
+        spin_stats: &mut SpinStepStats,
         spin_cooldown_frames: usize,
-    ) -> crate::core::input::ControllerState {
+    ) -> ControllerState {
         if !spin_controls_active {
             return base_controller_state;
         }
@@ -235,7 +285,7 @@ impl Host {
     fn finish_repeated_step(
         &self,
         accumulator: StepAccumulator,
-        spin_stats: super::spin::SpinStepStats,
+        spin_stats: SpinStepStats,
     ) -> StepSummary {
         let mut summary = accumulator.finish();
         summary.spin_macro_started = spin_stats.started;
