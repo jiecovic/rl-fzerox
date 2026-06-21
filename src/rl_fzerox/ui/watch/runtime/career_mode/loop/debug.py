@@ -10,7 +10,7 @@ import zlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -248,11 +248,11 @@ def _numpy_bool_to_python(value: np.bool_) -> bool:
     return bool(value)
 
 
-def _numpy_float_to_python(value: np.floating[object]) -> float:
+def _numpy_float_to_python(value: np.floating[Any]) -> float:
     return float(value)
 
 
-def _numpy_integer_to_python(value: np.integer[object]) -> int:
+def _numpy_integer_to_python(value: np.integer[Any]) -> int:
     return int(value)
 
 
