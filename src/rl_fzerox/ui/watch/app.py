@@ -37,7 +37,10 @@ from rl_fzerox.ui.watch.view.screen.frame import (
     _ensure_screen,
     _watch_game_display_size,
 )
-from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
+from rl_fzerox.ui.watch.view.screen.render import (
+    draw_watch_frame,
+    track_pool_records_for_watch_snapshot,
+)
 from rl_fzerox.ui.watch.view.screen.types import PygameModule, ViewerHitboxes
 
 WatchWorkerFactory = Callable[[WatchAppConfig], WatchWorker]
@@ -92,6 +95,12 @@ def run_viewer(
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
         auxiliary_metrics.observe_snapshot(snapshot)
         live_episode_series = getattr(snapshot, "live_episode_series", None)
+        active_track_sampling = snapshot.active_track_sampling
+        track_pool_records = track_pool_records_for_watch_snapshot(
+            config,
+            snapshot,
+            active_track_sampling=active_track_sampling,
+        )
         policy_observation_layout_shape = _initial_policy_observation_layout_shape(
             snapshot,
             config=config,
@@ -144,6 +153,13 @@ def run_viewer(
             )
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
+                if snapshot.active_track_sampling is not None:
+                    active_track_sampling = snapshot.active_track_sampling
+                    track_pool_records = track_pool_records_for_watch_snapshot(
+                        config,
+                        snapshot,
+                        active_track_sampling=active_track_sampling,
+                    )
                 policy_observation_layout_shape = _next_policy_observation_layout_shape(
                     policy_observation_layout_shape,
                     snapshot,
@@ -177,6 +193,7 @@ def run_viewer(
                 paused=paused,
                 render_rate=render_rate,
                 target_render_fps=target_render_fps,
+                track_pool_records=track_pool_records,
                 auxiliary_episode_metrics=auxiliary_metrics.snapshot(),
                 live_episode_series=live_episode_series,
                 panel_tabs=panel_tabs,

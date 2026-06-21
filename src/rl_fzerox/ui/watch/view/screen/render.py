@@ -45,6 +45,7 @@ def draw_watch_frame(
     paused: bool,
     render_rate: RateMeter,
     target_render_fps: float | None,
+    track_pool_records: tuple[dict[str, object], ...] | None = None,
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
     live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
     panel_tabs: PanelTabRegistry = WATCH_PANEL_TABS,
@@ -67,12 +68,13 @@ def draw_watch_frame(
         target_control_fps=snapshot.target_control_fps,
         target_render_fps=target_render_fps,
     )
-    track_pool_records = _track_pool_records(
-        config,
-        draw_info,
-        active_track_sampling=snapshot.active_track_sampling,
-        policy_stage_name=snapshot.policy_curriculum_stage,
-    )
+    if track_pool_records is None:
+        track_pool_records = track_pool_records_for_watch_snapshot(
+            config,
+            snapshot,
+            info=draw_info,
+            active_track_sampling=snapshot.active_track_sampling,
+        )
     _add_config_track_info(draw_info, config, track_pool_records=track_pool_records)
     _add_career_mode_info(draw_info, config)
     policy_observation = snapshot.policy_observation
@@ -182,6 +184,23 @@ def _thrust_full_threshold(action_config: ActionRuntimeConfig) -> float | None:
     if not action_config.uses_continuous_drive():
         return None
     return float(action_config.continuous_drive_full_threshold)
+
+
+def track_pool_records_for_watch_snapshot(
+    config: WatchAppConfig,
+    snapshot: WatchSnapshot,
+    *,
+    info: dict[str, object] | None = None,
+    active_track_sampling: TrackSamplingConfig | None = None,
+) -> tuple[dict[str, object], ...]:
+    """Build the track-pool view model once per track-sampling config update."""
+
+    return _track_pool_records(
+        config,
+        snapshot.info if info is None else info,
+        active_track_sampling=active_track_sampling,
+        policy_stage_name=snapshot.policy_curriculum_stage,
+    )
 
 
 def _add_config_track_info(

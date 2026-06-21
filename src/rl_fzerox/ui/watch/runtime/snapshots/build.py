@@ -121,6 +121,7 @@ def _publish_step_snapshots(
     cnn_activations: CnnActivationSnapshot | None,
     active_track_sampling: TrackSamplingConfig | None,
     track_record_book: TrackRecordBook,
+    include_track_sampling: bool = False,
     previous_control_state: RaceControlState | None = None,
     previous_gas_level: float | None = None,
     previous_action_mask_branches: ActionMaskBranches | None = None,
@@ -247,7 +248,9 @@ def _publish_step_snapshots(
                 manual_control_enabled=manual_control_enabled,
                 policy_reload_error=policy_reload_error,
                 cnn_activations=cnn_activations,
-                active_track_sampling=active_track_sampling,
+                active_track_sampling=(
+                    active_track_sampling if include_track_sampling and is_final_frame else None
+                ),
                 track_record_book=track_record_book,
                 action_hold_frame=index + 1,
                 action_hold_frames=len(frames),

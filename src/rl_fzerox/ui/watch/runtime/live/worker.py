@@ -614,7 +614,11 @@ def _run_simulation_loop(
                     deterministic_policy=deterministic_policy,
                     policy_reload_error=policy_reload_error,
                     cnn_activations=cnn_activations,
-                    active_track_sampling=active_track_sampling,
+                    # The full track-sampling config can be hundreds of KB when
+                    # race-start variants are enabled. Initial/reset snapshots
+                    # carry it for UI metadata; repeated display-frame snapshots
+                    # omit it so Watch does not pickle it every frame.
+                    active_track_sampling=None,
                     track_record_book=track_record_book,
                     manual_control_enabled=manual_control_enabled,
                     live_episode_series=live_episode_series,

@@ -9,6 +9,8 @@ from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
     WatchAppConfig,
 )
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
@@ -235,6 +237,65 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
             "best_completion": 1.0,
         }
         assert snapshot.track_record_book.entries["silence"].failed_attempt is True
+
+
+def test_publish_step_snapshots_omits_track_sampling_by_default(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    baseline_path = tmp_path / "baseline.state"
+    core_path.touch()
+    rom_path.touch()
+    baseline_path.touch()
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+    )
+    track_sampling = TrackSamplingConfig(
+        enabled=True,
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute-city-variant-1",
+                course_id="mute_city",
+                baseline_state_path=baseline_path,
+            ),
+        ),
+    )
+    queue = _SnapshotQueue()
+
+    _publish_step_snapshots(
+        config=config,
+        env=_Env(),
+        emulator=_Emulator(),
+        snapshot_queue=queue,
+        display_frames=(_rgb(1), _rgb(2)),
+        previous_observation=_rgb(10),
+        previous_info={"phase": "previous"},
+        previous_episode_reward=12.0,
+        previous_telemetry=None,
+        final_observation=_rgb(20),
+        final_info={"phase": "final"},
+        final_episode_reward=13.0,
+        final_telemetry=None,
+        reset_info={},
+        episode=4,
+        control_fps=30.0,
+        target_control_fps=30.0,
+        target_control_seconds=None,
+        control_state=race_control_state(),
+        gas_level=1.0,
+        boost_lamp_level=0.0,
+        policy_action=None,
+        policy_runner=None,
+        deterministic_policy=True,
+        manual_control_enabled=False,
+        policy_reload_error=None,
+        cnn_activations=None,
+        active_track_sampling=track_sampling,
+        track_record_book=record_book(),
+    )
+
+    assert all(isinstance(message, WatchSnapshot) for message in queue.messages)
+    snapshots = [message for message in queue.messages if isinstance(message, WatchSnapshot)]
+    assert [snapshot.active_track_sampling for snapshot in snapshots] == [None, None]
 
 
 def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Path) -> None:
