@@ -22,6 +22,8 @@ import type {
   PolicyPlaybackMode,
 } from "@/shared/api/contract";
 import { Button, IconButton } from "@/shared/ui/Button";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { cn } from "@/shared/ui/cn";
 import { ConfigStack } from "@/shared/ui/config/ConfigLayout";
 import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
@@ -85,6 +87,11 @@ export function EvaluationsPanel({
   const [nameEdited, setNameEdited] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [deletingEvaluationId, setDeletingEvaluationId] = useState<string | null>(null);
+  const [deleteSelectedRequested, setDeleteSelectedRequested] = useState(false);
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+  const [selectedEvaluationIds, setSelectedEvaluationIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
   const [activeTab, setActiveTab] = useState<EvaluationWorkspaceTab>("snapshots");
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
   const selectedRunDetail = runDetailsById[selectedRunId] ?? null;
@@ -122,6 +129,18 @@ export function EvaluationsPanel({
       return typeof nextConfig === "function" ? nextConfig(currentConfig) : nextConfig;
     });
   }, []);
+  const deletableEvaluations = useMemo(
+    () => evaluations.filter((evaluation) => evaluation.status === "created"),
+    [evaluations],
+  );
+  const selectedEvaluations = useMemo(
+    () => deletableEvaluations.filter((evaluation) => selectedEvaluationIds.has(evaluation.id)),
+    [deletableEvaluations, selectedEvaluationIds],
+  );
+  const allDeletableEvaluationsSelected =
+    deletableEvaluations.length > 0 &&
+    deletableEvaluations.every((evaluation) => selectedEvaluationIds.has(evaluation.id));
+  const isDeletingEvaluation = deletingEvaluationId !== null || isDeletingSelected;
 
   useEffect(() => {
     if (runs.length === 0) {
@@ -179,6 +198,14 @@ export function EvaluationsPanel({
       setNameText(defaultName);
     }
   }, [defaultName, nameEdited]);
+
+  useEffect(() => {
+    const deletableIds = new Set(deletableEvaluations.map((evaluation) => evaluation.id));
+    setSelectedEvaluationIds((current) => {
+      const next = new Set([...current].filter((evaluationId) => deletableIds.has(evaluationId)));
+      return next.size === current.size ? current : next;
+    });
+  }, [deletableEvaluations]);
 
   function selectPreset(nextPresetId: EvaluationPresetId) {
     const nextPreset = presets.find((preset) => preset.id === nextPresetId);
@@ -248,87 +275,154 @@ export function EvaluationsPanel({
     }
   }
 
+  function setAllEvaluationsSelected(selected: boolean) {
+    setSelectedEvaluationIds(
+      selected ? new Set(deletableEvaluations.map(({ id }) => id)) : new Set(),
+    );
+  }
+
+  function toggleEvaluationSelection(evaluationId: string, selected: boolean) {
+    setSelectedEvaluationIds((current) => {
+      const next = new Set(current);
+      if (selected) {
+        next.add(evaluationId);
+      } else {
+        next.delete(evaluationId);
+      }
+      return next;
+    });
+  }
+
+  async function confirmSelectedEvaluationDelete() {
+    const targets = selectedEvaluations;
+    if (targets.length === 0) {
+      setDeleteSelectedRequested(false);
+      return;
+    }
+    setIsDeletingSelected(true);
+    onGlobalError(null);
+    try {
+      for (const evaluation of targets) {
+        await onDeleteEvaluation(evaluation);
+      }
+      setSelectedEvaluationIds(new Set());
+      setDeleteSelectedRequested(false);
+    } catch (caught) {
+      onGlobalError(caught instanceof Error ? caught.message : "failed to delete evaluations");
+    } finally {
+      setIsDeletingSelected(false);
+    }
+  }
+
   return (
-    <Panel>
-      <div className="panel-header-row">
-        <PanelHeader
-          title="Evaluations"
-          subtitle="Freeze policy checkpoints for reproducible headless evaluation runs."
-        />
-      </div>
-
-      {runs.length === 0 ? (
-        <Notice>Create or import a run before creating evaluation snapshots.</Notice>
-      ) : defaultConfig === null || metadata === null ? (
-        <Notice tone="error">Run-manager metadata is required before creating evaluations.</Notice>
-      ) : (
-        <div className="grid gap-5">
-          <Tabs
-            activeId={activeTab}
-            items={EVALUATION_WORKSPACE_TABS}
-            label="Evaluation sections"
-            variant="section"
-            onSelect={setActiveTab}
+    <>
+      <Panel>
+        <div className="panel-header-row">
+          <PanelHeader
+            title="Evaluations"
+            subtitle="Freeze policy checkpoints for reproducible headless evaluation runs."
           />
-
-          {activeTab === "snapshots" ? (
-            <SnapshotCreatePanel
-              defaultName={defaultName}
-              isCreating={isCreating}
-              nameText={nameText}
-              policyMode={policyMode}
-              presetId={selectedPreset?.id ?? presetId}
-              presets={presets}
-              repeatText={repeatText}
-              repeatLabel={selectedTarget?.mode === "gp_cup" ? "Repeats / cup" : "Repeats / course"}
-              runs={runs}
-              seedText={seedText}
-              selectedRunId={selectedRunId}
-              selectedTarget={selectedTarget}
-              sourceArtifact={sourceArtifact}
-              onConfigurePreset={() => setActiveTab("preset_config")}
-              onCreate={() => void submitEvaluation()}
-              onNameChange={(value) => {
-                setNameEdited(true);
-                setNameText(value);
-              }}
-              onPolicyModeChange={setPolicyMode}
-              onPresetChange={selectPreset}
-              onRepeatChange={setRepeatText}
-              onRunChange={(runId) => {
-                setSelectedRunId(runId);
-                setNameEdited(false);
-              }}
-              onSeedChange={setSeedText}
-              onSourceArtifactChange={setSourceArtifact}
-            />
-          ) : null}
-
-          {activeTab === "preset_config" && presetConfig !== null ? (
-            <PresetConfigPanel
-              defaultConfig={defaultConfig}
-              metadata={metadata}
-              presetConfig={presetConfig}
-              presetId={selectedPreset?.id ?? presetId}
-              presets={presets}
-              selectedTarget={selectedTarget}
-              setEvaluationConfig={setEvaluationConfig}
-              onPresetChange={selectPreset}
-              onUseForSnapshot={() => setActiveTab("snapshots")}
-            />
-          ) : null}
-
-          {activeTab === "records" ? (
-            <RecordsPanel
-              deletingEvaluationId={deletingEvaluationId}
-              evaluationError={evaluationError}
-              evaluations={evaluations}
-              onDeleteEvaluation={(evaluation) => void deleteEvaluationRecord(evaluation)}
-            />
-          ) : null}
         </div>
-      )}
-    </Panel>
+
+        {runs.length === 0 ? (
+          <Notice>Create or import a run before creating evaluation snapshots.</Notice>
+        ) : defaultConfig === null || metadata === null ? (
+          <Notice tone="error">
+            Run-manager metadata is required before creating evaluations.
+          </Notice>
+        ) : (
+          <div className="grid gap-5">
+            <Tabs
+              activeId={activeTab}
+              items={EVALUATION_WORKSPACE_TABS}
+              label="Evaluation sections"
+              variant="section"
+              onSelect={setActiveTab}
+            />
+
+            {activeTab === "snapshots" ? (
+              <SnapshotCreatePanel
+                defaultName={defaultName}
+                isCreating={isCreating}
+                nameText={nameText}
+                policyMode={policyMode}
+                presetId={selectedPreset?.id ?? presetId}
+                presets={presets}
+                repeatText={repeatText}
+                repeatLabel={
+                  selectedTarget?.mode === "gp_cup" ? "Repeats / cup" : "Repeats / course"
+                }
+                runs={runs}
+                seedText={seedText}
+                selectedRunId={selectedRunId}
+                selectedTarget={selectedTarget}
+                sourceArtifact={sourceArtifact}
+                onConfigurePreset={() => setActiveTab("preset_config")}
+                onCreate={() => void submitEvaluation()}
+                onNameChange={(value) => {
+                  setNameEdited(true);
+                  setNameText(value);
+                }}
+                onPolicyModeChange={setPolicyMode}
+                onPresetChange={selectPreset}
+                onRepeatChange={setRepeatText}
+                onRunChange={(runId) => {
+                  setSelectedRunId(runId);
+                  setNameEdited(false);
+                }}
+                onSeedChange={setSeedText}
+                onSourceArtifactChange={setSourceArtifact}
+              />
+            ) : null}
+
+            {activeTab === "preset_config" && presetConfig !== null ? (
+              <PresetConfigPanel
+                defaultConfig={defaultConfig}
+                metadata={metadata}
+                presetConfig={presetConfig}
+                presetId={selectedPreset?.id ?? presetId}
+                presets={presets}
+                selectedTarget={selectedTarget}
+                setEvaluationConfig={setEvaluationConfig}
+                onPresetChange={selectPreset}
+                onUseForSnapshot={() => setActiveTab("snapshots")}
+              />
+            ) : null}
+
+            {activeTab === "records" ? (
+              <RecordsPanel
+                allDeletableEvaluationsSelected={allDeletableEvaluationsSelected}
+                deletingEvaluationId={deletingEvaluationId}
+                evaluationError={evaluationError}
+                evaluations={evaluations}
+                isDeletingEvaluation={isDeletingEvaluation}
+                selectedEvaluationCount={selectedEvaluations.length}
+                selectedEvaluationIds={selectedEvaluationIds}
+                onDeleteEvaluation={(evaluation) => void deleteEvaluationRecord(evaluation)}
+                onRequestSelectedDelete={() => setDeleteSelectedRequested(true)}
+                onSelectAllEvaluations={setAllEvaluationsSelected}
+                onToggleEvaluationSelection={toggleEvaluationSelection}
+              />
+            ) : null}
+          </div>
+        )}
+      </Panel>
+      <ConfirmDialog
+        busy={isDeletingSelected}
+        confirmLabel={
+          selectedEvaluations.length === 0
+            ? "Delete selected"
+            : `Delete ${selectedEvaluations.length} snapshots`
+        }
+        description={`Delete ${selectedEvaluations.length} created evaluation snapshot${
+          selectedEvaluations.length === 1 ? "" : "s"
+        } and their copied checkpoint files.`}
+        open={deleteSelectedRequested}
+        title="Delete selected evaluations"
+        onClose={() => setDeleteSelectedRequested(false)}
+        onConfirm={() => void confirmSelectedEvaluationDelete()}
+      />
+    </>
   );
 }
 
@@ -547,15 +641,29 @@ function PresetConfigPanel({
 }
 
 function RecordsPanel({
+  allDeletableEvaluationsSelected,
   deletingEvaluationId,
   evaluationError,
   evaluations,
+  isDeletingEvaluation,
+  selectedEvaluationCount,
+  selectedEvaluationIds,
   onDeleteEvaluation,
+  onRequestSelectedDelete,
+  onSelectAllEvaluations,
+  onToggleEvaluationSelection,
 }: {
+  allDeletableEvaluationsSelected: boolean;
   deletingEvaluationId: string | null;
   evaluationError: string | null;
   evaluations: ManagedEvaluation[];
+  isDeletingEvaluation: boolean;
+  selectedEvaluationCount: number;
+  selectedEvaluationIds: ReadonlySet<string>;
   onDeleteEvaluation: (evaluation: ManagedEvaluation) => void;
+  onRequestSelectedDelete: () => void;
+  onSelectAllEvaluations: (selected: boolean) => void;
+  onToggleEvaluationSelection: (evaluationId: string, selected: boolean) => void;
 }) {
   if (evaluationError !== null) {
     return (
@@ -568,28 +676,80 @@ function RecordsPanel({
   return evaluations.length === 0 ? (
     <Notice>No evaluation snapshots yet.</Notice>
   ) : (
-    <EvaluationTable
-      deletingEvaluationId={deletingEvaluationId}
-      evaluations={evaluations}
-      onDeleteEvaluation={onDeleteEvaluation}
-    />
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-app-muted">
+          {selectedEvaluationCount === 0
+            ? "No snapshots selected"
+            : `${selectedEvaluationCount} snapshot${
+                selectedEvaluationCount === 1 ? "" : "s"
+              } selected`}
+        </div>
+        <Button
+          className="gap-2"
+          disabled={selectedEvaluationCount === 0 || isDeletingEvaluation}
+          tone="danger"
+          type="button"
+          onClick={onRequestSelectedDelete}
+        >
+          <TrashIcon />
+          <span>
+            {selectedEvaluationCount === 0
+              ? "Delete selected"
+              : `Delete selected (${selectedEvaluationCount})`}
+          </span>
+        </Button>
+      </div>
+      <EvaluationTable
+        allDeletableEvaluationsSelected={allDeletableEvaluationsSelected}
+        deletingEvaluationId={deletingEvaluationId}
+        evaluations={evaluations}
+        isDeletingEvaluation={isDeletingEvaluation}
+        selectedEvaluationIds={selectedEvaluationIds}
+        onDeleteEvaluation={onDeleteEvaluation}
+        onSelectAllEvaluations={onSelectAllEvaluations}
+        onToggleEvaluationSelection={onToggleEvaluationSelection}
+      />
+    </div>
   );
 }
 
 function EvaluationTable({
+  allDeletableEvaluationsSelected,
   deletingEvaluationId,
   evaluations,
+  isDeletingEvaluation,
+  selectedEvaluationIds,
   onDeleteEvaluation,
+  onSelectAllEvaluations,
+  onToggleEvaluationSelection,
 }: {
+  allDeletableEvaluationsSelected: boolean;
   deletingEvaluationId: string | null;
   evaluations: ManagedEvaluation[];
+  isDeletingEvaluation: boolean;
+  selectedEvaluationIds: ReadonlySet<string>;
   onDeleteEvaluation: (evaluation: ManagedEvaluation) => void;
+  onSelectAllEvaluations: (selected: boolean) => void;
+  onToggleEvaluationSelection: (evaluationId: string, selected: boolean) => void;
 }) {
   return (
     <div className="overflow-x-auto border border-app-border bg-app-surface">
       <table className="w-full min-w-[980px] border-collapse text-left text-sm">
         <thead className="border-b border-app-border text-xs font-bold tracking-[0.04em] text-app-muted uppercase">
           <tr>
+            <th className="w-10 px-4 py-3">
+              <label className="grid place-items-center">
+                <input
+                  aria-label="Select all created evaluations"
+                  checked={allDeletableEvaluationsSelected}
+                  className={evaluationCheckboxClass}
+                  disabled={isDeletingEvaluation}
+                  type="checkbox"
+                  onChange={(event) => onSelectAllEvaluations(event.currentTarget.checked)}
+                />
+              </label>
+            </th>
             <th className="px-4 py-3">Evaluation</th>
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3">Checkpoint</th>
@@ -600,56 +760,76 @@ function EvaluationTable({
           </tr>
         </thead>
         <tbody>
-          {evaluations.map((evaluation) => (
-            <tr className="border-b border-app-border last:border-b-0" key={evaluation.id}>
-              <td className="px-4 py-3 align-top">
-                <div className="grid gap-1">
-                  <strong className="text-app-text">{evaluation.name}</strong>
-                  <span className="font-mono text-xs text-app-muted">{evaluation.id}</span>
-                </div>
-              </td>
-              <td className="px-4 py-3 align-top capitalize text-app-muted">{evaluation.status}</td>
-              <td className="px-4 py-3 align-top">
-                <div className="grid gap-1 text-app-muted">
-                  <span>
-                    {evaluation.checkpoint.source_run_name ?? evaluation.source_run_id ?? "-"} ·{" "}
-                    {evaluation.checkpoint.artifact}
-                  </span>
-                  <span className="text-xs">
-                    {formatStepCount(evaluation.checkpoint.lineage_num_timesteps)}
-                  </span>
-                </div>
-              </td>
-              <td className="px-4 py-3 align-top text-app-muted">
-                <div className="grid gap-1">
-                  <span>
-                    {TARGET_MODE_LABELS[evaluation.target.mode]} ·{" "}
-                    {evaluation.target.repeats_per_target}x
-                  </span>
-                  <span className="text-xs">{targetSelectionLabel(evaluation.target)}</span>
-                </div>
-              </td>
-              <td className="px-4 py-3 align-top text-app-muted">
-                {formatDate(evaluation.created_at)}
-              </td>
-              <td className="px-4 py-3 align-top font-mono text-xs text-app-muted">
-                {evaluation.evaluation_dir}
-              </td>
-              <td className="px-4 py-3 text-right align-top">
-                <IconButton
-                  aria-label={`Delete evaluation ${evaluation.name}`}
-                  disabled={
-                    evaluation.status !== "created" || deletingEvaluationId === evaluation.id
-                  }
-                  size="small"
-                  tone="danger"
-                  onClick={() => onDeleteEvaluation(evaluation)}
-                >
-                  <TrashIcon />
-                </IconButton>
-              </td>
-            </tr>
-          ))}
+          {evaluations.map((evaluation) => {
+            const isCreated = evaluation.status === "created";
+            const selected = selectedEvaluationIds.has(evaluation.id);
+            return (
+              <tr className={evaluationRowClass(selected)} key={evaluation.id}>
+                <td className="px-4 py-3 align-top">
+                  <label className="grid place-items-center">
+                    <input
+                      aria-label={`Select evaluation ${evaluation.name}`}
+                      checked={selected}
+                      className={evaluationCheckboxClass}
+                      disabled={!isCreated || isDeletingEvaluation}
+                      type="checkbox"
+                      onChange={(event) =>
+                        onToggleEvaluationSelection(evaluation.id, event.currentTarget.checked)
+                      }
+                    />
+                  </label>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <div className="grid gap-1">
+                    <strong className="text-app-text">{evaluation.name}</strong>
+                    <span className="font-mono text-xs text-app-muted">{evaluation.id}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top capitalize text-app-muted">
+                  {evaluation.status}
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <div className="grid gap-1 text-app-muted">
+                    <span>
+                      {evaluation.checkpoint.source_run_name ?? evaluation.source_run_id ?? "-"} ·{" "}
+                      {evaluation.checkpoint.artifact}
+                    </span>
+                    <span className="text-xs">
+                      {formatStepCount(evaluation.checkpoint.lineage_num_timesteps)}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top text-app-muted">
+                  <div className="grid gap-1">
+                    <span>
+                      {TARGET_MODE_LABELS[evaluation.target.mode]} ·{" "}
+                      {evaluation.target.repeats_per_target}x
+                    </span>
+                    <span className="text-xs">{targetSelectionLabel(evaluation.target)}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top text-app-muted">
+                  {formatDate(evaluation.created_at)}
+                </td>
+                <td className="px-4 py-3 align-top font-mono text-xs text-app-muted">
+                  {evaluation.evaluation_dir}
+                </td>
+                <td className="px-4 py-3 text-right align-top">
+                  <IconButton
+                    aria-label={`Delete evaluation ${evaluation.name}`}
+                    disabled={
+                      !isCreated || deletingEvaluationId === evaluation.id || isDeletingEvaluation
+                    }
+                    size="small"
+                    tone="danger"
+                    onClick={() => onDeleteEvaluation(evaluation)}
+                  >
+                    <TrashIcon />
+                  </IconButton>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -702,4 +882,13 @@ function selectionCountLabel(values: readonly string[], singular: string) {
 
 function formatStepCount(value: number | null) {
   return value === null ? "step unknown" : `${value.toLocaleString()} steps`;
+}
+
+const evaluationCheckboxClass = "h-4 w-4 accent-app-accent";
+
+function evaluationRowClass(selected: boolean) {
+  return cn(
+    "border-b border-app-border transition-colors last:border-b-0",
+    selected ? "bg-app-surface-muted" : undefined,
+  );
 }
