@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from rl_fzerox.core.evaluation.models import EvaluationCheckpointSnapshot
 from rl_fzerox.core.manager import ManagedEvaluation
 
 
@@ -19,7 +20,7 @@ def evaluation_payload(evaluation: ManagedEvaluation) -> dict[str, object]:
         "policy_mode": evaluation.policy_mode,
         "seed": evaluation.seed,
         "target": asdict(evaluation.target),
-        "checkpoint": asdict(evaluation.checkpoint),
+        "checkpoint": _checkpoint_payload(evaluation.checkpoint),
         "created_at": evaluation.created_at,
         "updated_at": evaluation.updated_at,
         "started_at": evaluation.started_at,
@@ -29,3 +30,13 @@ def evaluation_payload(evaluation: ManagedEvaluation) -> dict[str, object]:
         ),
         "error_message": evaluation.error_message,
     }
+
+
+def _checkpoint_payload(checkpoint: EvaluationCheckpointSnapshot) -> dict[str, object]:
+    payload = asdict(checkpoint)
+    # Nanosecond mtimes exceed JavaScript's safe integer range. Keep the Python
+    # model and persisted spec numeric, but expose the API value losslessly.
+    payload["source_mtime_ns"] = (
+        None if checkpoint.source_mtime_ns is None else str(checkpoint.source_mtime_ns)
+    )
+    return payload

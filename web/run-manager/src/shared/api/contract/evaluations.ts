@@ -35,7 +35,7 @@ export const evaluationCheckpointSnapshotSchema = z.object({
   copied_model_path: z.string().nullable(),
   local_num_timesteps: z.number().int().nonnegative().nullable(),
   lineage_num_timesteps: z.number().int().nonnegative().nullable(),
-  source_mtime_ns: z.number().int().nonnegative().nullable(),
+  source_mtime_ns: z.string().regex(/^\d+$/).nullable(),
 });
 
 export const managedEvaluationSchema = z.object({
