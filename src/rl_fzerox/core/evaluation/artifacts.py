@@ -68,7 +68,7 @@ def _evaluation_markdown(result: EvaluationRunResult, metrics: EvaluationMetrics
         f"- Seed: {_text(result.spec.seed)}",
         f"- Source run: {_text(source_run)}",
         f"- Artifact: {_text(result.spec.checkpoint.artifact)}",
-        f"- Checkpoint copy: {_text(result.spec.checkpoint.copied_checkpoint_path)}",
+        f"- Checkpoint copy: {_text(result.spec.checkpoint.copied_policy_path)}",
         f"- Started: {_text(result.started_at_utc)}",
         f"- Closed: {_text(result.closed_at_utc)}",
         "",

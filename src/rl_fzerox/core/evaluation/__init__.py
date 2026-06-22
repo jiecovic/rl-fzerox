@@ -16,6 +16,7 @@ from rl_fzerox.core.evaluation.models import (
     AttemptStatus,
     CourseResultStatus,
     EvaluationAttemptResult,
+    EvaluationCheckpointArtifact,
     EvaluationCheckpointSnapshot,
     EvaluationCourseResult,
     EvaluationMode,
@@ -25,12 +26,18 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationSpec,
     EvaluationTargetSpec,
 )
+from rl_fzerox.core.evaluation.snapshots import (
+    EvaluationCheckpointSource,
+    snapshot_evaluation_checkpoint,
+)
 
 __all__ = [
     "AttemptStatus",
     "CourseResultStatus",
     "EvaluationArtifactPaths",
     "EvaluationAttemptResult",
+    "EvaluationCheckpointArtifact",
+    "EvaluationCheckpointSource",
     "EvaluationCheckpointSnapshot",
     "EvaluationCourseResult",
     "EvaluationDetailMetrics",
@@ -44,5 +51,6 @@ __all__ = [
     "EvaluationSpec",
     "EvaluationTargetSpec",
     "aggregate_evaluation_metrics",
+    "snapshot_evaluation_checkpoint",
     "write_evaluation_result_files",
 ]

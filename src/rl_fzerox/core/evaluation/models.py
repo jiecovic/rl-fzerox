@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
 EvaluationMode: TypeAlias = Literal["time_attack", "gp_cup", "career_target", "best_of"]
+EvaluationCheckpointArtifact: TypeAlias = Literal["latest", "best", "final"]
 EvaluationPolicyMode: TypeAlias = Literal["deterministic", "stochastic"]
 EvaluationRunStatus: TypeAlias = Literal["completed", "failed", "cancelled", "partial"]
 AttemptStatus: TypeAlias = Literal["succeeded", "failed", "cancelled", "partial"]
@@ -36,9 +37,11 @@ class EvaluationCheckpointSnapshot:
 
     source_run_id: str | None
     source_run_name: str | None
-    artifact: str
-    source_checkpoint_path: str
-    copied_checkpoint_path: str
+    artifact: EvaluationCheckpointArtifact
+    source_policy_path: str
+    copied_policy_path: str
+    source_model_path: str | None = None
+    copied_model_path: str | None = None
     local_num_timesteps: int | None = None
     lineage_num_timesteps: int | None = None
     source_mtime_ns: int | None = None

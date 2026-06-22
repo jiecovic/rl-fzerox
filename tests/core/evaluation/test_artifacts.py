@@ -25,8 +25,8 @@ def test_evaluation_writer_persists_json_and_markdown_summary(tmp_path: Path) ->
                 source_run_id="run-b",
                 source_run_name="Run B",
                 artifact="best",
-                source_checkpoint_path="/runs/run-b/best.zip",
-                copied_checkpoint_path=str(tmp_path / "checkpoint.zip"),
+                source_policy_path="/runs/run-b/checkpoints/best/policy.zip",
+                copied_policy_path=str(tmp_path / "checkpoints" / "best" / "policy.zip"),
             ),
             total_planned_attempts=1,
         ),
@@ -61,8 +61,8 @@ def test_evaluation_writer_persists_json_and_markdown_summary(tmp_path: Path) ->
     markdown = paths.markdown_path.read_text(encoding="utf-8")
 
     assert payload["kind"] == "evaluation_summary"
-    assert payload["result"]["spec"]["checkpoint"]["copied_checkpoint_path"] == str(
-        tmp_path / "checkpoint.zip"
+    assert payload["result"]["spec"]["checkpoint"]["copied_policy_path"] == str(
+        tmp_path / "checkpoints" / "best" / "policy.zip"
     )
     assert payload["metrics"]["overall"]["primary"]["finish_count"] == 1
     assert "# Evaluation eval-artifact" in markdown
