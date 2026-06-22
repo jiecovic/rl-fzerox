@@ -27,6 +27,25 @@ class EvaluationTargetSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class EvaluationCourseTarget:
+    """One concrete single-course evaluation target.
+
+    Higher-level specs can expand into this form before execution. The runner
+    keeps this as data instead of reading manager state so evaluation attempts
+    remain reproducible from their written summary.
+    """
+
+    target_id: str
+    course_id: str
+    course_name: str | None = None
+    cup_id: str | None = None
+    difficulty: str | None = None
+    vehicle_id: str | None = None
+    baseline_state_path: str | None = None
+    engine_setting_raw_value: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class EvaluationCheckpointSnapshot:
     """Immutable checkpoint copy evaluated by a run.
 
