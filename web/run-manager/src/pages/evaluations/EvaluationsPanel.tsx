@@ -27,7 +27,7 @@ import { cn } from "@/shared/ui/cn";
 import { ConfigStack } from "@/shared/ui/config/ConfigLayout";
 import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
-import { EvaluationTabIcon, PlusIcon, TrashIcon } from "@/shared/ui/icons";
+import { EvaluationTabIcon, PlayIcon, PlusIcon, TrashIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { type TabItem, Tabs } from "@/shared/ui/Tabs";
 
@@ -677,6 +677,10 @@ function RecordsPanel({
     <Notice>No evaluation snapshots yet.</Notice>
   ) : (
     <div className="grid gap-3">
+      <Notice>
+        These records are frozen checkpoint snapshots. Headless execution and live progress are the
+        next evaluation-runner phase; GP cup snapshots are not startable yet.
+      </Notice>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-app-muted">
           {selectedEvaluationCount === 0
@@ -754,6 +758,7 @@ function EvaluationTable({
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3">Checkpoint</th>
             <th className="px-4 py-3">Target</th>
+            <th className="px-4 py-3">Execution</th>
             <th className="px-4 py-3">Created</th>
             <th className="px-4 py-3">Directory</th>
             <th className="px-4 py-3 text-right">Actions</th>
@@ -806,6 +811,20 @@ function EvaluationTable({
                       {evaluation.target.repeats_per_target}x
                     </span>
                     <span className="text-xs">{targetSelectionLabel(evaluation.target)}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <div className="grid gap-2">
+                    <span className="text-app-muted">{evaluationExecutionLabel(evaluation)}</span>
+                    <Button
+                      className="w-fit gap-2"
+                      disabled
+                      title={evaluationExecutionTitle(evaluation)}
+                      type="button"
+                    >
+                      <PlayIcon />
+                      <span>Start</span>
+                    </Button>
                   </div>
                 </td>
                 <td className="px-4 py-3 align-top text-app-muted">
@@ -882,6 +901,20 @@ function selectionCountLabel(values: readonly string[], singular: string) {
 
 function formatStepCount(value: number | null) {
   return value === null ? "step unknown" : `${value.toLocaleString()} steps`;
+}
+
+function evaluationExecutionLabel(evaluation: ManagedEvaluation) {
+  if (evaluation.status === "created") {
+    return evaluation.target.mode === "gp_cup" ? "GP runner pending" : "runner pending";
+  }
+  return evaluation.status;
+}
+
+function evaluationExecutionTitle(evaluation: ManagedEvaluation) {
+  if (evaluation.target.mode === "gp_cup") {
+    return "GP/cup evaluation execution is not implemented yet.";
+  }
+  return "Headless evaluation execution is not wired to Run Manager yet.";
 }
 
 const evaluationCheckboxClass = "h-4 w-4 accent-app-accent";
