@@ -26,6 +26,7 @@ const fetchRunMock = vi.fn();
 const fetchRunsMock = vi.fn();
 const fetchRunMetricsMock = vi.fn();
 const fetchRunTrackSamplingStateMock = vi.fn();
+const fetchRunEngineTuningStateMock = vi.fn();
 const fetchPolicyPreviewMock = vi.fn();
 const importRunBundleMock = vi.fn();
 const launchRunMock = vi.fn();
@@ -61,6 +62,8 @@ vi.mock("@/shared/api/client", async () => {
     fetchRuns: () => fetchRunsMock(),
     fetchRunMetrics: (runId: string) => fetchRunMetricsMock(runId),
     fetchRunTrackSamplingState: (runId: string) => fetchRunTrackSamplingStateMock(runId),
+    fetchRunEngineTuningState: (runId: string, artifact: "latest" | "best" | "final") =>
+      fetchRunEngineTuningStateMock(runId, artifact),
     fetchPolicyPreview: (config: typeof managedRunConfigFixture) => fetchPolicyPreviewMock(config),
     importRunBundle: (file: File) => importRunBundleMock(file),
     launchRun: (...args: unknown[]) => launchRunMock(...args),
@@ -135,6 +138,7 @@ describe("App", () => {
     fetchRunsMock.mockResolvedValue([]);
     fetchRunMetricsMock.mockResolvedValue([runMetricSampleFixture()]);
     fetchRunTrackSamplingStateMock.mockResolvedValue(null);
+    fetchRunEngineTuningStateMock.mockResolvedValue({ enabled: false, state: null });
     fetchPolicyPreviewMock.mockResolvedValue(policyPreviewFixture);
     importRunBundleMock.mockResolvedValue(runFixture({ id: "imported-run", name: "imported" }));
     launchRunMock.mockResolvedValue(runFixture());

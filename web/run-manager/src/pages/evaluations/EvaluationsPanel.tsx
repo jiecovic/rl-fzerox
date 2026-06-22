@@ -17,6 +17,7 @@ import { EvaluationTabIcon, PlusIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface EvaluationsPanelProps {
+  evaluationError: string | null;
   evaluations: ManagedEvaluation[];
   metadata: ConfigMetadata | null;
   runs: ManagedRun[];
@@ -35,6 +36,7 @@ const TARGET_MODE_LABELS: Record<EvaluationMode, string> = {
 };
 
 export function EvaluationsPanel({
+  evaluationError,
   evaluations,
   metadata,
   onCreateEvaluation,
@@ -144,6 +146,12 @@ export function EvaluationsPanel({
         <Notice>Create or import a run before creating evaluation snapshots.</Notice>
       ) : (
         <div className="grid gap-5">
+          {evaluationError !== null ? (
+            <Notice tone="error">
+              Evaluation records could not be loaded: {evaluationError}. Other run-manager data is
+              still available.
+            </Notice>
+          ) : null}
           <section className="border border-app-border bg-app-surface-muted p-4">
             <div className="mb-4 flex items-center gap-2 text-sm font-bold tracking-[0.04em] text-app-muted uppercase">
               <EvaluationTabIcon />

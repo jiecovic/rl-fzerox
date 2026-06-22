@@ -18,6 +18,7 @@ import type {
 
 export interface ManagerData {
   drafts: ManagedDraft[];
+  evaluationError: string | null;
   evaluations: ManagedEvaluation[];
   metadata: ConfigMetadata;
   runs: ManagedRun[];
@@ -26,13 +27,33 @@ export interface ManagerData {
 }
 
 export async function loadManagerData(): Promise<ManagerData> {
-  const [templates, drafts, runs, saveGames, evaluations, metadata] = await Promise.all([
+  const [templates, drafts, runs, saveGames, evaluationData, metadata] = await Promise.all([
     fetchTemplates(),
     fetchDrafts(),
     fetchRuns(),
     fetchSaveGames(),
-    fetchEvaluations(),
+    fetchEvaluationData(),
     fetchConfigMetadata(),
   ]);
-  return { drafts, evaluations, metadata, runs, saveGames, templates };
+  return {
+    drafts,
+    evaluationError: evaluationData.error,
+    evaluations: evaluationData.evaluations,
+    metadata,
+    runs,
+    saveGames,
+    templates,
+  };
+}
+
+async function fetchEvaluationData(): Promise<{
+  error: string | null;
+  evaluations: ManagedEvaluation[];
+}> {
+  try {
+    return { error: null, evaluations: await fetchEvaluations() };
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "failed to load evaluations";
+    return { error: message, evaluations: [] };
+  }
 }

@@ -29,6 +29,7 @@ interface WorkspaceBodyProps {
   defaultConfig: ManagedRunConfig | null;
   drafts: ManagedDraft[];
   error: string | null;
+  evaluationError: string | null;
   evaluations: ManagedEvaluation[];
   evaluationSourceRunId: string | null;
   isLoading: boolean;
@@ -47,6 +48,7 @@ export function WorkspaceBody({
   defaultConfig,
   drafts,
   error,
+  evaluationError,
   evaluations,
   evaluationSourceRunId,
   isLoading,
@@ -135,6 +137,7 @@ export function WorkspaceBody({
       ) : null}
       {!isLoading && sessions.activeTabId === "evaluations" ? (
         <EvaluationsPanel
+          evaluationError={evaluationError}
           evaluations={evaluations}
           metadata={metadata}
           runs={runs}
@@ -176,10 +179,13 @@ export function WorkspaceBody({
         />
       ) : null}
       {!isLoading && activeRunTab !== null ? (
-        metadata === null ? (
-          <Notice tone="error">Run manager metadata is missing.</Notice>
-        ) : activeRunSummary === null ? (
+        activeRunSummary === null ? (
           <Notice tone="error">This run is no longer available.</Notice>
+        ) : metadata === null ? (
+          <Notice tone="error">
+            Run metadata is unavailable. Reload the run manager; the live run list may still be
+            connected while the full manager payload failed to load.
+          </Notice>
         ) : activeRun === null ? (
           <Notice>
             {runDetailError === null ? "Loading run details..." : "Run details unavailable."}
