@@ -5,6 +5,7 @@ from rl_fzerox.core.evaluation.artifacts import (
     EvaluationArtifactPaths,
     write_evaluation_result_files,
 )
+from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.metrics import (
     EvaluationDetailMetrics,
     EvaluationMetricGroup,
@@ -56,6 +57,7 @@ __all__ = [
     "EvaluationRunStatus",
     "EvaluationSpec",
     "EvaluationTargetSpec",
+    "FZeroXSingleCourseEpisodeExecutor",
     "SingleCourseEpisodeExecutor",
     "aggregate_evaluation_metrics",
     "run_headless_single_course_evaluation",
