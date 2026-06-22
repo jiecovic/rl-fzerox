@@ -56,8 +56,35 @@ def _selected_summary_info(info: Mapping[str, object]) -> dict[str, object]:
     for key in _SUMMARY_INFO_FIELDS:
         if key not in info:
             continue
-        selected[key] = _summary_json_value(info[key])
+        value = _summary_json_value(info[key])
+        if not _valid_summary_info_value(key, value):
+            continue
+        selected[key] = value
     return selected
+
+
+def _valid_summary_info_value(key: str, value: object) -> bool:
+    if key in {"career_mode_gp_final_rank", "gp_final_rank"}:
+        return isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 30
+    if key in {"career_mode_gp_points", "gp_points"}:
+        return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 999
+    return True
+
+
+def _merge_selected_summary_info(
+    current: Mapping[str, object] | None,
+    selected: Mapping[str, object],
+) -> dict[str, object]:
+    if current is None:
+        return dict(selected)
+    merged = dict(selected)
+    for key in _STICKY_SUMMARY_INFO_FIELDS:
+        if merged.get(key) is not None:
+            continue
+        value = current.get(key)
+        if value is not None:
+            merged[key] = value
+    return merged
 
 
 def _course_result(info: Mapping[str, object]) -> dict[str, object] | None:
@@ -109,9 +136,20 @@ def _course_result_signature(result: Mapping[str, object]) -> tuple[object, ...]
 def _course_result_identity(result: Mapping[str, object]) -> tuple[str, object] | None:
     for key in ("course_id", "track_id", "course_index"):
         value = result.get(key)
-        if value is not None:
+        if _valid_course_identity_value(key, value):
             return (key, value)
     return None
+
+
+def _valid_course_identity_value(key: str, value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        stripped = value.strip()
+        return bool(stripped) and stripped != "-"
+    if key == "course_index" and isinstance(value, int) and not isinstance(value, bool):
+        return value in BUILT_IN_COURSES_BY_INDEX
+    return True
 
 
 def _course_engine_observation(
@@ -172,16 +210,16 @@ def _course_results_match(
     if (
         current_identity is not None
         and candidate_identity is not None
-        and current_identity == candidate_identity
+        and current_identity != candidate_identity
     ):
-        return True
+        return False
 
     # Live Career Mode can observe the same terminal result twice: once before
     # course metadata has been enriched and once after. Match that ordering on
     # the immutable terminal fields so the later event fills the missing course
-    # name/index/engine instead of appending a duplicate row.
-    if current_identity is not None and candidate_identity is not None:
-        return False
+    # name/index/engine instead of appending a duplicate row. Do not merge only
+    # by course identity: a GP attempt can spend lives retrying the same course,
+    # and those failed intermediate tries must remain visible in the summary.
     current_fingerprint = _course_terminal_fingerprint(current)
     candidate_fingerprint = _course_terminal_fingerprint(candidate)
     return (
@@ -281,6 +319,8 @@ _SUMMARY_INFO_FIELDS = (
     "career_mode_last_finished_attempt_failure_reason",
     "career_mode_fsm_observed_screen",
     "career_mode_fsm_terminal_reason",
+    "career_mode_gp_final_rank",
+    "career_mode_gp_points",
     "career_mode_policy_artifact",
     "career_mode_policy_checkpoint_local_num_timesteps",
     "career_mode_policy_checkpoint_mtime_ns",
@@ -294,6 +334,8 @@ _SUMMARY_INFO_FIELDS = (
     "career_mode_policy_run_name",
     "game_mode",
     "game_mode_name",
+    "gp_final_rank",
+    "gp_points",
     "track_id",
     "track_course_id",
     "track_course_name",
@@ -306,6 +348,15 @@ _SUMMARY_INFO_FIELDS = (
     "position",
     "race_laps_completed",
     "total_lap_count",
+)
+
+_STICKY_SUMMARY_INFO_FIELDS = frozenset(
+    {
+        "career_mode_gp_final_rank",
+        "career_mode_gp_points",
+        "gp_final_rank",
+        "gp_points",
+    }
 )
 
 _POST_GP_EXIT_SCREENS = frozenset(

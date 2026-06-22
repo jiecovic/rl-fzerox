@@ -15,7 +15,6 @@ from rl_fzerox.core.career_mode.execution.save_file import (
     persist_save_ram_for_store,
 )
 from rl_fzerox.core.career_mode.navigation import (
-    POST_GP_COMPLETION_MODES,
     POST_GP_RECORDING_END_MODES,
 )
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, CourseInfo
@@ -87,6 +86,7 @@ class CareerProgressTransition:
     finished_attempt_id: str | None = None
     finished_status: SaveAttemptStatus | None = None
     finished_failure_reason: str | None = None
+    recording_info: dict[str, object] | None = None
     reset_emulator: bool = False
 
 
@@ -115,6 +115,7 @@ class CareerAttemptProgress:
         self._initial_unlock_progress = self._unlock_progress
         self._observed_target_terminal_success = False
         self._observed_gp_final_rank: int | None = None
+        self._observed_gp_points: int | None = None
 
     @property
     def attempt_id(self) -> str | None:
@@ -175,7 +176,7 @@ class CareerAttemptProgress:
         if self._attempt_id is None:
             return CareerProgressTransition(attempt_finished=False)
 
-        self._observe_gp_final_rank(info)
+        self._observe_gp_result(info)
 
         persist_save_ram_for_store(self._store, self._save_game_id, session)
         progress = self._refresh_unlock_progress()
@@ -224,6 +225,7 @@ class CareerAttemptProgress:
         self._initial_unlock_progress = self._unlock_progress
         self._observed_target_terminal_success = False
         self._observed_gp_final_rank = None
+        self._observed_gp_points = None
 
     def observe_post_race_screen(
         self,
@@ -234,12 +236,15 @@ class CareerAttemptProgress:
         if _target_terminal_succeeded(info, setup):
             self._observed_target_terminal_success = True
         if self._observed_target_terminal_success:
-            self._observe_gp_final_rank(info)
+            self._observe_gp_result(info)
 
-    def _observe_gp_final_rank(self, info: dict[str, object]) -> None:
+    def _observe_gp_result(self, info: dict[str, object]) -> None:
         rank = _gp_final_rank(info)
         if rank is not None:
             self._observed_gp_final_rank = rank
+        points = _gp_points(info)
+        if points is not None:
+            self._observed_gp_points = points
 
     def _finish_and_advance(
         self,
@@ -251,15 +256,24 @@ class CareerAttemptProgress:
         reset_emulator: bool = False,
     ) -> CareerProgressTransition:
         finished_attempt_id = self._attempt_id
-        self._finish_attempt(info=info, status=status, failure_reason=failure_reason)
+        finish_info = self._finish_info(info)
+        self._finish_attempt(info=finish_info, status=status, failure_reason=failure_reason)
         return self._advance_after_finished_attempt(
-            info=info,
+            info=finish_info,
             setup=setup,
             finished_attempt_id=finished_attempt_id,
             finished_status=status,
             finished_failure_reason=failure_reason,
             reset_emulator=reset_emulator,
         )
+
+    def _finish_info(self, info: dict[str, object]) -> dict[str, object]:
+        finish_info = dict(info)
+        if self._observed_gp_final_rank is not None:
+            finish_info["career_mode_gp_final_rank"] = self._observed_gp_final_rank
+        if self._observed_gp_points is not None:
+            finish_info["career_mode_gp_points"] = self._observed_gp_points
+        return finish_info
 
     def _finish_attempt(
         self,
@@ -308,6 +322,7 @@ class CareerAttemptProgress:
                     finished_attempt_id=finished_attempt_id,
                     finished_status=finished_status,
                     finished_failure_reason=finished_failure_reason,
+                    recording_info=dict(info),
                     reset_emulator=reset_emulator,
                 )
             next_attempt = self._store.start_target_save_attempt(
@@ -333,6 +348,7 @@ class CareerAttemptProgress:
                 finished_attempt_id=finished_attempt_id,
                 finished_status=finished_status,
                 finished_failure_reason=finished_failure_reason,
+                recording_info=dict(info),
                 reset_emulator=next_attempt_reset_emulator,
             )
         if progress.next_target is None:
@@ -346,6 +362,7 @@ class CareerAttemptProgress:
                 finished_attempt_id=finished_attempt_id,
                 finished_status=finished_status,
                 finished_failure_reason=finished_failure_reason,
+                recording_info=dict(info),
                 reset_emulator=reset_emulator,
             )
 
@@ -362,6 +379,7 @@ class CareerAttemptProgress:
             finished_attempt_id=finished_attempt_id,
             finished_status=finished_status,
             finished_failure_reason=finished_failure_reason,
+            recording_info=dict(info),
             reset_emulator=next_attempt_reset_emulator,
         )
 
@@ -494,7 +512,11 @@ def _positive_int_info(info: dict[str, object], key: str) -> int | None:
     return value if value > 0 else None
 
 
-_GP_FINAL_RANK_MODES = POST_GP_COMPLETION_MODES | {"results"}
+_GP_RESULT_MODES = {
+    "gp_race",
+    "results",
+    "gp_end_cutscene",
+}
 
 
 def _gp_final_rank(info: dict[str, object]) -> int | None:
@@ -504,12 +526,32 @@ def _gp_final_rank(info: dict[str, object]) -> int | None:
     mode = info.get("game_mode")
     if not isinstance(mode, str) or not mode:
         mode = info.get("game_mode_name")
-    # The native rank field is written while the total-ranking UI is drawn.
-    # On race-terminal frames it can still hold an older GP result, so only
-    # trust generic telemetry from modes that actually own the GP result.
-    if mode not in _GP_FINAL_RANK_MODES:
+    # The native rank is derived from the live GP points table. Career progress
+    # only asks for it while handling post-terminal GP flow, so these modes are
+    # the windows where the table still belongs to the current cup attempt.
+    if mode not in _GP_RESULT_MODES:
         return None
     return _positive_int_info(info, "gp_final_rank")
+
+
+def _gp_points(info: dict[str, object]) -> int | None:
+    explicit_points = _gp_points_value(info.get("career_mode_gp_points"))
+    if explicit_points is not None:
+        return explicit_points
+    mode = info.get("game_mode")
+    if not isinstance(mode, str) or not mode:
+        mode = info.get("game_mode_name")
+    # `Racer.points` remains authoritative from the race result through the GP
+    # end cutscene; after menu/reset transitions it can be stale or reset.
+    if mode not in _GP_RESULT_MODES:
+        return None
+    return _gp_points_value(info.get("gp_points"))
+
+
+def _gp_points_value(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value if 0 <= value <= 999 else None
 
 
 def _int_info(info: dict[str, object], key: str) -> int | None:

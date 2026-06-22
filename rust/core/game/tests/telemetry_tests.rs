@@ -28,8 +28,17 @@ fn read_snapshot_decodes_player_one_race_values() {
     memory[GLOBALS.queued_game_mode..GLOBALS.queued_game_mode + 4]
         .copy_from_slice(&14_i32.to_le_bytes());
     memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
-    memory[GLOBALS.player_1_overall_position..GLOBALS.player_1_overall_position + 2]
-        .copy_from_slice(&2_i16.to_le_bytes());
+    for index in 0_i32..30 {
+        write_racer_gp_standing(
+            &mut memory,
+            index as usize,
+            index,
+            100 - index as i16,
+            index + 1,
+        );
+    }
+    write_racer_gp_standing(&mut memory, 0, 0, 542, 3);
+    write_racer_gp_standing(&mut memory, 1, 1, 600, 1);
     memory[GLOBALS.player_characters..GLOBALS.player_characters + 2]
         .copy_from_slice(&4_i16.to_le_bytes());
     memory[GLOBALS.player_engine..GLOBALS.player_engine + 4]
@@ -163,6 +172,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.queued_game_mode_raw, 14);
     assert_eq!(telemetry.total_racers, 30);
     assert_eq!(telemetry.gp_final_rank, 2);
+    assert_eq!(telemetry.gp_points, 542);
     assert_eq!(telemetry.course_index, 0);
     assert_eq!(telemetry.course_segment_count, 64);
     assert!((telemetry.course_length - 80_000.0).abs() < f32::EPSILON);
@@ -222,6 +232,20 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.player.machine_context.grip_stat, 2);
     assert_eq!(telemetry.player.machine_context.weight, 1260);
     assert!((telemetry.player.machine_context.engine_setting - 0.7).abs() < f32::EPSILON);
+}
+
+#[test]
+fn read_snapshot_derives_gp_result_from_live_racer_table() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&3_i32.to_le_bytes());
+    write_racer_gp_standing(&mut memory, 0, 0, 576, 29);
+    write_racer_gp_standing(&mut memory, 1, 1, 476, 1);
+    write_racer_gp_standing(&mut memory, 2, 2, 412, 2);
+
+    let telemetry = read_snapshot(&memory).expect("telemetry should decode");
+
+    assert_eq!(telemetry.gp_final_rank, 1);
+    assert_eq!(telemetry.gp_points, 576);
 }
 
 #[test]
@@ -361,6 +385,25 @@ fn read_step_sample_decodes_player_damage_rumble_counter() {
 
 fn write_word_swapped_u8(memory: &mut [u8], logical_offset: usize, value: u8) {
     memory[logical_offset ^ 0x03] = value;
+}
+
+fn write_word_swapped_i16(memory: &mut [u8], logical_offset: usize, value: i16) {
+    let bytes = value.to_be_bytes();
+    write_word_swapped_u8(memory, logical_offset, bytes[0]);
+    write_word_swapped_u8(memory, logical_offset + 1, bytes[1]);
+}
+
+fn write_racer_gp_standing(
+    memory: &mut [u8],
+    racer_index: usize,
+    racer_id: i32,
+    points: i16,
+    position: i32,
+) {
+    let racer_base = GLOBALS.racers + (racer_index * RACER.size);
+    write_i32(memory, racer_base + RACER.id, racer_id);
+    write_word_swapped_i16(memory, racer_base + RACER.points, points);
+    write_i32(memory, racer_base + RACER.position, position);
 }
 
 fn write_machine_u8(memory: &mut [u8], logical_offset: usize, value: u8) {

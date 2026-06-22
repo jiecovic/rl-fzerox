@@ -447,6 +447,7 @@ class CareerModeController(CareerMenuRoutingMixin):
             return
         self._recording.close(
             status=recording_status_from_attempt_status(transition.finished_status),
+            info=transition.recording_info,
         )
 
     def _apply_execution_plan(self, plan: SaveRaceExecutionPlan) -> None:

@@ -71,6 +71,7 @@ TELEMETRY_TO_DICT_KEYS = {
     "game_mode_name",
     "game_mode_raw",
     "gp_final_rank",
+    "gp_points",
     "in_race_mode",
     "menu_current_ghost_type_raw",
     "menu_difficulty_cursor_raw",
@@ -223,6 +224,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             "in_race_mode": True,
             "total_racers": 30,
             "gp_final_rank": 2,
+            "gp_points": 542,
             "course_index": 0,
             "course_length": 80_000.0,
             "course_segment_count": 64,
@@ -284,6 +286,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     assert payload["game_mode_name"] == "gp_race"
     assert payload["total_racers"] == 30
     assert payload["gp_final_rank"] == 2
+    assert payload["gp_points"] == 542
     assert payload["course_segment_count"] == 64
     assert payload["course_length"] == 80_000.0
     player_payload = payload["player"]

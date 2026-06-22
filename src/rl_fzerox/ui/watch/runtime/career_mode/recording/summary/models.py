@@ -12,6 +12,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.recording.summary.extract import (
     _course_result_signature,
     _existing_course_result_index,
     _merge_missing_course_result_fields,
+    _merge_selected_summary_info,
     _policy_checkpoint_signature,
     _policy_checkpoint_summary,
     _selected_summary_info,
@@ -57,7 +58,10 @@ class _SegmentSummaryBuilder:
     def observe_event(self, info: Mapping[str, object]) -> None:
         if status := last_finished_attempt_status(info):
             self.status = status
-        self.final_info = _selected_summary_info(info)
+        self.final_info = _merge_selected_summary_info(
+            self.final_info,
+            _selected_summary_info(info),
+        )
         if engine_observation := _course_engine_observation(info):
             identity, engine_raw = engine_observation
             self.observed_course_engine_raw_values[identity] = engine_raw

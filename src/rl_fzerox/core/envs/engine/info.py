@@ -141,6 +141,7 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "speed_kph": telemetry.player.speed_kph,
         "position": telemetry.player.position,
         "gp_final_rank": telemetry.gp_final_rank,
+        "gp_points": telemetry.gp_points,
         "ko_star_count": telemetry.player.ko_star_count,
         "total_racers": telemetry.total_racers,
         "termination_reason": telemetry.player.terminal_reason,

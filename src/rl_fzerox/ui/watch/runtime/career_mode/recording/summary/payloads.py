@@ -50,6 +50,10 @@ def _segment_summary_payload(
 ) -> dict[str, object]:
     course_results = tuple(dict(result) for result in summary.course_results)
     policy_checkpoints = tuple(dict(checkpoint) for checkpoint in summary.policy_checkpoints)
+    segment_summary = _segment_metric_summary(
+        course_results,
+        final_info=summary.final_info,
+    )
     return {
         "kind": "career_segment_summary",
         "schema_version": 1,
@@ -64,6 +68,7 @@ def _segment_summary_payload(
             "source_mkv_path": str(summary.source_path),
             "frame_count": summary.frame_count,
         },
+        "summary": segment_summary,
         "result_counts": _segment_result_counts(course_results),
         "courses": course_results,
         "policy_checkpoints": policy_checkpoints,
@@ -88,6 +93,7 @@ def _segment_summary_markdown(payload: Mapping[str, object]) -> str:
         f"- Frames: {_summary_text(frame_count)}",
         "",
     ]
+    lines.extend(_segment_metric_markdown_lines(payload))
     lines.extend(_policy_checkpoint_markdown_lines(payload))
     lines.extend(
         (
@@ -130,6 +136,40 @@ def _segment_summary_markdown(payload: Mapping[str, object]) -> str:
         )
     lines.append("")
     return "\n".join(lines)
+
+
+def _segment_metric_markdown_lines(payload: Mapping[str, object]) -> list[str]:
+    summary = payload.get("summary")
+    if not isinstance(summary, Mapping):
+        return []
+    lines = [
+        "## Segment summary",
+        "",
+        "| Metric | Value |",
+        "| --- | --- |",
+        f"| Course attempts | {_summary_text(summary.get('course_attempt_count'))} |",
+        f"| Finished attempts | {_summary_text(summary.get('finished_attempt_count'))} |",
+        f"| Failed attempts | {_summary_text(summary.get('failed_attempt_count'))} |",
+        (
+            "| Unique finished courses | "
+            f"{_summary_text(summary.get('unique_finished_course_count'))} |"
+        ),
+        (f"| Total race time | {_format_summary_time(summary.get('total_race_time_ms'))} |"),
+        (
+            "| Average race position | "
+            f"{_format_average_position(summary.get('average_position'))} |"
+        ),
+        (
+            "| Best / worst race position | "
+            f"{_summary_text(summary.get('best_position'))} / "
+            f"{_summary_text(summary.get('worst_position'))} |"
+        ),
+        f"| Final GP position | {_summary_text(summary.get('final_gp_position'))} |",
+        f"| GP points | {_summary_text(summary.get('gp_points'))} |",
+        f"| KO stars | {_summary_text(summary.get('ko_star_total'))} |",
+        "",
+    ]
+    return lines
 
 
 def _policy_checkpoint_markdown_lines(payload: Mapping[str, object]) -> list[str]:
@@ -186,6 +226,91 @@ def _segment_result_counts(course_results: tuple[dict[str, object], ...]) -> dic
             counts[reason] += 1
     counts["failed"] = counts["retired"] + counts["crashed"]
     return counts
+
+
+def _segment_metric_summary(
+    course_results: tuple[dict[str, object], ...],
+    *,
+    final_info: Mapping[str, object],
+) -> dict[str, object]:
+    counts = _segment_result_counts(course_results)
+    race_times = tuple(_int_value(result.get("race_time_ms")) for result in course_results)
+    positions = tuple(_int_value(result.get("position")) for result in course_results)
+    ko_stars = tuple(_int_value(result.get("ko_star_count")) for result in course_results)
+    valid_times = tuple(value for value in race_times if value is not None)
+    valid_positions = tuple(value for value in positions if value is not None)
+    valid_ko_stars = tuple(value for value in ko_stars if value is not None)
+    unique_finished_courses = _unique_finished_course_count(course_results)
+    return {
+        "course_attempt_count": len(course_results),
+        "finished_attempt_count": counts["finished"],
+        "failed_attempt_count": counts["failed"],
+        "retired_course_count": counts["retired"],
+        "crashed_course_count": counts["crashed"],
+        "unique_finished_course_count": unique_finished_courses,
+        "total_race_time_ms": None if not valid_times else sum(valid_times),
+        "average_position": None
+        if not valid_positions
+        else sum(valid_positions) / len(valid_positions),
+        "best_position": None if not valid_positions else min(valid_positions),
+        "worst_position": None if not valid_positions else max(valid_positions),
+        "final_gp_position": _first_valid_gp_rank(
+            final_info,
+            ("career_mode_gp_final_rank", "gp_final_rank"),
+        ),
+        "gp_points": _first_valid_gp_points(
+            final_info,
+            ("career_mode_gp_points", "gp_points"),
+        ),
+        "ko_star_total": None if not valid_ko_stars else sum(valid_ko_stars),
+    }
+
+
+def _unique_finished_course_count(course_results: tuple[dict[str, object], ...]) -> int:
+    course_ids: set[object] = set()
+    for result in course_results:
+        if result.get("termination_reason") != "finished":
+            continue
+        identity = _course_result_identity(result)
+        if identity is not None:
+            course_ids.add(identity)
+    return len(course_ids)
+
+
+def _course_result_identity(result: Mapping[str, object]) -> tuple[str, object] | None:
+    for key in ("course_id", "track_id", "course_index"):
+        value = result.get(key)
+        if value is not None and not isinstance(value, bool):
+            return (key, value)
+    return None
+
+
+def _first_valid_gp_rank(info: Mapping[str, object], keys: tuple[str, ...]) -> int | None:
+    for key in keys:
+        value = _int_value(info.get(key))
+        if value is not None and 1 <= value <= 30:
+            return value
+    return None
+
+
+def _first_valid_gp_points(info: Mapping[str, object], keys: tuple[str, ...]) -> int | None:
+    for key in keys:
+        value = _int_value(info.get(key))
+        if value is not None and 0 <= value <= 999:
+            return value
+    return None
+
+
+def _int_value(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _format_average_position(value: object) -> str:
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return "-"
+    return f"{float(value):.2f}"
 
 
 def _aggregate_segment_result_counts(

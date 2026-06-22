@@ -23,6 +23,7 @@ class CareerRecordingSegmentClose:
     """FSM-owned signal that one cup-attempt recording segment should close."""
 
     status: CareerRecordingSegmentStatus
+    info: dict[str, object]
 
 
 @dataclass(slots=True)
@@ -56,16 +57,26 @@ class CareerRecordingSegmentTracker:
         if facts.is_post_gp_screen:
             self.post_gp_seen = True
 
-    def close(self, *, status: CareerRecordingSegmentStatus) -> None:
+    def close(
+        self,
+        *,
+        status: CareerRecordingSegmentStatus,
+        info: dict[str, object] | None = None,
+    ) -> None:
         if self.pending_close is not None:
             return
-        self.pending_close = CareerRecordingSegmentClose(status=status)
+        self.pending_close = CareerRecordingSegmentClose(status=status, info=dict(info or {}))
         self.reset()
 
-    def force_close(self, *, status: CareerRecordingSegmentStatus) -> None:
+    def force_close(
+        self,
+        *,
+        status: CareerRecordingSegmentStatus,
+        info: dict[str, object] | None = None,
+    ) -> None:
         """Close the current segment when the FSM resets the emulator itself."""
 
-        self.close(status=status)
+        self.close(status=status, info=info)
 
     def pop_close(self) -> CareerRecordingSegmentClose | None:
         close = self.pending_close

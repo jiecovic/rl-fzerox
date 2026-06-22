@@ -212,7 +212,7 @@ class CareerModeFrameRecorder:
     def close(self) -> None:
         errors: list[Exception] = []
         try:
-            self._close_segment_writer()
+            self._close_segment_writer(partial=True)
         except Exception as exc:  # pragma: no cover - defensive close aggregation
             errors.append(exc)
         if self._live_writer is not None:
@@ -241,6 +241,7 @@ class CareerModeFrameRecorder:
             self._path,
             segment_index=self._segment_index,
             label=segment.label,
+            attempt_id=segment.attempt_id,
         )
         self._segment_summary = _SegmentSummaryBuilder(
             segment_index=self._segment_index,
@@ -250,7 +251,7 @@ class CareerModeFrameRecorder:
         )
         self._segment_writer = self._open_writer(self._segment_path)
 
-    def _close_segment_writer(self) -> None:
+    def _close_segment_writer(self, *, partial: bool = False) -> None:
         if self._segment_writer is None:
             return
         self._segment_writer.close()
@@ -260,7 +261,7 @@ class CareerModeFrameRecorder:
                 self._last_closed_finished_attempt_id = self._segment_attempt_id
             self._clear_segment_state()
             return
-        self._rename_failed_segment()
+        self._rename_segment_for_close(partial=partial)
         if self._segment_path is not None and self._segment_path.exists():
             summary = (
                 None
@@ -283,23 +284,24 @@ class CareerModeFrameRecorder:
         self._segment_path = None
         self._segment_summary = None
 
-    def _rename_failed_segment(self) -> None:
+    def _rename_segment_for_close(self, *, partial: bool) -> None:
         if (
-            self._segment_status != "failed"
-            or self._segment_path is None
+            self._segment_path is None
             or self._segment_label is None
             or not self._segment_path.exists()
         ):
             return
-        failed_path = career_segment_recording_path(
+        close_path = career_segment_recording_path(
             self._path,
             segment_index=self._segment_index,
             label=self._segment_label,
-            status="failed",
+            attempt_id=self._segment_attempt_id,
+            status=self._segment_status,
+            partial=partial,
         )
-        if failed_path != self._segment_path:
-            self._segment_path.replace(failed_path)
-            self._segment_path = failed_path
+        if close_path != self._segment_path:
+            self._segment_path.replace(close_path)
+            self._segment_path = close_path
 
     def _discard_failed_segment(self) -> bool:
         if self._keep_failed_segments or self._segment_status != "failed":
@@ -366,8 +368,8 @@ class CareerModeFrameRecorder:
             return None
         if (
             self._segment_key is None
+            and active_attempt_id is not None
             and active_attempt_id == self._last_closed_finished_attempt_id
-            and continuing_race_result(info)
         ):
             return None
         key = f"attempt:{active_attempt_id}" if active_attempt_id is not None else f"target:{label}"

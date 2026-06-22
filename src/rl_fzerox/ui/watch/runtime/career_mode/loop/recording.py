@@ -40,7 +40,8 @@ def handle_controller_lifecycle(
     recording_close_status = None
     recorded_event = False
     if frame_recorder is not None and events.recording_close is not None:
-        frame_recorder.finish_segment(status=events.recording_close.status, info=info)
+        close_info = {**info, **events.recording_close.info}
+        frame_recorder.finish_segment(status=events.recording_close.status, info=close_info)
         recording_close_status = events.recording_close.status
     elif frame_recorder is not None and record_event:
         frame_recorder.record_event(info=info)

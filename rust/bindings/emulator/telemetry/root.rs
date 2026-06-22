@@ -34,6 +34,7 @@ pub struct PyTelemetry {
     in_race_mode: bool,
     total_racers: i32,
     gp_final_rank: i16,
+    gp_points: i16,
     course_index: u32,
     course_segment_count: i32,
     course_length: f32,
@@ -134,6 +135,11 @@ impl PyTelemetry {
     }
 
     #[getter]
+    fn gp_points(&self) -> i16 {
+        self.gp_points
+    }
+
+    #[getter]
     fn course_index(&self) -> u32 {
         self.course_index
     }
@@ -175,6 +181,7 @@ impl PyTelemetry {
             "in_race_mode" => self.in_race_mode(),
             "total_racers" => self.total_racers(),
             "gp_final_rank" => self.gp_final_rank(),
+            "gp_points" => self.gp_points(),
             "course_index" => self.course_index(),
             "course_segment_count" => self.course_segment_count(),
             "course_length" => self.course_length(),
@@ -205,6 +212,7 @@ fn telemetry_from_dict(data: &Bound<'_, PyDict>) -> PyResult<PyTelemetry> {
         in_race_mode: required_item(data, TELEMETRY_PAYLOAD, "in_race_mode")?.extract()?,
         total_racers: required_item(data, TELEMETRY_PAYLOAD, "total_racers")?.extract()?,
         gp_final_rank: optional_item(data, "gp_final_rank", 0)?,
+        gp_points: optional_item(data, "gp_points", 0)?,
         course_index: required_item(data, TELEMETRY_PAYLOAD, "course_index")?.extract()?,
         course_segment_count: optional_item(data, "course_segment_count", 0)?,
         course_length: optional_item(data, "course_length", 0.0)?,
@@ -235,6 +243,7 @@ impl PyTelemetry {
             in_race_mode: telemetry.in_race_mode,
             total_racers: telemetry.total_racers,
             gp_final_rank: telemetry.gp_final_rank,
+            gp_points: telemetry.gp_points,
             course_index: telemetry.course_index,
             course_segment_count: telemetry.course_segment_count,
             course_length: telemetry.course_length,

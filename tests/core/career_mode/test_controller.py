@@ -209,11 +209,12 @@ def test_recording_segment_tracker_waits_for_explicit_close() -> None:
     )
     assert tracker.pop_close() is None
 
-    tracker.close(status="succeeded")
+    tracker.close(status="succeeded", info={"career_mode_gp_final_rank": 1})
     close = tracker.pop_close()
 
     assert close is not None
     assert close.status == "succeeded"
+    assert close.info == {"career_mode_gp_final_rank": 1}
     assert tracker.pop_close() is None
 
 
@@ -221,12 +222,13 @@ def test_recording_segment_close_is_not_downgraded_by_credit_reset() -> None:
     tracker = CareerRecordingSegmentTracker()
 
     tracker.observe_terminal_result({"termination_reason": "finished"})
-    tracker.close(status="succeeded")
-    tracker.force_close(status="failed")
+    tracker.close(status="succeeded", info={"career_mode_gp_points": 512})
+    tracker.force_close(status="failed", info={"career_mode_gp_points": 0})
     close = tracker.pop_close()
 
     assert close is not None
     assert close.status == "succeeded"
+    assert close.info == {"career_mode_gp_points": 512}
 
 
 def test_recording_segment_close_survives_next_plan_application(tmp_path: Path) -> None:
@@ -288,7 +290,7 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
     assert events.emulator_reset_requested is False
 
 
-def test_controller_annotates_post_gp_position_as_final_rank(tmp_path: Path) -> None:
+def test_controller_does_not_derive_final_rank_from_post_gp_position(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
     progress = _PostGpProgressStub()
     controller.__dict__["_progress"] = progress
@@ -307,7 +309,7 @@ def test_controller_annotates_post_gp_position_as_final_rank(tmp_path: Path) -> 
     )
 
     assert handled is False
-    assert progress.sync_calls[0]["career_mode_gp_final_rank"] == 1
+    assert "career_mode_gp_final_rank" not in progress.sync_calls[0]
     assert progress.sync_calls[0]["gp_final_rank"] == -15533
 
 
@@ -454,6 +456,7 @@ class _PostGpProgressStub:
                 attempt_finished=True,
                 finished_attempt_id="attempt-1",
                 finished_status="succeeded",
+                recording_info=dict(info),
                 next_plan=_execution_plan() if self._next_plan else None,
                 reset_emulator=True,
             )

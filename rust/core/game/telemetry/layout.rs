@@ -31,7 +31,6 @@ pub(crate) struct GlobalOffsets {
     pub game_mode: usize,
     pub queued_game_mode: usize,
     pub total_racers: usize,
-    pub player_1_overall_position: usize,
     pub current_course_info: usize,
     pub course_index: usize,
     pub cameras: usize,
@@ -63,8 +62,10 @@ pub(crate) struct CameraOffsets {
 
 #[derive(Clone, Copy)]
 pub(crate) struct RacerOffsets {
+    pub id: usize,
     pub size: usize,
     pub state_flags: usize,
+    pub points: usize,
     pub segment_position_info: usize,
     pub local_velocity: usize,
     pub velocity: usize,
@@ -156,15 +157,6 @@ pub(crate) const GLOBALS: GlobalOffsets = GlobalOffsets {
     game_mode: rdram_offset(0x800DCE44),
     queued_game_mode: rdram_offset(0x800DCE48),
     total_racers: rdram_offset(0x800E5EC0),
-    // GP total ranking writes this from `gRacerIdsByPosition` when drawing
-    // the total ranking screen. The public decomp names it
-    // `gPlayer1OverallPosition`; US Rev0 symbols are incomplete, so this
-    // address is derived from the decomp's stable data-layout distance to
-    // `gCurrentCourseInfo`:
-    //   JP/EK gCurrentCourseInfo 0x800D65C0 - gPlayer1OverallPosition
-    //   0x800BF068 = 0x17558
-    //   US runtime gCurrentCourseInfo 0x800F8510 - 0x17558 = 0x800E0FB8
-    player_1_overall_position: rdram_offset(0x800E0FB8),
     current_course_info: rdram_offset(0x800F8510),
     course_index: rdram_offset(0x800F8514),
     cameras: rdram_offset(0x800E5220),
@@ -199,8 +191,10 @@ pub(crate) const CAMERA: CameraOffsets = CameraOffsets {
 // Byte offsets within `struct Racer`, derived from the decomp's
 // `include/unk_structs.h`.
 pub(crate) const RACER: RacerOffsets = RacerOffsets {
+    id: 0x000,
     size: 0x3A8,
     state_flags: 0x004,
+    points: 0x00A,
     segment_position_info: 0x00C,
     local_velocity: 0x05C,
     velocity: 0x074,

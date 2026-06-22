@@ -284,7 +284,7 @@ def test_single_target_explicit_post_gp_rank_two_counts_as_failed_attempt(
     assert store.started_next_attempt_count == 1
 
 
-def test_single_target_generic_post_gp_rank_two_counts_as_failed_attempt(
+def test_single_target_result_screen_rank_two_counts_as_failed_attempt(
     tmp_path: Path,
 ) -> None:
     store = _SingleTargetCompletionStore(tmp_path)
@@ -305,7 +305,7 @@ def test_single_target_generic_post_gp_rank_two_counts_as_failed_attempt(
         session=_Session(),
         setup=_race_setup(),
         info={
-            "game_mode": "gp_end_cutscene",
+            "game_mode": "results",
             "termination_reason": "finished",
             "gp_final_rank": 2,
         },
@@ -431,6 +431,15 @@ def test_single_target_success_stops_after_target_clear_goal(tmp_path: Path) -> 
             "race_time_ms": 77_000,
             "course_index": 5,
         },
+    )
+    progress.observe_post_race_screen(
+        info={
+            "game_mode": "results",
+            "termination_reason": "finished",
+            "course_index": 5,
+            "gp_final_rank": 1,
+        },
+        setup=_race_setup(),
     )
     second_post_gp = progress.sync_post_terminal_progress(
         session=_Session(),
@@ -672,6 +681,15 @@ def test_replayed_target_success_waits_for_post_gp_recording_boundary(tmp_path: 
             "course_index": 5,
         },
     )
+    progress.observe_post_race_screen(
+        info={
+            "game_mode": "results",
+            "termination_reason": "finished",
+            "course_index": 5,
+            "gp_final_rank": 1,
+        },
+        setup=_race_setup(),
+    )
     result_transition = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
@@ -724,6 +742,15 @@ def test_replayed_target_success_counts_post_gp_without_final_course_metadata(
         setup=_race_setup(),
         info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
     )
+    progress.observe_post_race_screen(
+        info={
+            "game_mode": "results",
+            "termination_reason": "finished",
+            "course_index": 5,
+            "gp_final_rank": 1,
+        },
+        setup=_race_setup(),
+    )
     credits_transition = progress.sync_post_terminal_progress(
         session=_Session(),
         setup=_race_setup(),
@@ -760,6 +787,15 @@ def test_replayed_target_success_counts_when_ceremony_returns_to_menu(
         session=_Session(),
         setup=_race_setup(),
         info={"termination_reason": "finished", "position": 1, "race_time_ms": 88_333},
+    )
+    progress.observe_post_race_screen(
+        info={
+            "game_mode": "results",
+            "termination_reason": "finished",
+            "course_index": 5,
+            "gp_final_rank": 1,
+        },
+        setup=_race_setup(),
     )
     post_gp_transition = progress.sync_post_terminal_progress(
         session=_Session(),
@@ -940,6 +976,7 @@ def test_replayed_target_uses_losing_rank_observed_before_ceremony(
             "termination_reason": "finished",
             "course_index": 5,
             "gp_final_rank": 2,
+            "gp_points": 570,
         },
         setup=_race_setup(),
     )
@@ -953,6 +990,9 @@ def test_replayed_target_uses_losing_rank_observed_before_ceremony(
     assert menu_transition.attempt_finished is True
     assert menu_transition.finished_status == "failed"
     assert menu_transition.finished_failure_reason == "gp cup final rank 2"
+    assert menu_transition.recording_info is not None
+    assert menu_transition.recording_info["career_mode_gp_final_rank"] == 2
+    assert menu_transition.recording_info["career_mode_gp_points"] == 570
     assert store.finished_attempts == [("attempt-1", "failed", "gp cup final rank 2")]
 
 

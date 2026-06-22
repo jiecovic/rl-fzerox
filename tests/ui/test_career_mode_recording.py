@@ -111,7 +111,7 @@ def test_career_recorder_writes_live_video_and_target_segments(tmp_path: Path) -
     assert all(writer.closed for writer in writers)
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-novice-jack-cup.mkv",
-        "career.segment-002-clear-standard-queen-cup.mkv",
+        "career.segment-002-partial-clear-standard-queen-cup.mkv",
     ]
     assert finalizer.closed
 
@@ -275,7 +275,7 @@ def test_career_recorder_keeps_segment_during_post_result_continuation(
     assert [len(writer.frames) for writer in writers] == [3, 2, 1]
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-novice-jack-cup.mkv",
-        "career.segment-002-clear-novice-queen-cup.mkv",
+        "career.segment-002-partial-clear-novice-queen-cup.mkv",
     ]
 
 
@@ -423,7 +423,7 @@ def test_career_recorder_discards_failed_segments_when_requested(
     assert finalizer.paths == []
 
 
-def test_career_recorder_restarts_segment_after_same_attempt_retry(
+def test_career_recorder_restarts_segment_after_next_attempt_retry(
     tmp_path: Path,
 ) -> None:
     writers: list[_FakeWriter] = []
@@ -471,7 +471,7 @@ def test_career_recorder_restarts_segment_after_same_attempt_retry(
     recorder.record_frame(
         frame,
         info={
-            "career_mode_attempt_id": "attempt-a",
+            "career_mode_attempt_id": "attempt-b",
             "career_mode_target_label": "Clear Master Jack Cup",
             "career_mode_fsm_continuing_result": True,
         },
@@ -479,7 +479,7 @@ def test_career_recorder_restarts_segment_after_same_attempt_retry(
     recorder.record_frame(
         frame,
         info={
-            "career_mode_attempt_id": "attempt-a",
+            "career_mode_attempt_id": "attempt-b",
             "career_mode_target_label": "Clear Master Jack Cup",
         },
     )
@@ -490,10 +490,10 @@ def test_career_recorder_restarts_segment_after_same_attempt_retry(
         "career.segment-001-clear-master-jack-cup.mkv",
         "career.segment-002-clear-master-jack-cup.mkv",
     ]
-    assert [len(writer.frames) for writer in writers] == [4, 2, 1]
+    assert [len(writer.frames) for writer in writers] == [4, 2, 2]
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-failed-attempt-clear-master-jack-cup.mkv",
-        "career.segment-002-clear-master-jack-cup.mkv",
+        "career.segment-002-partial-clear-master-jack-cup.mkv",
     ]
 
 
@@ -555,10 +555,10 @@ def test_career_recorder_keeps_course_retire_inside_current_segment(
     ]
     assert [len(writer.frames) for writer in writers] == [4, 4]
     assert [path.name for path in finalizer.paths] == [
-        "career.segment-001-clear-master-joker-cup.mkv",
+        "career.segment-001-partial-clear-master-joker-cup.mkv",
     ]
 
-    summary_json_path = tmp_path / "career.segment-001-clear-master-joker-cup.summary.json"
+    summary_json_path = tmp_path / "career.segment-001-partial-clear-master-joker-cup.summary.json"
     summary = json.loads(summary_json_path.read_text(encoding="utf-8"))
     assert summary["status"] is None
     assert summary["result_counts"] == {"crashed": 0, "failed": 1, "finished": 0, "retired": 1}
@@ -634,10 +634,10 @@ def test_career_recorder_segments_by_attempt_and_marks_failed_attempts(
     assert [len(writer.frames) for writer in writers] == [4, 2, 2]
     assert not (tmp_path / "career.segment-001-clear-novice-jack-cup.mkv").exists()
     assert (tmp_path / "career.segment-001-failed-attempt-clear-novice-jack-cup.mkv").exists()
-    assert (tmp_path / "career.segment-002-clear-novice-jack-cup.mkv").exists()
+    assert (tmp_path / "career.segment-002-partial-clear-novice-jack-cup.mkv").exists()
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-failed-attempt-clear-novice-jack-cup.mkv",
-        "career.segment-002-clear-novice-jack-cup.mkv",
+        "career.segment-002-partial-clear-novice-jack-cup.mkv",
     ]
 
 
@@ -706,7 +706,7 @@ def test_career_recorder_starts_new_segment_after_succeeded_replay_attempt(
     assert [len(writer.frames) for writer in writers] == [3, 2, 1]
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-king-cup.mkv",
-        "career.segment-002-clear-master-king-cup.mkv",
+        "career.segment-002-partial-clear-master-king-cup.mkv",
     ]
 
 
@@ -749,6 +749,62 @@ def test_career_recorder_finishes_succeeded_segment_from_progress_event(
     )
 
     assert writers[1].closed
+    assert [path.name for path in finalizer.paths] == [
+        "career.segment-001-clear-master-joker-cup.mkv",
+    ]
+
+
+def test_career_recorder_ignores_frames_from_closed_attempt(
+    tmp_path: Path,
+) -> None:
+    writers: list[_FakeWriter] = []
+    finalizer = _FakeFinalizer()
+
+    def writer_factory(path: Path) -> _FakeWriter:
+        writer = _FakeWriter(path)
+        writers.append(writer)
+        return writer
+
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    recorder = CareerModeFrameRecorder(
+        path=tmp_path / "career.mkv",
+        native_fps=60.0,
+        writer_factory=writer_factory,
+        finalizer_factory=lambda: finalizer,
+    )
+
+    recorder.record_frame(
+        frame,
+        info={
+            "career_mode_attempt_id": "attempt-final",
+            "career_mode_target_label": "Clear Master Joker Cup",
+        },
+    )
+    recorder.finish_segment(
+        status="succeeded",
+        info={
+            "career_mode_attempt_id": "attempt-final",
+            "career_mode_target_label": "Clear Master Joker Cup",
+            "career_mode_last_finished_attempt_id": "attempt-final",
+            "career_mode_last_finished_attempt_status": "succeeded",
+            "game_mode": "gp_end_cutscene",
+        },
+    )
+    recorder.record_frame(
+        frame,
+        info={
+            "career_mode_attempt_id": "attempt-final",
+            "career_mode_target_label": "Clear Master Joker Cup",
+            "game_mode": "gp_end_cutscene",
+        },
+    )
+    recorder.close()
+
+    assert [writer.path.name for writer in writers] == [
+        "career.live.mkv",
+        "career.segment-001-clear-master-joker-cup.mkv",
+    ]
+    assert [len(writer.frames) for writer in writers] == [2, 1]
     assert [path.name for path in finalizer.paths] == [
         "career.segment-001-clear-master-joker-cup.mkv",
     ]
@@ -968,8 +1024,20 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_completion(
         "career_mode_last_finished_attempt_id": "attempt-final",
         "career_mode_last_finished_attempt_status": "succeeded",
     }
-    recorder.record_frame(frame, info=post_gp_info)
-    recorder.finish_segment(status="succeeded", info=post_gp_info)
+    recorder.record_frame(
+        frame,
+        info={
+            **post_gp_info,
+            "career_mode_gp_final_rank": 1,
+            "career_mode_gp_points": 512,
+            "gp_final_rank": -15533,
+            "gp_points": -32640,
+        },
+    )
+    recorder.finish_segment(
+        status="succeeded",
+        info={**post_gp_info, "gp_final_rank": -15533, "gp_points": -32640},
+    )
 
     assert writers[1].closed
     assert len(writers[1].frames) == 3
@@ -984,6 +1052,23 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_completion(
     assert summary["status"] == "succeeded"
     assert summary["video"]["frame_count"] == 3
     assert summary["result_counts"] == {"crashed": 0, "failed": 0, "finished": 1, "retired": 0}
+    assert "-15533" not in summary_json_path.read_text(encoding="utf-8")
+    assert "-32640" not in summary_json_path.read_text(encoding="utf-8")
+    assert summary["summary"] == {
+        "average_position": 1.0,
+        "best_position": 1,
+        "course_attempt_count": 1,
+        "crashed_course_count": 0,
+        "failed_attempt_count": 0,
+        "final_gp_position": 1,
+        "finished_attempt_count": 1,
+        "gp_points": 512,
+        "ko_star_total": 3,
+        "retired_course_count": 0,
+        "total_race_time_ms": 92_345,
+        "unique_finished_course_count": 1,
+        "worst_position": 1,
+    }
     assert summary["courses"] == [
         {
             "course_id": "big_hand",
@@ -1002,6 +1087,10 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_completion(
     assert "| Big Hand | finished | 1:32.345 | 1 | 3 | Engine 63 |" in (
         summary_md_path.read_text(encoding="utf-8")
     )
+    assert "| Final GP position | 1 |" in summary_md_path.read_text(encoding="utf-8")
+    assert "| GP points | 512 |" in summary_md_path.read_text(encoding="utf-8")
+    assert "-15533" not in summary_md_path.read_text(encoding="utf-8")
+    assert "-32640" not in summary_md_path.read_text(encoding="utf-8")
 
     recorder.close()
 
@@ -1089,8 +1178,8 @@ def test_career_recorder_summary_captures_terminal_events_between_frames(
     )
     recorder.close()
 
-    summary_json_path = tmp_path / "career.segment-001-clear-master-jack-cup.summary.json"
-    summary_md_path = tmp_path / "career.segment-001-clear-master-jack-cup.summary.md"
+    summary_json_path = tmp_path / "career.segment-001-partial-clear-master-jack-cup.summary.json"
+    summary_md_path = tmp_path / "career.segment-001-partial-clear-master-jack-cup.summary.md"
     summary = json.loads(summary_json_path.read_text(encoding="utf-8"))
     assert summary["status"] == "succeeded"
     assert summary["video"]["frame_count"] == 2
@@ -1138,7 +1227,93 @@ def test_career_recorder_summary_captures_terminal_events_between_frames(
     assert "| Run A | latest | mute_city | 14820470 | 660000 | 2025-12-10T12:00:00Z |" in markdown
 
 
-def test_career_recorder_summary_keeps_one_result_per_cup_course(
+def test_career_recorder_summary_keeps_retried_course_results(
+    tmp_path: Path,
+) -> None:
+    writers: list[_FakeWriter] = []
+    finalizer = _FakeFinalizer()
+
+    def writer_factory(path: Path) -> _FakeWriter:
+        writer = _FakeWriter(path)
+        writers.append(writer)
+        return writer
+
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    recorder = CareerModeFrameRecorder(
+        path=tmp_path / "career.mkv",
+        native_fps=60.0,
+        writer_factory=writer_factory,
+        finalizer_factory=lambda: finalizer,
+    )
+
+    base_info = {
+        "career_mode_attempt_id": "attempt-a",
+        "career_mode_target_label": "Clear Master Jack Cup",
+        "course_index": 0,
+        "track_engine_setting_raw_value": 80,
+    }
+    recorder.record_frame(frame, info=base_info)
+    recorder.record_event(
+        info={
+            **base_info,
+            "termination_reason": "retired",
+            "race_time_ms": 41_250,
+            "position": 30,
+            "ko_star_count": 0,
+            "race_laps_completed": 1,
+            "total_lap_count": 3,
+        }
+    )
+    recorder.record_event(
+        info={
+            **base_info,
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "succeeded",
+            "termination_reason": "finished",
+            "race_time_ms": 86_136,
+            "position": 1,
+            "ko_star_count": 1,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+        }
+    )
+    recorder.finish_segment(
+        status="succeeded",
+        info={
+            **base_info,
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "succeeded",
+            "career_mode_gp_final_rank": 1,
+            "career_mode_gp_points": 600,
+            "game_mode": "gp_end_cutscene",
+        },
+    )
+    recorder.close()
+
+    summary_json_path = tmp_path / "career.segment-001-clear-master-jack-cup.summary.json"
+    summary_md_path = tmp_path / "career.segment-001-clear-master-jack-cup.summary.md"
+    summary = json.loads(summary_json_path.read_text(encoding="utf-8"))
+    assert summary["status"] == "succeeded"
+    assert summary["result_counts"] == {"crashed": 0, "failed": 1, "finished": 1, "retired": 1}
+    assert [course["termination_reason"] for course in summary["courses"]] == [
+        "retired",
+        "finished",
+    ]
+    assert [course["course_name"] for course in summary["courses"]] == ["Mute City", "Mute City"]
+    assert summary["summary"]["final_gp_position"] == 1
+    assert summary["summary"]["gp_points"] == 600
+    assert summary["summary"]["course_attempt_count"] == 2
+    assert summary["summary"]["finished_attempt_count"] == 1
+    assert summary["summary"]["failed_attempt_count"] == 1
+    assert summary["summary"]["unique_finished_course_count"] == 1
+    markdown = summary_md_path.read_text(encoding="utf-8")
+    assert "| Course attempts | 2 |" in markdown
+    assert "| Failed attempts | 1 |" in markdown
+    assert "| Mute City | retired | 0:41.250 | 30 | 0 | Engine 63 |" in markdown
+    assert "| Mute City | finished | 1:26.136 | 1 | 1 | Engine 63 |" in markdown
+
+
+def test_career_recorder_summary_deduplicates_duplicate_terminal_observations(
     tmp_path: Path,
 ) -> None:
     writers: list[_FakeWriter] = []
@@ -1251,6 +1426,21 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
             "total_lap_count": 3,
         }
     )
+    recorder.record_event(
+        info={
+            "career_mode_attempt_id": "attempt-a",
+            "career_mode_target_label": "Clear Master Jack Cup",
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "failed",
+            "termination_reason": "finished",
+            "race_time_ms": 131_000,
+            "position": 1,
+            "ko_star_count": 3,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+            "course_index": 55,
+        }
+    )
     recorder.finish_segment(
         status="failed",
         info={
@@ -1272,6 +1462,11 @@ def test_career_recorder_summary_keeps_one_result_per_cup_course(
     summary = json.loads(summary_json_path.read_text(encoding="utf-8"))
     assert summary["status"] == "failed"
     assert summary["result_counts"] == {"crashed": 0, "failed": 0, "finished": 6, "retired": 0}
+    assert summary["summary"]["course_attempt_count"] == 6
+    assert summary["summary"]["total_race_time_ms"] == 490_209
+    assert summary["summary"]["average_position"] == 25 / 6
+    assert summary["summary"]["gp_points"] is None
+    assert summary["summary"]["ko_star_total"] == 1
     assert [course["course_name"] for course in summary["courses"]] == [
         "Mute City",
         "Silence",
@@ -1295,6 +1490,31 @@ def test_career_segment_recording_path_sanitizes_label() -> None:
             label="Clear Expert Joker Cup!",
         ).name
         == "career.segment-007-clear-expert-joker-cup.mkv"
+    )
+
+
+def test_career_segment_recording_path_includes_manager_attempt_uid() -> None:
+    assert (
+        career_segment_recording_path(
+            Path("career.mkv"),
+            segment_index=7,
+            label="Clear Expert Joker Cup!",
+            attempt_id="20260621-unlock-save-attempt-054792f5",
+        ).name
+        == "career.segment-007-054792f5-clear-expert-joker-cup.mkv"
+    )
+
+
+def test_career_segment_recording_path_marks_partial_window_close() -> None:
+    assert (
+        career_segment_recording_path(
+            Path("career.mkv"),
+            segment_index=7,
+            label="Clear Expert Joker Cup!",
+            status="failed",
+            partial=True,
+        ).name
+        == "career.segment-007-failed-attempt-partial-clear-expert-joker-cup.mkv"
     )
 
 
