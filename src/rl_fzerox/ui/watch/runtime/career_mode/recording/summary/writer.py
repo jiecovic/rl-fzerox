@@ -59,7 +59,9 @@ class _SessionSummaryWriter:
         return tuple(paths)
 
     def write(self) -> None:
-        career_session_summary_path(self.source_path).write_text(
+        summary_path = career_session_summary_path(self.source_path)
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(
             json.dumps(_session_summary_payload(self), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
