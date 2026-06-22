@@ -35,6 +35,7 @@ interface VehicleSectionProps {
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
   setConfig: ConfigSetter;
+  showEngineControls?: boolean;
 }
 
 export function VehicleSection({
@@ -42,6 +43,7 @@ export function VehicleSection({
   defaultConfig,
   metadata,
   setConfig,
+  showEngineControls = true,
 }: VehicleSectionProps) {
   const randomEngineDefaults = {
     max: enginePercentToSliderStep(80),
@@ -191,136 +193,149 @@ export function VehicleSection({
 
   return (
     <ConfigStack>
-      <ConfigGrid columns="two" className="items-stretch">
-        <ConfigPanel
-          onReset={() =>
-            updateVehicle({
-              adaptive_engine_ensemble_members:
-                defaultConfig.vehicle.adaptive_engine_ensemble_members,
-              adaptive_engine_mlp_hidden_dim: defaultConfig.vehicle.adaptive_engine_mlp_hidden_dim,
-              adaptive_engine_mlp_training_steps:
-                defaultConfig.vehicle.adaptive_engine_mlp_training_steps,
-              adaptive_engine_mlp_learning_rate:
-                defaultConfig.vehicle.adaptive_engine_mlp_learning_rate,
-              adaptive_engine_mlp_bootstrap_keep_probability:
-                defaultConfig.vehicle.adaptive_engine_mlp_bootstrap_keep_probability,
-              adaptive_engine_mlp_warmup_successes:
-                defaultConfig.vehicle.adaptive_engine_mlp_warmup_successes,
-              adaptive_engine_stat_decay: defaultConfig.vehicle.adaptive_engine_stat_decay,
-              adaptive_engine_tuner_backend: defaultConfig.vehicle.adaptive_engine_tuner_backend,
-              adaptive_engine_tuner_objective:
-                defaultConfig.vehicle.adaptive_engine_tuner_objective,
-              adaptive_engine_safe_finish_rate_threshold:
-                defaultConfig.vehicle.adaptive_engine_safe_finish_rate_threshold,
-              adaptive_engine_uniform_exploration:
-                defaultConfig.vehicle.adaptive_engine_uniform_exploration,
-              adaptive_engine_greedy_plateau_seconds:
-                defaultConfig.vehicle.adaptive_engine_greedy_plateau_seconds,
-              adaptive_engine_bandit_bucket_raw_values:
-                defaultConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
-              engine_mode: defaultConfig.vehicle.engine_mode,
-              engine_setting_raw_value: defaultConfig.vehicle.engine_setting_raw_value,
-              engine_setting_min_raw_value: defaultConfig.vehicle.engine_setting_min_raw_value,
-              engine_setting_max_raw_value: defaultConfig.vehicle.engine_setting_max_raw_value,
-            })
-          }
-          title="Engine setting"
-        >
-          <div className="grid gap-3">
-            <div className="grid min-h-[34px] gap-2">
-              <div className="grid gap-1">
-                <strong className="text-[13px] text-app-text">Engine mode</strong>
-                <small className="m-0 text-xs leading-snug text-app-muted">
-                  {engineModeDescription(config.vehicle.engine_mode)}
-                </small>
+      {showEngineControls ? (
+        <ConfigGrid columns="two" className="items-stretch">
+          <ConfigPanel
+            onReset={() =>
+              updateVehicle({
+                adaptive_engine_ensemble_members:
+                  defaultConfig.vehicle.adaptive_engine_ensemble_members,
+                adaptive_engine_mlp_hidden_dim:
+                  defaultConfig.vehicle.adaptive_engine_mlp_hidden_dim,
+                adaptive_engine_mlp_training_steps:
+                  defaultConfig.vehicle.adaptive_engine_mlp_training_steps,
+                adaptive_engine_mlp_learning_rate:
+                  defaultConfig.vehicle.adaptive_engine_mlp_learning_rate,
+                adaptive_engine_mlp_bootstrap_keep_probability:
+                  defaultConfig.vehicle.adaptive_engine_mlp_bootstrap_keep_probability,
+                adaptive_engine_mlp_warmup_successes:
+                  defaultConfig.vehicle.adaptive_engine_mlp_warmup_successes,
+                adaptive_engine_stat_decay: defaultConfig.vehicle.adaptive_engine_stat_decay,
+                adaptive_engine_tuner_backend: defaultConfig.vehicle.adaptive_engine_tuner_backend,
+                adaptive_engine_tuner_objective:
+                  defaultConfig.vehicle.adaptive_engine_tuner_objective,
+                adaptive_engine_safe_finish_rate_threshold:
+                  defaultConfig.vehicle.adaptive_engine_safe_finish_rate_threshold,
+                adaptive_engine_uniform_exploration:
+                  defaultConfig.vehicle.adaptive_engine_uniform_exploration,
+                adaptive_engine_greedy_plateau_seconds:
+                  defaultConfig.vehicle.adaptive_engine_greedy_plateau_seconds,
+                adaptive_engine_bandit_bucket_raw_values:
+                  defaultConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
+                engine_mode: defaultConfig.vehicle.engine_mode,
+                engine_setting_raw_value: defaultConfig.vehicle.engine_setting_raw_value,
+                engine_setting_min_raw_value: defaultConfig.vehicle.engine_setting_min_raw_value,
+                engine_setting_max_raw_value: defaultConfig.vehicle.engine_setting_max_raw_value,
+              })
+            }
+            title="Engine setting"
+          >
+            <div className="grid gap-3">
+              <div className="grid min-h-[34px] gap-2">
+                <div className="grid gap-1">
+                  <strong className="text-[13px] text-app-text">Engine mode</strong>
+                  <small className="m-0 text-xs leading-snug text-app-muted">
+                    {engineModeDescription(config.vehicle.engine_mode)}
+                  </small>
+                </div>
+                <SegmentedChoiceStrip
+                  ariaLabel="Engine mode"
+                  options={[
+                    {
+                      active: config.vehicle.engine_mode === "fixed",
+                      key: "fixed",
+                      label: "Fixed",
+                      onClick: () => setEngineMode("fixed"),
+                    },
+                    {
+                      active: config.vehicle.engine_mode === "random_range",
+                      key: "random_range",
+                      label: "Random",
+                      onClick: () => setEngineMode("random_range"),
+                    },
+                    {
+                      active: config.vehicle.engine_mode === "adaptive_tuner",
+                      key: "adaptive_tuner",
+                      label: "Adaptive",
+                      onClick: () => setEngineMode("adaptive_tuner"),
+                    },
+                  ]}
+                />
               </div>
-              <SegmentedChoiceStrip
-                ariaLabel="Engine mode"
-                options={[
-                  {
-                    active: config.vehicle.engine_mode === "fixed",
-                    key: "fixed",
-                    label: "Fixed",
-                    onClick: () => setEngineMode("fixed"),
-                  },
-                  {
-                    active: config.vehicle.engine_mode === "random_range",
-                    key: "random_range",
-                    label: "Random",
-                    onClick: () => setEngineMode("random_range"),
-                  },
-                  {
-                    active: config.vehicle.engine_mode === "adaptive_tuner",
-                    key: "adaptive_tuner",
-                    label: "Adaptive",
-                    onClick: () => setEngineMode("adaptive_tuner"),
-                  },
-                ]}
+              <EngineSettingControl
+                defaultFixedValue={defaultConfig.vehicle.engine_setting_raw_value}
+                defaultRangeMax={randomEngineDefaults.max}
+                defaultRangeMin={randomEngineDefaults.min}
+                fixedValue={config.vehicle.engine_setting_raw_value}
+                help={
+                  config.vehicle.engine_mode === "fixed"
+                    ? "F-Zero X engine slider step. Labels show the rounded in-game ENG percent."
+                    : config.vehicle.engine_mode === "random_range"
+                      ? "Sample one representable engine slider step inside this range on each episode reset."
+                      : "Candidate engine slider-step range used by the adaptive tuner at episode reset."
+                }
+                label={config.vehicle.engine_mode === "fixed" ? "Engine slider" : "Engine range"}
+                max={ENGINE_SLIDER.maxStep}
+                min={ENGINE_SLIDER.minStep}
+                mode={config.vehicle.engine_mode}
+                rangeMax={config.vehicle.engine_setting_max_raw_value}
+                rangeMin={config.vehicle.engine_setting_min_raw_value}
+                ticks={engineTicks}
+                onFixedChange={(value) => updateVehicle({ engine_setting_raw_value: value })}
+                onRangeChange={(value) => {
+                  const bucketSideCount =
+                    bucketSideCountFromRawValues(
+                      config.vehicle.adaptive_engine_bandit_bucket_raw_values,
+                    ) ||
+                    bucketSideCountFromRawValues(
+                      defaultConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
+                    );
+                  const adaptive_engine_bandit_bucket_raw_values = centeredEngineBuckets({
+                    sideCount: bucketSideCount,
+                    minimum: value.min,
+                    maximum: value.max,
+                  });
+                  updateVehicle({
+                    ...(adaptive_engine_bandit_bucket_raw_values.length > 0
+                      ? { adaptive_engine_bandit_bucket_raw_values }
+                      : {}),
+                    engine_setting_max_raw_value: value.max,
+                    engine_setting_min_raw_value: value.min,
+                  });
+                }}
               />
+              {config.vehicle.engine_mode === "adaptive_tuner" ? (
+                <AdaptiveEngineControls
+                  config={config}
+                  defaultConfig={defaultConfig}
+                  onChange={updateVehicle}
+                />
+              ) : null}
             </div>
-            <EngineSettingControl
-              defaultFixedValue={defaultConfig.vehicle.engine_setting_raw_value}
-              defaultRangeMax={randomEngineDefaults.max}
-              defaultRangeMin={randomEngineDefaults.min}
-              fixedValue={config.vehicle.engine_setting_raw_value}
-              help={
-                config.vehicle.engine_mode === "fixed"
-                  ? "F-Zero X engine slider step. Labels show the rounded in-game ENG percent."
-                  : config.vehicle.engine_mode === "random_range"
-                    ? "Sample one representable engine slider step inside this range on each episode reset."
-                    : "Candidate engine slider-step range used by the adaptive tuner at episode reset."
-              }
-              label={config.vehicle.engine_mode === "fixed" ? "Engine slider" : "Engine range"}
-              max={ENGINE_SLIDER.maxStep}
-              min={ENGINE_SLIDER.minStep}
-              mode={config.vehicle.engine_mode}
-              rangeMax={config.vehicle.engine_setting_max_raw_value}
-              rangeMin={config.vehicle.engine_setting_min_raw_value}
-              ticks={engineTicks}
-              onFixedChange={(value) => updateVehicle({ engine_setting_raw_value: value })}
-              onRangeChange={(value) => {
-                const bucketSideCount =
-                  bucketSideCountFromRawValues(
-                    config.vehicle.adaptive_engine_bandit_bucket_raw_values,
-                  ) ||
-                  bucketSideCountFromRawValues(
-                    defaultConfig.vehicle.adaptive_engine_bandit_bucket_raw_values,
-                  );
-                const adaptive_engine_bandit_bucket_raw_values = centeredEngineBuckets({
-                  sideCount: bucketSideCount,
-                  minimum: value.min,
-                  maximum: value.max,
-                });
-                updateVehicle({
-                  ...(adaptive_engine_bandit_bucket_raw_values.length > 0
-                    ? { adaptive_engine_bandit_bucket_raw_values }
-                    : {}),
-                  engine_setting_max_raw_value: value.max,
-                  engine_setting_min_raw_value: value.min,
-                });
-              }}
-            />
-            {config.vehicle.engine_mode === "adaptive_tuner" ? (
-              <AdaptiveEngineControls
-                config={config}
-                defaultConfig={defaultConfig}
-                onChange={updateVehicle}
-              />
-            ) : null}
-          </div>
-        </ConfigPanel>
+          </ConfigPanel>
 
-        <ConfigPanel title="Selection summary">
-          <div className="grid grid-cols-3 gap-2.5">
+          <ConfigPanel title="Selection summary">
+            <div className="grid grid-cols-3 gap-2.5">
+              <VehicleMetric label="Selected machines" value={String(selectedVehicleIds.length)} />
+              <VehicleMetric label="Rows covered" value={String(selectedRowCount)} />
+              <VehicleMetric label="Engine setting" value={engineSettingSummary(config.vehicle)} />
+            </div>
+            <p className="min-h-[34px] text-xs leading-snug text-app-muted">
+              {selectionSummary(selectedVehicles)}
+            </p>
+          </ConfigPanel>
+        </ConfigGrid>
+      ) : (
+        <ConfigPanel title="Machine selection">
+          <div className="grid grid-cols-2 gap-2.5 max-[760px]:grid-cols-1">
             <VehicleMetric label="Selected machines" value={String(selectedVehicleIds.length)} />
             <VehicleMetric label="Rows covered" value={String(selectedRowCount)} />
-            <VehicleMetric label="Engine setting" value={engineSettingSummary(config.vehicle)} />
           </div>
-          <p className="min-h-[34px] text-xs leading-snug text-app-muted">
+          <p className="min-h-[22px] text-xs leading-snug text-app-muted">
             {selectionSummary(selectedVehicles)}
           </p>
         </ConfigPanel>
-      </ConfigGrid>
+      )}
 
       <ConfigPanel
         onReset={() =>

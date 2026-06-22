@@ -137,9 +137,12 @@ export function WorkspaceBody({
       ) : null}
       {!isLoading && sessions.activeTabId === "evaluations" ? (
         <EvaluationsPanel
+          defaultConfig={defaultConfig}
           evaluationError={evaluationError}
           evaluations={evaluations}
+          loadRunDetail={loadRunDetail}
           metadata={metadata}
+          runDetailsById={runDetailsById}
           runs={runs}
           sourceRunId={evaluationSourceRunId}
           onCreateEvaluation={actions.createManagedEvaluation}

@@ -8,6 +8,7 @@ export interface TracksSectionProps {
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
   setConfig: ConfigSetter;
+  showSampling?: boolean;
 }
 
 export type BuiltInCourse = ConfigMetadata["built_in_courses"][number];

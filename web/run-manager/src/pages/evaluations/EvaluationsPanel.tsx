@@ -1,6 +1,15 @@
 // web/run-manager/src/pages/evaluations/EvaluationsPanel.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { ConfigSetter } from "@/entities/runConfig/model/state";
+import { TracksSection } from "@/entities/runConfig/ui/sections/tracks/TracksSection";
+import { VehicleSection } from "@/entities/runConfig/ui/sections/VehicleSection";
+import {
+  buildEvaluationPresets,
+  clonePresetConfig,
+  type EvaluationPresetId,
+  evaluationTargetFromConfig,
+} from "@/pages/evaluations/presets";
 import type {
   ConfigMetadata,
   CreateEvaluationRequest,
@@ -8,18 +17,24 @@ import type {
   EvaluationSourceArtifact,
   ManagedEvaluation,
   ManagedRun,
+  ManagedRunConfig,
+  ManagedRunDetail,
   PolicyPlaybackMode,
 } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
+import { ConfigStack } from "@/shared/ui/config/ConfigLayout";
 import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
 import { EvaluationTabIcon, PlusIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface EvaluationsPanelProps {
+  defaultConfig: ManagedRunConfig | null;
   evaluationError: string | null;
   evaluations: ManagedEvaluation[];
+  loadRunDetail: (runId: string) => Promise<ManagedRunDetail>;
   metadata: ConfigMetadata | null;
+  runDetailsById: Record<string, ManagedRunDetail>;
   runs: ManagedRun[];
   sourceRunId: string | null;
   onCreateEvaluation: (request: CreateEvaluationRequest) => Promise<ManagedEvaluation>;
@@ -29,46 +44,62 @@ interface EvaluationsPanelProps {
 type SourceArtifactChoice = Extract<EvaluationSourceArtifact, "latest" | "best">;
 
 const TARGET_MODE_LABELS: Record<EvaluationMode, string> = {
-  best_of: "Best of",
-  career_target: "Career target",
   gp_cup: "GP cup",
   time_attack: "Time attack",
 };
 
 export function EvaluationsPanel({
+  defaultConfig,
   evaluationError,
   evaluations,
+  loadRunDetail,
   metadata,
   onCreateEvaluation,
   onGlobalError,
+  runDetailsById,
   runs,
   sourceRunId,
 }: EvaluationsPanelProps) {
   const [selectedRunId, setSelectedRunId] = useState(runs[0]?.id ?? "");
   const [sourceArtifact, setSourceArtifact] = useState<SourceArtifactChoice>("latest");
   const [policyMode, setPolicyMode] = useState<PolicyPlaybackMode>("deterministic");
-  const [targetMode, setTargetMode] = useState<EvaluationMode>("time_attack");
-  const [courseIds, setCourseIds] = useState<string[]>([]);
-  const [cupIds, setCupIds] = useState<string[]>([]);
-  const [difficulties, setDifficulties] = useState<string[]>([]);
-  const [vehicleIds, setVehicleIds] = useState<string[]>([]);
+  const [presetId, setPresetId] = useState<EvaluationPresetId>("time_attack_blue_falcon");
+  const [appliedPresetKey, setAppliedPresetKey] = useState<string | null>(null);
+  const [presetConfig, setPresetConfig] = useState<ManagedRunConfig | null>(null);
   const [repeatText, setRepeatText] = useState("3");
   const [seedText, setSeedText] = useState(() => String(randomSeed()));
   const [nameText, setNameText] = useState("");
   const [nameEdited, setNameEdited] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
+  const selectedRunDetail = runDetailsById[selectedRunId] ?? null;
+  const presets = useMemo(
+    () =>
+      defaultConfig === null || metadata === null
+        ? []
+        : buildEvaluationPresets({
+            defaultConfig,
+            metadata,
+            sourceRun: selectedRunDetail,
+          }),
+    [defaultConfig, metadata, selectedRunDetail],
+  );
+  const selectedPreset = presets.find((preset) => preset.id === presetId) ?? presets[0] ?? null;
   const defaultName = useMemo(
     () =>
       selectedRun === null
         ? "evaluation"
-        : `${selectedRun.name} ${TARGET_MODE_LABELS[targetMode].toLowerCase()}`,
-    [selectedRun, targetMode],
+        : `${selectedRun.name} · ${selectedPreset?.label ?? "evaluation"}`,
+    [selectedPreset?.label, selectedRun],
   );
-  const courses = metadata?.built_in_courses ?? [];
-  const cups = metadata?.track_cups ?? [];
-  const difficultyOptions = metadata?.gp_difficulties ?? [];
-  const vehicles = metadata?.vehicles ?? [];
+  const setEvaluationConfig: ConfigSetter = useCallback((nextConfig) => {
+    setPresetConfig((currentConfig) => {
+      if (currentConfig === null) {
+        return currentConfig;
+      }
+      return typeof nextConfig === "function" ? nextConfig(currentConfig) : nextConfig;
+    });
+  }, []);
 
   useEffect(() => {
     if (runs.length === 0) {
@@ -88,10 +119,54 @@ export function EvaluationsPanel({
   }, [runs, sourceRunId]);
 
   useEffect(() => {
+    if (selectedRunId === "" || runDetailsById[selectedRunId] !== undefined) {
+      return undefined;
+    }
+    let ignore = false;
+    void loadRunDetail(selectedRunId).catch((caught) => {
+      if (!ignore) {
+        onGlobalError(caught instanceof Error ? caught.message : "failed to load run details");
+      }
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [loadRunDetail, onGlobalError, runDetailsById, selectedRunId]);
+
+  useEffect(() => {
+    if (sourceRunId !== null && selectedRunId === sourceRunId && selectedRunDetail !== null) {
+      setPresetId("source_run");
+    }
+  }, [selectedRunDetail, selectedRunId, sourceRunId]);
+
+  useEffect(() => {
+    if (selectedPreset === null) {
+      setPresetConfig(null);
+      setAppliedPresetKey(null);
+      return;
+    }
+    if (appliedPresetKey === selectedPreset.cacheKey) {
+      return;
+    }
+    setPresetConfig(clonePresetConfig(selectedPreset.config));
+    setAppliedPresetKey(selectedPreset.cacheKey);
+  }, [appliedPresetKey, selectedPreset]);
+
+  useEffect(() => {
     if (!nameEdited) {
       setNameText(defaultName);
     }
   }, [defaultName, nameEdited]);
+
+  function selectPreset(nextPresetId: EvaluationPresetId) {
+    const nextPreset = presets.find((preset) => preset.id === nextPresetId);
+    setPresetId(nextPresetId);
+    if (nextPreset !== undefined) {
+      setPresetConfig(clonePresetConfig(nextPreset.config));
+      setAppliedPresetKey(nextPreset.cacheKey);
+      setNameEdited(false);
+    }
+  }
 
   async function submitEvaluation() {
     const repeatsPerTarget = Number.parseInt(repeatText, 10);
@@ -99,6 +174,10 @@ export function EvaluationsPanel({
     const name = nameText.trim() || defaultName;
     if (selectedRun === null) {
       onGlobalError("Select a source run before creating an evaluation.");
+      return;
+    }
+    if (metadata === null || presetConfig === null) {
+      onGlobalError("Evaluation preset metadata is not available.");
       return;
     }
     if (!Number.isInteger(repeatsPerTarget) || repeatsPerTarget < 1) {
@@ -109,21 +188,22 @@ export function EvaluationsPanel({
       onGlobalError("Evaluation seed must be an integer from 0 to 4294967295.");
       return;
     }
+    const target = evaluationTargetFromConfig(presetConfig, metadata);
     setIsCreating(true);
     onGlobalError(null);
     try {
       await onCreateEvaluation({
-        courseIds,
-        cupIds,
-        difficulties,
+        courseIds: target.courseIds,
+        cupIds: target.cupIds,
+        difficulties: target.difficulties,
         name,
         policyMode,
         repeatsPerTarget,
         seed,
         sourceArtifact,
         sourceRunId: selectedRun.id,
-        targetMode,
-        vehicleIds,
+        targetMode: target.mode,
+        vehicleIds: target.vehicleIds,
       });
       setNameEdited(false);
     } catch (caught) {
@@ -144,6 +224,8 @@ export function EvaluationsPanel({
 
       {runs.length === 0 ? (
         <Notice>Create or import a run before creating evaluation snapshots.</Notice>
+      ) : defaultConfig === null || metadata === null ? (
+        <Notice tone="error">Run-manager metadata is required before creating evaluations.</Notice>
       ) : (
         <div className="grid gap-5">
           {evaluationError !== null ? (
@@ -155,14 +237,17 @@ export function EvaluationsPanel({
           <section className="border border-app-border bg-app-surface-muted p-4">
             <div className="mb-4 flex items-center gap-2 text-sm font-bold tracking-[0.04em] text-app-muted uppercase">
               <EvaluationTabIcon />
-              <span>Snapshot source</span>
+              <span>Checkpoint snapshot</span>
             </div>
-            <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_150px_160px_minmax(260px,1fr)]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_150px_160px_minmax(260px,1fr)]">
               <FieldShell>
                 <span>Policy run</span>
                 <FieldSelect
                   value={selectedRunId}
-                  onChange={(event) => setSelectedRunId(event.currentTarget.value)}
+                  onChange={(event) => {
+                    setSelectedRunId(event.currentTarget.value);
+                    setNameEdited(false);
+                  }}
                 >
                   {runs.map((run) => (
                     <option key={run.id} value={run.id}>
@@ -210,18 +295,20 @@ export function EvaluationsPanel({
 
           <section className="border border-app-border bg-app-surface-muted p-4">
             <div className="mb-4 flex items-center gap-2 text-sm font-bold tracking-[0.04em] text-app-muted uppercase">
-              <span>Target config</span>
+              <span>Evaluation preset</span>
             </div>
-            <div className="grid gap-3 xl:grid-cols-[180px_120px_180px_180px_minmax(220px,1fr)_180px_auto]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_120px_180px_auto]">
               <FieldShell>
-                <span>Target</span>
+                <span>Preset</span>
                 <FieldSelect
-                  value={targetMode}
-                  onChange={(event) => setTargetMode(event.currentTarget.value as EvaluationMode)}
+                  value={selectedPreset?.id ?? presetId}
+                  onChange={(event) =>
+                    selectPreset(event.currentTarget.value as EvaluationPresetId)
+                  }
                 >
-                  {Object.entries(TARGET_MODE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
+                  {presets.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
                     </option>
                   ))}
                 </FieldSelect>
@@ -235,36 +322,6 @@ export function EvaluationsPanel({
                   onChange={(event) => setRepeatText(event.currentTarget.value)}
                 />
               </FieldShell>
-              <MultiSelectField
-                label="Cups"
-                options={cups.map((cup) => ({ label: cup.label, value: cup.id }))}
-                values={cupIds}
-                onChange={setCupIds}
-              />
-              <MultiSelectField
-                label="Difficulty"
-                options={difficultyOptions}
-                values={difficulties}
-                onChange={setDifficulties}
-              />
-              <MultiSelectField
-                label="Courses"
-                options={courses.map((course) => ({
-                  label: `${course.display_name} · ${course.cup_label}`,
-                  value: course.id,
-                }))}
-                values={courseIds}
-                onChange={setCourseIds}
-              />
-              <MultiSelectField
-                label="Vehicles"
-                options={vehicles.map((vehicle) => ({
-                  label: vehicle.display_name,
-                  value: vehicle.id,
-                }))}
-                values={vehicleIds}
-                onChange={setVehicleIds}
-              />
               <FieldShell>
                 <span>Seed</span>
                 <FieldInput
@@ -276,7 +333,7 @@ export function EvaluationsPanel({
               </FieldShell>
               <Button
                 className="mt-[22px] gap-2"
-                disabled={isCreating}
+                disabled={isCreating || presetConfig === null}
                 type="button"
                 variant="primary"
                 onClick={() => void submitEvaluation()}
@@ -287,6 +344,25 @@ export function EvaluationsPanel({
             </div>
           </section>
 
+          {presetConfig !== null ? (
+            <ConfigStack>
+              <TracksSection
+                config={presetConfig}
+                defaultConfig={defaultConfig}
+                metadata={metadata}
+                setConfig={setEvaluationConfig}
+                showSampling={false}
+              />
+              <VehicleSection
+                config={presetConfig}
+                defaultConfig={defaultConfig}
+                metadata={metadata}
+                setConfig={setEvaluationConfig}
+                showEngineControls={false}
+              />
+            </ConfigStack>
+          ) : null}
+
           {evaluations.length === 0 ? (
             <Notice>No evaluation snapshots yet.</Notice>
           ) : (
@@ -295,40 +371,6 @@ export function EvaluationsPanel({
         </div>
       )}
     </Panel>
-  );
-}
-
-function MultiSelectField({
-  label,
-  onChange,
-  options,
-  values,
-}: {
-  label: string;
-  options: readonly { label: string; value: string }[];
-  values: readonly string[];
-  onChange: (values: string[]) => void;
-}) {
-  return (
-    <FieldShell>
-      <span>{label}</span>
-      <FieldSelect
-        className="h-[102px] py-2 text-left normal-case"
-        multiple
-        size={Math.min(4, Math.max(2, options.length))}
-        value={[...values]}
-        onChange={(event) =>
-          onChange(Array.from(event.currentTarget.selectedOptions, (option) => option.value))
-        }
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </FieldSelect>
-      <span className="text-[11px] text-app-muted">none selected = all</span>
-    </FieldShell>
   );
 }
 

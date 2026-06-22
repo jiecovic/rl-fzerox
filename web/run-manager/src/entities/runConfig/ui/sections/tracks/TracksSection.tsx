@@ -20,7 +20,13 @@ import type {
 import { ConfigStack } from "@/shared/ui/config/ConfigLayout";
 import { usePersistentCollapsedIds } from "@/shared/ui/config/disclosureState";
 
-export function TracksSection({ config, defaultConfig, metadata, setConfig }: TracksSectionProps) {
+export function TracksSection({
+  config,
+  defaultConfig,
+  metadata,
+  setConfig,
+  showSampling = true,
+}: TracksSectionProps) {
   const defaultGpDifficulties: GpDifficulty[] =
     defaultConfig.tracks.gp_difficulties.length > 0
       ? [...defaultConfig.tracks.gp_difficulties]
@@ -183,13 +189,15 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
         metadata={metadata}
         updateTracks={updateTracks}
       />
-      <CourseSamplingPanel
-        config={config}
-        defaultConfig={defaultConfig}
-        metadata={metadata}
-        samplingDefaults={samplingDefaults}
-        updateTracks={updateTracks}
-      />
+      {showSampling ? (
+        <CourseSamplingPanel
+          config={config}
+          defaultConfig={defaultConfig}
+          metadata={metadata}
+          samplingDefaults={samplingDefaults}
+          updateTracks={updateTracks}
+        />
+      ) : null}
       <CoursePoolPanel
         allCourseIds={allCourseIds}
         collapsibleCupIds={collapsibleCupIds}

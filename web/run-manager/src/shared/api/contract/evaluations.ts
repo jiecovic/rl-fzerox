@@ -14,7 +14,7 @@ export const evaluationStatusSchema = z.enum([
   "cancelled",
 ]);
 
-export const evaluationModeSchema = z.enum(["time_attack", "gp_cup", "career_target", "best_of"]);
+export const evaluationModeSchema = z.enum(["time_attack", "gp_cup"]);
 
 export const evaluationTargetSpecSchema = z.object({
   mode: evaluationModeSchema,

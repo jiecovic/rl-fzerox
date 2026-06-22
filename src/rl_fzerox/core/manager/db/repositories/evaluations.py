@@ -180,8 +180,4 @@ def _evaluation_mode(value: object) -> EvaluationMode:
             return "time_attack"
         case "gp_cup":
             return "gp_cup"
-        case "career_target":
-            return "career_target"
-        case "best_of":
-            return "best_of"
     raise ValueError(f"Unsupported evaluation mode: {value!r}")

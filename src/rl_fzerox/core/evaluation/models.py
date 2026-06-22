@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
-EvaluationMode: TypeAlias = Literal["time_attack", "gp_cup", "career_target", "best_of"]
+EvaluationMode: TypeAlias = Literal["time_attack", "gp_cup"]
 EvaluationCheckpointArtifact: TypeAlias = Literal["latest", "best", "final"]
 EvaluationPolicyMode: TypeAlias = Literal["deterministic", "stochastic"]
 EvaluationRunStatus: TypeAlias = Literal["completed", "failed", "cancelled", "partial"]
