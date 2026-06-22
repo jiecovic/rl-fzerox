@@ -17,6 +17,7 @@ import { fetchRun, fetchSaveGameStatus, fetchSaveGames } from "@/shared/api/clie
 import type {
   ConfigMetadata,
   ManagedDraft,
+  ManagedEvaluation,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
@@ -29,6 +30,7 @@ interface ReloadManagerDataOptions {
 
 export function useManagerData() {
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
+  const [evaluations, setEvaluations] = useState<ManagedEvaluation[]>([]);
   const [runs, setRuns] = useState<ManagedRun[]>([]);
   const [saveGames, setSaveGames] = useState<ManagedSaveGame[]>([]);
   const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
@@ -86,6 +88,7 @@ export function useManagerData() {
         rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
       }
       setDrafts(managerData.drafts);
+      setEvaluations(managerData.evaluations);
       setRuns(managerData.runs.map((run) => (hasRunDetail(run) ? runSummaryFromDetail(run) : run)));
       setSaveGames(managerData.saveGames);
       setRunDetailsById((current) =>
@@ -156,6 +159,7 @@ export function useManagerData() {
     defaultConfig,
     drafts,
     error,
+    evaluations,
     isLoading,
     loadRunDetail,
     metadata,
@@ -167,6 +171,7 @@ export function useManagerData() {
     saveGames,
     setDefaultConfig,
     setDrafts,
+    setEvaluations,
     setRuns,
     setSaveGames,
     upsertRunDetail,

@@ -39,6 +39,7 @@ interface RunWorkspaceProps {
   onResetEngineTuning: (runId: string) => Promise<void>;
   onResume: (runId: string) => Promise<void>;
   onResetTrackPool: (runId: string) => Promise<void>;
+  onSelectEvaluationSourceRun: (runId: string) => void;
   onShowCharts: (runId: string) => void;
   onStop: (runId: string) => Promise<void>;
   onWatch: (
@@ -64,6 +65,7 @@ export function RunWorkspace({
   onResetEngineTuning,
   onResume,
   onResetTrackPool,
+  onSelectEvaluationSourceRun,
   onShowCharts,
   onStop,
   onWatch,
@@ -201,6 +203,7 @@ export function RunWorkspace({
         actions={actions}
         allRuns={allRuns}
         metadata={metadata}
+        onSelectEvaluationSourceRun={onSelectEvaluationSourceRun}
         onShowCharts={onShowCharts}
         run={run}
         engineTuningExpanded={engineTuningExpanded}

@@ -14,9 +14,15 @@ from sqlalchemy.orm import Session
 
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
+from rl_fzerox.core.evaluation.models import (
+    EvaluationCheckpointArtifact,
+    EvaluationPolicyMode,
+    EvaluationTargetSpec,
+)
 from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
 from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
+    ManagedEvaluation,
     ManagedRun,
     ManagedRunDraft,
     ManagedRunEvent,
@@ -35,6 +41,7 @@ from rl_fzerox.core.manager.models import (
     ViewerLeaseKind,
 )
 from rl_fzerox.core.manager.registry import drafts as draft_registry
+from rl_fzerox.core.manager.registry import evaluations as evaluation_registry
 from rl_fzerox.core.manager.registry import lineages as lineage_registry
 from rl_fzerox.core.manager.registry import paths as path_registry
 from rl_fzerox.core.manager.registry import runs as run_registry
@@ -125,6 +132,9 @@ class ManagerStore:
 
     def save_games_root(self, *, output_root: Path | None = None) -> Path:
         return path_registry.save_games_root(self.db_path, output_root=output_root)
+
+    def evaluations_root(self, *, output_root: Path | None = None) -> Path:
+        return path_registry.evaluations_root(self.db_path, output_root=output_root)
 
     def path(self, value: str | Path) -> Path:
         return path_registry.resolved_path(value)
@@ -481,6 +491,34 @@ class ManagerStore:
 
     def rebuild_tensorboard_views(self) -> tuple[TensorboardViewGroup, ...]:
         return tensorboard_registry.rebuild_tensorboard_views(self)
+
+    def create_evaluation(
+        self,
+        *,
+        name: str,
+        source_run_id: str,
+        source_artifact: EvaluationCheckpointArtifact,
+        policy_mode: EvaluationPolicyMode,
+        seed: int,
+        target: EvaluationTargetSpec,
+        evaluations_root: Path | None = None,
+    ) -> ManagedEvaluation:
+        return evaluation_registry.create_evaluation(
+            self,
+            name=name,
+            source_run_id=source_run_id,
+            source_artifact=source_artifact,
+            policy_mode=policy_mode,
+            seed=seed,
+            target=target,
+            evaluations_root=evaluations_root,
+        )
+
+    def get_evaluation(self, evaluation_id: str) -> ManagedEvaluation | None:
+        return evaluation_registry.get_evaluation(self, evaluation_id)
+
+    def list_evaluations(self) -> tuple[ManagedEvaluation, ...]:
+        return evaluation_registry.list_evaluations(self)
 
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         return run_registry.update_run_name(self, run_id=run_id, name=name)

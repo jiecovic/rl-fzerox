@@ -17,6 +17,7 @@ from rl_fzerox.apps.run_manager.api.live import (
 )
 from rl_fzerox.apps.run_manager.api.routers import (
     create_drafts_router,
+    create_evaluations_router,
     create_lineages_router,
     create_metrics_router,
     create_runs_router,
@@ -57,6 +58,7 @@ def create_manager_api_app(
 
     app.include_router(create_system_router(store))
     app.include_router(create_drafts_router(store))
+    app.include_router(create_evaluations_router(store))
     app.include_router(create_save_games_router(store, launcher))
     app.include_router(
         create_streams_router(

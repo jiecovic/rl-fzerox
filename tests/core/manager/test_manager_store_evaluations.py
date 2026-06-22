@@ -1,0 +1,55 @@
+# tests/core/manager/test_manager_store_evaluations.py
+from __future__ import annotations
+
+from pathlib import Path
+
+from rl_fzerox.core.evaluation.models import EvaluationTargetSpec
+from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
+from rl_fzerox.core.training.runs import RUN_LAYOUT
+from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
+
+
+def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="run-001",
+        name="Policy Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "run-001",
+        lineage_step_offset=10_000,
+    )
+    checkpoint_dir = run.run_dir / RUN_LAYOUT.checkpoints_dirname / "latest"
+    checkpoint_dir.mkdir(parents=True)
+    model_path = checkpoint_dir / "model.zip"
+    policy_path = checkpoint_dir / "policy.zip"
+    model_path.write_bytes(b"model")
+    policy_path.write_bytes(b"policy")
+    policy_artifact_metadata_path(policy_path).write_text(
+        '{"num_timesteps": 123, "lineage_num_timesteps": 10123}\n',
+        encoding="utf-8",
+    )
+
+    evaluation = store.create_evaluation(
+        name="Eval 1",
+        source_run_id=run.id,
+        source_artifact="latest",
+        policy_mode="deterministic",
+        seed=42,
+        target=EvaluationTargetSpec(mode="time_attack", repeats_per_target=3),
+        evaluations_root=tmp_path / "evaluations",
+    )
+
+    assert "-eval-1-" in evaluation.id
+    assert evaluation.status == "created"
+    assert evaluation.checkpoint.source_run_id == run.id
+    assert evaluation.checkpoint.local_num_timesteps == 123
+    assert evaluation.checkpoint.lineage_num_timesteps == 10_123
+    assert Path(evaluation.checkpoint.copied_policy_path).read_bytes() == b"policy"
+    assert Path(evaluation.checkpoint.copied_model_path or "").read_bytes() == b"model"
+    assert (evaluation.evaluation_dir / "evaluation.spec.json").is_file()
+
+    reloaded = ManagerStore(store.db_path).list_evaluations()
+
+    assert [candidate.id for candidate in reloaded] == [evaluation.id]
+    assert reloaded[0].target.repeats_per_target == 3
+    assert reloaded[0].checkpoint.copied_policy_path == evaluation.checkpoint.copied_policy_path

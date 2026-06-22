@@ -8,6 +8,7 @@ import {
   runSummaryFromDetail,
   saveGameSessionId,
   upsertDraft,
+  upsertEvaluation,
   upsertRun,
   upsertSaveGame,
 } from "@/app/workspace/model";
@@ -17,6 +18,7 @@ import {
   clearRunAltBaselines,
   clearRunCourseAltBaselines,
   createDraftWithSource,
+  createEvaluation,
   createSaveGame,
   deleteDraft,
   deleteLineage,
@@ -45,8 +47,10 @@ import {
 } from "@/shared/api/client";
 import type {
   CareerModeRunnerLaunchRequest,
+  CreateEvaluationRequest,
   EngineTuningSourceAction,
   ManagedDraft,
+  ManagedEvaluation,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
@@ -67,6 +71,7 @@ interface UseWorkspaceActionsOptions {
   sessions: WorkspaceSessions;
   setGlobalError: Dispatch<SetStateAction<string | null>>;
   setDrafts: Dispatch<SetStateAction<ManagedDraft[]>>;
+  setEvaluations: Dispatch<SetStateAction<ManagedEvaluation[]>>;
   setRuns: Dispatch<SetStateAction<ManagedRun[]>>;
   setSaveGames: Dispatch<SetStateAction<ManagedSaveGame[]>>;
   upsertRunDetail: (run: ManagedRunDetail) => void;
@@ -74,6 +79,7 @@ interface UseWorkspaceActionsOptions {
 
 export interface WorkspaceActions {
   createDraftFromManagedRun: (runId: string) => Promise<void>;
+  createManagedEvaluation: (request: CreateEvaluationRequest) => Promise<ManagedEvaluation>;
   createManagedSaveGame: (name: string) => Promise<ManagedSaveGame>;
   forkManagedRun: (
     runId: string,
@@ -165,6 +171,7 @@ export function useWorkspaceActions({
   sessions,
   setGlobalError,
   setDrafts,
+  setEvaluations,
   setRuns,
   setSaveGames,
   upsertRunDetail,
@@ -174,6 +181,17 @@ export function useWorkspaceActions({
       const saveGame = await createSaveGame(name);
       setSaveGames((current) => upsertSaveGame(current, saveGame));
       return saveGame;
+    } catch (caught) {
+      await reloadManagerData();
+      throw caught;
+    }
+  }
+
+  async function createManagedEvaluation(request: CreateEvaluationRequest) {
+    try {
+      const evaluation = await createEvaluation(request);
+      setEvaluations((current) => upsertEvaluation(current, evaluation));
+      return evaluation;
     } catch (caught) {
       await reloadManagerData();
       throw caught;
@@ -494,6 +512,7 @@ export function useWorkspaceActions({
 
   return {
     createDraftFromManagedRun,
+    createManagedEvaluation,
     createManagedSaveGame,
     forkManagedRun,
     launchTrainingRun,

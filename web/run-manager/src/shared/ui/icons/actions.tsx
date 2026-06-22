@@ -222,6 +222,34 @@ export function CareerTabIcon({ size = 14 }: IconProps) {
   );
 }
 
+export function EvaluationTabIcon({ size = 14 }: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
+      <path
+        d="M4 15.5V4.5M4 15.5h12.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+      <path
+        d="m6.5 12 2-2.2 2 1.2 3-4.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M14.8 5.8h1.7v1.7"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
 export function WatchIcon({ size = 14 }: IconProps) {
   return (
     <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>

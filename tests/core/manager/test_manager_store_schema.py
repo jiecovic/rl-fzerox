@@ -160,6 +160,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     save_game_columns = _table_columns(store, "save_games")
     save_attempt_columns = _table_columns(store, "save_game_attempts")
     course_setup_columns = _table_columns(store, "save_game_course_setups")
+    evaluation_columns = _table_columns(store, "evaluations")
     generated_slot_columns = _table_columns(store, "run_track_sampling_generated_slots")
 
     assert columns == {
@@ -234,6 +235,24 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "engine_setting_raw_value",
         "created_at",
         "updated_at",
+    }
+    assert evaluation_columns == {
+        "id",
+        "name",
+        "status",
+        "evaluation_dir",
+        "source_run_id",
+        "source_artifact",
+        "policy_mode",
+        "seed",
+        "target_json",
+        "checkpoint_json",
+        "result_json_path",
+        "error_message",
+        "created_at",
+        "updated_at",
+        "started_at",
+        "finished_at",
     }
     cup_setup_columns = _table_columns(store, "save_game_cup_setups")
     assert cup_setup_columns == {

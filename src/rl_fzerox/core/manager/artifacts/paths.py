@@ -8,6 +8,7 @@ from pathlib import Path
 _DEFAULT_MANAGER_RUNS_ROOT = Path("local/runs").resolve()
 _DEFAULT_MANAGER_SAVE_GAMES_ROOT = Path("local/save_games").resolve()
 _DEFAULT_TENSORBOARD_VIEWS_ROOT = Path("local/tensorboard_views").resolve()
+_DEFAULT_MANAGER_EVALUATIONS_ROOT = Path("local/evaluations").resolve()
 
 
 def manager_runs_root(*, output_root: Path | None = None) -> Path:
@@ -28,6 +29,12 @@ def manager_save_games_root(*, output_root: Path | None = None) -> Path:
     """Return the root for portable save-game files managed by the runner."""
 
     return (output_root or _DEFAULT_MANAGER_SAVE_GAMES_ROOT).resolve()
+
+
+def manager_evaluations_root(*, output_root: Path | None = None) -> Path:
+    """Return the root for reproducible manager-owned evaluation artifacts."""
+
+    return (output_root or _DEFAULT_MANAGER_EVALUATIONS_ROOT).resolve()
 
 
 def predicted_managed_save_game_dir(

@@ -5,11 +5,13 @@ import type { WorkspaceActions } from "@/app/workspace/actions";
 import { configuratorBaseConfigForDraftEditor } from "@/app/workspace/model";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import { DraftsPanel } from "@/pages/drafts/DraftsPanel";
+import { EvaluationsPanel } from "@/pages/evaluations/EvaluationsPanel";
 import { RunsPanel } from "@/pages/runs/RunsPanel";
 import { SaveGamesPanel } from "@/pages/saveGames/SaveGamesPanel";
 import type {
   ConfigMetadata,
   ManagedDraft,
+  ManagedEvaluation,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
@@ -27,6 +29,8 @@ interface WorkspaceBodyProps {
   defaultConfig: ManagedRunConfig | null;
   drafts: ManagedDraft[];
   error: string | null;
+  evaluations: ManagedEvaluation[];
+  evaluationSourceRunId: string | null;
   isLoading: boolean;
   loadRunDetail: (runId: string) => Promise<ManagedRunDetail>;
   metadata: ConfigMetadata | null;
@@ -35,6 +39,7 @@ interface WorkspaceBodyProps {
   saveGames: ManagedSaveGame[];
   sessions: WorkspaceSessions;
   onRefreshSaveGameStatus: (saveGameId: string) => Promise<void>;
+  onSelectEvaluationSourceRun: (runId: string) => void;
 }
 
 export function WorkspaceBody({
@@ -42,6 +47,8 @@ export function WorkspaceBody({
   defaultConfig,
   drafts,
   error,
+  evaluations,
+  evaluationSourceRunId,
   isLoading,
   loadRunDetail,
   metadata,
@@ -50,6 +57,7 @@ export function WorkspaceBody({
   saveGames,
   sessions,
   onRefreshSaveGameStatus,
+  onSelectEvaluationSourceRun,
 }: WorkspaceBodyProps) {
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const setGlobalError = actions.setGlobalError;
@@ -125,6 +133,16 @@ export function WorkspaceBody({
           runs={runs}
         />
       ) : null}
+      {!isLoading && sessions.activeTabId === "evaluations" ? (
+        <EvaluationsPanel
+          evaluations={evaluations}
+          metadata={metadata}
+          runs={runs}
+          sourceRunId={evaluationSourceRunId}
+          onCreateEvaluation={actions.createManagedEvaluation}
+          onGlobalError={actions.setGlobalError}
+        />
+      ) : null}
       {!isLoading && sessions.activeTabId === "save-games" ? (
         <SaveGamesPanel
           saveGames={saveGames}
@@ -180,6 +198,7 @@ export function WorkspaceBody({
             onResetEngineTuning={actions.resetManagedRunEngineTuning}
             onResetTrackPool={actions.resetManagedRunTrackPool}
             onResume={actions.resumeManagedRun}
+            onSelectEvaluationSourceRun={onSelectEvaluationSourceRun}
             onShowCharts={sessions.showRunCharts}
             onStop={actions.stopManagedRun}
             onWatch={actions.watchManagedRun}

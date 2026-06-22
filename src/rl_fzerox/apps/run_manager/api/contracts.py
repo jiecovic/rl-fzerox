@@ -10,12 +10,39 @@ from rl_fzerox.core.domain.engine_setting import (
     ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )
+from rl_fzerox.core.evaluation.models import EvaluationMode
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
 
 WatchDevice = Literal["cpu", "cuda"]
 WatchRenderer = Literal["angrylion", "gliden64"]
 PolicyPlaybackMode = Literal["deterministic", "stochastic"]
 EngineTuningSourceAction = Literal["convert", "discard"]
+
+
+class EvaluationTargetRequest(BaseModel):
+    """Request body section for one evaluation target set."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: EvaluationMode = "time_attack"
+    course_ids: tuple[str, ...] = ()
+    cup_ids: tuple[str, ...] = ()
+    difficulties: tuple[str, ...] = ()
+    vehicle_ids: tuple[str, ...] = ()
+    repeats_per_target: int = Field(default=1, ge=1, le=1000)
+
+
+class CreateEvaluationRequest(BaseModel):
+    """Request body for creating one immutable evaluation snapshot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    source_run_id: str
+    source_artifact: Literal["latest", "best"] = "latest"
+    policy_mode: PolicyPlaybackMode = "deterministic"
+    seed: int = Field(ge=0, le=(1 << 32) - 1)
+    target: EvaluationTargetRequest = Field(default_factory=EvaluationTargetRequest)
 
 
 class CreateDraftRequest(BaseModel):

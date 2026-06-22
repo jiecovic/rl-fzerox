@@ -34,6 +34,7 @@ import { formatDate } from "@/shared/ui/format";
 import {
   ChartIcon,
   CopyIcon,
+  EvaluationTabIcon,
   FolderIcon,
   ForkIcon,
   ResumeIcon,
@@ -48,6 +49,7 @@ interface RunRuntimeSummaryProps {
   allRuns: ManagedRun[];
   canResetEngineTuning: boolean;
   metadata: ConfigMetadata;
+  onSelectEvaluationSourceRun: (runId: string) => void;
   onShowCharts: (runId: string) => void;
   run: ManagedRunDetail;
   engineTuningExpanded: boolean;
@@ -63,6 +65,7 @@ export function RunRuntimeSummary({
   allRuns,
   canResetEngineTuning,
   metadata,
+  onSelectEvaluationSourceRun,
   onShowCharts,
   run,
   engineTuningExpanded,
@@ -190,6 +193,13 @@ export function RunRuntimeSummary({
                 onClick={() => onShowCharts(run.id)}
               >
                 <ChartIcon />
+              </TooltipIconButton>
+              <TooltipIconButton
+                aria-label="Create evaluation snapshot from run"
+                tooltip="Evaluate"
+                onClick={() => onSelectEvaluationSourceRun(run.id)}
+              >
+                <EvaluationTabIcon />
               </TooltipIconButton>
               <TooltipIconButton
                 aria-label={

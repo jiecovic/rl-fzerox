@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from rl_fzerox.apps.run_manager.api.routers.drafts import create_drafts_router
+from rl_fzerox.apps.run_manager.api.routers.evaluations import create_evaluations_router
 from rl_fzerox.apps.run_manager.api.routers.lineages import create_lineages_router
 from rl_fzerox.apps.run_manager.api.routers.metrics import create_metrics_router
 from rl_fzerox.apps.run_manager.api.routers.runs import create_runs_router
@@ -12,6 +13,7 @@ from rl_fzerox.apps.run_manager.api.routers.transfer import create_transfer_rout
 
 __all__ = [
     "create_drafts_router",
+    "create_evaluations_router",
     "create_lineages_router",
     "create_metrics_router",
     "create_runs_router",

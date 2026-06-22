@@ -7,6 +7,7 @@ export {
   CnnConfigIcon,
   CopyIcon,
   DraftTabIcon,
+  EvaluationTabIcon,
   ExportIcon,
   FolderIcon,
   ForkIcon,

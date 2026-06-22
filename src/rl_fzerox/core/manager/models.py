@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from rl_fzerox.core.evaluation.models import (
+    EvaluationCheckpointSnapshot,
+    EvaluationPolicyMode,
+    EvaluationTargetSpec,
+)
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 
 RunStatus = Literal["created", "running", "paused", "stopped", "finished", "failed", "archived"]
@@ -14,6 +19,7 @@ SaveAttemptStatus = Literal["running", "succeeded", "failed"]
 SaveUnlockInspectionStatus = Literal["not_inspected", "inspected"]
 SaveUnlockTargetStatus = Literal["pending", "locked", "succeeded", "failed", "skipped"]
 ViewerLeaseKind = Literal["run_watch", "career_mode"]
+ManagedEvaluationStatus = Literal["created", "running", "completed", "failed", "cancelled"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +80,28 @@ class ManagedViewerLease:
     launched_at: str
     heartbeat_at: str
     qualifier: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedEvaluation:
+    """One manager-owned evaluation record with immutable policy inputs."""
+
+    id: str
+    name: str
+    status: ManagedEvaluationStatus
+    evaluation_dir: Path
+    source_run_id: str | None
+    source_artifact: Literal["latest", "best", "final"] | None
+    policy_mode: EvaluationPolicyMode
+    seed: int
+    target: EvaluationTargetSpec
+    checkpoint: EvaluationCheckpointSnapshot
+    created_at: str
+    updated_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    result_json_path: Path | None = None
+    error_message: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

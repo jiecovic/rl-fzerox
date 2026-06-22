@@ -4,6 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from rl_fzerox.core.manager.artifacts.paths import (
+    manager_evaluations_root as artifact_manager_evaluations_root,
+)
+from rl_fzerox.core.manager.artifacts.paths import (
     manager_runs_root as artifact_manager_runs_root,
 )
 from rl_fzerox.core.manager.artifacts.paths import (
@@ -31,6 +34,12 @@ def save_games_root(db_path: Path, *, output_root: Path | None = None) -> Path:
     if output_root is None:
         return db_path.parent.parent / "save_games"
     return artifact_manager_save_games_root(output_root=output_root)
+
+
+def evaluations_root(db_path: Path, *, output_root: Path | None = None) -> Path:
+    if output_root is None:
+        return db_path.parent.parent / "evaluations"
+    return artifact_manager_evaluations_root(output_root=output_root)
 
 
 def resolved_path(value: str | Path) -> Path:

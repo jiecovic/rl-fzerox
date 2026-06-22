@@ -2,6 +2,7 @@
 import {
   fetchConfigMetadata,
   fetchDrafts,
+  fetchEvaluations,
   fetchRuns,
   fetchSaveGames,
   fetchTemplates,
@@ -9,6 +10,7 @@ import {
 import type {
   ConfigMetadata,
   ManagedDraft,
+  ManagedEvaluation,
   ManagedRun,
   ManagedSaveGame,
   ManagedTemplate,
@@ -16,6 +18,7 @@ import type {
 
 export interface ManagerData {
   drafts: ManagedDraft[];
+  evaluations: ManagedEvaluation[];
   metadata: ConfigMetadata;
   runs: ManagedRun[];
   saveGames: ManagedSaveGame[];
@@ -23,12 +26,13 @@ export interface ManagerData {
 }
 
 export async function loadManagerData(): Promise<ManagerData> {
-  const [templates, drafts, runs, saveGames, metadata] = await Promise.all([
+  const [templates, drafts, runs, saveGames, evaluations, metadata] = await Promise.all([
     fetchTemplates(),
     fetchDrafts(),
     fetchRuns(),
     fetchSaveGames(),
+    fetchEvaluations(),
     fetchConfigMetadata(),
   ]);
-  return { drafts, metadata, runs, saveGames, templates };
+  return { drafts, evaluations, metadata, runs, saveGames, templates };
 }

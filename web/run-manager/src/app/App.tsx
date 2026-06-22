@@ -13,6 +13,7 @@ import { AppTooltipProvider } from "@/shared/ui/Tooltip";
 export function App() {
   const [theme, setTheme] = useState<Theme>("dark");
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [evaluationSourceRunId, setEvaluationSourceRunId] = useState<string | null>(null);
   const managerData = useManagerData();
   const sessions = useWorkspaceSessions({
     drafts: managerData.drafts,
@@ -27,6 +28,7 @@ export function App() {
     sessions,
     setGlobalError,
     setDrafts: managerData.setDrafts,
+    setEvaluations: managerData.setEvaluations,
     setRuns: managerData.setRuns,
     setSaveGames: managerData.setSaveGames,
     upsertRunDetail: managerData.upsertRunDetail,
@@ -83,6 +85,8 @@ export function App() {
               defaultConfig={managerData.defaultConfig}
               drafts={managerData.drafts}
               error={globalError ?? managerData.error}
+              evaluations={managerData.evaluations}
+              evaluationSourceRunId={evaluationSourceRunId}
               isLoading={managerData.isLoading}
               loadRunDetail={managerData.loadRunDetail}
               metadata={managerData.metadata}
@@ -91,6 +95,10 @@ export function App() {
               saveGames={managerData.saveGames}
               sessions={sessions}
               onRefreshSaveGameStatus={managerData.refreshSaveGameStatus}
+              onSelectEvaluationSourceRun={(runId) => {
+                setEvaluationSourceRunId(runId);
+                sessions.setActiveTabId("evaluations");
+              }}
             />
           </div>
         </div>

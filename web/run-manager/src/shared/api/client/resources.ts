@@ -8,6 +8,10 @@ export {
   updateDraftWithSource,
 } from "@/shared/api/client/resources/drafts";
 export {
+  createEvaluation,
+  fetchEvaluations,
+} from "@/shared/api/client/resources/evaluations";
+export {
   fetchConfigMetadata,
   fetchPolicyPreview,
   fetchTemplates,

@@ -11,6 +11,7 @@ import type {
 import { isPinnedRun } from "@/entities/run/model/runtime";
 import type {
   ManagedDraft,
+  ManagedEvaluation,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
@@ -34,6 +35,7 @@ export const primaryWorkspaceTabs = [
   { id: "drafts", icon: "draft", label: "Drafts" },
   { id: "runs", icon: "run", label: "Runs" },
   { id: "charts", icon: "charts", label: "Charts" },
+  { id: "evaluations", icon: "evaluation", label: "Evaluations", shortLabel: "Eval" },
   { id: "save-games", icon: "career", label: "Career Mode", shortLabel: "Career" },
 ] satisfies readonly (WorkspaceTab & { id: PrimaryWorkspaceTabId })[];
 
@@ -42,6 +44,7 @@ export function activePrimaryWorkspaceTabId(id: WorkspaceTabId): PrimaryWorkspac
     case "drafts":
     case "runs":
     case "charts":
+    case "evaluations":
     case "save-games":
       return id;
     default:
@@ -179,6 +182,18 @@ export function upsertRun(current: ManagedRun[], nextRun: ManagedRun) {
 export function upsertSaveGame(current: ManagedSaveGame[], nextSaveGame: ManagedSaveGame) {
   const withoutPrevious = current.filter((saveGame) => saveGame.id !== nextSaveGame.id);
   return [nextSaveGame, ...withoutPrevious].sort(compareSaveGames);
+}
+
+export function upsertEvaluation(current: ManagedEvaluation[], nextEvaluation: ManagedEvaluation) {
+  const withoutPrevious = current.filter((evaluation) => evaluation.id !== nextEvaluation.id);
+  return [nextEvaluation, ...withoutPrevious].sort(compareEvaluations);
+}
+
+export function compareEvaluations(left: ManagedEvaluation, right: ManagedEvaluation) {
+  if (left.created_at !== right.created_at) {
+    return right.created_at.localeCompare(left.created_at);
+  }
+  return right.id.localeCompare(left.id);
 }
 
 export function upsertSaveGameStatus(current: ManagedSaveGame[], status: ManagedSaveGameStatus) {

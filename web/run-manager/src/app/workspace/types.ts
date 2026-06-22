@@ -11,6 +11,7 @@ import type {
 
 export type WorkspaceTabId =
   | "drafts"
+  | "evaluations"
   | "runs"
   | "charts"
   | "save-games"
@@ -20,7 +21,7 @@ export type WorkspaceTabId =
 
 export type PrimaryWorkspaceTabId = Extract<
   WorkspaceTabId,
-  "drafts" | "runs" | "charts" | "save-games"
+  "drafts" | "evaluations" | "runs" | "charts" | "save-games"
 >;
 
 export interface ForkSource {
@@ -81,7 +82,7 @@ export interface WorkspaceTab {
   activity?: "running";
   closable?: boolean;
   id: WorkspaceTabId;
-  icon?: "career" | "charts" | "draft" | "run";
+  icon?: "career" | "charts" | "draft" | "evaluation" | "run";
   label: string;
   shortLabel?: string;
   tone?: "draft" | "run";

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.errors import ManagerNameConflictError
     from rl_fzerox.core.manager.models import (
+        ManagedEvaluation,
         ManagedRun,
         ManagedRunDraft,
         ManagedRunEvent,
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
 
 _EXPORT_MODULES = {
     "ManagerNameConflictError": "rl_fzerox.core.manager.errors",
+    "ManagedEvaluation": "rl_fzerox.core.manager.models",
     "ManagedRun": "rl_fzerox.core.manager.models",
     "ManagedRunConfig": "rl_fzerox.core.manager.run_spec",
     "ManagedRunDraft": "rl_fzerox.core.manager.models",
@@ -67,6 +69,7 @@ _EXPORT_MODULES = {
 
 __all__ = [
     "ManagerNameConflictError",
+    "ManagedEvaluation",
     "ManagedRun",
     "ManagedRunConfig",
     "ManagedRunDraft",

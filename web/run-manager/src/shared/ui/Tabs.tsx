@@ -1,14 +1,21 @@
 // web/run-manager/src/shared/ui/Tabs.tsx
 
 import { cn } from "@/shared/ui/cn";
-import { CareerTabIcon, ChartIcon, CloseIcon, DraftTabIcon, RunTabIcon } from "@/shared/ui/icons";
+import {
+  CareerTabIcon,
+  ChartIcon,
+  CloseIcon,
+  DraftTabIcon,
+  EvaluationTabIcon,
+  RunTabIcon,
+} from "@/shared/ui/icons";
 
 export interface TabItem<T extends string> {
   activity?: "running";
   id: T;
   label: string;
   closable?: boolean;
-  icon?: "career" | "charts" | "draft" | "run";
+  icon?: "career" | "charts" | "draft" | "evaluation" | "run";
   shortLabel?: string;
   tone?: "draft" | "run";
 }
@@ -77,6 +84,8 @@ function TabIcon({ icon }: { icon: TabItem<string>["icon"] }) {
       return <ChartIcon />;
     case "draft":
       return <DraftTabIcon />;
+    case "evaluation":
+      return <EvaluationTabIcon />;
     case "run":
       return <RunTabIcon />;
     default:

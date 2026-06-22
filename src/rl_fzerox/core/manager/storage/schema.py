@@ -12,6 +12,7 @@ from sqlalchemy.orm import DeclarativeBase, Session
 
 from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import (
+    EvaluationModel,
     ManagerBase,
     RunAltBaselineModel,
     RunTrackSamplingArtifactModel,
@@ -30,7 +31,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 35
+SCHEMA_VERSION = 36
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -50,6 +51,7 @@ RUN_CHILD_TABLES = (
     "run_workers",
 )
 MANAGER_RUNTIME_TABLES = ("viewer_leases",)
+EVALUATION_TABLES = ("evaluations",)
 TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS = frozenset(
     {
         "generated_entry_id",
@@ -96,6 +98,7 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
     try:
         table_names = set(inspect(engine).get_table_names())
         if _has_manager_schema(table_names):
+            _upgrade_evaluation_tables(engine=engine, table_names=table_names)
             _upgrade_save_game_runner_replay_columns(engine=engine, table_names=table_names)
             _upgrade_track_sampling_adaptive_signal_columns(
                 engine=engine,
@@ -194,6 +197,10 @@ def _assert_current_schema(
     for table_name in MANAGER_RUNTIME_TABLES:
         if table_name not in table_names:
             raise RuntimeError(f"manager DB is not current: missing {table_name}")
+    for table_name in EVALUATION_TABLES:
+        if table_name not in table_names:
+            raise RuntimeError(f"manager DB is not current: missing {table_name}")
+    _assert_evaluation_columns(inspector=inspector)
     _assert_save_game_child_columns(inspector=inspector)
     _assert_run_foreign_keys(inspector=inspector, table_names=table_names)
     _assert_track_sampling_artifact_columns(inspector=inspector)
@@ -230,6 +237,19 @@ def _upgrade_save_game_runner_replay_columns(
             connection.execute(
                 text(f"ALTER TABLE save_games ADD COLUMN {column_name} {definition}")
             )
+
+
+def _upgrade_evaluation_tables(
+    *,
+    engine: Engine,
+    table_names: set[str],
+) -> None:
+    """Create evaluation tables for pre-36 manager DBs."""
+
+    if "evaluations" in table_names:
+        return
+    ManagerBase.metadata.create_all(engine, tables=[EvaluationModel.__table__])
+    table_names.add("evaluations")
 
 
 def _upgrade_track_sampling_adaptive_signal_columns(
@@ -324,6 +344,15 @@ def _assert_save_game_columns(*, inspector: Inspector) -> None:
     for column_name in _required_column_names(SaveGameModel):
         if column_name not in columns:
             raise RuntimeError(f"manager DB is not current: save_games is missing {column_name}")
+
+
+def _assert_evaluation_columns(*, inspector: Inspector) -> None:
+    columns = {column["name"] for column in inspector.get_columns("evaluations")}
+    required_columns = {column.name for column in EvaluationModel.__table__.columns}
+    missing_columns = required_columns.difference(columns)
+    if missing_columns:
+        joined_columns = ", ".join(sorted(missing_columns))
+        raise RuntimeError(f"manager DB is not current: evaluations is missing {joined_columns}")
 
 
 def _assert_save_game_child_columns(*, inspector: Inspector) -> None:

@@ -16,6 +16,10 @@ from rl_fzerox.apps.run_manager.api.handlers.drafts import (
     templates_payload,
     update_draft_payload,
 )
+from rl_fzerox.apps.run_manager.api.handlers.evaluations import (
+    create_evaluation_payload,
+    evaluations_payload,
+)
 from rl_fzerox.apps.run_manager.api.handlers.lineages import (
     delete_lineage_payload,
     rebuild_tensorboard_views_payload,
@@ -73,12 +77,14 @@ __all__ = [
     "clear_run_alt_baselines_payload",
     "clear_run_course_alt_baselines_payload",
     "create_draft_payload",
+    "create_evaluation_payload",
     "create_save_game_payload",
     "delete_draft_payload",
     "delete_lineage_payload",
     "delete_run_payload",
     "delete_save_game_payload",
     "drafts_payload",
+    "evaluations_payload",
     "export_run_bundle_path",
     "fork_run_payload",
     "import_run_bundle_payload",

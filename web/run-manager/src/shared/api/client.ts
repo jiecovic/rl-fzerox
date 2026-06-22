@@ -27,6 +27,7 @@ export {
 export {
   createDraft,
   createDraftWithSource,
+  createEvaluation,
   createSaveGame,
   deleteDraft,
   deleteLineage,
@@ -34,6 +35,7 @@ export {
   deleteSaveGame,
   fetchConfigMetadata,
   fetchDrafts,
+  fetchEvaluations,
   fetchPolicyPreview,
   fetchRun,
   fetchRuns,
