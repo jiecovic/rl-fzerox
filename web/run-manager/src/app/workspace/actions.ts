@@ -21,6 +21,7 @@ import {
   createEvaluation,
   createSaveGame,
   deleteDraft,
+  deleteEvaluation,
   deleteLineage,
   deleteRun,
   deleteSaveGame,
@@ -124,6 +125,7 @@ export interface WorkspaceActions {
   exportManagedRun: (run: ManagedRun) => Promise<void>;
   importManagedRunBundle: (file: File) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
+  removeManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<void>;
   removeLineage: (lineageId: string) => Promise<void>;
   removeRun: (run: ManagedRun) => Promise<void>;
   removeSaveGame: (saveGame: ManagedSaveGame) => Promise<void>;
@@ -192,6 +194,19 @@ export function useWorkspaceActions({
       const evaluation = await createEvaluation(request);
       setEvaluations((current) => upsertEvaluation(current, evaluation));
       return evaluation;
+    } catch (caught) {
+      await reloadManagerData();
+      throw caught;
+    }
+  }
+
+  async function removeManagedEvaluation(evaluation: ManagedEvaluation) {
+    setGlobalError(null);
+    try {
+      const deleted = await deleteEvaluation(evaluation.id);
+      if (deleted) {
+        setEvaluations((current) => current.filter((entry) => entry.id !== evaluation.id));
+      }
     } catch (caught) {
       await reloadManagerData();
       throw caught;
@@ -522,6 +537,7 @@ export function useWorkspaceActions({
     importManagedRunBundle,
     importManagedSaveEngineTuning,
     removeDraft,
+    removeManagedEvaluation,
     removeLineage,
     removeRun,
     removeSaveGame,

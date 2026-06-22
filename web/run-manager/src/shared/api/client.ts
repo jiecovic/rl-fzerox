@@ -30,6 +30,7 @@ export {
   createEvaluation,
   createSaveGame,
   deleteDraft,
+  deleteEvaluation,
   deleteLineage,
   deleteRun,
   deleteSaveGame,

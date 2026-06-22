@@ -45,3 +45,13 @@ def create_evaluation_payload(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"evaluation": evaluation_payload(evaluation)}
+
+
+def delete_evaluation_payload(store: ManagerStore, evaluation_id: str) -> dict[str, bool]:
+    """Delete one created evaluation snapshot."""
+
+    try:
+        deleted = store.delete_evaluation(evaluation_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"deleted": deleted}

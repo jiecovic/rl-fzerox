@@ -9,6 +9,7 @@ export {
 } from "@/shared/api/client/resources/drafts";
 export {
   createEvaluation,
+  deleteEvaluation,
   fetchEvaluations,
 } from "@/shared/api/client/resources/evaluations";
 export {

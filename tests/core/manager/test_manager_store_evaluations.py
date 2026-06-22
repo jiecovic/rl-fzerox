@@ -5,12 +5,12 @@ from pathlib import Path
 
 from rl_fzerox.core.evaluation.models import EvaluationTargetSpec
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
+from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
 
 
-def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
-    store = ManagerStore(tmp_path / "manager" / "runs.db")
+def _create_run_with_latest_checkpoint(store: ManagerStore, tmp_path: Path) -> ManagedRun:
     run = store.create_run(
         run_id="run-001",
         name="Policy Run",
@@ -28,6 +28,12 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
         '{"num_timesteps": 123, "lineage_num_timesteps": 10123}\n',
         encoding="utf-8",
     )
+    return run
+
+
+def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = _create_run_with_latest_checkpoint(store, tmp_path)
 
     evaluation = store.create_evaluation(
         name="Eval 1",
@@ -53,3 +59,59 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
     assert [candidate.id for candidate in reloaded] == [evaluation.id]
     assert reloaded[0].target.repeats_per_target == 3
     assert reloaded[0].checkpoint.copied_policy_path == evaluation.checkpoint.copied_policy_path
+
+
+def test_manager_store_reuses_identical_created_evaluation_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = _create_run_with_latest_checkpoint(store, tmp_path)
+    target = EvaluationTargetSpec(mode="gp_cup", cup_ids=("joker",), repeats_per_target=2)
+
+    first = store.create_evaluation(
+        name="Eval 1",
+        source_run_id=run.id,
+        source_artifact="latest",
+        policy_mode="deterministic",
+        seed=42,
+        target=target,
+        evaluations_root=tmp_path / "evaluations",
+    )
+    second = store.create_evaluation(
+        name="Eval 1",
+        source_run_id=run.id,
+        source_artifact="latest",
+        policy_mode="deterministic",
+        seed=42,
+        target=target,
+        evaluations_root=tmp_path / "evaluations",
+    )
+
+    assert second.id == first.id
+    assert second.evaluation_dir == first.evaluation_dir
+    assert [evaluation.id for evaluation in store.list_evaluations()] == [first.id]
+
+
+def test_manager_store_deletes_created_evaluation_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = _create_run_with_latest_checkpoint(store, tmp_path)
+    evaluation = store.create_evaluation(
+        name="Eval 1",
+        source_run_id=run.id,
+        source_artifact="latest",
+        policy_mode="deterministic",
+        seed=42,
+        target=EvaluationTargetSpec(mode="time_attack", repeats_per_target=3),
+        evaluations_root=tmp_path / "evaluations",
+    )
+
+    assert evaluation.evaluation_dir.is_dir()
+
+    assert store.delete_evaluation(evaluation.id) is True
+
+    assert store.list_evaluations() == ()
+    assert not evaluation.evaluation_dir.exists()
+
+
+def test_manager_store_delete_missing_evaluation_returns_false(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+
+    assert store.delete_evaluation("missing-eval") is False

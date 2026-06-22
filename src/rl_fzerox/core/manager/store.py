@@ -520,6 +520,9 @@ class ManagerStore:
     def list_evaluations(self) -> tuple[ManagedEvaluation, ...]:
         return evaluation_registry.list_evaluations(self)
 
+    def delete_evaluation(self, evaluation_id: str) -> bool:
+        return evaluation_registry.delete_evaluation(self, evaluation_id)
+
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         return run_registry.update_run_name(self, run_id=run_id, name=name)
 

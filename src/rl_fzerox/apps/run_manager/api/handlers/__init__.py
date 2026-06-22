@@ -18,6 +18,7 @@ from rl_fzerox.apps.run_manager.api.handlers.drafts import (
 )
 from rl_fzerox.apps.run_manager.api.handlers.evaluations import (
     create_evaluation_payload,
+    delete_evaluation_payload,
     evaluations_payload,
 )
 from rl_fzerox.apps.run_manager.api.handlers.lineages import (
@@ -80,6 +81,7 @@ __all__ = [
     "create_evaluation_payload",
     "create_save_game_payload",
     "delete_draft_payload",
+    "delete_evaluation_payload",
     "delete_lineage_payload",
     "delete_run_payload",
     "delete_save_game_payload",

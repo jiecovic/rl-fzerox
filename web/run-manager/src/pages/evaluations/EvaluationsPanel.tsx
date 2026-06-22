@@ -21,11 +21,11 @@ import type {
   ManagedRunDetail,
   PolicyPlaybackMode,
 } from "@/shared/api/contract";
-import { Button } from "@/shared/ui/Button";
+import { Button, IconButton } from "@/shared/ui/Button";
 import { ConfigStack } from "@/shared/ui/config/ConfigLayout";
 import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
-import { EvaluationTabIcon, PlusIcon } from "@/shared/ui/icons";
+import { EvaluationTabIcon, PlusIcon, TrashIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { type TabItem, Tabs } from "@/shared/ui/Tabs";
 
@@ -39,6 +39,7 @@ interface EvaluationsPanelProps {
   runs: ManagedRun[];
   sourceRunId: string | null;
   onCreateEvaluation: (request: CreateEvaluationRequest) => Promise<ManagedEvaluation>;
+  onDeleteEvaluation: (evaluation: ManagedEvaluation) => Promise<void>;
   onGlobalError: (message: string | null) => void;
 }
 
@@ -66,6 +67,7 @@ export function EvaluationsPanel({
   loadRunDetail,
   metadata,
   onCreateEvaluation,
+  onDeleteEvaluation,
   onGlobalError,
   runDetailsById,
   runs,
@@ -82,6 +84,7 @@ export function EvaluationsPanel({
   const [nameText, setNameText] = useState("");
   const [nameEdited, setNameEdited] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingEvaluationId, setDeletingEvaluationId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EvaluationWorkspaceTab>("snapshots");
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
   const selectedRunDetail = runDetailsById[selectedRunId] ?? null;
@@ -225,10 +228,23 @@ export function EvaluationsPanel({
         vehicleIds: target.vehicleIds,
       });
       setNameEdited(false);
+      setActiveTab("records");
     } catch (caught) {
       onGlobalError(caught instanceof Error ? caught.message : "failed to create evaluation");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function deleteEvaluationRecord(evaluation: ManagedEvaluation) {
+    setDeletingEvaluationId(evaluation.id);
+    onGlobalError(null);
+    try {
+      await onDeleteEvaluation(evaluation);
+    } catch (caught) {
+      onGlobalError(caught instanceof Error ? caught.message : "failed to delete evaluation");
+    } finally {
+      setDeletingEvaluationId(null);
     }
   }
 
@@ -264,6 +280,7 @@ export function EvaluationsPanel({
               presetId={selectedPreset?.id ?? presetId}
               presets={presets}
               repeatText={repeatText}
+              repeatLabel={selectedTarget?.mode === "gp_cup" ? "Repeats / cup" : "Repeats / course"}
               runs={runs}
               seedText={seedText}
               selectedRunId={selectedRunId}
@@ -302,7 +319,12 @@ export function EvaluationsPanel({
           ) : null}
 
           {activeTab === "records" ? (
-            <RecordsPanel evaluationError={evaluationError} evaluations={evaluations} />
+            <RecordsPanel
+              deletingEvaluationId={deletingEvaluationId}
+              evaluationError={evaluationError}
+              evaluations={evaluations}
+              onDeleteEvaluation={(evaluation) => void deleteEvaluationRecord(evaluation)}
+            />
           ) : null}
         </div>
       )}
@@ -317,6 +339,7 @@ function SnapshotCreatePanel({
   policyMode,
   presetId,
   presets,
+  repeatLabel,
   repeatText,
   runs,
   seedText,
@@ -339,6 +362,7 @@ function SnapshotCreatePanel({
   policyMode: PolicyPlaybackMode;
   presetId: EvaluationPresetId;
   presets: ReturnType<typeof buildEvaluationPresets>;
+  repeatLabel: string;
   repeatText: string;
   runs: ManagedRun[];
   seedText: string;
@@ -417,7 +441,7 @@ function SnapshotCreatePanel({
           </FieldSelect>
         </FieldShell>
         <FieldShell>
-          <span>Repeats</span>
+          <span>{repeatLabel}</span>
           <FieldInput
             min={1}
             type="number"
@@ -523,11 +547,15 @@ function PresetConfigPanel({
 }
 
 function RecordsPanel({
+  deletingEvaluationId,
   evaluationError,
   evaluations,
+  onDeleteEvaluation,
 }: {
+  deletingEvaluationId: string | null;
   evaluationError: string | null;
   evaluations: ManagedEvaluation[];
+  onDeleteEvaluation: (evaluation: ManagedEvaluation) => void;
 }) {
   if (evaluationError !== null) {
     return (
@@ -540,11 +568,23 @@ function RecordsPanel({
   return evaluations.length === 0 ? (
     <Notice>No evaluation snapshots yet.</Notice>
   ) : (
-    <EvaluationTable evaluations={evaluations} />
+    <EvaluationTable
+      deletingEvaluationId={deletingEvaluationId}
+      evaluations={evaluations}
+      onDeleteEvaluation={onDeleteEvaluation}
+    />
   );
 }
 
-function EvaluationTable({ evaluations }: { evaluations: ManagedEvaluation[] }) {
+function EvaluationTable({
+  deletingEvaluationId,
+  evaluations,
+  onDeleteEvaluation,
+}: {
+  deletingEvaluationId: string | null;
+  evaluations: ManagedEvaluation[];
+  onDeleteEvaluation: (evaluation: ManagedEvaluation) => void;
+}) {
   return (
     <div className="overflow-x-auto border border-app-border bg-app-surface">
       <table className="w-full min-w-[980px] border-collapse text-left text-sm">
@@ -556,6 +596,7 @@ function EvaluationTable({ evaluations }: { evaluations: ManagedEvaluation[] }) 
             <th className="px-4 py-3">Target</th>
             <th className="px-4 py-3">Created</th>
             <th className="px-4 py-3">Directory</th>
+            <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -593,6 +634,19 @@ function EvaluationTable({ evaluations }: { evaluations: ManagedEvaluation[] }) 
               </td>
               <td className="px-4 py-3 align-top font-mono text-xs text-app-muted">
                 {evaluation.evaluation_dir}
+              </td>
+              <td className="px-4 py-3 text-right align-top">
+                <IconButton
+                  aria-label={`Delete evaluation ${evaluation.name}`}
+                  disabled={
+                    evaluation.status !== "created" || deletingEvaluationId === evaluation.id
+                  }
+                  size="small"
+                  tone="danger"
+                  onClick={() => onDeleteEvaluation(evaluation)}
+                >
+                  <TrashIcon />
+                </IconButton>
               </td>
             </tr>
           ))}

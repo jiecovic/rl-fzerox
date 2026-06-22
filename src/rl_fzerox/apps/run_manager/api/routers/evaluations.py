@@ -24,4 +24,8 @@ def create_evaluations_router(store: ManagerStore) -> APIRouter:
         name = required_name(request.name, subject="evaluation")
         return await run_sync(handlers.create_evaluation_payload, store, request, name)
 
+    @router.delete("/api/evaluations/{evaluation_id}")
+    async def delete_evaluation(evaluation_id: str) -> dict[str, bool]:
+        return await run_sync(handlers.delete_evaluation_payload, store, evaluation_id)
+
     return router

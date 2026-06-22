@@ -37,3 +37,19 @@ export async function createEvaluation(
   const payload = parseApiPayload(createEvaluationResponseSchema, await parseJson(response));
   return payload.evaluation;
 }
+
+export async function deleteEvaluation(evaluationId: string): Promise<boolean> {
+  const response = await fetch(`/api/evaluations/${encodeURIComponent(evaluationId)}`, {
+    method: "DELETE",
+  });
+  const payload = await parseJson(response);
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "deleted" in payload &&
+    typeof payload.deleted === "boolean"
+  ) {
+    return payload.deleted;
+  }
+  throw new Error("run-manager delete evaluation response is invalid");
+}

@@ -146,6 +146,7 @@ export function WorkspaceBody({
           runs={runs}
           sourceRunId={evaluationSourceRunId}
           onCreateEvaluation={actions.createManagedEvaluation}
+          onDeleteEvaluation={actions.removeManagedEvaluation}
           onGlobalError={actions.setGlobalError}
         />
       ) : null}

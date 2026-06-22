@@ -76,6 +76,51 @@ def list_managed_evaluations(session: Session) -> tuple[ManagedEvaluation, ...]:
     return tuple(managed_evaluation_from_model(evaluation) for evaluation in evaluations)
 
 
+def find_created_evaluation_snapshot(
+    session: Session,
+    *,
+    name: str,
+    source_run_id: str,
+    source_artifact: EvaluationCheckpointArtifact,
+    policy_mode: EvaluationPolicyMode,
+    seed: int,
+    target: EvaluationTargetSpec,
+    source_mtime_ns: int,
+) -> ManagedEvaluation | None:
+    """Return an existing identical created snapshot, if one exists."""
+
+    candidates = tuple(
+        session.scalars(
+            select(EvaluationModel)
+            .where(EvaluationModel.name == name)
+            .where(EvaluationModel.status == "created")
+            .where(EvaluationModel.source_run_id == source_run_id)
+            .where(EvaluationModel.source_artifact == source_artifact)
+            .where(EvaluationModel.policy_mode == policy_mode)
+            .where(EvaluationModel.seed == seed)
+            .order_by(EvaluationModel.created_at.desc(), EvaluationModel.id.desc())
+        )
+    )
+    for candidate in candidates:
+        evaluation = managed_evaluation_from_model(candidate)
+        if evaluation.target == target and evaluation.checkpoint.source_mtime_ns == source_mtime_ns:
+            return evaluation
+    return None
+
+
+def delete_created_evaluation(session: Session, evaluation_id: str) -> ManagedEvaluation | None:
+    """Delete one created evaluation record and return its previous value."""
+
+    evaluation = session.get(EvaluationModel, evaluation_id)
+    if evaluation is None:
+        return None
+    managed = managed_evaluation_from_model(evaluation)
+    if managed.status != "created":
+        raise ValueError("only created evaluation snapshots can be deleted")
+    session.delete(evaluation)
+    return managed
+
+
 def managed_evaluation_from_model(evaluation: EvaluationModel) -> ManagedEvaluation:
     """Build the public evaluation dataclass from an ORM row."""
 
