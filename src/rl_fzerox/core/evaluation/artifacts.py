@@ -1,0 +1,224 @@
+# src/rl_fzerox/core/evaluation/artifacts.py
+"""Local JSON and Markdown artifacts for evaluation results."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from rl_fzerox.core.evaluation.metrics import (
+    EvaluationMetricGroup,
+    EvaluationMetrics,
+    aggregate_evaluation_metrics,
+)
+from rl_fzerox.core.evaluation.models import EvaluationRunResult
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationArtifactPaths:
+    """Files written for one evaluation result artifact set."""
+
+    json_path: Path
+    markdown_path: Path
+
+
+def write_evaluation_result_files(
+    result: EvaluationRunResult,
+    *,
+    directory: Path,
+) -> EvaluationArtifactPaths:
+    """Write the evaluation result as JSON plus a human-readable summary."""
+
+    directory.mkdir(parents=True, exist_ok=True)
+    metrics = aggregate_evaluation_metrics(result)
+    json_path = directory / "evaluation.summary.json"
+    markdown_path = directory / "evaluation.summary.md"
+    json_path.write_text(
+        json.dumps(_evaluation_payload(result, metrics), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    markdown_path.write_text(
+        _evaluation_markdown(result, metrics),
+        encoding="utf-8",
+    )
+    return EvaluationArtifactPaths(json_path=json_path, markdown_path=markdown_path)
+
+
+def _evaluation_payload(
+    result: EvaluationRunResult,
+    metrics: EvaluationMetrics,
+) -> dict[str, object]:
+    return {
+        "kind": "evaluation_summary",
+        "schema_version": 1,
+        "result": asdict(result),
+        "metrics": asdict(metrics),
+    }
+
+
+def _evaluation_markdown(result: EvaluationRunResult, metrics: EvaluationMetrics) -> str:
+    source_run = result.spec.checkpoint.source_run_name or result.spec.checkpoint.source_run_id
+    lines = [
+        f"# Evaluation {result.spec.evaluation_id}",
+        "",
+        f"- Status: {_text(result.status)}",
+        f"- Policy mode: {_text(result.spec.policy_mode)}",
+        f"- Seed: {_text(result.spec.seed)}",
+        f"- Source run: {_text(source_run)}",
+        f"- Artifact: {_text(result.spec.checkpoint.artifact)}",
+        f"- Checkpoint copy: {_text(result.spec.checkpoint.copied_checkpoint_path)}",
+        f"- Started: {_text(result.started_at_utc)}",
+        f"- Closed: {_text(result.closed_at_utc)}",
+        "",
+    ]
+    lines.extend(_primary_section(metrics))
+    lines.extend(_detail_section(metrics))
+    lines.extend(_attempt_section(result))
+    return "\n".join(lines)
+
+
+def _primary_section(metrics: EvaluationMetrics) -> list[str]:
+    lines = [
+        "## Primary metrics",
+        "",
+        (
+            "| Scope | Attempts | Success | Finish | Completion | Mean time | Best time | "
+            "Mean pos | Final GP pos | Env steps | Mean episode steps |"
+        ),
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for group in _metric_groups(metrics):
+        primary = group.primary
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    _text(group.label),
+                    _text(primary.attempt_count),
+                    _percent(primary.success_rate, count=primary.success_count),
+                    _percent(primary.finish_rate, count=primary.finish_count),
+                    _percent(primary.completion_rate),
+                    _time(primary.mean_finish_time_ms),
+                    _time(primary.best_finish_time_ms),
+                    _number(primary.mean_position),
+                    _number(primary.mean_final_gp_position),
+                    _text(primary.total_env_steps),
+                    _number(primary.mean_episode_length_steps),
+                )
+            )
+            + " |"
+        )
+    lines.append("")
+    return lines
+
+
+def _detail_section(metrics: EvaluationMetrics) -> list[str]:
+    lines = [
+        "## Diagnostic metrics",
+        "",
+        (
+            "| Scope | Mean return | Best return | Boost active | Boost frames | Boost pads | "
+            "Damage | Min height | Avg speed |"
+        ),
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for group in _metric_groups(metrics):
+        detail = group.detail
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    _text(group.label),
+                    _number(detail.mean_episode_return),
+                    _number(detail.best_episode_return),
+                    _text(detail.boost_active_count),
+                    _text(detail.boost_active_frames),
+                    _text(detail.boost_pad_entries),
+                    _text(detail.damage_event_count),
+                    _number(detail.minimum_height),
+                    _number(detail.average_speed),
+                )
+            )
+            + " |"
+        )
+    lines.append("")
+    return lines
+
+
+def _attempt_section(result: EvaluationRunResult) -> list[str]:
+    lines = [
+        "## Attempts",
+        "",
+    ]
+    if not result.attempts:
+        return lines + ["No attempts recorded.", ""]
+    lines.extend(
+        (
+            (
+                "| Attempt | Target | Status | Seed | Final GP pos | GP points | Total time | "
+                "Env steps | Return | Courses |"
+            ),
+            "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        )
+    )
+    for attempt in result.attempts:
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    _text(attempt.attempt_id),
+                    _text(attempt.target_label or attempt.target_id),
+                    _text(attempt.status),
+                    _text(attempt.seed),
+                    _text(attempt.final_gp_position),
+                    _text(attempt.gp_points),
+                    _time(attempt.total_race_time_ms),
+                    _text(attempt.env_steps),
+                    _number(attempt.episode_return),
+                    _text(len(attempt.course_results)),
+                )
+            )
+            + " |"
+        )
+    lines.append("")
+    return lines
+
+
+def _metric_groups(metrics: EvaluationMetrics) -> Iterable[EvaluationMetricGroup]:
+    yield metrics.overall
+    yield from metrics.cups
+    yield from metrics.courses
+
+
+def _text(value: object) -> str:
+    if value is None:
+        return "-"
+    return str(value).replace("|", "\\|")
+
+
+def _percent(value: float | None, *, count: int | None = None) -> str:
+    if value is None:
+        return "-"
+    text = f"{100.0 * value:.1f}%"
+    if count is not None:
+        return f"{text} ({count})"
+    return text
+
+
+def _time(value: int | float | None) -> str:
+    if value is None:
+        return "-"
+    milliseconds = max(0, int(round(value)))
+    minutes, remainder = divmod(milliseconds, 60_000)
+    seconds, millis = divmod(remainder, 1_000)
+    return f"{minutes}:{seconds:02d}.{millis:03d}"
+
+
+def _number(value: int | float | None) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, int):
+        return str(value)
+    return f"{value:.2f}"
