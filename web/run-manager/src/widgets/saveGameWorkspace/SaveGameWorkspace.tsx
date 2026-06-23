@@ -1,16 +1,14 @@
 // web/run-manager/src/widgets/saveGameWorkspace/SaveGameWorkspace.tsx
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 
 import type { SaveGameSession } from "@/app/workspace/types";
 import {
-  nextUnlockTarget,
   summarizeUnlockTargets,
-  type UnlockTargetSummary,
   unlockCompletionFraction,
   unlockTargetKey,
 } from "@/entities/saveGame/model";
 import { SaveGameOverview } from "@/entities/saveGame/ui/SaveGameOverview";
-import { parseAttemptSeed, randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
+import { randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
 import { useSaveGameRunnerRefresh } from "@/features/careerRunner/model/useSaveGameRunnerRefresh";
 import { RunnerControlPanel } from "@/features/careerRunner/ui/RunnerControlPanel";
 import { CreateSaveGameForm } from "@/features/createSaveGame/ui/CreateSaveGameForm";
@@ -27,7 +25,6 @@ import type {
   ManagedSaveUnlockTarget,
   SaveEngineTuningCourseSetupRecommendation,
   SaveGameRunnerSettingsUpdateRequest,
-  SavePolicyArtifact,
 } from "@/shared/api/contract";
 import { rendererNames } from "@/shared/api/renderers";
 import { Button } from "@/shared/ui/Button";
@@ -35,23 +32,27 @@ import { FolderIcon, RenameIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
+import {
+  resolveLaunchCupVehicleId,
+  runnerSettingsDirty,
+  startableUnlockTargetKeys,
+  targetSummaryHasStarted,
+} from "@/widgets/saveGameWorkspace/model";
+import {
+  type ImportSaveEngineTuningRequest,
+  type SaveCourseSetupRequest,
+  type SaveCupSetupRequest,
+  useSaveGameWorkspaceController,
+} from "@/widgets/saveGameWorkspace/useSaveGameWorkspaceController";
 
 interface SaveGameWorkspaceProps {
   metadata: ConfigMetadata | null;
   onGlobalError: (message: string | null) => void;
   onCreateSaveGame: (name: string) => Promise<ManagedSaveGame>;
   onOpenSaveGameDirectory: (saveGameId: string) => Promise<void>;
-  onImportEngineTuning: (request: {
-    courseSetups: readonly {
-      courseId: string;
-      cupId: string;
-      difficulty?: string | null;
-      vehicleId: string;
-    }[];
-    policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
-    saveGameId: string;
-  }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
+  onImportEngineTuning: (
+    request: ImportSaveEngineTuningRequest,
+  ) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   onPatchSession: (
     sessionId: SaveGameSession["sessionId"],
     patch: Partial<Omit<SaveGameSession, "sessionId">>,
@@ -61,21 +62,8 @@ interface SaveGameWorkspaceProps {
   onUpdateRunnerSettings: (
     request: SaveGameRunnerSettingsUpdateRequest,
   ) => Promise<ManagedSaveGame>;
-  onUpsertCourseSetup: (request: {
-    courseId?: string | null;
-    cupId?: string | null;
-    difficulty?: string | null;
-    engineSettingRawValue: number;
-    policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
-    saveGameId: string;
-  }) => Promise<ManagedSaveGame>;
-  onUpsertCupSetup: (request: {
-    cupId: string;
-    difficulty?: string | null;
-    saveGameId: string;
-    vehicleId: string;
-  }) => Promise<ManagedSaveGame>;
+  onUpsertCourseSetup: (request: SaveCourseSetupRequest) => Promise<ManagedSaveGame>;
+  onUpsertCupSetup: (request: SaveCupSetupRequest) => Promise<ManagedSaveGame>;
   onStartCareerMode: (
     request: CareerModeRunnerLaunchRequest,
   ) => Promise<"started" | "already_running">;
@@ -101,314 +89,47 @@ export function SaveGameWorkspace({
   saveGame,
   session,
 }: SaveGameWorkspaceProps) {
-  const [copiedDetail, setCopiedDetail] = useState<"id" | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [openingSaveGameId, setOpeningSaveGameId] = useState<string | null>(null);
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
-  const [renamingSaveGameId, setRenamingSaveGameId] = useState<string | null>(null);
-  const [startingRunnerSaveGameId, setStartingRunnerSaveGameId] = useState<string | null>(null);
-  const [savingRunnerSettingsSaveGameId, setSavingRunnerSettingsSaveGameId] = useState<
-    string | null
-  >(null);
-  const [runnerStatus, setRunnerStatus] = useState<string | null>(null);
-  const [courseSetupDirty, setCourseSetupDirty] = useState(false);
-  const [updatingSaveGameId, setUpdatingSaveGameId] = useState<string | null>(null);
-  const assignableRuns = useStableAssignableRuns(runs);
-
   useSaveGameRunnerRefresh({ onRefreshStatus, saveGame });
-
-  async function createSaveGame() {
-    const name = session.nameText.trim();
-    if (name.length === 0) {
-      onGlobalError("career name is required");
-      return;
-    }
-    onGlobalError(null);
-    setIsCreating(true);
-    try {
-      const created = await onCreateSaveGame(name);
-      onPatchSession(session.sessionId, {
-        nameText: created.name,
-        saveGameId: created.id,
-        title: created.name,
-      });
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to create career save");
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
-  async function openSaveDirectory(target: ManagedSaveGame) {
-    onGlobalError(null);
-    setOpeningSaveGameId(target.id);
-    try {
-      await onOpenSaveGameDirectory(target.id);
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to open career folder");
-    } finally {
-      setOpeningSaveGameId(null);
-    }
-  }
-
-  async function renameSaveGame(target: ManagedSaveGame, name: string) {
-    onGlobalError(null);
-    setRenamingSaveGameId(target.id);
-    try {
-      await onRenameSaveGame(target.id, name);
-      onPatchSession(session.sessionId, {
-        nameText: name,
-        title: name,
-      });
-      setRenameDialogOpen(false);
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to rename career save");
-    } finally {
-      setRenamingSaveGameId(null);
-    }
-  }
-
-  const upsertCourseSetup = useCallback(
-    async function upsertCourseSetup(request: {
-      courseId?: string | null;
-      cupId?: string | null;
-      difficulty?: string | null;
-      engineSettingRawValue: number;
-      policyArtifact: SavePolicyArtifact;
-      policyRunId: string;
-      saveGameId: string;
-    }) {
-      onGlobalError(null);
-      setUpdatingSaveGameId(request.saveGameId);
-      try {
-        return await onUpsertCourseSetup(request);
-      } catch (caught) {
-        onGlobalError(caught instanceof Error ? caught.message : "failed to save course setup");
-        throw caught;
-      } finally {
-        setUpdatingSaveGameId(null);
-      }
-    },
-    [onGlobalError, onUpsertCourseSetup],
-  );
-
-  const upsertCupSetup = useCallback(
-    async function upsertCupSetup(request: {
-      cupId: string;
-      difficulty?: string | null;
-      saveGameId: string;
-      vehicleId: string;
-    }) {
-      onGlobalError(null);
-      setUpdatingSaveGameId(request.saveGameId);
-      try {
-        return await onUpsertCupSetup(request);
-      } catch (caught) {
-        onGlobalError(caught instanceof Error ? caught.message : "failed to save cup setup");
-        throw caught;
-      } finally {
-        setUpdatingSaveGameId(null);
-      }
-    },
-    [onGlobalError, onUpsertCupSetup],
-  );
-
-  const importEngineTuning = useCallback(
-    async function importEngineTuning(request: {
-      courseSetups: readonly {
-        courseId: string;
-        cupId: string;
-        difficulty?: string | null;
-        vehicleId: string;
-      }[];
-      policyArtifact: SavePolicyArtifact;
-      policyRunId: string;
-      saveGameId: string;
-    }) {
-      onGlobalError(null);
-      setUpdatingSaveGameId(request.saveGameId);
-      try {
-        return await onImportEngineTuning(request);
-      } catch (caught) {
-        onGlobalError(caught instanceof Error ? caught.message : "failed to import engine tuning");
-        throw caught;
-      } finally {
-        setUpdatingSaveGameId(null);
-      }
-    },
-    [onGlobalError, onImportEngineTuning],
-  );
-
-  function runnerSettingsRequest(
-    target: ManagedSaveGame,
-  ): SaveGameRunnerSettingsUpdateRequest | null {
-    const attemptSeed = parseAttemptSeed(session.attemptSeedText);
-    if (attemptSeed === "invalid") {
-      onGlobalError("runtime seed must be an integer from 0 to 4294967295");
-      return null;
-    }
-    return {
-      attemptSeed,
-      device: session.runnerDevice,
-      policyMode: session.policyMode,
-      recordingEnabled: session.recordingEnabled,
-      recordingInputHudEnabled: session.recordingInputHudEnabled,
-      recordingUpscaleFactor: session.recordingUpscaleFactor,
-      recordingPath: null,
-      renderer: session.runnerRenderer,
-      saveGameId: target.id,
-      targetRestartOnRetire: session.perfectRun,
-      targetClearGoal: parseTargetClearGoal(session.targetClearGoalText),
-      keepFailedRecordings: session.keepFailedPerfectRunVideos,
-      reloadPolicyBetweenAttempts: session.reloadPolicyBetweenAttempts,
-    };
-  }
-
-  async function saveRunnerSettings(
-    target: ManagedSaveGame,
-    options: { showNotice: boolean } = { showNotice: true },
-  ): Promise<ManagedSaveGame | null> {
-    const request = runnerSettingsRequest(target);
-    if (request === null) {
-      return null;
-    }
-    onGlobalError(null);
-    setSavingRunnerSettingsSaveGameId(target.id);
-    try {
-      const updated = await onUpdateRunnerSettings(request);
-      patchSessionFromRunnerSettings(updated);
-      if (options.showNotice) {
-        setRunnerStatus("Runner settings saved.");
-      }
-      return updated;
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to save runner settings");
-      return null;
-    } finally {
-      setSavingRunnerSettingsSaveGameId(null);
-    }
-  }
-
-  const patchSessionFromRunnerSettings = useCallback(
-    function patchSessionFromRunnerSettings(target: ManagedSaveGame) {
-      const settings = target.runner_settings;
-      onPatchSession(session.sessionId, {
-        attemptSeedText: settings.attempt_seed === null ? "" : String(settings.attempt_seed),
-        policyMode: settings.policy_mode,
-        recordingEnabled: settings.recording_enabled,
-        recordingInputHudEnabled: settings.recording_input_hud_enabled,
-        recordingUpscaleFactor: settings.recording_upscale_factor,
-        runnerDevice: settings.device,
-        runnerRenderer: settings.renderer,
-        perfectRun: settings.target_restart_on_retire,
-        targetClearGoalText: String(settings.target_clear_goal),
-        keepFailedPerfectRunVideos: settings.keep_failed_recordings,
-        reloadPolicyBetweenAttempts: settings.reload_policy_between_attempts,
-      });
-    },
-    [onPatchSession, session.sessionId],
-  );
-
-  async function startCareerMode(
-    target: ManagedSaveGame,
-    requestedTarget: ManagedSaveUnlockTarget | null = null,
-  ) {
-    const settingsRequest = runnerSettingsRequest(target);
-    if (settingsRequest === null) {
-      return;
-    }
-    const launchTarget = requestedTarget ?? nextUnlockTarget(target);
-    if (launchTarget === null) {
-      onGlobalError("career save has no pending unlock target");
-      return;
-    }
-    if (!launchableTargetStatus(launchTarget)) {
-      onGlobalError("selected unlock target is not playable");
-      return;
-    }
-    if (metadata === null) {
-      onGlobalError("run manager metadata is missing");
-      return;
-    }
-    if (
-      resolveSavedCourseSetup(target.course_setups, launchTarget, metadata.built_in_courses) ===
-      null
-    ) {
-      onGlobalError("choose a policy for the selected cup");
-      return;
-    }
-    if (
-      resolveLaunchCupVehicleId(
-        target.cup_setups,
-        target.unlock_progress?.unlocked_vehicle_ids ?? [],
-        launchTarget,
-      ) === null
-    ) {
-      onGlobalError("choose a vehicle for the selected cup");
-      return;
-    }
-    onGlobalError(null);
-    setRunnerStatus(null);
-    setStartingRunnerSaveGameId(target.id);
-    try {
-      const updated = await onUpdateRunnerSettings(settingsRequest);
-      patchSessionFromRunnerSettings(updated);
-      const targetRecordingEnabled = requestedTarget !== null && settingsRequest.recordingEnabled;
-      const status = await onStartCareerMode({
-        attemptSeed: settingsRequest.attemptSeed,
-        device: settingsRequest.device,
-        policyMode: settingsRequest.policyMode,
-        recordingEnabled: settingsRequest.recordingEnabled,
-        recordingInputHudEnabled: settingsRequest.recordingInputHudEnabled,
-        recordingUpscaleFactor: settingsRequest.recordingUpscaleFactor,
-        recordingPath: null,
-        renderer: settingsRequest.renderer,
-        saveGameId: target.id,
-        singleTarget: requestedTarget !== null,
-        perfectRun: requestedTarget !== null && settingsRequest.targetRestartOnRetire,
-        keepFailedRecordings: !targetRecordingEnabled || settingsRequest.keepFailedRecordings,
-        reloadPolicyBetweenAttempts: settingsRequest.reloadPolicyBetweenAttempts,
-        targetClearGoal: targetRecordingEnabled ? settingsRequest.targetClearGoal : 0,
-        target: requestedTarget,
-      });
-      setRunnerStatus(status === "started" ? "Runner started." : "Runner is already open.");
-      await onRefreshStatus(target.id);
-    } catch (caught) {
-      onGlobalError(caught instanceof Error ? caught.message : "failed to start runner");
-    } finally {
-      setStartingRunnerSaveGameId(null);
-    }
-  }
-
-  async function copyDetail(value: string, detail: "id") {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedDetail(detail);
-      onGlobalError(null);
-    } catch {
-      onGlobalError("failed to copy value");
-    }
-  }
-
-  const saveGameRef = useRef<ManagedSaveGame | null>(null);
-  const startCareerModeRef = useRef<typeof startCareerMode | null>(null);
-  saveGameRef.current = saveGame;
-  startCareerModeRef.current = startCareerMode;
-
-  const handleStartRunner = useCallback(() => {
-    const currentSaveGame = saveGameRef.current;
-    const currentStartCareerMode = startCareerModeRef.current;
-    if (currentSaveGame !== null && currentStartCareerMode !== null) {
-      void currentStartCareerMode(currentSaveGame);
-    }
-  }, []);
-  const handleStartTarget = useCallback((target: ManagedSaveUnlockTarget) => {
-    const currentSaveGame = saveGameRef.current;
-    const currentStartCareerMode = startCareerModeRef.current;
-    if (currentSaveGame !== null && currentStartCareerMode !== null) {
-      void currentStartCareerMode(currentSaveGame, target);
-    }
-  }, []);
+  const {
+    copiedDetail,
+    courseSetupDirty,
+    copyDetail,
+    createSaveGame,
+    handleStartRunner,
+    handleStartTarget,
+    importEngineTuning,
+    isCreating,
+    openSaveDirectory,
+    openingSaveGameId,
+    renameDialogOpen,
+    renameSaveGame,
+    renamingSaveGameId,
+    runnerStatus,
+    saveRunnerSettings,
+    savingRunnerSettingsSaveGameId,
+    setCourseSetupDirty,
+    setRenameDialogOpen,
+    startingRunnerSaveGameId,
+    updatingSaveGameId,
+    upsertCourseSetup,
+    upsertCupSetup,
+  } = useSaveGameWorkspaceController({
+    metadata,
+    onCreateSaveGame,
+    onGlobalError,
+    onImportEngineTuning,
+    onOpenSaveGameDirectory,
+    onPatchSession,
+    onRefreshStatus,
+    onRenameSaveGame,
+    onStartCareerMode,
+    onUpdateRunnerSettings,
+    onUpsertCourseSetup,
+    onUpsertCupSetup,
+    saveGame,
+    session,
+  });
+  const assignableRuns = useStableAssignableRuns(runs);
 
   const saveGameCourseSetups = saveGame?.course_setups ?? EMPTY_COURSE_SETUPS;
   const saveGameCupSetups = saveGame?.cup_setups ?? EMPTY_CUP_SETUPS;
@@ -661,83 +382,6 @@ export function SaveGameWorkspace({
   );
 }
 
-function launchableTargetStatus(target: ManagedSaveUnlockTarget): boolean {
-  return target.status === "pending" || target.status === "succeeded";
-}
-
-function parseTargetClearGoal(text: string): number {
-  const parsed = Number.parseInt(text.trim(), 10);
-  if (!Number.isFinite(parsed)) {
-    return 0;
-  }
-  return Math.max(0, parsed);
-}
-
-function resolveLaunchCupVehicleId(
-  cupSetups: ManagedSaveGame["cup_setups"],
-  unlockedVehicleIds: readonly string[],
-  target: ManagedSaveUnlockTarget,
-): string | null {
-  return resolveSavedCupSetup(cupSetups, target)?.vehicle_id ?? unlockedVehicleIds[0] ?? null;
-}
-
-function startableUnlockTargetKeys({
-  builtInCourses,
-  courseSetups,
-  cupSetups,
-  disabled,
-  targets,
-  unlockedVehicleIds,
-}: {
-  builtInCourses: ConfigMetadata["built_in_courses"];
-  courseSetups: ManagedSaveGame["course_setups"];
-  cupSetups: ManagedSaveGame["cup_setups"];
-  disabled: boolean;
-  targets: readonly ManagedSaveUnlockTarget[];
-  unlockedVehicleIds: readonly string[];
-}): ReadonlySet<string> {
-  if (disabled) {
-    return EMPTY_STRING_SET;
-  }
-  const keys = new Set<string>();
-  for (const target of targets) {
-    if (
-      launchableTargetStatus(target) &&
-      resolveSavedCourseSetup(courseSetups, target, builtInCourses) !== null &&
-      resolveLaunchCupVehicleId(cupSetups, unlockedVehicleIds, target) !== null
-    ) {
-      keys.add(unlockTargetKey(target));
-    }
-  }
-  return keys;
-}
-
-function targetSummaryHasStarted(summary: UnlockTargetSummary): boolean {
-  return summary.succeeded > 0 || summary.failed > 0 || summary.skipped > 0;
-}
-
-function runnerSettingsDirty(saveGame: ManagedSaveGame, session: SaveGameSession): boolean {
-  const settings = saveGame.runner_settings;
-  const attemptSeed = parseAttemptSeed(session.attemptSeedText);
-  const persistedAttemptSeed =
-    settings.attempt_seed === null ? null : String(settings.attempt_seed);
-  return (
-    attemptSeed === "invalid" ||
-    persistedAttemptSeed !== attemptSeed ||
-    settings.device !== session.runnerDevice ||
-    settings.renderer !== session.runnerRenderer ||
-    settings.policy_mode !== session.policyMode ||
-    settings.recording_enabled !== session.recordingEnabled ||
-    settings.recording_input_hud_enabled !== session.recordingInputHudEnabled ||
-    settings.recording_upscale_factor !== session.recordingUpscaleFactor ||
-    settings.recording_path !== null ||
-    settings.target_restart_on_retire !== session.perfectRun ||
-    settings.target_clear_goal !== parseTargetClearGoal(session.targetClearGoalText) ||
-    settings.keep_failed_recordings !== session.keepFailedPerfectRunVideos ||
-    settings.reload_policy_between_attempts !== session.reloadPolicyBetweenAttempts
-  );
-}
-
 function useStableAssignableRuns(runs: readonly ManagedRun[]): readonly ManagedRun[] {
   const stableAssignableRuns = useRef<{ key: string; runs: readonly ManagedRun[] } | null>(null);
   const key = useMemo(() => assignableRunsKey(runs), [runs]);
@@ -755,7 +399,6 @@ const EMPTY_COURSE_SETUPS: ManagedSaveGame["course_setups"] = [];
 const EMPTY_CUP_SETUPS: ManagedSaveGame["cup_setups"] = [];
 const EMPTY_RENDERER_OPTIONS: ReturnType<typeof rendererNames> = [];
 const EMPTY_STRING_ARRAY: readonly string[] = [];
-const EMPTY_STRING_SET: ReadonlySet<string> = new Set<string>();
 const EMPTY_UNLOCK_TARGETS: readonly ManagedSaveUnlockTarget[] = [];
 
 function useStableUnlockTargets(
