@@ -174,9 +174,9 @@ def _aggregate_group(
         for course in finished_courses
         if course.race_time_ms is not None and course.race_time_ms > 0
     )
-    course_positions = tuple(
+    finished_positions = tuple(
         int(course.position)
-        for course in course_results
+        for course in finished_courses
         if course.position is not None and course.position > 0
     )
     total_race_times = tuple(
@@ -201,9 +201,9 @@ def _aggregate_group(
             best_finish_time_ms=None if not course_times else min(course_times),
             mean_total_race_time_ms=_mean(total_race_times),
             best_total_race_time_ms=None if not total_race_times else min(total_race_times),
-            mean_position=_mean(course_positions),
-            best_position=None if not course_positions else min(course_positions),
-            worst_position=None if not course_positions else max(course_positions),
+            mean_position=_mean(finished_positions),
+            best_position=None if not finished_positions else min(finished_positions),
+            worst_position=None if not finished_positions else max(finished_positions),
             total_env_steps=_total_env_steps(attempts, course_results),
             mean_episode_length_steps=_mean(episode_lengths),
         ),

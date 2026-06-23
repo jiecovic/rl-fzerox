@@ -85,7 +85,7 @@ def _primary_section(metrics: EvaluationMetrics) -> list[str]:
     lines = [
         "## Primary metrics",
         "",
-        ("| Scope | Runs | Finish | Completion | Mean pos | Worst pos |"),
+        ("| Scope | Runs | Finish | Completion | Mean finish pos | Worst finish pos |"),
         "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for group in _metric_groups(metrics):

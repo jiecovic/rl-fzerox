@@ -63,7 +63,7 @@ def test_evaluation_metrics_break_down_by_course_and_cup() -> None:
     assert mute_city.detail.minimum_height == -10.0
 
 
-def test_evaluation_metrics_include_failed_course_position_penalty() -> None:
+def test_evaluation_metrics_positions_are_conditioned_on_finished_courses() -> None:
     result = EvaluationRunResult(
         spec=EvaluationSpec(
             evaluation_id="eval-test",
@@ -108,9 +108,12 @@ def test_evaluation_metrics_include_failed_course_position_penalty() -> None:
 
     metrics = aggregate_evaluation_metrics(result)
 
-    assert metrics.overall.primary.mean_position == 15.5
+    failed_position = result.attempts[1].course_results[0].position
+
+    assert failed_position == 30
+    assert metrics.overall.primary.mean_position == 1
     assert metrics.overall.primary.best_position == 1
-    assert metrics.overall.primary.worst_position == 30
+    assert metrics.overall.primary.worst_position == 1
 
 
 def _sample_result() -> EvaluationRunResult:

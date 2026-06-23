@@ -386,7 +386,7 @@ function ResultsSection({ evaluation }: { evaluation: ManagedEvaluation }) {
         />
         <Metric label="Finish" value={formatPercent(summary.overall.finish_rate)} />
         <Metric label="Completion" value={formatPercent(summary.overall.completion_rate)} />
-        <Metric label="Mean pos" value={formatNumber(summary.overall.mean_position)} />
+        <Metric label="Mean finish pos" value={formatNumber(summary.overall.mean_position)} />
         <Metric label="Mean return" value={formatNumber(summary.overall.mean_episode_return)} />
         <Metric
           detail={
@@ -416,7 +416,7 @@ function ResultsSection({ evaluation }: { evaluation: ManagedEvaluation }) {
         title="Recent course runs"
       />
       <ResultTable
-        columns={["Course", "Runs", "Finish", "Best time", "Mean pos", "Return", "Speed"]}
+        columns={["Course", "Runs", "Finish", "Best time", "Finish pos", "Return", "Speed"]}
         emptyLabel="No course breakdown yet."
         rows={summary.courses.map((course) => [
           course.label,
@@ -459,7 +459,7 @@ function CourseDistribution({ courses }: { courses: readonly EvaluationMetricSum
               key={course.key || course.label}
               title={`${course.label}: ${formatPercent(course.finish_rate)} finish, ${formatPercent(
                 course.completion_rate,
-              )} completion, ${formatNumber(course.mean_position)} mean pos`}
+              )} completion, ${formatNumber(course.mean_position)} mean finish pos`}
             >
               <div className="flex h-[150px] items-end border-b border-app-border bg-app-surface-muted px-1">
                 <div
