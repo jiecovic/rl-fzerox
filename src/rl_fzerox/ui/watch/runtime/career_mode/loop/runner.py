@@ -19,6 +19,7 @@ from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.records import TrackRecordBook
 from rl_fzerox.ui.watch.runtime.career_mode.loop.commands import (
     apply_control_timing_command,
+    apply_runtime_command_state,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.debug import (
     CareerModeDebugTrace,
@@ -517,25 +518,23 @@ def _run_career_mode_loop_body(
                     )
                 publish_snapshot(policy_visible=controller.policy_owns_control())
 
-            cnn_visualization_enabled = commands.cnn_visualization_enabled
-            auxiliary_visualization_enabled = (
-                bool(auxiliary_target_names) and commands.auxiliary_visualization_enabled
+            command_state = apply_runtime_command_state(
+                commands=commands,
+                auxiliary_target_names=auxiliary_target_names,
+                previous_live_visualization_enabled=previous_live_visualization_enabled,
+                last_live_series_publish_time=last_live_series_publish_time,
+                deterministic_policy=deterministic_policy,
+                policy_owns_control=controller.policy_owns_control(),
+                active_policy_started=active_policy_started,
             )
-            live_visualization_enabled = commands.live_visualization_enabled
-            if live_visualization_enabled != previous_live_visualization_enabled:
-                last_live_series_publish_time = 0.0
-            cnn_normalization = commands.cnn_normalization
-            if commands.toggle_deterministic_policy:
-                deterministic_policy = not deterministic_policy
-            next_manual_control_enabled = (
-                commands.manual_control_enabled
-                if controller.policy_owns_control() and active_policy_started
-                else False
-            )
-            if next_manual_control_enabled:
-                manual_spin_request = commands.spin_request
-            else:
-                manual_spin_request = "none"
+            cnn_visualization_enabled = command_state.cnn_visualization_enabled
+            auxiliary_visualization_enabled = command_state.auxiliary_visualization_enabled
+            live_visualization_enabled = command_state.live_visualization_enabled
+            last_live_series_publish_time = command_state.last_live_series_publish_time
+            cnn_normalization = command_state.cnn_normalization
+            deterministic_policy = command_state.deterministic_policy
+            next_manual_control_enabled = command_state.manual_control_enabled
+            manual_spin_request = command_state.spin_request
             if (
                 auxiliary_visualization_enabled != previous_auxiliary_visualization_enabled
                 and controller.policy_owns_control()
