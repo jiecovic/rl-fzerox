@@ -26,7 +26,7 @@ def main() -> None:
         )
     except Exception as exc:
         current = store.get_evaluation(args.evaluation_id)
-        if current is not None and current.status == "cancelled":
+        if current is not None and current.status in {"cancelling", "cancelled"}:
             store.mark_evaluation_cancelled(args.evaluation_id)
             return
         store.mark_evaluation_failed(args.evaluation_id, error_message=str(exc))

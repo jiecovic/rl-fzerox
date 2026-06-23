@@ -48,6 +48,7 @@ export function EvaluationWorkspace({
     evaluation.status === "failed" ||
     evaluation.status === "cancelled";
   const canCancel = evaluation.status === "running";
+  const cancelRequested = evaluation.status === "cancelling";
   const runtimeStats = evaluationRuntimeStats(evaluation);
 
   async function startEvaluation() {
@@ -153,15 +154,15 @@ export function EvaluationWorkspace({
             </div>
 
             <div className="flex flex-wrap items-start justify-end gap-2">
-              {canCancel ? (
+              {canCancel || cancelRequested ? (
                 <Button
                   className="gap-2"
-                  disabled={cancelling}
+                  disabled={cancelling || cancelRequested}
                   tone="danger"
                   onClick={() => void cancelEvaluation()}
                 >
                   <StopIcon />
-                  <span>{cancelling ? "Cancelling" : "Cancel"}</span>
+                  <span>{cancelling || cancelRequested ? "Cancelling" : "Cancel"}</span>
                 </Button>
               ) : (
                 <>

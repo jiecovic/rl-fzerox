@@ -359,14 +359,19 @@ def request_evaluation_cancel(
     evaluation = get_evaluation(store, evaluation_id)
     if evaluation is None:
         return None
-    if evaluation.status == "cancelled":
+    if evaluation.status in {"cancelling", "cancelled"}:
         return evaluation
     if evaluation.status != "running":
         raise ValueError(f"only running evaluations can be cancelled, got {evaluation.status}")
     cancel_path = evaluation_cancel_request_path(store, evaluation_id)
     cancel_path.parent.mkdir(parents=True, exist_ok=True)
     cancel_path.write_text(utc_now() + "\n", encoding="utf-8")
-    return mark_evaluation_cancelled(store, evaluation_id)
+    with store._orm_session() as session:
+        return evaluation_repository.mark_evaluation_cancelling(
+            session,
+            evaluation_id=evaluation_id,
+            updated_at=utc_now(),
+        )
 
 
 def mark_evaluation_cancelled(store: ManagerStore, evaluation_id: str) -> ManagedEvaluation:

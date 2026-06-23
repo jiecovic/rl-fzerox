@@ -19,7 +19,14 @@ SaveAttemptStatus = Literal["running", "succeeded", "failed"]
 SaveUnlockInspectionStatus = Literal["not_inspected", "inspected"]
 SaveUnlockTargetStatus = Literal["pending", "locked", "succeeded", "failed", "skipped"]
 ViewerLeaseKind = Literal["run_watch", "career_mode"]
-ManagedEvaluationStatus = Literal["created", "running", "completed", "failed", "cancelled"]
+ManagedEvaluationStatus = Literal[
+    "created",
+    "running",
+    "cancelling",
+    "completed",
+    "failed",
+    "cancelled",
+]
 EvaluationBaselineSuiteStatus = Literal["not_created", "ready", "failed"]
 
 

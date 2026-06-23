@@ -154,12 +154,23 @@ def test_manager_store_requests_evaluation_cancel(tmp_path: Path) -> None:
     )
     store.mark_evaluation_running(evaluation.id)
 
-    cancelled = store.request_evaluation_cancel(evaluation.id)
+    cancelling = store.request_evaluation_cancel(evaluation.id)
 
-    assert cancelled is not None
+    assert cancelling is not None
+    assert cancelling.status == "cancelling"
+    assert cancelling.finished_at is None
+    assert store.evaluation_cancel_request_path(evaluation.id).is_file()
+
+    repeated = store.request_evaluation_cancel(evaluation.id)
+    assert repeated is not None
+    assert repeated.status == "cancelling"
+
+    with pytest.raises(ValueError, match="before start"):
+        store.mark_evaluation_running(evaluation.id)
+
+    cancelled = store.mark_evaluation_cancelled(evaluation.id)
     assert cancelled.status == "cancelled"
     assert cancelled.finished_at is not None
-    assert store.evaluation_cancel_request_path(evaluation.id).is_file()
 
 
 def test_manager_store_delete_missing_evaluation_returns_false(tmp_path: Path) -> None:

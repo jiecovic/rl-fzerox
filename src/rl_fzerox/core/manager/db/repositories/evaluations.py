@@ -289,8 +289,8 @@ def delete_inactive_evaluation(session: Session, evaluation_id: str) -> ManagedE
     if evaluation is None:
         return None
     managed = managed_evaluation_from_model(evaluation)
-    if managed.status == "running":
-        raise ValueError("running evaluation snapshots cannot be deleted")
+    if managed.status in {"running", "cancelling"}:
+        raise ValueError("active evaluation snapshots cannot be deleted")
     session.delete(evaluation)
     return managed
 
@@ -350,8 +350,10 @@ def mark_evaluation_completed(
     managed = managed_evaluation_from_model(evaluation)
     if managed.status == "cancelled":
         return managed
-    if managed.status != "running":
-        raise ValueError(f"evaluation must be running before completion, got {managed.status!r}")
+    if managed.status not in {"running", "cancelling"}:
+        raise ValueError(
+            f"evaluation must be running or cancelling before completion, got {managed.status!r}"
+        )
     evaluation.status = "completed"
     evaluation.finished_at = finished_at
     evaluation.updated_at = finished_at
@@ -381,6 +383,29 @@ def mark_evaluation_failed(
     return managed_evaluation_from_model(evaluation)
 
 
+def mark_evaluation_cancelling(
+    session: Session,
+    *,
+    evaluation_id: str,
+    updated_at: str,
+) -> ManagedEvaluation:
+    """Record a cooperative cancel request without claiming the worker has exited."""
+
+    evaluation = _required_evaluation(session, evaluation_id)
+    managed = managed_evaluation_from_model(evaluation)
+    if managed.status == "cancelled":
+        return managed
+    if managed.status == "cancelling":
+        return managed
+    if managed.status != "running":
+        raise ValueError(f"only running evaluations can be cancelled, got {managed.status}")
+    evaluation.status = "cancelling"
+    evaluation.updated_at = updated_at
+    evaluation.error_message = None
+    session.flush()
+    return managed_evaluation_from_model(evaluation)
+
+
 def mark_evaluation_cancelled(
     session: Session,
     *,
@@ -390,6 +415,13 @@ def mark_evaluation_cancelled(
     """Mark one evaluation as cancelled."""
 
     evaluation = _required_evaluation(session, evaluation_id)
+    managed = managed_evaluation_from_model(evaluation)
+    if managed.status == "cancelled":
+        return managed
+    if managed.status not in {"running", "cancelling"}:
+        raise ValueError(
+            f"evaluation must be running or cancelling before cancel, got {managed.status!r}"
+        )
     evaluation.status = "cancelled"
     evaluation.finished_at = finished_at
     evaluation.updated_at = finished_at
@@ -501,6 +533,8 @@ def _evaluation_status(value: object) -> ManagedEvaluationStatus:
             return "created"
         case "running":
             return "running"
+        case "cancelling":
+            return "cancelling"
         case "completed":
             return "completed"
         case "failed":

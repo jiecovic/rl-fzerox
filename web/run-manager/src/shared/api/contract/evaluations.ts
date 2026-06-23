@@ -8,6 +8,7 @@ import { policyPlaybackModeSchema } from "@/shared/api/contract/saveGames";
 export const evaluationStatusSchema = z.enum([
   "created",
   "running",
+  "cancelling",
   "completed",
   "failed",
   "cancelled",
