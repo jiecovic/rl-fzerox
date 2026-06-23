@@ -3,6 +3,7 @@ import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
   type CreateEvaluationRequest,
   createEvaluationResponseSchema,
+  type EvaluationsResponse,
   evaluationsResponseSchema,
   type ManagedEvaluation,
   startEvaluationResponseSchema,
@@ -10,9 +11,12 @@ import {
   updateEvaluationResponseSchema,
 } from "@/shared/api/contract";
 
+export async function fetchEvaluationData(): Promise<EvaluationsResponse> {
+  return parseApiPayload(evaluationsResponseSchema, await getJson("/api/evaluations"));
+}
+
 export async function fetchEvaluations(): Promise<ManagedEvaluation[]> {
-  const payload = parseApiPayload(evaluationsResponseSchema, await getJson("/api/evaluations"));
-  return payload.evaluations;
+  return (await fetchEvaluationData()).evaluations;
 }
 
 export async function createEvaluation(
@@ -24,6 +28,7 @@ export async function createEvaluation(
     body: JSON.stringify({
       name: request.name,
       source_run_id: request.sourceRunId,
+      preset_id: request.presetId,
       source_artifact: request.sourceArtifact,
       policy_mode: request.policyMode,
       seed: request.seed,

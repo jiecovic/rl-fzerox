@@ -20,11 +20,15 @@ from rl_fzerox.core.evaluation.snapshots import (
 )
 from rl_fzerox.core.manager.db.repositories import evaluations as evaluation_repository
 from rl_fzerox.core.manager.db.repositories.filesystem import queue_delete_tree
-from rl_fzerox.core.manager.models import ManagedEvaluation
+from rl_fzerox.core.manager.models import (
+    ManagedEvaluation,
+    ManagedEvaluationBaselineSuite,
+    ManagedEvaluationPreset,
+)
 from rl_fzerox.core.manager.registry.common import new_record_id, utc_now
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.serialization import config_json
-from rl_fzerox.core.training.runs import resolve_policy_artifact_path
+from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_policy_artifact_path
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -40,9 +44,19 @@ def create_evaluation(
     seed: int,
     target: EvaluationTargetSpec,
     config: ManagedRunConfig,
+    preset_id: str,
     evaluations_root: Path | None = None,
 ) -> ManagedEvaluation:
     """Create one evaluation record and freeze its source checkpoint."""
+
+    preset = get_evaluation_preset(store, preset_id)
+    if preset is None:
+        raise ValueError("evaluation preset not found")
+    source_artifact = preset.source_artifact
+    seed = preset.seed
+    target = preset.target
+    config = preset.config
+    preset_version = preset.version
 
     source_run = store.get_run(source_run_id)
     if source_run is None:
@@ -60,6 +74,8 @@ def create_evaluation(
             target=target,
             config=config,
             source_mtime_ns=source_mtime_ns,
+            preset_id=preset_id,
+            preset_version=preset_version,
         )
         if existing is not None:
             return existing
@@ -83,6 +99,8 @@ def create_evaluation(
         evaluation_dir=evaluation_dir,
         source_run_id=source_run.id,
         source_artifact=source_artifact,
+        preset_id=preset_id,
+        preset_version=preset_version,
         policy_mode=policy_mode,
         seed=seed,
         target=target,
@@ -96,6 +114,53 @@ def create_evaluation(
     with store._orm_session() as session:
         evaluation_repository.insert_evaluation(session, evaluation=evaluation)
     return evaluation
+
+
+def get_evaluation_preset(
+    store: ManagerStore,
+    preset_id: str,
+) -> ManagedEvaluationPreset | None:
+    """Return one persisted evaluation preset."""
+
+    store.initialize()
+    with store._orm_session() as session:
+        return evaluation_repository.get_evaluation_preset(session, preset_id)
+
+
+def list_evaluation_presets(store: ManagerStore) -> tuple[ManagedEvaluationPreset, ...]:
+    """Return persisted evaluation presets."""
+
+    store.initialize()
+    with store._orm_session() as session:
+        return evaluation_repository.list_evaluation_presets(session)
+
+
+def list_evaluation_baseline_suites(
+    store: ManagerStore,
+) -> tuple[ManagedEvaluationBaselineSuite, ...]:
+    """Return one materialization-status row per preset version."""
+
+    store.initialize()
+    now = utc_now()
+    with store._orm_session() as session:
+        presets = evaluation_repository.list_evaluation_presets(session)
+        for preset in presets:
+            suite = _baseline_suite_for_preset(
+                store,
+                preset_id=preset.id,
+                preset_version=preset.version,
+                created_at=now,
+            )
+            evaluation_repository.ensure_evaluation_baseline_suite(session, suite=suite)
+        suites = evaluation_repository.list_evaluation_baseline_suites(session)
+        refreshed_suites = tuple(
+            evaluation_repository.upsert_evaluation_baseline_suite_status(
+                session,
+                suite=_with_filesystem_suite_status(suite, updated_at=now),
+            )
+            for suite in suites
+        )
+    return refreshed_suites
 
 
 def delete_evaluation(store: ManagerStore, evaluation_id: str) -> bool:
@@ -185,6 +250,20 @@ def list_evaluations(store: ManagerStore) -> tuple[ManagedEvaluation, ...]:
         return evaluation_repository.list_managed_evaluations(session)
 
 
+def baseline_suite_for_evaluation(evaluation: ManagedEvaluation) -> ManagedEvaluationBaselineSuite:
+    """Return the suite row implied by one preset-backed evaluation."""
+
+    return _with_filesystem_suite_status(
+        _baseline_suite_for_preset(
+            None,
+            preset_id=evaluation.preset_id,
+            preset_version=evaluation.preset_version,
+            created_at=None,
+            evaluations_root=evaluation.evaluation_dir.parent,
+        )
+    )
+
+
 def _write_evaluation_spec(evaluation: ManagedEvaluation) -> None:
     spec = EvaluationSpec(
         evaluation_id=evaluation.id,
@@ -198,3 +277,59 @@ def _write_evaluation_spec(evaluation: ManagedEvaluation) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     config_path = evaluation.evaluation_dir / "evaluation.config.json"
     config_path.write_text(config_json(evaluation.config) + "\n", encoding="utf-8")
+
+
+def _baseline_suite_for_preset(
+    store: ManagerStore | None,
+    *,
+    preset_id: str,
+    preset_version: int,
+    created_at: str | None,
+    evaluations_root: Path | None = None,
+) -> ManagedEvaluationBaselineSuite:
+    if evaluations_root is None:
+        if store is None:
+            raise ValueError("store or evaluations_root is required")
+        root = store.evaluations_root()
+    else:
+        root = evaluations_root
+    suite_id = f"{preset_id}-v{preset_version}"
+    suite_dir = root / "_baseline_suites" / suite_id
+    return ManagedEvaluationBaselineSuite(
+        id=suite_id,
+        preset_id=preset_id,
+        preset_version=preset_version,
+        status="missing",
+        suite_dir=suite_dir,
+        manifest_path=suite_dir / RUN_LAYOUT.config_filename,
+        created_at=created_at,
+        updated_at=created_at,
+    )
+
+
+def _with_filesystem_suite_status(
+    suite: ManagedEvaluationBaselineSuite,
+    *,
+    updated_at: str | None = None,
+) -> ManagedEvaluationBaselineSuite:
+    if suite.error_message is not None:
+        status = "failed"
+    elif suite.manifest_path is not None and suite.manifest_path.is_file():
+        status = "ready"
+    else:
+        status = "missing"
+    materialized_at = suite.materialized_at
+    if status == "ready" and materialized_at is None:
+        materialized_at = updated_at
+    return ManagedEvaluationBaselineSuite(
+        id=suite.id,
+        preset_id=suite.preset_id,
+        preset_version=suite.preset_version,
+        status=status,
+        suite_dir=suite.suite_dir,
+        manifest_path=suite.manifest_path,
+        error_message=suite.error_message,
+        created_at=suite.created_at,
+        updated_at=updated_at or suite.updated_at,
+        materialized_at=materialized_at,
+    )

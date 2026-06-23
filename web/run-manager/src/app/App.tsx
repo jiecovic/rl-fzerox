@@ -85,8 +85,10 @@ export function App() {
               defaultConfig={managerData.defaultConfig}
               drafts={managerData.drafts}
               error={globalError ?? managerData.error}
+              evaluationBaselineSuites={managerData.evaluationBaselineSuites}
               evaluationError={managerData.evaluationError}
               evaluations={managerData.evaluations}
+              evaluationPresets={managerData.evaluationPresets}
               isLoading={managerData.isLoading}
               loadRunDetail={managerData.loadRunDetail}
               metadata={managerData.metadata}

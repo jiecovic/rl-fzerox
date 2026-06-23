@@ -1,20 +1,11 @@
 // web/run-manager/src/features/evaluationSnapshots/ui/CreateEvaluationSnapshotDialog.tsx
 import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  buildEvaluationPresets,
-  clonePresetConfig,
-  type EvaluationPreset,
-  type EvaluationPresetId,
-  evaluationTargetFromConfig,
-  readEvaluationPresetStorage,
-} from "@/entities/evaluation/model/presets";
 import type {
-  ConfigMetadata,
   CreateEvaluationRequest,
   ManagedEvaluation,
-  ManagedRunConfig,
+  ManagedEvaluationPreset,
   ManagedRunDetail,
   PolicyPlaybackMode,
 } from "@/shared/api/contract";
@@ -22,8 +13,7 @@ import { Button } from "@/shared/ui/Button";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 
 interface CreateEvaluationSnapshotDialogProps {
-  defaultConfig: ManagedRunConfig;
-  metadata: ConfigMetadata;
+  evaluationPresets: ManagedEvaluationPreset[];
   open: boolean;
   run: ManagedRunDetail;
   onClose: () => void;
@@ -33,8 +23,7 @@ interface CreateEvaluationSnapshotDialogProps {
 }
 
 export function CreateEvaluationSnapshotDialog({
-  defaultConfig,
-  metadata,
+  evaluationPresets,
   open,
   run,
   onClose,
@@ -42,39 +31,21 @@ export function CreateEvaluationSnapshotDialog({
   onGlobalError,
   onOpenEvaluation,
 }: CreateEvaluationSnapshotDialogProps) {
-  const [presetStorage, setPresetStorage] = useState(() => readEvaluationPresetStorage());
   const [policyMode, setPolicyMode] = useState<PolicyPlaybackMode>("deterministic");
-  const presets = useMemo(
-    () =>
-      buildEvaluationPresets({
-        customPresets: presetStorage.customPresets,
-        defaultConfig,
-        metadata,
-        overrides: presetStorage.overrides,
-      }),
-    [defaultConfig, metadata, presetStorage],
-  );
-  const initialPresetId: EvaluationPresetId =
-    run.config.tracks.race_mode === "gp_race" ? "gp_course_blue_falcon" : "time_attack_blue_falcon";
-  const [presetId, setPresetId] = useState<EvaluationPresetId>(initialPresetId);
+  const initialPresetId = preferredPresetId(run, evaluationPresets);
+  const [presetId, setPresetId] = useState(initialPresetId);
   const [isCreating, setIsCreating] = useState(false);
   const requestInFlightRef = useRef(false);
-  const preset = presets.find((candidate) => candidate.id === presetId) ?? presets[0] ?? null;
-  const presetConfig = useMemo(
-    () => (preset === null ? null : clonePresetConfig(preset.config)),
-    [preset],
-  );
-  const target =
-    presetConfig === null || preset === null
-      ? null
-      : evaluationTargetFromConfig(presetConfig, metadata, preset.targetMode);
-  const defaultName = `${run.name} · ${preset?.label ?? "evaluation"}`;
+  const preset =
+    evaluationPresets.find((candidate) => candidate.id === presetId) ??
+    evaluationPresets[0] ??
+    null;
+  const defaultName = `${run.name} · ${preset?.name ?? "evaluation"}`;
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    setPresetStorage(readEvaluationPresetStorage());
     setPresetId(initialPresetId);
     setPolicyMode("deterministic");
   }, [initialPresetId, open]);
@@ -83,12 +54,8 @@ export function CreateEvaluationSnapshotDialog({
     if (requestInFlightRef.current) {
       return;
     }
-    if (presetConfig === null || target === null) {
-      onGlobalError("No evaluation preset is available.");
-      return;
-    }
     if (preset === null) {
-      onGlobalError("Select an evaluation preset.");
+      onGlobalError("No evaluation preset is available.");
       return;
     }
     requestInFlightRef.current = true;
@@ -96,18 +63,19 @@ export function CreateEvaluationSnapshotDialog({
     onGlobalError(null);
     try {
       const created = await onCreateEvaluation({
-        config: presetConfig,
-        courseIds: target.courseIds,
-        cupIds: target.cupIds,
-        difficulties: target.difficulties,
+        config: preset.config,
+        courseIds: preset.target.course_ids,
+        cupIds: preset.target.cup_ids,
+        difficulties: preset.target.difficulties,
         name: defaultName,
         policyMode,
-        repeatsPerTarget: preset.repeatsPerTarget,
+        presetId: preset.id,
+        repeatsPerTarget: preset.target.repeats_per_target,
         seed: preset.seed,
-        sourceArtifact: preset.sourceArtifact,
+        sourceArtifact: preset.source_artifact,
         sourceRunId: run.id,
-        targetMode: target.mode,
-        vehicleIds: target.vehicleIds,
+        targetMode: preset.target.mode,
+        vehicleIds: preset.target.vehicle_ids,
       });
       onOpenEvaluation(created);
       onClose();
@@ -156,12 +124,12 @@ export function CreateEvaluationSnapshotDialog({
               <FieldSelect
                 value={presetId}
                 onChange={(event) => {
-                  setPresetId(event.target.value as EvaluationPresetId);
+                  setPresetId(event.target.value);
                 }}
               >
-                {presets.map((candidate) => (
+                {evaluationPresets.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
-                    {candidate.label}
+                    {candidate.name}
                   </option>
                 ))}
               </FieldSelect>
@@ -182,9 +150,9 @@ export function CreateEvaluationSnapshotDialog({
             <PresetLine label="Name" value={defaultName} />
             <PresetLine
               label="Target"
-              value={target === null ? "-" : evaluationTargetLabel(target)}
+              value={preset === null ? "-" : evaluationTargetLabel(preset)}
             />
-            <PresetLine label="Preset" value={presetSummary(preset, presetConfig)} />
+            <PresetLine label="Preset" value={presetSummary(preset)} />
             <PresetLine label="Policy" value={policyMode} />
           </div>
 
@@ -206,22 +174,34 @@ export function CreateEvaluationSnapshotDialog({
   );
 }
 
-function evaluationTargetLabel(target: NonNullable<ReturnType<typeof evaluationTargetFromConfig>>) {
+function preferredPresetId(
+  run: ManagedRunDetail,
+  presets: readonly ManagedEvaluationPreset[],
+): string {
+  const preferredId =
+    run.config.tracks.race_mode === "gp_race"
+      ? "gp_course_master_blue_falcon_all_courses"
+      : "time_attack_blue_falcon_all_courses";
+  return presets.some((preset) => preset.id === preferredId) ? preferredId : (presets[0]?.id ?? "");
+}
+
+function evaluationTargetLabel(preset: ManagedEvaluationPreset) {
+  const target = preset.target;
   const mode = target.mode === "gp_course" ? "GP course" : "Time Attack course";
   const parts = [
-    target.cupIds.length > 0 ? selectionCountLabel(target.cupIds, "cup") : null,
-    target.courseIds.length > 0 ? selectionCountLabel(target.courseIds, "course") : null,
+    target.cup_ids.length > 0 ? selectionCountLabel(target.cup_ids, "cup") : null,
+    target.course_ids.length > 0 ? selectionCountLabel(target.course_ids, "course") : null,
     target.difficulties.length > 0 ? selectionCountLabel(target.difficulties, "difficulty") : null,
-    target.vehicleIds.length > 0 ? selectionCountLabel(target.vehicleIds, "vehicle") : null,
+    target.vehicle_ids.length > 0 ? selectionCountLabel(target.vehicle_ids, "vehicle") : null,
   ].filter((part) => part !== null);
   return `${mode} · ${parts.length === 0 ? "all targets" : parts.join(" · ")}`;
 }
 
-function presetSummary(preset: EvaluationPreset | null, config: ManagedRunConfig | null) {
-  if (preset === null || config === null) {
+function presetSummary(preset: ManagedEvaluationPreset | null) {
+  if (preset === null) {
     return "-";
   }
-  return `${preset.sourceArtifact} · ${preset.repeatsPerTarget}x · seed ${preset.seed} · ${config.environment.renderer}`;
+  return `${preset.source_artifact} · ${preset.target.repeats_per_target}x · seed ${preset.seed} · ${preset.renderer}`;
 }
 
 function selectionCountLabel(values: readonly unknown[], singular: string) {

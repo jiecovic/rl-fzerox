@@ -3,18 +3,18 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
 
+from rl_fzerox.core.evaluation.env_control import sync_checkpoint_curriculum_stage
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.models import EvaluationRunResult, EvaluationSpec
 from rl_fzerox.core.evaluation.runner import run_course_evaluation
 from rl_fzerox.core.evaluation.targets import single_course_targets_from_config
 from rl_fzerox.core.manager.models import ManagedEvaluation
 from rl_fzerox.core.manager.training import build_managed_train_app_config
+from rl_fzerox.core.runtime_spec.inference import inference_train_app_config
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     CurriculumStageConfig,
@@ -58,9 +58,7 @@ def run_managed_evaluation(evaluation: ManagedEvaluation) -> EvaluationRunResult
         runtime_dir=run_paths.env_runtime_dir(0),
     )
     try:
-        sync_stage = getattr(env, "sync_checkpoint_curriculum_stage", None)
-        if callable(sync_stage):
-            sync_stage(policy_runner.checkpoint_curriculum_stage_index)
+        sync_checkpoint_curriculum_stage(env, policy_runner.checkpoint_curriculum_stage_index)
         executor = FZeroXSingleCourseEpisodeExecutor(
             env=env,
             policy_runner=policy_runner,
@@ -96,11 +94,12 @@ def _materialize_evaluation_train_config(
         run_id=evaluation.id,
         run_dir=run_paths.run_dir,
     )
+    projected_config = inference_train_app_config(projected_config)
     materializer_input = _evaluation_materializer_input(
         projected_config,
         seed=evaluation.seed,
     )
-    suite = _evaluation_baseline_suite(evaluation, materializer_input)
+    suite = _evaluation_baseline_suite(evaluation)
     ensure_run_dirs(suite.run_paths)
     materialized_config = _load_or_materialize_baseline_suite(
         _suite_materializer_input(materializer_input, suite=suite),
@@ -116,14 +115,11 @@ def _evaluation_runtime_paths(evaluation: ManagedEvaluation) -> RunPaths:
     return explicit_run_paths(evaluation.evaluation_dir / "runtime_projection")
 
 
-def _evaluation_baseline_suite(
-    evaluation: ManagedEvaluation,
-    config: TrainAppConfig,
-) -> EvaluationBaselineSuite:
+def _evaluation_baseline_suite(evaluation: ManagedEvaluation) -> EvaluationBaselineSuite:
     run_paths = explicit_run_paths(
         evaluation.evaluation_dir.parent
         / "_baseline_suites"
-        / _evaluation_baseline_suite_id(evaluation, config)
+        / _evaluation_baseline_suite_id(evaluation)
     )
     return EvaluationBaselineSuite(
         run_paths=run_paths,
@@ -131,63 +127,10 @@ def _evaluation_baseline_suite(
     )
 
 
-def _evaluation_baseline_suite_id(
-    evaluation: ManagedEvaluation,
-    config: TrainAppConfig,
-) -> str:
-    """Return the stable shared-baseline key for this eval target.
+def _evaluation_baseline_suite_id(evaluation: ManagedEvaluation) -> str:
+    """Return the explicit preset-version baseline-suite key."""
 
-    Repeats do not affect baseline materialization, but the preset seed does:
-    it controls GP opponent grids and should be identical across compared
-    checkpoints that use the same preset.
-    """
-
-    target_data = asdict(evaluation.target)
-    target_data.pop("repeats_per_target", None)
-    payload = {
-        "schema": 1,
-        "seed": evaluation.seed,
-        "target": target_data,
-        "baseline_config": _baseline_suite_config_data(config),
-    }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    digest = hashlib.sha256(encoded).hexdigest()[:16]
-    return f"{evaluation.target.mode}-{digest}"
-
-
-def _baseline_suite_config_data(config: TrainAppConfig) -> dict[str, object]:
-    """Return only the config fields that affect baseline materialization."""
-
-    return {
-        "seed": config.seed,
-        "emulator": {
-            "core_path": str(config.emulator.core_path),
-            "rom_path": str(config.emulator.rom_path),
-            "renderer": config.emulator.renderer,
-        },
-        "track": _without_baseline_path(config.track.model_dump(mode="json")),
-        "env": {
-            "camera_setting": config.env.camera_setting,
-            "race_intro_target_timer": config.env.race_intro_target_timer,
-            "track_sampling": _track_sampling_baseline_key(config),
-        },
-    }
-
-
-def _track_sampling_baseline_key(config: TrainAppConfig) -> dict[str, object]:
-    data = config.env.track_sampling.model_dump(mode="json")
-    entries = data.get("entries")
-    if isinstance(entries, list):
-        data["entries"] = [
-            _without_baseline_path(entry) if isinstance(entry, dict) else entry for entry in entries
-        ]
-    return data
-
-
-def _without_baseline_path(data: dict[str, object]) -> dict[str, object]:
-    cleaned = dict(data)
-    cleaned["baseline_state_path"] = None
-    return cleaned
+    return f"{evaluation.preset_id}-v{evaluation.preset_version}"
 
 
 def _suite_materializer_input(

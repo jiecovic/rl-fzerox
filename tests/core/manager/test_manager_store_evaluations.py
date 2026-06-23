@@ -9,6 +9,9 @@ from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
 
+TIME_ATTACK_PRESET_ID = "time_attack_blue_falcon_all_courses"
+GP_PRESET_ID = "gp_course_master_blue_falcon_all_courses"
+
 
 def _create_run_with_latest_checkpoint(store: ManagerStore, tmp_path: Path) -> ManagedRun:
     run = store.create_run(
@@ -43,6 +46,7 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
         seed=42,
         target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=3),
         config=run.config,
+        preset_id=TIME_ATTACK_PRESET_ID,
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -53,14 +57,17 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
     assert evaluation.checkpoint.lineage_num_timesteps == 10_123
     assert Path(evaluation.checkpoint.copied_policy_path).read_bytes() == b"policy"
     assert Path(evaluation.checkpoint.copied_model_path or "").read_bytes() == b"model"
+    assert evaluation.preset_id == TIME_ATTACK_PRESET_ID
+    assert evaluation.preset_version == 1
     assert (evaluation.evaluation_dir / "evaluation.spec.json").is_file()
     assert (evaluation.evaluation_dir / "evaluation.config.json").is_file()
 
     reloaded = ManagerStore(store.db_path).list_evaluations()
 
     assert [candidate.id for candidate in reloaded] == [evaluation.id]
-    assert reloaded[0].target.repeats_per_target == 3
-    assert reloaded[0].config == run.config
+    assert reloaded[0].target.mode == "time_attack_course"
+    assert reloaded[0].target.repeats_per_target == 10
+    assert reloaded[0].config.environment.renderer == "gliden64"
     assert reloaded[0].checkpoint.copied_policy_path == evaluation.checkpoint.copied_policy_path
 
 
@@ -82,6 +89,7 @@ def test_manager_store_reuses_identical_created_evaluation_snapshot(tmp_path: Pa
         seed=42,
         target=target,
         config=run.config,
+        preset_id=GP_PRESET_ID,
         evaluations_root=tmp_path / "evaluations",
     )
     second = store.create_evaluation(
@@ -92,6 +100,7 @@ def test_manager_store_reuses_identical_created_evaluation_snapshot(tmp_path: Pa
         seed=42,
         target=target,
         config=run.config,
+        preset_id=GP_PRESET_ID,
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -111,6 +120,7 @@ def test_manager_store_deletes_created_evaluation_snapshot(tmp_path: Path) -> No
         seed=42,
         target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=3),
         config=run.config,
+        preset_id=TIME_ATTACK_PRESET_ID,
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -133,6 +143,7 @@ def test_manager_store_updates_evaluation_lifecycle(tmp_path: Path) -> None:
         seed=42,
         target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=3),
         config=run.config,
+        preset_id=TIME_ATTACK_PRESET_ID,
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -151,3 +162,16 @@ def test_manager_store_delete_missing_evaluation_returns_false(tmp_path: Path) -
     store = ManagerStore(tmp_path / "manager" / "runs.db")
 
     assert store.delete_evaluation("missing-eval") is False
+
+
+def test_manager_store_lists_default_evaluation_presets_and_suites(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+
+    presets = store.list_evaluation_presets()
+    suites = store.list_evaluation_baseline_suites()
+
+    assert {preset.id for preset in presets} == {TIME_ATTACK_PRESET_ID, GP_PRESET_ID}
+    assert {(suite.preset_id, suite.preset_version, suite.status) for suite in suites} == {
+        (TIME_ATTACK_PRESET_ID, 1, "missing"),
+        (GP_PRESET_ID, 1, "missing"),
+    }

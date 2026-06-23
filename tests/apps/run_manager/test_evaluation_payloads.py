@@ -8,7 +8,11 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationCheckpointSnapshot,
     EvaluationTargetSpec,
 )
-from rl_fzerox.core.manager import ManagedEvaluation, default_managed_run_config
+from rl_fzerox.core.manager import (
+    ManagedEvaluation,
+    ManagedEvaluationBaselineSuite,
+    default_managed_run_config,
+)
 
 
 def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
@@ -19,6 +23,8 @@ def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
         evaluation_dir=Path("local/evaluations/eval-001"),
         source_run_id="run-001",
         source_artifact="latest",
+        preset_id="time_attack_blue_falcon_all_courses",
+        preset_version=1,
         policy_mode="deterministic",
         seed=123,
         target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=1),
@@ -34,8 +40,17 @@ def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
         created_at="2026-06-22T10:00:00+00:00",
         updated_at="2026-06-22T10:00:00+00:00",
     )
+    baseline_suite = ManagedEvaluationBaselineSuite(
+        id="time_attack_blue_falcon_all_courses-v1",
+        preset_id="time_attack_blue_falcon_all_courses",
+        preset_version=1,
+        status="missing",
+        suite_dir=Path("local/evaluations/_baseline_suites/time_attack_blue_falcon_all_courses-v1"),
+        created_at="2026-06-22T10:00:00+00:00",
+        updated_at="2026-06-22T10:00:00+00:00",
+    )
 
-    payload = evaluation_payload(evaluation)
+    payload = evaluation_payload(evaluation, baseline_suite=baseline_suite)
     checkpoint = payload["checkpoint"]
 
     assert isinstance(checkpoint, dict)

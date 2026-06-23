@@ -3,7 +3,11 @@
 
 from rl_fzerox.core.manager.db.models.base import ManagerBase
 from rl_fzerox.core.manager.db.models.configs import ConfigSnapshotModel
-from rl_fzerox.core.manager.db.models.evaluations import EvaluationModel
+from rl_fzerox.core.manager.db.models.evaluations import (
+    EvaluationBaselineSuiteModel,
+    EvaluationModel,
+    EvaluationPresetModel,
+)
 from rl_fzerox.core.manager.db.models.metadata import (
     FilesystemOperationModel,
     LineageGroupModel,
@@ -37,7 +41,9 @@ from rl_fzerox.core.manager.db.models.track_sampling import (
 
 __all__ = [
     "ConfigSnapshotModel",
+    "EvaluationBaselineSuiteModel",
     "EvaluationModel",
+    "EvaluationPresetModel",
     "FilesystemOperationModel",
     "LineageGroupModel",
     "ManagerBase",

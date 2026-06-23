@@ -10,6 +10,12 @@ from typing import Protocol
 from fzerox_emulator.arrays import ActionMask
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.evaluation.env_control import (
+    action_masks as env_action_masks,
+)
+from rl_fzerox.core.evaluation.env_control import (
+    set_locked_reset_course,
+)
 from rl_fzerox.core.evaluation.models import (
     CourseResultStatus,
     EvaluationCourseResult,
@@ -19,8 +25,6 @@ from rl_fzerox.core.evaluation.models import (
 
 
 class _SingleCourseEnv(Protocol):
-    def set_locked_reset_course(self, course_id: str | None) -> None: ...
-
     def reset(
         self,
         *,
@@ -32,8 +36,6 @@ class _SingleCourseEnv(Protocol):
         self,
         action: ActionValue,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]: ...
-
-    def action_masks(self) -> ActionMask: ...
 
 
 class _PolicyRunner(Protocol):
@@ -78,7 +80,7 @@ class FZeroXSingleCourseEpisodeExecutor:
         if self.max_env_steps < 1:
             raise ValueError(f"max_env_steps must be at least 1, got {self.max_env_steps}")
 
-        self.env.set_locked_reset_course(target.course_id)
+        set_locked_reset_course(self.env, target.course_id)
         self.policy_runner.reset()
         observation, info = self.env.reset(seed=seed)
         stats = _EpisodeStats()
@@ -89,7 +91,7 @@ class FZeroXSingleCourseEpisodeExecutor:
             action = self.policy_runner.predict(
                 observation,
                 deterministic=policy_mode == "deterministic",
-                action_masks=self.env.action_masks()
+                action_masks=env_action_masks(self.env)
                 if self.policy_runner.supports_action_masks
                 else None,
                 refresh=False,

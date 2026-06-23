@@ -39,6 +39,7 @@ class CreateEvaluationRequest(BaseModel):
 
     name: str
     source_run_id: str
+    preset_id: str
     source_artifact: Literal["latest", "best", "final"] = "latest"
     policy_mode: PolicyPlaybackMode = "deterministic"
     seed: int = Field(ge=0, le=(1 << 32) - 1)

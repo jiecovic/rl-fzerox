@@ -1,274 +1,117 @@
 // web/run-manager/src/pages/evaluations/sections/PresetConfigPanel.tsx
-import {
-  type EvaluationPreset,
-  type EvaluationPresetId,
-  type EvaluationPresetOverride,
-  type EvaluationTargetDraft,
-  randomEvaluationSeed,
-} from "@/entities/evaluation/model/presets";
-import type { ConfigSetter } from "@/entities/runConfig/model/state";
-import { TracksSection } from "@/entities/runConfig/ui/sections/tracks/TracksSection";
-import { VehicleSection } from "@/entities/runConfig/ui/sections/VehicleSection";
-import type {
-  ConfigMetadata,
-  EvaluationMode,
-  EvaluationSourceArtifact,
-  ManagedRun,
-  ManagedRunConfig,
-} from "@/shared/api/contract";
-import { rendererNames } from "@/shared/api/renderers";
-import { Button } from "@/shared/ui/Button";
-import { ConfigStack } from "@/shared/ui/config/ConfigLayout";
-import { FieldInput, FieldSelect, FieldShell } from "@/shared/ui/Field";
-import { ImportIcon, PlusIcon, RandomizeIcon, TrashIcon } from "@/shared/ui/icons";
-import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
+import type { EvaluationBaselineSuite, ManagedEvaluationPreset } from "@/shared/api/contract";
+import { formatDate } from "@/shared/ui/format";
+import { Notice } from "@/shared/ui/Panel";
 
 interface PresetConfigPanelProps {
-  defaultConfig: ManagedRunConfig;
-  importRunId: string;
-  importingPreset: boolean;
-  metadata: ConfigMetadata;
-  presetConfig: ManagedRunConfig;
-  presetId: EvaluationPresetId;
-  presets: EvaluationPreset[];
-  runs: ManagedRun[];
-  selectedTarget: EvaluationTargetDraft | null;
-  selectedPreset: EvaluationPreset | null;
-  setEvaluationConfig: ConfigSetter;
-  onCreatePreset: () => void;
-  onDeletePreset: () => void;
-  onImportRunChange: (runId: string) => void;
-  onImportRunPreset: () => void;
-  onPresetChange: (value: EvaluationPresetId) => void;
-  onPresetSettingsChange: (patch: EvaluationPresetOverride) => void;
+  baselineSuites: EvaluationBaselineSuite[];
+  presets: ManagedEvaluationPreset[];
 }
 
-const TARGET_MODE_LABELS: Record<EvaluationMode, string> = {
+const TARGET_MODE_LABELS: Record<ManagedEvaluationPreset["target"]["mode"], string> = {
   gp_course: "GP course",
   time_attack_course: "Time Attack course",
 };
 
-export function PresetConfigPanel({
-  defaultConfig,
-  importRunId,
-  importingPreset,
-  metadata,
-  presetConfig,
-  presetId,
-  presets,
-  runs,
-  selectedTarget,
-  selectedPreset,
-  setEvaluationConfig,
-  onCreatePreset,
-  onDeletePreset,
-  onImportRunChange,
-  onImportRunPreset,
-  onPresetChange,
-  onPresetSettingsChange,
-}: PresetConfigPanelProps) {
-  const rendererOptions = rendererNames(metadata, presetConfig.environment.renderer);
+export function PresetConfigPanel({ baselineSuites, presets }: PresetConfigPanelProps) {
+  if (presets.length === 0) {
+    return <Notice>No evaluation presets are available.</Notice>;
+  }
+  const suitesByPresetVersion = new Map(
+    baselineSuites.map((suite) => [presetVersionKey(suite.preset_id, suite.preset_version), suite]),
+  );
   return (
-    <div className="grid gap-5">
-      <section className="border border-app-border bg-app-surface-muted p-4">
-        <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_minmax(260px,1fr)_auto] xl:items-end">
-          <FieldShell>
-            <span>Preset</span>
-            <FieldSelect
-              value={presetId}
-              onChange={(event) => onPresetChange(event.target.value as EvaluationPresetId)}
-            >
-              {presets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </FieldSelect>
-          </FieldShell>
-          <FieldShell>
-            <span>Name</span>
-            <FieldInput
-              disabled={selectedPreset === null}
-              value={selectedPreset?.label ?? ""}
-              onChange={(event) =>
-                onPresetSettingsChange({ label: event.currentTarget.value.trimStart() })
-              }
-            />
-          </FieldShell>
-          <div className="flex flex-wrap items-end gap-2">
-            <Button
-              className="gap-2"
-              disabled={selectedPreset === null}
-              type="button"
-              onClick={onCreatePreset}
-            >
-              <PlusIcon />
-              <span>New preset</span>
-            </Button>
-            <Button
-              className="gap-2"
-              disabled={selectedPreset === null || selectedPreset.builtin}
-              tone="danger"
-              type="button"
-              onClick={onDeletePreset}
-            >
-              <TrashIcon />
-              <span>Delete</span>
-            </Button>
-          </div>
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[140px_180px_120px_220px]">
-          <FieldShell>
-            <span>Artifact</span>
-            <FieldSelect
-              disabled={selectedPreset === null}
-              value={selectedPreset?.sourceArtifact ?? "latest"}
-              onChange={(event) =>
-                onPresetSettingsChange({
-                  sourceArtifact: event.currentTarget.value as EvaluationSourceArtifact,
-                })
-              }
-            >
-              <option value="latest">latest</option>
-              <option value="best">best</option>
-              <option value="final">final</option>
-            </FieldSelect>
-          </FieldShell>
-          <FieldShell>
-            <span>Renderer</span>
-            <FieldSelect
-              value={presetConfig.environment.renderer}
-              onChange={(event) =>
-                setEvaluationConfig((config) => ({
-                  ...config,
-                  environment: {
-                    ...config.environment,
-                    renderer: event.currentTarget
-                      .value as ManagedRunConfig["environment"]["renderer"],
-                  },
-                }))
-              }
-            >
-              {rendererOptions.map((renderer) => (
-                <option key={renderer} value={renderer}>
-                  {renderer}
-                </option>
-              ))}
-            </FieldSelect>
-          </FieldShell>
-          <FieldShell>
-            <span>Repeats</span>
-            <FieldInput
-              disabled={selectedPreset === null}
-              max={1000}
-              min={1}
-              type="number"
-              value={selectedPreset?.repeatsPerTarget ?? 1}
-              onChange={(event) =>
-                onPresetSettingsChange({
-                  repeatsPerTarget: clampInteger(event.currentTarget.valueAsNumber, 1, 1000),
-                })
-              }
-            />
-          </FieldShell>
-          <div className="grid grid-cols-[minmax(0,1fr)_40px] items-end gap-2">
-            <FieldShell>
-              <span>Seed</span>
-              <FieldInput
-                disabled={selectedPreset === null}
-                max={4_294_967_295}
-                min={0}
-                type="number"
-                value={selectedPreset?.seed ?? 0}
-                onChange={(event) =>
-                  onPresetSettingsChange({
-                    seed: clampInteger(event.currentTarget.valueAsNumber, 0, 4_294_967_295),
-                  })
-                }
-              />
-            </FieldShell>
-            <TooltipIconButton
-              aria-label="Randomize evaluation seed"
-              disabled={selectedPreset === null}
-              tooltip="Randomize seed"
-              onClick={() => onPresetSettingsChange({ seed: randomEvaluationSeed() })}
-            >
-              <RandomizeIcon />
-            </TooltipIconButton>
-          </div>
-        </div>
-        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(260px,1fr)_auto]">
-          <FieldShell>
-            <span>Import preset from run</span>
-            <FieldSelect
-              value={importRunId}
-              onChange={(event) => onImportRunChange(event.currentTarget.value)}
-            >
-              <option value="">Select run</option>
-              {runs.map((run) => (
-                <option key={run.id} value={run.id}>
-                  {run.name}
-                </option>
-              ))}
-            </FieldSelect>
-          </FieldShell>
-          <div className="flex items-end">
-            <Button
-              className="gap-2"
-              disabled={importRunId.length === 0 || importingPreset}
-              type="button"
-              onClick={onImportRunPreset}
-            >
-              <ImportIcon />
-              <span>{importingPreset ? "Importing" : "Import"}</span>
-            </Button>
-          </div>
-        </div>
-        <div className="mt-3 text-sm text-app-muted">
-          Target: {selectedTarget === null ? "not configured" : targetDraftLabel(selectedTarget)}
-        </div>
-      </section>
-      <ConfigStack>
-        <TracksSection
-          config={presetConfig}
-          defaultConfig={defaultConfig}
-          gpDifficultySelection="single"
-          metadata={metadata}
-          setConfig={setEvaluationConfig}
-          showSampling={false}
-        />
-        <VehicleSection
-          config={presetConfig}
-          defaultConfig={defaultConfig}
-          metadata={metadata}
-          setConfig={setEvaluationConfig}
-          showEngineControls={false}
-        />
-      </ConfigStack>
+    <div className="overflow-x-auto border border-app-border bg-app-surface">
+      <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+        <thead className="border-b border-app-border text-xs font-bold tracking-[0.04em] text-app-muted uppercase">
+          <tr>
+            <th className="px-4 py-3">Preset</th>
+            <th className="px-4 py-3">Target</th>
+            <th className="px-4 py-3">Source</th>
+            <th className="px-4 py-3">Runtime</th>
+            <th className="px-4 py-3">Baseline suite</th>
+          </tr>
+        </thead>
+        <tbody>
+          {presets.map((preset) => {
+            const suite = suitesByPresetVersion.get(presetVersionKey(preset.id, preset.version));
+            return (
+              <tr className="border-b border-app-border last:border-b-0" key={preset.id}>
+                <td className="px-4 py-3 align-top">
+                  <div className="grid gap-1">
+                    <strong className="text-app-text">{preset.name}</strong>
+                    <span className="text-xs text-app-muted">
+                      {preset.id} · v{preset.version}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top text-app-muted">
+                  <div className="grid gap-1">
+                    <span>
+                      {TARGET_MODE_LABELS[preset.target.mode]} · {preset.target.repeats_per_target}x
+                    </span>
+                    <span className="text-xs">{targetSelectionLabel(preset.target)}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top text-app-muted">{preset.source_artifact}</td>
+                <td className="px-4 py-3 align-top text-app-muted">
+                  <div className="grid gap-1">
+                    <span>{preset.renderer}</span>
+                    <span className="text-xs">seed {preset.seed}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-top text-app-muted">
+                  {suite === undefined ? (
+                    "not registered"
+                  ) : (
+                    <div className="grid gap-1">
+                      <span className={suiteStatusClass(suite.status)}>{suite.status}</span>
+                      <span className="text-xs">{suiteTimestampLabel(suite)}</span>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function targetDraftLabel(evaluationTarget: EvaluationTargetDraft) {
-  return `${TARGET_MODE_LABELS[evaluationTarget.mode]} · ${targetSelectionPartsLabel(evaluationTarget)}`;
+function presetVersionKey(presetId: string, presetVersion: number) {
+  return `${presetId}\n${presetVersion}`;
 }
 
-function targetSelectionPartsLabel({
-  courseIds,
-  cupIds,
-  difficulties,
-  vehicleIds,
-}: {
-  courseIds: readonly string[];
-  cupIds: readonly string[];
-  difficulties: readonly string[];
-  vehicleIds: readonly string[];
-}) {
+function suiteStatusClass(status: EvaluationBaselineSuite["status"]) {
+  if (status === "ready") {
+    return "font-semibold text-app-accent";
+  }
+  if (status === "failed") {
+    return "font-semibold text-app-danger";
+  }
+  return "text-app-muted";
+}
+
+function suiteTimestampLabel(suite: EvaluationBaselineSuite) {
+  if (suite.error_message !== null) {
+    return suite.error_message;
+  }
+  if (suite.materialized_at !== null) {
+    return `materialized ${formatDate(suite.materialized_at)}`;
+  }
+  if (suite.updated_at !== null) {
+    return `updated ${formatDate(suite.updated_at)}`;
+  }
+  return "first evaluation will materialize it";
+}
+
+function targetSelectionLabel(target: ManagedEvaluationPreset["target"]) {
   const parts = [
-    selectionCountLabel(cupIds, "cup"),
-    selectionCountLabel(courseIds, "course"),
-    selectionCountLabel(difficulties, "difficulty"),
-    selectionCountLabel(vehicleIds, "vehicle"),
+    selectionCountLabel(target.cup_ids, "cup"),
+    selectionCountLabel(target.course_ids, "course"),
+    selectionCountLabel(target.difficulties, "difficulty"),
+    selectionCountLabel(target.vehicle_ids, "vehicle"),
   ].filter((part) => part !== null);
   return parts.length === 0 ? "all targets" : parts.join(" · ");
 }
@@ -285,11 +128,4 @@ function pluralize(count: number, singular: string) {
     return singular;
   }
   return singular === "difficulty" ? "difficulties" : `${singular}s`;
-}
-
-function clampInteger(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-  return Math.max(min, Math.min(max, Math.trunc(value)));
 }

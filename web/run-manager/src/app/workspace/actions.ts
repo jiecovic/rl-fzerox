@@ -197,6 +197,7 @@ export function useWorkspaceActions({
     try {
       const evaluation = await createEvaluation(request);
       setEvaluations((current) => upsertEvaluation(current, evaluation));
+      await reloadManagerData({ showLoading: false });
       return evaluation;
     } catch (caught) {
       await reloadManagerData();

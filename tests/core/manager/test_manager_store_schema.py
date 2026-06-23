@@ -243,6 +243,8 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "evaluation_dir",
         "source_run_id",
         "source_artifact",
+        "preset_id",
+        "preset_version",
         "policy_mode",
         "seed",
         "target_json",

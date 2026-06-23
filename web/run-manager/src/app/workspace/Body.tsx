@@ -10,8 +10,10 @@ import { RunsPanel } from "@/pages/runs/RunsPanel";
 import { SaveGamesPanel } from "@/pages/saveGames/SaveGamesPanel";
 import type {
   ConfigMetadata,
+  EvaluationBaselineSuite,
   ManagedDraft,
   ManagedEvaluation,
+  ManagedEvaluationPreset,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
@@ -30,8 +32,10 @@ interface WorkspaceBodyProps {
   defaultConfig: ManagedRunConfig | null;
   drafts: ManagedDraft[];
   error: string | null;
+  evaluationBaselineSuites: EvaluationBaselineSuite[];
   evaluationError: string | null;
   evaluations: ManagedEvaluation[];
+  evaluationPresets: ManagedEvaluationPreset[];
   isLoading: boolean;
   loadRunDetail: (runId: string) => Promise<ManagedRunDetail>;
   metadata: ConfigMetadata | null;
@@ -47,8 +51,10 @@ export function WorkspaceBody({
   defaultConfig,
   drafts,
   error,
+  evaluationBaselineSuites,
   evaluationError,
   evaluations,
+  evaluationPresets,
   isLoading,
   loadRunDetail,
   metadata,
@@ -140,15 +146,13 @@ export function WorkspaceBody({
       ) : null}
       {!isLoading && sessions.activeTabId === "evaluations" ? (
         <EvaluationsPanel
-          defaultConfig={defaultConfig}
+          evaluationBaselineSuites={evaluationBaselineSuites}
           evaluationError={evaluationError}
           evaluations={evaluations}
-          loadRunDetail={loadRunDetail}
-          metadata={metadata}
+          evaluationPresets={evaluationPresets}
           onDeleteEvaluation={actions.removeManagedEvaluation}
           onGlobalError={actions.setGlobalError}
           onOpenEvaluation={sessions.openEvaluation}
-          runs={runs}
         />
       ) : null}
       {!isLoading && activeEvaluationSession !== null ? (
@@ -215,6 +219,7 @@ export function WorkspaceBody({
             onClearCourseAltBaselines={actions.clearManagedRunCourseAltBaselines}
             onCreateDraftFromRun={actions.createDraftFromManagedRun}
             onCreateEvaluation={actions.createManagedEvaluation}
+            evaluationPresets={evaluationPresets}
             onFork={actions.forkManagedRun}
             onGlobalError={actions.setGlobalError}
             onOpenDirectory={actions.openManagedRunDirectory}

@@ -23,6 +23,8 @@ from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGr
 from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
     ManagedEvaluation,
+    ManagedEvaluationBaselineSuite,
+    ManagedEvaluationPreset,
     ManagedRun,
     ManagedRunDraft,
     ManagedRunEvent,
@@ -502,6 +504,7 @@ class ManagerStore:
         seed: int,
         target: EvaluationTargetSpec,
         config: ManagedRunConfig,
+        preset_id: str,
         evaluations_root: Path | None = None,
     ) -> ManagedEvaluation:
         return evaluation_registry.create_evaluation(
@@ -513,6 +516,7 @@ class ManagerStore:
             seed=seed,
             target=target,
             config=config,
+            preset_id=preset_id,
             evaluations_root=evaluations_root,
         )
 
@@ -521,6 +525,18 @@ class ManagerStore:
 
     def list_evaluations(self) -> tuple[ManagedEvaluation, ...]:
         return evaluation_registry.list_evaluations(self)
+
+    def get_evaluation_preset(
+        self,
+        preset_id: str,
+    ) -> ManagedEvaluationPreset | None:
+        return evaluation_registry.get_evaluation_preset(self, preset_id)
+
+    def list_evaluation_presets(self) -> tuple[ManagedEvaluationPreset, ...]:
+        return evaluation_registry.list_evaluation_presets(self)
+
+    def list_evaluation_baseline_suites(self) -> tuple[ManagedEvaluationBaselineSuite, ...]:
+        return evaluation_registry.list_evaluation_baseline_suites(self)
 
     def delete_evaluation(self, evaluation_id: str) -> bool:
         return evaluation_registry.delete_evaluation(self, evaluation_id)

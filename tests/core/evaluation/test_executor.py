@@ -74,6 +74,33 @@ class _FakePolicyRunner:
         return np.array([0], dtype=np.int64)
 
 
+class _TransparentWrapper:
+    """Small Gymnasium-like wrapper that does not expose env controls directly."""
+
+    def __init__(self, env: _FakeEnv) -> None:
+        self.env = env
+
+    def reset(
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, object] | None = None,
+    ) -> tuple[ObservationValue, dict[str, object]]:
+        return self.env.reset(seed=seed, options=options)
+
+    def step(
+        self,
+        action: ActionValue,
+    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
+        return self.env.step(action)
+
+    def get_wrapper_attr(self, name: str) -> object:
+        value = getattr(self.env, name)
+        if value is None:
+            raise AttributeError(name)
+        return value
+
+
 def test_fzerox_single_course_executor_maps_finished_episode_info() -> None:
     env = _FakeEnv(
         steps=[
@@ -132,6 +159,41 @@ def test_fzerox_single_course_executor_maps_finished_episode_info() -> None:
     assert result.engine_setting_raw_value == 90
     assert result.boost_pad_entries == 3
     assert result.average_speed == 600.0
+
+
+def test_fzerox_single_course_executor_uses_controls_through_wrapped_env() -> None:
+    base_env = _FakeEnv(
+        steps=[
+            (
+                1.0,
+                True,
+                False,
+                {
+                    "finished": True,
+                    "termination_reason": "finished",
+                    "track_course_id": "mute_city",
+                },
+            )
+        ],
+        locked_courses=[],
+    )
+    policy = _FakePolicyRunner(supports_action_masks=True, calls=[])
+    executor = FZeroXSingleCourseEpisodeExecutor(
+        env=_TransparentWrapper(base_env),
+        policy_runner=policy,
+        max_env_steps=100,
+    )
+
+    result = executor.run_course(
+        EvaluationCourseTarget(target_id="target", course_id="mute_city"),
+        policy_path=Path("checkpoints/latest/policy.zip"),
+        policy_mode="deterministic",
+        seed=123,
+    )
+
+    assert base_env.locked_courses == ["mute_city"]
+    assert base_env.masks_requested == 1
+    assert result.status == "finished"
 
 
 def test_fzerox_single_course_executor_truncates_at_step_limit() -> None:

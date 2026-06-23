@@ -2,15 +2,17 @@
 import {
   fetchConfigMetadata,
   fetchDrafts,
-  fetchEvaluations,
+  fetchEvaluationData as fetchEvaluationPayload,
   fetchRuns,
   fetchSaveGames,
   fetchTemplates,
 } from "@/shared/api/client";
 import type {
   ConfigMetadata,
+  EvaluationBaselineSuite,
   ManagedDraft,
   ManagedEvaluation,
+  ManagedEvaluationPreset,
   ManagedRun,
   ManagedSaveGame,
   ManagedTemplate,
@@ -18,8 +20,10 @@ import type {
 
 export interface ManagerData {
   drafts: ManagedDraft[];
+  evaluationBaselineSuites: EvaluationBaselineSuite[];
   evaluationError: string | null;
   evaluations: ManagedEvaluation[];
+  evaluationPresets: ManagedEvaluationPreset[];
   metadata: ConfigMetadata;
   runs: ManagedRun[];
   saveGames: ManagedSaveGame[];
@@ -37,8 +41,10 @@ export async function loadManagerData(): Promise<ManagerData> {
   ]);
   return {
     drafts,
+    evaluationBaselineSuites: evaluationData.baselineSuites,
     evaluationError: evaluationData.error,
     evaluations: evaluationData.evaluations,
+    evaluationPresets: evaluationData.presets,
     metadata,
     runs,
     saveGames,
@@ -48,12 +54,20 @@ export async function loadManagerData(): Promise<ManagerData> {
 
 async function fetchEvaluationData(): Promise<{
   error: string | null;
+  baselineSuites: EvaluationBaselineSuite[];
   evaluations: ManagedEvaluation[];
+  presets: ManagedEvaluationPreset[];
 }> {
   try {
-    return { error: null, evaluations: await fetchEvaluations() };
+    const payload = await fetchEvaluationPayload();
+    return {
+      baselineSuites: payload.baseline_suites,
+      error: null,
+      evaluations: payload.evaluations,
+      presets: payload.presets,
+    };
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "failed to load evaluations";
-    return { error: message, evaluations: [] };
+    return { baselineSuites: [], error: message, evaluations: [], presets: [] };
   }
 }

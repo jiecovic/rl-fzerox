@@ -14,15 +14,17 @@ import {
   trimRunDetailCache,
 } from "@/app/workspace/runDetails";
 import {
-  fetchEvaluations,
+  fetchEvaluationData,
   fetchRun,
   fetchSaveGameStatus,
   fetchSaveGames,
 } from "@/shared/api/client";
 import type {
   ConfigMetadata,
+  EvaluationBaselineSuite,
   ManagedDraft,
   ManagedEvaluation,
+  ManagedEvaluationPreset,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
@@ -35,8 +37,12 @@ interface ReloadManagerDataOptions {
 
 export function useManagerData() {
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
+  const [evaluationBaselineSuites, setEvaluationBaselineSuites] = useState<
+    EvaluationBaselineSuite[]
+  >([]);
   const [evaluations, setEvaluations] = useState<ManagedEvaluation[]>([]);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
+  const [evaluationPresets, setEvaluationPresets] = useState<ManagedEvaluationPreset[]>([]);
   const [runs, setRuns] = useState<ManagedRun[]>([]);
   const [saveGames, setSaveGames] = useState<ManagedSaveGame[]>([]);
   const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
@@ -94,8 +100,10 @@ export function useManagerData() {
         rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
       }
       setDrafts(managerData.drafts);
+      setEvaluationBaselineSuites(managerData.evaluationBaselineSuites);
       setEvaluationError(managerData.evaluationError);
       setEvaluations(managerData.evaluations);
+      setEvaluationPresets(managerData.evaluationPresets);
       setRuns(managerData.runs.map((run) => (hasRunDetail(run) ? runSummaryFromDetail(run) : run)));
       setSaveGames(managerData.saveGames);
       setRunDetailsById((current) =>
@@ -161,10 +169,12 @@ export function useManagerData() {
     }
     let ignore = false;
     const refreshEvaluations = () => {
-      void fetchEvaluations()
-        .then((nextEvaluations) => {
+      void fetchEvaluationData()
+        .then((nextEvaluationData) => {
           if (!ignore) {
-            setEvaluations(nextEvaluations);
+            setEvaluationBaselineSuites(nextEvaluationData.baseline_suites);
+            setEvaluations(nextEvaluationData.evaluations);
+            setEvaluationPresets(nextEvaluationData.presets);
             setEvaluationError(null);
           }
         })
@@ -194,8 +204,10 @@ export function useManagerData() {
     defaultConfig,
     drafts,
     error,
+    evaluationBaselineSuites,
     evaluationError,
     evaluations,
+    evaluationPresets,
     isLoading,
     loadRunDetail,
     metadata,

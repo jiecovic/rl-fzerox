@@ -12,6 +12,7 @@ from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSn
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.policy_drive import PolicyDriveFrame, PolicyDriveRuntime
 from rl_fzerox.core.manager.training import build_managed_train_app_config
+from rl_fzerox.core.runtime_spec.inference import inference_train_app_config
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 
 if TYPE_CHECKING:
@@ -113,37 +114,4 @@ def _policy_train_config(policy_control: CareerModePolicyControl) -> TrainAppCon
         run_id=policy_control.policy_run.id,
         run_dir=policy_control.policy_run.run_dir,
     )
-    return _career_runtime_train_config(train_config)
-
-
-def _career_runtime_train_config(train_config: TrainAppConfig) -> TrainAppConfig:
-    """Return an evaluation-style runtime config for Career Mode policy handoff."""
-
-    # Career attempts should replay the trained policy without episode-scoped
-    # randomization, but p=1.0 is not random: it means the policy was trained
-    # with that branch always unavailable. Keep the observation/action layout
-    # intact so the checkpoint still loads against its original shape.
-    # State-feature dropout groups stay in the config because watch inference
-    # uses p=1.0 groups as deterministic zeroing metadata, while p<1.0 groups
-    # are not sampled there.
-    action_config = train_config.env.action.model_copy(
-        update={
-            "lean_episode_mask_probability": _deterministic_episode_mask_probability(
-                train_config.env.action.lean_episode_mask_probability
-            ),
-            "air_brake_episode_mask_probability": _deterministic_episode_mask_probability(
-                train_config.env.action.air_brake_episode_mask_probability
-            ),
-            "spin_episode_mask_probability": _deterministic_episode_mask_probability(
-                train_config.env.action.spin_episode_mask_probability
-            ),
-        }
-    )
-    env_config = train_config.env.model_copy(update={"action": action_config})
-    return train_config.model_copy(update={"env": env_config})
-
-
-def _deterministic_episode_mask_probability(probability: float) -> float:
-    """Preserve hard action masks while removing stochastic inference changes."""
-
-    return 1.0 if probability >= 1.0 else 0.0
+    return inference_train_app_config(train_config)

@@ -14,6 +14,7 @@ export const evaluationStatusSchema = z.enum([
 
 export const evaluationModeSchema = z.enum(["time_attack_course", "gp_course"]);
 export const evaluationSourceArtifactSchema = z.enum(["latest", "best", "final"]);
+export const evaluationBaselineSuiteStatusSchema = z.enum(["missing", "ready", "failed"]);
 
 export const evaluationTargetSpecSchema = z.object({
   mode: evaluationModeSchema,
@@ -43,6 +44,19 @@ export const evaluationProgressSchema = z.object({
   result_status: z.string().nullable(),
 });
 
+export const evaluationBaselineSuiteSchema = z.object({
+  id: z.string(),
+  preset_id: z.string(),
+  preset_version: z.number().int().positive(),
+  status: evaluationBaselineSuiteStatusSchema,
+  suite_dir: z.string(),
+  manifest_path: z.string().nullable(),
+  error_message: z.string().nullable(),
+  created_at: z.string().nullable(),
+  updated_at: z.string().nullable(),
+  materialized_at: z.string().nullable(),
+});
+
 export const managedEvaluationSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -50,6 +64,8 @@ export const managedEvaluationSchema = z.object({
   evaluation_dir: z.string(),
   source_run_id: z.string().nullable(),
   source_artifact: evaluationSourceArtifactSchema.nullable(),
+  preset_id: z.string(),
+  preset_version: z.number().int().positive(),
   policy_mode: policyPlaybackModeSchema,
   seed: z.number().int().nonnegative(),
   target: evaluationTargetSpecSchema,
@@ -62,10 +78,27 @@ export const managedEvaluationSchema = z.object({
   result_json_path: z.string().nullable(),
   error_message: z.string().nullable(),
   progress: evaluationProgressSchema,
+  baseline_suite: evaluationBaselineSuiteSchema,
+});
+
+export const managedEvaluationPresetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: z.number().int().positive(),
+  source_artifact: evaluationSourceArtifactSchema,
+  seed: z.number().int().nonnegative(),
+  renderer: z.enum(["angrylion", "gliden64"]),
+  target: evaluationTargetSpecSchema,
+  config: managedRunConfigSchema,
+  builtin: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
 });
 
 export const evaluationsResponseSchema = z.object({
   evaluations: z.array(managedEvaluationSchema),
+  presets: z.array(managedEvaluationPresetSchema),
+  baseline_suites: z.array(evaluationBaselineSuiteSchema),
 });
 
 export const createEvaluationResponseSchema = z.object({
@@ -82,6 +115,10 @@ export const updateEvaluationResponseSchema = z.object({
 
 export type EvaluationMode = z.infer<typeof evaluationModeSchema>;
 export type ManagedEvaluation = z.infer<typeof managedEvaluationSchema>;
+export type ManagedEvaluationPreset = z.infer<typeof managedEvaluationPresetSchema>;
+export type EvaluationBaselineSuite = z.infer<typeof evaluationBaselineSuiteSchema>;
+export type EvaluationBaselineSuiteStatus = z.infer<typeof evaluationBaselineSuiteStatusSchema>;
+export type EvaluationsResponse = z.infer<typeof evaluationsResponseSchema>;
 export type EvaluationStatus = z.infer<typeof evaluationStatusSchema>;
 export type EvaluationSourceArtifact = z.infer<typeof evaluationSourceArtifactSchema>;
 
@@ -91,6 +128,7 @@ export interface CreateEvaluationRequest {
   difficulties: readonly string[];
   name: string;
   policyMode: "deterministic" | "stochastic";
+  presetId: string;
   repeatsPerTarget: number;
   seed: number;
   sourceArtifact: EvaluationSourceArtifact;

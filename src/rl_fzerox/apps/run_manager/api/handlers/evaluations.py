@@ -4,17 +4,33 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from rl_fzerox.apps.run_manager.api.contracts import CreateEvaluationRequest
-from rl_fzerox.apps.run_manager.api.payloads.evaluations import evaluation_payload
+from rl_fzerox.apps.run_manager.api.payloads.evaluations import (
+    evaluation_baseline_suite_payload,
+    evaluation_payload,
+    evaluation_preset_payload,
+)
 from rl_fzerox.apps.run_manager.launching import launch_evaluation_worker
 from rl_fzerox.core.evaluation.models import EvaluationTargetSpec
-from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager import ManagedEvaluation, ManagedEvaluationBaselineSuite, ManagerStore
 
 
 def evaluations_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
     """Return all manager-owned evaluations."""
 
+    baseline_suites = store.list_evaluation_baseline_suites()
+    suites_by_preset = {(suite.preset_id, suite.preset_version): suite for suite in baseline_suites}
     return {
-        "evaluations": [evaluation_payload(evaluation) for evaluation in store.list_evaluations()]
+        "evaluations": [
+            evaluation_payload(
+                evaluation,
+                baseline_suite=_required_suite_for_evaluation(evaluation, suites_by_preset),
+            )
+            for evaluation in store.list_evaluations()
+        ],
+        "presets": [
+            evaluation_preset_payload(preset) for preset in store.list_evaluation_presets()
+        ],
+        "baseline_suites": [evaluation_baseline_suite_payload(suite) for suite in baseline_suites],
     }
 
 
@@ -41,12 +57,13 @@ def create_evaluation_payload(
                 repeats_per_target=request.target.repeats_per_target,
             ),
             config=request.config,
+            preset_id=request.preset_id,
         )
     except FileNotFoundError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return {"evaluation": evaluation_payload(evaluation)}
+    return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}
 
 
 def delete_evaluation_payload(store: ManagerStore, evaluation_id: str) -> dict[str, bool]:
@@ -72,7 +89,7 @@ def update_evaluation_payload(
         raise HTTPException(status_code=400, detail=str(error)) from error
     if evaluation is None:
         raise HTTPException(status_code=404, detail="evaluation not found")
-    return {"evaluation": evaluation_payload(evaluation)}
+    return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}
 
 
 def start_evaluation_payload(
@@ -85,4 +102,28 @@ def start_evaluation_payload(
         evaluation = launch_evaluation_worker(store, evaluation_id=evaluation_id)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return {"evaluation": evaluation_payload(evaluation)}
+    return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}
+
+
+def _evaluation_payload_with_suite(
+    store: ManagerStore,
+    evaluation: ManagedEvaluation,
+) -> dict[str, object]:
+    suites_by_preset = {
+        (suite.preset_id, suite.preset_version): suite
+        for suite in store.list_evaluation_baseline_suites()
+    }
+    return evaluation_payload(
+        evaluation,
+        baseline_suite=_required_suite_for_evaluation(evaluation, suites_by_preset),
+    )
+
+
+def _required_suite_for_evaluation(
+    evaluation: ManagedEvaluation,
+    suites_by_preset: dict[tuple[str, int], ManagedEvaluationBaselineSuite],
+) -> ManagedEvaluationBaselineSuite:
+    suite = suites_by_preset.get((evaluation.preset_id, evaluation.preset_version))
+    if suite is None:
+        raise HTTPException(status_code=500, detail="evaluation baseline suite is missing")
+    return suite

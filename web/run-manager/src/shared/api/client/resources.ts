@@ -10,6 +10,7 @@ export {
 export {
   createEvaluation,
   deleteEvaluation,
+  fetchEvaluationData,
   fetchEvaluations,
   startEvaluation,
   updateEvaluation,

@@ -13,6 +13,7 @@ import type {
   ConfigMetadata,
   CreateEvaluationRequest,
   ManagedEvaluation,
+  ManagedEvaluationPreset,
   ManagedRun,
   ManagedRunDetail,
   PolicyPlaybackMode,
@@ -36,6 +37,7 @@ interface RunWorkspaceProps {
   onClearCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
   onCreateEvaluation: (request: CreateEvaluationRequest) => Promise<ManagedEvaluation>;
+  evaluationPresets: ManagedEvaluationPreset[];
   onFork: (runId: string, artifact: "latest" | "best", copyAltBaselines: boolean) => Promise<void>;
   onGlobalError: (message: string | null) => void;
   onOpenDirectory: (runId: string) => Promise<void>;
@@ -63,6 +65,7 @@ export function RunWorkspace({
   onClearCourseAltBaselines,
   onCreateDraftFromRun,
   onCreateEvaluation,
+  evaluationPresets,
   onFork,
   onGlobalError,
   onOpenDirectory,
@@ -199,8 +202,7 @@ export function RunWorkspace({
         onSubmit={(name) => void submitRunRename(name)}
       />
       <CreateEvaluationSnapshotDialog
-        defaultConfig={run.config}
-        metadata={metadata}
+        evaluationPresets={evaluationPresets}
         open={evaluationDialogOpen}
         run={run}
         onClose={() => setEvaluationDialogOpen(false)}

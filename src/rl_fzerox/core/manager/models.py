@@ -20,6 +20,7 @@ SaveUnlockInspectionStatus = Literal["not_inspected", "inspected"]
 SaveUnlockTargetStatus = Literal["pending", "locked", "succeeded", "failed", "skipped"]
 ViewerLeaseKind = Literal["run_watch", "career_mode"]
 ManagedEvaluationStatus = Literal["created", "running", "completed", "failed", "cancelled"]
+EvaluationBaselineSuiteStatus = Literal["missing", "ready", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +93,8 @@ class ManagedEvaluation:
     evaluation_dir: Path
     source_run_id: str | None
     source_artifact: Literal["latest", "best", "final"] | None
+    preset_id: str
+    preset_version: int
     policy_mode: EvaluationPolicyMode
     seed: int
     target: EvaluationTargetSpec
@@ -103,6 +106,39 @@ class ManagedEvaluation:
     finished_at: str | None = None
     result_json_path: Path | None = None
     error_message: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedEvaluationPreset:
+    """One SQLite-owned evaluation preset version."""
+
+    id: str
+    name: str
+    version: int
+    source_artifact: Literal["latest", "best", "final"]
+    seed: int
+    renderer: Literal["angrylion", "gliden64"]
+    target: EvaluationTargetSpec
+    config: ManagedRunConfig
+    builtin: bool
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedEvaluationBaselineSuite:
+    """Materialized reset-state suite for a preset version."""
+
+    id: str
+    preset_id: str
+    preset_version: int
+    status: EvaluationBaselineSuiteStatus
+    suite_dir: Path
+    manifest_path: Path | None = None
+    error_message: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    materialized_at: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

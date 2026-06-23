@@ -36,6 +36,7 @@ export {
   deleteSaveGame,
   fetchConfigMetadata,
   fetchDrafts,
+  fetchEvaluationData,
   fetchEvaluations,
   fetchPolicyPreview,
   fetchRun,

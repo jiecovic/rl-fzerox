@@ -5,10 +5,18 @@ import json
 from dataclasses import asdict
 
 from rl_fzerox.core.evaluation.models import EvaluationCheckpointSnapshot
-from rl_fzerox.core.manager import ManagedEvaluation
+from rl_fzerox.core.manager import (
+    ManagedEvaluation,
+    ManagedEvaluationBaselineSuite,
+    ManagedEvaluationPreset,
+)
 
 
-def evaluation_payload(evaluation: ManagedEvaluation) -> dict[str, object]:
+def evaluation_payload(
+    evaluation: ManagedEvaluation,
+    *,
+    baseline_suite: ManagedEvaluationBaselineSuite,
+) -> dict[str, object]:
     """Return one evaluation record payload."""
 
     return {
@@ -18,6 +26,8 @@ def evaluation_payload(evaluation: ManagedEvaluation) -> dict[str, object]:
         "evaluation_dir": str(evaluation.evaluation_dir),
         "source_run_id": evaluation.source_run_id,
         "source_artifact": evaluation.source_artifact,
+        "preset_id": evaluation.preset_id,
+        "preset_version": evaluation.preset_version,
         "policy_mode": evaluation.policy_mode,
         "seed": evaluation.seed,
         "target": asdict(evaluation.target),
@@ -32,6 +42,44 @@ def evaluation_payload(evaluation: ManagedEvaluation) -> dict[str, object]:
         ),
         "error_message": evaluation.error_message,
         "progress": _progress_payload(evaluation),
+        "baseline_suite": evaluation_baseline_suite_payload(baseline_suite),
+    }
+
+
+def evaluation_preset_payload(preset: ManagedEvaluationPreset) -> dict[str, object]:
+    """Return one persisted evaluation-preset payload."""
+
+    return {
+        "id": preset.id,
+        "name": preset.name,
+        "version": preset.version,
+        "source_artifact": preset.source_artifact,
+        "seed": preset.seed,
+        "renderer": preset.renderer,
+        "target": asdict(preset.target),
+        "config": preset.config.model_dump(mode="json"),
+        "builtin": preset.builtin,
+        "created_at": preset.created_at,
+        "updated_at": preset.updated_at,
+    }
+
+
+def evaluation_baseline_suite_payload(
+    suite: ManagedEvaluationBaselineSuite,
+) -> dict[str, object]:
+    """Return one preset-version baseline-suite payload."""
+
+    return {
+        "id": suite.id,
+        "preset_id": suite.preset_id,
+        "preset_version": suite.preset_version,
+        "status": suite.status,
+        "suite_dir": str(suite.suite_dir),
+        "manifest_path": None if suite.manifest_path is None else str(suite.manifest_path),
+        "error_message": suite.error_message,
+        "created_at": suite.created_at,
+        "updated_at": suite.updated_at,
+        "materialized_at": suite.materialized_at,
     }
 
 

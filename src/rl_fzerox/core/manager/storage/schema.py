@@ -12,7 +12,9 @@ from sqlalchemy.orm import DeclarativeBase, Session
 
 from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import (
+    EvaluationBaselineSuiteModel,
     EvaluationModel,
+    EvaluationPresetModel,
     ManagerBase,
     RunAltBaselineModel,
     RunTrackSamplingArtifactModel,
@@ -31,7 +33,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 37
+SCHEMA_VERSION = 38
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -51,7 +53,15 @@ RUN_CHILD_TABLES = (
     "run_workers",
 )
 MANAGER_RUNTIME_TABLES = ("viewer_leases",)
-EVALUATION_TABLES = ("evaluations",)
+EVALUATION_TABLES = (
+    "evaluations",
+    "evaluation_presets",
+    "evaluation_baseline_suites",
+)
+EVALUATION_RECORD_PRESET_COLUMNS = (
+    ("preset_id", "VARCHAR"),
+    ("preset_version", "INTEGER"),
+)
 TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS = frozenset(
     {
         "generated_entry_id",
@@ -122,6 +132,7 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
         for version in session.scalars(select(SchemaVersionModel)):
             session.delete(version)
         session.add(SchemaVersionModel(version=SCHEMA_VERSION, applied_at=applied_at))
+        _refresh_default_evaluation_presets(session=session, updated_at=applied_at)
         _refresh_default_template(session=session, updated_at=applied_at)
 
 
@@ -153,6 +164,18 @@ def _refresh_default_template(
         created_at=updated_at,
         updated_at=updated_at,
     )
+
+
+def _refresh_default_evaluation_presets(
+    *,
+    session: Session,
+    updated_at: str,
+) -> None:
+    from rl_fzerox.core.manager.db.repositories.evaluations import (
+        upsert_default_evaluation_presets,
+    )
+
+    upsert_default_evaluation_presets(session, now=updated_at)
 
 
 def _has_manager_schema(table_names: set[str]) -> bool:
@@ -244,12 +267,51 @@ def _upgrade_evaluation_tables(
     engine: Engine,
     table_names: set[str],
 ) -> None:
-    """Create evaluation tables for pre-36 manager DBs."""
+    """Create and extend evaluation tables for pre-preset manager DBs."""
 
-    if "evaluations" in table_names:
+    missing_tables = [
+        model.__table__
+        for table_name, model in (
+            ("evaluations", EvaluationModel),
+            ("evaluation_presets", EvaluationPresetModel),
+            ("evaluation_baseline_suites", EvaluationBaselineSuiteModel),
+        )
+        if table_name not in table_names
+    ]
+    if missing_tables:
+        ManagerBase.metadata.create_all(engine, tables=missing_tables)
+        table_names.update(table.name for table in missing_tables)
+    if "evaluations" not in table_names:
         return
-    ManagerBase.metadata.create_all(engine, tables=[EvaluationModel.__table__])
-    table_names.add("evaluations")
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("evaluations")}
+    missing_columns = [
+        (column_name, definition)
+        for column_name, definition in EVALUATION_RECORD_PRESET_COLUMNS
+        if column_name not in columns
+    ]
+    if missing_columns:
+        with engine.begin() as connection:
+            for column_name, definition in missing_columns:
+                connection.execute(
+                    text(f"ALTER TABLE evaluations ADD COLUMN {column_name} {definition}")
+                )
+    _delete_presetless_evaluation_records(engine)
+
+
+def _delete_presetless_evaluation_records(engine: Engine) -> None:
+    """Enforce that current-schema evaluations are backed by SQLite presets."""
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                DELETE FROM evaluations
+                WHERE preset_id IS NULL
+                   OR preset_version IS NULL
+                """,
+            )
+        )
 
 
 def _upgrade_track_sampling_adaptive_signal_columns(
@@ -347,12 +409,16 @@ def _assert_save_game_columns(*, inspector: Inspector) -> None:
 
 
 def _assert_evaluation_columns(*, inspector: Inspector) -> None:
-    columns = {column["name"] for column in inspector.get_columns("evaluations")}
-    required_columns = {column.name for column in EvaluationModel.__table__.columns}
-    missing_columns = required_columns.difference(columns)
-    if missing_columns:
-        joined_columns = ", ".join(sorted(missing_columns))
-        raise RuntimeError(f"manager DB is not current: evaluations is missing {joined_columns}")
+    for model in (EvaluationModel, EvaluationPresetModel, EvaluationBaselineSuiteModel):
+        table_name = model.__table__.name
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        required_columns = {column.name for column in model.__table__.columns}
+        missing_columns = required_columns.difference(columns)
+        if missing_columns:
+            joined_columns = ", ".join(sorted(missing_columns))
+            raise RuntimeError(
+                f"manager DB is not current: {table_name} is missing {joined_columns}"
+            )
 
 
 def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
