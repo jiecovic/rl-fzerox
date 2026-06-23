@@ -11,7 +11,7 @@ import type {
   TrackSamplingRuntimeEntry,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
-import { formatRelativeTime } from "@/shared/ui/format";
+import { formatRatioPercent, formatRelativeTime } from "@/shared/ui/format";
 
 const X_CUP_TRACK_POOL = {
   courseKeyPrefix: "x_cup_",
@@ -129,7 +129,7 @@ export function trackSamplingUpdatedLabel(run: ManagedRunDetail) {
 }
 
 export function formatPercent(value: number) {
-  return `${(value * 100).toFixed(1)}%`;
+  return formatRatioPercent(value, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 }
 
 export function formatOptionalPercent(value: number | null) {

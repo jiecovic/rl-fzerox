@@ -1,5 +1,6 @@
 // web/run-manager/src/entities/run/model/runtime.ts
 import type { ManagedRun, ManagedRunDetail } from "@/shared/api/contract";
+import { formatLongDurationSeconds } from "@/shared/ui/format";
 
 export function isPinnedRun(run: ManagedRun): boolean {
   return run.status === "running";
@@ -59,12 +60,12 @@ export function trainFpsLabel(run: ManagedRun): string {
 
 export function timeLeftLabel(run: ManagedRun): string {
   const seconds = timeLeftSeconds(run);
-  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
+  return seconds === null ? "n/a" : formatLongDurationSeconds(seconds);
 }
 
 export function localWallTimeLabel(run: ManagedRun, nowMs: number): string {
   const seconds = localWallTimeSeconds(run, nowMs);
-  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
+  return seconds === null ? "n/a" : formatLongDurationSeconds(seconds);
 }
 
 export function lineageWallTimeLabel(
@@ -73,17 +74,17 @@ export function lineageWallTimeLabel(
   nowMs: number,
 ): string {
   const seconds = lineageWallTimeSeconds(run, allRuns, nowMs);
-  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
+  return seconds === null ? "n/a" : formatLongDurationSeconds(seconds);
 }
 
 export function localSimGameTimeLabel(run: ManagedRun): string {
   const seconds = localSimGameTimeSeconds(run);
-  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
+  return seconds === null ? "n/a" : formatLongDurationSeconds(seconds);
 }
 
 export function lineageSimGameTimeLabel(run: ManagedRun, allRuns: ManagedRun[]): string {
   const seconds = lineageSimGameTimeSeconds(run, allRuns);
-  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
+  return seconds === null ? "n/a" : formatLongDurationSeconds(seconds);
 }
 
 export function localSimToWallRatioLabel(run: ManagedRun, nowMs: number): string {
@@ -136,35 +137,6 @@ export function latestFailureMessage(run: ManagedRun): string | null {
     return null;
   }
   return failedEvent.message;
-}
-
-export function formatDurationSeconds(value: number): string {
-  const totalSeconds = Math.max(0, Math.floor(value));
-  const durationUnits = [
-    { label: "y", seconds: 365 * 24 * 3600 },
-    { label: "mo", seconds: 30 * 24 * 3600 },
-    { label: "d", seconds: 24 * 3600 },
-    { label: "h", seconds: 3600 },
-    { label: "m", seconds: 60 },
-    { label: "s", seconds: 1 },
-  ] as const;
-
-  let remainingSeconds = totalSeconds;
-  const parts: string[] = [];
-  for (const unit of durationUnits) {
-    if (remainingSeconds < unit.seconds && parts.length === 0 && unit.label !== "s") {
-      continue;
-    }
-    const amount = Math.floor(remainingSeconds / unit.seconds);
-    remainingSeconds -= amount * unit.seconds;
-    if (amount > 0 || unit.label === "s") {
-      parts.push(`${amount}${unit.label}`);
-    }
-    if (parts.length >= 3) {
-      break;
-    }
-  }
-  return parts.join(" ");
 }
 
 function formatRate(value: number): string {

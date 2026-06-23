@@ -22,6 +22,7 @@ import {
 } from "@/shared/ui/configFields/numberInput";
 import { resetHandler } from "@/shared/ui/configFields/reset";
 import { FieldInput, FieldNote, FieldShell } from "@/shared/ui/Field";
+import { formatProbabilityPercent, formatSignedDecimal } from "@/shared/ui/format";
 
 interface SpinControlCardProps {
   action: AuxiliaryActionConfig;
@@ -124,7 +125,11 @@ function SpinIdleLogitField({
         onKeyDown={blurOnEnter}
       />
       <FieldNote>
-        {`delta ${formatSignedDecimal(noteValue)} -> idle ${formatPercent(idleProbability)}, left/right ${formatPercent(sideProbability)} each`}
+        {`delta ${formatSignedDecimal(noteValue, {
+          maximumFractionDigits: 2,
+        })} -> idle ${formatProbabilityPercent(idleProbability)}, left/right ${formatProbabilityPercent(
+          sideProbability,
+        )} each`}
       </FieldNote>
     </FieldShell>
   );
@@ -133,26 +138,4 @@ function SpinIdleLogitField({
 function spinIdleProbability(value: number): number {
   const idleWeight = Math.exp(value);
   return idleWeight / (idleWeight + 2);
-}
-
-function formatPercent(value: number): string {
-  const percent = value * 100;
-  if (percent > 0 && percent < 0.1) {
-    return "<0.1%";
-  }
-  if (percent < 100 && percent > 99.9) {
-    return ">99.9%";
-  }
-  return `${(value * 100).toLocaleString(undefined, {
-    maximumFractionDigits: 1,
-    minimumFractionDigits: 1,
-  })}%`;
-}
-
-function formatSignedDecimal(value: number): string {
-  const formatted = value.toLocaleString(undefined, {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 0,
-  });
-  return value > 0 ? `+${formatted}` : formatted;
 }

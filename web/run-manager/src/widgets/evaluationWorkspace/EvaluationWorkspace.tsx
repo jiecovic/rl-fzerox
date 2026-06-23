@@ -9,7 +9,17 @@ import type {
 } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { FieldSelect } from "@/shared/ui/Field";
-import { formatDate } from "@/shared/ui/format";
+import {
+  formatCourseRunRate as formatCourseRunRateValue,
+  formatDate,
+  formatDecimal,
+  formatEnvStepRate as formatEnvStepRateValue,
+  formatEtaSeconds,
+  formatFrameRate as formatFrameRateValue,
+  formatInteger,
+  formatRaceTimeMs,
+  formatRatioPercent,
+} from "@/shared/ui/format";
 import { EvaluationTabIcon, PlayIcon, RenameIcon, StopIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { RenameDialog } from "@/shared/ui/RenameDialog";
@@ -676,51 +686,36 @@ function titleLabel(value: string) {
 }
 
 function formatStepCount(value: number | null) {
-  return value === null ? "step unknown" : `${value.toLocaleString()} steps`;
+  return value === null ? "step unknown" : `${formatInteger(value)} steps`;
 }
 
 function formatPercent(value: number | null) {
-  return value === null ? "-" : `${(value * 100).toFixed(1)}%`;
+  return value === null
+    ? "-"
+    : formatRatioPercent(value, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 }
 
 function formatRaceTime(value: number | null) {
-  if (value === null) {
-    return "-";
-  }
-  const milliseconds = Math.max(0, Math.round(value));
-  const minutes = Math.floor(milliseconds / 60_000);
-  const seconds = Math.floor((milliseconds % 60_000) / 1_000);
-  const millis = milliseconds % 1_000;
-  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+  return value === null ? "-" : formatRaceTimeMs(value);
 }
 
 function formatNumber(value: number | null) {
-  if (value === null) {
-    return "-";
-  }
-  return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
+  return value === null ? "-" : formatDecimal(value, { maximumFractionDigits: 2 });
 }
 
 function formatCourseRunRate(value: number | null) {
-  if (value === null) {
-    return "-";
-  }
-  const formatted = value >= 10 ? value.toFixed(0) : value.toFixed(1);
-  return `${formatted} runs/min`;
+  return value === null ? "-" : formatCourseRunRateValue(value);
 }
 
 function formatFrameRate(value: number | null) {
-  if (value === null) {
-    return "-";
-  }
-  return `${Math.round(value).toLocaleString()} fps`;
+  return value === null ? "-" : formatFrameRateValue(value);
 }
 
 function formatEnvStepRate(value: number | null) {
   if (value === null) {
     return undefined;
   }
-  return `${Math.round(value).toLocaleString()} env steps/s`;
+  return formatEnvStepRateValue(value);
 }
 
 function formatSpeedDetail(runtimeStats: ReturnType<typeof evaluationRuntimeStats>) {
@@ -735,20 +730,7 @@ function formatSpeedDetail(runtimeStats: ReturnType<typeof evaluationRuntimeStat
 }
 
 function formatEta(value: number | null) {
-  if (value === null) {
-    return "-";
-  }
-  const totalSeconds = Math.max(0, Math.round(value));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
-  }
-  return `${seconds}s`;
+  return value === null ? "-" : formatEtaSeconds(value);
 }
 
 function statusLabel(status: ManagedEvaluation["status"]) {

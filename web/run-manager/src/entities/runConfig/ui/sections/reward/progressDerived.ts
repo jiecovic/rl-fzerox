@@ -1,5 +1,11 @@
 // web/run-manager/src/entities/runConfig/ui/sections/reward/progressDerived.ts
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import {
+  formatDecimal,
+  formatDurationSeconds,
+  formatInteger,
+  formatSignedDecimal,
+} from "@/shared/ui/format";
 
 export interface ProgressSummaryRow {
   detail: string;
@@ -72,7 +78,10 @@ export function progressSummaryRows(config: ManagedRunConfig): readonly Progress
     },
     {
       label: "Payout cadence",
-      detail: `${formatInteger(intervalFrames)} internal frames ≈ ${formatDuration(intervalFrames / 60)}`,
+      detail: `${formatInteger(intervalFrames)} internal frames ≈ ${formatDurationSeconds(
+        intervalFrames / 60,
+        { secondsFractionDigits: 2 },
+      )}`,
       value: policyCadenceSummary(intervalFrames, actionRepeat),
     },
     {
@@ -165,32 +174,12 @@ function policyCadenceSummary(intervalFrames: number, actionRepeat: number) {
   return `Batched across about ${formatNumber(policySteps)} policy steps at repeat x${actionRepeat}`;
 }
 
-function formatInteger(value: number) {
-  return value.toLocaleString();
-}
-
 function formatNumber(value: number) {
-  if (Number.isInteger(value)) {
-    return formatInteger(value);
-  }
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return formatDecimal(value, { maximumFractionDigits: 2 });
 }
 
 function formatSignedNumber(value: number) {
-  const formatted = formatNumber(value);
-  return value > 0 ? `+${formatted}` : formatted;
-}
-
-function formatDuration(value: number) {
-  if (value < 60) {
-    return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} s`;
-  }
-  const wholeMinutes = Math.floor(value / 60);
-  const remainingSeconds = value - wholeMinutes * 60;
-  if (Math.abs(remainingSeconds - Math.round(remainingSeconds)) < 1e-9) {
-    return `${wholeMinutes}m ${Math.round(remainingSeconds)}s`;
-  }
-  return `${wholeMinutes}m ${remainingSeconds.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}s`;
+  return formatSignedDecimal(value, { maximumFractionDigits: 2 });
 }
 
 function roundProgressValue(value: number) {

@@ -22,6 +22,7 @@ import {
   SegmentedChoiceStrip,
 } from "@/shared/ui/configFields";
 import { FieldShell } from "@/shared/ui/Field";
+import { formatProbabilityPercent, formatSignedDecimal } from "@/shared/ui/format";
 
 interface AirBrakeCardProps {
   action: AuxiliaryActionConfig;
@@ -147,7 +148,11 @@ export function AirBrakeCard({
                   onChange={(value) => updatePolicy({ air_brake_on_logit: value })}
                 />
                 <div className="field-note">
-                  {`delta ${formatSignedDecimal(policy.air_brake_on_logit)} -> ${formatPercent(binaryOnProbability(policy.air_brake_on_logit))} zero-logit engage probability`}
+                  {`delta ${formatSignedDecimal(policy.air_brake_on_logit, {
+                    maximumFractionDigits: 2,
+                  })} -> ${formatProbabilityPercent(
+                    binaryOnProbability(policy.air_brake_on_logit),
+                  )} zero-logit engage probability`}
                 </div>
               </div>
               <IntegerField
@@ -207,26 +212,4 @@ export function AirBrakeCard({
 
 function binaryOnProbability(value: number) {
   return 1 / (1 + Math.exp(-value));
-}
-
-function formatPercent(value: number) {
-  const percent = value * 100;
-  if (percent > 0 && percent < 0.1) {
-    return "<0.1%";
-  }
-  if (percent < 100 && percent > 99.9) {
-    return ">99.9%";
-  }
-  return `${(value * 100).toLocaleString(undefined, {
-    maximumFractionDigits: 1,
-    minimumFractionDigits: 1,
-  })}%`;
-}
-
-function formatSignedDecimal(value: number) {
-  const formatted = value.toLocaleString(undefined, {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 0,
-  });
-  return value > 0 ? `+${formatted}` : formatted;
 }

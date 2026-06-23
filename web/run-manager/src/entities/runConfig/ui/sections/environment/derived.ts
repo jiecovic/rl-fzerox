@@ -1,8 +1,9 @@
 // web/run-manager/src/entities/runConfig/ui/sections/environment/derived.ts
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { formatDecimal, formatDurationSeconds, formatInteger } from "@/shared/ui/format";
 
 export function episodeFrameSummary(config: ManagedRunConfig) {
-  return `${formatInteger(config.environment.max_episode_steps)} internal frames ≈ ${formatDuration(config.environment.max_episode_steps / 60)} of game time`;
+  return `${formatInteger(config.environment.max_episode_steps)} internal frames ≈ ${formatDurationSeconds(config.environment.max_episode_steps / 60)} of game time`;
 }
 
 export function episodeDecisionSummary(config: ManagedRunConfig) {
@@ -15,7 +16,7 @@ export function noProgressSummary(config: ManagedRunConfig) {
   if (stallLimit === null) {
     return "No-progress truncation is disabled.";
   }
-  return `${formatInteger(stallLimit)} internal frames ≈ ${formatDuration(stallLimit / 60)} before truncation.`;
+  return `${formatInteger(stallLimit)} internal frames ≈ ${formatDurationSeconds(stallLimit / 60)} before truncation.`;
 }
 
 export function environmentSummaryRows(config: ManagedRunConfig) {
@@ -45,7 +46,7 @@ export function environmentSummaryRows(config: ManagedRunConfig) {
     {
       label: "No-progress timeout",
       detail: stallLimit === null ? "Disabled." : `${formatInteger(stallLimit)} / 60 native fps`,
-      value: stallLimit === null ? "Off" : formatDuration(stallLimit / 60),
+      value: stallLimit === null ? "Off" : formatDurationSeconds(stallLimit / 60),
     },
     {
       label: "Frontier reset rule",
@@ -57,27 +58,4 @@ export function environmentSummaryRows(config: ManagedRunConfig) {
 
 function formatCameraSetting(value: string) {
   return value.replaceAll("_", " ");
-}
-
-function formatInteger(value: number) {
-  return value.toLocaleString();
-}
-
-function formatDecimal(value: number) {
-  if (Number.isInteger(value)) {
-    return formatInteger(value);
-  }
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-function formatDuration(value: number) {
-  if (value < 60) {
-    return `${value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
-  }
-  const wholeMinutes = Math.floor(value / 60);
-  const remainingSeconds = value - wholeMinutes * 60;
-  if (Math.abs(remainingSeconds - Math.round(remainingSeconds)) < 1e-9) {
-    return `${wholeMinutes}m ${Math.round(remainingSeconds)}s`;
-  }
-  return `${wholeMinutes}m ${remainingSeconds.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}s`;
 }

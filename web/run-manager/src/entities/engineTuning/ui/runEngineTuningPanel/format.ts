@@ -1,5 +1,6 @@
 // web/run-manager/src/entities/engineTuning/ui/runEngineTuningPanel/format.ts
 import { engineSliderStepLabel } from "@/shared/domain/engineBuckets";
+import { formatRaceTimeMs } from "@/shared/ui/format";
 
 export function engineStepLabel(step: number) {
   return engineSliderStepLabel(step);
@@ -22,11 +23,7 @@ export function formatPercent(value: number | null) {
 }
 
 export function formatRaceTime(value: number) {
-  const safeValue = Math.max(0, Math.round(value));
-  const minutes = Math.floor(safeValue / 60_000);
-  const seconds = Math.floor((safeValue % 60_000) / 1000);
-  const millis = safeValue % 1000;
-  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+  return formatRaceTimeMs(value);
 }
 
 export function formatScore(value: number) {

@@ -19,6 +19,7 @@ import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 import { ConfigGrid } from "@/shared/ui/config/ConfigLayout";
 import { ConfigPanel } from "@/shared/ui/config/ConfigPanel";
 import { IntegerField, NumberField } from "@/shared/ui/configFields";
+import { formatRatioPercent } from "@/shared/ui/format";
 
 interface RaceModePanelProps {
   config: ManagedRunConfig;
@@ -505,5 +506,8 @@ function deficitBudgetMetricDescription(metric: TracksConfig["deficit_budget_dif
 }
 
 function formatPercent(value: number) {
-  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(0)}%`;
+  return formatRatioPercent(Math.max(0, Math.min(1, value)), {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  });
 }
