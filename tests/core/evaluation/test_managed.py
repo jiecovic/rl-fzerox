@@ -2,13 +2,26 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from rl_fzerox.core.evaluation.managed import _evaluation_baseline_suite
+import pytest
+
+from rl_fzerox.core.engine_tuning import EngineTuningResetSampler
+from rl_fzerox.core.evaluation.managed import (
+    _configure_evaluation_engine_tuning,
+    _evaluation_baseline_suite,
+)
 from rl_fzerox.core.evaluation.models import (
     EvaluationCheckpointSnapshot,
     EvaluationTargetSpec,
 )
 from rl_fzerox.core.manager import ManagedEvaluation, default_managed_run_config
+from rl_fzerox.core.manager.training import build_managed_train_app_config
+from rl_fzerox.core.runtime_spec.schema import (
+    AdaptiveEngineTuningConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+)
 
 
 def test_baseline_suite_uses_preset_version_key(tmp_path: Path) -> None:
@@ -54,6 +67,62 @@ def test_baseline_suite_changes_with_preset_version(tmp_path: Path) -> None:
     )
 
     assert _suite_dir(different_version) != _suite_dir(base)
+
+
+def test_evaluation_engine_tuning_uses_greedy_checkpoint_sampler(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loaded_paths: list[Path] = []
+    monkeypatch.setattr(
+        "rl_fzerox.core.evaluation.managed.load_engine_tuning_checkpoint_state",
+        lambda path: loaded_paths.append(path) or None,
+    )
+    config = build_managed_train_app_config(
+        default_managed_run_config(),
+        run_id="eval-001",
+        run_dir=tmp_path / "eval-001",
+    )
+    config = config.model_copy(
+        update={
+            "env": config.env.model_copy(
+                update={
+                    "track_sampling": TrackSamplingConfig(
+                        enabled=True,
+                        entries=(
+                            TrackSamplingEntryConfig(
+                                id="mute-city",
+                                course_id="mute_city",
+                                vehicle="blue_falcon",
+                            ),
+                        ),
+                        engine_tuning=AdaptiveEngineTuningConfig(enabled=True),
+                    )
+                }
+            )
+        }
+    )
+    env = _EngineTuningEnv()
+    policy_path = tmp_path / "checkpoint_snapshot" / "checkpoints" / "latest" / "policy.zip"
+
+    _configure_evaluation_engine_tuning(env, config, policy_path=policy_path)
+
+    assert loaded_paths == [policy_path]
+    assert env.selection == "greedy"
+    assert env.sampler is not None
+    assert [context.context.key for context in env.sampler.contexts] == ["mute_city|blue_falcon"]
+
+
+class _EngineTuningEnv:
+    def __init__(self) -> None:
+        self.sampler: EngineTuningResetSampler | None = None
+        self.selection: Literal["sample", "greedy"] | None = None
+
+    def set_engine_tuning_sampler(self, sampler: EngineTuningResetSampler) -> None:
+        self.sampler = sampler
+
+    def set_engine_tuning_selection(self, selection: Literal["sample", "greedy"]) -> None:
+        self.selection = selection
 
 
 def _suite_dir(evaluation: ManagedEvaluation) -> Path:

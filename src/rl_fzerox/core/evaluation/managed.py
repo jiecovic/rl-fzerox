@@ -9,6 +9,8 @@ from math import ceil
 from pathlib import Path
 from typing import Literal
 
+from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
+from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
 from rl_fzerox.core.evaluation.env_control import sync_checkpoint_curriculum_stage
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.models import EvaluationRunResult, EvaluationSpec
@@ -32,6 +34,7 @@ from rl_fzerox.core.training.runs import (
     materialize_train_run_config,
     save_train_run_config,
 )
+from rl_fzerox.core.training.session.artifacts import load_engine_tuning_checkpoint_state
 from rl_fzerox.core.training.session.env import build_single_training_env
 
 
@@ -67,6 +70,11 @@ def run_managed_evaluation(
     )
     try:
         sync_checkpoint_curriculum_stage(env, policy_runner.checkpoint_curriculum_stage_index)
+        _configure_evaluation_engine_tuning(
+            env,
+            runtime_config,
+            policy_path=Path(evaluation.checkpoint.copied_policy_path),
+        )
         executor = FZeroXSingleCourseEpisodeExecutor(
             env=env,
             policy_runner=policy_runner,
@@ -97,6 +105,34 @@ def _runtime_device_config(
     device: Literal["cpu", "cuda"],
 ) -> TrainAppConfig:
     return config.model_copy(update={"train": config.train.model_copy(update={"device": device})})
+
+
+def _configure_evaluation_engine_tuning(
+    env: object,
+    config: TrainAppConfig,
+    *,
+    policy_path: Path,
+) -> None:
+    track_sampling = config.env.track_sampling
+    if not track_sampling.enabled or not track_sampling.engine_tuning.enabled:
+        return
+
+    contexts = tuple(engine_tuning_context_for_entry(entry) for entry in track_sampling.entries)
+    if not contexts:
+        return
+
+    state = load_engine_tuning_checkpoint_state(policy_path)
+    controller = EngineTuningTrainingController(track_sampling.engine_tuning, state=state)
+    sampler = controller.reset_sampler_snapshot(contexts)
+    set_sampler = getattr(env, "set_engine_tuning_sampler", None)
+    if not callable(set_sampler):
+        raise TypeError("evaluation env does not support engine tuning sampler updates")
+    set_sampler(sampler)
+
+    set_selection = getattr(env, "set_engine_tuning_selection", None)
+    if not callable(set_selection):
+        raise TypeError("evaluation env does not support engine tuning selection updates")
+    set_selection("greedy")
 
 
 def _materialize_evaluation_train_config(
