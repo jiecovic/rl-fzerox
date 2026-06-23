@@ -1,6 +1,10 @@
 # Contributing
 
-This repo uses the `Justfile` for routine local checks.
+`rl-fzerox` is currently a solo-maintained research project. There is not a
+formal contribution process yet. If you are interested in contributing, please
+open an issue first so we can align on scope before implementation.
+
+The repo uses the `Justfile` for routine local checks.
 
 ```bash
 PYTHON=.venv/bin/python just py-lint

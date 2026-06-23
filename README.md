@@ -53,8 +53,8 @@ just run-manager-install
 by `just fzerox`.
 
 `local/` is the ignored machine-local workspace. After clone, it contains empty
-placeholder folders for required runtime assets. Example paths used by the
-default app config:
+folders for required runtime assets. Example paths used by the default app
+config:
 
 ```text
 local/libretro/mupen64plus_next_libretro.so
@@ -67,7 +67,7 @@ the run manager. The run manager also stores its SQLite DB, generated baselines,
 TensorBoard views, and training runs under `local/`. None of those local files
 are included in git.
 
-Tracked runtime binary policy is documented in
+The small bundled minimap mask files are described in
 [docs/runtime_assets.md](docs/runtime_assets.md).
 
 ## F-Zero X App
