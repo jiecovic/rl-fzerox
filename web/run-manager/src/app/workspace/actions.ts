@@ -1,54 +1,37 @@
 // web/run-manager/src/app/workspace/actions.ts
 import type { Dispatch, SetStateAction } from "react";
+import { workspaceEvaluationActions } from "@/app/workspace/actions/evaluations";
+import { workspaceSaveGameActions } from "@/app/workspace/actions/saveGames";
 import {
   draftForkSource,
   forkInitialConfig,
   nextAvailableDraftName,
   nextForkDraftName,
   runSummaryFromDetail,
-  saveGameSessionId,
   upsertDraft,
-  upsertEvaluation,
   upsertRun,
-  upsertSaveGame,
 } from "@/app/workspace/model";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import type { DraftEditorSession, ForkSourceEngineTuning } from "@/app/workspace/types";
 import {
-  cancelEvaluation,
   clearRunAltBaselines,
   clearRunCourseAltBaselines,
   createDraftWithSource,
-  createEvaluation,
-  createEvaluationPreset,
-  createSaveGame,
   deleteDraft,
-  deleteEvaluation,
-  deleteEvaluationPreset,
   deleteLineage,
   deleteRun,
-  deleteSaveGame,
   exportRunBundle,
   fetchRunEngineTuningState,
   importRunBundle,
-  importSaveEngineTuning,
   launchRun,
   openRunDirectory,
-  openSaveGameDirectory,
   renameRun,
-  renameSaveGame,
   resetRunEngineTuningState,
   resetRunTrackSamplingState,
   resumeRun,
-  startCareerModeRunner,
-  startEvaluation,
   stopRun,
   updateDraftWithSource,
-  updateEvaluation,
   updateLineageGroups,
-  updateSaveGameRunnerSettings,
-  upsertSaveCourseSetup,
-  upsertSaveCupSetup,
   watchRun,
 } from "@/shared/api/client";
 import type {
@@ -196,135 +179,17 @@ export function useWorkspaceActions({
   setSaveGames,
   upsertRunDetail,
 }: UseWorkspaceActionsOptions): WorkspaceActions {
-  async function createManagedSaveGame(name: string) {
-    try {
-      const saveGame = await createSaveGame(name);
-      setSaveGames((current) => upsertSaveGame(current, saveGame));
-      return saveGame;
-    } catch (caught) {
-      await reloadManagerData();
-      throw caught;
-    }
-  }
-
-  async function createManagedEvaluation(request: CreateEvaluationRequest) {
-    try {
-      const evaluation = await createEvaluation(request);
-      setEvaluations((current) => upsertEvaluation(current, evaluation));
-      await reloadManagerData({ showLoading: false });
-      return evaluation;
-    } catch (caught) {
-      await reloadManagerData();
-      throw caught;
-    }
-  }
-
-  async function createManagedEvaluationPreset(request: CreateEvaluationPresetRequest) {
-    try {
-      const preset = await createEvaluationPreset(request);
-      await reloadManagerData({ showLoading: false });
-      return preset;
-    } catch (caught) {
-      await reloadManagerData();
-      throw caught;
-    }
-  }
-
-  async function removeManagedEvaluationPreset(preset: ManagedEvaluationPreset) {
-    try {
-      await deleteEvaluationPreset(preset.id);
-      await reloadManagerData({ showLoading: false });
-    } catch (caught) {
-      await reloadManagerData();
-      throw caught;
-    }
-  }
-
-  async function startManagedEvaluation(
-    evaluation: ManagedEvaluation,
-    request: StartEvaluationRequest,
-  ) {
-    try {
-      const updated = await startEvaluation(evaluation.id, request);
-      setEvaluations((current) => upsertEvaluation(current, updated));
-      await reloadManagerData({ showLoading: false });
-      return updated;
-    } catch (caught) {
-      await reloadManagerData({ showLoading: false });
-      throw caught;
-    }
-  }
-
-  async function cancelManagedEvaluation(evaluation: ManagedEvaluation) {
-    try {
-      const updated = await cancelEvaluation(evaluation.id);
-      setEvaluations((current) => upsertEvaluation(current, updated));
-      await reloadManagerData({ showLoading: false });
-      return updated;
-    } catch (caught) {
-      await reloadManagerData({ showLoading: false });
-      throw caught;
-    }
-  }
-
-  async function removeManagedEvaluation(evaluation: ManagedEvaluation) {
-    setGlobalError(null);
-    try {
-      const deleted = await deleteEvaluation(evaluation.id);
-      if (deleted) {
-        setEvaluations((current) => current.filter((entry) => entry.id !== evaluation.id));
-        sessions.closeEvaluationTabsForEvaluation(evaluation.id);
-      }
-    } catch (caught) {
-      await reloadManagerData();
-      throw caught;
-    }
-  }
-
-  async function renameManagedEvaluation(evaluationId: string, name: string) {
-    const updated = await updateEvaluation(evaluationId, { name });
-    setEvaluations((current) => upsertEvaluation(current, updated));
-    sessions.renameEvaluationTab(evaluationId, updated.name);
-  }
-
-  async function upsertManagedSaveCourseSetup(request: {
-    engineSettingRawValue: number;
-    policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
-    saveGameId: string;
-    courseId?: string | null;
-    cupId?: string | null;
-    difficulty?: string | null;
-  }) {
-    const saveGame = await upsertSaveCourseSetup(request);
-    setSaveGames((current) => upsertSaveGame(current, saveGame));
-    return saveGame;
-  }
-
-  async function upsertManagedSaveCupSetup(request: {
-    cupId: string;
-    saveGameId: string;
-    vehicleId: string;
-    difficulty?: string | null;
-  }) {
-    const saveGame = await upsertSaveCupSetup(request);
-    setSaveGames((current) => upsertSaveGame(current, saveGame));
-    return saveGame;
-  }
-
-  async function importManagedSaveEngineTuning(request: {
-    courseSetups: readonly {
-      courseId: string;
-      cupId: string;
-      difficulty?: string | null;
-      vehicleId: string;
-    }[];
-    policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
-    saveGameId: string;
-  }) {
-    return await importSaveEngineTuning(request);
-  }
+  const evaluationActions = workspaceEvaluationActions({
+    reloadManagerData,
+    sessions,
+    setEvaluations,
+    setGlobalError,
+  });
+  const saveGameActions = workspaceSaveGameActions({
+    reloadManagerData,
+    sessions,
+    setSaveGames,
+  });
 
   async function saveDraft(
     sessionId: DraftEditorSession["sessionId"],
@@ -393,12 +258,6 @@ export function useWorkspaceActions({
     setRuns((current) => current.filter((candidate) => candidate.id !== run.id));
     sessions.closeRunTabsForRun(run.id);
     sessions.setChartsFocusRunId((current) => (current === run.id ? null : current));
-  }
-
-  async function removeSaveGame(saveGame: ManagedSaveGame) {
-    await deleteSaveGame(saveGame.id);
-    setSaveGames((current) => current.filter((candidate) => candidate.id !== saveGame.id));
-    sessions.closeWorkspaceTab(saveGameSessionId(saveGame.id));
   }
 
   async function removeLineage(lineageId: string) {
@@ -498,21 +357,6 @@ export function useWorkspaceActions({
     upsertRunDetail(run);
   }
 
-  async function renameManagedSaveGame(saveGameId: string, name: string) {
-    const saveGame = await renameSaveGame(saveGameId, name);
-    setSaveGames((current) => upsertSaveGame(current, saveGame));
-    sessions.patchSaveGameSession(saveGameSessionId(saveGameId), {
-      nameText: saveGame.name,
-      title: saveGame.name,
-    });
-  }
-
-  async function updateManagedSaveRunnerSettings(request: SaveGameRunnerSettingsUpdateRequest) {
-    const saveGame = await updateSaveGameRunnerSettings(request);
-    setSaveGames((current) => upsertSaveGame(current, saveGame));
-    return saveGame;
-  }
-
   async function updateManagedLineageGroups(lineageId: string, groupNames: readonly string[]) {
     const lineageGroups = await updateLineageGroups(lineageId, groupNames);
     setRuns((current) =>
@@ -524,10 +368,6 @@ export function useWorkspaceActions({
 
   async function openManagedRunDirectory(runId: string) {
     await openRunDirectory(runId);
-  }
-
-  async function openManagedSaveGameDirectory(saveGameId: string) {
-    await openSaveGameDirectory(saveGameId);
   }
 
   async function exportManagedRun(run: ManagedRun) {
@@ -550,14 +390,6 @@ export function useWorkspaceActions({
     policyMode: PolicyPlaybackMode,
   ): Promise<"started" | "already_running"> {
     return await watchRun(runId, artifact, device, renderer, policyMode);
-  }
-
-  async function startManagedCareerMode(
-    request: CareerModeRunnerLaunchRequest,
-  ): Promise<"started" | "already_running"> {
-    const status = await startCareerModeRunner(request);
-    await reloadManagerData();
-    return status;
   }
 
   async function resetManagedRunTrackPool(runId: string) {
@@ -600,29 +432,18 @@ export function useWorkspaceActions({
   }
 
   return {
+    ...evaluationActions,
+    ...saveGameActions,
     createDraftFromManagedRun,
-    createManagedEvaluation,
-    createManagedEvaluationPreset,
-    cancelManagedEvaluation,
-    startManagedEvaluation,
-    createManagedSaveGame,
     forkManagedRun,
     launchTrainingRun,
     openManagedRunDirectory,
-    openManagedSaveGameDirectory,
     exportManagedRun,
     importManagedRunBundle,
-    importManagedSaveEngineTuning,
     removeDraft,
-    removeManagedEvaluation,
-    removeManagedEvaluationPreset,
     removeLineage,
     removeRun,
-    removeSaveGame,
-    renameManagedEvaluation,
     renameManagedRun,
-    renameManagedSaveGame,
-    updateManagedSaveRunnerSettings,
     clearManagedRunAltBaselines,
     clearManagedRunCourseAltBaselines,
     resetManagedRunEngineTuning,
@@ -632,10 +453,7 @@ export function useWorkspaceActions({
     stopManagedRun,
     updateManagedLineageGroups,
     updateExistingDraft,
-    upsertManagedSaveCourseSetup,
-    upsertManagedSaveCupSetup,
     watchManagedRun,
-    startManagedCareerMode,
     setGlobalError,
   };
 }
