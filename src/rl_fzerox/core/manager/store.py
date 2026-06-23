@@ -12,42 +12,23 @@ from typing import TYPE_CHECKING, Literal
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
-from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
-from rl_fzerox.core.evaluation.models import (
-    EvaluationCheckpointArtifact,
-    EvaluationPolicyMode,
-    EvaluationTargetSpec,
-)
 from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
 from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
-    ManagedEvaluation,
-    ManagedEvaluationBaselineSuite,
-    ManagedEvaluationPreset,
     ManagedRun,
     ManagedRunDraft,
     ManagedRunEvent,
     ManagedRunSummary,
     ManagedRunTemplate,
-    ManagedSaveAttempt,
-    ManagedSaveCourseSetup,
-    ManagedSaveCupSetup,
-    ManagedSaveGame,
-    ManagedSaveUnlockProgress,
     ManagedViewerLease,
     RunCommand,
     RunStatus,
-    SaveAttemptStatus,
-    SaveGameStatus,
     ViewerLeaseKind,
 )
 from rl_fzerox.core.manager.registry import drafts as draft_registry
-from rl_fzerox.core.manager.registry import evaluations as evaluation_registry
 from rl_fzerox.core.manager.registry import lineages as lineage_registry
 from rl_fzerox.core.manager.registry import paths as path_registry
 from rl_fzerox.core.manager.registry import runs as run_registry
-from rl_fzerox.core.manager.registry import save_games as save_game_registry
 from rl_fzerox.core.manager.registry import tensorboard as tensorboard_registry
 from rl_fzerox.core.manager.registry import viewers as viewer_registry
 from rl_fzerox.core.manager.registry.common import new_run_id
@@ -56,6 +37,7 @@ from rl_fzerox.core.manager.storage.schema import (
     initialize_manager_schema,
     refresh_default_template,
 )
+from rl_fzerox.core.manager.store_api import EvaluationStoreMixin, SaveGameStoreMixin
 
 if TYPE_CHECKING:
     from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
@@ -79,7 +61,7 @@ def new_managed_run_id(name: str) -> str:
     return new_run_id()
 
 
-class ManagerStore:
+class ManagerStore(EvaluationStoreMixin, SaveGameStoreMixin):
     """SQLite-backed source of truth for managed training runs.
 
     The store owns database lifecycle and exposes a narrow domain API, while
@@ -494,100 +476,6 @@ class ManagerStore:
     def rebuild_tensorboard_views(self) -> tuple[TensorboardViewGroup, ...]:
         return tensorboard_registry.rebuild_tensorboard_views(self)
 
-    def create_evaluation(
-        self,
-        *,
-        name: str,
-        source_run_id: str,
-        source_artifact: EvaluationCheckpointArtifact,
-        policy_mode: EvaluationPolicyMode,
-        preset_id: str,
-        evaluations_root: Path | None = None,
-    ) -> ManagedEvaluation:
-        return evaluation_registry.create_evaluation(
-            self,
-            name=name,
-            source_run_id=source_run_id,
-            source_artifact=source_artifact,
-            policy_mode=policy_mode,
-            preset_id=preset_id,
-            evaluations_root=evaluations_root,
-        )
-
-    def get_evaluation(self, evaluation_id: str) -> ManagedEvaluation | None:
-        return evaluation_registry.get_evaluation(self, evaluation_id)
-
-    def list_evaluations(self) -> tuple[ManagedEvaluation, ...]:
-        return evaluation_registry.list_evaluations(self)
-
-    def get_evaluation_preset(
-        self,
-        preset_id: str,
-    ) -> ManagedEvaluationPreset | None:
-        return evaluation_registry.get_evaluation_preset(self, preset_id)
-
-    def list_evaluation_presets(self) -> tuple[ManagedEvaluationPreset, ...]:
-        return evaluation_registry.list_evaluation_presets(self)
-
-    def create_evaluation_preset(
-        self,
-        *,
-        name: str,
-        seed: int,
-        renderer: Literal["angrylion", "gliden64"],
-        target: EvaluationTargetSpec,
-    ) -> ManagedEvaluationPreset:
-        return evaluation_registry.create_evaluation_preset(
-            self,
-            name=name,
-            seed=seed,
-            renderer=renderer,
-            target=target,
-        )
-
-    def delete_evaluation_preset(self, preset_id: str) -> bool:
-        return evaluation_registry.delete_evaluation_preset(self, preset_id)
-
-    def list_evaluation_baseline_suites(self) -> tuple[ManagedEvaluationBaselineSuite, ...]:
-        return evaluation_registry.list_evaluation_baseline_suites(self)
-
-    def delete_evaluation(self, evaluation_id: str) -> bool:
-        return evaluation_registry.delete_evaluation(self, evaluation_id)
-
-    def update_evaluation_name(self, *, evaluation_id: str, name: str) -> ManagedEvaluation | None:
-        return evaluation_registry.update_evaluation_name(
-            self,
-            evaluation_id=evaluation_id,
-            name=name,
-        )
-
-    def mark_evaluation_running(self, evaluation_id: str) -> ManagedEvaluation:
-        return evaluation_registry.mark_evaluation_running(self, evaluation_id)
-
-    def mark_evaluation_completed(self, evaluation_id: str) -> ManagedEvaluation:
-        return evaluation_registry.mark_evaluation_completed(self, evaluation_id)
-
-    def mark_evaluation_failed(
-        self,
-        evaluation_id: str,
-        *,
-        error_message: str,
-    ) -> ManagedEvaluation:
-        return evaluation_registry.mark_evaluation_failed(
-            self,
-            evaluation_id,
-            error_message=error_message,
-        )
-
-    def request_evaluation_cancel(self, evaluation_id: str) -> ManagedEvaluation | None:
-        return evaluation_registry.request_evaluation_cancel(self, evaluation_id)
-
-    def mark_evaluation_cancelled(self, evaluation_id: str) -> ManagedEvaluation:
-        return evaluation_registry.mark_evaluation_cancelled(self, evaluation_id)
-
-    def evaluation_cancel_request_path(self, evaluation_id: str) -> Path:
-        return evaluation_registry.evaluation_cancel_request_path(self, evaluation_id)
-
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         return run_registry.update_run_name(self, run_id=run_id, name=name)
 
@@ -617,238 +505,6 @@ class ManagerStore:
 
     def default_template(self) -> ManagedRunTemplate:
         return draft_registry.default_template(self)
-
-    def create_save_game(
-        self,
-        *,
-        name: str,
-        save_games_root: Path | None = None,
-    ) -> ManagedSaveGame:
-        return save_game_registry.create_save_game(
-            self,
-            name=name,
-            save_games_root=save_games_root or self.save_games_root(),
-        )
-
-    def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None:
-        return save_game_registry.get_save_game(self, save_game_id)
-
-    def list_save_games(self) -> tuple[ManagedSaveGame, ...]:
-        return save_game_registry.list_save_games(self)
-
-    def rename_save_game(
-        self,
-        *,
-        save_game_id: str,
-        name: str,
-    ) -> ManagedSaveGame | None:
-        return save_game_registry.rename_save_game(
-            self,
-            save_game_id=save_game_id,
-            name=name,
-        )
-
-    def update_save_game_runner_settings(
-        self,
-        *,
-        save_game_id: str,
-        device: Literal["cpu", "cuda"],
-        renderer: Literal["angrylion", "gliden64"],
-        policy_mode: Literal["deterministic", "stochastic"],
-        attempt_seed: int | None,
-        recording_enabled: bool,
-        recording_input_hud_enabled: bool,
-        recording_upscale_factor: int,
-        recording_path: Path | None,
-        target_restart_on_retire: bool,
-        target_clear_goal: int,
-        keep_failed_recordings: bool,
-        reload_policy_between_attempts: bool,
-    ) -> ManagedSaveGame | None:
-        return save_game_registry.update_runner_settings(
-            self,
-            save_game_id=save_game_id,
-            device=device,
-            renderer=renderer,
-            policy_mode=policy_mode,
-            attempt_seed=attempt_seed,
-            recording_enabled=recording_enabled,
-            recording_input_hud_enabled=recording_input_hud_enabled,
-            recording_upscale_factor=recording_upscale_factor,
-            recording_path=recording_path,
-            target_restart_on_retire=target_restart_on_retire,
-            target_clear_goal=target_clear_goal,
-            keep_failed_recordings=keep_failed_recordings,
-            reload_policy_between_attempts=reload_policy_between_attempts,
-        )
-
-    def delete_save_game(self, save_game_id: str) -> bool:
-        return save_game_registry.delete_save_game(self, save_game_id)
-
-    def save_game_unlock_progress(self, save_game_id: str) -> ManagedSaveUnlockProgress:
-        return save_game_registry.unlock_progress(self, save_game_id)
-
-    def list_save_course_setups(
-        self,
-        save_game_id: str,
-    ) -> tuple[ManagedSaveCourseSetup, ...]:
-        return save_game_registry.list_course_setups(self, save_game_id)
-
-    def list_save_cup_setups(
-        self,
-        save_game_id: str,
-    ) -> tuple[ManagedSaveCupSetup, ...]:
-        return save_game_registry.list_cup_setups(self, save_game_id)
-
-    def start_save_attempt(
-        self,
-        *,
-        save_game_id: str,
-        target_kind: str | None = None,
-        difficulty: str | None = None,
-        cup_id: str | None = None,
-        course_id: str | None = None,
-    ) -> ManagedSaveAttempt:
-        return save_game_registry.start_save_attempt(
-            self,
-            save_game_id=save_game_id,
-            target_kind=target_kind,
-            difficulty=difficulty,
-            cup_id=cup_id,
-            course_id=course_id,
-        )
-
-    def start_next_save_attempt(
-        self,
-        save_game_id: str,
-    ) -> ManagedSaveAttempt:
-        return save_game_registry.start_next_save_attempt(self, save_game_id)
-
-    def start_target_save_attempt(
-        self,
-        save_game_id: str,
-        *,
-        target_kind: str,
-        difficulty: str,
-        cup_id: str,
-        course_id: str | None = None,
-    ) -> ManagedSaveAttempt:
-        return save_game_registry.start_target_save_attempt(
-            self,
-            save_game_id,
-            target_kind=target_kind,
-            difficulty=difficulty,
-            cup_id=cup_id,
-            course_id=course_id,
-        )
-
-    def start_or_reuse_next_save_attempt(
-        self,
-        save_game_id: str,
-    ) -> ManagedSaveAttempt:
-        return save_game_registry.start_or_reuse_next_save_attempt(self, save_game_id)
-
-    def list_save_attempts(
-        self,
-        save_game_id: str,
-    ) -> tuple[ManagedSaveAttempt, ...]:
-        return save_game_registry.list_save_attempts(self, save_game_id)
-
-    def fail_running_save_attempts(
-        self,
-        *,
-        save_game_id: str,
-        failure_reason: str,
-    ) -> int:
-        return save_game_registry.fail_running_save_attempts(
-            self,
-            save_game_id=save_game_id,
-            failure_reason=failure_reason,
-        )
-
-    def discard_running_save_attempts(
-        self,
-        *,
-        save_game_id: str,
-    ) -> int:
-        return save_game_registry.discard_running_save_attempts(
-            self,
-            save_game_id=save_game_id,
-        )
-
-    def get_save_attempt_execution_context(
-        self,
-        attempt_id: str,
-    ) -> SaveAttemptExecutionContext | None:
-        return save_game_registry.get_save_attempt_execution_context(self, attempt_id)
-
-    def finish_save_attempt(
-        self,
-        *,
-        attempt_id: str,
-        status: SaveAttemptStatus,
-        finish_position: int | None = None,
-        finish_time_s: float | None = None,
-        failure_reason: str | None = None,
-    ) -> ManagedSaveAttempt | None:
-        return save_game_registry.finish_save_attempt(
-            self,
-            attempt_id=attempt_id,
-            status=status,
-            finish_position=finish_position,
-            finish_time_s=finish_time_s,
-            failure_reason=failure_reason,
-        )
-
-    def upsert_save_course_setup(
-        self,
-        *,
-        save_game_id: str,
-        policy_run_id: str,
-        policy_artifact: Literal["latest", "best"],
-        engine_setting_raw_value: int = engine_percent_to_slider_step(50),
-        difficulty: str | None = None,
-        cup_id: str | None = None,
-        course_id: str | None = None,
-    ) -> ManagedSaveCourseSetup:
-        return save_game_registry.upsert_course_setup(
-            self,
-            save_game_id=save_game_id,
-            policy_run_id=policy_run_id,
-            policy_artifact=policy_artifact,
-            engine_setting_raw_value=engine_setting_raw_value,
-            difficulty=difficulty,
-            cup_id=cup_id,
-            course_id=course_id,
-        )
-
-    def upsert_save_cup_setup(
-        self,
-        *,
-        save_game_id: str,
-        cup_id: str,
-        vehicle_id: str,
-        difficulty: str | None = None,
-    ) -> ManagedSaveCupSetup:
-        return save_game_registry.upsert_cup_setup(
-            self,
-            save_game_id=save_game_id,
-            cup_id=cup_id,
-            vehicle_id=vehicle_id,
-            difficulty=difficulty,
-        )
-
-    def update_save_game_status(
-        self,
-        *,
-        save_game_id: str,
-        status: SaveGameStatus,
-    ) -> ManagedSaveGame | None:
-        return save_game_registry.update_save_game_status(
-            self,
-            save_game_id=save_game_id,
-            status=status,
-        )
 
     def viewer_lease_id(
         self,
