@@ -10,6 +10,8 @@ from rl_fzerox.core.career_mode.execution.attempt_timing import (
 )
 from rl_fzerox.core.career_mode.execution.save_file import load_save_ram
 from rl_fzerox.core.career_mode.navigation import RawMenuStep, in_gp_race
+from rl_fzerox.core.career_mode.policy import CareerModePolicyControl
+from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.runtime.career_mode.menu import menu_viewer_info
 from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
@@ -109,6 +111,18 @@ def policy_intro_wait_required(
         return False
     intro_timer = info.get("race_intro_timer")
     return isinstance(intro_timer, int) and intro_timer > target_timer
+
+
+def active_policy_intro_target_timer(
+    active_policy_control: CareerModePolicyControl | None,
+) -> int | None:
+    if active_policy_control is None:
+        return None
+    return build_managed_train_app_config(
+        active_policy_control.policy_run.config,
+        run_id=active_policy_control.policy_run.id,
+        run_dir=active_policy_control.policy_run.run_dir,
+    ).env.race_intro_target_timer
 
 
 def career_mode_attempt_id(info: Mapping[str, object]) -> str | None:

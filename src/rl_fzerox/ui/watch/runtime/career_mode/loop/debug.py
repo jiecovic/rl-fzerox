@@ -17,6 +17,7 @@ import numpy as np
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.career_mode.controller import CareerModeController
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+from rl_fzerox.ui.watch.runtime.career_mode.loop.recording import ControllerLifecycleResult
 from rl_fzerox.ui.watch.runtime.career_mode.recording.paths import career_debug_dir
 
 _TRUE_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
@@ -240,6 +241,55 @@ def observe_career_mode_debug_trace(
         )
     except Exception as exc:
         print(f"Career debug trace failed: {exc}", flush=True)
+
+
+@dataclass(frozen=True, slots=True)
+class CareerModeLoopTracer:
+    """Small adapter that keeps loop debug tracing out of runner closures."""
+
+    trace: CareerModeDebugTrace | None
+    controller: CareerModeController
+    frame_source: CareerDebugFrameSource
+
+    def state(
+        self,
+        stage: str,
+        *,
+        info: dict[str, object],
+        event: str | None = None,
+        force: bool = False,
+    ) -> None:
+        observe_career_mode_debug_trace(
+            self.trace,
+            stage=stage,
+            info=info,
+            controller=self.controller,
+            frame_source=self.frame_source,
+            event=event,
+            force=force,
+        )
+
+    def lifecycle(
+        self,
+        lifecycle: ControllerLifecycleResult,
+        *,
+        info: dict[str, object],
+        trace_info: dict[str, object] | None = None,
+    ) -> None:
+        if lifecycle.recording_close_status is not None:
+            self.state(
+                "lifecycle",
+                info=info if trace_info is None else trace_info,
+                event=f"recording_close:{lifecycle.recording_close_status}",
+                force=True,
+            )
+        elif lifecycle.recorded_event:
+            self.state(
+                "lifecycle",
+                info=info if trace_info is None else trace_info,
+                event="record_event",
+                force=True,
+            )
 
 
 def _debug_enabled(config: WatchAppConfig) -> bool:

@@ -15,7 +15,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.attempts import (
     RUNNER_CLOSE_REASONS,
     fail_running_attempts,
 )
-from rl_fzerox.ui.watch.runtime.career_mode.loop import runner as career_loop_runner
+from rl_fzerox.ui.watch.runtime.career_mode.loop import run_loaded_career_mode_loop
 from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
     should_observe_policy_transition,
 )
@@ -59,7 +59,7 @@ def _run_career_mode_loop(
 
     failure_reason = RUNNER_CLOSE_REASONS.closed
     try:
-        career_loop_runner.run_loaded_career_mode_loop(
+        run_loaded_career_mode_loop(
             config=config,
             session=session,
             controller=controller,

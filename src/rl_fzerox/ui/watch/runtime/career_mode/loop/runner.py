@@ -13,7 +13,6 @@ from rl_fzerox.core.career_mode.navigation import (
     course_id_from_info,
     in_gp_race,
 )
-from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.records import TrackRecordBook
@@ -23,15 +22,14 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.commands import (
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.debug import (
     CareerModeDebugTrace,
-    observe_career_mode_debug_trace,
-    open_career_mode_debug_trace,
+    CareerModeLoopTracer,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.recording import (
-    ControllerLifecycleResult,
     drain_recording_notices,
     handle_controller_lifecycle,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
+    active_policy_intro_target_timer,
     career_mode_attempt_id,
     career_runtime_error_context,
     fresh_menu_runtime_state,
@@ -39,14 +37,13 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
     reset_emulator_for_next_attempt,
     should_observe_policy_transition,
 )
+from rl_fzerox.ui.watch.runtime.career_mode.loop.signals import CareerModeWorkerQuit
 from rl_fzerox.ui.watch.runtime.career_mode.loop.snapshot import (
     publish_career_loop_snapshot,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop.state import (
     CareerModeLoopState,
     TimedRecordingNotice,
-    initial_career_mode_loop_state,
-    publish_initial_career_snapshot,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.menu import (
     menu_viewer_info,
@@ -56,22 +53,15 @@ from rl_fzerox.ui.watch.runtime.career_mode.policy_step import (
     required_episode_return,
     step_policy_or_manual,
 )
-from rl_fzerox.ui.watch.runtime.career_mode.recording import (
-    FrameRecorder,
-    open_career_mode_recorder,
-)
-from rl_fzerox.ui.watch.runtime.career_mode.session import (
-    CareerModeRuntimeSession,
-)
+from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
+from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
 from rl_fzerox.ui.watch.runtime.career_mode.timing import active_policy_timing
 from rl_fzerox.ui.watch.runtime.ipc import drain_worker_commands
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
     toggle_watch_state_feature,
 )
-from rl_fzerox.ui.watch.runtime.policy.runner import (
-    _reset_policy_runner,
-)
+from rl_fzerox.ui.watch.runtime.policy.runner import _reset_policy_runner
 from rl_fzerox.ui.watch.runtime.policy.visualization import (
     current_auxiliary_predictions as _current_auxiliary_predictions,
 )
@@ -82,63 +72,6 @@ from rl_fzerox.ui.watch.runtime.policy.visualization import (
     refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
-
-
-def run_loaded_career_mode_loop(
-    *,
-    config: WatchAppConfig,
-    session: CareerModeRuntimeSession,
-    controller: CareerModeController,
-    command_queue: ProcessQueue,
-    snapshot_queue: ProcessQueue,
-) -> None:
-    state = initial_career_mode_loop_state(
-        config=config,
-        session=session,
-        controller=controller,
-    )
-    recorder = open_career_mode_recorder(
-        config=config,
-        native_fps=session.native_fps,
-        native_sample_rate=session.native_sample_rate,
-    )
-    debug_trace = open_career_mode_debug_trace(config)
-
-    try:
-        publish_initial_career_snapshot(
-            config=config,
-            session=session,
-            snapshot_queue=snapshot_queue,
-            state=state,
-            frame_recorder=recorder,
-        )
-        observe_career_mode_debug_trace(
-            debug_trace,
-            stage="initial",
-            info=state.info,
-            controller=controller,
-            frame_source=session.render,
-            force=True,
-        )
-        _run_career_mode_loop_body(
-            config=config,
-            session=session,
-            controller=controller,
-            command_queue=command_queue,
-            snapshot_queue=snapshot_queue,
-            state=state,
-            frame_recorder=recorder,
-            debug_trace=debug_trace,
-        )
-    except _CareerModeWorkerQuit:
-        return
-    finally:
-        if recorder is not None:
-            recorder.close()
-
-
-class _CareerModeWorkerQuit(Exception):
-    """Internal signal used to unwind the Career Mode worker loop."""
 
 
 def _run_career_mode_loop_body(
@@ -193,43 +126,11 @@ def _run_career_mode_loop_body(
     last_menu_step = state.last_menu_step
     manual_spin_request: SpinRequest = "none"
     recording_notice = TimedRecordingNotice()
-
-    def trace_career_state(
-        stage: str,
-        *,
-        event: str | None = None,
-        force: bool = False,
-        trace_info: dict[str, object] | None = None,
-    ) -> None:
-        observe_career_mode_debug_trace(
-            debug_trace,
-            stage=stage,
-            info=info if trace_info is None else trace_info,
-            controller=controller,
-            frame_source=session.render,
-            event=event,
-            force=force,
-        )
-
-    def trace_lifecycle_result(
-        lifecycle: ControllerLifecycleResult,
-        *,
-        trace_info: dict[str, object] | None = None,
-    ) -> None:
-        if lifecycle.recording_close_status is not None:
-            trace_career_state(
-                "lifecycle",
-                event=f"recording_close:{lifecycle.recording_close_status}",
-                force=True,
-                trace_info=trace_info,
-            )
-        elif lifecycle.recorded_event:
-            trace_career_state(
-                "lifecycle",
-                event="record_event",
-                force=True,
-                trace_info=trace_info,
-            )
+    tracer = CareerModeLoopTracer(
+        trace=debug_trace,
+        controller=controller,
+        frame_source=session.render,
+    )
 
     def clear_policy_runtime_state(*, reset_episode_reward: bool = False) -> None:
         nonlocal active_policy_control, active_policy_started, manual_control_enabled
@@ -294,7 +195,12 @@ def _run_career_mode_loop_body(
     def reset_for_next_attempt_snapshot() -> None:
         nonlocal raw_info, info, current_telemetry, reset_info
 
-        trace_career_state("before_emulator_reset", event="reset_requested", force=True)
+        tracer.state(
+            "before_emulator_reset",
+            info=info,
+            event="reset_requested",
+            force=True,
+        )
         raw_info, info, current_telemetry = reset_emulator_for_next_attempt(
             config=config,
             session=session,
@@ -303,7 +209,12 @@ def _run_career_mode_loop_body(
         reset_info = dict(info)
         clear_policy_runtime_state()
         sync_attempt_change_side_effects()
-        trace_career_state("after_emulator_reset", event="reset_complete", force=True)
+        tracer.state(
+            "after_emulator_reset",
+            info=info,
+            event="reset_complete",
+            force=True,
+        )
         publish_snapshot(policy_visible=False)
 
     def refresh_after_terminal_episode(*, increment_episode: bool) -> None:
@@ -332,7 +243,7 @@ def _run_career_mode_loop_body(
         reset_info = dict(info)
         sync_attempt_change_side_effects()
         clear_policy_runtime_state()
-        trace_career_state("after_terminal_refresh")
+        tracer.state("after_terminal_refresh", info=info)
         publish_snapshot(policy_visible=False)
 
     def run_menu_step(step: RawMenuStep) -> None:
@@ -405,15 +316,6 @@ def _run_career_mode_loop_body(
         )
         refresh_menu_viewer_state(reset_controls=True)
 
-    def active_policy_intro_target_timer() -> int | None:
-        if active_policy_control is None:
-            return None
-        return build_managed_train_app_config(
-            active_policy_control.policy_run.config,
-            run_id=active_policy_control.policy_run.id,
-            run_dir=active_policy_control.policy_run.run_dir,
-        ).env.race_intro_target_timer
-
     def begin_active_policy_race() -> None:
         nonlocal raw_observation, raw_info, watch_zeroed_state_features
         nonlocal auxiliary_target_names, live_series, last_live_series_publish_time
@@ -455,7 +357,7 @@ def _run_career_mode_loop_body(
         current_auxiliary_targets = None
         _reset_policy_runner(policy_control.runner)
         active_policy_started = True
-        trace_career_state("begin_policy_race", force=True)
+        tracer.state("begin_policy_race", info=info, force=True)
         publish_snapshot(policy_visible=True)
 
     try:
@@ -479,7 +381,7 @@ def _run_career_mode_loop_body(
                 cnn_normalization=cnn_normalization,
             )
             if commands.quit_requested:
-                raise _CareerModeWorkerQuit()
+                raise CareerModeWorkerQuit()
             if commands.save_requests:
                 persist_save_ram(config, session)
             timing_update = apply_control_timing_command(
@@ -588,13 +490,13 @@ def _run_career_mode_loop_body(
                     active_policy_control=active_policy_control,
                 )
                 sync_attempt_change_side_effects()
-                trace_career_state("after_before_step")
+                tracer.state("after_before_step", info=info)
             lifecycle = handle_controller_lifecycle(
                 controller=controller,
                 frame_recorder=frame_recorder,
                 info=info,
             )
-            trace_lifecycle_result(lifecycle)
+            tracer.lifecycle(lifecycle, info=info)
             if lifecycle.reset_requested:
                 reset_for_next_attempt_snapshot()
                 continue
@@ -616,8 +518,9 @@ def _run_career_mode_loop_body(
                 if not terminal_handled and not in_gp_race(info):
                     raise RuntimeError("Career Mode left a race before observing a game result")
                 if terminal_handled:
-                    trace_career_state(
+                    tracer.state(
                         "terminal_handled",
+                        info=info,
                         event="policy_start_terminal",
                         force=True,
                     )
@@ -631,7 +534,7 @@ def _run_career_mode_loop_body(
                         info=terminal_info,
                         record_event=True,
                     )
-                    trace_lifecycle_result(lifecycle, trace_info=terminal_info)
+                    tracer.lifecycle(lifecycle, info=info, trace_info=terminal_info)
                     if lifecycle.reset_requested:
                         reset_for_next_attempt_snapshot()
                         continue
@@ -647,7 +550,7 @@ def _run_career_mode_loop_body(
                 clear_policy_runtime_state(reset_episode_reward=True)
                 run_menu_step(menu_step)
                 refresh_menu_viewer_state()
-                trace_career_state("after_menu_step")
+                tracer.state("after_menu_step", info=info)
             else:
                 active_policy_control = controller.active_policy_control(
                     session=session,
@@ -665,16 +568,16 @@ def _run_career_mode_loop_body(
                         reset_controls=True,
                         refresh_telemetry=False,
                     )
-                    trace_career_state("after_policy_resolution_wait")
+                    tracer.state("after_policy_resolution_wait", info=info)
                     continue
                 if not active_policy_started:
-                    target_timer = active_policy_intro_target_timer()
+                    target_timer = active_policy_intro_target_timer(active_policy_control)
                     if target_timer is not None and policy_intro_wait_required(
                         info=info,
                         target_timer=target_timer,
                     ):
                         step_visible_policy_intro_wait(target_timer)
-                        trace_career_state("after_policy_intro_wait")
+                        tracer.state("after_policy_intro_wait", info=info)
                         continue
                     begin_active_policy_race()
                     continue
@@ -739,14 +642,15 @@ def _run_career_mode_loop_body(
                 current_auxiliary_predictions = policy_step.auxiliary_predictions
                 current_auxiliary_targets = policy_step.auxiliary_targets
                 last_live_series_publish_time = policy_step.last_live_series_publish_time
-                trace_career_state("policy_step")
+                tracer.state("policy_step", info=info)
                 terminal_handled = controller.observe_step(
                     session=session,
                     info=info,
                 )
                 if terminal_handled and not controller.policy_owns_control():
-                    trace_career_state(
+                    tracer.state(
                         "terminal_handled",
+                        info=info,
                         event="race_terminal",
                         force=True,
                     )
@@ -760,7 +664,7 @@ def _run_career_mode_loop_body(
                         info=terminal_info,
                         record_event=True,
                     )
-                    trace_lifecycle_result(lifecycle, trace_info=terminal_info)
+                    tracer.lifecycle(lifecycle, info=info, trace_info=terminal_info)
                     if lifecycle.reset_requested:
                         reset_for_next_attempt_snapshot()
                         continue
@@ -772,11 +676,12 @@ def _run_career_mode_loop_body(
             if current_step_seconds is not None:
                 now = time.perf_counter()
                 next_step_time = max(next_step_time + current_step_seconds, now)
-    except _CareerModeWorkerQuit:
+    except CareerModeWorkerQuit:
         raise
     except Exception as exc:
-        trace_career_state(
+        tracer.state(
             "worker_exception",
+            info=info,
             event=type(exc).__name__,
             force=True,
         )
