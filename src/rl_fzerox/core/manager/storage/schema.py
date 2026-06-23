@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import inspect, select, text
+from sqlalchemy import inspect, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.orm import DeclarativeBase, Session
@@ -64,36 +64,6 @@ TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS = frozenset(
         "generated_baseline_state_path",
     }
 )
-SAVE_GAME_RUNNER_REPLAY_COLUMNS = (
-    ("runner_target_restart_on_retire", "BOOLEAN NOT NULL DEFAULT 0"),
-    ("runner_target_clear_goal", "INTEGER NOT NULL DEFAULT 1"),
-    ("runner_keep_failed_recordings", "BOOLEAN NOT NULL DEFAULT 0"),
-    ("runner_reload_policy_between_attempts", "BOOLEAN NOT NULL DEFAULT 1"),
-)
-TRACK_SAMPLING_RUNTIME_ADAPTIVE_SIGNAL_COLUMNS = (
-    (
-        "run_track_sampling_runtime",
-        "deficit_budget_difficulty_metric",
-        "VARCHAR NOT NULL DEFAULT 'completion_ema'",
-    ),
-    (
-        "run_track_sampling_runtime",
-        "deficit_budget_warmup_min_episodes_per_course",
-        "INTEGER NOT NULL DEFAULT 0",
-    ),
-    ("run_track_sampling_entries", "ema_finish_rate", "FLOAT"),
-    ("run_track_sampling_entries", "current_problem_score", "FLOAT NOT NULL DEFAULT 0.0"),
-)
-TRACK_SAMPLING_ENTRY_COMPLETION_COLUMNS = (
-    (
-        "completion_sample_count",
-        "INTEGER NOT NULL DEFAULT 0",
-    ),
-    (
-        "completion_fraction_total",
-        "FLOAT NOT NULL DEFAULT 0.0",
-    ),
-)
 
 
 def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
@@ -104,20 +74,6 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
     try:
         table_names = set(inspect(engine).get_table_names())
         if _has_manager_schema(table_names):
-            _ensure_evaluation_tables(engine=engine, table_names=table_names)
-            _upgrade_save_game_runner_replay_columns(engine=engine, table_names=table_names)
-            _upgrade_track_sampling_adaptive_signal_columns(
-                engine=engine,
-                table_names=table_names,
-            )
-            _upgrade_track_sampling_completion_columns(
-                engine=engine,
-                table_names=table_names,
-            )
-            _upgrade_track_sampling_scheduler_columns(
-                engine=engine,
-                table_names=table_names,
-            )
             _assert_current_schema(engine=engine, table_names=table_names)
         else:
             ManagerBase.metadata.create_all(engine)
@@ -227,143 +183,6 @@ def _assert_current_schema(
     _assert_track_sampling_runtime_columns(inspector=inspector)
     _assert_track_sampling_entry_columns(inspector=inspector)
     _assert_track_sampling_generated_slot_columns(inspector=inspector)
-
-
-def _upgrade_save_game_runner_replay_columns(
-    *,
-    engine: Engine,
-    table_names: set[str],
-) -> None:
-    """Add target-replay runner settings to pre-31 manager DBs.
-
-    The manager registry is current-schema oriented. These additive columns are
-    safe to backfill in place because defaults preserve the old launch behavior.
-    """
-
-    if "save_games" not in table_names:
-        return
-    inspector = inspect(engine)
-    columns = {column["name"] for column in inspector.get_columns("save_games")}
-    missing_columns = [
-        (column_name, definition)
-        for column_name, definition in SAVE_GAME_RUNNER_REPLAY_COLUMNS
-        if column_name not in columns
-    ]
-    if not missing_columns:
-        return
-    with engine.begin() as connection:
-        for column_name, definition in missing_columns:
-            connection.execute(
-                text(f"ALTER TABLE save_games ADD COLUMN {column_name} {definition}")
-            )
-
-
-def _ensure_evaluation_tables(
-    *,
-    engine: Engine,
-    table_names: set[str],
-) -> None:
-    """Create evaluation tables that are entirely missing from older manager DBs."""
-
-    missing_tables = [
-        model.__table__
-        for table_name, model in (
-            ("evaluations", EvaluationModel),
-            ("evaluation_presets", EvaluationPresetModel),
-            ("evaluation_baseline_suites", EvaluationBaselineSuiteModel),
-        )
-        if table_name not in table_names
-    ]
-    if missing_tables:
-        ManagerBase.metadata.create_all(engine, tables=missing_tables)
-        table_names.update(table.name for table in missing_tables)
-
-
-def _upgrade_track_sampling_adaptive_signal_columns(
-    *,
-    engine: Engine,
-    table_names: set[str],
-) -> None:
-    """Add deficit-budget adaptive-signal fields to pre-metric manager DBs."""
-
-    inspector = inspect(engine)
-    missing_columns: list[tuple[str, str, str]] = []
-    for table_name, column_name, definition in TRACK_SAMPLING_RUNTIME_ADAPTIVE_SIGNAL_COLUMNS:
-        if table_name not in table_names:
-            continue
-        columns = {column["name"] for column in inspector.get_columns(table_name)}
-        if column_name not in columns:
-            missing_columns.append((table_name, column_name, definition))
-    if not missing_columns:
-        return
-    with engine.begin() as connection:
-        for table_name, column_name, definition in missing_columns:
-            connection.execute(
-                text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
-            )
-
-
-def _upgrade_track_sampling_completion_columns(
-    *,
-    engine: Engine,
-    table_names: set[str],
-) -> None:
-    """Add lifetime completion averages to pre-global-completion manager DBs."""
-
-    table_name = "run_track_sampling_entries"
-    if table_name not in table_names:
-        return
-    inspector = inspect(engine)
-    columns = {column["name"] for column in inspector.get_columns(table_name)}
-    missing_columns = [
-        (column_name, definition)
-        for column_name, definition in TRACK_SAMPLING_ENTRY_COMPLETION_COLUMNS
-        if column_name not in columns
-    ]
-    if not missing_columns:
-        return
-    with engine.begin() as connection:
-        for column_name, definition in missing_columns:
-            connection.execute(
-                text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
-            )
-        connection.execute(
-            text(
-                """
-                UPDATE run_track_sampling_entries
-                SET
-                    completion_sample_count = success_sample_count,
-                    completion_fraction_total =
-                        COALESCE(ema_completion_fraction, 0.0) * success_sample_count
-                WHERE success_sample_count > 0
-                  AND completion_sample_count = 0
-                  AND completion_fraction_total = 0.0
-                """,
-            )
-        )
-
-
-def _upgrade_track_sampling_scheduler_columns(
-    *,
-    engine: Engine,
-    table_names: set[str],
-) -> None:
-    """Add exact deficit-budget scheduler accounts to pre-35 manager DBs.
-
-    TEMP MIGRATION: remove this additive upgrade after local active DBs have
-    moved to schema 35 and only current-schema creation remains needed.
-    """
-
-    table_name = "run_track_sampling_runtime"
-    if table_name not in table_names:
-        return
-    inspector = inspect(engine)
-    columns = {column["name"] for column in inspector.get_columns(table_name)}
-    column_name = "deficit_budget_scheduler_json"
-    if column_name in columns:
-        return
-    with engine.begin() as connection:
-        connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} TEXT"))
 
 
 def _assert_save_game_columns(*, inspector: Inspector) -> None:
