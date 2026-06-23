@@ -9,11 +9,15 @@ after fine-tuning.
 
 Teaser video: the current policy can unlock everything by completing all cups on
 Master, the hardest F-Zero X difficulty. This run shows one example: winning the
-full Joker Cup on Master.
+full Joker Cup on Master. The full playlist shows every cup on Master with one
+policy.
 
 [![rl-fzerox teaser video - click to watch on YouTube](https://img.youtube.com/vi/r_4lAayCBBo/maxresdefault.jpg)](https://www.youtube.com/watch?v=r_4lAayCBBo)
 
 <https://www.youtube.com/watch?v=r_4lAayCBBo>
+
+Full Master cups playlist:
+<https://www.youtube.com/watch?v=86LLfsIqnNY&list=PLD--3BNqNNAAzywGSzOT0VPQ6eSBUllQa>
 
 ## Requirements
 
