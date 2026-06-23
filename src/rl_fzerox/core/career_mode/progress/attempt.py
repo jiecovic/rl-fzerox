@@ -26,6 +26,7 @@ from rl_fzerox.core.manager.models import (
     SaveAttemptStatus,
     SaveGameStatus,
 )
+from rl_fzerox.core.runtime_info import optional_int_info, optional_str_info
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
@@ -506,10 +507,7 @@ def _is_failed_gp_exit(info: dict[str, object]) -> bool:
 
 
 def _positive_int_info(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value if value > 0 else None
+    return optional_int_info(info, key, float_values=False, minimum=1)
 
 
 _GP_RESULT_MODES = {
@@ -555,12 +553,8 @@ def _gp_points_value(value: object) -> int | None:
 
 
 def _int_info(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
+    return optional_int_info(info, key, float_values=False)
 
 
 def _str_info(info: dict[str, object], key: str) -> str | None:
-    value = info.get(key)
-    return value if isinstance(value, str) and value else None
+    return optional_str_info(info, key, non_empty=True)

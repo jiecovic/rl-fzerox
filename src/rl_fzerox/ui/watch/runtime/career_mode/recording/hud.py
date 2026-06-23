@@ -7,6 +7,7 @@ from typing import TypeAlias
 import numpy as np
 
 from fzerox_emulator.arrays import RgbFrame
+from rl_fzerox.core.runtime_info import bool_info, float_info
 
 _RgbColor: TypeAlias = tuple[int, int, int]
 
@@ -36,7 +37,7 @@ _HUD_TINY_GLYPHS: dict[str, tuple[str, ...]] = {
 def input_hud_frame(frame: RgbFrame, info: Mapping[str, object]) -> RgbFrame:
     """Return a frame with the optional recording input HUD rendered on top."""
 
-    if info.get("watch_recording_input_hud") is not True:
+    if not bool_info(info, "watch_recording_input_hud"):
         return frame
     height, width = frame.shape[:2]
     if width < 120 or height < 90:
@@ -63,8 +64,8 @@ def _draw_input_hud(frame: RgbFrame, info: Mapping[str, object]) -> None:
         stick_x,
         stick_y,
         size=stick_size,
-        stick_x_value=_float_info(info, "watch_recording_input_stick_x"),
-        pitch_value=_float_info(info, "watch_recording_input_pitch"),
+        stick_x_value=float_info(info, "watch_recording_input_stick_x"),
+        pitch_value=float_info(info, "watch_recording_input_pitch"),
     )
 
     row_x = x + (hud_width - 25 * scale) // 2
@@ -76,7 +77,7 @@ def _draw_input_hud(frame: RgbFrame, info: Mapping[str, object]) -> None:
         center_x=row_x + button_radius,
         center_y=lr_y + button_radius,
         radius=button_radius,
-        active=_bool_info(info, "watch_recording_input_lean_left"),
+        active=bool_info(info, "watch_recording_input_lean_left"),
     )
     _draw_round_button(
         frame,
@@ -84,7 +85,7 @@ def _draw_input_hud(frame: RgbFrame, info: Mapping[str, object]) -> None:
         center_x=row_x + 15 * scale + button_radius,
         center_y=lr_y + button_radius,
         radius=button_radius,
-        active=_bool_info(info, "watch_recording_input_lean_right"),
+        active=bool_info(info, "watch_recording_input_lean_right"),
     )
 
     ab_y = lr_y + 13 * scale
@@ -94,7 +95,7 @@ def _draw_input_hud(frame: RgbFrame, info: Mapping[str, object]) -> None:
         center_x=row_x + button_radius,
         center_y=ab_y + button_radius,
         radius=button_radius,
-        active=_bool_info(info, "watch_recording_input_gas"),
+        active=bool_info(info, "watch_recording_input_gas"),
     )
     _draw_round_button(
         frame,
@@ -102,7 +103,7 @@ def _draw_input_hud(frame: RgbFrame, info: Mapping[str, object]) -> None:
         center_x=row_x + 15 * scale + button_radius,
         center_y=ab_y + button_radius,
         radius=button_radius,
-        active=_bool_info(info, "watch_recording_input_boost"),
+        active=bool_info(info, "watch_recording_input_boost"),
     )
 
 
@@ -336,17 +337,6 @@ def _clipped_rect(
         min(frame_width, x + width),
         min(frame_height, y + height),
     )
-
-
-def _bool_info(info: Mapping[str, object], key: str) -> bool:
-    return info.get(key) is True
-
-
-def _float_info(info: Mapping[str, object], key: str) -> float:
-    value = info.get(key)
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return float(value)
-    return 0.0
 
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:

@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+from rl_fzerox.core.runtime_info import optional_int_info, optional_str_info
 from rl_fzerox.core.runtime_spec.vehicle_catalog import engine_setting_display_name_for_raw
 
 
@@ -44,15 +45,8 @@ def _format_summary_engine(value: object) -> str:
 
 
 def _str_info(info: Mapping[str, object], key: str) -> str | None:
-    value = info.get(key)
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
+    return optional_str_info(info, key, strip=True, non_empty=True)
 
 
 def _int_mapping(info: Mapping[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
+    return optional_int_info(info, key, float_values=False)

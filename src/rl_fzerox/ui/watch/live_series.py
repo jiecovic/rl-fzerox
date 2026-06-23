@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from rl_fzerox.core.envs.observations.state.utils import clamp
+from rl_fzerox.core.runtime_info import float_info, optional_int_info
 
 
 class _LiveEpisodeSnapshot(Protocol):
@@ -215,19 +216,15 @@ class EpisodeLiveSeriesTracker:
 
 
 def _env_step(info: dict[str, object], *, action_repeat: int) -> int:
-    episode_frames = info.get("episode_step")
-    if isinstance(episode_frames, int | float) and not isinstance(episode_frames, bool):
-        repeat = max(1, int(action_repeat))
-        frames = max(0, int(episode_frames))
-        return (frames + repeat - 1) // repeat
-    return 0
+    episode_frames = optional_int_info(info, "episode_step", minimum=0)
+    if episode_frames is None:
+        return 0
+    repeat = max(1, int(action_repeat))
+    return (episode_frames + repeat - 1) // repeat
 
 
 def _progress_fraction(info: dict[str, object]) -> float:
-    value = info.get("episode_completion_fraction")
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return max(0.0, min(1.0, float(value)))
-    return 0.0
+    return float_info(info, "episode_completion_fraction", minimum=0.0, maximum=1.0)
 
 
 def _speed_kph(info: dict[str, object]) -> float:
@@ -235,10 +232,7 @@ def _speed_kph(info: dict[str, object]) -> float:
 
 
 def _info_float(info: dict[str, object], key: str, *, default: float = 0.0) -> float:
-    value = info.get(key)
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return float(value)
-    return default
+    return float_info(info, key, default=default)
 
 
 def _player_telemetry_float(
@@ -248,26 +242,20 @@ def _player_telemetry_float(
     player_data = _player_telemetry_data(telemetry_data)
     if player_data is None:
         return 0.0
-    value = player_data.get(key)
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return float(value)
-    return 0.0
+    return float_info(player_data, key)
 
 
 def _ko_star_count(
     info: dict[str, object],
     telemetry_data: Mapping[str, object] | None,
 ) -> int | None:
-    value = info.get("ko_star_count")
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return max(int(value), 0)
+    value = optional_int_info(info, "ko_star_count", minimum=0)
+    if value is not None:
+        return value
     player_data = _player_telemetry_data(telemetry_data)
     if player_data is None:
         return None
-    player_value = player_data.get("ko_star_count")
-    if isinstance(player_value, int | float) and not isinstance(player_value, bool):
-        return max(int(player_value), 0)
-    return None
+    return optional_int_info(player_data, "ko_star_count", minimum=0)
 
 
 def _ko_star_reward_event(
@@ -293,10 +281,7 @@ def _ko_star_reward_event(
 
 
 def _info_int(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return int(value)
-    return None
+    return optional_int_info(info, key)
 
 
 def _edge_ratio(telemetry_data: Mapping[str, object] | None) -> float:
@@ -355,7 +340,4 @@ def _player_telemetry_data(
 
 
 def _mapping_float(mapping: Mapping[object, object], key: str) -> float:
-    value = mapping.get(key)
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return float(value)
-    return 0.0
+    return float_info(mapping, key)

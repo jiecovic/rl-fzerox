@@ -10,6 +10,12 @@ from rl_fzerox.core.career_mode.navigation.types import (
 )
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
+from rl_fzerox.core.runtime_info import (
+    bool_info,
+    optional_float_info,
+    optional_int_info,
+    optional_str_info,
+)
 
 BUILT_IN_COURSES_BY_INDEX = {course.course_index: course for course in BUILT_IN_COURSES}
 POST_GP_COMPLETION_MODES = frozenset(
@@ -58,9 +64,9 @@ class MenuFacts:
 
     @classmethod
     def from_info(cls, info: dict[str, object]) -> MenuFacts:
-        entered_finished = info.get("entered_finished") is True
-        entered_retired = info.get("entered_retired") is True
-        entered_crashed = info.get("entered_crashed") is True
+        entered_finished = bool_info(info, "entered_finished")
+        entered_retired = bool_info(info, "entered_retired")
+        entered_crashed = bool_info(info, "entered_crashed")
         return cls(
             game_mode=game_mode(info),
             game_mode_raw=_int_info(info, "game_mode_raw"),
@@ -80,9 +86,9 @@ class MenuFacts:
             completed_laps=_int_info(info, "race_laps_completed"),
             total_laps=_int_info(info, "total_lap_count"),
             terminal_reason=_str_info(info, "termination_reason"),
-            finished=info.get("finished") is True or entered_finished,
-            retired=info.get("retired") is True or entered_retired,
-            crashed=info.get("crashed") is True or entered_crashed,
+            finished=bool_info(info, "finished") or entered_finished,
+            retired=bool_info(info, "retired") or entered_retired,
+            crashed=bool_info(info, "crashed") or entered_crashed,
             entered_finished=entered_finished,
             entered_retired=entered_retired,
             entered_crashed=entered_crashed,
@@ -245,10 +251,7 @@ def observed_menu_screen(
 
 
 def game_mode(info: dict[str, object]) -> str | None:
-    value = info.get("game_mode")
-    if not isinstance(value, str) or not value:
-        value = info.get("game_mode_name")
-    return value if isinstance(value, str) and value else None
+    return _str_info(info, "game_mode") or _str_info(info, "game_mode_name")
 
 
 def is_title_mode(info: dict[str, object]) -> bool:
@@ -260,8 +263,8 @@ def is_mode_select(info: dict[str, object]) -> bool:
 
 
 def course_select_cup_index(info: dict[str, object]) -> int | None:
-    course_index = info.get("course_index")
-    if isinstance(course_index, bool) or not isinstance(course_index, int):
+    course_index = _int_info(info, "course_index")
+    if course_index is None:
         return None
     if course_index < 0:
         return None
@@ -269,8 +272,8 @@ def course_select_cup_index(info: dict[str, object]) -> int | None:
 
 
 def course_id_from_info(info: dict[str, object]) -> str | None:
-    course_index = info.get("course_index")
-    if isinstance(course_index, bool) or not isinstance(course_index, int):
+    course_index = _int_info(info, "course_index")
+    if course_index is None:
         return None
     course = BUILT_IN_COURSES_BY_INDEX.get(course_index)
     if course is None:
@@ -283,28 +286,16 @@ def in_gp_race(info: dict[str, object]) -> bool:
 
 
 def camera_setting(info: dict[str, object]) -> str | None:
-    value = info.get("camera_setting")
-    if not isinstance(value, str) or not value:
-        value = info.get("camera_setting_name")
-    return value if isinstance(value, str) and value else None
+    return _str_info(info, "camera_setting") or _str_info(info, "camera_setting_name")
 
 
 def _int_info(info: dict[str, object], key: str) -> int | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
+    return optional_int_info(info, key)
 
 
 def _str_info(info: dict[str, object], key: str) -> str | None:
-    value = info.get(key)
-    if not isinstance(value, str) or not value:
-        return None
-    return value
+    return optional_str_info(info, key, non_empty=True)
 
 
 def _number_info(info: dict[str, object], key: str) -> float | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return None
-    return float(value)
+    return optional_float_info(info, key)

@@ -11,6 +11,7 @@ from fzerox_emulator import FZeroXTelemetry, RaceControlState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.core.runtime_info import bool_info, int_info, optional_float_info
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.records import TrackRecordBook
@@ -556,22 +557,15 @@ def _game_status_overlay_label(info: dict[str, object]) -> str | None:
 
 
 def _finite_float_info(info: dict[str, object], key: str) -> float | None:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return None
-    number = float(value)
-    return number if math.isfinite(number) else None
+    return optional_float_info(info, key, finite=True)
 
 
 def _bool_info(info: dict[str, object], key: str) -> bool:
-    return info.get(key) is True
+    return bool_info(info, key)
 
 
 def _int_info(info: dict[str, object], key: str) -> int:
-    value = info.get(key)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return 0
-    return max(0, value)
+    return int_info(info, key, minimum=0)
 
 
 def _spin_request_info(info: dict[str, object]) -> str:

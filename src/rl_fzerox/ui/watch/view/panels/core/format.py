@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.runtime_info import float_info, int_info
 
 
 def _format_policy_action(policy_action: ActionValue | None) -> str:
@@ -63,10 +64,7 @@ def _format_checkpoint_experience(total_frames: int | None) -> str:
 
 
 def _display_aspect_ratio(info: dict[str, object]) -> float:
-    value = info.get("display_aspect_ratio")
-    if isinstance(value, int | float):
-        return float(value)
-    return 0.0
+    return float_info(info, "display_aspect_ratio", numeric_bool=True)
 
 
 def _format_height_width(height: int, width: int) -> str:
@@ -154,17 +152,11 @@ def _format_game_speed(info: dict[str, object], *, action_repeat: int) -> str:
 
 
 def _float_info(info: dict[str, object], key: str) -> float:
-    value = info.get(key)
-    if isinstance(value, int | float):
-        return float(value)
-    return 0.0
+    return float_info(info, key, numeric_bool=True)
 
 
 def _int_info(info: dict[str, object], key: str) -> int:
-    value = info.get(key)
-    if isinstance(value, int | float):
-        return int(value)
-    return 0
+    return int_info(info, key, numeric_bool=True)
 
 
 def _format_mode_name(mode_name: str) -> str:
