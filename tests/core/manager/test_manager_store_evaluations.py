@@ -7,6 +7,7 @@ import pytest
 
 from rl_fzerox.core.evaluation.models import EvaluationTargetSpec
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
+from rl_fzerox.core.manager.db.models.evaluations import EvaluationPresetModel
 from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
@@ -190,6 +191,27 @@ def test_manager_store_lists_default_evaluation_presets_and_suites(tmp_path: Pat
         (TIME_ATTACK_PRESET_ID, 1, "not_created"),
         (GP_PRESET_ID, 1, "not_created"),
     }
+
+
+def test_manager_store_does_not_mutate_existing_default_evaluation_presets(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.list_evaluation_presets()
+
+    with store._orm_session() as session:
+        preset = session.get(EvaluationPresetModel, GP_PRESET_ID)
+        assert preset is not None
+        preset.name = "Pinned GP benchmark"
+        preset.renderer = "angrylion"
+        preset.updated_at = "2000-01-01T00:00:00+00:00"
+
+    reloaded = ManagerStore(store.db_path).list_evaluation_presets()
+    gp_preset = next(preset for preset in reloaded if preset.id == GP_PRESET_ID)
+
+    assert gp_preset.name == "Pinned GP benchmark"
+    assert gp_preset.renderer == "angrylion"
+    assert gp_preset.updated_at == "2000-01-01T00:00:00+00:00"
 
 
 def test_manager_store_creates_and_deletes_unused_custom_evaluation_preset(

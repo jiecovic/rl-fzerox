@@ -39,16 +39,14 @@ _DEFAULT_PRESET_SETTINGS = _DefaultPresetSettings(
 
 
 def upsert_default_evaluation_presets(session: Session, *, now: str) -> None:
-    """Refresh built-in evaluation presets from the current code definition."""
+    """Create missing built-in evaluation presets without mutating existing rows."""
 
     for preset in _default_evaluation_presets(now=now):
         existing = session.get(EvaluationPresetModel, preset.id)
         if existing is None:
             session.add(_preset_model_from_dataclass(preset))
+        elif not existing.builtin:
             continue
-        if not existing.builtin:
-            continue
-        _update_preset_model(existing, preset)
 
 
 def list_evaluation_presets(session: Session) -> tuple[ManagedEvaluationPreset, ...]:
@@ -131,19 +129,6 @@ def _preset_model_from_dataclass(preset: ManagedEvaluationPreset) -> EvaluationP
         created_at=preset.created_at,
         updated_at=preset.updated_at,
     )
-
-
-def _update_preset_model(
-    model: EvaluationPresetModel,
-    preset: ManagedEvaluationPreset,
-) -> None:
-    model.name = preset.name
-    model.version = preset.version
-    model.seed = preset.seed
-    model.renderer = preset.renderer
-    model.target_json = json.dumps(asdict(preset.target), sort_keys=True)
-    model.builtin = preset.builtin
-    model.updated_at = preset.updated_at
 
 
 def _default_evaluation_presets(*, now: str) -> tuple[ManagedEvaluationPreset, ...]:
