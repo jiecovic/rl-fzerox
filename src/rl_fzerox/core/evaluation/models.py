@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
-EvaluationMode: TypeAlias = Literal["time_attack", "gp_cup"]
+EvaluationMode: TypeAlias = Literal["time_attack_course", "gp_course"]
 EvaluationCheckpointArtifact: TypeAlias = Literal["latest", "best", "final"]
 EvaluationPolicyMode: TypeAlias = Literal["deterministic", "stochastic"]
 EvaluationRunStatus: TypeAlias = Literal["completed", "failed", "cancelled", "partial"]
@@ -110,12 +110,7 @@ class EvaluationCourseResult:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationAttemptResult:
-    """One repeated target attempt.
-
-    For single-course suites this usually contains one course result. For GP and
-    Career targets it can contain multiple course results and GP-level final
-    rank/points fields.
-    """
+    """One repeated single-course target attempt."""
 
     attempt_id: str
     target_id: str
@@ -127,14 +122,11 @@ class EvaluationAttemptResult:
     seed: int | None = None
     started_at_utc: str | None = None
     closed_at_utc: str | None = None
-    final_gp_position: int | None = None
-    gp_points: int | None = None
     total_race_time_ms: int | None = None
     env_steps: int | None = None
     episode_length_steps: int | None = None
     episode_return: float | None = None
     course_results: tuple[EvaluationCourseResult, ...] = ()
-    artifact_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

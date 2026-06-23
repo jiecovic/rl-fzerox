@@ -38,8 +38,10 @@ import {
   resetRunTrackSamplingState,
   resumeRun,
   startCareerModeRunner,
+  startEvaluation,
   stopRun,
   updateDraftWithSource,
+  updateEvaluation,
   updateLineageGroups,
   updateSaveGameRunnerSettings,
   upsertSaveCourseSetup,
@@ -81,6 +83,8 @@ interface UseWorkspaceActionsOptions {
 export interface WorkspaceActions {
   createDraftFromManagedRun: (runId: string) => Promise<void>;
   createManagedEvaluation: (request: CreateEvaluationRequest) => Promise<ManagedEvaluation>;
+  startManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
+  renameManagedEvaluation: (evaluationId: string, name: string) => Promise<void>;
   createManagedSaveGame: (name: string) => Promise<ManagedSaveGame>;
   forkManagedRun: (
     runId: string,
@@ -200,17 +204,36 @@ export function useWorkspaceActions({
     }
   }
 
+  async function startManagedEvaluation(evaluation: ManagedEvaluation) {
+    try {
+      const updated = await startEvaluation(evaluation.id);
+      setEvaluations((current) => upsertEvaluation(current, updated));
+      await reloadManagerData({ showLoading: false });
+      return updated;
+    } catch (caught) {
+      await reloadManagerData({ showLoading: false });
+      throw caught;
+    }
+  }
+
   async function removeManagedEvaluation(evaluation: ManagedEvaluation) {
     setGlobalError(null);
     try {
       const deleted = await deleteEvaluation(evaluation.id);
       if (deleted) {
         setEvaluations((current) => current.filter((entry) => entry.id !== evaluation.id));
+        sessions.closeEvaluationTabsForEvaluation(evaluation.id);
       }
     } catch (caught) {
       await reloadManagerData();
       throw caught;
     }
+  }
+
+  async function renameManagedEvaluation(evaluationId: string, name: string) {
+    const updated = await updateEvaluation(evaluationId, { name });
+    setEvaluations((current) => upsertEvaluation(current, updated));
+    sessions.renameEvaluationTab(evaluationId, updated.name);
   }
 
   async function upsertManagedSaveCourseSetup(request: {
@@ -528,6 +551,7 @@ export function useWorkspaceActions({
   return {
     createDraftFromManagedRun,
     createManagedEvaluation,
+    startManagedEvaluation,
     createManagedSaveGame,
     forkManagedRun,
     launchTrainingRun,
@@ -541,6 +565,7 @@ export function useWorkspaceActions({
     removeLineage,
     removeRun,
     removeSaveGame,
+    renameManagedEvaluation,
     renameManagedRun,
     renameManagedSaveGame,
     updateManagedSaveRunnerSettings,

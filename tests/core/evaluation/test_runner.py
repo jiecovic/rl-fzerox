@@ -16,7 +16,7 @@ from rl_fzerox.core.evaluation import (
     EvaluationRunResult,
     EvaluationSpec,
     EvaluationTargetSpec,
-    run_headless_single_course_evaluation,
+    run_course_evaluation,
 )
 
 
@@ -55,7 +55,7 @@ class _Clock:
         return f"2026-06-22T10:00:{self._tick:02d}+00:00"
 
 
-def test_headless_single_course_runner_writes_progress_and_final_summary(
+def test_course_runner_writes_progress_and_final_summary(
     tmp_path: Path,
 ) -> None:
     updates: list[EvaluationRunResult] = []
@@ -71,7 +71,7 @@ def test_headless_single_course_runner_writes_progress_and_final_summary(
         engine_setting_raw_value=90,
     )
 
-    result = run_headless_single_course_evaluation(
+    result = run_course_evaluation(
         spec,
         (target,),
         executor,
@@ -97,11 +97,11 @@ def test_headless_single_course_runner_writes_progress_and_final_summary(
     assert payload["metrics"]["overall"]["primary"]["success_count"] == 1
 
 
-def test_headless_single_course_runner_rejects_empty_targets(tmp_path: Path) -> None:
+def test_course_runner_rejects_empty_targets(tmp_path: Path) -> None:
     executor = _FakeEpisodeExecutor(statuses=(), calls=[])
 
     with pytest.raises(ValueError, match="at least one target"):
-        run_headless_single_course_evaluation(
+        run_course_evaluation(
             _evaluation_spec(tmp_path, repeats=1),
             (),
             executor,
@@ -109,12 +109,38 @@ def test_headless_single_course_runner_rejects_empty_targets(tmp_path: Path) -> 
         )
 
 
+def test_course_runner_repeats_target_set_in_rounds(tmp_path: Path) -> None:
+    executor = _FakeEpisodeExecutor(
+        statuses=("finished", "finished", "finished", "finished"),
+        calls=[],
+    )
+    targets = (
+        EvaluationCourseTarget(target_id="mute-city", course_id="mute_city"),
+        EvaluationCourseTarget(target_id="silence", course_id="silence"),
+    )
+
+    result = run_course_evaluation(
+        _evaluation_spec(tmp_path, repeats=2),
+        targets,
+        executor,
+        clock=_Clock(),
+    )
+
+    assert result.spec.total_planned_attempts == 4
+    assert [call[0] for call in executor.calls] == [
+        "mute-city",
+        "silence",
+        "mute-city",
+        "silence",
+    ]
+
+
 def _evaluation_spec(tmp_path: Path, *, repeats: int) -> EvaluationSpec:
     return EvaluationSpec(
         evaluation_id="eval-runner",
         seed=123,
         target=EvaluationTargetSpec(
-            mode="time_attack",
+            mode="time_attack_course",
             course_ids=("mute_city",),
             vehicle_ids=("blue_falcon",),
             repeats_per_target=repeats,

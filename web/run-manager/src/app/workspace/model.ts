@@ -1,6 +1,7 @@
 // web/run-manager/src/app/workspace/model.ts
 import type {
   DraftEditorSession,
+  EvaluationSession,
   ForkSource,
   PrimaryWorkspaceTabId,
   RunSession,
@@ -25,6 +26,10 @@ export function editorSessionId(seed: string): `editor:${string}` {
 
 export function runSessionId(seed: string): `run:${string}` {
   return `run:${seed}`;
+}
+
+export function evaluationSessionId(seed: string): `evaluation:${string}` {
+  return `evaluation:${seed}`;
 }
 
 export function saveGameSessionId(seed: string): `save-game:${string}` {
@@ -53,6 +58,9 @@ export function activePrimaryWorkspaceTabId(id: WorkspaceTabId): PrimaryWorkspac
       }
       if (id.startsWith("run:")) {
         return "runs";
+      }
+      if (id.startsWith("evaluation:")) {
+        return "evaluations";
       }
       return "save-games";
   }
@@ -289,6 +297,8 @@ export function configuratorBaseConfigForDraftEditor(
 
 export function buildWorkspaceSessionTabs(
   draftEditors: readonly DraftEditorSession[],
+  evaluationSessions: readonly EvaluationSession[],
+  evaluations: readonly ManagedEvaluation[],
   runTabs: readonly RunSession[],
   runs: readonly ManagedRun[],
   saveGameSessions: readonly SaveGameSession[],
@@ -303,6 +313,16 @@ export function buildWorkspaceSessionTabs(
         activity: run?.status === "running" ? ("running" as const) : undefined,
         closable: true,
         tone: "run" as const,
+      };
+    }),
+    ...evaluationSessions.map((session) => {
+      const evaluation = evaluations.find((candidate) => candidate.id === session.evaluationId);
+      return {
+        id: session.sessionId,
+        icon: "evaluation" as const,
+        label: `Eval · ${evaluation?.name ?? session.title}`,
+        activity: evaluation?.status === "running" ? ("running" as const) : undefined,
+        closable: true,
       };
     }),
     ...draftEditors.map((session) => ({

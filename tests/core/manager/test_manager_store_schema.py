@@ -246,6 +246,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "policy_mode",
         "seed",
         "target_json",
+        "config_json",
         "checkpoint_json",
         "result_json_path",
         "error_message",

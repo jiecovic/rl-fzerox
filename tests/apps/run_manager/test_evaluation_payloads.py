@@ -8,7 +8,7 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationCheckpointSnapshot,
     EvaluationTargetSpec,
 )
-from rl_fzerox.core.manager.models import ManagedEvaluation
+from rl_fzerox.core.manager import ManagedEvaluation, default_managed_run_config
 
 
 def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
@@ -21,7 +21,8 @@ def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
         source_artifact="latest",
         policy_mode="deterministic",
         seed=123,
-        target=EvaluationTargetSpec(mode="time_attack", repeats_per_target=1),
+        target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=1),
+        config=default_managed_run_config(),
         checkpoint=EvaluationCheckpointSnapshot(
             source_run_id="run-001",
             source_run_name="Run 1",

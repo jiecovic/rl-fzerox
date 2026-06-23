@@ -22,6 +22,8 @@ from rl_fzerox.core.manager.db.repositories import evaluations as evaluation_rep
 from rl_fzerox.core.manager.db.repositories.filesystem import queue_delete_tree
 from rl_fzerox.core.manager.models import ManagedEvaluation
 from rl_fzerox.core.manager.registry.common import new_record_id, utc_now
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.manager.storage.serialization import config_json
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 if TYPE_CHECKING:
@@ -37,6 +39,7 @@ def create_evaluation(
     policy_mode: EvaluationPolicyMode,
     seed: int,
     target: EvaluationTargetSpec,
+    config: ManagedRunConfig,
     evaluations_root: Path | None = None,
 ) -> ManagedEvaluation:
     """Create one evaluation record and freeze its source checkpoint."""
@@ -55,6 +58,7 @@ def create_evaluation(
             policy_mode=policy_mode,
             seed=seed,
             target=target,
+            config=config,
             source_mtime_ns=source_mtime_ns,
         )
         if existing is not None:
@@ -82,6 +86,7 @@ def create_evaluation(
         policy_mode=policy_mode,
         seed=seed,
         target=target,
+        config=config,
         checkpoint=checkpoint,
         created_at=created_at,
         updated_at=created_at,
@@ -107,11 +112,70 @@ def delete_evaluation(store: ManagerStore, evaluation_id: str) -> bool:
     return True
 
 
+def update_evaluation_name(
+    store: ManagerStore,
+    *,
+    evaluation_id: str,
+    name: str,
+) -> ManagedEvaluation | None:
+    """Rename one evaluation record."""
+
+    with store._orm_session() as session:
+        return evaluation_repository.update_evaluation_name(
+            session,
+            evaluation_id=evaluation_id,
+            name=name,
+            updated_at=utc_now(),
+        )
+
+
 def get_evaluation(store: ManagerStore, evaluation_id: str) -> ManagedEvaluation | None:
     """Return one evaluation record by id."""
 
     with store._orm_session() as session:
         return evaluation_repository.get_managed_evaluation(session, evaluation_id)
+
+
+def mark_evaluation_running(store: ManagerStore, evaluation_id: str) -> ManagedEvaluation:
+    """Mark one evaluation as running and expose its summary path."""
+
+    started_at = utc_now()
+    with store._orm_session() as session:
+        evaluation = evaluation_repository.mark_evaluation_running(
+            session,
+            evaluation_id=evaluation_id,
+            started_at=started_at,
+            result_json_path=store.evaluations_root() / evaluation_id / "evaluation.summary.json",
+        )
+    return evaluation
+
+
+def mark_evaluation_completed(store: ManagerStore, evaluation_id: str) -> ManagedEvaluation:
+    """Mark one evaluation as completed."""
+
+    with store._orm_session() as session:
+        return evaluation_repository.mark_evaluation_completed(
+            session,
+            evaluation_id=evaluation_id,
+            finished_at=utc_now(),
+        )
+
+
+def mark_evaluation_failed(
+    store: ManagerStore,
+    evaluation_id: str,
+    *,
+    error_message: str,
+) -> ManagedEvaluation:
+    """Mark one evaluation as failed."""
+
+    with store._orm_session() as session:
+        return evaluation_repository.mark_evaluation_failed(
+            session,
+            evaluation_id=evaluation_id,
+            finished_at=utc_now(),
+            error_message=error_message,
+        )
 
 
 def list_evaluations(store: ManagerStore) -> tuple[ManagedEvaluation, ...]:
@@ -132,3 +196,5 @@ def _write_evaluation_spec(evaluation: ManagedEvaluation) -> None:
     payload = asdict(spec)
     path = evaluation.evaluation_dir / "evaluation.spec.json"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    config_path = evaluation.evaluation_dir / "evaluation.config.json"
+    config_path.write_text(config_json(evaluation.config) + "\n", encoding="utf-8")

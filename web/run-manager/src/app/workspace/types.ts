@@ -16,6 +16,7 @@ export type WorkspaceTabId =
   | "charts"
   | "save-games"
   | `editor:${string}`
+  | `evaluation:${string}`
   | `run:${string}`
   | `save-game:${string}`;
 
@@ -57,6 +58,12 @@ export interface DraftEditorSession {
 export interface RunSession {
   runId: string;
   sessionId: `run:${string}`;
+  title: string;
+}
+
+export interface EvaluationSession {
+  evaluationId: string;
+  sessionId: `evaluation:${string}`;
   title: string;
 }
 

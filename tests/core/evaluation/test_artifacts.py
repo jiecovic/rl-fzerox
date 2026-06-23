@@ -20,7 +20,7 @@ def test_evaluation_writer_persists_json_and_markdown_summary(tmp_path: Path) ->
         spec=EvaluationSpec(
             evaluation_id="eval-artifact",
             seed=42,
-            target=EvaluationTargetSpec(mode="time_attack", course_ids=("mute_city",)),
+            target=EvaluationTargetSpec(mode="time_attack_course", course_ids=("mute_city",)),
             checkpoint=EvaluationCheckpointSnapshot(
                 source_run_id="run-b",
                 source_run_name="Run B",
@@ -69,3 +69,5 @@ def test_evaluation_writer_persists_json_and_markdown_summary(tmp_path: Path) ->
     assert "Checkpoint copy" in markdown
     assert "Mute City" in markdown
     assert "1:26.123" in markdown
+    assert "Final GP" not in markdown
+    assert "GP points" not in markdown

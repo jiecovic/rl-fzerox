@@ -41,7 +41,8 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
         source_artifact="latest",
         policy_mode="deterministic",
         seed=42,
-        target=EvaluationTargetSpec(mode="time_attack", repeats_per_target=3),
+        target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=3),
+        config=run.config,
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -53,18 +54,25 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
     assert Path(evaluation.checkpoint.copied_policy_path).read_bytes() == b"policy"
     assert Path(evaluation.checkpoint.copied_model_path or "").read_bytes() == b"model"
     assert (evaluation.evaluation_dir / "evaluation.spec.json").is_file()
+    assert (evaluation.evaluation_dir / "evaluation.config.json").is_file()
 
     reloaded = ManagerStore(store.db_path).list_evaluations()
 
     assert [candidate.id for candidate in reloaded] == [evaluation.id]
     assert reloaded[0].target.repeats_per_target == 3
+    assert reloaded[0].config == run.config
     assert reloaded[0].checkpoint.copied_policy_path == evaluation.checkpoint.copied_policy_path
 
 
 def test_manager_store_reuses_identical_created_evaluation_snapshot(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = _create_run_with_latest_checkpoint(store, tmp_path)
-    target = EvaluationTargetSpec(mode="gp_cup", cup_ids=("joker",), repeats_per_target=2)
+    target = EvaluationTargetSpec(
+        mode="gp_course",
+        cup_ids=("joker",),
+        difficulties=("master",),
+        repeats_per_target=2,
+    )
 
     first = store.create_evaluation(
         name="Eval 1",
@@ -73,6 +81,7 @@ def test_manager_store_reuses_identical_created_evaluation_snapshot(tmp_path: Pa
         policy_mode="deterministic",
         seed=42,
         target=target,
+        config=run.config,
         evaluations_root=tmp_path / "evaluations",
     )
     second = store.create_evaluation(
@@ -82,6 +91,7 @@ def test_manager_store_reuses_identical_created_evaluation_snapshot(tmp_path: Pa
         policy_mode="deterministic",
         seed=42,
         target=target,
+        config=run.config,
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -99,7 +109,8 @@ def test_manager_store_deletes_created_evaluation_snapshot(tmp_path: Path) -> No
         source_artifact="latest",
         policy_mode="deterministic",
         seed=42,
-        target=EvaluationTargetSpec(mode="time_attack", repeats_per_target=3),
+        target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=3),
+        config=run.config,
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -109,6 +120,31 @@ def test_manager_store_deletes_created_evaluation_snapshot(tmp_path: Path) -> No
 
     assert store.list_evaluations() == ()
     assert not evaluation.evaluation_dir.exists()
+
+
+def test_manager_store_updates_evaluation_lifecycle(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = _create_run_with_latest_checkpoint(store, tmp_path)
+    evaluation = store.create_evaluation(
+        name="Eval 1",
+        source_run_id=run.id,
+        source_artifact="latest",
+        policy_mode="deterministic",
+        seed=42,
+        target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=3),
+        config=run.config,
+        evaluations_root=tmp_path / "evaluations",
+    )
+
+    running = store.mark_evaluation_running(evaluation.id)
+    assert running.status == "running"
+    assert running.started_at is not None
+    assert running.result_json_path == evaluation.evaluation_dir / "evaluation.summary.json"
+
+    completed = store.mark_evaluation_completed(evaluation.id)
+    assert completed.status == "completed"
+    assert completed.finished_at is not None
+    assert completed.error_message is None
 
 
 def test_manager_store_delete_missing_evaluation_returns_false(tmp_path: Path) -> None:

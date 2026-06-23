@@ -30,7 +30,7 @@ from rl_fzerox.core.evaluation.models import (
 )
 from rl_fzerox.core.evaluation.runner import (
     SingleCourseEpisodeExecutor,
-    run_headless_single_course_evaluation,
+    run_course_evaluation,
 )
 from rl_fzerox.core.evaluation.snapshots import (
     EvaluationCheckpointSource,
@@ -60,7 +60,7 @@ __all__ = [
     "FZeroXSingleCourseEpisodeExecutor",
     "SingleCourseEpisodeExecutor",
     "aggregate_evaluation_metrics",
-    "run_headless_single_course_evaluation",
+    "run_course_evaluation",
     "snapshot_evaluation_checkpoint",
     "write_evaluation_result_files",
 ]

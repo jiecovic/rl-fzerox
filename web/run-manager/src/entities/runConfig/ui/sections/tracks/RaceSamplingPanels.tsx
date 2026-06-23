@@ -31,6 +31,7 @@ interface GpDifficultyPanelProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   defaultGpDifficulties: readonly GpDifficulty[];
+  selectionMode?: "multi" | "single";
   metadata: ConfigMetadata;
   updateTracks: TrackUpdate;
 }
@@ -63,9 +64,13 @@ export function RaceSetupPanels({
   config,
   defaultConfig,
   defaultGpDifficulties,
+  gpDifficultySelection = "multi",
   metadata,
   updateTracks,
-}: RaceModePanelProps & { defaultGpDifficulties: readonly GpDifficulty[] }) {
+}: RaceModePanelProps & {
+  defaultGpDifficulties: readonly GpDifficulty[];
+  gpDifficultySelection?: "multi" | "single";
+}) {
   return (
     <ConfigGrid columns="two" className="items-stretch">
       <RaceModePanel
@@ -79,6 +84,7 @@ export function RaceSetupPanels({
         defaultConfig={defaultConfig}
         defaultGpDifficulties={defaultGpDifficulties}
         metadata={metadata}
+        selectionMode={gpDifficultySelection}
         updateTracks={updateTracks}
       />
     </ConfigGrid>
@@ -119,6 +125,7 @@ export function GpDifficultyPanel({
   defaultConfig,
   defaultGpDifficulties,
   metadata,
+  selectionMode = "multi",
   updateTracks,
 }: GpDifficultyPanelProps) {
   const selectedDifficulties = selectedGpDifficulties(
@@ -131,13 +138,15 @@ export function GpDifficultyPanel({
   return (
     <ConfigPanel
       onReset={() => updateTracks({ gp_difficulties: [...defaultGpDifficulties] })}
-      title="GP difficulties"
+      title={selectionMode === "single" ? "GP difficulty" : "GP difficulties"}
     >
       <div className="grid gap-3">
         <ToggleChoiceStrip
           description={
             config.tracks.race_mode === "gp_race"
-              ? selectedLabels.join(", ")
+              ? selectionMode === "single"
+                ? `${selectedLabels[0] ?? "None"} selected`
+                : selectedLabels.join(", ")
               : "Only used when GP race mode is selected."
           }
           options={metadata.gp_difficulties.map((option) => ({
@@ -151,7 +160,10 @@ export function GpDifficultyPanel({
                 : undefined,
             onClick: () => {
               const difficulty = option.value as GpDifficulty;
-              const nextDifficulties = toggleGpDifficulty(selectedDifficulties, difficulty);
+              const nextDifficulties =
+                selectionMode === "single"
+                  ? [difficulty]
+                  : toggleGpDifficulty(selectedDifficulties, difficulty);
               if (nextDifficulties === null) {
                 return;
               }
@@ -159,7 +171,7 @@ export function GpDifficultyPanel({
             },
           }))}
         />
-        {config.tracks.race_mode === "gp_race" ? (
+        {config.tracks.race_mode === "gp_race" && selectionMode === "multi" ? (
           <IntegerField
             help="Materialize this many GP race-start baselines per built-in course/difficulty/vehicle by varying the game RNG before race init. Time Attack and X Cup stay single-baseline."
             label="Race-start variants"

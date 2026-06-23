@@ -72,6 +72,29 @@ def build_training_env(config: TrainAppConfig, run_paths: RunPaths):
     raise ValueError(f"Unsupported vec env kind: {config.train.vec_env!r}")
 
 
+def build_single_training_env(
+    config: TrainAppConfig,
+    *,
+    env_index: int,
+    runtime_dir: Path,
+) -> gym.Env:
+    """Construct one non-vectorized env with the training observation wrappers."""
+
+    env = _build_worker_env(
+        config=config,
+        env_index=env_index,
+        runtime_dir=runtime_dir,
+    )
+    initial_seed = derive_seed(
+        config.seed,
+        _DOMAIN_TRAIN_ENV,
+        env_index,
+    )
+    if initial_seed is not None:
+        env.reset(seed=int(initial_seed))
+    return env
+
+
 def _make_env_factory(
     *,
     config: TrainAppConfig,
@@ -82,29 +105,10 @@ def _make_env_factory(
     """Build one worker-local env factory for SB3 vectorized training."""
 
     def _make_env():
-        emulator = Emulator(
-            core_path=config.emulator.core_path,
-            rom_path=config.emulator.rom_path,
-            runtime_dir=runtime_dir,
-            baseline_state_path=config.emulator.baseline_state_path,
-            renderer=config.emulator.renderer,
-        )
-        env = FZeroXEnv(
-            backend=emulator,
-            config=config.env,
-            reward_config=config.reward,
-            curriculum_config=config.curriculum,
+        env = _build_worker_env(
+            config=config,
             env_index=env_index,
-        )
-        env = maybe_wrap_training_auxiliary_state_observation(
-            env,
-            policy_config=config.policy,
-            train_config=config.train,
-        )
-        env = maybe_wrap_training_observation_augmentation(
-            env,
-            env_config=config.env,
-            train_config=config.train,
+            runtime_dir=runtime_dir,
         )
         wrapped = monitor_cls(env, info_keywords=MONITOR_INFO_KEYS)
         initial_seed = derive_seed(
@@ -120,6 +124,38 @@ def _make_env_factory(
         return wrapped
 
     return _make_env
+
+
+def _build_worker_env(
+    *,
+    config: TrainAppConfig,
+    env_index: int,
+    runtime_dir: Path,
+) -> gym.Env:
+    emulator = Emulator(
+        core_path=config.emulator.core_path,
+        rom_path=config.emulator.rom_path,
+        runtime_dir=runtime_dir,
+        baseline_state_path=config.emulator.baseline_state_path,
+        renderer=config.emulator.renderer,
+    )
+    env = FZeroXEnv(
+        backend=emulator,
+        config=config.env,
+        reward_config=config.reward,
+        curriculum_config=config.curriculum,
+        env_index=env_index,
+    )
+    env = maybe_wrap_training_auxiliary_state_observation(
+        env,
+        policy_config=config.policy,
+        train_config=config.train,
+    )
+    return maybe_wrap_training_observation_augmentation(
+        env,
+        env_config=config.env,
+        train_config=config.train,
+    )
 
 
 def _subproc_start_method() -> str:

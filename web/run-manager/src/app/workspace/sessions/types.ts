@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type {
   DraftEditorSession,
+  EvaluationSession,
   ForkSource,
   PrimaryWorkspaceTabId,
   RunSession,
@@ -10,16 +11,23 @@ import type {
   WorkspaceTab,
   WorkspaceTabId,
 } from "@/app/workspace/types";
-import type { ManagedDraft, ManagedRun, ManagedSaveGame } from "@/shared/api/contract";
+import type {
+  ManagedDraft,
+  ManagedEvaluation,
+  ManagedRun,
+  ManagedSaveGame,
+} from "@/shared/api/contract";
 
 export interface UseWorkspaceSessionsOptions {
   drafts: ManagedDraft[];
+  evaluations: ManagedEvaluation[];
   runs: ManagedRun[];
   saveGames: ManagedSaveGame[];
 }
 
 export interface WorkspaceSessions {
   activeDraftEditor: DraftEditorSession | null;
+  activeEvaluationSession: EvaluationSession | null;
   activePrimaryTabId: PrimaryWorkspaceTabId;
   activeRunTab: RunSession | null;
   activeSaveGameSession: SaveGameSession | null;
@@ -27,6 +35,7 @@ export interface WorkspaceSessions {
   chartsFocusRunId: string | null;
   closeEditorsForDraft: (draftId: string) => void;
   closeEditorsForSourceRuns: (runIds: readonly string[]) => void;
+  closeEvaluationTabsForEvaluation: (evaluationId: string) => void;
   closeRunTabsForRun: (runId: string) => void;
   closeRunTabsForRuns: (runIds: readonly string[]) => void;
   closeWorkspaceTab: (id: WorkspaceTabId) => void;
@@ -43,10 +52,13 @@ export interface WorkspaceSessions {
     sourceEngineTuningKnown: ForkSource["sourceEngineTuningKnown"];
   }) => void;
   draftEditors: DraftEditorSession[];
+  evaluationSessions: EvaluationSession[];
   forkSourceRunLabel: (source: ForkSource | null) => string | null;
   openDraft: (draft: ManagedDraft) => void;
+  openEvaluation: (evaluation: ManagedEvaluation) => void;
   openRun: (run: ManagedRun) => void;
   openSaveGame: (saveGame: ManagedSaveGame) => void;
+  renameEvaluationTab: (evaluationId: string, title: string) => void;
   patchDraftEditor: (
     sessionId: DraftEditorSession["sessionId"],
     patch: Partial<Omit<DraftEditorSession, "sessionId">>,

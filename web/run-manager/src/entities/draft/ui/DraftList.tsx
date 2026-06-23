@@ -27,39 +27,47 @@ export function DraftList({
   selectedDraftIds,
 }: DraftListProps) {
   return (
-    <div className="grid gap-2">
-      <div className="grid grid-cols-[38px_minmax(0,1fr)_40px] items-center px-3.5 pb-1 text-[11px] font-bold tracking-[0.04em] text-app-muted uppercase">
-        <label className={draftSelectCellClass}>
-          <input
-            aria-label="Select all drafts"
-            checked={allDraftsSelected}
-            className={draftCheckboxClass}
-            disabled={isDeleting}
-            type="checkbox"
-            onChange={(event) => onSelectAll(event.currentTarget.checked)}
-          />
-        </label>
-        <div className={draftRecordGridClass}>
-          <span>Draft</span>
-          <span>Envs</span>
-          <span>Steps</span>
-          <span>LR</span>
-          <span>CNN</span>
-          <span>Created at</span>
-        </div>
-        <span className="w-10" />
-      </div>
-      {drafts.map((draft) => (
-        <DraftRow
-          draft={draft}
-          isDeleting={isDeleting}
-          key={draft.id}
-          selected={selectedDraftIds.has(draft.id)}
-          onOpenDraft={onOpenDraft}
-          onRequestDelete={onRequestDelete}
-          onToggleDraftSelection={onToggleDraftSelection}
-        />
-      ))}
+    <div className="overflow-x-auto border border-app-border bg-app-surface">
+      <table className="w-full min-w-[780px] border-collapse text-left text-sm">
+        <thead className="border-b border-app-border text-xs font-bold tracking-[0.04em] text-app-muted uppercase">
+          <tr>
+            <th className="w-10 px-4 py-3">
+              <label className="grid place-items-center" data-draft-row-interaction>
+                <input
+                  aria-label="Select all drafts"
+                  checked={allDraftsSelected}
+                  className={draftCheckboxClass}
+                  disabled={isDeleting}
+                  type="checkbox"
+                  onChange={(event) => onSelectAll(event.currentTarget.checked)}
+                />
+              </label>
+            </th>
+            <th className="px-4 py-3">Draft</th>
+            <th className="px-4 py-3">Envs</th>
+            <th className="px-4 py-3">Steps</th>
+            <th className="px-4 py-3">LR</th>
+            <th className="px-4 py-3">CNN</th>
+            <th className="px-4 py-3">Created</th>
+            <th className="w-12 px-4 py-3">
+              <span className="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {drafts.map((draft) => (
+            <DraftRow
+              draft={draft}
+              isDeleting={isDeleting}
+              key={draft.id}
+              selected={selectedDraftIds.has(draft.id)}
+              onOpenDraft={onOpenDraft}
+              onRequestDelete={onRequestDelete}
+              onToggleDraftSelection={onToggleDraftSelection}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -80,54 +88,79 @@ function DraftRow({
   selected: boolean;
 }) {
   return (
-    <div className={draftRowClass(selected)}>
-      <label className={draftSelectCellClass}>
-        <input
-          aria-label={`Select draft ${draft.name}`}
-          checked={selected}
-          className={draftCheckboxClass}
+    <tr
+      className={draftRowClass(selected)}
+      tabIndex={0}
+      onClick={(event) => {
+        if (isDraftRowInteractionTarget(event.target)) {
+          return;
+        }
+        onOpenDraft(draft);
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpenDraft(draft);
+        }
+      }}
+    >
+      <td className="px-4 py-3 align-top" data-draft-row-interaction>
+        <label className="grid place-items-center">
+          <input
+            aria-label={`Select draft ${draft.name}`}
+            checked={selected}
+            className={draftCheckboxClass}
+            disabled={isDeleting}
+            type="checkbox"
+            onChange={(event) => onToggleDraftSelection(draft.id, event.currentTarget.checked)}
+          />
+        </label>
+      </td>
+      <td className="px-4 py-3 align-top">
+        <strong className="text-app-text">{draft.name}</strong>
+      </td>
+      <td className="px-4 py-3 align-top text-app-muted">{draft.config.train.num_envs}</td>
+      <td className="px-4 py-3 align-top text-app-muted">
+        {draft.config.train.total_timesteps.toLocaleString()}
+      </td>
+      <td className="px-4 py-3 align-top text-app-muted">
+        {draft.config.train.learning_rate.toExponential(2)}
+      </td>
+      <td className="px-4 py-3 align-top text-app-muted">{draft.config.policy.conv_profile}</td>
+      <td className="px-4 py-3 align-top whitespace-nowrap text-app-muted">
+        {formatDate(draft.created_at)}
+      </td>
+      <td className="px-4 py-3 align-top" data-draft-row-interaction>
+        <TooltipIconButton
+          aria-label={`Delete draft ${draft.name}`}
           disabled={isDeleting}
-          type="checkbox"
-          onChange={(event) => onToggleDraftSelection(draft.id, event.currentTarget.checked)}
-        />
-      </label>
-      <button className={draftRecordButtonClass} type="button" onClick={() => onOpenDraft(draft)}>
-        <span className="font-semibold text-app-text">{draft.name}</span>
-        <span>{draft.config.train.num_envs} envs</span>
-        <span>{draft.config.train.total_timesteps.toLocaleString()} steps</span>
-        <span>{draft.config.train.learning_rate.toExponential(2)}</span>
-        <span>{draft.config.policy.conv_profile}</span>
-        <span className="whitespace-nowrap">{formatDate(draft.created_at)}</span>
-      </button>
-      <TooltipIconButton
-        aria-label={`Delete draft ${draft.name}`}
-        className="mr-2.5 justify-self-end"
-        disabled={isDeleting}
-        size="compact"
-        tone="danger"
-        tooltip="Delete draft"
-        onClick={() => onRequestDelete(draft)}
-      >
-        <TrashIcon />
-      </TooltipIconButton>
-    </div>
+          size="compact"
+          tone="danger"
+          tooltip="Delete draft"
+          onClick={() => onRequestDelete(draft)}
+        >
+          <TrashIcon />
+        </TooltipIconButton>
+      </td>
+    </tr>
   );
 }
 
-const draftRecordGridClass =
-  "grid grid-cols-[2fr_0.8fr_1fr_0.9fr_1.1fr_1.45fr] items-center gap-3 [&>span]:whitespace-nowrap";
-
-const draftRecordButtonClass = cn(
-  draftRecordGridClass,
-  "min-h-12 min-w-0 border-0 bg-transparent px-3.5 text-left text-app-muted",
-);
-
-const draftSelectCellClass = "grid min-h-full place-items-center";
 const draftCheckboxClass = "h-4 w-4 accent-app-accent";
 
 function draftRowClass(selected: boolean) {
   return cn(
-    "grid min-h-12 grid-cols-[38px_minmax(0,1fr)_40px] items-center overflow-hidden rounded-lg border border-app-border bg-app-surface hover:border-app-border-strong hover:bg-app-surface-muted",
-    selected ? "border-app-border-strong bg-app-surface-muted" : undefined,
+    "cursor-pointer border-b border-app-border transition-colors last:border-b-0 hover:bg-app-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-app-accent",
+    selected ? "bg-app-surface-muted" : undefined,
+  );
+}
+
+function isDraftRowInteractionTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest("[data-draft-row-interaction],a,button,input,label,select,textarea") !== null
   );
 }

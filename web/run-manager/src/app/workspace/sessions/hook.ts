@@ -6,6 +6,7 @@ import {
   buildWorkspaceSessionTabs,
   defaultDraftName,
   editorSessionId,
+  evaluationSessionId,
   nextAvailableDraftName,
   nextAvailableSaveGameName,
   runSessionId,
@@ -20,6 +21,12 @@ import {
   openDraftSession,
   patchDraftSessions,
 } from "@/app/workspace/sessions/drafts";
+import {
+  closeEvaluationSession,
+  closeEvaluationSessionsForEvaluation,
+  openEvaluationSession,
+  renameEvaluationSession,
+} from "@/app/workspace/sessions/evaluations";
 import {
   allKnownWorkspaceNames,
   reservedWorkspaceNamesForSession,
@@ -36,6 +43,7 @@ import type {
 } from "@/app/workspace/sessions/types";
 import type {
   DraftEditorSession,
+  EvaluationSession,
   ForkSource,
   RunSession,
   SaveGameSession,
@@ -45,11 +53,13 @@ import { randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed"
 
 export function useWorkspaceSessions({
   drafts,
+  evaluations,
   runs,
   saveGames,
 }: UseWorkspaceSessionsOptions): WorkspaceSessions {
   const [activeTabId, setActiveTabId] = useState<WorkspaceTabId>("drafts");
   const [draftEditors, setDraftEditors] = useState<DraftEditorSession[]>([]);
+  const [evaluationSessions, setEvaluationSessions] = useState<EvaluationSession[]>([]);
   const [runTabs, setRunTabs] = useState<RunSession[]>([]);
   const [saveGameSessions, setSaveGameSessions] = useState<SaveGameSession[]>([]);
   const [chartsFocusRunId, setChartsFocusRunId] = useState<string | null>(null);
@@ -68,6 +78,13 @@ export function useWorkspaceSessions({
         : null,
     [activeTabId, runTabs],
   );
+  const activeEvaluationSession = useMemo(
+    () =>
+      activeTabId.startsWith("evaluation:")
+        ? (evaluationSessions.find((session) => session.sessionId === activeTabId) ?? null)
+        : null,
+    [activeTabId, evaluationSessions],
+  );
   const activeSaveGameSession = useMemo(
     () =>
       activeTabId.startsWith("save-game:")
@@ -77,8 +94,16 @@ export function useWorkspaceSessions({
   );
   const activePrimaryTabId = activePrimaryWorkspaceTabId(activeTabId);
   const sessionTabs = useMemo(
-    () => buildWorkspaceSessionTabs(draftEditors, runTabs, runs, saveGameSessions),
-    [draftEditors, runTabs, runs, saveGameSessions],
+    () =>
+      buildWorkspaceSessionTabs(
+        draftEditors,
+        evaluationSessions,
+        evaluations,
+        runTabs,
+        runs,
+        saveGameSessions,
+      ),
+    [draftEditors, evaluationSessions, evaluations, runTabs, runs, saveGameSessions],
   );
 
   function openDraft(draft: UseWorkspaceSessionsOptions["drafts"][number]) {
@@ -90,6 +115,12 @@ export function useWorkspaceSessions({
   function openRun(run: UseWorkspaceSessionsOptions["runs"][number]) {
     const sessionId = runSessionId(run.id);
     setRunTabs((current) => openRunSession(current, run));
+    setActiveTabId(sessionId);
+  }
+
+  function openEvaluation(evaluation: UseWorkspaceSessionsOptions["evaluations"][number]) {
+    const sessionId = evaluationSessionId(evaluation.id);
+    setEvaluationSessions((current) => openEvaluationSession(current, evaluation));
     setActiveTabId(sessionId);
   }
 
@@ -206,6 +237,17 @@ export function useWorkspaceSessions({
     }
   }
 
+  function closeEvaluationTab(sessionId: EvaluationSession["sessionId"]) {
+    const nextState = closeEvaluationSession(evaluationSessions, sessionId);
+    if (nextState === null) {
+      return;
+    }
+    setEvaluationSessions(nextState.remaining);
+    if (activeTabId === sessionId) {
+      setActiveTabId(nextState.fallbackTabId);
+    }
+  }
+
   function closeSaveGameTab(sessionId: SaveGameSession["sessionId"]) {
     const remaining = saveGameSessions.filter((session) => session.sessionId !== sessionId);
     if (remaining.length === saveGameSessions.length) {
@@ -243,6 +285,10 @@ export function useWorkspaceSessions({
     }
     if (id.startsWith("run:")) {
       closeRunTab(id as RunSession["sessionId"]);
+      return;
+    }
+    if (id.startsWith("evaluation:")) {
+      closeEvaluationTab(id as EvaluationSession["sessionId"]);
       return;
     }
     if (id.startsWith("save-game:")) {
@@ -294,6 +340,21 @@ export function useWorkspaceSessions({
     }
   }
 
+  function closeEvaluationTabsForEvaluation(evaluationId: string) {
+    const nextState = closeEvaluationSessionsForEvaluation(evaluationSessions, evaluationId);
+    if (nextState === null) {
+      return;
+    }
+    setEvaluationSessions(nextState.remaining);
+    if (nextState.removedSessionIds.has(activeTabId as EvaluationSession["sessionId"])) {
+      setActiveTabId("evaluations");
+    }
+  }
+
+  function renameEvaluationTab(evaluationId: string, title: string) {
+    setEvaluationSessions((current) => renameEvaluationSession(current, evaluationId, title));
+  }
+
   function forkSourceRunLabel(source: DraftEditorSession["forkSource"]) {
     return resolveForkSourceRunLabel(source, runs);
   }
@@ -308,6 +369,7 @@ export function useWorkspaceSessions({
 
   return {
     activeDraftEditor,
+    activeEvaluationSession,
     activePrimaryTabId,
     activeRunTab,
     activeSaveGameSession,
@@ -315,6 +377,7 @@ export function useWorkspaceSessions({
     chartsFocusRunId,
     closeEditorsForDraft,
     closeEditorsForSourceRuns,
+    closeEvaluationTabsForEvaluation,
     closeRunTabsForRun,
     closeRunTabsForRuns,
     closeWorkspaceTab,
@@ -322,12 +385,15 @@ export function useWorkspaceSessions({
     createNewDraft,
     createNewSaveGame,
     draftEditors,
+    evaluationSessions,
     forkSourceRunLabel,
     openDraft,
+    openEvaluation,
     openRun,
     openSaveGame,
     patchDraftEditor,
     patchSaveGameSession,
+    renameEvaluationTab,
     reservedNamesForSession,
     runTabs,
     saveGameSessions,

@@ -20,6 +20,7 @@ import type {
 import { FloatingNotice } from "@/shared/ui/FloatingNotice";
 import { Notice } from "@/shared/ui/Panel";
 import { Configurator } from "@/widgets/configurator/Configurator";
+import { EvaluationWorkspace } from "@/widgets/evaluationWorkspace/EvaluationWorkspace";
 import { ChartsPanel } from "@/widgets/runCharts/ChartsPanel";
 import { RunWorkspace } from "@/widgets/runWorkspace/RunWorkspace";
 import { SaveGameWorkspace } from "@/widgets/saveGameWorkspace/SaveGameWorkspace";
@@ -31,7 +32,6 @@ interface WorkspaceBodyProps {
   error: string | null;
   evaluationError: string | null;
   evaluations: ManagedEvaluation[];
-  evaluationSourceRunId: string | null;
   isLoading: boolean;
   loadRunDetail: (runId: string) => Promise<ManagedRunDetail>;
   metadata: ConfigMetadata | null;
@@ -40,7 +40,6 @@ interface WorkspaceBodyProps {
   saveGames: ManagedSaveGame[];
   sessions: WorkspaceSessions;
   onRefreshSaveGameStatus: (saveGameId: string) => Promise<void>;
-  onSelectEvaluationSourceRun: (runId: string) => void;
 }
 
 export function WorkspaceBody({
@@ -50,7 +49,6 @@ export function WorkspaceBody({
   error,
   evaluationError,
   evaluations,
-  evaluationSourceRunId,
   isLoading,
   loadRunDetail,
   metadata,
@@ -59,13 +57,18 @@ export function WorkspaceBody({
   saveGames,
   sessions,
   onRefreshSaveGameStatus,
-  onSelectEvaluationSourceRun,
 }: WorkspaceBodyProps) {
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const setGlobalError = actions.setGlobalError;
   const activeRunTab = sessions.activeRunTab;
   const activeDraftEditor = sessions.activeDraftEditor;
+  const activeEvaluationSession = sessions.activeEvaluationSession;
   const activeSaveGameSession = sessions.activeSaveGameSession;
+  const activeEvaluation =
+    activeEvaluationSession === null
+      ? null
+      : (evaluations.find((evaluation) => evaluation.id === activeEvaluationSession.evaluationId) ??
+        null);
   const activeRunSummary =
     activeRunTab === null
       ? null
@@ -142,13 +145,23 @@ export function WorkspaceBody({
           evaluations={evaluations}
           loadRunDetail={loadRunDetail}
           metadata={metadata}
-          runDetailsById={runDetailsById}
-          runs={runs}
-          sourceRunId={evaluationSourceRunId}
-          onCreateEvaluation={actions.createManagedEvaluation}
           onDeleteEvaluation={actions.removeManagedEvaluation}
           onGlobalError={actions.setGlobalError}
+          onOpenEvaluation={sessions.openEvaluation}
+          runs={runs}
         />
+      ) : null}
+      {!isLoading && activeEvaluationSession !== null ? (
+        activeEvaluation === null ? (
+          <Notice tone="error">This evaluation is no longer available.</Notice>
+        ) : (
+          <EvaluationWorkspace
+            evaluation={activeEvaluation}
+            onGlobalError={actions.setGlobalError}
+            onRenameEvaluation={actions.renameManagedEvaluation}
+            onStartEvaluation={actions.startManagedEvaluation}
+          />
+        )
       ) : null}
       {!isLoading && sessions.activeTabId === "save-games" ? (
         <SaveGamesPanel
@@ -201,6 +214,7 @@ export function WorkspaceBody({
             onClearAltBaselines={actions.clearManagedRunAltBaselines}
             onClearCourseAltBaselines={actions.clearManagedRunCourseAltBaselines}
             onCreateDraftFromRun={actions.createDraftFromManagedRun}
+            onCreateEvaluation={actions.createManagedEvaluation}
             onFork={actions.forkManagedRun}
             onGlobalError={actions.setGlobalError}
             onOpenDirectory={actions.openManagedRunDirectory}
@@ -208,7 +222,7 @@ export function WorkspaceBody({
             onResetEngineTuning={actions.resetManagedRunEngineTuning}
             onResetTrackPool={actions.resetManagedRunTrackPool}
             onResume={actions.resumeManagedRun}
-            onSelectEvaluationSourceRun={onSelectEvaluationSourceRun}
+            onOpenEvaluation={sessions.openEvaluation}
             onShowCharts={sessions.showRunCharts}
             onStop={actions.stopManagedRun}
             onWatch={actions.watchManagedRun}

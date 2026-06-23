@@ -6,6 +6,7 @@ import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 export interface TracksSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
+  gpDifficultySelection?: "multi" | "single";
   metadata: ConfigMetadata;
   setConfig: ConfigSetter;
   showSampling?: boolean;

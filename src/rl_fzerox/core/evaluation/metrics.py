@@ -36,11 +36,6 @@ class EvaluationPrimaryMetrics:
     mean_position: float | None
     best_position: int | None
     worst_position: int | None
-    mean_final_gp_position: float | None
-    best_final_gp_position: int | None
-    worst_final_gp_position: int | None
-    mean_gp_points: float | None
-    best_gp_points: int | None
     total_env_steps: int
     mean_episode_length_steps: float | None
 
@@ -189,16 +184,6 @@ def _aggregate_group(
         for attempt in attempts
         if (value := _attempt_total_race_time_ms(attempt)) is not None
     )
-    final_gp_positions = tuple(
-        int(attempt.final_gp_position)
-        for attempt in attempts
-        if attempt.final_gp_position is not None and attempt.final_gp_position > 0
-    )
-    gp_points = tuple(
-        int(attempt.gp_points)
-        for attempt in attempts
-        if attempt.gp_points is not None and attempt.gp_points >= 0
-    )
     episode_lengths = _episode_lengths(attempts, course_results)
     returns = _episode_returns(attempts, course_results)
     group = EvaluationMetricGroup(
@@ -219,11 +204,6 @@ def _aggregate_group(
             mean_position=_mean(course_positions),
             best_position=None if not course_positions else min(course_positions),
             worst_position=None if not course_positions else max(course_positions),
-            mean_final_gp_position=_mean(final_gp_positions),
-            best_final_gp_position=None if not final_gp_positions else min(final_gp_positions),
-            worst_final_gp_position=None if not final_gp_positions else max(final_gp_positions),
-            mean_gp_points=_mean(gp_points),
-            best_gp_points=None if not gp_points else max(gp_points),
             total_env_steps=_total_env_steps(attempts, course_results),
             mean_episode_length_steps=_mean(episode_lengths),
         ),

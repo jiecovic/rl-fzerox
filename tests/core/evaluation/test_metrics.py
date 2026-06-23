@@ -29,8 +29,6 @@ def test_evaluation_metrics_aggregate_primary_and_detail_stats() -> None:
     assert metrics.overall.primary.best_finish_time_ms == 90_000
     assert metrics.overall.primary.mean_total_race_time_ms == 190_000.0
     assert metrics.overall.primary.mean_position == 1.5
-    assert metrics.overall.primary.mean_final_gp_position == 1.0
-    assert metrics.overall.primary.best_gp_points == 100
     assert metrics.overall.primary.total_env_steps == 6_900
     assert metrics.overall.primary.mean_episode_length_steps == 3_450.0
 
@@ -71,7 +69,7 @@ def _sample_result() -> EvaluationRunResult:
             evaluation_id="eval-test",
             seed=123,
             target=EvaluationTargetSpec(
-                mode="gp_cup",
+                mode="gp_course",
                 cup_ids=("jack",),
                 vehicle_ids=("blue_falcon",),
                 repeats_per_target=2,
@@ -94,8 +92,6 @@ def _sample_result() -> EvaluationRunResult:
                 target_label="Jack Cup Master",
                 status="succeeded",
                 cup_id="jack",
-                final_gp_position=1,
-                gp_points=100,
                 total_race_time_ms=190_000,
                 env_steps=6_200,
                 episode_length_steps=6_200,

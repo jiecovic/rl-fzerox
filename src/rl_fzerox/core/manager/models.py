@@ -95,6 +95,7 @@ class ManagedEvaluation:
     policy_mode: EvaluationPolicyMode
     seed: int
     target: EvaluationTargetSpec
+    config: ManagedRunConfig
     checkpoint: EvaluationCheckpointSnapshot
     created_at: str
     updated_at: str

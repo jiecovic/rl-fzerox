@@ -5,6 +5,9 @@ import {
   createEvaluationResponseSchema,
   evaluationsResponseSchema,
   type ManagedEvaluation,
+  startEvaluationResponseSchema,
+  type UpdateEvaluationRequest,
+  updateEvaluationResponseSchema,
 } from "@/shared/api/contract";
 
 export async function fetchEvaluations(): Promise<ManagedEvaluation[]> {
@@ -24,6 +27,7 @@ export async function createEvaluation(
       source_artifact: request.sourceArtifact,
       policy_mode: request.policyMode,
       seed: request.seed,
+      config: request.config,
       target: {
         mode: request.targetMode,
         course_ids: request.courseIds,
@@ -52,4 +56,25 @@ export async function deleteEvaluation(evaluationId: string): Promise<boolean> {
     return payload.deleted;
   }
   throw new Error("run-manager delete evaluation response is invalid");
+}
+
+export async function startEvaluation(evaluationId: string): Promise<ManagedEvaluation> {
+  const response = await fetch(`/api/evaluations/${encodeURIComponent(evaluationId)}/start`, {
+    method: "POST",
+  });
+  const payload = parseApiPayload(startEvaluationResponseSchema, await parseJson(response));
+  return payload.evaluation;
+}
+
+export async function updateEvaluation(
+  evaluationId: string,
+  request: UpdateEvaluationRequest,
+): Promise<ManagedEvaluation> {
+  const response = await fetch(`/api/evaluations/${encodeURIComponent(evaluationId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: request.name }),
+  });
+  const payload = parseApiPayload(updateEvaluationResponseSchema, await parseJson(response));
+  return payload.evaluation;
 }

@@ -1,6 +1,7 @@
 // web/run-manager/src/widgets/runWorkspace/RunWorkspace.tsx
 import { useEffect, useRef, useState } from "react";
 import type { ConfigSection } from "@/entities/runConfig/model/sections";
+import { CreateEvaluationSnapshotDialog } from "@/features/evaluationSnapshots/ui/CreateEvaluationSnapshotDialog";
 import {
   useRunEngineTuningState,
   useRunPolicyPreview,
@@ -10,6 +11,8 @@ import { ForkAltBaselinesDialog } from "@/features/runWorkspaceActions/ForkAltBa
 import { useRunWorkspaceActions } from "@/features/runWorkspaceActions/useRunWorkspaceActions";
 import type {
   ConfigMetadata,
+  CreateEvaluationRequest,
+  ManagedEvaluation,
   ManagedRun,
   ManagedRunDetail,
   PolicyPlaybackMode,
@@ -32,6 +35,7 @@ interface RunWorkspaceProps {
   onClearAltBaselines: (runId: string) => Promise<void>;
   onClearCourseAltBaselines: (runId: string, courseKey: string) => Promise<void>;
   onCreateDraftFromRun: (runId: string) => Promise<void>;
+  onCreateEvaluation: (request: CreateEvaluationRequest) => Promise<ManagedEvaluation>;
   onFork: (runId: string, artifact: "latest" | "best", copyAltBaselines: boolean) => Promise<void>;
   onGlobalError: (message: string | null) => void;
   onOpenDirectory: (runId: string) => Promise<void>;
@@ -39,7 +43,7 @@ interface RunWorkspaceProps {
   onResetEngineTuning: (runId: string) => Promise<void>;
   onResume: (runId: string) => Promise<void>;
   onResetTrackPool: (runId: string) => Promise<void>;
-  onSelectEvaluationSourceRun: (runId: string) => void;
+  onOpenEvaluation: (evaluation: ManagedEvaluation) => void;
   onShowCharts: (runId: string) => void;
   onStop: (runId: string) => Promise<void>;
   onWatch: (
@@ -58,6 +62,7 @@ export function RunWorkspace({
   onClearAltBaselines,
   onClearCourseAltBaselines,
   onCreateDraftFromRun,
+  onCreateEvaluation,
   onFork,
   onGlobalError,
   onOpenDirectory,
@@ -65,7 +70,7 @@ export function RunWorkspace({
   onResetEngineTuning,
   onResume,
   onResetTrackPool,
-  onSelectEvaluationSourceRun,
+  onOpenEvaluation,
   onShowCharts,
   onStop,
   onWatch,
@@ -74,6 +79,7 @@ export function RunWorkspace({
   const [runName, setRunName] = useState(run.name);
   const lastObservedWatchFailureRef = useRef<{ key: string | null; runId: string } | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [evaluationDialogOpen, setEvaluationDialogOpen] = useState(false);
   const [configSection, setConfigSection] = useState<ConfigSection>("training");
   const [isResettingEngineTuning, setIsResettingEngineTuning] = useState(false);
   const [engineTuningExpansion, setEngineTuningExpansion] = useState({
@@ -192,6 +198,16 @@ export function RunWorkspace({
         onClose={() => setRenameDialogOpen(false)}
         onSubmit={(name) => void submitRunRename(name)}
       />
+      <CreateEvaluationSnapshotDialog
+        defaultConfig={run.config}
+        metadata={metadata}
+        open={evaluationDialogOpen}
+        run={run}
+        onClose={() => setEvaluationDialogOpen(false)}
+        onCreateEvaluation={onCreateEvaluation}
+        onGlobalError={onGlobalError}
+        onOpenEvaluation={onOpenEvaluation}
+      />
       <ForkAltBaselinesDialog
         altBaselineCount={actions.pendingForkAltBaselineChoice?.count ?? 0}
         open={actions.pendingForkAltBaselineChoice !== null}
@@ -203,7 +219,7 @@ export function RunWorkspace({
         actions={actions}
         allRuns={allRuns}
         metadata={metadata}
-        onSelectEvaluationSourceRun={onSelectEvaluationSourceRun}
+        onCreateEvaluation={() => setEvaluationDialogOpen(true)}
         onShowCharts={onShowCharts}
         run={run}
         engineTuningExpanded={engineTuningExpanded}

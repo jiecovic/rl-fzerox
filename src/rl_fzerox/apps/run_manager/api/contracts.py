@@ -24,7 +24,7 @@ class EvaluationTargetRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    mode: EvaluationMode = "time_attack"
+    mode: EvaluationMode = "time_attack_course"
     course_ids: tuple[str, ...] = ()
     cup_ids: tuple[str, ...] = ()
     difficulties: tuple[str, ...] = ()
@@ -39,10 +39,19 @@ class CreateEvaluationRequest(BaseModel):
 
     name: str
     source_run_id: str
-    source_artifact: Literal["latest", "best"] = "latest"
+    source_artifact: Literal["latest", "best", "final"] = "latest"
     policy_mode: PolicyPlaybackMode = "deterministic"
     seed: int = Field(ge=0, le=(1 << 32) - 1)
     target: EvaluationTargetRequest = Field(default_factory=EvaluationTargetRequest)
+    config: ManagedRunConfig
+
+
+class UpdateEvaluationRequest(BaseModel):
+    """Request body for renaming one manager-owned evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
 
 
 class CreateDraftRequest(BaseModel):

@@ -1,10 +1,8 @@
 // web/run-manager/src/shared/api/contract/evaluations.ts
 import { z } from "zod";
 
-import {
-  policyPlaybackModeSchema,
-  type savePolicyArtifactSchema,
-} from "@/shared/api/contract/saveGames";
+import { type ManagedRunConfig, managedRunConfigSchema } from "@/shared/api/contract/config";
+import { policyPlaybackModeSchema } from "@/shared/api/contract/saveGames";
 
 export const evaluationStatusSchema = z.enum([
   "created",
@@ -14,7 +12,8 @@ export const evaluationStatusSchema = z.enum([
   "cancelled",
 ]);
 
-export const evaluationModeSchema = z.enum(["time_attack", "gp_cup"]);
+export const evaluationModeSchema = z.enum(["time_attack_course", "gp_course"]);
+export const evaluationSourceArtifactSchema = z.enum(["latest", "best", "final"]);
 
 export const evaluationTargetSpecSchema = z.object({
   mode: evaluationModeSchema,
@@ -28,7 +27,7 @@ export const evaluationTargetSpecSchema = z.object({
 export const evaluationCheckpointSnapshotSchema = z.object({
   source_run_id: z.string().nullable(),
   source_run_name: z.string().nullable(),
-  artifact: z.enum(["latest", "best", "final"]),
+  artifact: evaluationSourceArtifactSchema,
   source_policy_path: z.string(),
   copied_policy_path: z.string(),
   source_model_path: z.string().nullable(),
@@ -38,16 +37,23 @@ export const evaluationCheckpointSnapshotSchema = z.object({
   source_mtime_ns: z.string().regex(/^\d+$/).nullable(),
 });
 
+export const evaluationProgressSchema = z.object({
+  completed_attempts: z.number().int().nonnegative(),
+  total_attempts: z.number().int().nonnegative().nullable(),
+  result_status: z.string().nullable(),
+});
+
 export const managedEvaluationSchema = z.object({
   id: z.string(),
   name: z.string(),
   status: evaluationStatusSchema,
   evaluation_dir: z.string(),
   source_run_id: z.string().nullable(),
-  source_artifact: z.enum(["latest", "best", "final"]).nullable(),
+  source_artifact: evaluationSourceArtifactSchema.nullable(),
   policy_mode: policyPlaybackModeSchema,
   seed: z.number().int().nonnegative(),
   target: evaluationTargetSpecSchema,
+  config: managedRunConfigSchema,
   checkpoint: evaluationCheckpointSnapshotSchema,
   created_at: z.string(),
   updated_at: z.string(),
@@ -55,6 +61,7 @@ export const managedEvaluationSchema = z.object({
   finished_at: z.string().nullable(),
   result_json_path: z.string().nullable(),
   error_message: z.string().nullable(),
+  progress: evaluationProgressSchema,
 });
 
 export const evaluationsResponseSchema = z.object({
@@ -65,10 +72,18 @@ export const createEvaluationResponseSchema = z.object({
   evaluation: managedEvaluationSchema,
 });
 
+export const startEvaluationResponseSchema = z.object({
+  evaluation: managedEvaluationSchema,
+});
+
+export const updateEvaluationResponseSchema = z.object({
+  evaluation: managedEvaluationSchema,
+});
+
 export type EvaluationMode = z.infer<typeof evaluationModeSchema>;
 export type ManagedEvaluation = z.infer<typeof managedEvaluationSchema>;
 export type EvaluationStatus = z.infer<typeof evaluationStatusSchema>;
-export type EvaluationSourceArtifact = z.infer<typeof savePolicyArtifactSchema>;
+export type EvaluationSourceArtifact = z.infer<typeof evaluationSourceArtifactSchema>;
 
 export interface CreateEvaluationRequest {
   courseIds: readonly string[];
@@ -82,4 +97,9 @@ export interface CreateEvaluationRequest {
   sourceRunId: string;
   targetMode: EvaluationMode;
   vehicleIds: readonly string[];
+  config: ManagedRunConfig;
+}
+
+export interface UpdateEvaluationRequest {
+  name: string;
 }

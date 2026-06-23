@@ -49,7 +49,7 @@ interface RunRuntimeSummaryProps {
   allRuns: ManagedRun[];
   canResetEngineTuning: boolean;
   metadata: ConfigMetadata;
-  onSelectEvaluationSourceRun: (runId: string) => void;
+  onCreateEvaluation: () => void;
   onShowCharts: (runId: string) => void;
   run: ManagedRunDetail;
   engineTuningExpanded: boolean;
@@ -65,7 +65,7 @@ export function RunRuntimeSummary({
   allRuns,
   canResetEngineTuning,
   metadata,
-  onSelectEvaluationSourceRun,
+  onCreateEvaluation,
   onShowCharts,
   run,
   engineTuningExpanded,
@@ -195,9 +195,9 @@ export function RunRuntimeSummary({
                 <ChartIcon />
               </TooltipIconButton>
               <TooltipIconButton
-                aria-label="Create evaluation snapshot from run"
+                aria-label="Create evaluation from run"
                 tooltip="Evaluate"
-                onClick={() => onSelectEvaluationSourceRun(run.id)}
+                onClick={onCreateEvaluation}
               >
                 <EvaluationTabIcon />
               </TooltipIconButton>

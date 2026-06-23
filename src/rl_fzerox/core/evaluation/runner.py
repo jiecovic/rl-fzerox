@@ -1,5 +1,5 @@
 # src/rl_fzerox/core/evaluation/runner.py
-"""Headless evaluation orchestration for deterministic single-course suites."""
+"""Evaluation orchestration for deterministic course-attempt suites."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def _utc_now_text() -> str:
     return datetime.now(tz=UTC).isoformat(timespec="seconds")
 
 
-def run_headless_single_course_evaluation(
+def run_course_evaluation(
     spec: EvaluationSpec,
     targets: Iterable[EvaluationCourseTarget],
     executor: SingleCourseEpisodeExecutor,
@@ -72,10 +72,8 @@ def run_headless_single_course_evaluation(
     actually advances F-Zero X.
     """
 
-    if spec.target.mode != "time_attack":
-        raise ValueError(
-            "headless single-course evaluation currently supports time_attack targets only"
-        )
+    if spec.target.mode not in ("time_attack_course", "gp_course"):
+        raise ValueError(f"course evaluation does not support mode={spec.target.mode!r}")
 
     expanded_targets = _expand_targets(targets, repeats=spec.target.repeats_per_target)
     run_spec = replace(
@@ -141,7 +139,7 @@ def _expand_targets(
     concrete_targets = tuple(targets)
     if not concrete_targets:
         raise ValueError("single-course evaluation requires at least one target")
-    return tuple(target for target in concrete_targets for _ in range(repeats))
+    return tuple(target for _ in range(repeats) for target in concrete_targets)
 
 
 def _attempt_seed(master_seed: int, attempt_index: int) -> int:

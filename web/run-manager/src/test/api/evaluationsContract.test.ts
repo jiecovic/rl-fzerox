@@ -1,7 +1,7 @@
 // web/run-manager/src/test/api/evaluationsContract.test.ts
 
 import { describe, expect, it } from "vitest";
-import { evaluationsResponseSchema } from "@/shared/api/contract";
+import { evaluationsResponseSchema, managedRunConfigSchema } from "@/shared/api/contract";
 
 describe("evaluations API contract", () => {
   it("accepts checkpoint mtimes larger than JavaScript safe integers as strings", () => {
@@ -24,6 +24,7 @@ describe("evaluations API contract", () => {
             vehicle_ids: [],
             repeats_per_target: 1,
           },
+          config: managedRunConfigSchema.parse({}),
           checkpoint: {
             source_run_id: "run-001",
             source_run_name: "Run 1",
@@ -42,6 +43,11 @@ describe("evaluations API contract", () => {
           finished_at: null,
           result_json_path: null,
           error_message: null,
+          progress: {
+            completed_attempts: 0,
+            total_attempts: null,
+            result_status: null,
+          },
         },
       ],
     });

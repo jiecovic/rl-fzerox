@@ -27,6 +27,7 @@ class EvaluationModel(ManagerBase):
     policy_mode: Mapped[str]
     seed: Mapped[int] = mapped_column(Integer)
     target_json: Mapped[str] = mapped_column(Text)
+    config_json: Mapped[str] = mapped_column(Text)
     checkpoint_json: Mapped[str] = mapped_column(Text)
     result_json_path: Mapped[str | None]
     error_message: Mapped[str | None] = mapped_column(Text)

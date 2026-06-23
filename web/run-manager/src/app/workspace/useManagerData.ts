@@ -13,7 +13,12 @@ import {
   rememberRunDetailAccess,
   trimRunDetailCache,
 } from "@/app/workspace/runDetails";
-import { fetchRun, fetchSaveGameStatus, fetchSaveGames } from "@/shared/api/client";
+import {
+  fetchEvaluations,
+  fetchRun,
+  fetchSaveGameStatus,
+  fetchSaveGames,
+} from "@/shared/api/client";
 import type {
   ConfigMetadata,
   ManagedDraft,
@@ -149,6 +154,34 @@ export function useManagerData() {
   useEffect(() => {
     void reloadManagerData();
   }, [reloadManagerData]);
+
+  useEffect(() => {
+    if (!evaluations.some((evaluation) => evaluation.status === "running")) {
+      return undefined;
+    }
+    let ignore = false;
+    const refreshEvaluations = () => {
+      void fetchEvaluations()
+        .then((nextEvaluations) => {
+          if (!ignore) {
+            setEvaluations(nextEvaluations);
+            setEvaluationError(null);
+          }
+        })
+        .catch((caught) => {
+          if (!ignore) {
+            setEvaluationError(
+              caught instanceof Error ? caught.message : "failed to refresh evaluations",
+            );
+          }
+        });
+    };
+    const intervalId = window.setInterval(refreshEvaluations, 3000);
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+    };
+  }, [evaluations]);
 
   useRunLiveSync({
     runDetailAccessOrderRef,

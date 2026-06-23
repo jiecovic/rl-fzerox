@@ -5,6 +5,7 @@ from fastapi import HTTPException
 
 from rl_fzerox.apps.run_manager.api.contracts import CreateEvaluationRequest
 from rl_fzerox.apps.run_manager.api.payloads.evaluations import evaluation_payload
+from rl_fzerox.apps.run_manager.launching import launch_evaluation_worker
 from rl_fzerox.core.evaluation.models import EvaluationTargetSpec
 from rl_fzerox.core.manager import ManagerStore
 
@@ -39,6 +40,7 @@ def create_evaluation_payload(
                 vehicle_ids=tuple(request.target.vehicle_ids),
                 repeats_per_target=request.target.repeats_per_target,
             ),
+            config=request.config,
         )
     except FileNotFoundError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -55,3 +57,32 @@ def delete_evaluation_payload(store: ManagerStore, evaluation_id: str) -> dict[s
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"deleted": deleted}
+
+
+def update_evaluation_payload(
+    store: ManagerStore,
+    evaluation_id: str,
+    name: str,
+) -> dict[str, dict[str, object]]:
+    """Rename one manager-owned evaluation."""
+
+    try:
+        evaluation = store.update_evaluation_name(evaluation_id=evaluation_id, name=name)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if evaluation is None:
+        raise HTTPException(status_code=404, detail="evaluation not found")
+    return {"evaluation": evaluation_payload(evaluation)}
+
+
+def start_evaluation_payload(
+    store: ManagerStore,
+    evaluation_id: str,
+) -> dict[str, dict[str, object]]:
+    """Start one created evaluation snapshot."""
+
+    try:
+        evaluation = launch_evaluation_worker(store, evaluation_id=evaluation_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"evaluation": evaluation_payload(evaluation)}

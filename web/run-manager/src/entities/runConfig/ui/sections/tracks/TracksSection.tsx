@@ -23,6 +23,7 @@ import { usePersistentCollapsedIds } from "@/shared/ui/config/disclosureState";
 export function TracksSection({
   config,
   defaultConfig,
+  gpDifficultySelection = "multi",
   metadata,
   setConfig,
   showSampling = true,
@@ -186,6 +187,7 @@ export function TracksSection({
         config={config}
         defaultConfig={defaultConfig}
         defaultGpDifficulties={defaultGpDifficulties}
+        gpDifficultySelection={gpDifficultySelection}
         metadata={metadata}
         updateTracks={updateTracks}
       />

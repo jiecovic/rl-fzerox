@@ -4,7 +4,10 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from rl_fzerox.apps.run_manager.api import handlers
-from rl_fzerox.apps.run_manager.api.contracts import CreateEvaluationRequest
+from rl_fzerox.apps.run_manager.api.contracts import (
+    CreateEvaluationRequest,
+    UpdateEvaluationRequest,
+)
 from rl_fzerox.apps.run_manager.api.execution import run_sync
 from rl_fzerox.apps.run_manager.api.validation import required_name
 from rl_fzerox.core.manager import ManagerStore
@@ -23,6 +26,18 @@ def create_evaluations_router(store: ManagerStore) -> APIRouter:
     ) -> dict[str, dict[str, object]]:
         name = required_name(request.name, subject="evaluation")
         return await run_sync(handlers.create_evaluation_payload, store, request, name)
+
+    @router.post("/api/evaluations/{evaluation_id}/start")
+    async def start_evaluation(evaluation_id: str) -> dict[str, dict[str, object]]:
+        return await run_sync(handlers.start_evaluation_payload, store, evaluation_id)
+
+    @router.put("/api/evaluations/{evaluation_id}")
+    async def update_evaluation(
+        evaluation_id: str,
+        request: UpdateEvaluationRequest,
+    ) -> dict[str, dict[str, object]]:
+        name = required_name(request.name, subject="evaluation")
+        return await run_sync(handlers.update_evaluation_payload, store, evaluation_id, name)
 
     @router.delete("/api/evaluations/{evaluation_id}")
     async def delete_evaluation(evaluation_id: str) -> dict[str, bool]:

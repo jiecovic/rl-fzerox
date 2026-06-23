@@ -11,6 +11,8 @@ export {
   createEvaluation,
   deleteEvaluation,
   fetchEvaluations,
+  startEvaluation,
+  updateEvaluation,
 } from "@/shared/api/client/resources/evaluations";
 export {
   fetchConfigMetadata,

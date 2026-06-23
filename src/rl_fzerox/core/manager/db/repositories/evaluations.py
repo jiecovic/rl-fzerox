@@ -19,6 +19,8 @@ from rl_fzerox.core.evaluation.models import (
 )
 from rl_fzerox.core.manager.db.models.evaluations import EvaluationModel
 from rl_fzerox.core.manager.models import ManagedEvaluation, ManagedEvaluationStatus
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.manager.storage.serialization import config_json, load_config_json
 
 
 def insert_evaluation(
@@ -39,6 +41,7 @@ def insert_evaluation(
             policy_mode=evaluation.policy_mode,
             seed=evaluation.seed,
             target_json=json.dumps(asdict(evaluation.target), sort_keys=True),
+            config_json=config_json(evaluation.config),
             checkpoint_json=json.dumps(asdict(evaluation.checkpoint), sort_keys=True),
             result_json_path=(
                 None if evaluation.result_json_path is None else str(evaluation.result_json_path)
@@ -85,6 +88,7 @@ def find_created_evaluation_snapshot(
     policy_mode: EvaluationPolicyMode,
     seed: int,
     target: EvaluationTargetSpec,
+    config: ManagedRunConfig,
     source_mtime_ns: int,
 ) -> ManagedEvaluation | None:
     """Return an existing identical created snapshot, if one exists."""
@@ -103,7 +107,11 @@ def find_created_evaluation_snapshot(
     )
     for candidate in candidates:
         evaluation = managed_evaluation_from_model(candidate)
-        if evaluation.target == target and evaluation.checkpoint.source_mtime_ns == source_mtime_ns:
+        if (
+            evaluation.target == target
+            and evaluation.config == config
+            and evaluation.checkpoint.source_mtime_ns == source_mtime_ns
+        ):
             return evaluation
     return None
 
@@ -121,6 +129,81 @@ def delete_created_evaluation(session: Session, evaluation_id: str) -> ManagedEv
     return managed
 
 
+def update_evaluation_name(
+    session: Session,
+    *,
+    evaluation_id: str,
+    name: str,
+    updated_at: str,
+) -> ManagedEvaluation | None:
+    """Rename one manager-owned evaluation."""
+
+    evaluation = session.get(EvaluationModel, evaluation_id)
+    if evaluation is None:
+        return None
+    evaluation.name = name
+    evaluation.updated_at = updated_at
+    session.flush()
+    return managed_evaluation_from_model(evaluation)
+
+
+def mark_evaluation_running(
+    session: Session,
+    *,
+    evaluation_id: str,
+    started_at: str,
+    result_json_path: Path,
+) -> ManagedEvaluation:
+    """Mark one created evaluation as running."""
+
+    evaluation = _required_evaluation(session, evaluation_id)
+    managed = managed_evaluation_from_model(evaluation)
+    if managed.status != "created":
+        raise ValueError(f"evaluation must be created before start, got {managed.status!r}")
+    evaluation.status = "running"
+    evaluation.started_at = started_at
+    evaluation.updated_at = started_at
+    evaluation.result_json_path = str(result_json_path)
+    evaluation.error_message = None
+    session.flush()
+    return managed_evaluation_from_model(evaluation)
+
+
+def mark_evaluation_completed(
+    session: Session,
+    *,
+    evaluation_id: str,
+    finished_at: str,
+) -> ManagedEvaluation:
+    """Mark one running evaluation as completed."""
+
+    evaluation = _required_evaluation(session, evaluation_id)
+    evaluation.status = "completed"
+    evaluation.finished_at = finished_at
+    evaluation.updated_at = finished_at
+    evaluation.error_message = None
+    session.flush()
+    return managed_evaluation_from_model(evaluation)
+
+
+def mark_evaluation_failed(
+    session: Session,
+    *,
+    evaluation_id: str,
+    finished_at: str,
+    error_message: str,
+) -> ManagedEvaluation:
+    """Mark one evaluation as failed with a user-facing error."""
+
+    evaluation = _required_evaluation(session, evaluation_id)
+    evaluation.status = "failed"
+    evaluation.finished_at = finished_at
+    evaluation.updated_at = finished_at
+    evaluation.error_message = error_message
+    session.flush()
+    return managed_evaluation_from_model(evaluation)
+
+
 def managed_evaluation_from_model(evaluation: EvaluationModel) -> ManagedEvaluation:
     """Build the public evaluation dataclass from an ORM row."""
 
@@ -134,6 +217,7 @@ def managed_evaluation_from_model(evaluation: EvaluationModel) -> ManagedEvaluat
         policy_mode=_policy_mode(evaluation.policy_mode),
         seed=evaluation.seed,
         target=_target_from_json(evaluation.target_json),
+        config=load_config_json(evaluation.config_json),
         checkpoint=_checkpoint_from_json(evaluation.checkpoint_json),
         result_json_path=(
             None if evaluation.result_json_path is None else Path(evaluation.result_json_path)
@@ -221,8 +305,15 @@ def _policy_mode(value: object) -> EvaluationPolicyMode:
 
 def _evaluation_mode(value: object) -> EvaluationMode:
     match str(value):
-        case "time_attack":
-            return "time_attack"
-        case "gp_cup":
-            return "gp_cup"
+        case "time_attack_course":
+            return "time_attack_course"
+        case "gp_course":
+            return "gp_course"
     raise ValueError(f"Unsupported evaluation mode: {value!r}")
+
+
+def _required_evaluation(session: Session, evaluation_id: str) -> EvaluationModel:
+    evaluation = session.get(EvaluationModel, evaluation_id)
+    if evaluation is None:
+        raise ValueError(f"evaluation not found: {evaluation_id}")
+    return evaluation

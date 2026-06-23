@@ -501,6 +501,7 @@ class ManagerStore:
         policy_mode: EvaluationPolicyMode,
         seed: int,
         target: EvaluationTargetSpec,
+        config: ManagedRunConfig,
         evaluations_root: Path | None = None,
     ) -> ManagedEvaluation:
         return evaluation_registry.create_evaluation(
@@ -511,6 +512,7 @@ class ManagerStore:
             policy_mode=policy_mode,
             seed=seed,
             target=target,
+            config=config,
             evaluations_root=evaluations_root,
         )
 
@@ -522,6 +524,31 @@ class ManagerStore:
 
     def delete_evaluation(self, evaluation_id: str) -> bool:
         return evaluation_registry.delete_evaluation(self, evaluation_id)
+
+    def update_evaluation_name(self, *, evaluation_id: str, name: str) -> ManagedEvaluation | None:
+        return evaluation_registry.update_evaluation_name(
+            self,
+            evaluation_id=evaluation_id,
+            name=name,
+        )
+
+    def mark_evaluation_running(self, evaluation_id: str) -> ManagedEvaluation:
+        return evaluation_registry.mark_evaluation_running(self, evaluation_id)
+
+    def mark_evaluation_completed(self, evaluation_id: str) -> ManagedEvaluation:
+        return evaluation_registry.mark_evaluation_completed(self, evaluation_id)
+
+    def mark_evaluation_failed(
+        self,
+        evaluation_id: str,
+        *,
+        error_message: str,
+    ) -> ManagedEvaluation:
+        return evaluation_registry.mark_evaluation_failed(
+            self,
+            evaluation_id,
+            error_message=error_message,
+        )
 
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         return run_registry.update_run_name(self, run_id=run_id, name=name)
