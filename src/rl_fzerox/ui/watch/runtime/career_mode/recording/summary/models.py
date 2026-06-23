@@ -53,9 +53,23 @@ class _SegmentSummaryBuilder:
 
     def observe(self, info: Mapping[str, object]) -> None:
         self.frame_count += 1
-        self.observe_event(info)
+        # Frame samples may carry stale terminal telemetry during menu/course
+        # transitions. Only frames marked by the controller as the actual race
+        # terminal event may create course-result rows.
+        self._observe(
+            info,
+            include_course_result=info.get("career_mode_race_terminal") is True,
+        )
 
     def observe_event(self, info: Mapping[str, object]) -> None:
+        self._observe(info, include_course_result=True)
+
+    def _observe(
+        self,
+        info: Mapping[str, object],
+        *,
+        include_course_result: bool,
+    ) -> None:
         if status := last_finished_attempt_status(info):
             self.status = status
         self.final_info = _merge_selected_summary_info(
@@ -65,21 +79,8 @@ class _SegmentSummaryBuilder:
         if engine_observation := _course_engine_observation(info):
             identity, engine_raw = engine_observation
             self.observed_course_engine_raw_values[identity] = engine_raw
-        course_result = _course_result(info)
-        if course_result is not None:
-            self._apply_observed_course_engine(course_result)
-            existing_index = _existing_course_result_index(self.course_results, course_result)
-            if existing_index is not None:
-                self.course_results[existing_index] = _merge_missing_course_result_fields(
-                    self.course_results[existing_index],
-                    course_result,
-                )
-                self.last_course_result_signature = _course_result_signature(course_result)
-            else:
-                signature = _course_result_signature(course_result)
-                if signature != self.last_course_result_signature:
-                    self.course_results.append(course_result)
-                    self.last_course_result_signature = signature
+        if include_course_result:
+            self._observe_course_result(info)
         policy_checkpoint = _policy_checkpoint_summary(info)
         if policy_checkpoint is None:
             return
@@ -88,6 +89,24 @@ class _SegmentSummaryBuilder:
             return
         self.policy_checkpoints.append(policy_checkpoint)
         self.last_policy_checkpoint_signature = signature
+
+    def _observe_course_result(self, info: Mapping[str, object]) -> None:
+        course_result = _course_result(info)
+        if course_result is None:
+            return
+        self._apply_observed_course_engine(course_result)
+        existing_index = _existing_course_result_index(self.course_results, course_result)
+        if existing_index is not None:
+            self.course_results[existing_index] = _merge_missing_course_result_fields(
+                self.course_results[existing_index],
+                course_result,
+            )
+            self.last_course_result_signature = _course_result_signature(course_result)
+            return
+        signature = _course_result_signature(course_result)
+        if signature != self.last_course_result_signature:
+            self.course_results.append(course_result)
+            self.last_course_result_signature = signature
 
     def _apply_observed_course_engine(self, course_result: dict[str, object]) -> None:
         identity = _course_result_identity(course_result)

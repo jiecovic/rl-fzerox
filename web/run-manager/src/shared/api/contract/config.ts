@@ -22,6 +22,7 @@ import {
   stateComponentNameSchema,
   trackSamplingModeSchema,
   vehicleSelectionModeSchema,
+  watchDeviceSchema,
 } from "@/shared/api/contract/enums";
 import { centeredEngineBuckets, ENGINE_SLIDER } from "@/shared/domain/engineBuckets";
 
@@ -103,6 +104,7 @@ const trainConfigSchema = z.object({
   save_best_checkpoint: z.boolean(),
   save_recent_checkpoints: z.boolean(),
   recent_checkpoint_limit: z.number().int().positive().nullable(),
+  device: watchDeviceSchema.default("cuda"),
 });
 
 type GpDifficulty = z.infer<typeof gpDifficultySchema>;

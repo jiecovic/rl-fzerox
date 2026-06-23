@@ -529,6 +529,7 @@ def test_career_recorder_keeps_course_retire_inside_current_segment(
             "career_mode_attempt_id": "attempt-a",
             "career_mode_target_label": "Clear Master Joker Cup",
             "career_mode_fsm_terminal_result": True,
+            "career_mode_race_terminal": True,
             "termination_reason": "retired",
         },
     )
@@ -993,6 +994,7 @@ def test_career_recorder_finalizes_succeeded_segment_on_post_gp_completion(
             "career_mode_target_label": "Clear Master Joker Cup",
             "career_mode_fsm_continuing_result": False,
             "career_mode_fsm_terminal_result": True,
+            "career_mode_race_terminal": True,
             "career_mode_last_finished_attempt_id": "attempt-final",
             "career_mode_last_finished_attempt_status": "succeeded",
             "termination_reason": "finished",
@@ -1480,6 +1482,111 @@ def test_career_recorder_summary_deduplicates_duplicate_terminal_observations(
     markdown = summary_md_path.read_text(encoding="utf-8")
     assert "| - | finished |" not in markdown
     assert "| Mute City | finished | 1:26.136 | 7 | 0 | Engine 80 |" in markdown
+
+
+def test_career_recorder_summary_ignores_stale_terminal_frame_samples(
+    tmp_path: Path,
+) -> None:
+    writers: list[_FakeWriter] = []
+    finalizer = _FakeFinalizer()
+
+    def writer_factory(path: Path) -> _FakeWriter:
+        writer = _FakeWriter(path)
+        writers.append(writer)
+        return writer
+
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    recorder = CareerModeFrameRecorder(
+        path=tmp_path / "career.mkv",
+        native_fps=60.0,
+        writer_factory=writer_factory,
+        finalizer_factory=lambda: finalizer,
+    )
+
+    base_info = {
+        "career_mode_attempt_id": "attempt-a",
+        "career_mode_target_label": "Clear Master Jack Cup",
+        "game_mode": "gp_race",
+    }
+    recorder.record_frame(
+        frame,
+        info={
+            **base_info,
+            "course_index": 0,
+            "engine_setting_raw_value_ram": 80,
+        },
+    )
+    recorder.record_event(
+        info={
+            **base_info,
+            "termination_reason": "finished",
+            "course_index": 0,
+            "race_time_ms": 76_120,
+            "position": 1,
+            "ko_star_count": 0,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+        },
+    )
+    recorder.record_frame(
+        frame,
+        info={
+            **base_info,
+            "termination_reason": "finished",
+            "course_index": 1,
+            "race_time_ms": 76_120,
+            "position": 30,
+            "ko_star_count": 0,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+            "engine_setting_raw_value_ram": 50,
+        },
+    )
+    recorder.record_frame(
+        frame,
+        info={
+            **base_info,
+            "course_index": 1,
+            "engine_setting_raw_value_ram": 96,
+        },
+    )
+    recorder.record_event(
+        info={
+            **base_info,
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "succeeded",
+            "termination_reason": "finished",
+            "course_index": 1,
+            "race_time_ms": 68_233,
+            "position": 1,
+            "ko_star_count": 0,
+            "race_laps_completed": 3,
+            "total_lap_count": 3,
+        },
+    )
+    recorder.finish_segment(
+        status="succeeded",
+        info={
+            **base_info,
+            "career_mode_last_finished_attempt_id": "attempt-a",
+            "career_mode_last_finished_attempt_status": "succeeded",
+            "game_mode": "main_menu",
+        },
+    )
+    recorder.close()
+
+    summary_json_path = tmp_path / "career.segment-001-clear-master-jack-cup.summary.json"
+    summary_md_path = tmp_path / "career.segment-001-clear-master-jack-cup.summary.md"
+    summary = json.loads(summary_json_path.read_text(encoding="utf-8"))
+    assert summary["result_counts"] == {"crashed": 0, "failed": 0, "finished": 2, "retired": 0}
+    assert [course["course_name"] for course in summary["courses"]] == ["Mute City", "Silence"]
+    assert [course["race_time_ms"] for course in summary["courses"]] == [76_120, 68_233]
+    assert [course["position"] for course in summary["courses"]] == [1, 1]
+    assert [course["engine_setting_raw_value"] for course in summary["courses"]] == [80, 96]
+    markdown = summary_md_path.read_text(encoding="utf-8")
+    assert "| Mute City | finished | 1:16.120 | 1 | 0 | Engine 63 |" in markdown
+    assert "| Silence | finished | 1:08.233 | 1 | 0 | Engine 75 |" in markdown
+    assert "| Silence | finished | 1:16.120 | 30 | 0 |" not in markdown
 
 
 def test_career_segment_recording_path_sanitizes_label() -> None:

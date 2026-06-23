@@ -15,13 +15,16 @@ import {
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import type { DraftEditorSession, ForkSourceEngineTuning } from "@/app/workspace/types";
 import {
+  cancelEvaluation,
   clearRunAltBaselines,
   clearRunCourseAltBaselines,
   createDraftWithSource,
   createEvaluation,
+  createEvaluationPreset,
   createSaveGame,
   deleteDraft,
   deleteEvaluation,
+  deleteEvaluationPreset,
   deleteLineage,
   deleteRun,
   deleteSaveGame,
@@ -50,10 +53,12 @@ import {
 } from "@/shared/api/client";
 import type {
   CareerModeRunnerLaunchRequest,
+  CreateEvaluationPresetRequest,
   CreateEvaluationRequest,
   EngineTuningSourceAction,
   ManagedDraft,
   ManagedEvaluation,
+  ManagedEvaluationPreset,
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
@@ -83,6 +88,11 @@ interface UseWorkspaceActionsOptions {
 export interface WorkspaceActions {
   createDraftFromManagedRun: (runId: string) => Promise<void>;
   createManagedEvaluation: (request: CreateEvaluationRequest) => Promise<ManagedEvaluation>;
+  createManagedEvaluationPreset: (
+    request: CreateEvaluationPresetRequest,
+  ) => Promise<ManagedEvaluationPreset>;
+  removeManagedEvaluationPreset: (preset: ManagedEvaluationPreset) => Promise<void>;
+  cancelManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
   startManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
   renameManagedEvaluation: (evaluationId: string, name: string) => Promise<void>;
   createManagedSaveGame: (name: string) => Promise<ManagedSaveGame>;
@@ -205,9 +215,42 @@ export function useWorkspaceActions({
     }
   }
 
+  async function createManagedEvaluationPreset(request: CreateEvaluationPresetRequest) {
+    try {
+      const preset = await createEvaluationPreset(request);
+      await reloadManagerData({ showLoading: false });
+      return preset;
+    } catch (caught) {
+      await reloadManagerData();
+      throw caught;
+    }
+  }
+
+  async function removeManagedEvaluationPreset(preset: ManagedEvaluationPreset) {
+    try {
+      await deleteEvaluationPreset(preset.id);
+      await reloadManagerData({ showLoading: false });
+    } catch (caught) {
+      await reloadManagerData();
+      throw caught;
+    }
+  }
+
   async function startManagedEvaluation(evaluation: ManagedEvaluation) {
     try {
       const updated = await startEvaluation(evaluation.id);
+      setEvaluations((current) => upsertEvaluation(current, updated));
+      await reloadManagerData({ showLoading: false });
+      return updated;
+    } catch (caught) {
+      await reloadManagerData({ showLoading: false });
+      throw caught;
+    }
+  }
+
+  async function cancelManagedEvaluation(evaluation: ManagedEvaluation) {
+    try {
+      const updated = await cancelEvaluation(evaluation.id);
       setEvaluations((current) => upsertEvaluation(current, updated));
       await reloadManagerData({ showLoading: false });
       return updated;
@@ -552,6 +595,8 @@ export function useWorkspaceActions({
   return {
     createDraftFromManagedRun,
     createManagedEvaluation,
+    createManagedEvaluationPreset,
+    cancelManagedEvaluation,
     startManagedEvaluation,
     createManagedSaveGame,
     forkManagedRun,
@@ -563,6 +608,7 @@ export function useWorkspaceActions({
     importManagedSaveEngineTuning,
     removeDraft,
     removeManagedEvaluation,
+    removeManagedEvaluationPreset,
     removeLineage,
     removeRun,
     removeSaveGame,

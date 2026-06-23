@@ -1,7 +1,10 @@
 // web/run-manager/src/shared/api/client/resources/evaluations.ts
 import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
+  type CreateEvaluationPresetRequest,
   type CreateEvaluationRequest,
+  cancelEvaluationResponseSchema,
+  createEvaluationPresetResponseSchema,
   createEvaluationResponseSchema,
   type EvaluationsResponse,
   evaluationsResponseSchema,
@@ -28,23 +31,35 @@ export async function createEvaluation(
     body: JSON.stringify({
       name: request.name,
       source_run_id: request.sourceRunId,
-      preset_id: request.presetId,
       source_artifact: request.sourceArtifact,
+      preset_id: request.presetId,
+      device: request.device,
       policy_mode: request.policyMode,
+    }),
+  });
+  const payload = parseApiPayload(createEvaluationResponseSchema, await parseJson(response));
+  return payload.evaluation;
+}
+
+export async function createEvaluationPreset(request: CreateEvaluationPresetRequest) {
+  const response = await fetch("/api/evaluation-presets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: request.name,
       seed: request.seed,
-      config: request.config,
+      renderer: request.renderer,
       target: {
         mode: request.targetMode,
         course_ids: request.courseIds,
         cup_ids: request.cupIds,
         difficulties: request.difficulties,
-        vehicle_ids: request.vehicleIds,
         repeats_per_target: request.repeatsPerTarget,
       },
     }),
   });
-  const payload = parseApiPayload(createEvaluationResponseSchema, await parseJson(response));
-  return payload.evaluation;
+  const payload = parseApiPayload(createEvaluationPresetResponseSchema, await parseJson(response));
+  return payload.preset;
 }
 
 export async function deleteEvaluation(evaluationId: string): Promise<boolean> {
@@ -63,11 +78,35 @@ export async function deleteEvaluation(evaluationId: string): Promise<boolean> {
   throw new Error("run-manager delete evaluation response is invalid");
 }
 
+export async function deleteEvaluationPreset(presetId: string): Promise<boolean> {
+  const response = await fetch(`/api/evaluation-presets/${encodeURIComponent(presetId)}`, {
+    method: "DELETE",
+  });
+  const payload = await parseJson(response);
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "deleted" in payload &&
+    typeof payload.deleted === "boolean"
+  ) {
+    return payload.deleted;
+  }
+  throw new Error("run-manager delete evaluation preset response is invalid");
+}
+
 export async function startEvaluation(evaluationId: string): Promise<ManagedEvaluation> {
   const response = await fetch(`/api/evaluations/${encodeURIComponent(evaluationId)}/start`, {
     method: "POST",
   });
   const payload = parseApiPayload(startEvaluationResponseSchema, await parseJson(response));
+  return payload.evaluation;
+}
+
+export async function cancelEvaluation(evaluationId: string): Promise<ManagedEvaluation> {
+  const response = await fetch(`/api/evaluations/${encodeURIComponent(evaluationId)}/cancel`, {
+    method: "POST",
+  });
+  const payload = parseApiPayload(cancelEvaluationResponseSchema, await parseJson(response));
   return payload.evaluation;
 }
 

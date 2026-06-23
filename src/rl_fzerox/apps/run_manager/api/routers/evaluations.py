@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.contracts import (
+    CreateEvaluationPresetRequest,
     CreateEvaluationRequest,
     UpdateEvaluationRequest,
 )
@@ -27,9 +28,24 @@ def create_evaluations_router(store: ManagerStore) -> APIRouter:
         name = required_name(request.name, subject="evaluation")
         return await run_sync(handlers.create_evaluation_payload, store, request, name)
 
+    @router.post("/api/evaluation-presets", status_code=201)
+    async def create_evaluation_preset(
+        request: CreateEvaluationPresetRequest,
+    ) -> dict[str, dict[str, object]]:
+        name = required_name(request.name, subject="evaluation preset")
+        return await run_sync(handlers.create_evaluation_preset_payload, store, request, name)
+
+    @router.delete("/api/evaluation-presets/{preset_id}")
+    async def delete_evaluation_preset(preset_id: str) -> dict[str, bool]:
+        return await run_sync(handlers.delete_evaluation_preset_payload, store, preset_id)
+
     @router.post("/api/evaluations/{evaluation_id}/start")
     async def start_evaluation(evaluation_id: str) -> dict[str, dict[str, object]]:
         return await run_sync(handlers.start_evaluation_payload, store, evaluation_id)
+
+    @router.post("/api/evaluations/{evaluation_id}/cancel")
+    async def cancel_evaluation(evaluation_id: str) -> dict[str, dict[str, object]]:
+        return await run_sync(handlers.cancel_evaluation_payload, store, evaluation_id)
 
     @router.put("/api/evaluations/{evaluation_id}")
     async def update_evaluation(

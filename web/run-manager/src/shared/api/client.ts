@@ -25,12 +25,15 @@ export {
   resetRunTrackSamplingState,
 } from "@/shared/api/client/metrics";
 export {
+  cancelEvaluation,
   createDraft,
   createDraftWithSource,
   createEvaluation,
+  createEvaluationPreset,
   createSaveGame,
   deleteDraft,
   deleteEvaluation,
+  deleteEvaluationPreset,
   deleteLineage,
   deleteRun,
   deleteSaveGame,

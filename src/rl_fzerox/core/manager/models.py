@@ -20,7 +20,7 @@ SaveUnlockInspectionStatus = Literal["not_inspected", "inspected"]
 SaveUnlockTargetStatus = Literal["pending", "locked", "succeeded", "failed", "skipped"]
 ViewerLeaseKind = Literal["run_watch", "career_mode"]
 ManagedEvaluationStatus = Literal["created", "running", "completed", "failed", "cancelled"]
-EvaluationBaselineSuiteStatus = Literal["missing", "ready", "failed"]
+EvaluationBaselineSuiteStatus = Literal["not_created", "ready", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,11 +115,9 @@ class ManagedEvaluationPreset:
     id: str
     name: str
     version: int
-    source_artifact: Literal["latest", "best", "final"]
     seed: int
     renderer: Literal["angrylion", "gliden64"]
     target: EvaluationTargetSpec
-    config: ManagedRunConfig
     builtin: bool
     created_at: str
     updated_at: str

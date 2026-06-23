@@ -8,8 +8,11 @@ export {
   updateDraftWithSource,
 } from "@/shared/api/client/resources/drafts";
 export {
+  cancelEvaluation,
   createEvaluation,
+  createEvaluationPreset,
   deleteEvaluation,
+  deleteEvaluationPreset,
   fetchEvaluationData,
   fetchEvaluations,
   startEvaluation,

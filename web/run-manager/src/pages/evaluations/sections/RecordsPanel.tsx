@@ -42,12 +42,7 @@ export function RecordsPanel({
   onToggleEvaluationSelection,
 }: RecordsPanelProps) {
   if (evaluationError !== null) {
-    return (
-      <Notice tone="error">
-        Evaluation records could not be loaded: {evaluationError}. Other run-manager data is still
-        available.
-      </Notice>
-    );
+    return <Notice tone="error">Evaluation records are unavailable. See the global error.</Notice>;
   }
   return evaluations.length === 0 ? (
     <Notice>
@@ -115,7 +110,7 @@ function EvaluationTable({
             <th className="w-10 px-4 py-3">
               <label className="grid place-items-center" data-evaluation-row-interaction>
                 <input
-                  aria-label="Select all created evaluations"
+                  aria-label="Select all inactive evaluations"
                   checked={allDeletableEvaluationsSelected}
                   className={evaluationCheckboxClass}
                   disabled={isDeletingEvaluation}
@@ -136,7 +131,7 @@ function EvaluationTable({
         </thead>
         <tbody>
           {evaluations.map((evaluation) => {
-            const isCreated = evaluation.status === "created";
+            const isDeletable = evaluation.status !== "running";
             const selected = selectedEvaluationIds.has(evaluation.id);
             return (
               <tr
@@ -165,7 +160,7 @@ function EvaluationTable({
                       aria-label={`Select evaluation ${evaluation.name}`}
                       checked={selected}
                       className={evaluationCheckboxClass}
-                      disabled={!isCreated || isDeletingEvaluation}
+                      disabled={!isDeletable || isDeletingEvaluation}
                       type="checkbox"
                       onChange={(event) =>
                         onToggleEvaluationSelection(evaluation.id, event.currentTarget.checked)
@@ -209,7 +204,7 @@ function EvaluationTable({
                   <TooltipIconButton
                     aria-label={`Delete evaluation ${evaluation.name}`}
                     disabled={
-                      !isCreated || deletingEvaluationId === evaluation.id || isDeletingEvaluation
+                      !isDeletable || deletingEvaluationId === evaluation.id || isDeletingEvaluation
                     }
                     size="compact"
                     tone="danger"
@@ -272,9 +267,9 @@ function evaluationExecutionLabel(evaluation: ManagedEvaluation) {
 function evaluationProgressLabel(evaluation: ManagedEvaluation) {
   const { completed_attempts: completed, total_attempts: total } = evaluation.progress;
   if (total !== null && total > 0) {
-    return `${completed}/${total} attempts`;
+    return `${completed}/${total} course runs`;
   }
-  return completed > 0 ? `${completed} attempts` : null;
+  return completed > 0 ? `${completed} course runs` : null;
 }
 
 const evaluationCheckboxClass = "h-4 w-4 accent-app-accent";

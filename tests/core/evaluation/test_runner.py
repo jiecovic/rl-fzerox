@@ -135,6 +135,35 @@ def test_course_runner_repeats_target_set_in_rounds(tmp_path: Path) -> None:
     ]
 
 
+def test_course_runner_cancels_between_attempts(tmp_path: Path) -> None:
+    updates: list[EvaluationRunResult] = []
+    executor = _FakeEpisodeExecutor(statuses=("finished", "finished"), calls=[])
+    cancel_checks = 0
+
+    def should_cancel() -> bool:
+        nonlocal cancel_checks
+        cancel_checks += 1
+        return cancel_checks > 1
+
+    result = run_course_evaluation(
+        _evaluation_spec(tmp_path, repeats=2),
+        (EvaluationCourseTarget(target_id="mute-city", course_id="mute_city"),),
+        executor,
+        result_dir=tmp_path / "eval",
+        on_update=updates.append,
+        should_cancel=should_cancel,
+        clock=_Clock(),
+    )
+
+    assert result.status == "cancelled"
+    assert len(result.attempts) == 1
+    assert [update.status for update in updates] == ["partial", "cancelled"]
+    payload = json.loads(
+        (tmp_path / "eval" / "evaluation.summary.json").read_text(encoding="utf-8")
+    )
+    assert payload["result"]["status"] == "cancelled"
+
+
 def _evaluation_spec(tmp_path: Path, *, repeats: int) -> EvaluationSpec:
     return EvaluationSpec(
         evaluation_id="eval-runner",

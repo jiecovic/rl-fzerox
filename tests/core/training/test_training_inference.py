@@ -65,6 +65,7 @@ class _FakePolicy:
         self.deterministic_calls: list[bool] = []
         self.state_calls: list[PolicyState] = []
         self.episode_start_calls: list[BoolArray | None] = []
+        self.observation_calls: list[ObservationValue] = []
 
     def predict(
         self,
@@ -73,7 +74,7 @@ class _FakePolicy:
         episode_start: BoolArray | None = None,
         deterministic: bool = True,
     ) -> tuple[DiscreteAction, PolicyState]:
-        _ = observation
+        self.observation_calls.append(observation)
         self.deterministic_calls.append(deterministic)
         self.state_calls.append(state)
         self.episode_start_calls.append(
@@ -190,6 +191,28 @@ class _FakeAuxiliaryStatePolicy(_FakeMaskablePolicy):
         return {"track_position.edge_ratio": 0.25}
 
 
+class _FakeChannelsFirstPolicy(_FakePolicy):
+    def __init__(self) -> None:
+        super().__init__([1])
+        self.observation_space = spaces.Box(
+            low=0,
+            high=255,
+            shape=(6, 72, 96),
+            dtype=np.uint8,
+        )
+
+
+class _FakeChannelsFirstDictPolicy(_FakePolicy):
+    def __init__(self) -> None:
+        super().__init__([1])
+        self.observation_space = spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(6, 72, 96), dtype=np.uint8),
+                "state": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            }
+        )
+
+
 def _array_action(action: object) -> NumpyArray:
     assert isinstance(action, np.ndarray)
     return action
@@ -263,6 +286,83 @@ def test_policy_runner_can_sample_non_deterministic_actions(tmp_path: Path) -> N
     assert _array_action(runner.predict(observation, deterministic=False)).tolist() == [2, 0]
 
     assert fake_policy.deterministic_calls == [False]
+
+
+def test_policy_runner_adapts_channels_last_box_observation_for_channels_first_policy(
+    tmp_path: Path,
+) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    fake_policy = _FakeChannelsFirstPolicy()
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        fake_policy,
+    )
+
+    observation = np.zeros((72, 96, 6), dtype=np.uint8)
+    _array_action(runner.predict(observation))
+
+    recorded_observation = fake_policy.observation_calls[-1]
+    assert isinstance(recorded_observation, np.ndarray)
+    assert recorded_observation.shape == (6, 72, 96)
+
+
+def test_policy_runner_adapts_channels_last_dict_image_for_channels_first_policy(
+    tmp_path: Path,
+) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    fake_policy = _FakeChannelsFirstDictPolicy()
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        fake_policy,
+    )
+
+    state = np.array([0.25, -0.5], dtype=np.float32)
+    observation: ObservationValue = {
+        "image": np.zeros((72, 96, 6), dtype=np.uint8),
+        "state": state,
+    }
+    _array_action(runner.predict(observation))
+
+    recorded_observation = fake_policy.observation_calls[-1]
+    assert isinstance(recorded_observation, dict)
+    recorded_image = recorded_observation["image"]
+    assert isinstance(recorded_image, np.ndarray)
+    assert recorded_image.shape == (6, 72, 96)
+    assert recorded_observation["state"] is state
+
+
+def test_policy_runner_leaves_mismatched_image_shape_visible(tmp_path: Path) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    fake_policy = _FakeChannelsFirstPolicy()
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        fake_policy,
+    )
+
+    observation = np.zeros((84, 84, 6), dtype=np.uint8)
+    _array_action(runner.predict(observation))
+
+    recorded_observation = fake_policy.observation_calls[-1]
+    assert isinstance(recorded_observation, np.ndarray)
+    assert recorded_observation.shape == (84, 84, 6)
 
 
 def test_policy_runner_preserves_continuous_action_values(tmp_path: Path) -> None:

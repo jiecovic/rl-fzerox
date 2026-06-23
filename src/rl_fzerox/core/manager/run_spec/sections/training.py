@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -75,6 +77,7 @@ class ManagedTrainConfig(BaseModel):
     save_best_checkpoint: bool = True
     save_recent_checkpoints: bool = False
     recent_checkpoint_limit: PositiveInt | None = 5
+    device: Literal["cpu", "cuda"] = "cuda"
 
 
 def default_entropy_coefficients() -> dict[str, float]:

@@ -501,10 +501,8 @@ class ManagerStore:
         source_run_id: str,
         source_artifact: EvaluationCheckpointArtifact,
         policy_mode: EvaluationPolicyMode,
-        seed: int,
-        target: EvaluationTargetSpec,
-        config: ManagedRunConfig,
         preset_id: str,
+        device: Literal["cpu", "cuda"] = "cuda",
         evaluations_root: Path | None = None,
     ) -> ManagedEvaluation:
         return evaluation_registry.create_evaluation(
@@ -513,10 +511,8 @@ class ManagerStore:
             source_run_id=source_run_id,
             source_artifact=source_artifact,
             policy_mode=policy_mode,
-            seed=seed,
-            target=target,
-            config=config,
             preset_id=preset_id,
+            device=device,
             evaluations_root=evaluations_root,
         )
 
@@ -534,6 +530,25 @@ class ManagerStore:
 
     def list_evaluation_presets(self) -> tuple[ManagedEvaluationPreset, ...]:
         return evaluation_registry.list_evaluation_presets(self)
+
+    def create_evaluation_preset(
+        self,
+        *,
+        name: str,
+        seed: int,
+        renderer: Literal["angrylion", "gliden64"],
+        target: EvaluationTargetSpec,
+    ) -> ManagedEvaluationPreset:
+        return evaluation_registry.create_evaluation_preset(
+            self,
+            name=name,
+            seed=seed,
+            renderer=renderer,
+            target=target,
+        )
+
+    def delete_evaluation_preset(self, preset_id: str) -> bool:
+        return evaluation_registry.delete_evaluation_preset(self, preset_id)
 
     def list_evaluation_baseline_suites(self) -> tuple[ManagedEvaluationBaselineSuite, ...]:
         return evaluation_registry.list_evaluation_baseline_suites(self)
@@ -565,6 +580,15 @@ class ManagerStore:
             evaluation_id,
             error_message=error_message,
         )
+
+    def request_evaluation_cancel(self, evaluation_id: str) -> ManagedEvaluation | None:
+        return evaluation_registry.request_evaluation_cancel(self, evaluation_id)
+
+    def mark_evaluation_cancelled(self, evaluation_id: str) -> ManagedEvaluation:
+        return evaluation_registry.mark_evaluation_cancelled(self, evaluation_id)
+
+    def evaluation_cancel_request_path(self, evaluation_id: str) -> Path:
+        return evaluation_registry.evaluation_cancel_request_path(self, evaluation_id)
 
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         return run_registry.update_run_name(self, run_id=run_id, name=name)

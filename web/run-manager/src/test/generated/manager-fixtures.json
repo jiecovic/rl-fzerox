@@ -1521,6 +1521,7 @@
       "checkpoint_every_rollouts": 5,
       "clip_range": 0.19,
       "clip_range_vf": null,
+      "device": "cuda",
       "entropy_coefficients": {
         "air_brake": 0.01,
         "boost": 0.01,

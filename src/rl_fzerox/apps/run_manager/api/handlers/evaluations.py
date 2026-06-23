@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
-from rl_fzerox.apps.run_manager.api.contracts import CreateEvaluationRequest
+from rl_fzerox.apps.run_manager.api.contracts import (
+    CreateEvaluationPresetRequest,
+    CreateEvaluationRequest,
+)
 from rl_fzerox.apps.run_manager.api.payloads.evaluations import (
     evaluation_baseline_suite_payload,
     evaluation_payload,
@@ -47,23 +50,50 @@ def create_evaluation_payload(
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
             policy_mode=request.policy_mode,
-            seed=request.seed,
-            target=EvaluationTargetSpec(
-                mode=request.target.mode,
-                course_ids=tuple(request.target.course_ids),
-                cup_ids=tuple(request.target.cup_ids),
-                difficulties=tuple(request.target.difficulties),
-                vehicle_ids=tuple(request.target.vehicle_ids),
-                repeats_per_target=request.target.repeats_per_target,
-            ),
-            config=request.config,
             preset_id=request.preset_id,
+            device=request.device,
         )
     except FileNotFoundError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}
+
+
+def create_evaluation_preset_payload(
+    store: ManagerStore,
+    request: CreateEvaluationPresetRequest,
+    name: str,
+) -> dict[str, dict[str, object]]:
+    """Create one custom immutable benchmark preset."""
+
+    target = EvaluationTargetSpec(
+        mode=request.target.mode,
+        course_ids=tuple(request.target.course_ids),
+        cup_ids=tuple(request.target.cup_ids),
+        difficulties=tuple(request.target.difficulties),
+        repeats_per_target=request.target.repeats_per_target,
+    )
+    try:
+        preset = store.create_evaluation_preset(
+            name=name,
+            seed=request.seed,
+            renderer=request.renderer,
+            target=target,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"preset": evaluation_preset_payload(preset)}
+
+
+def delete_evaluation_preset_payload(store: ManagerStore, preset_id: str) -> dict[str, bool]:
+    """Delete one unused custom benchmark preset."""
+
+    try:
+        deleted = store.delete_evaluation_preset(preset_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"deleted": deleted}
 
 
 def delete_evaluation_payload(store: ManagerStore, evaluation_id: str) -> dict[str, bool]:
@@ -96,12 +126,27 @@ def start_evaluation_payload(
     store: ManagerStore,
     evaluation_id: str,
 ) -> dict[str, dict[str, object]]:
-    """Start one created evaluation snapshot."""
+    """Start or retry one inactive evaluation snapshot."""
 
     try:
         evaluation = launch_evaluation_worker(store, evaluation_id=evaluation_id)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}
+
+
+def cancel_evaluation_payload(
+    store: ManagerStore,
+    evaluation_id: str,
+) -> dict[str, dict[str, object]]:
+    """Request cooperative cancellation for one running evaluation."""
+
+    try:
+        evaluation = store.request_evaluation_cancel(evaluation_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if evaluation is None:
+        raise HTTPException(status_code=404, detail="evaluation not found")
     return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}
 
 

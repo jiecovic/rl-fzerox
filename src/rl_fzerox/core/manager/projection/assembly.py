@@ -169,7 +169,7 @@ def train_data(config: ManagedRunConfig, *, run_id: str, run_dir: Path) -> dict[
         "recent_checkpoint_limit": train.recent_checkpoint_limit,
         "state_feature_dropout_groups": build_state_feature_dropout_groups(config),
         "verbose": 0,
-        "device": "cuda",
+        "device": train.device,
         "save_freq": 10_000,
         "output_root": manager_runs_root(output_root=run_dir.parent),
         "run_name": run_id,

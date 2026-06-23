@@ -14,6 +14,10 @@ export function App() {
   const [theme, setTheme] = useState<Theme>("dark");
   const [globalError, setGlobalError] = useState<string | null>(null);
   const managerData = useManagerData();
+  const evaluationLoadError =
+    managerData.evaluationError === null
+      ? null
+      : `Evaluation records could not be loaded: ${managerData.evaluationError}`;
   const sessions = useWorkspaceSessions({
     drafts: managerData.drafts,
     evaluations: managerData.evaluations,
@@ -84,7 +88,7 @@ export function App() {
               actions={actions}
               defaultConfig={managerData.defaultConfig}
               drafts={managerData.drafts}
-              error={globalError ?? managerData.error}
+              error={globalError ?? managerData.error ?? evaluationLoadError}
               evaluationBaselineSuites={managerData.evaluationBaselineSuites}
               evaluationError={managerData.evaluationError}
               evaluations={managerData.evaluations}

@@ -23,13 +23,16 @@ def launch_evaluation_worker(
     *,
     evaluation_id: str,
 ) -> ManagedEvaluation:
-    """Start one created evaluation and return its running DB row."""
+    """Start one new or failed evaluation and return its running DB row."""
 
     evaluation = store.get_evaluation(evaluation_id)
     if evaluation is None:
         raise ValueError("evaluation not found")
-    if evaluation.status != "created":
-        raise ValueError(f"only created evaluations can be started, got {evaluation.status}")
+    if evaluation.status not in {"created", "failed", "cancelled"}:
+        raise ValueError(
+            "only created, failed, or cancelled evaluations can be started, "
+            f"got {evaluation.status}"
+        )
 
     running = store.mark_evaluation_running(evaluation_id)
     log_path = manager_evaluation_log_path(evaluation_id)

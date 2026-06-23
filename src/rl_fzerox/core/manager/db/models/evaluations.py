@@ -47,11 +47,9 @@ class EvaluationPresetModel(ManagerBase):
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str]
     version: Mapped[int] = mapped_column(Integer)
-    source_artifact: Mapped[str]
     seed: Mapped[int] = mapped_column(Integer)
     renderer: Mapped[str]
     target_json: Mapped[str] = mapped_column(Text)
-    config_json: Mapped[str] = mapped_column(Text)
     builtin: Mapped[bool]
     created_at: Mapped[str]
     updated_at: Mapped[str]

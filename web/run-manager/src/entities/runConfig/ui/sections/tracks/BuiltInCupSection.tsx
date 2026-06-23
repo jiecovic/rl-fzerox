@@ -13,6 +13,7 @@ import { AppTooltip } from "@/shared/ui/Tooltip";
 interface BuiltInCupSectionProps {
   cup: TrackCupView;
   collapsed: boolean;
+  readOnly?: boolean;
   selectedCourseIds: readonly string[];
   selectedCourseSet: ReadonlySet<string>;
   xCupEnabled: boolean;
@@ -24,6 +25,7 @@ interface BuiltInCupSectionProps {
 export function BuiltInCupSection({
   cup,
   collapsed,
+  readOnly = false,
   selectedCourseIds,
   selectedCourseSet,
   xCupEnabled,
@@ -34,7 +36,8 @@ export function BuiltInCupSection({
   const selectedCount = cup.courses.filter((course) => selectedCourseSet.has(course.id)).length;
   const allCupCoursesSelected = selectedCount === cup.courses.length;
   const disablingWouldClearPool =
-    allCupCoursesSelected && selectedCourseIds.length === cup.courses.length && !xCupEnabled;
+    readOnly ||
+    (allCupCoursesSelected && selectedCourseIds.length === cup.courses.length && !xCupEnabled);
 
   return (
     <details
@@ -63,7 +66,9 @@ export function BuiltInCupSection({
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  onToggleCup(cup.course_ids);
+                  if (!readOnly) {
+                    onToggleCup(cup.course_ids);
+                  }
                 }}
               >
                 <span aria-hidden="true" />
@@ -77,7 +82,8 @@ export function BuiltInCupSection({
         <div className="grid grid-cols-[repeat(auto-fit,minmax(164px,1fr))] gap-3">
           {cup.courses.map((course) => {
             const isSelected = selectedCourseSet.has(course.id);
-            const isOnlySelected = isSelected && selectedCourseIds.length === 1 && !xCupEnabled;
+            const isOnlySelected =
+              readOnly || (isSelected && selectedCourseIds.length === 1 && !xCupEnabled);
             return (
               <button
                 aria-label={course.display_name}
@@ -87,7 +93,11 @@ export function BuiltInCupSection({
                 disabled={isOnlySelected}
                 key={course.id}
                 type="button"
-                onClick={() => onToggleCourse(course.id)}
+                onClick={() => {
+                  if (!readOnly) {
+                    onToggleCourse(course.id);
+                  }
+                }}
               >
                 {isSelected ? <span className={courseSelectedBadgeClass}>selected</span> : null}
                 <TrackMinimap courseId={course.id} cup={course.cup} />

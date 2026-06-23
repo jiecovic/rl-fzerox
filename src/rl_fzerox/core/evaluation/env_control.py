@@ -29,14 +29,32 @@ def action_masks(env: object) -> ActionMask:
 
 
 def _env_control_method(env: object, method_name: str) -> Callable[..., object]:
-    direct_method = getattr(env, method_name, None)
+    return _env_control_method_from(env, method_name, seen=set())
+
+
+def _env_control_method_from(
+    env: object,
+    method_name: str,
+    *,
+    seen: set[int],
+) -> Callable[..., object]:
+    env_id = id(env)
+    if env_id in seen:
+        raise AttributeError(f"evaluation env wrapper cycle while resolving {method_name!r}")
+    seen.add(env_id)
+
+    try:
+        direct_method = object.__getattribute__(env, method_name)
+    except AttributeError:
+        direct_method = None
     if callable(direct_method):
         return direct_method
 
-    get_wrapper_attr = getattr(env, "get_wrapper_attr", None)
-    if callable(get_wrapper_attr):
-        wrapper_method = get_wrapper_attr(method_name)
-        if callable(wrapper_method):
-            return wrapper_method
+    try:
+        inner_env = object.__getattribute__(env, "env")
+    except AttributeError:
+        inner_env = None
+    if inner_env is not None and inner_env is not env:
+        return _env_control_method_from(inner_env, method_name, seen=seen)
 
     raise AttributeError(f"evaluation env does not expose {method_name!r}")

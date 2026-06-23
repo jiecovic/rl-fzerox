@@ -31,12 +31,11 @@ from rl_fzerox.core.manager.models import (
     ManagedEvaluationPreset,
     ManagedEvaluationStatus,
 )
-from rl_fzerox.core.manager.run_spec import ManagedRunConfig, default_managed_run_config
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.serialization import config_json, load_config_json
 
 _DEFAULT_EVALUATION_SEED = 2_262_218_583
 _DEFAULT_EVALUATION_REPEATS = 10
-_BLUE_FALCON_ID = "blue_falcon"
 
 
 def insert_evaluation(
@@ -176,6 +175,49 @@ def get_evaluation_preset(
     return None if preset is None else evaluation_preset_from_model(preset)
 
 
+def insert_evaluation_preset(
+    session: Session,
+    *,
+    preset: ManagedEvaluationPreset,
+) -> ManagedEvaluationPreset:
+    """Insert one custom evaluation preset."""
+
+    session.add(_preset_model_from_dataclass(preset))
+    session.flush()
+    return preset
+
+
+def delete_evaluation_preset(
+    session: Session,
+    preset_id: str,
+) -> tuple[ManagedEvaluationPreset, tuple[ManagedEvaluationBaselineSuite, ...]] | None:
+    """Delete one unused custom preset and return its baseline-suite rows."""
+
+    preset = session.get(EvaluationPresetModel, preset_id)
+    if preset is None:
+        return None
+    managed = evaluation_preset_from_model(preset)
+    if managed.builtin:
+        raise ValueError("built-in evaluation presets cannot be deleted")
+    referenced_evaluation_id = session.scalar(
+        select(EvaluationModel.id).where(EvaluationModel.preset_id == preset_id).limit(1)
+    )
+    if referenced_evaluation_id is not None:
+        raise ValueError("evaluation preset is referenced by evaluation records")
+    suites = tuple(
+        session.scalars(
+            select(EvaluationBaselineSuiteModel).where(
+                EvaluationBaselineSuiteModel.preset_id == preset_id
+            )
+        )
+    )
+    managed_suites = tuple(evaluation_baseline_suite_from_model(suite) for suite in suites)
+    for suite in suites:
+        session.delete(suite)
+    session.delete(preset)
+    return managed, managed_suites
+
+
 def ensure_evaluation_baseline_suite(
     session: Session,
     *,
@@ -240,15 +282,15 @@ def list_evaluation_baseline_suites(
     return tuple(evaluation_baseline_suite_from_model(suite) for suite in suites)
 
 
-def delete_created_evaluation(session: Session, evaluation_id: str) -> ManagedEvaluation | None:
-    """Delete one created evaluation record and return its previous value."""
+def delete_inactive_evaluation(session: Session, evaluation_id: str) -> ManagedEvaluation | None:
+    """Delete one evaluation record that has no active worker."""
 
     evaluation = session.get(EvaluationModel, evaluation_id)
     if evaluation is None:
         return None
     managed = managed_evaluation_from_model(evaluation)
-    if managed.status != "created":
-        raise ValueError("only created evaluation snapshots can be deleted")
+    if managed.status == "running":
+        raise ValueError("running evaluation snapshots cannot be deleted")
     session.delete(evaluation)
     return managed
 
@@ -278,14 +320,17 @@ def mark_evaluation_running(
     started_at: str,
     result_json_path: Path,
 ) -> ManagedEvaluation:
-    """Mark one created evaluation as running."""
+    """Mark one new or failed evaluation as running."""
 
     evaluation = _required_evaluation(session, evaluation_id)
     managed = managed_evaluation_from_model(evaluation)
-    if managed.status != "created":
-        raise ValueError(f"evaluation must be created before start, got {managed.status!r}")
+    if managed.status not in {"created", "failed", "cancelled"}:
+        raise ValueError(
+            f"evaluation must be created, failed, or cancelled before start, got {managed.status!r}"
+        )
     evaluation.status = "running"
     evaluation.started_at = started_at
+    evaluation.finished_at = None
     evaluation.updated_at = started_at
     evaluation.result_json_path = str(result_json_path)
     evaluation.error_message = None
@@ -302,6 +347,11 @@ def mark_evaluation_completed(
     """Mark one running evaluation as completed."""
 
     evaluation = _required_evaluation(session, evaluation_id)
+    managed = managed_evaluation_from_model(evaluation)
+    if managed.status == "cancelled":
+        return managed
+    if managed.status != "running":
+        raise ValueError(f"evaluation must be running before completion, got {managed.status!r}")
     evaluation.status = "completed"
     evaluation.finished_at = finished_at
     evaluation.updated_at = finished_at
@@ -320,10 +370,30 @@ def mark_evaluation_failed(
     """Mark one evaluation as failed with a user-facing error."""
 
     evaluation = _required_evaluation(session, evaluation_id)
+    managed = managed_evaluation_from_model(evaluation)
+    if managed.status == "cancelled":
+        return managed
     evaluation.status = "failed"
     evaluation.finished_at = finished_at
     evaluation.updated_at = finished_at
     evaluation.error_message = error_message
+    session.flush()
+    return managed_evaluation_from_model(evaluation)
+
+
+def mark_evaluation_cancelled(
+    session: Session,
+    *,
+    evaluation_id: str,
+    finished_at: str,
+) -> ManagedEvaluation:
+    """Mark one evaluation as cancelled."""
+
+    evaluation = _required_evaluation(session, evaluation_id)
+    evaluation.status = "cancelled"
+    evaluation.finished_at = finished_at
+    evaluation.updated_at = finished_at
+    evaluation.error_message = None
     session.flush()
     return managed_evaluation_from_model(evaluation)
 
@@ -365,11 +435,9 @@ def evaluation_preset_from_model(preset: EvaluationPresetModel) -> ManagedEvalua
         id=preset.id,
         name=preset.name,
         version=preset.version,
-        source_artifact=_checkpoint_artifact(preset.source_artifact),
         seed=preset.seed,
         renderer=_renderer(preset.renderer),
         target=_target_from_json(preset.target_json),
-        config=load_config_json(preset.config_json),
         builtin=preset.builtin,
         created_at=preset.created_at,
         updated_at=preset.updated_at,
@@ -488,8 +556,8 @@ def _renderer(value: object) -> Literal["angrylion", "gliden64"]:
 
 def _baseline_suite_status(value: object) -> EvaluationBaselineSuiteStatus:
     match str(value):
-        case "missing":
-            return "missing"
+        case "not_created":
+            return "not_created"
         case "ready":
             return "ready"
         case "failed":
@@ -509,11 +577,9 @@ def _preset_model_from_dataclass(preset: ManagedEvaluationPreset) -> EvaluationP
         id=preset.id,
         name=preset.name,
         version=preset.version,
-        source_artifact=preset.source_artifact,
         seed=preset.seed,
         renderer=preset.renderer,
         target_json=json.dumps(asdict(preset.target), sort_keys=True),
-        config_json=config_json(preset.config),
         builtin=preset.builtin,
         created_at=preset.created_at,
         updated_at=preset.updated_at,
@@ -526,11 +592,9 @@ def _update_preset_model(
 ) -> None:
     model.name = preset.name
     model.version = preset.version
-    model.source_artifact = preset.source_artifact
     model.seed = preset.seed
     model.renderer = preset.renderer
     model.target_json = json.dumps(asdict(preset.target), sort_keys=True)
-    model.config_json = config_json(preset.config)
     model.builtin = preset.builtin
     model.updated_at = preset.updated_at
 
@@ -539,76 +603,34 @@ def _default_evaluation_presets(*, now: str) -> tuple[ManagedEvaluationPreset, .
     all_course_ids = tuple(course.id for course in BUILT_IN_COURSES)
     return (
         ManagedEvaluationPreset(
-            id="time_attack_blue_falcon_all_courses",
-            name="Time Attack course · Blue Falcon · all courses",
+            id="time_attack_all_courses",
+            name="Time Attack course · all courses",
             version=1,
-            source_artifact="latest",
             seed=_DEFAULT_EVALUATION_SEED,
             renderer="gliden64",
             target=EvaluationTargetSpec(
                 mode="time_attack_course",
                 course_ids=all_course_ids,
-                vehicle_ids=(_BLUE_FALCON_ID,),
                 repeats_per_target=_DEFAULT_EVALUATION_REPEATS,
-            ),
-            config=_default_preset_config(
-                race_mode="time_attack",
-                course_ids=all_course_ids,
-                difficulties=(),
             ),
             builtin=True,
             created_at=now,
             updated_at=now,
         ),
         ManagedEvaluationPreset(
-            id="gp_course_master_blue_falcon_all_courses",
-            name="GP course · Master · Blue Falcon · all courses",
+            id="gp_course_master_all_courses",
+            name="GP course · Master · all courses",
             version=1,
-            source_artifact="latest",
             seed=_DEFAULT_EVALUATION_SEED,
             renderer="gliden64",
             target=EvaluationTargetSpec(
                 mode="gp_course",
                 course_ids=all_course_ids,
                 difficulties=("master",),
-                vehicle_ids=(_BLUE_FALCON_ID,),
                 repeats_per_target=_DEFAULT_EVALUATION_REPEATS,
-            ),
-            config=_default_preset_config(
-                race_mode="gp_race",
-                course_ids=all_course_ids,
-                difficulties=("master",),
             ),
             builtin=True,
             created_at=now,
             updated_at=now,
         ),
     )
-
-
-def _default_preset_config(
-    *,
-    race_mode: str,
-    course_ids: tuple[str, ...],
-    difficulties: tuple[str, ...],
-) -> ManagedRunConfig:
-    base = default_managed_run_config()
-    data = base.model_dump(mode="python")
-    data["tracks"] = {
-        **data["tracks"],
-        "baseline_variant_count": 1,
-        "gp_difficulties": difficulties,
-        "include_x_cup": False,
-        "race_mode": race_mode,
-        "selected_course_ids": course_ids,
-    }
-    data["vehicle"] = {
-        **data["vehicle"],
-        "selected_vehicle_ids": (_BLUE_FALCON_ID,),
-        "selection_mode": "fixed",
-    }
-    data["environment"] = {
-        **data["environment"],
-        "renderer": "gliden64",
-    }
-    return ManagedRunConfig.model_validate(data)

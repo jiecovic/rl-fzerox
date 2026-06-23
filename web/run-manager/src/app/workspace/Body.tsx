@@ -150,7 +150,10 @@ export function WorkspaceBody({
           evaluationError={evaluationError}
           evaluations={evaluations}
           evaluationPresets={evaluationPresets}
+          metadata={metadata}
           onDeleteEvaluation={actions.removeManagedEvaluation}
+          onCreateEvaluationPreset={actions.createManagedEvaluationPreset}
+          onDeleteEvaluationPreset={actions.removeManagedEvaluationPreset}
           onGlobalError={actions.setGlobalError}
           onOpenEvaluation={sessions.openEvaluation}
         />
@@ -161,6 +164,7 @@ export function WorkspaceBody({
         ) : (
           <EvaluationWorkspace
             evaluation={activeEvaluation}
+            onCancelEvaluation={actions.cancelManagedEvaluation}
             onGlobalError={actions.setGlobalError}
             onRenameEvaluation={actions.renameManagedEvaluation}
             onStartEvaluation={actions.startManagedEvaluation}

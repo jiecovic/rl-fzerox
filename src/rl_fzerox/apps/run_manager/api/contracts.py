@@ -10,7 +10,7 @@ from rl_fzerox.core.domain.engine_setting import (
     ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )
-from rl_fzerox.core.evaluation.models import EvaluationMode
+from rl_fzerox.core.evaluation.models import EvaluationCheckpointArtifact, EvaluationMode
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
 
 WatchDevice = Literal["cpu", "cuda"]
@@ -28,8 +28,17 @@ class EvaluationTargetRequest(BaseModel):
     course_ids: tuple[str, ...] = ()
     cup_ids: tuple[str, ...] = ()
     difficulties: tuple[str, ...] = ()
-    vehicle_ids: tuple[str, ...] = ()
     repeats_per_target: int = Field(default=1, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def _validate_mode_specific_target(self) -> EvaluationTargetRequest:
+        if self.mode == "gp_course":
+            if len(self.difficulties) != 1:
+                raise ValueError("gp_course evaluation presets require exactly one difficulty")
+            return self
+        if self.difficulties:
+            raise ValueError("time_attack_course evaluation presets must not set difficulties")
+        return self
 
 
 class CreateEvaluationRequest(BaseModel):
@@ -39,12 +48,21 @@ class CreateEvaluationRequest(BaseModel):
 
     name: str
     source_run_id: str
+    source_artifact: EvaluationCheckpointArtifact = "latest"
     preset_id: str
-    source_artifact: Literal["latest", "best", "final"] = "latest"
+    device: WatchDevice = "cuda"
     policy_mode: PolicyPlaybackMode = "deterministic"
+
+
+class CreateEvaluationPresetRequest(BaseModel):
+    """Request body for creating one immutable evaluation preset."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
     seed: int = Field(ge=0, le=(1 << 32) - 1)
+    renderer: WatchRenderer = "gliden64"
     target: EvaluationTargetRequest = Field(default_factory=EvaluationTargetRequest)
-    config: ManagedRunConfig
 
 
 class UpdateEvaluationRequest(BaseModel):

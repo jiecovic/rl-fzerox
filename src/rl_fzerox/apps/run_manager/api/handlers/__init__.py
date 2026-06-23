@@ -17,8 +17,11 @@ from rl_fzerox.apps.run_manager.api.handlers.drafts import (
     update_draft_payload,
 )
 from rl_fzerox.apps.run_manager.api.handlers.evaluations import (
+    cancel_evaluation_payload,
     create_evaluation_payload,
+    create_evaluation_preset_payload,
     delete_evaluation_payload,
+    delete_evaluation_preset_payload,
     evaluations_payload,
     start_evaluation_payload,
     update_evaluation_payload,
@@ -77,12 +80,15 @@ from rl_fzerox.apps.run_manager.api.handlers.transfer import (
 
 __all__ = [
     "config_metadata_payload",
+    "cancel_evaluation_payload",
     "clear_run_alt_baselines_payload",
     "clear_run_course_alt_baselines_payload",
     "create_draft_payload",
+    "create_evaluation_preset_payload",
     "create_evaluation_payload",
     "create_save_game_payload",
     "delete_draft_payload",
+    "delete_evaluation_preset_payload",
     "delete_evaluation_payload",
     "delete_lineage_payload",
     "delete_run_payload",

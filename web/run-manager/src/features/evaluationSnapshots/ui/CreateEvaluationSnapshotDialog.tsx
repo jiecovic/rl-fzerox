@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 
 import type {
   CreateEvaluationRequest,
+  EvaluationSourceArtifact,
   ManagedEvaluation,
   ManagedEvaluationPreset,
   ManagedRunDetail,
   PolicyPlaybackMode,
+  WatchDevice,
 } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
@@ -31,6 +33,8 @@ export function CreateEvaluationSnapshotDialog({
   onGlobalError,
   onOpenEvaluation,
 }: CreateEvaluationSnapshotDialogProps) {
+  const [sourceArtifact, setSourceArtifact] = useState<EvaluationSourceArtifact>("latest");
+  const [device, setDevice] = useState<WatchDevice>("cuda");
   const [policyMode, setPolicyMode] = useState<PolicyPlaybackMode>("deterministic");
   const initialPresetId = preferredPresetId(run, evaluationPresets);
   const [presetId, setPresetId] = useState(initialPresetId);
@@ -40,13 +44,17 @@ export function CreateEvaluationSnapshotDialog({
     evaluationPresets.find((candidate) => candidate.id === presetId) ??
     evaluationPresets[0] ??
     null;
-  const defaultName = `${run.name} · ${preset?.name ?? "evaluation"}`;
+  const defaultName = `${run.name} · ${sourceArtifact} ${checkpointStepLabel(run)} · ${
+    preset?.name ?? "evaluation"
+  }`;
 
   useEffect(() => {
     if (!open) {
       return;
     }
     setPresetId(initialPresetId);
+    setSourceArtifact("latest");
+    setDevice("cuda");
     setPolicyMode("deterministic");
   }, [initialPresetId, open]);
 
@@ -63,19 +71,12 @@ export function CreateEvaluationSnapshotDialog({
     onGlobalError(null);
     try {
       const created = await onCreateEvaluation({
-        config: preset.config,
-        courseIds: preset.target.course_ids,
-        cupIds: preset.target.cup_ids,
-        difficulties: preset.target.difficulties,
         name: defaultName,
+        device,
         policyMode,
         presetId: preset.id,
-        repeatsPerTarget: preset.target.repeats_per_target,
-        seed: preset.seed,
-        sourceArtifact: preset.source_artifact,
+        sourceArtifact,
         sourceRunId: run.id,
-        targetMode: preset.target.mode,
-        vehicleIds: preset.target.vehicle_ids,
       });
       onOpenEvaluation(created);
       onClose();
@@ -135,6 +136,29 @@ export function CreateEvaluationSnapshotDialog({
               </FieldSelect>
             </FieldShell>
             <FieldShell>
+              <span>Checkpoint</span>
+              <FieldSelect
+                value={sourceArtifact}
+                onChange={(event) =>
+                  setSourceArtifact(event.currentTarget.value as EvaluationSourceArtifact)
+                }
+              >
+                <option value="latest">latest</option>
+                <option value="best">best</option>
+                <option value="final">final</option>
+              </FieldSelect>
+            </FieldShell>
+            <FieldShell>
+              <span>Device</span>
+              <FieldSelect
+                value={device}
+                onChange={(event) => setDevice(event.currentTarget.value as WatchDevice)}
+              >
+                <option value="cuda">cuda</option>
+                <option value="cpu">cpu</option>
+              </FieldSelect>
+            </FieldShell>
+            <FieldShell>
               <span>Policy mode</span>
               <FieldSelect
                 value={policyMode}
@@ -153,7 +177,7 @@ export function CreateEvaluationSnapshotDialog({
               value={preset === null ? "-" : evaluationTargetLabel(preset)}
             />
             <PresetLine label="Preset" value={presetSummary(preset)} />
-            <PresetLine label="Policy" value={policyMode} />
+            <PresetLine label="Snapshot" value={`${sourceArtifact} · ${policyMode} · ${device}`} />
           </div>
 
           <div className="flex justify-end gap-2.5">
@@ -180,8 +204,8 @@ function preferredPresetId(
 ): string {
   const preferredId =
     run.config.tracks.race_mode === "gp_race"
-      ? "gp_course_master_blue_falcon_all_courses"
-      : "time_attack_blue_falcon_all_courses";
+      ? "gp_course_master_all_courses"
+      : "time_attack_all_courses";
   return presets.some((preset) => preset.id === preferredId) ? preferredId : (presets[0]?.id ?? "");
 }
 
@@ -192,7 +216,6 @@ function evaluationTargetLabel(preset: ManagedEvaluationPreset) {
     target.cup_ids.length > 0 ? selectionCountLabel(target.cup_ids, "cup") : null,
     target.course_ids.length > 0 ? selectionCountLabel(target.course_ids, "course") : null,
     target.difficulties.length > 0 ? selectionCountLabel(target.difficulties, "difficulty") : null,
-    target.vehicle_ids.length > 0 ? selectionCountLabel(target.vehicle_ids, "vehicle") : null,
   ].filter((part) => part !== null);
   return `${mode} · ${parts.length === 0 ? "all targets" : parts.join(" · ")}`;
 }
@@ -201,7 +224,15 @@ function presetSummary(preset: ManagedEvaluationPreset | null) {
   if (preset === null) {
     return "-";
   }
-  return `${preset.source_artifact} · ${preset.target.repeats_per_target}x · seed ${preset.seed} · ${preset.renderer}`;
+  return `${preset.target.repeats_per_target}x · seed ${preset.seed} · ${preset.renderer}`;
+}
+
+function checkpointStepLabel(run: ManagedRunDetail) {
+  const localSteps = run.runtime?.num_timesteps ?? run.source_num_timesteps;
+  if (localSteps === null || localSteps === undefined) {
+    return "steps unknown";
+  }
+  return `${(run.lineage_step_offset + localSteps).toLocaleString()} steps`;
 }
 
 function selectionCountLabel(values: readonly unknown[], singular: string) {

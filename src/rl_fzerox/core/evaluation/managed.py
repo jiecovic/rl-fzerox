@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
@@ -41,7 +42,11 @@ class EvaluationBaselineSuite:
     manifest_path: Path
 
 
-def run_managed_evaluation(evaluation: ManagedEvaluation) -> EvaluationRunResult:
+def run_managed_evaluation(
+    evaluation: ManagedEvaluation,
+    *,
+    should_cancel: Callable[[], bool] | None = None,
+) -> EvaluationRunResult:
     """Execute one manager evaluation record."""
 
     train_config, run_paths = _materialize_evaluation_train_config(evaluation)
@@ -49,7 +54,7 @@ def run_managed_evaluation(evaluation: ManagedEvaluation) -> EvaluationRunResult
     policy_runner = load_policy_runner(
         evaluation.evaluation_dir / "checkpoint_snapshot",
         artifact=evaluation.checkpoint.artifact,
-        device="cpu",
+        device=train_config.train.device,
         algorithm=train_config.train.algorithm,
     )
     env = build_single_training_env(
@@ -75,6 +80,7 @@ def run_managed_evaluation(evaluation: ManagedEvaluation) -> EvaluationRunResult
             targets,
             executor,
             result_dir=evaluation.evaluation_dir,
+            should_cancel=should_cancel,
         )
     finally:
         close = getattr(env, "close", None)

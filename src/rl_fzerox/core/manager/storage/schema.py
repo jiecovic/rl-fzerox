@@ -33,7 +33,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 38
+SCHEMA_VERSION = 40
 
 CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
 SAVE_GAME_CHILD_TABLES = (
@@ -57,10 +57,6 @@ EVALUATION_TABLES = (
     "evaluations",
     "evaluation_presets",
     "evaluation_baseline_suites",
-)
-EVALUATION_RECORD_PRESET_COLUMNS = (
-    ("preset_id", "VARCHAR"),
-    ("preset_version", "INTEGER"),
 )
 TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS = frozenset(
     {
@@ -108,7 +104,7 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
     try:
         table_names = set(inspect(engine).get_table_names())
         if _has_manager_schema(table_names):
-            _upgrade_evaluation_tables(engine=engine, table_names=table_names)
+            _ensure_evaluation_tables(engine=engine, table_names=table_names)
             _upgrade_save_game_runner_replay_columns(engine=engine, table_names=table_names)
             _upgrade_track_sampling_adaptive_signal_columns(
                 engine=engine,
@@ -262,12 +258,12 @@ def _upgrade_save_game_runner_replay_columns(
             )
 
 
-def _upgrade_evaluation_tables(
+def _ensure_evaluation_tables(
     *,
     engine: Engine,
     table_names: set[str],
 ) -> None:
-    """Create and extend evaluation tables for pre-preset manager DBs."""
+    """Create evaluation tables that are entirely missing from older manager DBs."""
 
     missing_tables = [
         model.__table__
@@ -281,37 +277,6 @@ def _upgrade_evaluation_tables(
     if missing_tables:
         ManagerBase.metadata.create_all(engine, tables=missing_tables)
         table_names.update(table.name for table in missing_tables)
-    if "evaluations" not in table_names:
-        return
-    inspector = inspect(engine)
-    columns = {column["name"] for column in inspector.get_columns("evaluations")}
-    missing_columns = [
-        (column_name, definition)
-        for column_name, definition in EVALUATION_RECORD_PRESET_COLUMNS
-        if column_name not in columns
-    ]
-    if missing_columns:
-        with engine.begin() as connection:
-            for column_name, definition in missing_columns:
-                connection.execute(
-                    text(f"ALTER TABLE evaluations ADD COLUMN {column_name} {definition}")
-                )
-    _delete_presetless_evaluation_records(engine)
-
-
-def _delete_presetless_evaluation_records(engine: Engine) -> None:
-    """Enforce that current-schema evaluations are backed by SQLite presets."""
-
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                DELETE FROM evaluations
-                WHERE preset_id IS NULL
-                   OR preset_version IS NULL
-                """,
-            )
-        )
 
 
 def _upgrade_track_sampling_adaptive_signal_columns(
@@ -412,6 +377,14 @@ def _assert_evaluation_columns(*, inspector: Inspector) -> None:
     for model in (EvaluationModel, EvaluationPresetModel, EvaluationBaselineSuiteModel):
         table_name = model.__table__.name
         columns = {column["name"] for column in inspector.get_columns(table_name)}
+        legacy_preset_columns = {"config_json", "source_artifact"}
+        legacy_columns = legacy_preset_columns.intersection(columns)
+        if table_name == "evaluation_presets" and legacy_columns:
+            joined_columns = ", ".join(sorted(legacy_columns))
+            raise RuntimeError(
+                "manager DB is not current: "
+                f"evaluation presets have legacy columns {joined_columns}"
+            )
         required_columns = {column.name for column in model.__table__.columns}
         missing_columns = required_columns.difference(columns)
         if missing_columns:

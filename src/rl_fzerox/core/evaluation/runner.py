@@ -23,6 +23,7 @@ from rl_fzerox.core.evaluation.models import (
 from rl_fzerox.core.seed import derive_seed
 
 ProgressCallback: TypeAlias = Callable[[EvaluationRunResult], None]
+CancelCheck: TypeAlias = Callable[[], bool]
 Clock: TypeAlias = Callable[[], str]
 
 
@@ -62,6 +63,7 @@ def run_course_evaluation(
     *,
     result_dir: Path | None = None,
     on_update: ProgressCallback | None = None,
+    should_cancel: CancelCheck | None = None,
     clock: Clock = _utc_now_text,
 ) -> EvaluationRunResult:
     """Run a deterministic single-course evaluation suite.
@@ -85,6 +87,15 @@ def run_course_evaluation(
     policy_path = Path(run_spec.checkpoint.copied_policy_path)
 
     for index, target in enumerate(expanded_targets, start=1):
+        if _cancel_requested(should_cancel):
+            return _publish_cancelled_result(
+                run_spec,
+                started_at_utc=started_at_utc,
+                attempts=attempts,
+                result_dir=result_dir,
+                on_update=on_update,
+                clock=clock,
+            )
         attempt_seed = _attempt_seed(run_spec.seed, index)
         attempt_started_at_utc = clock()
         course_result = _target_course_result(
@@ -117,10 +128,43 @@ def run_course_evaluation(
             result_dir=result_dir,
             on_update=on_update,
         )
+        if _cancel_requested(should_cancel):
+            return _publish_cancelled_result(
+                run_spec,
+                started_at_utc=started_at_utc,
+                attempts=attempts,
+                result_dir=result_dir,
+                on_update=on_update,
+                clock=clock,
+            )
 
     result = EvaluationRunResult(
         spec=run_spec,
         status="completed",
+        started_at_utc=started_at_utc,
+        closed_at_utc=clock(),
+        attempts=tuple(attempts),
+    )
+    _publish_result_update(result, result_dir=result_dir, on_update=on_update)
+    return result
+
+
+def _cancel_requested(should_cancel: CancelCheck | None) -> bool:
+    return False if should_cancel is None else should_cancel()
+
+
+def _publish_cancelled_result(
+    spec: EvaluationSpec,
+    *,
+    started_at_utc: str,
+    attempts: list[EvaluationAttemptResult],
+    result_dir: Path | None,
+    on_update: ProgressCallback | None,
+    clock: Clock,
+) -> EvaluationRunResult:
+    result = EvaluationRunResult(
+        spec=spec,
+        status="cancelled",
         started_at_utc=started_at_utc,
         closed_at_utc=clock(),
         attempts=tuple(attempts),
