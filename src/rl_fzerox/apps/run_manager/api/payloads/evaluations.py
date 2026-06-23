@@ -2,15 +2,78 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
-from typing import Any
+from collections.abc import Mapping
+from typing import TypedDict
 
-from rl_fzerox.core.evaluation.models import EvaluationCheckpointSnapshot
+from rl_fzerox.core.evaluation.models import EvaluationCheckpointSnapshot, EvaluationTargetSpec
 from rl_fzerox.core.manager import (
     ManagedEvaluation,
     ManagedEvaluationBaselineSuite,
     ManagedEvaluationPreset,
 )
+
+JsonObject = Mapping[str, object]
+
+
+class EvaluationTargetPayload(TypedDict):
+    mode: str
+    course_ids: list[str]
+    cup_ids: list[str]
+    difficulties: list[str]
+    vehicle_ids: list[str]
+    repeats_per_target: int
+
+
+class EvaluationProgressPayload(TypedDict):
+    completed_attempts: int
+    total_attempts: int | None
+    result_status: str | None
+
+
+class EvaluationMetricSummaryPayload(TypedDict):
+    key: str
+    label: str
+    attempt_count: int
+    success_count: int
+    success_rate: float | None
+    finish_count: int
+    finish_rate: float | None
+    completion_rate: float | None
+    mean_finish_time_ms: float | None
+    best_finish_time_ms: float | None
+    mean_position: float | None
+    best_position: int | None
+    total_env_steps: int
+    mean_episode_length_steps: float | None
+    mean_episode_return: float | None
+    best_episode_return: float | None
+    average_speed: float | None
+
+
+class EvaluationAttemptSummaryPayload(TypedDict):
+    attempt_id: str
+    target_id: str
+    target_label: str | None
+    status: str
+    seed: str | None
+    cup_id: str | None
+    difficulty: str | None
+    vehicle_id: str | None
+    total_race_time_ms: int | None
+    env_steps: int | None
+    episode_return: float | None
+    position: int | None
+    completion_ratio: float | None
+    closed_at_utc: str | None
+
+
+class EvaluationResultSummaryPayload(TypedDict):
+    status: str
+    started_at_utc: str | None
+    closed_at_utc: str | None
+    overall: EvaluationMetricSummaryPayload | None
+    courses: list[EvaluationMetricSummaryPayload]
+    attempts: list[EvaluationAttemptSummaryPayload]
 
 
 def evaluation_payload(
@@ -32,7 +95,7 @@ def evaluation_payload(
         "preset_version": evaluation.preset_version,
         "policy_mode": evaluation.policy_mode,
         "seed": evaluation.seed,
-        "target": asdict(evaluation.target),
+        "target": _target_payload(evaluation.target),
         "config": evaluation.config.model_dump(mode="json"),
         "checkpoint": _checkpoint_payload(evaluation.checkpoint),
         "created_at": evaluation.created_at,
@@ -58,7 +121,7 @@ def evaluation_preset_payload(preset: ManagedEvaluationPreset) -> dict[str, obje
         "version": preset.version,
         "seed": preset.seed,
         "renderer": preset.renderer,
-        "target": asdict(preset.target),
+        "target": _target_payload(preset.target),
         "builtin": preset.builtin,
         "created_at": preset.created_at,
         "updated_at": preset.updated_at,
@@ -84,37 +147,57 @@ def evaluation_baseline_suite_payload(
     }
 
 
+def _target_payload(target: EvaluationTargetSpec) -> EvaluationTargetPayload:
+    return {
+        "mode": target.mode,
+        "course_ids": list(target.course_ids),
+        "cup_ids": list(target.cup_ids),
+        "difficulties": list(target.difficulties),
+        "vehicle_ids": list(target.vehicle_ids),
+        "repeats_per_target": target.repeats_per_target,
+    }
+
+
 def _checkpoint_payload(checkpoint: EvaluationCheckpointSnapshot) -> dict[str, object]:
-    payload = asdict(checkpoint)
     # Nanosecond mtimes exceed JavaScript's safe integer range. Keep the Python
     # model and persisted spec numeric, but expose the API value losslessly.
-    payload["source_mtime_ns"] = (
-        None if checkpoint.source_mtime_ns is None else str(checkpoint.source_mtime_ns)
-    )
-    return payload
+    return {
+        "source_run_id": checkpoint.source_run_id,
+        "source_run_name": checkpoint.source_run_name,
+        "artifact": checkpoint.artifact,
+        "source_policy_path": checkpoint.source_policy_path,
+        "copied_policy_path": checkpoint.copied_policy_path,
+        "source_model_path": checkpoint.source_model_path,
+        "copied_model_path": checkpoint.copied_model_path,
+        "local_num_timesteps": checkpoint.local_num_timesteps,
+        "lineage_num_timesteps": checkpoint.lineage_num_timesteps,
+        "source_mtime_ns": (
+            None if checkpoint.source_mtime_ns is None else str(checkpoint.source_mtime_ns)
+        ),
+    }
 
 
-def _read_result_file(evaluation: ManagedEvaluation) -> dict[str, Any] | None:
+def _read_result_file(evaluation: ManagedEvaluation) -> dict[str, object] | None:
     if evaluation.result_json_path is None or not evaluation.result_json_path.is_file():
         return None
     try:
-        payload = json.loads(evaluation.result_json_path.read_text(encoding="utf-8"))
+        payload: object = json.loads(evaluation.result_json_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, dict) else None
+    return _object_mapping(payload)
 
 
-def _progress_payload(payload: dict[str, Any] | None) -> dict[str, object]:
+def _progress_payload(payload: JsonObject | None) -> EvaluationProgressPayload:
     completed_attempts = 0
     total_attempts: int | None = None
     result_status: str | None = None
-    result = payload.get("result") if payload is not None else None
-    if isinstance(result, dict):
+    result = _object_mapping(payload.get("result")) if payload is not None else None
+    if result is not None:
         attempts = result.get("attempts")
         if isinstance(attempts, list):
             completed_attempts = len(attempts)
-        spec = result.get("spec")
-        if isinstance(spec, dict):
+        spec = _object_mapping(result.get("spec"))
+        if spec is not None:
             planned = spec.get("total_planned_attempts")
             if isinstance(planned, int) and planned >= 0:
                 total_attempts = planned
@@ -128,10 +211,10 @@ def _progress_payload(payload: dict[str, Any] | None) -> dict[str, object]:
     }
 
 
-def _result_summary_payload(payload: dict[str, Any] | None) -> dict[str, object] | None:
-    result = payload.get("result") if payload is not None else None
-    metrics = payload.get("metrics") if payload is not None else None
-    if not isinstance(result, dict) or not isinstance(metrics, dict):
+def _result_summary_payload(payload: JsonObject | None) -> EvaluationResultSummaryPayload | None:
+    result = _object_mapping(payload.get("result")) if payload is not None else None
+    metrics = _object_mapping(payload.get("metrics")) if payload is not None else None
+    if result is None or metrics is None:
         return None
     return {
         "status": _string_or_default(result.get("status"), "partial"),
@@ -143,22 +226,23 @@ def _result_summary_payload(payload: dict[str, Any] | None) -> dict[str, object]
     }
 
 
-def _metric_group_list_payload(value: object) -> list[dict[str, object]]:
+def _metric_group_list_payload(value: object) -> list[EvaluationMetricSummaryPayload]:
     if not isinstance(value, list):
         return []
     return [metric for group in value if (metric := _metric_group_payload(group)) is not None]
 
 
-def _metric_group_payload(value: object) -> dict[str, object] | None:
-    if not isinstance(value, dict):
+def _metric_group_payload(value: object) -> EvaluationMetricSummaryPayload | None:
+    group = _object_mapping(value)
+    if group is None:
         return None
-    primary = value.get("primary")
-    detail = value.get("detail")
-    if not isinstance(primary, dict) or not isinstance(detail, dict):
+    primary = _object_mapping(group.get("primary"))
+    detail = _object_mapping(group.get("detail"))
+    if primary is None or detail is None:
         return None
     return {
-        "key": _string_or_default(value.get("key"), ""),
-        "label": _string_or_default(value.get("label"), "Overall"),
+        "key": _string_or_default(group.get("key"), ""),
+        "label": _string_or_default(group.get("label"), "Overall"),
         "attempt_count": _nonnegative_int(primary.get("attempt_count")),
         "success_count": _nonnegative_int(primary.get("success_count")),
         "success_rate": _number_or_none(primary.get("success_rate")),
@@ -177,13 +261,19 @@ def _metric_group_payload(value: object) -> dict[str, object] | None:
     }
 
 
-def _attempts_payload(value: object) -> list[dict[str, object]]:
+def _attempts_payload(value: object) -> list[EvaluationAttemptSummaryPayload]:
     if not isinstance(value, list):
         return []
-    return [_attempt_payload(attempt) for attempt in value if isinstance(attempt, dict)]
+    return [
+        payload
+        for attempt in value
+        if (payload := _attempt_payload(_object_mapping(attempt))) is not None
+    ]
 
 
-def _attempt_payload(attempt: dict[str, object]) -> dict[str, object]:
+def _attempt_payload(attempt: JsonObject | None) -> EvaluationAttemptSummaryPayload | None:
+    if attempt is None:
+        return None
     course_result = _first_course_result(attempt.get("course_results"))
     return {
         "attempt_id": _string_or_default(attempt.get("attempt_id"), ""),
@@ -210,13 +300,12 @@ def _attempt_payload(attempt: dict[str, object]) -> dict[str, object]:
 def _first_course_result(value: object) -> dict[str, object] | None:
     if not isinstance(value, list) or not value:
         return None
-    first = value[0]
-    return first if isinstance(first, dict) else None
+    return _object_mapping(value[0])
 
 
 def _attempt_position(
-    attempt: dict[str, object],
-    course_result: dict[str, object] | None,
+    attempt: JsonObject,
+    course_result: JsonObject | None,
 ) -> int | None:
     if course_result is None:
         return None
@@ -227,6 +316,17 @@ def _attempt_position(
     if status in {"finished", "succeeded"}:
         return position
     return max(position, 30)
+
+
+def _object_mapping(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    mapping: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            return None
+        mapping[key] = item
+    return mapping
 
 
 def _string_or_default(value: object, default: str) -> str:
