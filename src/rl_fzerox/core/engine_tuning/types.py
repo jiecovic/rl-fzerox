@@ -13,12 +13,7 @@ from rl_fzerox.core.domain.engine_setting import (
     engine_slider_steps,
     validate_engine_slider_bucket_values,
 )
-
-# Bandit is the maintained run-manager backend. GP and MLP remain loadable for
-# old configs and future experiments, but are not exposed for new managed runs
-# until their telemetry and reset-distribution contracts are redesigned.
-EngineTunerBackend = Literal["bandit", "gaussian_process", "mlp_ensemble"]
-EngineTunerObjective = Literal["finish_time", "safe_finish_time", "finish_rate"]
+from rl_fzerox.core.domain.engine_tuning import EngineTunerBackend, EngineTunerObjective
 
 
 @dataclass(frozen=True, slots=True)

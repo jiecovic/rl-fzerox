@@ -4,7 +4,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from rl_fzerox.apps.run_manager.launching.processes import (
     fresh_process_log,
@@ -19,8 +19,9 @@ from rl_fzerox.core.manager import ManagedSaveAttempt, ManagerStore
 from rl_fzerox.core.manager.registry.common import new_record_id
 from rl_fzerox.core.manager.registry.viewers import viewer_lease_is_fresh
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.renderers import RendererName
 
-WatchRenderer = Literal["angrylion", "gliden64"]
+WatchRenderer: TypeAlias = RendererName
 
 
 def launch_career_mode_runner(

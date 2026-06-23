@@ -5,17 +5,18 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, TypeAlias
 
 from rl_fzerox.apps.run_manager.launching.processes import fresh_process_log
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.watch import resolve_watch_app_config
 from rl_fzerox.core.manager.registry.viewers import viewer_lease_is_fresh
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
 WatchLaunchStatus = Literal["started", "already_running"]
-WatchRenderer = Literal["angrylion", "gliden64"]
+WatchRenderer: TypeAlias = RendererName
 WATCH_STARTUP_TIMEOUT_SECONDS = 8.0
 
 

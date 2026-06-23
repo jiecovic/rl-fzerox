@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -12,9 +12,10 @@ from rl_fzerox.core.domain.engine_setting import (
 )
 from rl_fzerox.core.evaluation.models import EvaluationCheckpointArtifact, EvaluationMode
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
+from rl_fzerox.core.runtime_spec.renderers import RendererName
 
 WatchDevice = Literal["cpu", "cuda"]
-WatchRenderer = Literal["angrylion", "gliden64"]
+WatchRenderer: TypeAlias = RendererName
 PolicyPlaybackMode = Literal["deterministic", "stochastic"]
 EngineTuningSourceAction = Literal["convert", "discard"]
 

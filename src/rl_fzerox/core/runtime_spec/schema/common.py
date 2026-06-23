@@ -11,23 +11,16 @@ from rl_fzerox.core.domain.observation_image import (
 from rl_fzerox.core.domain.observation_image import (
     ObservationResizeFilter as DomainObservationResizeFilter,
 )
+from rl_fzerox.core.domain.track_sampling import (
+    DeficitBudgetDifficultyMetric as DomainDeficitBudgetDifficultyMetric,
+)
+from rl_fzerox.core.domain.track_sampling import (
+    RuntimeTrackSamplingMode,
+)
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
-TrackSamplingMode: TypeAlias = Literal[
-    "random",
-    "balanced",
-    "step_balanced",
-    # Hidden from new manager UI metadata, but still accepted for legacy
-    # train manifests and saved configs. Remove after compatibility migration.
-    "adaptive_step_balanced",
-    "fixed_env",
-    "deficit_budget",
-]
-DeficitBudgetDifficultyMetric: TypeAlias = Literal[
-    "completion_ema",
-    "finish_ema",
-    "mixed",
-]
+TrackSamplingMode: TypeAlias = RuntimeTrackSamplingMode
+DeficitBudgetDifficultyMetric: TypeAlias = DomainDeficitBudgetDifficultyMetric
 ObservationPresetName: TypeAlias = DomainObservationPresetName
 ObservationResizeFilter: TypeAlias = DomainObservationResizeFilter
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
