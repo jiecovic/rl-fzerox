@@ -75,6 +75,16 @@ def run_parallel_managed_evaluation(
             closed_at_utc=_utc_now_text(),
         )
 
+    _publish_managed_evaluation_result(
+        evaluation,
+        plan=plan,
+        runtime=runtime,
+        status="partial",
+        started_at_utc=started_at_utc,
+        attempts_by_index=attempts_by_index,
+        closed_at_utc=None,
+    )
+
     pool = ProcessPoolExecutor(
         max_workers=runtime.worker_count,
         mp_context=_evaluation_process_context(),

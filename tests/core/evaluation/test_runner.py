@@ -90,7 +90,13 @@ def test_course_runner_writes_progress_and_final_summary(
     assert executor.calls[0][1] == tmp_path / "checkpoints" / "latest" / "policy.zip"
     assert executor.calls[0][2] == "deterministic"
     assert executor.calls[0][3] != executor.calls[1][3]
-    assert [update.status for update in updates] == ["partial", "partial", "completed"]
+    assert [update.status for update in updates] == [
+        "partial",
+        "partial",
+        "partial",
+        "completed",
+    ]
+    assert len(updates[0].attempts) == 0
 
     payload = json.loads(
         (tmp_path / "eval" / "evaluation.summary.json").read_text(encoding="utf-8")
@@ -181,7 +187,7 @@ def test_course_runner_cancels_between_attempts(tmp_path: Path) -> None:
 
     assert result.status == "cancelled"
     assert len(result.attempts) == 1
-    assert [update.status for update in updates] == ["partial", "cancelled"]
+    assert [update.status for update in updates] == ["partial", "partial", "cancelled"]
     payload = json.loads(
         (tmp_path / "eval" / "evaluation.summary.json").read_text(encoding="utf-8")
     )

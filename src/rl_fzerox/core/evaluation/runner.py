@@ -100,6 +100,18 @@ def run_course_evaluation(
     attempts: list[EvaluationAttemptResult] = []
     policy_path = Path(run_spec.checkpoint.copied_policy_path)
 
+    _publish_result_update(
+        EvaluationRunResult(
+            spec=run_spec,
+            status="partial",
+            runtime=run_runtime,
+            started_at_utc=started_at_utc,
+            attempts=(),
+        ),
+        result_dir=result_dir,
+        on_update=on_update,
+    )
+
     for job in plan.jobs:
         if _cancel_requested(should_cancel):
             return _publish_cancelled_result(
