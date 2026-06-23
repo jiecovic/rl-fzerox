@@ -1,12 +1,12 @@
-# src/rl_fzerox/core/manager/registry/evaluations.py
-"""Manager registry operations for evaluation records and artifacts."""
+# src/rl_fzerox/core/manager/registry/evaluations/records.py
+"""Registry operations for evaluation records, snapshots, and lifecycle."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from rl_fzerox.core.evaluation.models import (
     EvaluationCheckpointArtifact,
@@ -20,15 +20,12 @@ from rl_fzerox.core.evaluation.snapshots import (
 )
 from rl_fzerox.core.manager.db.repositories import evaluations as evaluation_repository
 from rl_fzerox.core.manager.db.repositories.filesystem import queue_delete_tree
-from rl_fzerox.core.manager.models import (
-    ManagedEvaluation,
-    ManagedEvaluationBaselineSuite,
-    ManagedEvaluationPreset,
-)
+from rl_fzerox.core.manager.models import ManagedEvaluation, ManagedEvaluationPreset
 from rl_fzerox.core.manager.registry.common import new_record_id, utc_now
+from rl_fzerox.core.manager.registry.evaluations.presets import get_evaluation_preset
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.serialization import config_json
-from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_policy_artifact_path
+from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -116,153 +113,6 @@ def create_evaluation(
     with store._orm_session() as session:
         evaluation_repository.insert_evaluation(session, evaluation=evaluation)
     return evaluation
-
-
-def _evaluation_target_for_source(
-    config: ManagedRunConfig,
-    target: EvaluationTargetSpec,
-) -> EvaluationTargetSpec:
-    """Bind policy-owned vehicle selection to one frozen evaluation target."""
-
-    vehicle_ids = target.vehicle_ids or config.vehicle.selected_vehicle_ids
-    return EvaluationTargetSpec(
-        mode=target.mode,
-        course_ids=target.course_ids,
-        cup_ids=target.cup_ids,
-        difficulties=target.difficulties,
-        vehicle_ids=vehicle_ids,
-        repeats_per_target=target.repeats_per_target,
-    )
-
-
-def _evaluation_config_for_source(
-    config: ManagedRunConfig,
-    *,
-    preset: ManagedEvaluationPreset,
-    target: EvaluationTargetSpec,
-) -> ManagedRunConfig:
-    """Project source-run policy config onto the preset-owned evaluation suite."""
-
-    course_ids = target.course_ids or config.tracks.selected_course_ids
-    if target.mode == "gp_course":
-        race_mode = "gp_race"
-        gp_difficulties = target.difficulties or config.tracks.gp_difficulties
-    else:
-        race_mode = "time_attack"
-        gp_difficulties = ()
-    tracks = config.tracks.model_copy(
-        update={
-            "baseline_variant_count": 1,
-            "gp_difficulties": gp_difficulties,
-            "include_x_cup": False,
-            "race_mode": race_mode,
-            "selected_course_ids": course_ids,
-        }
-    )
-    environment = config.environment.model_copy(update={"renderer": preset.renderer})
-    return config.model_copy(update={"environment": environment, "tracks": tracks})
-
-
-def get_evaluation_preset(
-    store: ManagerStore,
-    preset_id: str,
-) -> ManagedEvaluationPreset | None:
-    """Return one persisted evaluation preset."""
-
-    store.initialize()
-    with store._orm_session() as session:
-        return evaluation_repository.get_evaluation_preset(session, preset_id)
-
-
-def list_evaluation_presets(store: ManagerStore) -> tuple[ManagedEvaluationPreset, ...]:
-    """Return persisted evaluation presets."""
-
-    store.initialize()
-    with store._orm_session() as session:
-        return evaluation_repository.list_evaluation_presets(session)
-
-
-def create_evaluation_preset(
-    store: ManagerStore,
-    *,
-    name: str,
-    seed: int,
-    renderer: Literal["angrylion", "gliden64"],
-    target: EvaluationTargetSpec,
-) -> ManagedEvaluationPreset:
-    """Create one immutable custom benchmark preset."""
-
-    store.initialize()
-    _validate_preset_target(target)
-    created_at = utc_now()
-    preset = ManagedEvaluationPreset(
-        id=new_record_id(name),
-        name=name,
-        version=1,
-        seed=seed,
-        renderer=renderer,
-        target=target,
-        builtin=False,
-        created_at=created_at,
-        updated_at=created_at,
-    )
-    with store._orm_session() as session:
-        return evaluation_repository.insert_evaluation_preset(session, preset=preset)
-
-
-def delete_evaluation_preset(store: ManagerStore, preset_id: str) -> bool:
-    """Delete one unused custom preset and its materialized baseline suite."""
-
-    store.initialize()
-    deleted_at = utc_now()
-    with store._orm_session() as session:
-        deleted = evaluation_repository.delete_evaluation_preset(session, preset_id)
-        if deleted is None:
-            return False
-        preset, suites = deleted
-        if suites:
-            for suite in suites:
-                queue_delete_tree(session, path=suite.suite_dir, created_at=deleted_at)
-        else:
-            suite = _baseline_suite_for_preset(
-                store,
-                preset_id=preset.id,
-                preset_version=preset.version,
-                created_at=None,
-            )
-            queue_delete_tree(session, path=suite.suite_dir, created_at=deleted_at)
-    store._drain_pending_filesystem_operations()
-    return True
-
-
-def list_evaluation_baseline_suites(
-    store: ManagerStore,
-) -> tuple[ManagedEvaluationBaselineSuite, ...]:
-    """Return materialization status for each preset without creating DB rows."""
-
-    store.initialize()
-    now = utc_now()
-    with store._orm_session() as session:
-        presets = evaluation_repository.list_evaluation_presets(session)
-        persisted_suites = {
-            (suite.preset_id, suite.preset_version): suite
-            for suite in evaluation_repository.list_evaluation_baseline_suites(session)
-        }
-    return tuple(
-        _with_filesystem_suite_status(
-            persisted_suites.get(
-                (preset.id, preset.version),
-                _baseline_suite_for_preset(
-                    store,
-                    preset_id=preset.id,
-                    preset_version=preset.version,
-                    created_at=None,
-                ),
-            ),
-            updated_at=now,
-        )
-        for preset in presets
-    )
 
 
 def delete_evaluation(store: ManagerStore, evaluation_id: str) -> bool:
@@ -398,25 +248,49 @@ def list_evaluations(store: ManagerStore) -> tuple[ManagedEvaluation, ...]:
         return evaluation_repository.list_managed_evaluations(session)
 
 
-def _validate_preset_target(target: EvaluationTargetSpec) -> None:
-    if target.mode == "gp_course" and len(target.difficulties) != 1:
-        raise ValueError("gp_course evaluation presets require exactly one difficulty")
-    if target.mode == "time_attack_course" and target.difficulties:
-        raise ValueError("time_attack_course evaluation presets must not set difficulties")
+def _evaluation_target_for_source(
+    config: ManagedRunConfig,
+    target: EvaluationTargetSpec,
+) -> EvaluationTargetSpec:
+    """Bind policy-owned vehicle selection to one frozen evaluation target."""
 
-
-def baseline_suite_for_evaluation(evaluation: ManagedEvaluation) -> ManagedEvaluationBaselineSuite:
-    """Return the suite row implied by one preset-backed evaluation."""
-
-    return _with_filesystem_suite_status(
-        _baseline_suite_for_preset(
-            None,
-            preset_id=evaluation.preset_id,
-            preset_version=evaluation.preset_version,
-            created_at=None,
-            evaluations_root=evaluation.evaluation_dir.parent,
-        )
+    vehicle_ids = target.vehicle_ids or config.vehicle.selected_vehicle_ids
+    return EvaluationTargetSpec(
+        mode=target.mode,
+        course_ids=target.course_ids,
+        cup_ids=target.cup_ids,
+        difficulties=target.difficulties,
+        vehicle_ids=vehicle_ids,
+        repeats_per_target=target.repeats_per_target,
     )
+
+
+def _evaluation_config_for_source(
+    config: ManagedRunConfig,
+    *,
+    preset: ManagedEvaluationPreset,
+    target: EvaluationTargetSpec,
+) -> ManagedRunConfig:
+    """Project source-run policy config onto the preset-owned evaluation suite."""
+
+    course_ids = target.course_ids or config.tracks.selected_course_ids
+    if target.mode == "gp_course":
+        race_mode = "gp_race"
+        gp_difficulties = target.difficulties or config.tracks.gp_difficulties
+    else:
+        race_mode = "time_attack"
+        gp_difficulties = ()
+    tracks = config.tracks.model_copy(
+        update={
+            "baseline_variant_count": 1,
+            "gp_difficulties": gp_difficulties,
+            "include_x_cup": False,
+            "race_mode": race_mode,
+            "selected_course_ids": course_ids,
+        }
+    )
+    environment = config.environment.model_copy(update={"renderer": preset.renderer})
+    return config.model_copy(update={"environment": environment, "tracks": tracks})
 
 
 def _write_evaluation_spec(evaluation: ManagedEvaluation) -> None:
@@ -432,59 +306,3 @@ def _write_evaluation_spec(evaluation: ManagedEvaluation) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     config_path = evaluation.evaluation_dir / "evaluation.config.json"
     config_path.write_text(config_json(evaluation.config) + "\n", encoding="utf-8")
-
-
-def _baseline_suite_for_preset(
-    store: ManagerStore | None,
-    *,
-    preset_id: str,
-    preset_version: int,
-    created_at: str | None,
-    evaluations_root: Path | None = None,
-) -> ManagedEvaluationBaselineSuite:
-    if evaluations_root is None:
-        if store is None:
-            raise ValueError("store or evaluations_root is required")
-        root = store.evaluations_root()
-    else:
-        root = evaluations_root
-    suite_id = f"{preset_id}-v{preset_version}"
-    suite_dir = root / "_baseline_suites" / suite_id
-    return ManagedEvaluationBaselineSuite(
-        id=suite_id,
-        preset_id=preset_id,
-        preset_version=preset_version,
-        status="not_created",
-        suite_dir=suite_dir,
-        manifest_path=suite_dir / RUN_LAYOUT.config_filename,
-        created_at=created_at,
-        updated_at=created_at,
-    )
-
-
-def _with_filesystem_suite_status(
-    suite: ManagedEvaluationBaselineSuite,
-    *,
-    updated_at: str | None = None,
-) -> ManagedEvaluationBaselineSuite:
-    if suite.error_message is not None:
-        status = "failed"
-    elif suite.manifest_path is not None and suite.manifest_path.is_file():
-        status = "ready"
-    else:
-        status = "not_created"
-    materialized_at = suite.materialized_at
-    if status == "ready" and materialized_at is None:
-        materialized_at = updated_at
-    return ManagedEvaluationBaselineSuite(
-        id=suite.id,
-        preset_id=suite.preset_id,
-        preset_version=suite.preset_version,
-        status=status,
-        suite_dir=suite.suite_dir,
-        manifest_path=suite.manifest_path,
-        error_message=suite.error_message,
-        created_at=suite.created_at,
-        updated_at=updated_at or suite.updated_at,
-        materialized_at=materialized_at,
-    )
