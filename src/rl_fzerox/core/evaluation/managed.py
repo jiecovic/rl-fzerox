@@ -11,7 +11,11 @@ from typing import Literal
 
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
 from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
-from rl_fzerox.core.evaluation.env_control import sync_checkpoint_curriculum_stage
+from rl_fzerox.core.evaluation.env_control import (
+    set_engine_tuning_sampler,
+    set_engine_tuning_selection,
+    sync_checkpoint_curriculum_stage,
+)
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.models import EvaluationRunResult, EvaluationSpec
 from rl_fzerox.core.evaluation.runner import run_course_evaluation
@@ -123,16 +127,8 @@ def _configure_evaluation_engine_tuning(
 
     state = load_engine_tuning_checkpoint_state(policy_path)
     controller = EngineTuningTrainingController(track_sampling.engine_tuning, state=state)
-    sampler = controller.reset_sampler_snapshot(contexts)
-    set_sampler = getattr(env, "set_engine_tuning_sampler", None)
-    if not callable(set_sampler):
-        raise TypeError("evaluation env does not support engine tuning sampler updates")
-    set_sampler(sampler)
-
-    set_selection = getattr(env, "set_engine_tuning_selection", None)
-    if not callable(set_selection):
-        raise TypeError("evaluation env does not support engine tuning selection updates")
-    set_selection("greedy")
+    set_engine_tuning_sampler(env, controller.reset_sampler_snapshot(contexts))
+    set_engine_tuning_selection(env, "greedy")
 
 
 def _materialize_evaluation_train_config(

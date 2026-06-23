@@ -8,12 +8,28 @@ from collections.abc import Callable
 import numpy as np
 
 from fzerox_emulator.arrays import ActionMask
+from rl_fzerox.core.engine_tuning import (
+    EngineTuningResetSampler,
+    EngineTuningSelectionMode,
+)
 
 
 def set_locked_reset_course(env: object, course_id: str | None) -> None:
     """Lock reset selection even when training observation wrappers are present."""
 
     _env_control_method(env, "set_locked_reset_course")(course_id)
+
+
+def set_engine_tuning_sampler(env: object, sampler: EngineTuningResetSampler | None) -> None:
+    """Update engine-tuning reset choices through transparent Gym wrappers."""
+
+    _env_control_method(env, "set_engine_tuning_sampler")(sampler)
+
+
+def set_engine_tuning_selection(env: object, selection: EngineTuningSelectionMode) -> None:
+    """Select sampled or greedy engine-tuning resets through transparent wrappers."""
+
+    _env_control_method(env, "set_engine_tuning_selection")(selection)
 
 
 def sync_checkpoint_curriculum_stage(env: object, stage_index: int | None) -> None:

@@ -103,9 +103,10 @@ def test_evaluation_engine_tuning_uses_greedy_checkpoint_sampler(
         }
     )
     env = _EngineTuningEnv()
+    wrapped_env = _TransparentWrapper(env)
     policy_path = tmp_path / "checkpoint_snapshot" / "checkpoints" / "latest" / "policy.zip"
 
-    _configure_evaluation_engine_tuning(env, config, policy_path=policy_path)
+    _configure_evaluation_engine_tuning(wrapped_env, config, policy_path=policy_path)
 
     assert loaded_paths == [policy_path]
     assert env.selection == "greedy"
@@ -123,6 +124,13 @@ class _EngineTuningEnv:
 
     def set_engine_tuning_selection(self, selection: Literal["sample", "greedy"]) -> None:
         self.selection = selection
+
+
+class _TransparentWrapper:
+    """Small Gymnasium-like wrapper that does not expose env controls directly."""
+
+    def __init__(self, env: _EngineTuningEnv) -> None:
+        self.env = env
 
 
 def _suite_dir(evaluation: ManagedEvaluation) -> Path:
