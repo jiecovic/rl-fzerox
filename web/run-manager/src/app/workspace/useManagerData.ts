@@ -61,6 +61,8 @@ export function useManagerData() {
       trimRunDetailCache({ ...current, [run.id]: run }, null, runDetailAccessOrderRef.current),
     );
   }, []);
+  const clearError = useCallback(() => setError(null), []);
+  const clearEvaluationError = useCallback(() => setEvaluationError(null), []);
 
   const loadRunDetail = useCallback(async (runId: string) => {
     const cached = runDetailsRef.current[runId];
@@ -201,6 +203,8 @@ export function useManagerData() {
   });
 
   return {
+    clearError,
+    clearEvaluationError,
     defaultConfig,
     drafts,
     error,

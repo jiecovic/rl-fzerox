@@ -43,6 +43,7 @@ interface WorkspaceBodyProps {
   runDetailsById: Record<string, ManagedRunDetail>;
   saveGames: ManagedSaveGame[];
   sessions: WorkspaceSessions;
+  onDismissError: () => void;
   onRefreshSaveGameStatus: (saveGameId: string) => Promise<void>;
 }
 
@@ -62,6 +63,7 @@ export function WorkspaceBody({
   runDetailsById,
   saveGames,
   sessions,
+  onDismissError,
   onRefreshSaveGameStatus,
 }: WorkspaceBodyProps) {
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
@@ -110,7 +112,11 @@ export function WorkspaceBody({
 
   return (
     <div className="workspace">
-      {error !== null ? <FloatingNotice tone="error">{error}</FloatingNotice> : null}
+      {error !== null ? (
+        <FloatingNotice tone="error" onDismiss={onDismissError}>
+          {error}
+        </FloatingNotice>
+      ) : null}
       {isLoading ? <Notice>Loading manager data...</Notice> : null}
 
       {!isLoading && sessions.activeTabId === "drafts" ? (

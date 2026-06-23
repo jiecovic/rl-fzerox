@@ -18,6 +18,7 @@ export function App() {
     managerData.evaluationError === null
       ? null
       : `Evaluation records could not be loaded: ${managerData.evaluationError}`;
+  const workspaceError = globalError ?? managerData.error ?? evaluationLoadError;
   const sessions = useWorkspaceSessions({
     drafts: managerData.drafts,
     evaluations: managerData.evaluations,
@@ -41,6 +42,18 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  function dismissWorkspaceError() {
+    if (globalError !== null) {
+      setGlobalError(null);
+      return;
+    }
+    if (managerData.error !== null) {
+      managerData.clearError();
+      return;
+    }
+    managerData.clearEvaluationError();
+  }
 
   return (
     <AppTooltipProvider>
@@ -88,7 +101,7 @@ export function App() {
               actions={actions}
               defaultConfig={managerData.defaultConfig}
               drafts={managerData.drafts}
-              error={globalError ?? managerData.error ?? evaluationLoadError}
+              error={workspaceError}
               evaluationBaselineSuites={managerData.evaluationBaselineSuites}
               evaluationError={managerData.evaluationError}
               evaluations={managerData.evaluations}
@@ -100,6 +113,7 @@ export function App() {
               runDetailsById={managerData.runDetailsById}
               saveGames={managerData.saveGames}
               sessions={sessions}
+              onDismissError={dismissWorkspaceError}
               onRefreshSaveGameStatus={managerData.refreshSaveGameStatus}
             />
           </div>
