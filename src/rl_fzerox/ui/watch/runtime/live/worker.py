@@ -37,6 +37,10 @@ from rl_fzerox.ui.watch.runtime.ipc import (
     publish_worker_message,
 )
 from rl_fzerox.ui.watch.runtime.live.bootstrap import _watch_bootstrap_error_message
+from rl_fzerox.ui.watch.runtime.live.commands import (
+    apply_live_command_state,
+    apply_live_control_timing_command,
+)
 from rl_fzerox.ui.watch.runtime.live.notices import _TimedWatchNotice
 from rl_fzerox.ui.watch.runtime.live.reset import _sync_next_watch_reset_after_episode
 from rl_fzerox.ui.watch.runtime.live.session import (
@@ -71,11 +75,7 @@ from rl_fzerox.ui.watch.runtime.snapshots.build import (
     _publish_step_snapshots,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry, _telemetry_to_data
-from rl_fzerox.ui.watch.runtime.timing import (
-    RateMeter,
-    _adjust_control_fps,
-    _target_seconds,
-)
+from rl_fzerox.ui.watch.runtime.timing import RateMeter
 
 if TYPE_CHECKING:
     from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
@@ -321,23 +321,25 @@ def _run_simulation_loop(
                     live_visualization_enabled=live_visualization_enabled,
                     cnn_normalization=cnn_normalization,
                 )
-                manual_control_enabled = (
-                    True if policy_runner is None else commands.manual_control_enabled
+                command_state = apply_live_command_state(
+                    commands=commands,
+                    auxiliary_target_names=auxiliary_target_names,
+                    previous_live_visualization_enabled=previous_live_visualization_enabled,
+                    last_live_series_publish_time=last_live_series_publish_time,
+                    deterministic_policy=deterministic_policy,
+                    policy_available=policy_runner is not None,
                 )
-                if manual_control_enabled:
-                    manual_spin_request = commands.spin_request
-                else:
-                    manual_spin_request = "none"
-                cnn_visualization_enabled = commands.cnn_visualization_enabled
-                auxiliary_visualization_enabled = (
-                    bool(auxiliary_target_names) and commands.auxiliary_visualization_enabled
-                )
-                live_visualization_enabled = commands.live_visualization_enabled
-                cnn_normalization = commands.cnn_normalization
+                manual_control_enabled = command_state.manual_control_enabled
+                manual_spin_request = command_state.spin_request
+                cnn_visualization_enabled = command_state.cnn_visualization_enabled
+                auxiliary_visualization_enabled = command_state.auxiliary_visualization_enabled
+                live_visualization_enabled = command_state.live_visualization_enabled
+                last_live_series_publish_time = command_state.last_live_series_publish_time
+                cnn_normalization = command_state.cnn_normalization
+                deterministic_policy = command_state.deterministic_policy
                 if commands.quit_requested:
                     return
-                if live_visualization_enabled != previous_live_visualization_enabled:
-                    last_live_series_publish_time = 0.0
+                if command_state.live_visualization_changed:
                     publish_snapshot()
                 if refresh_track_sampling() and commands.paused:
                     publish_snapshot()
@@ -367,20 +369,16 @@ def _run_simulation_loop(
                     break
                 if course_command.lock_state_changed:
                     publish_snapshot()
-                if commands.reset_control_fps:
-                    target_control_fps = native_control_fps
-                    target_control_seconds = _target_seconds(target_control_fps)
-                    control_rate.trim_to_recent()
-                    next_step_time = time.perf_counter()
-                elif commands.control_fps_delta:
-                    target_control_fps = _adjust_control_fps(
-                        target_control_fps,
-                        commands.control_fps_delta,
-                        native_control_fps=native_control_fps,
-                    )
-                    target_control_seconds = _target_seconds(target_control_fps)
-                    control_rate.trim_to_recent()
-                    next_step_time = time.perf_counter()
+                timing_update = apply_live_control_timing_command(
+                    commands=commands,
+                    control_rate=control_rate,
+                    native_control_fps=native_control_fps,
+                    target_control_fps=target_control_fps,
+                )
+                if timing_update is not None:
+                    target_control_fps = timing_update.target_control_fps
+                    target_control_seconds = timing_update.target_control_seconds
+                    next_step_time = timing_update.next_step_time
                 if commands.save_requests:
                     alt_save = _save_managed_alt_baseline(
                         emulator=emulator,
@@ -406,8 +404,7 @@ def _run_simulation_loop(
                         )
                         save_notice.show("baseline saved", now=time.perf_counter())
                         publish_snapshot()
-                if commands.toggle_deterministic_policy and policy_runner is not None:
-                    deterministic_policy = not deterministic_policy
+                if command_state.deterministic_policy_changed:
                     env.set_engine_tuning_selection("greedy" if deterministic_policy else "sample")
                 if manual_control_enabled:
                     current_control_state = commands.control_state
