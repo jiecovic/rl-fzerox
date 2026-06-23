@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,8 +25,17 @@ from rl_fzerox.core.manager.models import (
     ManagedEvaluationPreset,
 )
 
-_DEFAULT_EVALUATION_SEED = 2_262_218_583
-_DEFAULT_EVALUATION_REPEATS = 10
+
+@dataclass(frozen=True)
+class _DefaultPresetSettings:
+    seed: int
+    repeats_per_target: int
+
+
+_DEFAULT_PRESET_SETTINGS = _DefaultPresetSettings(
+    seed=2_262_218_583,
+    repeats_per_target=10,
+)
 
 
 def upsert_default_evaluation_presets(session: Session, *, now: str) -> None:
@@ -144,12 +153,12 @@ def _default_evaluation_presets(*, now: str) -> tuple[ManagedEvaluationPreset, .
             id="time_attack_all_courses",
             name="Time Attack course · all courses",
             version=1,
-            seed=_DEFAULT_EVALUATION_SEED,
+            seed=_DEFAULT_PRESET_SETTINGS.seed,
             renderer="gliden64",
             target=EvaluationTargetSpec(
                 mode="time_attack_course",
                 course_ids=all_course_ids,
-                repeats_per_target=_DEFAULT_EVALUATION_REPEATS,
+                repeats_per_target=_DEFAULT_PRESET_SETTINGS.repeats_per_target,
             ),
             builtin=True,
             created_at=now,
@@ -159,13 +168,13 @@ def _default_evaluation_presets(*, now: str) -> tuple[ManagedEvaluationPreset, .
             id="gp_course_master_all_courses",
             name="GP course · Master · all courses",
             version=1,
-            seed=_DEFAULT_EVALUATION_SEED,
+            seed=_DEFAULT_PRESET_SETTINGS.seed,
             renderer="gliden64",
             target=EvaluationTargetSpec(
                 mode="gp_course",
                 course_ids=all_course_ids,
                 difficulties=("master",),
-                repeats_per_target=_DEFAULT_EVALUATION_REPEATS,
+                repeats_per_target=_DEFAULT_PRESET_SETTINGS.repeats_per_target,
             ),
             builtin=True,
             created_at=now,
