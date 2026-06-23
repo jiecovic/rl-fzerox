@@ -233,10 +233,7 @@ export function EvaluationWorkspace({
                 label="Finished"
                 value={evaluation.finished_at === null ? "-" : formatDate(evaluation.finished_at)}
               />
-              <Detail
-                label="Result"
-                value={evaluation.result_json_path === null ? "pending" : "written"}
-              />
+              <Detail label="Result" value={executionResultLabel(evaluation)} />
             </dl>
           </div>
         </section>
@@ -275,7 +272,7 @@ function ProgressBar({ evaluation }: { evaluation: ManagedEvaluation }) {
     <div>
       <div className="mb-2 flex items-center justify-between gap-4 text-sm text-app-muted">
         <span>{progressLabel(evaluation)}</span>
-        <span>{evaluation.progress.result_status ?? evaluation.status}</span>
+        <span>{evaluationProgressStatusLabel(evaluation)}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-sm bg-app-surface">
         <div
@@ -362,7 +359,7 @@ function ResultsSection({ evaluation }: { evaluation: ManagedEvaluation }) {
     <section className="grid gap-4 border border-app-border bg-app-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionTitle title="Results" />
-        <span className="text-sm text-app-muted">{summary.status}</span>
+        <span className="text-sm text-app-muted">{evaluationResultStatusLabel(evaluation)}</span>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <Metric
@@ -540,6 +537,33 @@ function progressLabel(evaluation: ManagedEvaluation) {
     return `${completed.toLocaleString()} / ${total.toLocaleString()} course runs`;
   }
   return completed > 0 ? `${completed.toLocaleString()} course runs` : "not started";
+}
+
+function executionResultLabel(evaluation: ManagedEvaluation) {
+  if (evaluation.result_json_path === null) {
+    return "pending";
+  }
+  return evaluationResultStatusLabel(evaluation);
+}
+
+function evaluationProgressStatusLabel(evaluation: ManagedEvaluation) {
+  return evaluationStatusLabel(evaluation, evaluation.progress.result_status ?? evaluation.status);
+}
+
+function evaluationResultStatusLabel(evaluation: ManagedEvaluation) {
+  return evaluationStatusLabel(
+    evaluation,
+    evaluation.result_summary?.status ?? evaluation.progress.result_status ?? evaluation.status,
+  );
+}
+
+function evaluationStatusLabel(evaluation: ManagedEvaluation, status: string) {
+  if (status === "partial") {
+    return evaluation.status === "running" || evaluation.status === "cancelling"
+      ? "in progress"
+      : "partial result";
+  }
+  return status.replace(/[_-]+/g, " ");
 }
 
 function runCountDetail(evaluation: ManagedEvaluation, observedCourseCount: number) {
