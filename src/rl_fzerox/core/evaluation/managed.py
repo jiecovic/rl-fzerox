@@ -9,16 +9,19 @@ from math import ceil
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
-from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
-from rl_fzerox.core.evaluation.env_control import (
-    set_engine_tuning_sampler,
-    set_engine_tuning_selection,
-    sync_checkpoint_curriculum_stage,
-)
+from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
+from rl_fzerox.core.evaluation.env_control import sync_checkpoint_curriculum_stage
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
-from rl_fzerox.core.evaluation.models import EvaluationRunResult, EvaluationSpec
-from rl_fzerox.core.evaluation.runner import run_course_evaluation
+from rl_fzerox.core.evaluation.managed_parallel import run_parallel_managed_evaluation
+from rl_fzerox.core.evaluation.models import (
+    EvaluationRunResult,
+    EvaluationRuntimeSpec,
+    EvaluationSpec,
+)
+from rl_fzerox.core.evaluation.runner import (
+    build_evaluation_attempt_plan,
+    run_course_evaluation,
+)
 from rl_fzerox.core.evaluation.targets import single_course_targets_from_config
 from rl_fzerox.core.manager.models import ManagedEvaluation
 from rl_fzerox.core.manager.training import build_managed_train_app_config
@@ -38,7 +41,6 @@ from rl_fzerox.core.training.runs import (
     materialize_train_run_config,
     save_train_run_config,
 )
-from rl_fzerox.core.training.session.artifacts import load_engine_tuning_checkpoint_state
 from rl_fzerox.core.training.session.env import build_single_training_env
 
 
@@ -54,13 +56,38 @@ def run_managed_evaluation(
     evaluation: ManagedEvaluation,
     *,
     device: Literal["cpu", "cuda"] = "cuda",
+    worker_count: int = 1,
     should_cancel: Callable[[], bool] | None = None,
 ) -> EvaluationRunResult:
     """Execute one manager evaluation record."""
 
+    if worker_count < 1:
+        raise ValueError(f"worker_count must be at least 1, got {worker_count}")
     train_config, run_paths = _materialize_evaluation_train_config(evaluation)
     runtime_config = _runtime_device_config(train_config, device=device)
     targets = single_course_targets_from_config(runtime_config, evaluation.target)
+    spec = EvaluationSpec(
+        evaluation_id=evaluation.id,
+        seed=evaluation.seed,
+        target=evaluation.target,
+        checkpoint=evaluation.checkpoint,
+        policy_mode=evaluation.policy_mode,
+    )
+    plan = build_evaluation_attempt_plan(spec, targets)
+    actual_worker_count = min(worker_count, len(plan.jobs))
+    runtime = EvaluationRuntimeSpec(device=device, worker_count=actual_worker_count)
+    max_env_steps = ceil(train_config.env.max_episode_steps / train_config.env.action_repeat)
+    if actual_worker_count > 1:
+        return run_parallel_managed_evaluation(
+            evaluation,
+            runtime_config=runtime_config,
+            run_paths=run_paths,
+            plan=plan,
+            runtime=runtime,
+            max_env_steps=max_env_steps,
+            should_cancel=should_cancel,
+        )
+
     policy_runner = load_policy_runner(
         evaluation.evaluation_dir / "checkpoint_snapshot",
         artifact=evaluation.checkpoint.artifact,
@@ -74,7 +101,7 @@ def run_managed_evaluation(
     )
     try:
         sync_checkpoint_curriculum_stage(env, policy_runner.checkpoint_curriculum_stage_index)
-        _configure_evaluation_engine_tuning(
+        configure_evaluation_engine_tuning(
             env,
             runtime_config,
             policy_path=Path(evaluation.checkpoint.copied_policy_path),
@@ -82,18 +109,13 @@ def run_managed_evaluation(
         executor = FZeroXSingleCourseEpisodeExecutor(
             env=env,
             policy_runner=policy_runner,
-            max_env_steps=ceil(train_config.env.max_episode_steps / train_config.env.action_repeat),
+            max_env_steps=max_env_steps,
         )
         return run_course_evaluation(
-            EvaluationSpec(
-                evaluation_id=evaluation.id,
-                seed=evaluation.seed,
-                target=evaluation.target,
-                checkpoint=evaluation.checkpoint,
-                policy_mode=evaluation.policy_mode,
-            ),
+            plan.spec,
             targets,
             executor,
+            runtime=runtime,
             result_dir=evaluation.evaluation_dir,
             should_cancel=should_cancel,
         )
@@ -109,26 +131,6 @@ def _runtime_device_config(
     device: Literal["cpu", "cuda"],
 ) -> TrainAppConfig:
     return config.model_copy(update={"train": config.train.model_copy(update={"device": device})})
-
-
-def _configure_evaluation_engine_tuning(
-    env: object,
-    config: TrainAppConfig,
-    *,
-    policy_path: Path,
-) -> None:
-    track_sampling = config.env.track_sampling
-    if not track_sampling.enabled or not track_sampling.engine_tuning.enabled:
-        return
-
-    contexts = tuple(engine_tuning_context_for_entry(entry) for entry in track_sampling.entries)
-    if not contexts:
-        return
-
-    state = load_engine_tuning_checkpoint_state(policy_path)
-    controller = EngineTuningTrainingController(track_sampling.engine_tuning, state=state)
-    set_engine_tuning_sampler(env, controller.reset_sampler_snapshot(contexts))
-    set_engine_tuning_selection(env, "greedy")
 
 
 def _materialize_evaluation_train_config(

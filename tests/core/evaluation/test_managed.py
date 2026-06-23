@@ -7,9 +7,10 @@ from typing import Literal
 import pytest
 
 from rl_fzerox.core.engine_tuning import EngineTuningResetSampler
+from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
 from rl_fzerox.core.evaluation.managed import (
-    _configure_evaluation_engine_tuning,
     _evaluation_baseline_suite,
+    run_managed_evaluation,
 )
 from rl_fzerox.core.evaluation.models import (
     EvaluationCheckpointSnapshot,
@@ -75,7 +76,7 @@ def test_evaluation_engine_tuning_uses_greedy_checkpoint_sampler(
 ) -> None:
     loaded_paths: list[Path] = []
     monkeypatch.setattr(
-        "rl_fzerox.core.evaluation.managed.load_engine_tuning_checkpoint_state",
+        "rl_fzerox.core.evaluation.engine_tuning.load_engine_tuning_checkpoint_state",
         lambda path: loaded_paths.append(path) or None,
     )
     config = build_managed_train_app_config(
@@ -106,12 +107,19 @@ def test_evaluation_engine_tuning_uses_greedy_checkpoint_sampler(
     wrapped_env = _TransparentWrapper(env)
     policy_path = tmp_path / "checkpoint_snapshot" / "checkpoints" / "latest" / "policy.zip"
 
-    _configure_evaluation_engine_tuning(wrapped_env, config, policy_path=policy_path)
+    configure_evaluation_engine_tuning(wrapped_env, config, policy_path=policy_path)
 
     assert loaded_paths == [policy_path]
     assert env.selection == "greedy"
     assert env.sampler is not None
     assert [context.context.key for context in env.sampler.contexts] == ["mute_city|blue_falcon"]
+
+
+def test_managed_evaluation_rejects_invalid_worker_count(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="worker_count must be at least 1"):
+        run_managed_evaluation(
+            _managed_evaluation(tmp_path, evaluation_id="eval-001"), worker_count=0
+        )
 
 
 class _EngineTuningEnv:

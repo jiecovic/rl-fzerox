@@ -31,6 +31,8 @@ const EVALUATION_MODE_LABELS = {
   time_attack_course: "Time Attack course",
 } satisfies Record<ManagedEvaluation["target"]["mode"], string>;
 
+const WORKER_COUNT_OPTIONS = [1, 2, 4, 8, 16] as const;
+
 export function EvaluationWorkspace({
   evaluation,
   onCancelEvaluation,
@@ -39,6 +41,7 @@ export function EvaluationWorkspace({
   onStartEvaluation,
 }: EvaluationWorkspaceProps) {
   const [device, setDevice] = useState<WatchDevice>("cuda");
+  const [workerCount, setWorkerCount] = useState(1);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -58,7 +61,7 @@ export function EvaluationWorkspace({
     setStarting(true);
     onGlobalError(null);
     try {
-      await onStartEvaluation(evaluation, { device });
+      await onStartEvaluation(evaluation, { device, workerCount });
     } catch (caught) {
       onGlobalError(caught instanceof Error ? caught.message : "failed to start evaluation");
     } finally {
@@ -176,6 +179,19 @@ export function EvaluationWorkspace({
                     <option value="cuda">cuda</option>
                     <option value="cpu">cpu</option>
                   </FieldSelect>
+                  <FieldSelect
+                    aria-label="Evaluation worker count"
+                    className="min-w-[120px]"
+                    disabled={!canStart || starting}
+                    value={String(workerCount)}
+                    onChange={(event) => setWorkerCount(Number(event.currentTarget.value))}
+                  >
+                    {WORKER_COUNT_OPTIONS.map((count) => (
+                      <option key={count} value={count}>
+                        {count} {count === 1 ? "worker" : "workers"}
+                      </option>
+                    ))}
+                  </FieldSelect>
                   <Button
                     className="gap-2"
                     disabled={!canStart || starting}
@@ -225,6 +241,7 @@ export function EvaluationWorkspace({
             <h3 className="m-0 text-base font-semibold text-app-text">Execution</h3>
             <dl className="mt-4 grid gap-3 text-sm">
               <Detail label="Created" value={formatDate(evaluation.created_at)} />
+              <Detail label="Runtime" value={evaluationRuntimeLabel(evaluation)} />
               <Detail
                 label="Started"
                 value={evaluation.started_at === null ? "-" : formatDate(evaluation.started_at)}
@@ -564,6 +581,17 @@ function evaluationStatusLabel(evaluation: ManagedEvaluation, status: string) {
       : "partial result";
   }
   return status.replace(/[_-]+/g, " ");
+}
+
+function evaluationRuntimeLabel(evaluation: ManagedEvaluation) {
+  const runtime = evaluation.result_summary?.runtime ?? null;
+  if (runtime === null) {
+    return "-";
+  }
+  return `${runtime.device} · ${runtime.worker_count.toLocaleString()} ${pluralize(
+    runtime.worker_count,
+    "worker",
+  )}`;
 }
 
 function runCountDetail(evaluation: ManagedEvaluation, observedCourseCount: number) {

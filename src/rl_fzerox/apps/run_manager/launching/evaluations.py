@@ -24,9 +24,12 @@ def launch_evaluation_worker(
     *,
     evaluation_id: str,
     device: Literal["cpu", "cuda"],
+    worker_count: int = 1,
 ) -> ManagedEvaluation:
     """Start one new or failed evaluation and return its running DB row."""
 
+    if worker_count < 1:
+        raise ValueError(f"worker_count must be at least 1, got {worker_count}")
     evaluation = store.get_evaluation(evaluation_id)
     if evaluation is None:
         raise ValueError("evaluation not found")
@@ -49,6 +52,8 @@ def launch_evaluation_worker(
         evaluation_id,
         "--device",
         device,
+        "--worker-count",
+        str(worker_count),
     ]
     try:
         with log_path.open("ab") as log_handle:

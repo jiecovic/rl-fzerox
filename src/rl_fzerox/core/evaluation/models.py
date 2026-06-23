@@ -9,6 +9,7 @@ from typing import Literal, TypeAlias
 EvaluationMode: TypeAlias = Literal["time_attack_course", "gp_course"]
 EvaluationCheckpointArtifact: TypeAlias = Literal["latest", "best", "final"]
 EvaluationPolicyMode: TypeAlias = Literal["deterministic", "stochastic"]
+EvaluationDevice: TypeAlias = Literal["cpu", "cuda"]
 EvaluationRunStatus: TypeAlias = Literal["completed", "failed", "cancelled", "partial"]
 AttemptStatus: TypeAlias = Literal["succeeded", "failed", "cancelled", "partial"]
 CourseResultStatus: TypeAlias = Literal["finished", "retired", "crashed", "truncated", "failed"]
@@ -79,6 +80,14 @@ class EvaluationSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class EvaluationRuntimeSpec:
+    """Runtime settings used to execute one evaluation attempt plan."""
+
+    device: EvaluationDevice = "cuda"
+    worker_count: int = 1
+
+
+@dataclass(frozen=True, slots=True)
 class EvaluationCourseResult:
     """Terminal result for one course episode or one GP course attempt."""
 
@@ -135,6 +144,7 @@ class EvaluationRunResult:
 
     spec: EvaluationSpec
     status: EvaluationRunStatus
+    runtime: EvaluationRuntimeSpec = field(default_factory=EvaluationRuntimeSpec)
     started_at_utc: str | None = None
     closed_at_utc: str | None = None
     attempts: tuple[EvaluationAttemptResult, ...] = field(default_factory=tuple)

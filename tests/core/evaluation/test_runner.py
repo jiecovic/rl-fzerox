@@ -14,8 +14,10 @@ from rl_fzerox.core.evaluation import (
     EvaluationCourseTarget,
     EvaluationPolicyMode,
     EvaluationRunResult,
+    EvaluationRuntimeSpec,
     EvaluationSpec,
     EvaluationTargetSpec,
+    build_evaluation_attempt_plan,
     run_course_evaluation,
 )
 
@@ -75,6 +77,7 @@ def test_course_runner_writes_progress_and_final_summary(
         spec,
         (target,),
         executor,
+        runtime=EvaluationRuntimeSpec(device="cpu", worker_count=1),
         result_dir=tmp_path / "eval",
         on_update=updates.append,
         clock=_Clock(),
@@ -93,6 +96,7 @@ def test_course_runner_writes_progress_and_final_summary(
         (tmp_path / "eval" / "evaluation.summary.json").read_text(encoding="utf-8")
     )
     assert payload["result"]["status"] == "completed"
+    assert payload["result"]["runtime"] == {"device": "cpu", "worker_count": 1}
     assert payload["metrics"]["overall"]["primary"]["attempt_count"] == 2
     assert payload["metrics"]["overall"]["primary"]["success_count"] == 1
 
@@ -133,6 +137,26 @@ def test_course_runner_repeats_target_set_in_rounds(tmp_path: Path) -> None:
         "mute-city",
         "silence",
     ]
+
+
+def test_course_runner_attempt_plan_is_worker_partition_invariant(tmp_path: Path) -> None:
+    targets = (
+        EvaluationCourseTarget(target_id="mute-city", course_id="mute_city"),
+        EvaluationCourseTarget(target_id="silence", course_id="silence"),
+        EvaluationCourseTarget(target_id="sand-ocean", course_id="sand_ocean"),
+    )
+
+    plan = build_evaluation_attempt_plan(_evaluation_spec(tmp_path, repeats=3), targets)
+    worker_one = tuple((job.attempt_index, job.target.target_id, job.seed) for job in plan.jobs)
+    worker_four = tuple(
+        sorted(
+            (job.attempt_index, job.target.target_id, job.seed)
+            for worker_index in range(4)
+            for job in plan.jobs[worker_index::4]
+        )
+    )
+
+    assert worker_four == worker_one
 
 
 def test_course_runner_cancels_between_attempts(tmp_path: Path) -> None:

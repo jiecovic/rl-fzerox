@@ -67,10 +67,16 @@ class EvaluationAttemptSummaryPayload(TypedDict):
     closed_at_utc: str | None
 
 
+class EvaluationRuntimePayload(TypedDict):
+    device: str
+    worker_count: int
+
+
 class EvaluationResultSummaryPayload(TypedDict):
     status: str
     started_at_utc: str | None
     closed_at_utc: str | None
+    runtime: EvaluationRuntimePayload | None
     overall: EvaluationMetricSummaryPayload | None
     courses: list[EvaluationMetricSummaryPayload]
     attempts: list[EvaluationAttemptSummaryPayload]
@@ -220,6 +226,7 @@ def _result_summary_payload(payload: JsonObject | None) -> EvaluationResultSumma
         "status": _string_or_default(result.get("status"), "partial"),
         "started_at_utc": _string_or_none(result.get("started_at_utc")),
         "closed_at_utc": _string_or_none(result.get("closed_at_utc")),
+        "runtime": _runtime_payload(result.get("runtime")),
         "overall": _metric_group_payload(metrics.get("overall")),
         "courses": _metric_group_list_payload(metrics.get("courses")),
         "attempts": _attempts_payload(result.get("attempts")),
@@ -294,6 +301,17 @@ def _attempt_payload(attempt: JsonObject | None) -> EvaluationAttemptSummaryPayl
             else _number_or_none(course_result.get("completion_ratio"))
         ),
         "closed_at_utc": _string_or_none(attempt.get("closed_at_utc")),
+    }
+
+
+def _runtime_payload(value: object) -> EvaluationRuntimePayload | None:
+    runtime = _object_mapping(value)
+    if runtime is None:
+        return None
+    worker_count = runtime.get("worker_count")
+    return {
+        "device": _string_or_default(runtime.get("device"), "cuda"),
+        "worker_count": worker_count if isinstance(worker_count, int) and worker_count >= 1 else 1,
     }
 
 

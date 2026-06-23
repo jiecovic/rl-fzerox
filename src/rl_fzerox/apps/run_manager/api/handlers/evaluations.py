@@ -134,6 +134,7 @@ def start_evaluation_payload(
             store,
             evaluation_id=evaluation_id,
             device=request.device,
+            worker_count=request.worker_count,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

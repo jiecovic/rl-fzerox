@@ -70,6 +70,7 @@ def test_evaluation_payload_includes_result_summary(tmp_path: Path) -> None:
                     "status": "partial",
                     "started_at_utc": "2026-06-22T10:00:00+00:00",
                     "closed_at_utc": None,
+                    "runtime": {"device": "cuda", "worker_count": 4},
                     "spec": {"total_planned_attempts": 2},
                     "attempts": [
                         {
@@ -189,6 +190,7 @@ def test_evaluation_payload_includes_result_summary(tmp_path: Path) -> None:
     summary = payload["result_summary"]
     assert isinstance(summary, dict)
     assert summary["status"] == "partial"
+    assert summary["runtime"] == {"device": "cuda", "worker_count": 4}
     assert summary["overall"] == {
         "key": "overall",
         "label": "Overall",

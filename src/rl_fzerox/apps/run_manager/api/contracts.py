@@ -59,6 +59,7 @@ class StartEvaluationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     device: WatchDevice = "cuda"
+    worker_count: int = Field(default=1, ge=1, le=32)
 
 
 class CreateEvaluationPresetRequest(BaseModel):

@@ -66,6 +66,8 @@ def _evaluation_markdown(result: EvaluationRunResult, metrics: EvaluationMetrics
         f"- Status: {_text(result.status)}",
         f"- Policy mode: {_text(result.spec.policy_mode)}",
         f"- Seed: {_text(result.spec.seed)}",
+        f"- Device: {_text(result.runtime.device)}",
+        f"- Workers: {_text(result.runtime.worker_count)}",
         f"- Source run: {_text(source_run)}",
         f"- Artifact: {_text(result.spec.checkpoint.artifact)}",
         f"- Checkpoint copy: {_text(result.spec.checkpoint.copied_policy_path)}",

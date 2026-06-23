@@ -101,7 +101,7 @@ export async function startEvaluation(
   const response = await fetch(`/api/evaluations/${encodeURIComponent(evaluationId)}/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ device: request.device }),
+    body: JSON.stringify({ device: request.device, worker_count: request.workerCount }),
   });
   const payload = parseApiPayload(startEvaluationResponseSchema, await parseJson(response));
   return payload.evaluation;

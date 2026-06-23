@@ -18,6 +18,7 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationCourseTarget,
     EvaluationPolicyMode,
     EvaluationRunResult,
+    EvaluationRuntimeSpec,
     EvaluationSpec,
 )
 from rl_fzerox.core.seed import derive_seed
@@ -35,6 +36,23 @@ class _EvaluationRunnerSeedDomains:
 
 
 _SEED_DOMAINS = _EvaluationRunnerSeedDomains()
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationAttemptJob:
+    """One deterministic course-run job in a materialized evaluation plan."""
+
+    attempt_index: int
+    target: EvaluationCourseTarget
+    seed: int
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationAttemptPlan:
+    """Stable attempt order and seed assignment for one evaluation run."""
+
+    spec: EvaluationSpec
+    jobs: tuple[EvaluationAttemptJob, ...]
 
 
 class SingleCourseEpisodeExecutor(Protocol):
@@ -61,6 +79,7 @@ def run_course_evaluation(
     targets: Iterable[EvaluationCourseTarget],
     executor: SingleCourseEpisodeExecutor,
     *,
+    runtime: EvaluationRuntimeSpec | None = None,
     result_dir: Path | None = None,
     on_update: ProgressCallback | None = None,
     should_cancel: CancelCheck | None = None,
@@ -74,46 +93,39 @@ def run_course_evaluation(
     actually advances F-Zero X.
     """
 
-    if spec.target.mode not in ("time_attack_course", "gp_course"):
-        raise ValueError(f"course evaluation does not support mode={spec.target.mode!r}")
-
-    expanded_targets = _expand_targets(targets, repeats=spec.target.repeats_per_target)
-    run_spec = replace(
-        spec,
-        total_planned_attempts=spec.total_planned_attempts or len(expanded_targets),
-    )
+    plan = build_evaluation_attempt_plan(spec, targets)
+    run_spec = plan.spec
+    run_runtime = runtime or EvaluationRuntimeSpec()
     started_at_utc = clock()
     attempts: list[EvaluationAttemptResult] = []
     policy_path = Path(run_spec.checkpoint.copied_policy_path)
 
-    for index, target in enumerate(expanded_targets, start=1):
+    for job in plan.jobs:
         if _cancel_requested(should_cancel):
             return _publish_cancelled_result(
                 run_spec,
+                runtime=run_runtime,
                 started_at_utc=started_at_utc,
                 attempts=attempts,
                 result_dir=result_dir,
                 on_update=on_update,
                 clock=clock,
             )
-        attempt_seed = _attempt_seed(run_spec.seed, index)
         attempt_started_at_utc = clock()
-        course_result = _target_course_result(
+        course_result = evaluation_course_result_for_target(
             executor.run_course(
-                target,
+                job.target,
                 policy_path=policy_path,
                 policy_mode=run_spec.policy_mode,
-                seed=attempt_seed,
+                seed=job.seed,
             ),
-            target=target,
-            seed=attempt_seed,
+            target=job.target,
+            seed=job.seed,
         )
         attempts.append(
-            _attempt_from_course_result(
+            evaluation_attempt_from_course_result(
                 course_result,
-                target=target,
-                attempt_index=index,
-                seed=attempt_seed,
+                job=job,
                 started_at_utc=attempt_started_at_utc,
                 closed_at_utc=clock(),
             )
@@ -122,6 +134,7 @@ def run_course_evaluation(
             EvaluationRunResult(
                 spec=run_spec,
                 status="partial",
+                runtime=run_runtime,
                 started_at_utc=started_at_utc,
                 attempts=tuple(attempts),
             ),
@@ -131,6 +144,7 @@ def run_course_evaluation(
         if _cancel_requested(should_cancel):
             return _publish_cancelled_result(
                 run_spec,
+                runtime=run_runtime,
                 started_at_utc=started_at_utc,
                 attempts=attempts,
                 result_dir=result_dir,
@@ -141,6 +155,7 @@ def run_course_evaluation(
     result = EvaluationRunResult(
         spec=run_spec,
         status="completed",
+        runtime=run_runtime,
         started_at_utc=started_at_utc,
         closed_at_utc=clock(),
         attempts=tuple(attempts),
@@ -153,9 +168,35 @@ def _cancel_requested(should_cancel: CancelCheck | None) -> bool:
     return False if should_cancel is None else should_cancel()
 
 
+def build_evaluation_attempt_plan(
+    spec: EvaluationSpec,
+    targets: Iterable[EvaluationCourseTarget],
+) -> EvaluationAttemptPlan:
+    """Materialize target order and per-attempt seeds before execution starts."""
+
+    if spec.target.mode not in ("time_attack_course", "gp_course"):
+        raise ValueError(f"course evaluation does not support mode={spec.target.mode!r}")
+
+    expanded_targets = _expand_targets(targets, repeats=spec.target.repeats_per_target)
+    run_spec = replace(
+        spec,
+        total_planned_attempts=spec.total_planned_attempts or len(expanded_targets),
+    )
+    jobs = tuple(
+        EvaluationAttemptJob(
+            attempt_index=index,
+            target=target,
+            seed=_attempt_seed(run_spec.seed, index),
+        )
+        for index, target in enumerate(expanded_targets, start=1)
+    )
+    return EvaluationAttemptPlan(spec=run_spec, jobs=jobs)
+
+
 def _publish_cancelled_result(
     spec: EvaluationSpec,
     *,
+    runtime: EvaluationRuntimeSpec,
     started_at_utc: str,
     attempts: list[EvaluationAttemptResult],
     result_dir: Path | None,
@@ -165,6 +206,7 @@ def _publish_cancelled_result(
     result = EvaluationRunResult(
         spec=spec,
         status="cancelled",
+        runtime=runtime,
         started_at_utc=started_at_utc,
         closed_at_utc=clock(),
         attempts=tuple(attempts),
@@ -193,7 +235,7 @@ def _attempt_seed(master_seed: int, attempt_index: int) -> int:
     return seed
 
 
-def _target_course_result(
+def evaluation_course_result_for_target(
     result: EvaluationCourseResult,
     *,
     target: EvaluationCourseTarget,
@@ -215,24 +257,22 @@ def _target_course_result(
     )
 
 
-def _attempt_from_course_result(
+def evaluation_attempt_from_course_result(
     course_result: EvaluationCourseResult,
     *,
-    target: EvaluationCourseTarget,
-    attempt_index: int,
-    seed: int,
+    job: EvaluationAttemptJob,
     started_at_utc: str,
     closed_at_utc: str,
 ) -> EvaluationAttemptResult:
     return EvaluationAttemptResult(
-        attempt_id=f"attempt-{attempt_index:04d}",
-        target_id=target.target_id,
-        target_label=target.course_name or target.course_id,
+        attempt_id=f"attempt-{job.attempt_index:04d}",
+        target_id=job.target.target_id,
+        target_label=job.target.course_name or job.target.course_id,
         status=_attempt_status(course_result.status),
-        cup_id=target.cup_id,
-        difficulty=target.difficulty,
-        vehicle_id=target.vehicle_id,
-        seed=seed,
+        cup_id=job.target.cup_id,
+        difficulty=job.target.difficulty,
+        vehicle_id=job.target.vehicle_id,
+        seed=job.seed,
         started_at_utc=started_at_utc,
         closed_at_utc=closed_at_utc,
         total_race_time_ms=course_result.race_time_ms,

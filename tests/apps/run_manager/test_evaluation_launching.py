@@ -99,6 +99,7 @@ def test_launch_evaluation_worker_passes_runtime_device(
         _FakeStore(),
         evaluation_id=evaluation.id,
         device="cpu",
+        worker_count=4,
     )
 
     assert launched is evaluation
@@ -112,4 +113,6 @@ def test_launch_evaluation_worker_passes_runtime_device(
         evaluation.id,
         "--device",
         "cpu",
+        "--worker-count",
+        "4",
     ]

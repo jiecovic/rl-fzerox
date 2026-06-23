@@ -83,10 +83,16 @@ export const evaluationAttemptSummarySchema = z.object({
   closed_at_utc: z.string().nullable(),
 });
 
+export const evaluationRuntimeSchema = z.object({
+  device: z.enum(["cpu", "cuda"]),
+  worker_count: z.number().int().positive(),
+});
+
 export const evaluationResultSummarySchema = z.object({
   status: z.string(),
   started_at_utc: z.string().nullable(),
   closed_at_utc: z.string().nullable(),
+  runtime: evaluationRuntimeSchema.nullable(),
   overall: evaluationMetricSummarySchema.nullable(),
   courses: z.array(evaluationMetricSummarySchema),
   attempts: z.array(evaluationAttemptSummarySchema),
@@ -176,6 +182,7 @@ export type EvaluationBaselineSuiteStatus = z.infer<typeof evaluationBaselineSui
 export type EvaluationMetricSummary = z.infer<typeof evaluationMetricSummarySchema>;
 export type EvaluationAttemptSummary = z.infer<typeof evaluationAttemptSummarySchema>;
 export type EvaluationResultSummary = z.infer<typeof evaluationResultSummarySchema>;
+export type EvaluationRuntime = z.infer<typeof evaluationRuntimeSchema>;
 export type EvaluationsResponse = z.infer<typeof evaluationsResponseSchema>;
 export type EvaluationStatus = z.infer<typeof evaluationStatusSchema>;
 export type EvaluationSourceArtifact = z.infer<typeof evaluationSourceArtifactSchema>;
@@ -190,6 +197,7 @@ export interface CreateEvaluationRequest {
 
 export interface StartEvaluationRequest {
   device: WatchDevice;
+  workerCount: number;
 }
 
 export interface CreateEvaluationPresetRequest {
