@@ -547,7 +547,16 @@ def test_run_viewer_exits_quietly_on_keyboard_interrupt(
     )
     monkeypatch.setattr(
         "rl_fzerox.ui.watch.app.wait_initial_snapshot",
-        lambda _worker, **_kwargs: (SimpleNamespace(native_fps=30.0), False),
+        lambda _worker, **_kwargs: (
+            SimpleNamespace(
+                native_fps=30.0,
+                active_track_sampling=None,
+                info={},
+                policy_curriculum_stage=None,
+                policy_observation_shape=None,
+            ),
+            False,
+        ),
     )
     monkeypatch.setattr("rl_fzerox.ui.watch.app._create_fonts", lambda _pygame: object())
     monkeypatch.setattr(

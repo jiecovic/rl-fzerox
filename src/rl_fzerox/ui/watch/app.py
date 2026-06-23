@@ -95,7 +95,7 @@ def run_viewer(
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
         auxiliary_metrics.observe_snapshot(snapshot)
         live_episode_series = getattr(snapshot, "live_episode_series", None)
-        active_track_sampling = snapshot.active_track_sampling
+        active_track_sampling = getattr(snapshot, "active_track_sampling", None)
         track_pool_records = track_pool_records_for_watch_snapshot(
             config,
             snapshot,
@@ -153,8 +153,9 @@ def run_viewer(
             )
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
-                if snapshot.active_track_sampling is not None:
-                    active_track_sampling = snapshot.active_track_sampling
+                latest_active_track_sampling = getattr(snapshot, "active_track_sampling", None)
+                if latest_active_track_sampling is not None:
+                    active_track_sampling = latest_active_track_sampling
                     track_pool_records = track_pool_records_for_watch_snapshot(
                         config,
                         snapshot,
