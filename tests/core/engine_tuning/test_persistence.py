@@ -97,6 +97,19 @@ def test_loader_keeps_inconsistent_legacy_candidate_rates_unknown() -> None:
     assert candidate.best_completion_score == 1.0
 
 
+def test_loader_rejects_removed_objective_aliases() -> None:
+    data = json.dumps(
+        {
+            "version": 7,
+            "objective": "completion",
+            "update_count": 1,
+            "candidates": [],
+        }
+    )
+
+    assert load_engine_tuning_runtime_state_json(data) is None
+
+
 def test_mlp_model_weights_round_trip_through_pt_sidecar(tmp_path: Path) -> None:
     context = EngineTuningContext(
         course_key="big_blue_2",

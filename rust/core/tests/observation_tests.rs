@@ -6,7 +6,7 @@ use crate::core::video::VideoCrop;
 #[test]
 fn crop_profile_keeps_existing_angrylion_crop() {
     assert_eq!(
-        ObservationPreset::Crop84x116.crop(ObservationCropProfile::Angrylion),
+        ObservationPreset::Crop84x84.crop(ObservationCropProfile::Angrylion),
         VideoCrop {
             top: 16,
             bottom: 16,
@@ -19,7 +19,7 @@ fn crop_profile_keeps_existing_angrylion_crop() {
 #[test]
 fn crop_profile_uses_measured_gliden64_borders() {
     assert_eq!(
-        ObservationPreset::Crop84x116.crop(ObservationCropProfile::Gliden64),
+        ObservationPreset::Crop84x84.crop(ObservationCropProfile::Gliden64),
         VideoCrop {
             top: 15,
             bottom: 17,
@@ -31,32 +31,12 @@ fn crop_profile_uses_measured_gliden64_borders() {
 
 #[test]
 fn gliden64_crop_resolves_to_half_size_watch_display() {
-    let spec = ObservationPreset::Crop84x116
+    let spec = ObservationPreset::Crop84x84
         .resolve(320, 240, 4.0 / 3.0, ObservationCropProfile::Gliden64)
         .expect("gliden64 crop should resolve");
 
     assert_eq!((spec.display_width, spec.display_height), (296, 222));
-    assert_eq!((spec.frame_width, spec.frame_height), (116, 84));
-}
-
-#[test]
-fn crop_98x130_resolves_to_wide_legacy_geometry() {
-    let spec = ObservationPreset::Crop98x130
-        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_98x130 should resolve");
-
-    assert_eq!(spec.layout_name, "crop_98x130");
-    assert_eq!((spec.frame_width, spec.frame_height), (130, 98));
-}
-
-#[test]
-fn crop_66x82_resolves_to_small_racing_geometry() {
-    let spec = ObservationPreset::Crop66x82
-        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_66x82 should resolve");
-
-    assert_eq!(spec.layout_name, "crop_66x82");
-    assert_eq!((spec.frame_width, spec.frame_height), (82, 66));
+    assert_eq!((spec.frame_width, spec.frame_height), (84, 84));
 }
 
 #[test]
@@ -70,16 +50,6 @@ fn crop_72x96_resolves_to_impala_geometry() {
 }
 
 #[test]
-fn crop_68x68_resolves_to_square_nature_geometry() {
-    let spec = ObservationPreset::Crop68x68
-        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_68x68 should resolve");
-
-    assert_eq!(spec.layout_name, "crop_68x68");
-    assert_eq!((spec.frame_width, spec.frame_height), (68, 68));
-}
-
-#[test]
 fn crop_84x84_resolves_to_square_nature_geometry() {
     let spec = ObservationPreset::Crop84x84
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
@@ -87,26 +57,6 @@ fn crop_84x84_resolves_to_square_nature_geometry() {
 
     assert_eq!(spec.layout_name, "crop_84x84");
     assert_eq!((spec.frame_width, spec.frame_height), (84, 84));
-}
-
-#[test]
-fn crop_76x100_resolves_to_nature_geometry() {
-    let spec = ObservationPreset::Crop76x100
-        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_76x100 should resolve");
-
-    assert_eq!(spec.layout_name, "crop_76x100");
-    assert_eq!((spec.frame_width, spec.frame_height), (100, 76));
-}
-
-#[test]
-fn crop_64x64_resolves_to_square_geometry() {
-    let spec = ObservationPreset::Crop64x64
-        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_64x64 should resolve");
-
-    assert_eq!(spec.layout_name, "crop_64x64");
-    assert_eq!((spec.frame_width, spec.frame_height), (64, 64));
 }
 
 #[test]
@@ -121,11 +71,8 @@ fn custom_layout_uses_requested_target_geometry() {
 }
 
 #[test]
-fn legacy_native_crop_name_aliases_to_canonical_name() {
-    let preset = ObservationPreset::parse("native_crop_v4").expect("legacy name resolves");
-
-    assert_eq!(preset, ObservationPreset::Crop98x130);
-    assert_eq!(preset.name(), "crop_98x130");
+fn legacy_native_crop_name_is_rejected() {
+    assert!(ObservationPreset::parse("native_crop_v4").is_err());
 }
 
 #[test]

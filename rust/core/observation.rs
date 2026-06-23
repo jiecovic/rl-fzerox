@@ -47,16 +47,8 @@ impl ObservationCropProfile {
 /// Named single-frame observation layouts exposed to Python.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationPreset {
-    Crop84x116,
-    Crop92x124,
-    Crop116x164,
-    Crop98x130,
-    Crop66x82,
     Crop72x96,
-    Crop68x68,
     Crop84x84,
-    Crop76x100,
-    Crop64x64,
 }
 
 /// How repeated observation frames are encoded along the channel axis.
@@ -93,22 +85,8 @@ impl ObservationPreset {
     /// Parse the stable string name recorded in YAML configs and run metadata.
     pub fn parse(name: &str) -> Result<Self, CoreError> {
         match name {
-            "crop_84x116" => Ok(Self::Crop84x116),
-            "crop_92x124" => Ok(Self::Crop92x124),
-            "crop_116x164" => Ok(Self::Crop116x164),
-            "crop_98x130" => Ok(Self::Crop98x130),
-            "crop_66x82" => Ok(Self::Crop66x82),
             "crop_72x96" => Ok(Self::Crop72x96),
-            "crop_68x68" => Ok(Self::Crop68x68),
             "crop_84x84" => Ok(Self::Crop84x84),
-            "crop_76x100" => Ok(Self::Crop76x100),
-            "crop_64x64" => Ok(Self::Crop64x64),
-            // V4 LEGACY SHIM: accept old saved run manifests and CLI overrides.
-            "native_crop_v1" => Ok(Self::Crop84x116),
-            "native_crop_v2" => Ok(Self::Crop92x124),
-            "native_crop_v3" => Ok(Self::Crop116x164),
-            "native_crop_v4" => Ok(Self::Crop98x130),
-            "native_crop_v6" => Ok(Self::Crop66x82),
             _ => Err(CoreError::InvalidObservationPreset {
                 name: name.to_owned(),
             }),
@@ -117,16 +95,8 @@ impl ObservationPreset {
 
     pub fn name(self) -> &'static str {
         match self {
-            Self::Crop84x116 => "crop_84x116",
-            Self::Crop92x124 => "crop_92x124",
-            Self::Crop116x164 => "crop_116x164",
-            Self::Crop98x130 => "crop_98x130",
-            Self::Crop66x82 => "crop_66x82",
             Self::Crop72x96 => "crop_72x96",
-            Self::Crop68x68 => "crop_68x68",
             Self::Crop84x84 => "crop_84x84",
-            Self::Crop76x100 => "crop_76x100",
-            Self::Crop64x64 => "crop_64x64",
         }
     }
 
@@ -147,16 +117,8 @@ impl ObservationPreset {
         let (display_width, display_height) =
             display_size(cropped_width, cropped_height, display_aspect_ratio);
         let (frame_width, frame_height, channels) = match self {
-            Self::Crop84x116 => (116, 84, 3),
-            Self::Crop92x124 => (124, 92, 3),
-            Self::Crop116x164 => (164, 116, 3),
-            Self::Crop98x130 => (130, 98, 3),
-            Self::Crop66x82 => (82, 66, 3),
             Self::Crop72x96 => (96, 72, 3),
-            Self::Crop68x68 => (68, 68, 3),
             Self::Crop84x84 => (84, 84, 3),
-            Self::Crop76x100 => (100, 76, 3),
-            Self::Crop64x64 => (64, 64, 3),
         };
         Ok(ObservationSpec {
             layout_name: self.name().to_owned(),

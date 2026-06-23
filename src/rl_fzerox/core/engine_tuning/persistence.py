@@ -116,12 +116,15 @@ def load_engine_tuning_runtime_state_json(data: str) -> EngineTuningRuntimeState
         return None
     candidates = tuple(_candidate_from_mapping(raw_candidate) for raw_candidate in raw_candidates)
     candidates = tuple(candidate for candidate in candidates if candidate is not None)
+    objective = _objective_from_mapping(loaded)
+    if objective is None:
+        return None
     model_state = _model_state_from_mapping(loaded.get("model_state"))
     return EngineTuningRuntimeState(
         version=ENGINE_TUNING_STATE_VERSION,
         update_count=max(0, _mapping_int(loaded, "update_count") or 0),
         candidates=candidates,
-        objective=_objective(loaded.get("objective")) or "finish_time",
+        objective=objective,
         reward_fingerprint=_mapping_optional_str(loaded, "reward_fingerprint"),
         model_state=model_state,
     )
@@ -359,13 +362,15 @@ def _objective(raw: object) -> EngineTunerObjective | None:
         return "finish_time"
     if raw == "safe_finish_time":
         return "safe_finish_time"
-    # Transitional read compatibility for pre-safe-mode sidecars. Remove after
-    # local engine-tuning sidecars have been migrated or cleared.
-    if raw in {"episode_return", "completion"}:
-        return "finish_time"
     if raw == "finish_rate":
         return "finish_rate"
     return None
+
+
+def _objective_from_mapping(raw: Mapping[object, object]) -> EngineTunerObjective | None:
+    if "objective" not in raw:
+        return "finish_time"
+    return _objective(raw.get("objective"))
 
 
 def _string_tuple(raw: object) -> tuple[str, ...] | None:

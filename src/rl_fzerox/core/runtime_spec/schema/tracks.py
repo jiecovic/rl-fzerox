@@ -214,18 +214,6 @@ class AdaptiveEngineTuningConfig(BaseModel):
         ENGINE_TUNER_DEFAULTS.greedy_plateau_tolerance_seconds
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_engine_tuner_objective(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        next_data = dict(data)
-        # Transitional config compatibility. Remove after local run specs have
-        # been migrated away from removed non-finish tuner objectives.
-        if next_data.get("objective") in {"episode_return", "completion"}:
-            next_data["objective"] = "finish_time"
-        return next_data
-
     @model_serializer(mode="wrap")
     def _serialize_engine_tuning(self, handler: SerializerFunctionWrapHandler) -> object:
         data = handler(self)

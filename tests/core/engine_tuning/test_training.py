@@ -15,6 +15,11 @@ from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
 DEFAULT_BANDIT_BUCKETS = (0, 13, 26, 38, 51, 64, 77, 90, 102, 115, 128)
 
 
+def test_adaptive_engine_tuning_config_rejects_removed_objective_alias() -> None:
+    with pytest.raises(ValueError, match="objective"):
+        AdaptiveEngineTuningConfig.model_validate({"objective": "completion"})
+
+
 @pytest.mark.parametrize("backend", ["bandit", "gaussian_process", "mlp_ensemble"])
 def test_engine_tuning_controller_ignores_alt_baseline_episodes(
     backend: Literal["bandit", "gaussian_process", "mlp_ensemble"],

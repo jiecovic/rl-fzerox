@@ -151,6 +151,19 @@ def test_manager_config_rejects_legacy_gp_difficulty() -> None:
         )
 
 
+def test_manager_config_rejects_removed_engine_tuner_objective_alias() -> None:
+    with pytest.raises(ValueError, match="adaptive_engine_tuner_objective"):
+        ManagedRunConfig.model_validate(
+            {
+                **default_managed_run_config().model_dump(mode="json"),
+                "vehicle": {
+                    **default_managed_run_config().vehicle.model_dump(mode="json"),
+                    "adaptive_engine_tuner_objective": "completion",
+                },
+            }
+        )
+
+
 def test_manager_training_bridge_projects_configured_gp_difficulties(
     tmp_path: Path,
 ) -> None:

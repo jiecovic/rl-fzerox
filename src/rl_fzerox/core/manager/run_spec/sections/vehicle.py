@@ -127,13 +127,6 @@ class ManagedVehicleConfig(BaseModel):
         if not isinstance(data, dict):
             return data
         next_data = dict(data)
-        # Transitional config compatibility. Remove after local run specs have
-        # been migrated away from removed non-finish tuner objectives.
-        if next_data.get("adaptive_engine_tuner_objective") in {
-            "episode_return",
-            "completion",
-        }:
-            next_data["adaptive_engine_tuner_objective"] = "finish_time"
         if next_data.get("engine_mode") != "adaptive_tuner":
             return next_data
         next_data.setdefault("engine_setting_min_raw_value", ENGINE_SLIDER.min_step)
