@@ -1,6 +1,7 @@
 # tests/core/manager/test_manager_api_core.py
 from __future__ import annotations
 
+import contextvars
 import threading
 from pathlib import Path
 from typing import Literal
@@ -32,6 +33,23 @@ async def test_run_sync_uses_worker_thread() -> None:
     worker_thread = await _run_sync(threading.get_ident)
 
     assert worker_thread != caller_thread
+
+
+async def test_run_sync_preserves_contextvars() -> None:
+    marker: contextvars.ContextVar[str] = contextvars.ContextVar("marker")
+    marker.set("request-context")
+
+    value = await _run_sync(marker.get)
+
+    assert value == "request-context"
+
+
+async def test_run_sync_propagates_worker_exceptions() -> None:
+    def fail() -> None:
+        raise ValueError("boom")
+
+    with pytest.raises(ValueError, match="boom"):
+        await _run_sync(fail)
 
 
 async def test_manager_api_lists_default_template(tmp_path: Path) -> None:
