@@ -83,11 +83,8 @@ def _primary_section(metrics: EvaluationMetrics) -> list[str]:
     lines = [
         "## Primary metrics",
         "",
-        (
-            "| Scope | Attempts | Success | Finish | Completion | Mean time | Best time | "
-            "Mean pos | Env steps | Mean episode steps |"
-        ),
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ("| Scope | Runs | Finish | Completion | Mean pos | Worst pos |"),
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for group in _metric_groups(metrics):
         primary = group.primary
@@ -97,14 +94,10 @@ def _primary_section(metrics: EvaluationMetrics) -> list[str]:
                 (
                     _text(group.label),
                     _text(primary.attempt_count),
-                    _percent(primary.success_rate, count=primary.success_count),
                     _percent(primary.finish_rate, count=primary.finish_count),
                     _percent(primary.completion_rate),
-                    _time(primary.mean_finish_time_ms),
-                    _time(primary.best_finish_time_ms),
                     _number(primary.mean_position),
-                    _text(primary.total_env_steps),
-                    _number(primary.mean_episode_length_steps),
+                    _text(primary.worst_position),
                 )
             )
             + " |"
@@ -118,18 +111,28 @@ def _detail_section(metrics: EvaluationMetrics) -> list[str]:
         "## Diagnostic metrics",
         "",
         (
-            "| Scope | Mean return | Best return | Boost active | Boost frames | Boost pads | "
-            "Damage | Min height | Avg speed |"
+            "| Scope | Success | Mean finish | Best finish | Env steps | Mean episode steps | "
+            "Mean return | Best return | Boost active | Boost frames | Boost pads | Damage | "
+            "Min height | Avg speed |"
         ),
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        (
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
+            "---: | ---: | ---: | ---: |"
+        ),
     ]
     for group in _metric_groups(metrics):
+        primary = group.primary
         detail = group.detail
         lines.append(
             "| "
             + " | ".join(
                 (
                     _text(group.label),
+                    _percent(primary.success_rate, count=primary.success_count),
+                    _time(primary.mean_finish_time_ms),
+                    _time(primary.best_finish_time_ms),
+                    _text(primary.total_env_steps),
+                    _number(primary.mean_episode_length_steps),
                     _number(detail.mean_episode_return),
                     _number(detail.best_episode_return),
                     _text(detail.boost_active_count),

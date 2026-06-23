@@ -145,9 +145,9 @@ export function EvaluationWorkspace({
               />
               <Metric label="Seed" value={String(evaluation.seed)} />
               <Metric
-                detail={formatEnvStepRate(runtimeStats?.envStepsPerSecond ?? null)}
+                detail={formatSpeedDetail(runtimeStats)}
                 label="Speed"
-                value={formatCourseRunRate(runtimeStats?.courseRunsPerMinute ?? null)}
+                value={formatFrameRate(runtimeStats?.gameFramesPerSecond ?? null)}
               />
               <Metric label="ETA" value={formatEta(runtimeStats?.etaSeconds ?? null)} />
             </div>
@@ -312,9 +312,14 @@ function evaluationRuntimeStats(evaluation: ManagedEvaluation) {
     courseRunsPerSecond > 0
       ? (total - completed) / courseRunsPerSecond
       : null;
+  const envStepsPerSecond = envSteps > 0 ? envSteps / elapsedSeconds : null;
   return {
     courseRunsPerMinute: courseRunsPerSecond === null ? null : courseRunsPerSecond * 60,
-    envStepsPerSecond: envSteps > 0 ? envSteps / elapsedSeconds : null,
+    envStepsPerSecond,
+    gameFramesPerSecond:
+      envStepsPerSecond === null
+        ? null
+        : envStepsPerSecond * Math.max(1, evaluation.config.action.action_repeat),
     etaSeconds,
   };
 }
@@ -651,11 +656,29 @@ function formatCourseRunRate(value: number | null) {
   return `${formatted} runs/min`;
 }
 
+function formatFrameRate(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+  return `${Math.round(value).toLocaleString()} fps`;
+}
+
 function formatEnvStepRate(value: number | null) {
   if (value === null) {
     return undefined;
   }
   return `${Math.round(value).toLocaleString()} env steps/s`;
+}
+
+function formatSpeedDetail(runtimeStats: ReturnType<typeof evaluationRuntimeStats>) {
+  if (runtimeStats === null) {
+    return undefined;
+  }
+  const parts = [
+    formatCourseRunRate(runtimeStats.courseRunsPerMinute),
+    formatEnvStepRate(runtimeStats.envStepsPerSecond),
+  ].filter((part): part is string => part !== undefined && part !== "-");
+  return parts.length === 0 ? undefined : parts.join(" · ");
 }
 
 function formatEta(value: number | null) {

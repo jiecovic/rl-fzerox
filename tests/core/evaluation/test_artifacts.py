@@ -67,6 +67,8 @@ def test_evaluation_writer_persists_json_and_markdown_summary(tmp_path: Path) ->
     assert payload["metrics"]["overall"]["primary"]["finish_count"] == 1
     assert "# Evaluation eval-artifact" in markdown
     assert "Checkpoint copy" in markdown
+    assert "| Scope | Runs | Finish | Completion | Mean pos | Worst pos |" in markdown
+    assert "| Scope | Success | Mean finish | Best finish | Env steps |" in markdown
     assert "Mute City" in markdown
     assert "1:26.123" in markdown
     assert "Final GP" not in markdown
