@@ -6,6 +6,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from typing import Literal
 
 from rl_fzerox.apps.run_manager.launching.processes import reap_child_when_done
 from rl_fzerox.core.manager import ManagedEvaluation, ManagerStore
@@ -22,6 +23,7 @@ def launch_evaluation_worker(
     store: ManagerStore,
     *,
     evaluation_id: str,
+    device: Literal["cpu", "cuda"],
 ) -> ManagedEvaluation:
     """Start one new or failed evaluation and return its running DB row."""
 
@@ -45,6 +47,8 @@ def launch_evaluation_worker(
         str(store.db_path),
         "--evaluation-id",
         evaluation_id,
+        "--device",
+        device,
     ]
     try:
         with log_path.open("ab") as log_handle:

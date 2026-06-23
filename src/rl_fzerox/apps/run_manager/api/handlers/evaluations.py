@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from rl_fzerox.apps.run_manager.api.contracts import (
     CreateEvaluationPresetRequest,
     CreateEvaluationRequest,
+    StartEvaluationRequest,
 )
 from rl_fzerox.apps.run_manager.api.payloads.evaluations import (
     evaluation_baseline_suite_payload,
@@ -51,7 +52,6 @@ def create_evaluation_payload(
             source_artifact=request.source_artifact,
             policy_mode=request.policy_mode,
             preset_id=request.preset_id,
-            device=request.device,
         )
     except FileNotFoundError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -125,11 +125,16 @@ def update_evaluation_payload(
 def start_evaluation_payload(
     store: ManagerStore,
     evaluation_id: str,
+    request: StartEvaluationRequest,
 ) -> dict[str, dict[str, object]]:
     """Start or retry one inactive evaluation snapshot."""
 
     try:
-        evaluation = launch_evaluation_worker(store, evaluation_id=evaluation_id)
+        evaluation = launch_evaluation_worker(
+            store,
+            evaluation_id=evaluation_id,
+            device=request.device,
+        )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}

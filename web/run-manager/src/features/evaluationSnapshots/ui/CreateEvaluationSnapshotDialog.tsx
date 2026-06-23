@@ -9,7 +9,6 @@ import type {
   ManagedEvaluationPreset,
   ManagedRunDetail,
   PolicyPlaybackMode,
-  WatchDevice,
 } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
@@ -34,7 +33,6 @@ export function CreateEvaluationSnapshotDialog({
   onOpenEvaluation,
 }: CreateEvaluationSnapshotDialogProps) {
   const [sourceArtifact, setSourceArtifact] = useState<EvaluationSourceArtifact>("latest");
-  const [device, setDevice] = useState<WatchDevice>("cuda");
   const [policyMode, setPolicyMode] = useState<PolicyPlaybackMode>("deterministic");
   const initialPresetId = preferredPresetId(run, evaluationPresets);
   const [presetId, setPresetId] = useState(initialPresetId);
@@ -54,7 +52,6 @@ export function CreateEvaluationSnapshotDialog({
     }
     setPresetId(initialPresetId);
     setSourceArtifact("latest");
-    setDevice("cuda");
     setPolicyMode("deterministic");
   }, [initialPresetId, open]);
 
@@ -72,7 +69,6 @@ export function CreateEvaluationSnapshotDialog({
     try {
       const created = await onCreateEvaluation({
         name: defaultName,
-        device,
         policyMode,
         presetId: preset.id,
         sourceArtifact,
@@ -149,16 +145,6 @@ export function CreateEvaluationSnapshotDialog({
               </FieldSelect>
             </FieldShell>
             <FieldShell>
-              <span>Device</span>
-              <FieldSelect
-                value={device}
-                onChange={(event) => setDevice(event.currentTarget.value as WatchDevice)}
-              >
-                <option value="cuda">cuda</option>
-                <option value="cpu">cpu</option>
-              </FieldSelect>
-            </FieldShell>
-            <FieldShell>
               <span>Policy mode</span>
               <FieldSelect
                 value={policyMode}
@@ -177,7 +163,7 @@ export function CreateEvaluationSnapshotDialog({
               value={preset === null ? "-" : evaluationTargetLabel(preset)}
             />
             <PresetLine label="Preset" value={presetSummary(preset)} />
-            <PresetLine label="Snapshot" value={`${sourceArtifact} · ${policyMode} · ${device}`} />
+            <PresetLine label="Snapshot" value={`${sourceArtifact} · ${policyMode}`} />
           </div>
 
           <div className="flex justify-end gap-2.5">
@@ -215,9 +201,16 @@ function evaluationTargetLabel(preset: ManagedEvaluationPreset) {
   const parts = [
     target.cup_ids.length > 0 ? selectionCountLabel(target.cup_ids, "cup") : null,
     target.course_ids.length > 0 ? selectionCountLabel(target.course_ids, "course") : null,
-    target.difficulties.length > 0 ? selectionCountLabel(target.difficulties, "difficulty") : null,
+    difficultySelectionLabel(target.difficulties),
   ].filter((part) => part !== null);
   return `${mode} · ${parts.length === 0 ? "all targets" : parts.join(" · ")}`;
+}
+
+function difficultySelectionLabel(difficulties: readonly string[]) {
+  if (difficulties.length === 0) {
+    return null;
+  }
+  return difficulties.map(titleLabel).join(", ");
 }
 
 function presetSummary(preset: ManagedEvaluationPreset | null) {
@@ -240,10 +233,15 @@ function selectionCountLabel(values: readonly unknown[], singular: string) {
 }
 
 function pluralize(count: number, singular: string) {
-  if (count === 1) {
-    return singular;
-  }
-  return singular === "difficulty" ? "difficulties" : `${singular}s`;
+  return count === 1 ? singular : `${singular}s`;
+}
+
+function titleLabel(value: string) {
+  return value
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function PresetLine({ label, value }: { label: string; value: string }) {

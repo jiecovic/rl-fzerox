@@ -56,7 +56,6 @@ def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
 
     assert isinstance(checkpoint, dict)
     assert checkpoint["source_mtime_ns"] == "1765000000000000123"
-    assert payload["device"] == "cuda"
     assert payload["result_summary"] is None
 
 
@@ -92,7 +91,28 @@ def test_evaluation_payload_includes_result_summary(tmp_path: Path) -> None:
                                     "completion_ratio": 1.0,
                                 }
                             ],
-                        }
+                        },
+                        {
+                            "attempt_id": "attempt-0002",
+                            "target_id": "white_land",
+                            "target_label": "White Land",
+                            "status": "failed",
+                            "seed": 123,
+                            "cup_id": "king",
+                            "difficulty": "master",
+                            "vehicle_id": "blue_falcon",
+                            "total_race_time_ms": 53_900,
+                            "env_steps": 1_615,
+                            "episode_return": 408.07,
+                            "closed_at_utc": "2026-06-22T10:02:00+00:00",
+                            "course_results": [
+                                {
+                                    "status": "crashed",
+                                    "position": 1,
+                                    "completion_ratio": 0.6,
+                                }
+                            ],
+                        },
                     ],
                 },
                 "metrics": {
@@ -162,7 +182,7 @@ def test_evaluation_payload_includes_result_summary(tmp_path: Path) -> None:
     payload = evaluation_payload(evaluation, baseline_suite=baseline_suite)
 
     assert payload["progress"] == {
-        "completed_attempts": 1,
+        "completed_attempts": 2,
         "total_attempts": 2,
         "result_status": "partial",
     }
@@ -190,3 +210,4 @@ def test_evaluation_payload_includes_result_summary(tmp_path: Path) -> None:
     }
     assert summary["attempts"][0]["seed"] == "18446744073709551615"
     assert summary["attempts"][0]["position"] == 1
+    assert summary["attempts"][1]["position"] == 30

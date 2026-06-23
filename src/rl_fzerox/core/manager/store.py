@@ -502,7 +502,6 @@ class ManagerStore:
         source_artifact: EvaluationCheckpointArtifact,
         policy_mode: EvaluationPolicyMode,
         preset_id: str,
-        device: Literal["cpu", "cuda"] = "cuda",
         evaluations_root: Path | None = None,
     ) -> ManagedEvaluation:
         return evaluation_registry.create_evaluation(
@@ -512,7 +511,6 @@ class ManagerStore:
             source_artifact=source_artifact,
             policy_mode=policy_mode,
             preset_id=preset_id,
-            device=device,
             evaluations_root=evaluations_root,
         )
 

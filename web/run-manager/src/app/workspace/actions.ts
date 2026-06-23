@@ -67,6 +67,7 @@ import type {
   SaveEngineTuningCourseSetupRecommendation,
   SaveGameRunnerSettingsUpdateRequest,
   SavePolicyArtifact,
+  StartEvaluationRequest,
   WatchDevice,
   WatchRenderer,
 } from "@/shared/api/contract";
@@ -93,7 +94,10 @@ export interface WorkspaceActions {
   ) => Promise<ManagedEvaluationPreset>;
   removeManagedEvaluationPreset: (preset: ManagedEvaluationPreset) => Promise<void>;
   cancelManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
-  startManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
+  startManagedEvaluation: (
+    evaluation: ManagedEvaluation,
+    request: StartEvaluationRequest,
+  ) => Promise<ManagedEvaluation>;
   renameManagedEvaluation: (evaluationId: string, name: string) => Promise<void>;
   createManagedSaveGame: (name: string) => Promise<ManagedSaveGame>;
   forkManagedRun: (
@@ -236,9 +240,12 @@ export function useWorkspaceActions({
     }
   }
 
-  async function startManagedEvaluation(evaluation: ManagedEvaluation) {
+  async function startManagedEvaluation(
+    evaluation: ManagedEvaluation,
+    request: StartEvaluationRequest,
+  ) {
     try {
-      const updated = await startEvaluation(evaluation.id);
+      const updated = await startEvaluation(evaluation.id, request);
       setEvaluations((current) => upsertEvaluation(current, updated));
       await reloadManagerData({ showLoading: false });
       return updated;

@@ -176,7 +176,7 @@ def _aggregate_group(
     )
     course_positions = tuple(
         int(course.position)
-        for course in finished_courses
+        for course in course_results
         if course.position is not None and course.position > 0
     )
     total_race_times = tuple(

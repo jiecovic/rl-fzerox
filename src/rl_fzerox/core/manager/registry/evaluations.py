@@ -44,7 +44,6 @@ def create_evaluation(
     source_artifact: EvaluationCheckpointArtifact,
     policy_mode: EvaluationPolicyMode,
     preset_id: str,
-    device: Literal["cpu", "cuda"] = "cuda",
     evaluations_root: Path | None = None,
 ) -> ManagedEvaluation:
     """Create one evaluation record and freeze its source checkpoint."""
@@ -63,7 +62,6 @@ def create_evaluation(
         source_run.config,
         preset=preset,
         target=target,
-        device=device,
     )
     source_policy_path = resolve_policy_artifact_path(source_run.run_dir, artifact=source_artifact)
     source_mtime_ns = source_policy_path.stat().st_mtime_ns
@@ -142,7 +140,6 @@ def _evaluation_config_for_source(
     *,
     preset: ManagedEvaluationPreset,
     target: EvaluationTargetSpec,
-    device: Literal["cpu", "cuda"],
 ) -> ManagedRunConfig:
     """Project source-run policy config onto the preset-owned evaluation suite."""
 
@@ -163,8 +160,7 @@ def _evaluation_config_for_source(
         }
     )
     environment = config.environment.model_copy(update={"renderer": preset.renderer})
-    train = config.train.model_copy(update={"device": device})
-    return config.model_copy(update={"environment": environment, "tracks": tracks, "train": train})
+    return config.model_copy(update={"environment": environment, "tracks": tracks})
 
 
 def get_evaluation_preset(

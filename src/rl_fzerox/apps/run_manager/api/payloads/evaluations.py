@@ -31,7 +31,6 @@ def evaluation_payload(
         "preset_id": evaluation.preset_id,
         "preset_version": evaluation.preset_version,
         "policy_mode": evaluation.policy_mode,
-        "device": evaluation.config.train.device,
         "seed": evaluation.seed,
         "target": asdict(evaluation.target),
         "config": evaluation.config.model_dump(mode="json"),
@@ -198,7 +197,7 @@ def _attempt_payload(attempt: dict[str, object]) -> dict[str, object]:
         "total_race_time_ms": _int_or_none(attempt.get("total_race_time_ms")),
         "env_steps": _int_or_none(attempt.get("env_steps")),
         "episode_return": _number_or_none(attempt.get("episode_return")),
-        "position": None if course_result is None else _int_or_none(course_result.get("position")),
+        "position": _attempt_position(attempt, course_result),
         "completion_ratio": (
             None
             if course_result is None
@@ -213,6 +212,21 @@ def _first_course_result(value: object) -> dict[str, object] | None:
         return None
     first = value[0]
     return first if isinstance(first, dict) else None
+
+
+def _attempt_position(
+    attempt: dict[str, object],
+    course_result: dict[str, object] | None,
+) -> int | None:
+    if course_result is None:
+        return None
+    position = _int_or_none(course_result.get("position"))
+    if position is None:
+        return None
+    status = _string_or_none(course_result.get("status")) or _string_or_none(attempt.get("status"))
+    if status in {"finished", "succeeded"}:
+        return position
+    return max(position, 30)
 
 
 def _string_or_default(value: object, default: str) -> str:

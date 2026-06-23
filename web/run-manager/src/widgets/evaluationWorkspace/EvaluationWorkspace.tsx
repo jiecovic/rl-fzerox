@@ -1,8 +1,14 @@
 // web/run-manager/src/widgets/evaluationWorkspace/EvaluationWorkspace.tsx
 import { useState } from "react";
 
-import type { EvaluationMetricSummary, ManagedEvaluation } from "@/shared/api/contract";
+import type {
+  EvaluationMetricSummary,
+  ManagedEvaluation,
+  StartEvaluationRequest,
+  WatchDevice,
+} from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
+import { FieldSelect } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
 import { EvaluationTabIcon, PlayIcon, RenameIcon, StopIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
@@ -14,7 +20,10 @@ interface EvaluationWorkspaceProps {
   onCancelEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
   onGlobalError: (message: string | null) => void;
   onRenameEvaluation: (evaluationId: string, name: string) => Promise<void>;
-  onStartEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
+  onStartEvaluation: (
+    evaluation: ManagedEvaluation,
+    request: StartEvaluationRequest,
+  ) => Promise<ManagedEvaluation>;
 }
 
 const EVALUATION_MODE_LABELS = {
@@ -29,6 +38,7 @@ export function EvaluationWorkspace({
   onRenameEvaluation,
   onStartEvaluation,
 }: EvaluationWorkspaceProps) {
+  const [device, setDevice] = useState<WatchDevice>("cuda");
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -38,6 +48,7 @@ export function EvaluationWorkspace({
     evaluation.status === "failed" ||
     evaluation.status === "cancelled";
   const canCancel = evaluation.status === "running";
+  const runtimeStats = evaluationRuntimeStats(evaluation);
 
   async function startEvaluation() {
     if (!canStart || starting) {
@@ -46,7 +57,7 @@ export function EvaluationWorkspace({
     setStarting(true);
     onGlobalError(null);
     try {
-      await onStartEvaluation(evaluation);
+      await onStartEvaluation(evaluation, { device });
     } catch (caught) {
       onGlobalError(caught instanceof Error ? caught.message : "failed to start evaluation");
     } finally {
@@ -116,7 +127,7 @@ export function EvaluationWorkspace({
       <div className="grid gap-4">
         <section className="border border-app-border bg-app-surface-muted p-4">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
               <Metric label="Status" value={statusLabel(evaluation.status)} />
               <Metric
                 label="Checkpoint"
@@ -133,6 +144,12 @@ export function EvaluationWorkspace({
                 detail={targetSelectionLabel(evaluation.target)}
               />
               <Metric label="Seed" value={String(evaluation.seed)} />
+              <Metric
+                detail={formatEnvStepRate(runtimeStats?.envStepsPerSecond ?? null)}
+                label="Speed"
+                value={formatCourseRunRate(runtimeStats?.courseRunsPerMinute ?? null)}
+              />
+              <Metric label="ETA" value={formatEta(runtimeStats?.etaSeconds ?? null)} />
             </div>
 
             <div className="flex flex-wrap items-start justify-end gap-2">
@@ -147,17 +164,29 @@ export function EvaluationWorkspace({
                   <span>{cancelling ? "Cancelling" : "Cancel"}</span>
                 </Button>
               ) : (
-                <Button
-                  className="gap-2"
-                  disabled={!canStart || starting}
-                  variant={canStart ? "primary" : undefined}
-                  onClick={() => void startEvaluation()}
-                >
-                  <PlayIcon />
-                  <span>
-                    {starting ? "Starting" : evaluation.status === "created" ? "Start" : "Retry"}
-                  </span>
-                </Button>
+                <>
+                  <FieldSelect
+                    aria-label="Evaluation runtime device"
+                    className="min-w-[110px]"
+                    disabled={!canStart || starting}
+                    value={device}
+                    onChange={(event) => setDevice(event.currentTarget.value as WatchDevice)}
+                  >
+                    <option value="cuda">cuda</option>
+                    <option value="cpu">cpu</option>
+                  </FieldSelect>
+                  <Button
+                    className="gap-2"
+                    disabled={!canStart || starting}
+                    variant={canStart ? "primary" : undefined}
+                    onClick={() => void startEvaluation()}
+                  >
+                    <PlayIcon />
+                    <span>
+                      {starting ? "Starting" : evaluation.status === "created" ? "Start" : "Retry"}
+                    </span>
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -186,7 +215,6 @@ export function EvaluationWorkspace({
                 value={formatStepCount(evaluation.checkpoint.lineage_num_timesteps)}
               />
               <Detail label="Policy mode" value={evaluation.policy_mode} />
-              <Detail label="Device" value={evaluation.device} />
               <Detail label="Renderer" value={evaluation.config.environment.renderer} />
               <Detail label="Snapshot time" value={sourceSnapshotLabel(evaluation)} />
             </dl>
@@ -256,6 +284,60 @@ function ProgressBar({ evaluation }: { evaluation: ManagedEvaluation }) {
       </div>
     </div>
   );
+}
+
+function evaluationRuntimeStats(evaluation: ManagedEvaluation) {
+  const summary = evaluation.result_summary;
+  const startedMs = timestampMs(summary?.started_at_utc ?? evaluation.started_at);
+  if (summary === null || startedMs === null) {
+    return null;
+  }
+  const endMs =
+    evaluation.status === "running"
+      ? Date.now()
+      : (timestampMs(summary.closed_at_utc) ?? latestAttemptClosedMs(summary.attempts));
+  if (endMs === null || endMs <= startedMs) {
+    return null;
+  }
+  const elapsedSeconds = (endMs - startedMs) / 1000;
+  const completed = summary.attempts.length;
+  const total = evaluation.progress.total_attempts;
+  const envSteps = summary.attempts.reduce((sum, attempt) => sum + (attempt.env_steps ?? 0), 0);
+  const courseRunsPerSecond = completed > 0 ? completed / elapsedSeconds : null;
+  const etaSeconds =
+    evaluation.status === "running" &&
+    total !== null &&
+    total > completed &&
+    courseRunsPerSecond !== null &&
+    courseRunsPerSecond > 0
+      ? (total - completed) / courseRunsPerSecond
+      : null;
+  return {
+    courseRunsPerMinute: courseRunsPerSecond === null ? null : courseRunsPerSecond * 60,
+    envStepsPerSecond: envSteps > 0 ? envSteps / elapsedSeconds : null,
+    etaSeconds,
+  };
+}
+
+function latestAttemptClosedMs(
+  attempts: NonNullable<ManagedEvaluation["result_summary"]>["attempts"],
+) {
+  let latest: number | null = null;
+  for (const attempt of attempts) {
+    const closed = timestampMs(attempt.closed_at_utc);
+    if (closed !== null && (latest === null || closed > latest)) {
+      latest = closed;
+    }
+  }
+  return latest;
+}
+
+function timestampMs(value: string | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function ResultsSection({ evaluation }: { evaluation: ManagedEvaluation }) {
@@ -336,14 +418,19 @@ function CourseDistribution({ courses }: { courses: readonly EvaluationMetricSum
   if (rankedCourses.length === 0) {
     return null;
   }
+  const compactBars = rankedCourses.length <= 4;
   return (
     <div className="grid gap-2">
       <h3 className="m-0 text-sm font-semibold text-app-text">Course finish distribution</h3>
       <div className="overflow-hidden border border-app-border p-3">
         <div
-          className="grid items-end gap-1.5"
+          className={
+            compactBars ? "grid items-end justify-center gap-1.5" : "grid items-end gap-1.5"
+          }
           style={{
-            gridTemplateColumns: `repeat(${rankedCourses.length}, minmax(0, 1fr))`,
+            gridTemplateColumns: compactBars
+              ? `repeat(${rankedCourses.length}, minmax(72px, 120px))`
+              : `repeat(${rankedCourses.length}, minmax(0, 1fr))`,
           }}
         >
           {rankedCourses.map((course, index) => (
@@ -498,10 +585,17 @@ function targetSelectionLabel(target: ManagedEvaluation["target"]) {
   const parts = [
     selectionCountLabel(target.cup_ids, "cup"),
     selectionCountLabel(target.course_ids, "course"),
-    selectionCountLabel(target.difficulties, "difficulty"),
+    difficultySelectionLabel(target.difficulties),
     selectionCountLabel(target.vehicle_ids, "vehicle"),
   ].filter((part) => part !== null);
   return parts.length === 0 ? "all targets" : parts.join(" · ");
+}
+
+function difficultySelectionLabel(difficulties: readonly string[]) {
+  if (difficulties.length === 0) {
+    return null;
+  }
+  return difficulties.map(titleLabel).join(", ");
 }
 
 function selectionCountLabel(values: readonly string[], singular: string) {
@@ -512,10 +606,15 @@ function selectionCountLabel(values: readonly string[], singular: string) {
 }
 
 function pluralize(count: number, singular: string) {
-  if (count === 1) {
-    return singular;
-  }
-  return singular === "difficulty" ? "difficulties" : `${singular}s`;
+  return count === 1 ? singular : `${singular}s`;
+}
+
+function titleLabel(value: string) {
+  return value
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatStepCount(value: number | null) {
@@ -542,6 +641,38 @@ function formatNumber(value: number | null) {
     return "-";
   }
   return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
+}
+
+function formatCourseRunRate(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+  const formatted = value >= 10 ? value.toFixed(0) : value.toFixed(1);
+  return `${formatted} runs/min`;
+}
+
+function formatEnvStepRate(value: number | null) {
+  if (value === null) {
+    return undefined;
+  }
+  return `${Math.round(value).toLocaleString()} env steps/s`;
+}
+
+function formatEta(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+  const totalSeconds = Math.max(0, Math.round(value));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  return `${seconds}s`;
 }
 
 function statusLabel(status: ManagedEvaluation["status"]) {

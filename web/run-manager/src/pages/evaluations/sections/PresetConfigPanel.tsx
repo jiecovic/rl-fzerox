@@ -433,9 +433,16 @@ function targetSelectionLabel(target: ManagedEvaluationPreset["target"]) {
   const parts = [
     selectionCountLabel(target.cup_ids, "cup"),
     selectionCountLabel(target.course_ids, "course"),
-    selectionCountLabel(target.difficulties, "difficulty"),
+    difficultySelectionLabel(target.difficulties),
   ].filter((part) => part !== null);
   return parts.length === 0 ? "all targets" : parts.join(" · ");
+}
+
+function difficultySelectionLabel(difficulties: readonly string[]) {
+  if (difficulties.length === 0) {
+    return null;
+  }
+  return difficulties.map(titleLabel).join(", ");
 }
 
 function selectionCountLabel(values: readonly string[], singular: string) {
@@ -446,8 +453,13 @@ function selectionCountLabel(values: readonly string[], singular: string) {
 }
 
 function pluralize(count: number, singular: string) {
-  if (count === 1) {
-    return singular;
-  }
-  return singular === "difficulty" ? "difficulties" : `${singular}s`;
+  return count === 1 ? singular : `${singular}s`;
+}
+
+function titleLabel(value: string) {
+  return value
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
 }

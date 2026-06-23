@@ -240,5 +240,44 @@ def test_fzerox_single_course_executor_truncates_at_step_limit() -> None:
     assert result.engine_setting_raw_value == 64
 
 
+def test_fzerox_single_course_executor_reports_failed_gp_position_as_last() -> None:
+    env = _FakeEnv(
+        steps=[
+            (
+                1.0,
+                True,
+                False,
+                {
+                    "termination_reason": "falling_off_track",
+                    "track_gp_difficulty": "master",
+                    "position": 1,
+                    "total_racers": 30,
+                },
+            )
+        ],
+        locked_courses=[],
+    )
+    policy = _FakePolicyRunner(supports_action_masks=False, calls=[])
+    executor = FZeroXSingleCourseEpisodeExecutor(
+        env=env,
+        policy_runner=policy,
+        max_env_steps=100,
+    )
+
+    result = executor.run_course(
+        EvaluationCourseTarget(
+            target_id="target",
+            course_id="white_land",
+            difficulty="master",
+        ),
+        policy_path=Path("checkpoints/latest/policy.zip"),
+        policy_mode="deterministic",
+        seed=789,
+    )
+
+    assert result.status == "crashed"
+    assert result.position == 30
+
+
 def _observation() -> ObservationValue:
     return np.zeros((1, 1, 3), dtype=np.uint8)

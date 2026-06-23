@@ -9,6 +9,7 @@ import {
   type EvaluationsResponse,
   evaluationsResponseSchema,
   type ManagedEvaluation,
+  type StartEvaluationRequest,
   startEvaluationResponseSchema,
   type UpdateEvaluationRequest,
   updateEvaluationResponseSchema,
@@ -33,7 +34,6 @@ export async function createEvaluation(
       source_run_id: request.sourceRunId,
       source_artifact: request.sourceArtifact,
       preset_id: request.presetId,
-      device: request.device,
       policy_mode: request.policyMode,
     }),
   });
@@ -94,9 +94,14 @@ export async function deleteEvaluationPreset(presetId: string): Promise<boolean>
   throw new Error("run-manager delete evaluation preset response is invalid");
 }
 
-export async function startEvaluation(evaluationId: string): Promise<ManagedEvaluation> {
+export async function startEvaluation(
+  evaluationId: string,
+  request: StartEvaluationRequest,
+): Promise<ManagedEvaluation> {
   const response = await fetch(`/api/evaluations/${encodeURIComponent(evaluationId)}/start`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device: request.device }),
   });
   const payload = parseApiPayload(startEvaluationResponseSchema, await parseJson(response));
   return payload.evaluation;

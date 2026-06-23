@@ -23,6 +23,8 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationPolicyMode,
 )
 
+DEFAULT_GP_RACER_COUNT = 30
+
 
 class _SingleCourseEnv(Protocol):
     def reset(
@@ -146,7 +148,7 @@ class _EpisodeStats:
             seed=seed,
             status=status,
             race_time_ms=_optional_int(info, "race_time_ms"),
-            position=_optional_int(info, "position"),
+            position=_result_position(info, target=target, status=status),
             completion_ratio=_optional_float(info, "episode_completion_fraction"),
             laps_completed=laps_completed,
             total_laps=_optional_int(info, "total_lap_count"),
@@ -194,6 +196,24 @@ def _failure_reason(info: dict[str, object], *, status: CourseResultStatus) -> s
     if isinstance(reason, str) and reason:
         return reason
     return status
+
+
+def _result_position(
+    info: dict[str, object],
+    *,
+    target: EvaluationCourseTarget,
+    status: CourseResultStatus,
+) -> int | None:
+    position = _optional_int(info, "position")
+    if status == "finished":
+        return position
+    if _is_gp_result(info, target=target):
+        return DEFAULT_GP_RACER_COUNT
+    return position
+
+
+def _is_gp_result(info: dict[str, object], *, target: EvaluationCourseTarget) -> bool:
+    return target.difficulty is not None or _optional_str(info, "track_gp_difficulty") is not None
 
 
 def _optional_bool(info: dict[str, object], key: str) -> bool:

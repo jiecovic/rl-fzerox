@@ -63,6 +63,56 @@ def test_evaluation_metrics_break_down_by_course_and_cup() -> None:
     assert mute_city.detail.minimum_height == -10.0
 
 
+def test_evaluation_metrics_include_failed_course_position_penalty() -> None:
+    result = EvaluationRunResult(
+        spec=EvaluationSpec(
+            evaluation_id="eval-test",
+            seed=123,
+            target=EvaluationTargetSpec(mode="gp_course", repeats_per_target=2),
+            checkpoint=EvaluationCheckpointSnapshot(
+                source_run_id="run-a",
+                source_run_name="Run A",
+                artifact="latest",
+                source_policy_path="/runs/run-a/checkpoints/latest/policy.zip",
+                copied_policy_path="/evals/eval-test/checkpoints/latest/policy.zip",
+            ),
+        ),
+        status="completed",
+        attempts=(
+            EvaluationAttemptResult(
+                attempt_id="attempt-1",
+                target_id="mute_city",
+                status="succeeded",
+                course_results=(
+                    EvaluationCourseResult(
+                        course_id="mute_city",
+                        status="finished",
+                        position=1,
+                    ),
+                ),
+            ),
+            EvaluationAttemptResult(
+                attempt_id="attempt-2",
+                target_id="mute_city",
+                status="failed",
+                course_results=(
+                    EvaluationCourseResult(
+                        course_id="mute_city",
+                        status="crashed",
+                        position=30,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    metrics = aggregate_evaluation_metrics(result)
+
+    assert metrics.overall.primary.mean_position == 15.5
+    assert metrics.overall.primary.best_position == 1
+    assert metrics.overall.primary.worst_position == 30
+
+
 def _sample_result() -> EvaluationRunResult:
     return EvaluationRunResult(
         spec=EvaluationSpec(

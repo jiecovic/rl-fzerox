@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
+from typing import Literal
 
 from rl_fzerox.core.evaluation.env_control import sync_checkpoint_curriculum_stage
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
@@ -45,20 +46,22 @@ class EvaluationBaselineSuite:
 def run_managed_evaluation(
     evaluation: ManagedEvaluation,
     *,
+    device: Literal["cpu", "cuda"] = "cuda",
     should_cancel: Callable[[], bool] | None = None,
 ) -> EvaluationRunResult:
     """Execute one manager evaluation record."""
 
     train_config, run_paths = _materialize_evaluation_train_config(evaluation)
-    targets = single_course_targets_from_config(train_config, evaluation.target)
+    runtime_config = _runtime_device_config(train_config, device=device)
+    targets = single_course_targets_from_config(runtime_config, evaluation.target)
     policy_runner = load_policy_runner(
         evaluation.evaluation_dir / "checkpoint_snapshot",
         artifact=evaluation.checkpoint.artifact,
-        device=train_config.train.device,
-        algorithm=train_config.train.algorithm,
+        device=runtime_config.train.device,
+        algorithm=runtime_config.train.algorithm,
     )
     env = build_single_training_env(
-        train_config,
+        runtime_config,
         env_index=0,
         runtime_dir=run_paths.env_runtime_dir(0),
     )
@@ -86,6 +89,14 @@ def run_managed_evaluation(
         close = getattr(env, "close", None)
         if callable(close):
             close()
+
+
+def _runtime_device_config(
+    config: TrainAppConfig,
+    *,
+    device: Literal["cpu", "cuda"],
+) -> TrainAppConfig:
+    return config.model_copy(update={"train": config.train.model_copy(update={"device": device})})
 
 
 def _materialize_evaluation_train_config(

@@ -39,7 +39,6 @@ describe("evaluations API contract", () => {
           preset_id: "time_attack_all_courses",
           preset_version: 1,
           policy_mode: "deterministic",
-          device: "cuda",
           seed: 123,
           target,
           config,

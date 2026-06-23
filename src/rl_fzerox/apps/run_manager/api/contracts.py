@@ -50,8 +50,15 @@ class CreateEvaluationRequest(BaseModel):
     source_run_id: str
     source_artifact: EvaluationCheckpointArtifact = "latest"
     preset_id: str
-    device: WatchDevice = "cuda"
     policy_mode: PolicyPlaybackMode = "deterministic"
+
+
+class StartEvaluationRequest(BaseModel):
+    """Runtime options for launching one evaluation worker."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    device: WatchDevice = "cuda"
 
 
 class CreateEvaluationPresetRequest(BaseModel):

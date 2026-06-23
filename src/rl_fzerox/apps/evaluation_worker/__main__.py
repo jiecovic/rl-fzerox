@@ -21,6 +21,7 @@ def main() -> None:
 
         result = run_managed_evaluation(
             evaluation,
+            device=args.device,
             should_cancel=cancel_path.is_file,
         )
     except Exception as exc:
@@ -43,6 +44,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db-path", required=True, type=Path)
     parser.add_argument("--evaluation-id", required=True)
+    parser.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
     return parser.parse_args()
 
 

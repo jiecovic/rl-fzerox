@@ -46,7 +46,6 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
         source_artifact="latest",
         policy_mode="deterministic",
         preset_id=TIME_ATTACK_PRESET_ID,
-        device="cpu",
         evaluations_root=tmp_path / "evaluations",
     )
 
@@ -69,7 +68,7 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
     assert reloaded[0].target.mode == "time_attack_course"
     assert reloaded[0].target.repeats_per_target == 10
     assert reloaded[0].config.environment.renderer == "gliden64"
-    assert reloaded[0].config.train.device == "cpu"
+    assert reloaded[0].config.train.device == run.config.train.device
     assert reloaded[0].target.vehicle_ids == run.config.vehicle.selected_vehicle_ids
     assert reloaded[0].checkpoint.copied_policy_path == evaluation.checkpoint.copied_policy_path
 
