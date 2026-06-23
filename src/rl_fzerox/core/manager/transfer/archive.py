@@ -1,12 +1,9 @@
 # src/rl_fzerox/core/manager/transfer/archive.py
 from __future__ import annotations
 
-import json
 import shutil
-import stat
 import zipfile
-from collections.abc import Iterable
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from sqlalchemy.exc import IntegrityError as SqlAlchemyIntegrityError
 from sqlalchemy.orm import Session
@@ -21,6 +18,8 @@ from rl_fzerox.core.manager.db.repositories.runs import append_run_event, insert
 from rl_fzerox.core.manager.models import ManagedRun, ManagedRunRuntime, RunStatus
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.store import ManagerStore
+from rl_fzerox.core.manager.transfer.errors import RunBundleError
+from rl_fzerox.core.manager.transfer.files import archive_path_for_run_file, run_files
 from rl_fzerox.core.manager.transfer.models import (
     RunBundleEvent,
     RunBundleFile,
@@ -30,12 +29,13 @@ from rl_fzerox.core.manager.transfer.models import (
     RunBundleRecord,
     RunBundleRuntime,
 )
+from rl_fzerox.core.manager.transfer.payload import extract_run_payload, read_manifest
+from rl_fzerox.core.manager.transfer.rewrite import (
+    path_replacements,
+    rewrite_imported_manifest_paths,
+    rewritten_optional_path,
+)
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
-
-
-class RunBundleError(RuntimeError):
-    """Raised when a run bundle cannot be exported or imported safely."""
-
 
 MAX_RUN_BUNDLE_PAYLOAD_BYTES = 16 * 1024 * 1024 * 1024
 MAX_RUN_BUNDLE_PAYLOAD_FILES = 100_000
@@ -67,7 +67,7 @@ def export_run_bundle(
     bundle_path = (output_path or default_run_export_path(run.id)).expanduser().resolve()
     bundle_path.parent.mkdir(parents=True, exist_ok=True)
     layout = RunBundleLayout()
-    files = tuple(_run_files(run.run_dir))
+    files = tuple(run_files(run.run_dir))
     manifest = RunBundleManifest(
         format_name=layout.format_name,
         schema_version=layout.schema_version,
@@ -76,7 +76,7 @@ def export_run_bundle(
         run=_record_for_run(store, run),
         files=tuple(
             RunBundleFile(
-                path=_archive_path_for_run_file(layout, file_path, run_dir=run.run_dir),
+                path=archive_path_for_run_file(layout, file_path, run_dir=run.run_dir),
                 size_bytes=file_path.stat().st_size,
             )
             for file_path in files
@@ -94,7 +94,7 @@ def export_run_bundle(
         for file_path in files:
             archive.write(
                 file_path,
-                _archive_path_for_run_file(layout, file_path, run_dir=run.run_dir),
+                archive_path_for_run_file(layout, file_path, run_dir=run.run_dir),
             )
     temporary_path.replace(bundle_path)
     return bundle_path
@@ -118,7 +118,7 @@ def import_run_bundle(
     extracted_payload = False
     try:
         with zipfile.ZipFile(archive_path, mode="r") as archive:
-            manifest = _read_manifest(archive, layout=layout)
+            manifest = read_manifest(archive, layout=layout)
             target_run_id = (run_id or manifest.run.id).strip()
             if not target_run_id:
                 raise RunBundleError("target run id cannot be empty")
@@ -128,21 +128,27 @@ def import_run_bundle(
                 (target_runs_root / target_lineage_id / target_run_id).expanduser().resolve()
             )
             _assert_import_target_available(store, run_id=target_run_id, run_dir=target_run_dir)
-            _extract_run_payload(archive, layout=layout, target_run_dir=target_run_dir)
+            extract_run_payload(
+                archive,
+                layout=layout,
+                target_run_dir=target_run_dir,
+                max_payload_bytes=MAX_RUN_BUNDLE_PAYLOAD_BYTES,
+                max_payload_files=MAX_RUN_BUNDLE_PAYLOAD_FILES,
+            )
             extracted_payload = True
 
-        replacements = _path_replacements(
+        replacements = path_replacements(
             manifest=manifest,
             target_run_dir=target_run_dir,
             target_runs_root=target_runs_root,
         )
         if target_run_id != manifest.run.id:
             replacements = (*replacements, (manifest.run.id, target_run_id))
-        _rewrite_imported_manifest_paths(target_run_dir, replacements=replacements)
+        rewrite_imported_manifest_paths(target_run_dir, replacements=replacements)
         imported_status = _imported_status(manifest.run.status)
         imported_at = store.utc_now()
         imported_config = ManagedRunConfig.model_validate(manifest.run.config)
-        source_snapshot_dir = _rewritten_optional_path(
+        source_snapshot_dir = rewritten_optional_path(
             manifest.run.source_snapshot_dir,
             replacements=replacements,
         )
@@ -292,221 +298,11 @@ def _events_for_bundle(store: ManagerStore, run_id: str) -> tuple[RunBundleEvent
     )
 
 
-def _run_files(run_dir: Path) -> Iterable[Path]:
-    for file_path in sorted(run_dir.rglob("*")):
-        if file_path.is_symlink() or not file_path.is_file():
-            continue
-        yield file_path
-
-
-def _archive_path_for_run_file(layout: RunBundleLayout, file_path: Path, *, run_dir: Path) -> str:
-    return str(PurePosixPath(layout.payload_dir, file_path.relative_to(run_dir).as_posix()))
-
-
-def _read_manifest(
-    archive: zipfile.ZipFile,
-    *,
-    layout: RunBundleLayout,
-) -> RunBundleManifest:
-    try:
-        raw_manifest = archive.read(layout.manifest_path)
-    except KeyError as error:
-        raise RunBundleError("bundle manifest is missing") from error
-    manifest = RunBundleManifest.model_validate_json(raw_manifest)
-    if manifest.format_name != layout.format_name:
-        raise RunBundleError(f"unsupported bundle format: {manifest.format_name!r}")
-    if manifest.schema_version != layout.schema_version:
-        raise RunBundleError(f"unsupported bundle schema version: {manifest.schema_version}")
-    return manifest
-
-
 def _assert_import_target_available(store: ManagerStore, *, run_id: str, run_dir: Path) -> None:
     if store.get_run(run_id) is not None:
         raise RunBundleError(f"run {run_id!r} already exists in this manager database")
     if run_dir.exists():
         raise RunBundleError(f"target run directory already exists: {run_dir}")
-
-
-def _extract_run_payload(
-    archive: zipfile.ZipFile,
-    *,
-    layout: RunBundleLayout,
-    target_run_dir: Path,
-) -> None:
-    target_run_dir.mkdir(parents=True, exist_ok=False)
-    try:
-        payload_bytes = 0
-        payload_files = 0
-        for info in archive.infolist():
-            if info.filename == layout.manifest_path:
-                continue
-            relative_path = _safe_payload_relative_path(info, layout=layout)
-            if relative_path is None:
-                continue
-            target_path = target_run_dir.joinpath(*relative_path.parts)
-            if not target_path.resolve().is_relative_to(target_run_dir.resolve()):
-                raise RunBundleError(f"unsafe archive member: {info.filename}")
-            if info.is_dir():
-                target_path.mkdir(parents=True, exist_ok=True)
-                continue
-            payload_files += 1
-            if payload_files > MAX_RUN_BUNDLE_PAYLOAD_FILES:
-                raise RunBundleError(
-                    f"bundle payload has more than {MAX_RUN_BUNDLE_PAYLOAD_FILES} files"
-                )
-            payload_bytes += info.file_size
-            if payload_bytes > MAX_RUN_BUNDLE_PAYLOAD_BYTES:
-                raise RunBundleError(f"bundle payload exceeds {MAX_RUN_BUNDLE_PAYLOAD_BYTES} bytes")
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            with archive.open(info, mode="r") as source, target_path.open("wb") as target:
-                shutil.copyfileobj(source, target)
-    except Exception:
-        shutil.rmtree(target_run_dir, ignore_errors=True)
-        raise
-
-
-def _safe_payload_relative_path(
-    info: zipfile.ZipInfo,
-    *,
-    layout: RunBundleLayout,
-) -> PurePosixPath | None:
-    mode = info.external_attr >> 16
-    if stat.S_ISLNK(mode):
-        raise RunBundleError(f"bundle contains unsupported symlink: {info.filename}")
-    member_path = PurePosixPath(info.filename)
-    if member_path.is_absolute() or ".." in member_path.parts:
-        raise RunBundleError(f"unsafe archive member: {info.filename}")
-    if not member_path.parts or member_path.parts[0] != layout.payload_dir:
-        raise RunBundleError(f"unexpected archive member outside payload: {info.filename}")
-    relative_parts = member_path.parts[1:]
-    if not relative_parts:
-        return None
-    return PurePosixPath(*relative_parts)
-
-
-def _path_replacements(
-    *,
-    manifest: RunBundleManifest,
-    target_run_dir: Path,
-    target_runs_root: Path,
-) -> tuple[tuple[str, str], ...]:
-    source_run_dir = Path(manifest.run.run_dir)
-    source_lineage_dir = source_run_dir.parent
-    source_runs_root = source_lineage_dir.parent
-    replacements = {
-        str(source_run_dir): str(target_run_dir),
-        str(source_lineage_dir): str(target_run_dir.parent),
-        str(source_runs_root): str(target_runs_root),
-        manifest.project_root: str(project_root_dir()),
-    }
-    return tuple(
-        sorted(
-            (
-                (source, target)
-                for source, target in replacements.items()
-                if source and source != target
-            ),
-            key=lambda item: len(item[0]),
-            reverse=True,
-        )
-    )
-
-
-def _rewrite_imported_manifest_paths(
-    run_dir: Path,
-    *,
-    replacements: tuple[tuple[str, str], ...],
-) -> None:
-    for file_path in _rewrite_candidate_files(run_dir):
-        if file_path.suffix.lower() == ".json" and _rewrite_json_paths(
-            file_path,
-            replacements=replacements,
-        ):
-            continue
-        try:
-            text = file_path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        rewritten = _rewrite_path_text(text, replacements=replacements)
-        if rewritten != text:
-            file_path.write_text(rewritten, encoding="utf-8")
-
-
-def _rewrite_candidate_files(run_dir: Path) -> Iterable[Path]:
-    suffixes = {".json", ".yaml", ".yml", ".txt", ".toml"}
-    for file_path in _run_files(run_dir):
-        if file_path.suffix.lower() in suffixes:
-            yield file_path
-
-
-def _rewrite_path_text(text: str, *, replacements: tuple[tuple[str, str], ...]) -> str:
-    rewritten = text
-    for source, target in replacements:
-        rewritten = rewritten.replace(source, target)
-    return rewritten
-
-
-def _rewrite_json_paths(
-    file_path: Path,
-    *,
-    replacements: tuple[tuple[str, str], ...],
-) -> bool:
-    try:
-        value = json.loads(file_path.read_text(encoding="utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return False
-
-    rewritten, changed = _rewrite_json_value(value, replacements=replacements)
-    if changed:
-        file_path.write_text(
-            json.dumps(rewritten, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-    return True
-
-
-def _rewrite_json_value(
-    value: object,
-    *,
-    replacements: tuple[tuple[str, str], ...],
-) -> tuple[object, bool]:
-    if isinstance(value, str):
-        rewritten = _rewrite_path_text(value, replacements=replacements)
-        return rewritten, rewritten != value
-    if isinstance(value, list):
-        changed = False
-        rewritten_items: list[object] = []
-        for item in value:
-            rewritten_item, item_changed = _rewrite_json_value(
-                item,
-                replacements=replacements,
-            )
-            rewritten_items.append(rewritten_item)
-            changed = changed or item_changed
-        return rewritten_items, changed
-    if isinstance(value, dict):
-        changed = False
-        rewritten_dict: dict[object, object] = {}
-        for key, item in value.items():
-            rewritten_item, item_changed = _rewrite_json_value(
-                item,
-                replacements=replacements,
-            )
-            rewritten_dict[key] = rewritten_item
-            changed = changed or item_changed
-        return rewritten_dict, changed
-    return value, False
-
-
-def _rewritten_optional_path(
-    value: str | None,
-    *,
-    replacements: tuple[tuple[str, str], ...],
-) -> str | None:
-    if value is None:
-        return None
-    rewritten = _rewrite_path_text(value, replacements=replacements)
-    return rewritten if Path(rewritten).exists() else None
 
 
 def _target_lineage_id(run: RunBundleRecord, target_run_id: str) -> str:
