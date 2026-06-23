@@ -17,7 +17,7 @@ policy.
 <https://www.youtube.com/watch?v=r_4lAayCBBo>
 
 Full Master cups playlist:
-<https://www.youtube.com/watch?v=86LLfsIqnNY&list=PLD--3BNqNNAAzywGSzOT0VPQ6eSBUllQa>
+<https://www.youtube.com/playlist?list=PLD--3BNqNNAAzywGSzOT0VPQ6eSBUllQa>
 
 ## Requirements
 
