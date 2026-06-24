@@ -248,6 +248,7 @@ def _build_or_resume_training_model(
         model=model,
         train_env=train_env,
         train_config=run_config.train,
+        current_run_config=run_config,
         policy_config=run_config.policy,
     )
 

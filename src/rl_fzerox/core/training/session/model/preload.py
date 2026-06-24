@@ -8,7 +8,7 @@ from stable_baselines3.common.utils import FloatSchedule
 from torch import nn
 
 from rl_fzerox.core.domain.training_algorithms import TrainAlgorithmName
-from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainAppConfig, TrainConfig
 from rl_fzerox.core.training.runs import (
     load_train_run_config,
     load_train_run_train_config,
@@ -23,6 +23,9 @@ from rl_fzerox.core.training.session.model.action_bias import (
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
     resolve_training_algorithm_class,
+)
+from rl_fzerox.core.training.session.model.compatibility import (
+    resume_compatibility_change_labels,
 )
 
 _ModelT = TypeVar("_ModelT")
@@ -39,6 +42,7 @@ def maybe_resume_training_model(
     model: _ModelT,
     train_env: object,
     train_config: TrainConfig,
+    current_run_config: TrainAppConfig | None = None,
     policy_config: PolicyConfig | None = None,
 ) -> _ModelT:
     """Resume or warm-start a training model from a saved run artifact.
@@ -52,6 +56,11 @@ def maybe_resume_training_model(
         return model
 
     resume_run_dir = train_config.resume_run_dir.resolve()
+    if current_run_config is not None and not train_config.resume_source_metadata_required:
+        _validate_non_managed_resume_compatibility(
+            source_config=load_train_run_config(resume_run_dir),
+            current_config=current_run_config,
+        )
     source_auxiliary_state_signature = _source_auxiliary_state_signature(
         train_config=train_config,
         resume_run_dir=resume_run_dir,
@@ -114,6 +123,22 @@ def maybe_resume_training_model(
             source_offsets=source_action_bias_offsets,
         )
     return model
+
+
+def _validate_non_managed_resume_compatibility(
+    *,
+    source_config: TrainAppConfig,
+    current_config: TrainAppConfig,
+) -> None:
+    changed = resume_compatibility_change_labels(source_config, current_config)
+    if not changed:
+        return
+    detail = ", ".join(changed)
+    raise RuntimeError(
+        "Resume checkpoint is incompatible with the current run config: "
+        f"{detail}. Change reward/training knobs only, use weights_only only for "
+        "compatible auxiliary-head changes, or start a fresh run."
+    )
 
 
 def _source_auxiliary_state_signature(

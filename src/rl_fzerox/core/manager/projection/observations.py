@@ -6,6 +6,7 @@ from rl_fzerox.core.manager.run_spec import (
     ManagedStateComponentConfig,
 )
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
+from rl_fzerox.core.training.session.model.compatibility import resume_observation_signature
 
 
 def build_observation_data(config: ManagedRunConfig) -> dict[str, object]:
@@ -82,17 +83,7 @@ def build_state_feature_dropout_groups(config: ManagedRunConfig) -> list[dict[st
 
 
 def fork_observation_signature(train_config: TrainAppConfig) -> dict[str, object]:
-    observation = train_config.env.observation
-    return {
-        "mode": observation.mode,
-        "resolution": observation.resolution.model_dump(mode="python"),
-        "frame_stack": observation.frame_stack,
-        "stack_mode": observation.stack_mode,
-        "minimap_layer": observation.minimap_layer,
-        "state_components": tuple(
-            component.model_dump(mode="python") for component in observation.state_components or ()
-        ),
-    }
+    return resume_observation_signature(train_config)
 
 
 def _state_component_data(component: ManagedStateComponentConfig) -> dict[str, object]:

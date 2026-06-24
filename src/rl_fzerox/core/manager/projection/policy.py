@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
+from rl_fzerox.core.training.session.model.compatibility import resume_policy_signature
 
 
 def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
@@ -62,29 +63,4 @@ def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
 
 
 def fork_policy_signature(train_config: TrainAppConfig) -> dict[str, object]:
-    extractor = train_config.policy.extractor
-    recurrent = train_config.policy.recurrent
-    net_arch = train_config.policy.net_arch
-    return {
-        "extractor": {
-            "conv_profile": extractor.conv_profile,
-            "custom_conv_layers": tuple(
-                layer.model_dump(mode="python") for layer in extractor.custom_conv_layers
-            ),
-            "features_dim": extractor.features_dim,
-            "state_net_arch": tuple(extractor.state_net_arch or ()),
-            "fusion_features_dim": extractor.fusion_features_dim,
-            "layer_norm": extractor.layer_norm,
-        },
-        "recurrent": {
-            "enabled": recurrent.enabled,
-            "hidden_size": recurrent.hidden_size,
-            "n_lstm_layers": recurrent.n_lstm_layers,
-            "shared_lstm": recurrent.shared_lstm,
-            "enable_critic_lstm": recurrent.enable_critic_lstm,
-        },
-        "net_arch": {
-            "pi": tuple(net_arch.pi),
-            "vf": tuple(net_arch.vf),
-        },
-    }
+    return resume_policy_signature(train_config)

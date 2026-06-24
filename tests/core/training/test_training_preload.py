@@ -9,7 +9,15 @@ import pytest
 from pydantic import ValidationError
 from torch import nn
 
-from rl_fzerox.core.runtime_spec.schema import PolicyActionBiasConfig, PolicyConfig, TrainConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    ActionConfig,
+    EmulatorConfig,
+    EnvConfig,
+    PolicyActionBiasConfig,
+    PolicyConfig,
+    TrainAppConfig,
+    TrainConfig,
+)
 from rl_fzerox.core.training.session.model.action_bias import MODEL_ACTION_BIAS_OFFSETS_ATTR
 from rl_fzerox.core.training.session.model.preload import maybe_resume_training_model
 
@@ -58,6 +66,25 @@ def _resume_train_config(
     )
 
 
+def _train_app_config(
+    tmp_path: Path,
+    *,
+    train_config: TrainConfig | None = None,
+    policy_config: PolicyConfig | None = None,
+    action_config: ActionConfig | None = None,
+) -> TrainAppConfig:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    return TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=action_config or ActionConfig()),
+        policy=policy_config or PolicyConfig(),
+        train=train_config or TrainConfig(algorithm="maskable_hybrid_action_ppo"),
+    )
+
+
 def test_weights_only_resume_relaxes_exact_match_when_aux_bank_presence_differs(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -82,6 +109,74 @@ def test_weights_only_resume_relaxes_exact_match_when_aux_bank_presence_differs(
     )
 
     assert model.set_parameters_calls == [(str(model_path), False, "cpu")]
+
+
+def test_non_managed_resume_allows_nonstructural_config_edits(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = _DummyModel(auxiliary_state_head_arch=None)
+    model_path = tmp_path / "model.zip"
+    train_config = _resume_train_config(tmp_path)
+    source_config = _train_app_config(
+        tmp_path, train_config=TrainConfig(algorithm=train_config.algorithm)
+    )
+    current_config = _train_app_config(
+        tmp_path,
+        train_config=train_config,
+        policy_config=PolicyConfig(activation="gelu"),
+    )
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
+        lambda run_dir: source_config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.load_train_run_train_config",
+        lambda run_dir: source_config.train,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
+        lambda run_dir, artifact: model_path,
+    )
+
+    maybe_resume_training_model(
+        model=model,
+        train_env=object(),
+        train_config=train_config,
+        current_run_config=current_config,
+    )
+
+    assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
+
+
+def test_non_managed_resume_rejects_structural_config_edits(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model = _DummyModel(auxiliary_state_head_arch=None)
+    train_config = _resume_train_config(tmp_path)
+    source_config = _train_app_config(
+        tmp_path, train_config=TrainConfig(algorithm=train_config.algorithm)
+    )
+    current_config = _train_app_config(
+        tmp_path,
+        train_config=train_config,
+        action_config=ActionConfig(pitch_buckets=7),
+    )
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
+        lambda run_dir: source_config,
+    )
+
+    with pytest.raises(RuntimeError, match="action layout"):
+        maybe_resume_training_model(
+            model=model,
+            train_env=object(),
+            train_config=train_config,
+            current_run_config=current_config,
+        )
 
 
 def test_weights_only_resume_keeps_exact_match_when_aux_bank_signature_matches(
