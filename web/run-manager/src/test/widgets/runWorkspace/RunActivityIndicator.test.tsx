@@ -54,7 +54,7 @@ describe("RunActivityIndicator", () => {
     expect(screen.getByText(/last metrics 30s ago/)).toBeInTheDocument();
   });
 
-  it("shows startup progress while it is newer than runtime metrics", () => {
+  it("keeps the compact header free of startup progress details", () => {
     const baseRuntime = runFixture().runtime;
     if (baseRuntime === null) {
       throw new Error("run fixture must include runtime data");
@@ -78,32 +78,7 @@ describe("RunActivityIndicator", () => {
 
     render(<RunActivityIndicator run={run} />);
 
-    expect(screen.getByText(/Resolving track sampling baselines/)).toBeInTheDocument();
-  });
-
-  it("hides startup progress after newer runtime metrics arrive", () => {
-    const baseRuntime = runFixture().runtime;
-    if (baseRuntime === null) {
-      throw new Error("run fixture must include runtime data");
-    }
-    const run = runFixture({
-      worker_heartbeat_at: "2026-05-03T18:55:27+00:00",
-      runtime: {
-        ...baseRuntime,
-        updated_at: "2026-05-03T18:55:25+00:00",
-      },
-      recent_events: [
-        {
-          created_at: "2026-05-03T18:55:20+00:00",
-          kind: "startup_resume",
-          message: "Starting training loop",
-        },
-      ],
-    });
-
-    render(<RunActivityIndicator run={run} />);
-
-    expect(screen.queryByText(/Starting training loop/)).not.toBeInTheDocument();
-    expect(screen.getByText(/last metrics 5s ago/)).toBeInTheDocument();
+    expect(screen.queryByText(/Resolving track sampling baselines/)).not.toBeInTheDocument();
+    expect(screen.getByText(/last metrics 30s ago/)).toBeInTheDocument();
   });
 });

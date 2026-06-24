@@ -1,6 +1,6 @@
 // web/run-manager/src/entities/run/ui/RunActivityIndicator.tsx
 
-import { latestActiveStartupMessage, latestFailureMessage } from "@/entities/run/model/runtime";
+import { latestFailureMessage } from "@/entities/run/model/runtime";
 import type { ManagedRun } from "@/shared/api/contract";
 import { formatRelativeTime } from "@/shared/ui/format";
 
@@ -10,13 +10,11 @@ export function RunActivityIndicator({ run }: { run: ManagedRun }) {
   if (run.pending_command !== null) {
     return <span>{run.pending_command} requested</span>;
   }
-  const activeStartupMessage = latestActiveStartupMessage(run);
   if (isRunHeartbeatFresh(run)) {
     return (
       <span className="run-live-indicator">
         <span aria-hidden="true" className="run-live-indicator-dot" />
         <span>live</span>
-        {activeStartupMessage !== null ? <span> · {activeStartupMessage}</span> : null}
         {run.runtime !== null ? (
           <span> · last metrics {formatRelativeTime(run.runtime.updated_at)}</span>
         ) : null}
@@ -26,22 +24,10 @@ export function RunActivityIndicator({ run }: { run: ManagedRun }) {
   if (run.status === "running") {
     const staleHeartbeatLabel = heartbeatAgeLabel(run);
     const staleMetricsLabel = metricsAgeLabel(run);
-    if (
-      activeStartupMessage !== null ||
-      staleHeartbeatLabel !== null ||
-      staleMetricsLabel !== null
-    ) {
+    if (staleHeartbeatLabel !== null || staleMetricsLabel !== null) {
       return (
         <span>
-          {activeStartupMessage ?? staleHeartbeatLabel ?? staleMetricsLabel}
-          {activeStartupMessage !== null && staleHeartbeatLabel !== null ? (
-            <span> · {staleHeartbeatLabel}</span>
-          ) : null}
-          {activeStartupMessage !== null &&
-          staleHeartbeatLabel === null &&
-          staleMetricsLabel !== null ? (
-            <span> · {staleMetricsLabel}</span>
-          ) : null}
+          {staleHeartbeatLabel ?? staleMetricsLabel}
           {staleHeartbeatLabel !== null && staleMetricsLabel !== null ? (
             <span> · {staleMetricsLabel}</span>
           ) : null}

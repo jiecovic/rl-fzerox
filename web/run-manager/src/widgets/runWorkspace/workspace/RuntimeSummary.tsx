@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { RunEngineTuningPanel } from "@/entities/engineTuning/ui/RunEngineTuningPanel";
 import {
   envStepRateLabel,
+  latestActiveStartupMessage,
   lineageSimGameTimeLabel,
   lineageSimToWallRatioLabel,
   lineageStepsLabel,
@@ -30,7 +31,7 @@ import type {
 import { rendererNames } from "@/shared/api/renderers";
 import { cn } from "@/shared/ui/cn";
 import { FieldSelect } from "@/shared/ui/Field";
-import { formatDate } from "@/shared/ui/format";
+import { formatDate, formatRelativeTime } from "@/shared/ui/format";
 import {
   ChartIcon,
   CopyIcon,
@@ -80,6 +81,7 @@ export function RunRuntimeSummary({
   const progressFraction = runtime?.progress_fraction ?? 0;
   const hasLineageTotals = showsLineageTotals(run);
   const watchRendererOptions = rendererNames(metadata, actions.selectedWatchRenderer);
+  const activeStartupMessage = latestActiveStartupMessage(run);
 
   return (
     <div className="mb-[18px] grid grid-cols-1 items-start gap-3.5">
@@ -105,6 +107,14 @@ export function RunRuntimeSummary({
         >
           {progressNote(run)}
         </div>
+        {activeStartupMessage !== null ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-app-muted">
+            <span>{activeStartupMessage}</span>
+            {runtime !== null ? (
+              <span>last metrics {formatRelativeTime(runtime.updated_at)}</span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-2.5">
           <RunMetric label="Env step / s">{envStepRateLabel(run)}</RunMetric>
           <RunMetric label="Train fps">{trainFpsLabel(run)}</RunMetric>
