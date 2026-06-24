@@ -50,7 +50,6 @@ def _build_panel_columns(
     paused: bool,
     control_state: RaceControlState,
     policy_label: str | None = None,
-    policy_curriculum_stage: str | None,
     policy_action: ActionValue | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
@@ -91,10 +90,6 @@ def _build_panel_columns(
     train_config: TrainConfig | None = None,
     policy_config: PolicyConfig | None = None,
 ) -> PanelColumns:
-    curriculum_stage = _format_curriculum_stage(
-        checkpoint_stage=policy_curriculum_stage,
-        info=info,
-    )
     return PanelColumns(
         left=[
             PanelSection(
@@ -115,11 +110,6 @@ def _build_panel_columns(
                             policy_label=policy_label,
                             manual_control_enabled=manual_control_enabled,
                         ),
-                    ),
-                    _panel_line(
-                        "Stage",
-                        curriculum_stage,
-                        PALETTE.text_primary if curriculum_stage != "-" else PALETTE.text_muted,
                     ),
                     _panel_line(
                         "Experience",
@@ -555,19 +545,3 @@ def _driver_mode_color(
     if policy_label is not None:
         return PALETTE.text_accent
     return PALETTE.text_primary
-
-
-def _format_env_curriculum_stage(info: dict[str, object]) -> str:
-    stage_name = info.get("curriculum_stage_name")
-    if isinstance(stage_name, str) and stage_name:
-        return stage_name
-    stage_index = info.get("curriculum_stage")
-    if isinstance(stage_index, int):
-        return str(stage_index)
-    return "-"
-
-
-def _format_curriculum_stage(*, checkpoint_stage: str | None, info: dict[str, object]) -> str:
-    if checkpoint_stage is not None and checkpoint_stage:
-        return checkpoint_stage
-    return _format_env_curriculum_stage(info)

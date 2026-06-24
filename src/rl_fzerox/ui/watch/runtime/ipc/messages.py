@@ -107,7 +107,6 @@ class WatchSnapshot:
     action_mask_branches: ActionMaskBranches
     policy_action: ActionValue | None
     policy_label: str | None
-    policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
     policy_experience_frames: int | None
     policy_deterministic: bool | None

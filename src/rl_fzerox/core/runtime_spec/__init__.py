@@ -9,10 +9,6 @@ runtime schema that training, watch, and saved run manifests validate against.
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
-    CurriculumConfig,
-    CurriculumStageConfig,
-    CurriculumTrainOverridesConfig,
-    CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
     ExtractorConfig,
@@ -29,10 +25,6 @@ from rl_fzerox.core.runtime_spec.schema import (
 
 __all__ = [
     "ActionMaskConfig",
-    "CurriculumConfig",
-    "CurriculumStageConfig",
-    "CurriculumTrainOverridesConfig",
-    "CurriculumTriggerConfig",
     "EmulatorConfig",
     "EnvConfig",
     "ExtractorConfig",

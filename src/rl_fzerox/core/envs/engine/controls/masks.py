@@ -5,17 +5,11 @@ from dataclasses import dataclass
 
 from fzerox_emulator.arrays import ActionMask
 from rl_fzerox.core.envs.actions import ActionAdapter
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig
 
 from .mask_config import (
     ActionMaskBranches,
     ActionMaskOverrides,
     ActionMaskSnapshot,
-    curriculum_stage_boost_energy_gates,
-    curriculum_stage_boost_speed_gates,
-    curriculum_stage_lean_gates,
-    curriculum_stage_names,
-    curriculum_stage_overrides,
     validate_configured_overrides,
 )
 from .mask_queries import split_action_mask_by_branch
@@ -23,21 +17,15 @@ from .mask_queries import split_action_mask_by_branch
 
 @dataclass(slots=True)
 class ActionMaskController:
-    """Compose static, curriculum, and live gameplay action masks."""
+    """Compose static and live gameplay action masks."""
 
     adapter: ActionAdapter
     base_overrides: ActionMaskOverrides | None
-    stage_overrides: tuple[ActionMaskOverrides | None, ...]
-    stage_names: tuple[str, ...]
-    stage_lean_unmask_min_speed_kph: tuple[float | None, ...]
-    stage_boost_unmask_max_speed_kph: tuple[float | None, ...]
-    stage_boost_min_energy_fraction: tuple[float | None, ...]
     boost_unmask_max_speed_kph: float | None
     lean_unmask_min_speed_kph: float | None
     mask_air_brake_on_ground: bool
     mask_pitch_on_ground: bool
     pitch_neutral_index: int = 2
-    _stage_index: int | None = None
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
     _air_brake_allowed_values: tuple[int, ...] | None = None
@@ -54,49 +42,32 @@ class ActionMaskController:
         *,
         adapter: ActionAdapter,
         base_overrides: ActionMaskOverrides | None,
-        curriculum_config: CurriculumConfig | None,
         boost_unmask_max_speed_kph: float | None = None,
         lean_unmask_min_speed_kph: float | None = None,
         mask_air_brake_on_ground: bool = True,
         mask_pitch_on_ground: bool = True,
         pitch_neutral_index: int = 2,
     ) -> ActionMaskController:
-        stage_overrides = curriculum_stage_overrides(curriculum_config)
         validate_configured_overrides(
             adapter=adapter,
             base_overrides=base_overrides,
-            stage_overrides=stage_overrides,
         )
         return cls(
             adapter=adapter,
             base_overrides=base_overrides,
-            stage_overrides=stage_overrides,
-            stage_names=curriculum_stage_names(curriculum_config),
-            stage_lean_unmask_min_speed_kph=curriculum_stage_lean_gates(curriculum_config),
-            stage_boost_unmask_max_speed_kph=curriculum_stage_boost_speed_gates(curriculum_config),
-            stage_boost_min_energy_fraction=curriculum_stage_boost_energy_gates(curriculum_config),
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             mask_air_brake_on_ground=bool(mask_air_brake_on_ground),
             mask_pitch_on_ground=bool(mask_pitch_on_ground),
             pitch_neutral_index=int(pitch_neutral_index),
-            _stage_index=0 if stage_overrides else None,
         )
 
     def action_mask(self) -> ActionMask:
         """Return the flattened boolean mask for the current action adapter."""
 
-        stage_overrides = None
-        if self._stage_index is not None:
-            stage_overrides = self.stage_overrides[self._stage_index]
-        lean_unmask_min_speed_kph = self.lean_unmask_min_speed_kph
-        if self._stage_index is not None:
-            stage_lean_gate = self.stage_lean_unmask_min_speed_kph[self._stage_index]
-            if stage_lean_gate is not None:
-                lean_unmask_min_speed_kph = stage_lean_gate
         return self.adapter.action_mask(
             base_overrides=self.base_overrides,
-            stage_overrides=stage_overrides,
+            stage_overrides=None,
             dynamic_overrides=_dynamic_action_mask_overrides(
                 boost_unlocked=self._boost_unlocked,
                 airborne=self._airborne,
@@ -107,7 +78,7 @@ class ActionMaskController:
                 air_brake_episode_masked=self._air_brake_episode_masked,
                 spin_episode_masked=self._spin_episode_masked,
                 speed_kph=self._speed_kph,
-                lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
+                lean_unmask_min_speed_kph=self.lean_unmask_min_speed_kph,
                 mask_air_brake_on_ground=self.mask_air_brake_on_ground,
                 mask_pitch_on_ground=self.mask_pitch_on_ground,
                 pitch_neutral_index=self.pitch_neutral_index,
@@ -143,30 +114,6 @@ class ActionMaskController:
             return self.action_mask_branches()
         finally:
             self._air_brake_allowed_values = air_brake_allowed_values
-
-    def set_curriculum_stage(self, stage_index: int) -> None:
-        """Switch the active curriculum stage for subsequent action masks."""
-
-        if not self.stage_overrides:
-            raise RuntimeError("No curriculum stages are configured for this env")
-        if not 0 <= stage_index < len(self.stage_overrides):
-            raise ValueError(f"Invalid curriculum stage index {stage_index}")
-        self._stage_index = int(stage_index)
-
-    def sync_checkpoint_stage(self, stage_index: int | None) -> None:
-        """Align the active watch-stage mask with checkpoint metadata.
-
-        Missing metadata falls back to stage 0 when a curriculum exists so the
-        env does not keep a stale later stage from a previously watched policy.
-        """
-
-        if not self.stage_overrides:
-            self._stage_index = None
-            return
-        if stage_index is None:
-            self._stage_index = 0
-            return
-        self.set_curriculum_stage(stage_index)
 
     def set_boost_unlocked(self, boost_unlocked: bool | None) -> None:
         """Update live boost availability used by the dynamic action mask."""
@@ -214,33 +161,11 @@ class ActionMaskController:
         self._airborne = airborne
 
     @property
-    def stage_index(self) -> int | None:
-        """Return the active curriculum stage index, if any."""
-
-        return self._stage_index
-
-    @property
-    def stage_name(self) -> str | None:
-        """Return the active curriculum stage name, if any."""
-
-        if self._stage_index is None:
-            return None
-        return self.stage_names[self._stage_index]
-
-    @property
     def current_boost_unmask_max_speed_kph(self) -> float | None:
-        if self._stage_index is None:
-            return self.boost_unmask_max_speed_kph
-        stage_gate = self.stage_boost_unmask_max_speed_kph[self._stage_index]
-        if stage_gate is not None:
-            return stage_gate
         return self.boost_unmask_max_speed_kph
 
     def current_boost_min_energy_fraction(self, default: float) -> float:
-        if self._stage_index is None:
-            return float(default)
-        stage_gate = self.stage_boost_min_energy_fraction[self._stage_index]
-        return float(default if stage_gate is None else stage_gate)
+        return float(default)
 
     @property
     def lean_episode_masked(self) -> bool:

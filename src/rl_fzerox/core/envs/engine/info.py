@@ -212,15 +212,3 @@ def vehicle_setup_info(backend: BackendInfoReader) -> dict[str, object]:
         return dict(backend.vehicle_setup_info())
     except (OSError, RuntimeError, ValueError):
         return {}
-
-
-def set_curriculum_info(
-    info: dict[str, object],
-    *,
-    stage_index: int | None,
-    stage_name: str | None,
-) -> None:
-    """Attach the active curriculum stage in a watch- and callback-friendly form."""
-
-    info["curriculum_stage"] = stage_index
-    info["curriculum_stage_name"] = stage_name

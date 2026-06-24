@@ -9,7 +9,6 @@ from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.runtime_spec.schema import (
     ActionRuntimeConfig,
     CareerModeRaceSetupConfig,
-    CurriculumStageConfig,
     TrackConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
@@ -72,7 +71,6 @@ def draw_watch_frame(
         track_pool_records = track_pool_records_for_watch_snapshot(
             config,
             snapshot,
-            info=draw_info,
             active_track_sampling=snapshot.active_track_sampling,
         )
     _add_config_track_info(draw_info, config, track_pool_records=track_pool_records)
@@ -123,7 +121,6 @@ def draw_watch_frame(
             boost_lamp_level=snapshot.boost_lamp_level,
             action_mask_branches=snapshot.action_mask_branches,
             policy_label=snapshot.policy_label,
-            policy_curriculum_stage=snapshot.policy_curriculum_stage,
             policy_num_timesteps=snapshot.policy_num_timesteps,
             policy_experience_frames=snapshot.policy_experience_frames,
             policy_deterministic=snapshot.policy_deterministic,
@@ -190,16 +187,13 @@ def track_pool_records_for_watch_snapshot(
     config: WatchAppConfig,
     snapshot: WatchSnapshot,
     *,
-    info: dict[str, object] | None = None,
     active_track_sampling: TrackSamplingConfig | None = None,
 ) -> tuple[dict[str, object], ...]:
     """Build the track-pool view model once per track-sampling config update."""
 
     return _track_pool_records(
         config,
-        snapshot.info if info is None else info,
         active_track_sampling=active_track_sampling,
-        policy_stage_name=snapshot.policy_curriculum_stage,
     )
 
 
@@ -209,9 +203,7 @@ def _add_config_track_info(
     *,
     track_pool_records: tuple[dict[str, object], ...] | None = None,
 ) -> None:
-    records = (
-        _track_pool_records(config, info) if track_pool_records is None else track_pool_records
-    )
+    records = _track_pool_records(config) if track_pool_records is None else track_pool_records
     registry_match = _track_record_matching_info(info, records)
     if registry_match:
         for key, value in registry_match.items():
@@ -233,16 +225,10 @@ def _add_career_mode_info(info: dict[str, object], config: WatchAppConfig) -> No
 
 def _track_pool_records(
     config: WatchAppConfig,
-    info: dict[str, object] | None = None,
     *,
     active_track_sampling: TrackSamplingConfig | None = None,
-    policy_stage_name: str | None = None,
 ) -> tuple[dict[str, object], ...]:
-    track_sampling = active_track_sampling or _active_track_sampling(
-        config,
-        info,
-        policy_stage_name=policy_stage_name,
-    )
+    track_sampling = active_track_sampling or config.env.track_sampling
     if track_sampling.enabled and track_sampling.entries:
         return _track_sampling_records(track_sampling.entries)
     career_records = _career_mode_track_pool_records(config)
@@ -306,62 +292,6 @@ def _course_records_info(records: CourseRecords) -> dict[str, object]:
         "track_non_agg_worst_mode": records.non_agg_worst.mode,
     }
     return info
-
-
-def _active_track_sampling(
-    config: WatchAppConfig,
-    info: dict[str, object] | None,
-    *,
-    policy_stage_name: str | None,
-) -> TrackSamplingConfig:
-    stage = _active_curriculum_stage(
-        config,
-        info,
-        policy_stage_name=policy_stage_name,
-    )
-    if stage is None or stage.track_sampling is None:
-        return config.env.track_sampling
-    return stage.track_sampling
-
-
-def _active_curriculum_stage(
-    config: WatchAppConfig,
-    info: dict[str, object] | None,
-    *,
-    policy_stage_name: str | None,
-) -> CurriculumStageConfig | None:
-    if not config.curriculum.enabled:
-        return None
-
-    stage_index = _curriculum_stage_index(info)
-    if stage_index is not None and 0 <= stage_index < len(config.curriculum.stages):
-        return config.curriculum.stages[stage_index]
-
-    stage_name = _curriculum_stage_name(info) or policy_stage_name
-    if stage_name is None:
-        return None
-    for stage in config.curriculum.stages:
-        if stage.name == stage_name:
-            return stage
-    return None
-
-
-def _curriculum_stage_index(info: dict[str, object] | None) -> int | None:
-    if info is None:
-        return None
-    value = info.get("curriculum_stage")
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
-
-
-def _curriculum_stage_name(info: dict[str, object] | None) -> str | None:
-    if info is None:
-        return None
-    value = info.get("curriculum_stage_name")
-    if not isinstance(value, str) or not value:
-        return None
-    return value
 
 
 def _track_sampling_records(

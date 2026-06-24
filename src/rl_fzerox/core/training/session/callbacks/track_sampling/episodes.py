@@ -3,23 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig, TrackSamplingConfig
 
 
-def runtime_track_sampling_configs(
-    env_config: EnvConfig,
-    curriculum_config: CurriculumConfig,
-) -> tuple[TrackSamplingConfig, ...]:
-    configs: list[TrackSamplingConfig] = []
+def runtime_track_sampling_configs(env_config: EnvConfig) -> tuple[TrackSamplingConfig, ...]:
     if uses_track_sampling_runtime(env_config.track_sampling):
-        configs.append(env_config.track_sampling)
-    if curriculum_config.enabled:
-        for stage in curriculum_config.stages:
-            if stage.track_sampling is not None and uses_track_sampling_runtime(
-                stage.track_sampling,
-            ):
-                configs.append(stage.track_sampling)
-    return tuple(configs)
+        return (env_config.track_sampling,)
+    return ()
 
 
 def uses_track_sampling_runtime(config: TrackSamplingConfig) -> bool:

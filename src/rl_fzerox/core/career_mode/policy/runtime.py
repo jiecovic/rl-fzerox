@@ -104,9 +104,6 @@ class CareerPolicyRaceDriver:
     def action_mask_snapshot(self) -> ActionMaskSnapshot:
         return self._runtime.action_mask_snapshot()
 
-    def sync_curriculum_stage(self, stage_index: int | None) -> None:
-        self._runtime.sync_curriculum_stage(stage_index)
-
 
 def _policy_train_config(policy_control: CareerModePolicyControl) -> TrainAppConfig:
     train_config = build_managed_train_app_config(

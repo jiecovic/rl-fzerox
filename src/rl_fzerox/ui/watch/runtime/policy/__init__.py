@@ -2,7 +2,6 @@
 from rl_fzerox.ui.watch.runtime.policy.runner import (
     _load_policy_runner,
     _persist_reload_error,
-    _policy_curriculum_stage,
     _policy_deterministic,
     _policy_experience_frames,
     _policy_label,
@@ -10,13 +9,11 @@ from rl_fzerox.ui.watch.runtime.policy.runner import (
     _policy_reload_age_seconds,
     _policy_reload_error,
     _reset_policy_runner,
-    _sync_policy_curriculum_stage,
 )
 
 __all__ = [
     "_load_policy_runner",
     "_persist_reload_error",
-    "_policy_curriculum_stage",
     "_policy_deterministic",
     "_policy_experience_frames",
     "_policy_label",
@@ -24,5 +21,4 @@ __all__ = [
     "_policy_reload_age_seconds",
     "_policy_reload_error",
     "_reset_policy_runner",
-    "_sync_policy_curriculum_stage",
 ]

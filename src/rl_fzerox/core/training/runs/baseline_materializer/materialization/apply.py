@@ -6,8 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
-    CurriculumStageConfig,
     TrackConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
@@ -101,18 +99,6 @@ def materialize_run_baselines_impl(
         )
 
     env_config = config.env.model_copy(update={"track_sampling": track_sampling_config})
-    curriculum_config = _materialize_curriculum(
-        config.curriculum,
-        run_paths=run_paths,
-        cache_root=resolved_cache_root,
-        camera_setting=config.env.camera_setting,
-        context=context,
-        startup_reporter=startup_reporter,
-        emulator_type=emulator_type,
-        generic_mode_seed_materializer=generic_mode_seed_materializer,
-        menu_seed_race_start_materializer=menu_seed_race_start_materializer,
-    )
-
     _report_startup(
         startup_reporter,
         "startup_materialize",
@@ -129,7 +115,6 @@ def materialize_run_baselines_impl(
                 }
             ),
             "env": env_config,
-            "curriculum": curriculum_config,
         }
     )
 
@@ -190,48 +175,6 @@ def _should_materialize_primary_track_baseline(
     if not track_sampling_enabled and can_generate_track_config(track_config):
         return True
     return track_config.baseline_state_path is not None
-
-
-def _materialize_curriculum(
-    config: CurriculumConfig,
-    *,
-    run_paths: RunPaths,
-    cache_root: Path,
-    camera_setting: str | None,
-    context: BaselineMaterializerContext,
-    startup_reporter: Callable[[str, str], None] | None,
-    emulator_type: Callable[..., StateSavingEmulator],
-    generic_mode_seed_materializer: GenericModeSeedMaterializer,
-    menu_seed_race_start_materializer: RaceStartMaterializer,
-) -> CurriculumConfig:
-    stages: list[CurriculumStageConfig] = []
-    changed = False
-    for stage_index, stage in enumerate(config.stages, start=1):
-        if stage.track_sampling is None:
-            stages.append(stage)
-            continue
-        changed = True
-        stages.append(
-            stage.model_copy(
-                update={
-                    "track_sampling": _materialize_track_sampling(
-                        stage.track_sampling,
-                        run_paths=run_paths,
-                        cache_root=cache_root,
-                        camera_setting=camera_setting,
-                        context=context,
-                        startup_reporter=startup_reporter,
-                        sampling_label=f"curriculum stage {stage_index}",
-                        emulator_type=emulator_type,
-                        generic_mode_seed_materializer=generic_mode_seed_materializer,
-                        menu_seed_race_start_materializer=menu_seed_race_start_materializer,
-                    )
-                }
-            )
-        )
-    if not changed:
-        return config
-    return config.model_copy(update={"stages": tuple(stages)})
 
 
 def _materialize_track_sampling(

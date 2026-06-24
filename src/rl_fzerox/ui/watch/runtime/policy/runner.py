@@ -2,26 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rl_fzerox.core.training.inference import PolicyRunner
-
-
-class _CurriculumStagePolicyRunner(Protocol):
-    @property
-    def checkpoint_curriculum_stage_index(self) -> int | None: ...
-
-    @property
-    def supports_action_masks(self) -> bool: ...
-
-    def refresh(self) -> None: ...
-    def refresh_if_due(self, *, interval_seconds: float) -> None: ...
-    def reset(self) -> None: ...
-
-
-class _CheckpointStageSyncEnv(Protocol):
-    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None: ...
 
 
 def _load_policy_runner(
@@ -61,12 +45,6 @@ def _policy_reload_error(policy_runner: PolicyRunner | None) -> str | None:
     return policy_runner.last_reload_error
 
 
-def _policy_curriculum_stage(policy_runner: PolicyRunner | None) -> str | None:
-    if policy_runner is None:
-        return None
-    return policy_runner.checkpoint_curriculum_stage
-
-
 def _policy_num_timesteps(policy_runner: PolicyRunner | None) -> int | None:
     if policy_runner is None:
         return None
@@ -99,20 +77,10 @@ def _policy_deterministic(policy_runner: PolicyRunner | None, deterministic: boo
     return deterministic
 
 
-def _reset_policy_runner(policy_runner: _CurriculumStagePolicyRunner | None) -> None:
+def _reset_policy_runner(policy_runner: PolicyRunner | None) -> None:
     if policy_runner is None:
         return
     policy_runner.reset()
-
-
-def _sync_policy_curriculum_stage(
-    policy_runner: _CurriculumStagePolicyRunner | None,
-    env: _CheckpointStageSyncEnv,
-) -> None:
-    if policy_runner is None:
-        return
-    policy_runner.refresh_if_due(interval_seconds=10.0)
-    env.sync_checkpoint_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
 
 
 def _persist_reload_error(

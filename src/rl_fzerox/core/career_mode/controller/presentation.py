@@ -93,10 +93,6 @@ def career_viewer_info(
                     policy_runner.checkpoint_num_timesteps
                 ),
                 "career_mode_policy_checkpoint_path": str(policy_runner.checkpoint_policy_path),
-                "career_mode_policy_checkpoint_stage": (policy_runner.checkpoint_curriculum_stage),
-                "career_mode_policy_checkpoint_stage_index": (
-                    policy_runner.checkpoint_curriculum_stage_index
-                ),
                 "career_mode_policy_run_id": active_policy_control.policy_run.id,
                 "career_mode_policy_run_name": active_policy_control.policy_run.name,
                 "career_mode_policy_course_id": (

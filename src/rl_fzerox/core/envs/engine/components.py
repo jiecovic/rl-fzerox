@@ -12,7 +12,7 @@ from rl_fzerox.core.envs.engine.rendering import backend_renderer
 from rl_fzerox.core.envs.engine.stepping import EngineStepAssembler
 from rl_fzerox.core.envs.rewards import RewardSummaryConfig, RewardTracker, build_reward_tracker
 from rl_fzerox.core.runtime_spec.renderers import RendererName
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, RewardConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig, RewardConfig
 from rl_fzerox.core.runtime_spec.schema.actions import ActionRuntimeConfig
 
 
@@ -37,7 +37,6 @@ def build_engine_runtime_components(
     backend: EmulatorBackend,
     config: EnvConfig,
     reward_config: RewardConfig | None,
-    curriculum_config: CurriculumConfig | None,
 ) -> EngineRuntimeComponents:
     """Build shared action/observation/reward/stepping pieces for one emulator."""
 
@@ -57,7 +56,6 @@ def build_engine_runtime_components(
     mask_controller = ActionMaskController.from_config(
         adapter=action_adapter,
         base_overrides=action_config.mask_overrides,
-        curriculum_config=curriculum_config,
         boost_unmask_max_speed_kph=action_config.boost_unmask_max_speed_kph,
         lean_unmask_min_speed_kph=action_config.lean_unmask_min_speed_kph,
         mask_air_brake_on_ground=action_config.mask_air_brake_on_ground,

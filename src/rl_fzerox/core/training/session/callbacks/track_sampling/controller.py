@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
 from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
     ResolvedTrackSamplingCourses,
     resolve_track_sampling_courses_from_configs,
@@ -92,10 +92,9 @@ class StepBalancedTrackSamplingController:
         cls,
         *,
         env_config: EnvConfig,
-        curriculum_config: CurriculumConfig,
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> StepBalancedTrackSamplingController | None:
-        configs = runtime_track_sampling_configs(env_config, curriculum_config)
+        configs = runtime_track_sampling_configs(env_config)
         if not configs:
             return None
 

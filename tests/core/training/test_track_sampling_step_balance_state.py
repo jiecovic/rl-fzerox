@@ -5,7 +5,6 @@ import pytest
 
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EnvConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
@@ -34,7 +33,6 @@ def test_step_balance_controller_builds_from_env_config() -> None:
                 step_balance_update_episodes=3,
             ),
         ),
-        curriculum_config=CurriculumConfig(),
     )
 
     assert controller is not None
@@ -62,7 +60,6 @@ def test_step_balance_controller_compacts_tensorboard_course_logs() -> None:
                 step_balance_log_details=True,
             ),
         ),
-        curriculum_config=CurriculumConfig(),
     )
 
     assert controller is not None
@@ -108,7 +105,6 @@ def test_step_balance_controller_can_suppress_generated_course_logs() -> None:
                 step_balance_update_episodes=2,
             ),
         ),
-        curriculum_config=CurriculumConfig(),
     )
 
     assert controller is not None
@@ -147,7 +143,6 @@ def test_step_balance_controller_aggregates_duplicate_courses() -> None:
                 step_balance_log_details=True,
             ),
         ),
-        curriculum_config=CurriculumConfig(),
     )
 
     assert controller is None

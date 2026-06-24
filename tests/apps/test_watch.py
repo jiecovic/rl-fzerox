@@ -11,10 +11,6 @@ import pytest
 from rl_fzerox.apps.watch import main, resolve_watch_app_config
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
-    ActionMaskConfig,
-    CurriculumConfig,
-    CurriculumStageConfig,
-    CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
@@ -30,43 +26,13 @@ from rl_fzerox.ui.watch.runtime import WatchWorker
 from rl_fzerox.ui.watch.runtime.policy import (
     _load_policy_runner,
     _policy_experience_frames,
-    _sync_policy_curriculum_stage,
 )
-
-
-class _FakePolicyRunner:
-    def __init__(self, stage_index: int | None) -> None:
-        self.checkpoint_curriculum_stage_index = stage_index
-        self.refresh_calls = 0
-        self.reset_calls = 0
-
-    @property
-    def supports_action_masks(self) -> bool:
-        return True
-
-    def refresh(self) -> None:
-        self.refresh_calls += 1
-
-    def refresh_if_due(self, *, interval_seconds: float) -> None:
-        del interval_seconds
-        self.refresh()
-
-    def reset(self) -> None:
-        self.reset_calls += 1
 
 
 class _FakeInferencePolicy:
     def predict(self, observation: object, **_kwargs: object) -> tuple[int, None]:
         del observation
         return 0, None
-
-
-class _FakeWatchEnv:
-    def __init__(self) -> None:
-        self.stage_indices: list[int | None] = []
-
-    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
-        self.stage_indices.append(stage_index)
 
 
 def test_watch_rejects_artifact_without_run_dir() -> None:
@@ -314,20 +280,6 @@ def test_watch_allows_run_dir_without_config(
         env=EnvConfig(action_repeat=2),
         reward=RewardConfig(time_penalty_per_frame=-0.123),
         policy=PolicyConfig(),
-        curriculum=CurriculumConfig(
-            enabled=True,
-            stages=(
-                CurriculumStageConfig(
-                    name="basic_drive",
-                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
-                    action_mask=ActionMaskConfig(lean=(0,)),
-                ),
-                CurriculumStageConfig(
-                    name="lean_enabled",
-                    action_mask=ActionMaskConfig(lean=(0, 1, 2)),
-                ),
-            ),
-        ),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
 
@@ -354,8 +306,6 @@ def test_watch_allows_run_dir_without_config(
     assert config.emulator.rom_path == rom_path.resolve()
     assert config.env.action_repeat == 2
     assert config.reward.time_penalty_per_frame == -0.123
-    assert config.curriculum.enabled is True
-    assert config.curriculum.stages[0].name == "basic_drive"
     assert config.train == train_config.train
     assert config.policy == train_config.policy
     assert config.watch.device == "cpu"
@@ -482,26 +432,6 @@ def test_policy_experience_frames_prefers_managed_frame_offset(tmp_path: Path) -
     )
 
 
-def test_sync_policy_curriculum_stage_applies_checkpoint_stage_to_watch_env() -> None:
-    policy_runner = _FakePolicyRunner(stage_index=0)
-    env = _FakeWatchEnv()
-
-    _sync_policy_curriculum_stage(policy_runner, env)
-
-    assert policy_runner.refresh_calls == 1
-    assert env.stage_indices == [0]
-
-
-def test_sync_policy_curriculum_stage_resets_when_checkpoint_stage_is_missing() -> None:
-    policy_runner = _FakePolicyRunner(stage_index=None)
-    env = _FakeWatchEnv()
-
-    _sync_policy_curriculum_stage(policy_runner, env)
-
-    assert policy_runner.refresh_calls == 1
-    assert env.stage_indices == [None]
-
-
 def test_run_viewer_exits_quietly_on_keyboard_interrupt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -552,7 +482,6 @@ def test_run_viewer_exits_quietly_on_keyboard_interrupt(
                 native_fps=30.0,
                 active_track_sampling=None,
                 info={},
-                policy_curriculum_stage=None,
                 policy_observation_shape=None,
             ),
             False,

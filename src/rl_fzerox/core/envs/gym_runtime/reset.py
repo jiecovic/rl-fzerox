@@ -6,7 +6,7 @@ from rl_fzerox.core.envs.actions import ResettableActionAdapter
 from rl_fzerox.core.envs.engine.components import EngineRuntimeComponents
 from rl_fzerox.core.envs.engine.controls import sync_dynamic_action_masks
 from rl_fzerox.core.envs.engine.controls.episode_dropout import sample_episode_action_masks
-from rl_fzerox.core.envs.engine.info import set_curriculum_info, telemetry_info
+from rl_fzerox.core.envs.engine.info import telemetry_info
 from rl_fzerox.core.envs.engine.reset import EngineResetCoordinator
 from rl_fzerox.core.envs.engine.stepping import set_episode_boost_pad_info
 from rl_fzerox.core.envs.observations import ObservationValue
@@ -76,11 +76,6 @@ def reset_gym_episode(
     if isinstance(components.action_adapter, ResettableActionAdapter):
         components.action_adapter.reset()
     info["seed"] = seed
-    set_curriculum_info(
-        info,
-        stage_index=components.mask_controller.stage_index,
-        stage_name=components.mask_controller.stage_name,
-    )
     if telemetry is not None:
         info.update(telemetry_info(telemetry))
     info.update(components.reward_tracker.info(telemetry))

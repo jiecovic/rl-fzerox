@@ -33,8 +33,6 @@ def test_recent_checkpoint_artifacts_use_timestep_directories_and_trim(
     ensure_run_dirs(run_paths)
     model = _FakeModel()
     metadata = PolicyArtifactMetadata(
-        curriculum_stage_index=2,
-        curriculum_stage_name="all_open",
         num_timesteps=61_440,
     )
 
@@ -68,7 +66,7 @@ def test_recent_checkpoint_artifacts_use_timestep_directories_and_trim(
     assert load_policy_artifact_metadata(checkpoint_dirs[-1] / "policy.zip") == metadata
 
 
-def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path) -> None:
+def test_save_artifacts_atomically_persists_policy_metadata(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
 
@@ -77,8 +75,6 @@ def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path
         model_path=run_paths.latest_model_path,
         policy_path=run_paths.latest_policy_path,
         policy_metadata=PolicyArtifactMetadata(
-            curriculum_stage_index=1,
-            curriculum_stage_name="lean_enabled",
             num_timesteps=123_456,
         ),
     )
@@ -86,8 +82,6 @@ def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path
     metadata = load_policy_artifact_metadata(run_paths.latest_policy_path)
 
     assert metadata == PolicyArtifactMetadata(
-        curriculum_stage_index=1,
-        curriculum_stage_name="lean_enabled",
         num_timesteps=123_456,
     )
 

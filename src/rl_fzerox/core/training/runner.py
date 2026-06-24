@@ -25,7 +25,6 @@ from rl_fzerox.core.training.session import (
     cleanup_failed_run,
     current_policy_artifact_metadata,
     load_engine_tuning_checkpoint_state,
-    load_policy_artifact_metadata,
     maybe_resume_training_model,
     print_training_startup,
     resolve_train_run_config,
@@ -131,13 +130,7 @@ def run_training(
             train_config=run_config.train,
             policy_config=run_config.policy,
         )
-        initial_curriculum_stage_index = _resume_curriculum_stage_index(run_config)
         initial_engine_tuning_state = _resume_engine_tuning_state(run_config)
-        if initial_curriculum_stage_index is not None:
-            train_env.env_method(
-                "sync_checkpoint_curriculum_stage",
-                initial_curriculum_stage_index,
-            )
         engine_tuning_controller = _engine_tuning_controller(
             run_config,
             state=initial_engine_tuning_state,
@@ -176,7 +169,6 @@ def run_training(
                 run_paths,
                 engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
                 policy_metadata=current_policy_artifact_metadata(
-                    train_env,
                     model,
                     lineage_step_offset=run_config.train.tensorboard_step_offset,
                 ),
@@ -185,9 +177,7 @@ def run_training(
             env_config=run_config.env,
             train_app_config=run_config,
             train_config=run_config.train,
-            curriculum_config=run_config.curriculum,
             run_paths=run_paths,
-            initial_curriculum_stage_index=initial_curriculum_stage_index,
             initial_engine_tuning_state=initial_engine_tuning_state,
             engine_tuning_controller=engine_tuning_controller,
             track_sampling_runtime_persistence=track_sampling_runtime_persistence,
@@ -225,7 +215,6 @@ def run_training(
                     run_paths,
                     engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
                     policy_metadata=current_policy_artifact_metadata(
-                        train_env,
                         model,
                         lineage_step_offset=run_config.train.tensorboard_step_offset,
                     ),
@@ -237,7 +226,6 @@ def run_training(
             policy_path=run_paths.final_policy_path,
             engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
             policy_metadata=current_policy_artifact_metadata(
-                train_env,
                 model,
                 lineage_step_offset=run_config.train.tensorboard_step_offset,
             ),
@@ -248,7 +236,6 @@ def run_training(
                 run_paths,
                 engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
                 policy_metadata=current_policy_artifact_metadata(
-                    train_env,
                     model,
                     lineage_step_offset=run_config.train.tensorboard_step_offset,
                 ),
@@ -272,19 +259,6 @@ def _report_startup(
 ) -> None:
     if startup_reporter is not None:
         startup_reporter(kind, message)
-
-
-def _resume_curriculum_stage_index(config: TrainAppConfig) -> int | None:
-    if config.train.resume_run_dir is None or config.train.resume_mode != "full_model":
-        return None
-    policy_path = resolve_policy_artifact_path(
-        config.train.resume_run_dir,
-        artifact=config.train.resume_artifact,
-    )
-    metadata = load_policy_artifact_metadata(policy_path)
-    if metadata is None:
-        return None
-    return metadata.curriculum_stage_index
 
 
 def _resume_engine_tuning_state(config: TrainAppConfig) -> EngineTuningRuntimeState | None:

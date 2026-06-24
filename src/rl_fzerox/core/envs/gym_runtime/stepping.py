@@ -242,8 +242,6 @@ class GymStepRuntime:
                 episode_return=components.episode.return_value,
                 episode_boost_pad_entries=components.episode.boost_pad_entries,
                 episode_airborne_frames=components.episode.airborne_frames,
-                curriculum_stage_index=components.mask_controller.stage_index,
-                curriculum_stage_name=components.mask_controller.stage_name,
             )
         )
         components.episode.record_step(

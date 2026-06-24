@@ -174,7 +174,6 @@ def test_side_panel_drops_cockpit_control_section() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -207,7 +206,6 @@ def test_train_tab_shows_current_training_hparams() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -262,7 +260,6 @@ def test_state_tab_shows_auxiliary_state_predictions_next_to_targets() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -333,7 +330,6 @@ def test_session_section_shows_episode_step_counter() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -372,7 +368,6 @@ def test_session_section_omits_reverse_and_stuck_counters() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -427,7 +422,6 @@ def test_timing_section_shows_compact_runtime_rates() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -468,7 +462,6 @@ def test_timing_section_shows_game_speed_multiplier() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -493,7 +486,6 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -566,7 +558,6 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -623,7 +614,6 @@ def test_side_panel_splits_component_action_history_from_state_vector() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=0.0,
         policy_reload_error=None,
@@ -678,7 +668,6 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=0.0,
         policy_reload_error=None,
@@ -729,7 +718,6 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=0.0,
         policy_reload_error=None,
@@ -753,34 +741,6 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
     ]
 
 
-def test_session_section_shows_canonical_curriculum_stage_name() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={
-            "frame_index": 0,
-            "native_fps": 60.0,
-        },
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=RaceControlState(),
-        policy_curriculum_stage="lean_enabled",
-        policy_action=np.array([2, 1, 0], dtype=np.int64),
-        policy_reload_age_seconds=5.0,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
-    )
-
-    session_section = next(section for section in columns.left if section.title == "Run State")
-    curriculum_line = next(line for line in session_section.lines if line.label == "Stage")
-
-    assert curriculum_line.value == "lean_enabled"
-
-
 def test_session_section_shows_checkpoint_experience_from_frames() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -792,7 +752,6 @@ def test_session_section_shows_checkpoint_experience_from_frames() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage="lean_enabled",
         policy_num_timesteps=660_000,
         policy_experience_frames=1_320_000,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
@@ -822,7 +781,6 @@ def test_session_section_keeps_mixed_action_repeat_lineage_experience() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage="lean_enabled",
         policy_num_timesteps=10_000,
         policy_experience_frames=15_000,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
@@ -849,7 +807,6 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_deterministic=False,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -876,7 +833,6 @@ def test_session_section_shows_manual_driver_mode() -> None:
         paused=False,
         control_state=RaceControlState(),
         policy_label="latest",
-        policy_curriculum_stage=None,
         policy_deterministic=False,
         manual_control_enabled=True,
         policy_action=None,
@@ -903,7 +859,6 @@ def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_deterministic=False,
         policy_action={
             "continuous": np.array([0.0, 0.5, -0.5], dtype=np.float32),
@@ -936,7 +891,6 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
         episode_reward=-12.34567,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -965,7 +919,6 @@ def test_session_section_omits_global_best_finish_position() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=RaceControlState(),
-        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,

@@ -7,7 +7,6 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 from rl_fzerox.core.envs.engine.reset.track_sampling import TrackSamplingQueuedReset
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EnvConfig,
     TrackSamplingConfig,
     TrainConfig,
@@ -78,14 +77,12 @@ class _TrackSamplingRuntimeCallback(BaseCallback):
         self,
         *,
         env_config: EnvConfig,
-        curriculum_config: CurriculumConfig,
         rotation_manager: XCupRotationManager | None,
         runtime_persistence: TrackSamplingRuntimePersistence,
         alt_baseline_projection: AltBaselineProjectionState | None,
     ) -> None:
         super().__init__(verbose=0)
         self._env_config = env_config
-        self._curriculum_config = curriculum_config
         self._rotation_manager = rotation_manager
         self._runtime_persistence = runtime_persistence
         self._alt_baseline_projection = alt_baseline_projection
@@ -162,14 +159,12 @@ class StepBalancedTrackSamplingCallback(_TrackSamplingRuntimeCallback):
         *,
         controller: StepBalancedTrackSamplingController,
         env_config: EnvConfig,
-        curriculum_config: CurriculumConfig,
         rotation_manager: XCupRotationManager | None,
         runtime_persistence: TrackSamplingRuntimePersistence,
         alt_baseline_projection: AltBaselineProjectionState | None,
     ) -> None:
         super().__init__(
             env_config=env_config,
-            curriculum_config=curriculum_config,
             rotation_manager=rotation_manager,
             runtime_persistence=runtime_persistence,
             alt_baseline_projection=alt_baseline_projection,
@@ -202,7 +197,6 @@ class StepBalancedTrackSamplingCallback(_TrackSamplingRuntimeCallback):
             runtime_state, rotation_update = rotation
             self._controller = _rebuild_track_sampling_controller(
                 env_config=self._env_config,
-                curriculum_config=self._curriculum_config,
                 restored_state=runtime_state,
             )
             weights = self._controller.current_weights()
@@ -227,7 +221,6 @@ class DeficitBudgetTrackSamplingCallback(_TrackSamplingRuntimeCallback):
         *,
         controller: DeficitBudgetTrackSamplingController,
         env_config: EnvConfig,
-        curriculum_config: CurriculumConfig,
         rotation_manager: XCupRotationManager | None,
         runtime_persistence: TrackSamplingRuntimePersistence,
         alt_baseline_projection: AltBaselineProjectionState | None,
@@ -235,7 +228,6 @@ class DeficitBudgetTrackSamplingCallback(_TrackSamplingRuntimeCallback):
     ) -> None:
         super().__init__(
             env_config=env_config,
-            curriculum_config=curriculum_config,
             rotation_manager=rotation_manager,
             runtime_persistence=runtime_persistence,
             alt_baseline_projection=alt_baseline_projection,
@@ -301,7 +293,6 @@ class DeficitBudgetTrackSamplingCallback(_TrackSamplingRuntimeCallback):
         runtime_state, rotation_update = rotation
         self._controller = _rebuild_deficit_budget_track_sampling_controller(
             env_config=self._env_config,
-            curriculum_config=self._curriculum_config,
             restored_state=runtime_state,
         )
         self._replace_env_queues()
@@ -375,12 +366,10 @@ class AltBaselineSyncCallback(BaseCallback):
 def _rebuild_track_sampling_controller(
     *,
     env_config: EnvConfig,
-    curriculum_config: CurriculumConfig,
     restored_state: TrackSamplingRuntimeState,
 ) -> StepBalancedTrackSamplingController:
     controller = StepBalancedTrackSamplingController.from_configs(
         env_config=env_config,
-        curriculum_config=curriculum_config,
         restored_state=restored_state,
     )
     if controller is None:
@@ -391,12 +380,10 @@ def _rebuild_track_sampling_controller(
 def _rebuild_deficit_budget_track_sampling_controller(
     *,
     env_config: EnvConfig,
-    curriculum_config: CurriculumConfig,
     restored_state: TrackSamplingRuntimeState,
 ) -> DeficitBudgetTrackSamplingController:
     controller = DeficitBudgetTrackSamplingController.from_configs(
         env_config=env_config,
-        curriculum_config=curriculum_config,
         restored_state=restored_state,
     )
     if controller is None:

@@ -11,8 +11,6 @@ from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
-    CurriculumStageConfig,
     EnvConfig,
     ObservationConfig,
     ObservationStateComponentConfig,
@@ -776,61 +774,6 @@ def test_step_balanced_track_sampling_zeroes_duplicate_course_entries(
     sampled_courses = [env.reset(seed=123)[1]["track_course_id"] for _ in range(4)]
 
     assert sampled_courses == ["silence", "silence", "silence", "silence"]
-
-
-def test_curriculum_stage_can_override_track_sampling(tmp_path: Path) -> None:
-    stage_zero_path = tmp_path / "mute-city.state"
-    stage_one_path = tmp_path / "silence.state"
-    stage_zero_path.write_bytes(b"mute")
-    stage_one_path.write_bytes(b"silence")
-    backend = SyntheticBackend()
-    env = FZeroXEnv(
-        backend=backend,
-        config=EnvConfig(action_repeat=1),
-        curriculum_config=CurriculumConfig(
-            enabled=True,
-            stages=(
-                CurriculumStageConfig(
-                    name="mute",
-                    track_sampling=TrackSamplingConfig(
-                        enabled=True,
-                        entries=(
-                            TrackSamplingEntryConfig(
-                                id="mute",
-                                baseline_state_path=stage_zero_path,
-                                weight=1.0,
-                            ),
-                        ),
-                    ),
-                ),
-                CurriculumStageConfig(
-                    name="silence",
-                    track_sampling=TrackSamplingConfig(
-                        enabled=True,
-                        entries=(
-                            TrackSamplingEntryConfig(
-                                id="silence",
-                                baseline_state_path=stage_one_path,
-                                weight=1.0,
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    )
-
-    _, first_info = env.reset(seed=123)
-    env.set_curriculum_stage(1)
-    _, second_info = env.reset(seed=123)
-
-    assert backend.loaded_baselines == []
-    assert backend.loaded_baseline_bytes == [
-        (stage_zero_path, len(b"mute")),
-        (stage_one_path, len(b"silence")),
-    ]
-    assert first_info["track_id"] == "mute"
-    assert second_info["track_id"] == "silence"
 
 
 def test_reset_randomizes_game_rng_when_enabled_and_in_race() -> None:

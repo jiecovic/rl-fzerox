@@ -12,7 +12,6 @@ from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     ActionMaskConfig,
-    CurriculumConfig,
     EnvConfig,
     PolicyConfig,
     TrackSamplingConfig,
@@ -67,7 +66,6 @@ def test_rollout_checkpoint_callback_saves_and_trims_recent_snapshots(tmp_path: 
             save_recent_checkpoints=True,
             recent_checkpoint_limit=1,
         ),
-        curriculum_config=CurriculumConfig(),
         run_paths=run_paths,
     )
     env = DummyVecEnv(
@@ -184,7 +182,6 @@ def test_alt_baseline_callback_syncs_stable_entries_in_mixed_x_cup_run(
             batch_size=4,
             device="cpu",
         ),
-        curriculum_config=CurriculumConfig(),
         run_paths=run_paths,
         track_sampling_runtime_persistence=persistence,
     )

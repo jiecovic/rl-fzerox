@@ -6,7 +6,6 @@ from typing import TypeAlias
 
 from fzerox_emulator.arrays import ActionMask
 from rl_fzerox.core.envs.actions import ActionAdapter
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig
 
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
 ActionMaskBranches: TypeAlias = dict[str, tuple[bool, ...]]
@@ -20,52 +19,10 @@ class ActionMaskSnapshot:
     branches: ActionMaskBranches
 
 
-def curriculum_stage_overrides(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[ActionMaskOverrides | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(
-        stage.action_mask.branch_overrides() if stage.action_mask is not None else None
-        for stage in curriculum_config.stages
-    )
-
-
-def curriculum_stage_names(curriculum_config: CurriculumConfig | None) -> tuple[str, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.name for stage in curriculum_config.stages)
-
-
-def curriculum_stage_lean_gates(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[float | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.lean_unmask_min_speed_kph for stage in curriculum_config.stages)
-
-
-def curriculum_stage_boost_speed_gates(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[float | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.boost_unmask_max_speed_kph for stage in curriculum_config.stages)
-
-
-def curriculum_stage_boost_energy_gates(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[float | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.boost_min_energy_fraction for stage in curriculum_config.stages)
-
-
 def validate_configured_overrides(
     *,
     adapter: ActionAdapter,
     base_overrides: ActionMaskOverrides | None,
-    stage_overrides: tuple[ActionMaskOverrides | None, ...],
 ) -> None:
     """Reject mask branches that the active action adapter cannot consume."""
 
@@ -75,12 +32,6 @@ def validate_configured_overrides(
         valid_labels=valid_labels,
         source_label="env.action.mask",
     )
-    for stage_index, overrides in enumerate(stage_overrides):
-        _validate_override_branches(
-            overrides=overrides,
-            valid_labels=valid_labels,
-            source_label=f"curriculum.stages[{stage_index}].action_mask",
-        )
 
 
 def _validate_override_branches(

@@ -161,7 +161,6 @@ def build_manager_training_callback(
                     None if engine_tuning_state_provider is None else engine_tuning_state_provider()
                 ),
                 policy_metadata=current_policy_artifact_metadata(
-                    self.training_env,
                     self.model,
                     lineage_step_offset=lineage_step_offset,
                 ),

@@ -42,7 +42,6 @@ class RollingArtifactCallback(BaseCallback):
             policy_path=self._run_paths.latest_policy_path,
             engine_tuning_state=self._engine_tuning_state(),
             policy_metadata=current_policy_artifact_metadata(
-                self.training_env,
                 self.model,
                 lineage_step_offset=self._lineage_step_offset,
             ),
@@ -58,7 +57,6 @@ class RollingArtifactCallback(BaseCallback):
             engine_tuning_state=self._engine_tuning_state(),
             num_timesteps=num_timesteps,
             policy_metadata=current_policy_artifact_metadata(
-                self.training_env,
                 self.model,
                 lineage_step_offset=self._lineage_step_offset,
             ),
@@ -84,7 +82,6 @@ class RollingArtifactCallback(BaseCallback):
             policy_path=self._run_paths.best_policy_path,
             engine_tuning_state=self._engine_tuning_state(),
             policy_metadata=current_policy_artifact_metadata(
-                self.training_env,
                 self.model,
                 lineage_step_offset=self._lineage_step_offset,
             ),

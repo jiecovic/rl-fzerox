@@ -21,7 +21,7 @@ from rl_fzerox.core.runtime_spec.schema.actions import ActionRuntimeConfig
 
 from ..controls import ActionMaskController, ControlStateTracker, sync_dynamic_action_masks
 from ..controls.lean import lean_index_from_control, signed_lean
-from ..info import backend_step_info, set_curriculum_info, telemetry_info
+from ..info import backend_step_info, telemetry_info
 from ..observation import EngineObservationBuilder
 from ..reset import SelectedTrack
 from .result import WatchEnvStep
@@ -47,8 +47,6 @@ class EnvStepRequest:
     episode_return: float
     episode_boost_pad_entries: int
     episode_airborne_frames: int
-    curriculum_stage_index: int | None
-    curriculum_stage_name: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,11 +233,6 @@ class EngineStepAssembler:
         info["progress_frontier_stalled_frames"] = status.progress_frontier_stalled_frames
         info["termination_reason"] = status.termination_reason
         info["truncation_reason"] = status.truncation_reason
-        set_curriculum_info(
-            info,
-            stage_index=request.curriculum_stage_index,
-            stage_name=request.curriculum_stage_name,
-        )
         if telemetry is not None:
             # Keep env info pickle-safe for SubprocVecEnv workers.
             info.update(telemetry_info(telemetry))

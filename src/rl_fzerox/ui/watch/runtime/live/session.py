@@ -19,10 +19,7 @@ from rl_fzerox.core.training.session.artifacts import (
     load_engine_tuning_checkpoint_state,
 )
 from rl_fzerox.ui.watch.runtime.observation import configured_watch_zeroed_features
-from rl_fzerox.ui.watch.runtime.policy.runner import (
-    _load_policy_runner,
-    _sync_policy_curriculum_stage,
-)
+from rl_fzerox.ui.watch.runtime.policy.runner import _load_policy_runner
 from rl_fzerox.ui.watch.runtime.timing import _resolve_control_fps, _target_seconds
 
 if TYPE_CHECKING:
@@ -63,7 +60,6 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
         backend=emulator,
         config=config.env,
         reward_config=config.reward,
-        curriculum_config=config.curriculum,
     )
     env.set_sequential_track_sampling(True)
     env.set_engine_tuning_selection("greedy" if config.watch.deterministic_policy else "sample")
@@ -75,7 +71,6 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
         device=config.watch.device,
         algorithm=config.watch.policy_algorithm,
     )
-    _sync_policy_curriculum_stage(policy_runner, env)
 
     native_control_fps = env.backend.native_fps / config.env.action_repeat
     target_control_fps = _resolve_control_fps(

@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
@@ -61,7 +60,6 @@ def _full_model_resume_config(tmp_path: Path, *, total_timesteps: int) -> TrainA
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
         env=EnvConfig(),
         policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
         train=TrainConfig(
             continue_run_dir=run_dir,
             resume_run_dir=run_dir,
@@ -83,7 +81,6 @@ def _stub_run_training_dependencies(
     monkeypatch.setattr(runner, "build_training_env", lambda *_, **__: env)
     monkeypatch.setattr(runner, "build_training_model", lambda **_: model)
     monkeypatch.setattr(runner, "maybe_resume_training_model", lambda **_: model)
-    monkeypatch.setattr(runner, "_resume_curriculum_stage_index", lambda _: None)
     monkeypatch.setattr(runner, "build_callbacks", lambda **_: object())
     monkeypatch.setattr(runner, "build_tensorboard_logger", lambda *_, **__: object())
     monkeypatch.setattr(runner, "print_training_startup", lambda **_: None)

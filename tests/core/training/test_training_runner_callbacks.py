@@ -1,7 +1,6 @@
 # tests/core/training/test_training_runner_callbacks.py
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -11,22 +10,18 @@ from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     ActionMaskConfig,
-    CurriculumConfig,
-    EmulatorConfig,
     EnvConfig,
     PolicyConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
-    TrainAppConfig,
     TrainConfig,
 )
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training import runner
-from rl_fzerox.core.training.runs import RUN_LAYOUT, build_run_paths, ensure_run_dirs
+from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
     load_policy_artifact_metadata,
-    policy_artifact_metadata_path,
 )
 from rl_fzerox.core.training.session.callbacks import (
     RolloutInfoAccumulator,
@@ -242,7 +237,6 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
     ensure_run_dirs(run_paths)
     callbacks = build_callbacks(
         train_config=TrainConfig(save_freq=1_000, num_envs=1),
-        curriculum_config=CurriculumConfig(),
         run_paths=run_paths,
     )
     env = DummyVecEnv(
@@ -276,70 +270,8 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
     assert run_paths.latest_model_path.is_file()
     assert run_paths.latest_policy_path.is_file()
     assert load_policy_artifact_metadata(run_paths.latest_policy_path) == PolicyArtifactMetadata(
-        curriculum_stage_index=None,
-        curriculum_stage_name=None,
         num_timesteps=0,
     )
-
-
-def test_resume_curriculum_stage_index_reads_full_model_artifact_metadata(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-    latest_policy_path = run_dir / RUN_LAYOUT.policy_artifacts.latest
-    latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
-    latest_policy_path.write_bytes(b"policy")
-    policy_artifact_metadata_path(latest_policy_path).write_text(
-        json.dumps(
-            {
-                "curriculum_stage_index": 2,
-                "curriculum_stage_name": "finetune",
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    config = TrainAppConfig(
-        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(),
-        policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
-        train=TrainConfig(
-            resume_run_dir=run_dir,
-            resume_artifact="latest",
-            resume_mode="full_model",
-        ),
-    )
-
-    assert runner._resume_curriculum_stage_index(config) == 2
-
-
-def test_weights_only_resume_does_not_restore_curriculum_stage(tmp_path: Path) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-
-    config = TrainAppConfig(
-        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(),
-        policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
-        train=TrainConfig(
-            resume_run_dir=run_dir,
-            resume_artifact="latest",
-            resume_mode="weights_only",
-        ),
-    )
-
-    assert runner._resume_curriculum_stage_index(config) is None
 
 
 def test_learn_total_timesteps_uses_full_target_when_resetting_counter() -> None:

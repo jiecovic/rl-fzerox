@@ -250,7 +250,6 @@ def test_policy_drive_begin_uses_training_observation_pipeline(tmp_path: Path) -
         backend=SyntheticBackend(),
         config=train_config.env,
         reward_config=train_config.reward,
-        curriculum_config=train_config.curriculum,
     )
     policy_runtime = PolicyDriveRuntime(
         emulator=ScriptedPolicyDriveBackend([]),

@@ -18,15 +18,11 @@ from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     CareerModeRaceSetupConfig,
-    CurriculumConfig,
-    CurriculumStageConfig,
     EmulatorConfig,
     EnvConfig,
     ObservationConfig,
     ObservationStateComponentConfig,
     StateFeatureDropoutGroupConfig,
-    TrackRecordEntryConfig,
-    TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
     TrainConfig,
@@ -854,81 +850,6 @@ def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -
     assert info["track_id"] == "mute_city"
     assert info["track_course_key"] == "course:0"
     assert info["track_display_name"] == "Mute City Time Attack - Blue Falcon Engine 50"
-
-
-def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    mute_baseline_path = tmp_path / "mute.state"
-    port_baseline_path = tmp_path / "port.state"
-    white_land_baseline_path = tmp_path / "white_land.state"
-    core_path.touch()
-    rom_path.touch()
-    mute_baseline_path.write_bytes(b"mute")
-    port_baseline_path.write_bytes(b"port")
-    white_land_baseline_path.write_bytes(b"white")
-    config = WatchAppConfig(
-        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(
-            track_sampling=TrackSamplingConfig(
-                enabled=True,
-                entries=(
-                    TrackSamplingEntryConfig(
-                        id="mute_city",
-                        display_name="Mute City Time Attack - Blue Falcon Engine 50",
-                        baseline_state_path=mute_baseline_path,
-                        course_index=0,
-                    ),
-                ),
-            )
-        ),
-        curriculum=CurriculumConfig(
-            enabled=True,
-            stages=(
-                CurriculumStageConfig(name="jack"),
-                CurriculumStageConfig(
-                    name="queen_seed",
-                    track_sampling=TrackSamplingConfig(
-                        enabled=True,
-                        entries=(
-                            TrackSamplingEntryConfig(
-                                id="port_town",
-                                display_name="Port Town Time Attack - Blue Falcon Engine 50",
-                                baseline_state_path=port_baseline_path,
-                                course_index=7,
-                                records=TrackRecordsConfig(
-                                    non_agg_best=TrackRecordEntryConfig(time_ms=73_000),
-                                ),
-                            ),
-                            TrackSamplingEntryConfig(
-                                id="white_land",
-                                display_name="White Land Time Attack - Blue Falcon Engine 50",
-                                baseline_state_path=white_land_baseline_path,
-                                course_index=8,
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    )
-    info: dict[str, object] = {"course_index": 7, "curriculum_stage": 1}
-
-    _add_config_track_info(info, config)
-
-    assert [record["track_entry_id"] for record in _track_pool_records(config, info)] == [
-        "port_town",
-        "white_land",
-    ]
-    assert [record["track_course_key"] for record in _track_pool_records(config, info)] == [
-        "course:7",
-        "course:8",
-    ]
-    assert info["track_entry_id"] == "port_town"
-    assert info["track_id"] == "port_town"
-    assert info["track_course_key"] == "course:7"
-    assert info["track_display_name"] == "Port Town Time Attack - Blue Falcon Engine 50"
-    assert info["track_non_agg_best_time_ms"] == 73_000
 
 
 def test_track_sampling_records_prefer_refreshed_watch_snapshot_state(tmp_path: Path) -> None:

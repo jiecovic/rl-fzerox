@@ -16,7 +16,6 @@ from typing import Literal
 
 from rl_fzerox.core.evaluation.artifacts import write_evaluation_result_files
 from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
-from rl_fzerox.core.evaluation.env_control import sync_checkpoint_curriculum_stage
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.models import (
     EvaluationAttemptResult,
@@ -209,7 +208,6 @@ def _initialize_parallel_evaluation_worker(
         env_index=0,
         runtime_dir=runtime_root / f"eval_worker_{os.getpid()}",
     )
-    sync_checkpoint_curriculum_stage(env, policy_runner.checkpoint_curriculum_stage_index)
     configure_evaluation_engine_tuning(
         env,
         config,

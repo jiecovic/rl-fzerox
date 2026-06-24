@@ -10,7 +10,7 @@ from rl_fzerox.core.envs.engine.reset.track_sampling import (
     TrackSamplingDeficitLane,
     TrackSamplingQueuedReset,
 )
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
 from rl_fzerox.core.training.session.callbacks.track_sampling.courses import (
     ResolvedTrackSamplingCourses,
     resolve_track_sampling_courses_from_configs,
@@ -111,12 +111,11 @@ class DeficitBudgetTrackSamplingController:
         cls,
         *,
         env_config: EnvConfig,
-        curriculum_config: CurriculumConfig,
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> DeficitBudgetTrackSamplingController | None:
         configs = tuple(
             config
-            for config in runtime_track_sampling_configs(env_config, curriculum_config)
+            for config in runtime_track_sampling_configs(env_config)
             if config.sampling_mode == "deficit_budget"
         )
         if not configs:

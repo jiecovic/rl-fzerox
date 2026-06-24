@@ -48,8 +48,6 @@ class LoadedPolicy:
     artifact: str
     device: str = "cpu"
     algorithm: str | None = None
-    curriculum_stage_index: int | None = None
-    curriculum_stage_name: str | None = None
     num_timesteps: int | None = None
     lineage_num_timesteps: int | None = None
 
@@ -104,18 +102,6 @@ class PolicyRunner:
         """Return the last hot-reload failure, even if a later reload succeeded."""
 
         return self._last_reload_error
-
-    @property
-    def checkpoint_curriculum_stage(self) -> str | None:
-        """Return the curriculum stage saved with the current checkpoint, if any."""
-
-        return self._loaded_policy.curriculum_stage_name
-
-    @property
-    def checkpoint_curriculum_stage_index(self) -> int | None:
-        """Return the curriculum stage index saved with the current checkpoint, if any."""
-
-        return self._loaded_policy.curriculum_stage_index
 
     @property
     def checkpoint_num_timesteps(self) -> int | None:

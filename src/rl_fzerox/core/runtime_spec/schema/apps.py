@@ -15,7 +15,6 @@ from pydantic import (
 
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema.common import WatchFpsSetting
-from rl_fzerox.core.runtime_spec.schema.curriculum import CurriculumConfig
 from rl_fzerox.core.runtime_spec.schema.env import EmulatorConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.runtime_spec.schema.policy import PolicyConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackConfig
@@ -114,7 +113,6 @@ class WatchAppConfig(BaseModel):
     env: EnvConfig = Field(default_factory=EnvConfig)
     reward: RewardConfig = Field(default_factory=RewardConfig)
     policy: PolicyConfig | None = None
-    curriculum: CurriculumConfig = Field(default_factory=CurriculumConfig)
     train: TrainConfig | None = None
     watch: WatchConfig = Field(default_factory=WatchConfig)
 
@@ -130,7 +128,6 @@ class TrainAppConfig(BaseModel):
     env: EnvConfig = Field(default_factory=EnvConfig)
     reward: RewardConfig = Field(default_factory=RewardConfig)
     policy: PolicyConfig = Field(default_factory=PolicyConfig)
-    curriculum: CurriculumConfig = Field(default_factory=CurriculumConfig)
     train: TrainConfig = Field(default_factory=TrainConfig)
 
     @model_validator(mode="after")

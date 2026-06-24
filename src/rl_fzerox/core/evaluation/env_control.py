@@ -32,12 +32,6 @@ def set_engine_tuning_selection(env: object, selection: EngineTuningSelectionMod
     _env_control_method(env, "set_engine_tuning_selection")(selection)
 
 
-def sync_checkpoint_curriculum_stage(env: object, stage_index: int | None) -> None:
-    """Apply checkpoint-stage action masks through transparent Gym wrappers."""
-
-    _env_control_method(env, "sync_checkpoint_curriculum_stage")(stage_index)
-
-
 def action_masks(env: object) -> ActionMask:
     """Return the action mask exposed by the wrapped F-Zero X env."""
 

@@ -6,9 +6,11 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 
+RuntimeInfo = Mapping[str, object] | Mapping[object, object]
+
 
 def bool_info(
-    info: Mapping[object, object],
+    info: RuntimeInfo,
     key: str,
     *,
     numeric: bool = False,
@@ -29,7 +31,7 @@ def bool_info(
 
 
 def optional_int_info(
-    info: Mapping[object, object],
+    info: RuntimeInfo,
     key: str,
     *,
     numeric_bool: bool = False,
@@ -51,7 +53,7 @@ def optional_int_info(
 
 
 def int_info(
-    info: Mapping[object, object],
+    info: RuntimeInfo,
     key: str,
     *,
     default: int = 0,
@@ -70,7 +72,7 @@ def int_info(
 
 
 def optional_float_info(
-    info: Mapping[object, object],
+    info: RuntimeInfo,
     key: str,
     *,
     numeric_bool: bool = False,
@@ -97,7 +99,7 @@ def optional_float_info(
 
 
 def float_info(
-    info: Mapping[object, object],
+    info: RuntimeInfo,
     key: str,
     *,
     default: float = 0.0,
@@ -118,7 +120,7 @@ def float_info(
 
 
 def str_info(
-    info: Mapping[object, object],
+    info: RuntimeInfo,
     key: str,
     *,
     default: str = "",
@@ -129,7 +131,7 @@ def str_info(
 
 
 def optional_str_info(
-    info: Mapping[object, object],
+    info: RuntimeInfo,
     key: str,
     *,
     strip: bool = False,

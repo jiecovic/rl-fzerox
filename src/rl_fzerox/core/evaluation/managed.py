@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Literal
 
 from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
-from rl_fzerox.core.evaluation.env_control import sync_checkpoint_curriculum_stage
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.managed_parallel import run_parallel_managed_evaluation
 from rl_fzerox.core.evaluation.models import (
@@ -26,11 +25,7 @@ from rl_fzerox.core.evaluation.targets import single_course_targets_from_config
 from rl_fzerox.core.manager.models import ManagedEvaluation
 from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.inference import inference_train_app_config
-from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
-    CurriculumStageConfig,
-    TrainAppConfig,
-)
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.training.inference import load_policy_runner
 from rl_fzerox.core.training.runs import (
     RUN_LAYOUT,
@@ -100,7 +95,6 @@ def run_managed_evaluation(
         runtime_dir=run_paths.env_runtime_dir(0),
     )
     try:
-        sync_checkpoint_curriculum_stage(env, policy_runner.checkpoint_curriculum_stage_index)
         configure_evaluation_engine_tuning(
             env,
             runtime_config,
@@ -232,12 +226,9 @@ def _materialized_baselines_are_ready(config: TrainAppConfig) -> bool:
 def _evaluation_materializer_input(config: TrainAppConfig, *, seed: int) -> TrainAppConfig:
     """Return a materializer input whose reset pool is owned by the eval target.
 
-    Training configs may carry multiple GP baseline variants and curriculum
-    stages with their own track pools. Evaluation repeats are specified by the
-    evaluation preset, so variants must not multiply the target count. Curriculum
-    action-mask stages are still preserved for checkpoint-stage inference, but
-    their track-sampling overrides are removed so the explicit eval target pool
-    remains the single reset source.
+    Training configs may carry multiple GP baseline variants. Evaluation repeats
+    are specified by the evaluation preset, so variants must not multiply the
+    target count.
     """
 
     track_sampling = config.env.track_sampling.model_copy(update={"baseline_variant_count": 1})
@@ -245,22 +236,5 @@ def _evaluation_materializer_input(config: TrainAppConfig, *, seed: int) -> Trai
         update={
             "seed": seed,
             "env": config.env.model_copy(update={"track_sampling": track_sampling}),
-            "curriculum": _curriculum_without_track_sampling(config.curriculum),
         }
     )
-
-
-def _curriculum_without_track_sampling(config: CurriculumConfig) -> CurriculumConfig:
-    if not config.enabled or not config.stages:
-        return config
-    stages: list[CurriculumStageConfig] = []
-    changed = False
-    for stage in config.stages:
-        if stage.track_sampling is None:
-            stages.append(stage)
-            continue
-        changed = True
-        stages.append(stage.model_copy(update={"track_sampling": None}))
-    if not changed:
-        return config
-    return config.model_copy(update={"stages": tuple(stages)})

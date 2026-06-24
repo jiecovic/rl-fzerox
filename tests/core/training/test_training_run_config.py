@@ -303,7 +303,6 @@ def test_materialize_train_run_config_does_not_copy_init_run_baseline(
                 "env: {}",
                 "reward: {}",
                 "policy: {}",
-                "curriculum: {}",
                 "train:",
                 "  algorithm: maskable_hybrid_action_ppo",
             ]

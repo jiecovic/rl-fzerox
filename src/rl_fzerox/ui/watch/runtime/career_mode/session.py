@@ -113,9 +113,6 @@ class CareerModeRuntimeSession:
             capture_audio=capture_audio,
         )
 
-    def sync_policy_curriculum_stage(self, stage_index: int | None) -> None:
-        self._require_policy_race().sync_curriculum_stage(stage_index)
-
     def menu_info(self) -> dict[str, object]:
         telemetry = self.emulator.try_read_telemetry()
         info = backend_step_info(self.emulator)
@@ -137,7 +134,6 @@ class CareerModeRuntimeSession:
                 "env": train_config.env,
                 "reward": train_config.reward,
                 "policy": train_config.policy,
-                "curriculum": train_config.curriculum,
                 "train": train_config.train,
                 "watch": base_config.watch.model_copy(
                     update={

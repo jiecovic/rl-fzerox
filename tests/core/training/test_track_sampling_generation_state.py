@@ -7,7 +7,6 @@ from rl_fzerox.apps.run_manager.api.payloads.track_sampling import (
 )
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EnvConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
@@ -55,7 +54,6 @@ def test_step_balance_runtime_state_exposes_generated_x_cup_generation() -> None
                 ),
             ),
         ),
-        curriculum_config=CurriculumConfig(),
     )
 
     assert controller is not None
@@ -100,7 +98,6 @@ def test_deficit_budget_runtime_state_tracks_generated_x_cup_generation_stats() 
                 ),
             ),
         ),
-        curriculum_config=CurriculumConfig(),
     )
 
     assert controller is not None

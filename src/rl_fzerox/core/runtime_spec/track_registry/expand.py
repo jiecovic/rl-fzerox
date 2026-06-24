@@ -23,25 +23,10 @@ def expand_track_registry_metadata(
 
     expand_track_course_metadata(nested_mapping(config_data, "track"), config_root)
     env_track_sampling = nested_mapping(config_data, "env", "track_sampling")
-    default_baseline_spec = (
-        None if env_track_sampling is None else env_track_sampling.get(REGISTRY.keys.baseline)
-    )
     expand_track_sampling_section(
         env_track_sampling,
         config_root,
     )
-
-    curriculum = nested_mapping(config_data, "curriculum")
-    stages = curriculum.get("stages") if curriculum is not None else None
-    if not isinstance(stages, list | tuple):
-        return
-    for stage in stages:
-        if isinstance(stage, dict):
-            expand_track_sampling_section(
-                nested_mapping(stage, "track_sampling"),
-                config_root,
-                default_baseline_spec=default_baseline_spec,
-            )
 
 
 def expand_track_sampling_section(

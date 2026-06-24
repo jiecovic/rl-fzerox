@@ -10,7 +10,6 @@ from gymnasium import spaces
 
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EmulatorConfig,
     EnvConfig,
     ObservationConfig,
@@ -99,7 +98,6 @@ def test_training_requires_action_masks_for_current_supported_algorithms(
                 emulator=emulator,
                 env=hybrid_env,
                 policy=PolicyConfig(),
-                curriculum=CurriculumConfig(),
                 train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
             )
         )
@@ -111,7 +109,6 @@ def test_training_requires_action_masks_for_current_supported_algorithms(
                 emulator=emulator,
                 env=hybrid_env,
                 policy=PolicyConfig(),
-                curriculum=CurriculumConfig(),
                 train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
             )
         )
@@ -123,7 +120,6 @@ def test_training_requires_action_masks_for_current_supported_algorithms(
                 emulator=emulator,
                 env=hybrid_env,
                 policy=PolicyConfig(recurrent=PolicyRecurrentConfig(enabled=True)),
-                curriculum=CurriculumConfig(),
                 train=TrainConfig(algorithm="maskable_hybrid_recurrent_ppo"),
             )
         )
@@ -135,7 +131,6 @@ def test_training_requires_action_masks_for_current_supported_algorithms(
                 emulator=emulator,
                 env=discrete_only_hybrid_env,
                 policy=PolicyConfig(),
-                curriculum=CurriculumConfig(),
                 train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
             )
         )
@@ -155,7 +150,6 @@ def test_resolve_effective_training_algorithm_returns_configured_algorithm(
             )
         ),
         policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
     )
 
@@ -171,7 +165,6 @@ def test_validate_training_algorithm_config_rejects_hybrid_ppo_without_hybrid_ac
         emulator=_emulator_config(tmp_path),
         env=EnvConfig(action=configured_discrete_action("steer", "gas", "boost", "lean")),
         policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
     )
 

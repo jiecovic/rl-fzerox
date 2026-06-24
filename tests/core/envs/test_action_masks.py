@@ -6,9 +6,6 @@ from fzerox_emulator.arrays import Float32Array, Int64Array
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
-    CurriculumConfig,
-    CurriculumStageConfig,
-    CurriculumTriggerConfig,
     EnvConfig,
     RewardConfig,
 )
@@ -91,86 +88,6 @@ def test_env_action_masks_reject_base_mask_branch_missing_from_adapter() -> None
                 )
             ),
         )
-
-
-def test_env_action_masks_update_with_curriculum_stage_changes() -> None:
-    env = FZeroXEnv(
-        backend=SyntheticBackend(),
-        config=EnvConfig(
-            action=configured_discrete_action(
-                "steer",
-                "gas",
-                "boost",
-                "lean",
-                mask=ActionMaskConfig(lean=(0,)),
-            )
-        ),
-        curriculum_config=CurriculumConfig(
-            enabled=True,
-            stages=(
-                CurriculumStageConfig(
-                    name="basic_drive",
-                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
-                    action_mask=ActionMaskConfig(lean=(0,)),
-                ),
-                CurriculumStageConfig(
-                    name="full_controls",
-                    action_mask=ActionMaskConfig(lean=(0, 1, 2)),
-                ),
-            ),
-        ),
-    )
-
-    assert env.action_masks().tolist() == (
-        ([True] * 7) + ([True] * 2) + ([True] * 2) + [True, False, False]
-    )
-
-    env.set_curriculum_stage(1)
-
-    assert env.action_masks().tolist() == ([True] * (7 + 2 + 2 + 3))
-
-
-def test_hybrid_curriculum_stage_can_speed_gate_lean_temporarily() -> None:
-    backend = ScriptedStepBackend(
-        [],
-        reset_telemetry=_telemetry(
-            race_distance=0.0,
-            state_labels=("active", "can_boost"),
-            speed_kph=800.0,
-        ),
-    )
-    env = FZeroXEnv(
-        backend=backend,
-        config=EnvConfig(
-            action=configured_hybrid_action(
-                continuous_axes=("steer", "drive"),
-                discrete_axes=("boost", "lean"),
-            )
-        ),
-        curriculum_config=CurriculumConfig(
-            enabled=True,
-            stages=(
-                CurriculumStageConfig(
-                    name="high_speed_lean",
-                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=1.0),
-                    action_mask=ActionMaskConfig(boost=(0,), lean=(0, 1, 2)),
-                    lean_unmask_min_speed_kph=900.0,
-                ),
-                CurriculumStageConfig(
-                    name="full_controls",
-                    action_mask=ActionMaskConfig(boost=(0, 1), lean=(0, 1, 2)),
-                ),
-            ),
-        ),
-    )
-
-    env.reset(seed=1)
-
-    assert env.action_masks().tolist() == [True, False, True, False, False]
-
-    env.set_curriculum_stage(1)
-
-    assert env.action_masks().tolist() == [True, True, True, True, True]
 
 
 def test_hybrid_env_action_masks_disable_lean_for_initial_episode_frames() -> None:
@@ -1059,37 +976,3 @@ def test_env_action_masks_lock_boost_after_manual_request() -> None:
 
     env.step(_discrete_gas_boost_action())
     assert env.action_masks().tolist() == ([True] * (7 + 2 + 2))
-
-
-def test_env_action_masks_intersect_curriculum_and_boost_unlock_rules() -> None:
-    env = FZeroXEnv(
-        backend=ScriptedStepBackend(
-            [],
-            reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
-        ),
-        config=EnvConfig(
-            action=configured_discrete_action(
-                "steer",
-                "gas",
-                "boost",
-                "lean",
-                mask=ActionMaskConfig(lean=(0,)),
-            )
-        ),
-        curriculum_config=CurriculumConfig(
-            enabled=True,
-            stages=(
-                CurriculumStageConfig(
-                    name="basic_drive",
-                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
-                    action_mask=ActionMaskConfig(lean=(0,)),
-                ),
-            ),
-        ),
-    )
-
-    env.reset(seed=2)
-
-    assert env.action_masks().tolist() == (
-        ([True] * 7) + ([True] * 2) + [True, False] + [True, False, False]
-    )

@@ -58,7 +58,6 @@ from rl_fzerox.ui.watch.runtime.policy.runner import (
     _persist_reload_error,
     _policy_reload_error,
     _reset_policy_runner,
-    _sync_policy_curriculum_stage,
 )
 from rl_fzerox.ui.watch.runtime.policy.visualization import (
     current_auxiliary_predictions as _current_auxiliary_predictions,
@@ -491,7 +490,7 @@ def _run_simulation_loop(
                     cnn_activations = None
                 else:
                     assert policy_runner is not None
-                    _sync_policy_curriculum_stage(policy_runner, env)
+                    policy_runner.refresh_if_due(interval_seconds=10.0)
                     decision_action_mask = env.action_mask_snapshot()
                     policy_action_mask = (
                         decision_action_mask if policy_runner.supports_action_masks else None

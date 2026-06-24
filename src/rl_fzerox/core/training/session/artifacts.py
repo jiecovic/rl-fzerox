@@ -24,8 +24,6 @@ POLICY_METADATA_SUFFIX = ".metadata.json"
 class PolicyArtifactMetadata:
     """Small sidecar metadata persisted next to one saved policy artifact."""
 
-    curriculum_stage_index: int | None
-    curriculum_stage_name: str | None
     num_timesteps: int | None
     lineage_num_timesteps: int | None = None
 
@@ -36,10 +34,6 @@ class SaveArtifactFn(Protocol):
 
 class ModelSaveable(Protocol):
     def save(self, path: str) -> object: ...
-
-
-class TrainingEnvAttrReader(Protocol):
-    def get_attr(self, attr_name: str) -> list[object]: ...
 
 
 def resolve_train_run_config(
@@ -83,12 +77,6 @@ def _configured_baseline_state_paths(config: TrainAppConfig) -> tuple[Path, ...]
     for entry in config.env.track_sampling.entries:
         if entry.baseline_state_path is not None:
             paths.append(entry.baseline_state_path)
-    for stage in config.curriculum.stages:
-        if stage.track_sampling is None:
-            continue
-        for entry in stage.track_sampling.entries:
-            if entry.baseline_state_path is not None:
-                paths.append(entry.baseline_state_path)
     return tuple(dict.fromkeys(paths))
 
 
@@ -178,8 +166,6 @@ def load_policy_artifact_metadata(policy_path: Path) -> PolicyArtifactMetadata |
     if not isinstance(data, dict):
         return None
     return PolicyArtifactMetadata(
-        curriculum_stage_index=_coerce_optional_int(data.get("curriculum_stage_index")),
-        curriculum_stage_name=_coerce_optional_str(data.get("curriculum_stage_name")),
         num_timesteps=_coerce_optional_int(data.get("num_timesteps")),
         lineage_num_timesteps=_coerce_optional_int(data.get("lineage_num_timesteps")),
     )
@@ -197,34 +183,20 @@ def load_engine_tuning_checkpoint_state(
 
 
 def current_policy_artifact_metadata(
-    train_env: TrainingEnvAttrReader,
     model: object,
     *,
     lineage_step_offset: int = 0,
 ) -> PolicyArtifactMetadata:
-    """Read the currently active curriculum stage from the vector env."""
+    """Return checkpoint metadata derived from the current training model."""
 
     num_timesteps = _current_num_timesteps(model)
     lineage_num_timesteps = None
     if num_timesteps is not None and lineage_step_offset > 0:
         lineage_num_timesteps = int(lineage_step_offset) + num_timesteps
     return PolicyArtifactMetadata(
-        curriculum_stage_index=_coerce_optional_int(
-            _first_env_attr(train_env, "curriculum_stage_index")
-        ),
-        curriculum_stage_name=_coerce_optional_str(
-            _first_env_attr(train_env, "curriculum_stage_name")
-        ),
         num_timesteps=num_timesteps,
         lineage_num_timesteps=lineage_num_timesteps,
     )
-
-
-def _first_env_attr(train_env: TrainingEnvAttrReader, attr_name: str) -> object | None:
-    values = train_env.get_attr(attr_name)
-    if not values:
-        return None
-    return values[0]
 
 
 def policy_artifact_metadata_path(policy_path: Path) -> Path:
@@ -278,10 +250,6 @@ def _atomic_write_json(target_path: Path, data: dict[str, object]) -> None:
 
 def _coerce_optional_int(value: object) -> int | None:
     return value if isinstance(value, int) else None
-
-
-def _coerce_optional_str(value: object) -> str | None:
-    return value if isinstance(value, str) else None
 
 
 def _current_num_timesteps(model: object) -> int | None:

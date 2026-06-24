@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     ActionMaskConfig,
-    CurriculumConfig,
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
@@ -64,7 +63,6 @@ def test_train_config_rejects_plain_ppo_algorithm(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
             env=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             policy=PolicyConfig(),
-            curriculum=CurriculumConfig(),
             train=TrainConfig.model_validate({"algorithm": "ppo"}),
         )
 
@@ -87,7 +85,6 @@ def test_train_app_config_rejects_recurrent_policy_without_recurrent_algorithm(
             policy=PolicyConfig(
                 recurrent=PolicyRecurrentConfig(enabled=True),
             ),
-            curriculum=CurriculumConfig(),
             train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
         )
 
@@ -110,6 +107,5 @@ def test_train_app_config_rejects_recurrent_algorithm_without_recurrent_policy(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
             env=EnvConfig(),
             policy=PolicyConfig(),
-            curriculum=CurriculumConfig(),
             train=TrainConfig(algorithm="maskable_hybrid_recurrent_ppo"),
         )

@@ -21,7 +21,7 @@ from rl_fzerox.core.envs.engine.controls import (
     sync_dynamic_action_masks,
 )
 from rl_fzerox.core.envs.engine.controls.episode_dropout import sample_episode_action_masks
-from rl_fzerox.core.envs.engine.info import backend_step_info, set_curriculum_info, telemetry_info
+from rl_fzerox.core.envs.engine.info import backend_step_info, telemetry_info
 from rl_fzerox.core.envs.engine.reset import EngineResetSeeds
 from rl_fzerox.core.envs.engine.stepping import (
     EnvStepRequest,
@@ -55,7 +55,6 @@ class PolicyDriveRuntime:
             backend=emulator,
             config=self._config,
             reward_config=train_config.reward,
-            curriculum_config=train_config.curriculum,
         )
         self._renderer = components.renderer
         self._action_config = components.action_config
@@ -132,11 +131,6 @@ class PolicyDriveRuntime:
 
         info = backend_step_info(self._backend)
         info["seed"] = seed
-        set_curriculum_info(
-            info,
-            stage_index=self._mask_controller.stage_index,
-            stage_name=self._mask_controller.stage_name,
-        )
         if telemetry is not None:
             info.update(telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
@@ -203,9 +197,6 @@ class PolicyDriveRuntime:
 
     def action_mask_snapshot(self) -> ActionMaskSnapshot:
         return self._mask_controller.action_mask_snapshot()
-
-    def sync_curriculum_stage(self, stage_index: int | None) -> None:
-        self._mask_controller.sync_checkpoint_stage(stage_index)
 
     def _step_control_state(
         self,
@@ -274,8 +265,6 @@ class PolicyDriveRuntime:
                 episode_return=self._episode.return_value,
                 episode_boost_pad_entries=self._episode.boost_pad_entries,
                 episode_airborne_frames=self._episode.airborne_frames,
-                curriculum_stage_index=self._mask_controller.stage_index,
-                curriculum_stage_name=self._mask_controller.stage_name,
             )
         )
         self._episode.record_step(

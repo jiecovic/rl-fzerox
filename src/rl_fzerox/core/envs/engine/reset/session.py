@@ -12,7 +12,6 @@ from rl_fzerox.core.engine_tuning import (
     EngineTuningSelectionMode,
 )
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EnvConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
@@ -52,15 +51,14 @@ class EngineResetCoordinator:
         *,
         backend: EmulatorBackend,
         config: EnvConfig,
-        curriculum_config: CurriculumConfig | None,
         env_index: int,
     ) -> None:
         self._backend = backend
         self._config = config
-        self._curriculum_config = curriculum_config
-        self._stage_index: int | None = None
         self._track_sampling_weight_overrides: dict[str, float] = {}
-        self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
+        self._active_track_sampling = self._track_sampling_with_weight_overrides(
+            self._config.track_sampling
+        )
         self._locked_reset_course_id: str | None = None
         self._sequential_track_sampling = False
         self._queued_resets: list[TrackSamplingQueuedReset] = []
@@ -69,11 +67,6 @@ class EngineResetCoordinator:
         self._reset_seeds = EngineResetSeeds()
         self._engine_tuning_sampler: EngineTuningResetSampler | None = None
         self._engine_tuning_selection: EngineTuningSelectionMode = "sample"
-
-    def set_curriculum_stage(self, stage_index: int | None) -> None:
-        self._stage_index = stage_index
-        self._active_track_sampling = self._stage_track_sampling_config(stage_index)
-        self._prune_baseline_cache_to_active_tracks()
 
     def set_track_sampling_weights(self, weights_by_track_id: dict[str, float]) -> None:
         """Update adaptive reset weights used by step-balanced track sampling."""
@@ -86,14 +79,18 @@ class EngineResetCoordinator:
             and math.isfinite(float(weight))
             and float(weight) >= 0.0
         }
-        self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
+        self._active_track_sampling = self._track_sampling_with_weight_overrides(
+            self._config.track_sampling
+        )
 
     def set_track_sampling_config(self, config: TrackSamplingConfig) -> None:
         """Replace the base track-sampling config used at future episode resets."""
 
         self._config = self._config.model_copy(update={"track_sampling": config})
         self._queued_resets.clear()
-        self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
+        self._active_track_sampling = self._track_sampling_with_weight_overrides(
+            self._config.track_sampling
+        )
         self._prune_baseline_cache_to_active_tracks()
 
     def set_engine_tuning_sampler(self, sampler: EngineTuningResetSampler | None) -> None:
@@ -222,18 +219,6 @@ class EngineResetCoordinator:
 
     def advance_reset_count(self) -> None:
         self._reset_seeds.advance_reset_count()
-
-    def _stage_track_sampling_config(self, stage_index: int | None) -> TrackSamplingConfig:
-        if (
-            self._curriculum_config is None
-            or not self._curriculum_config.enabled
-            or stage_index is None
-        ):
-            return self._track_sampling_with_weight_overrides(self._config.track_sampling)
-        stage = self._curriculum_config.stages[stage_index]
-        return self._track_sampling_with_weight_overrides(
-            stage.track_sampling or self._config.track_sampling
-        )
 
     def _track_sampling_with_weight_overrides(
         self,

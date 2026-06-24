@@ -17,7 +17,6 @@ from rl_fzerox.core.envs.engine.reset.track_sampling import TrackSamplingQueuedR
 from rl_fzerox.core.envs.gym_runtime import FZeroXEnvRuntime
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EnvConfig,
     RewardConfig,
     TrackSamplingConfig,
@@ -34,7 +33,6 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         backend: EmulatorBackend,
         config: EnvConfig,
         reward_config: RewardConfig | None = None,
-        curriculum_config: CurriculumConfig | None = None,
         env_index: int = 0,
     ) -> None:
         super().__init__()
@@ -42,7 +40,6 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
             backend=backend,
             config=config,
             reward_config=reward_config,
-            curriculum_config=curriculum_config,
             env_index=env_index,
         )
         self.backend = self._runtime.backend
@@ -102,16 +99,6 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         return self._runtime.action_dimensions
 
-    def set_curriculum_stage(self, stage_index: int) -> None:
-        """Switch the active curriculum stage used for action masking."""
-
-        self._runtime.set_curriculum_stage(stage_index)
-
-    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
-        """Align watch-time curriculum masks with saved checkpoint metadata."""
-
-        self._runtime.sync_checkpoint_curriculum_stage(stage_index)
-
     def set_track_sampling_weights(self, weights_by_track_id: dict[str, float]) -> None:
         """Update adaptive reset weights used by step-balanced track sampling."""
 
@@ -164,18 +151,6 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Align the next sequential watch reset to a specific configured course."""
 
         self._runtime.set_next_sequential_reset_course(course_id)
-
-    @property
-    def curriculum_stage_index(self) -> int | None:
-        """Return the active curriculum stage index, if any."""
-
-        return self._runtime.curriculum_stage_index
-
-    @property
-    def curriculum_stage_name(self) -> str | None:
-        """Return the active curriculum stage name, if any."""
-
-        return self._runtime.curriculum_stage_name
 
     def auxiliary_state_targets(self) -> StateVector:
         """Return the current hidden auxiliary-state target vector."""

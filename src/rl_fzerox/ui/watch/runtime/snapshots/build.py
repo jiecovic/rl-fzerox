@@ -27,7 +27,6 @@ from rl_fzerox.ui.watch.runtime.ipc import (
 )
 from rl_fzerox.ui.watch.runtime.policy.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.policy.runner import (
-    _policy_curriculum_stage,
     _policy_deterministic,
     _policy_experience_frames,
     _policy_label,
@@ -329,7 +328,6 @@ def _build_snapshot(
         ),
         policy_action=policy_action,
         policy_label=_policy_label(policy_runner),
-        policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
         policy_num_timesteps=_policy_num_timesteps(policy_runner),
         policy_experience_frames=_policy_experience_frames(
             policy_runner,

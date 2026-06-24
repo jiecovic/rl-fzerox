@@ -539,7 +539,6 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
             self.frames_written += 1
 
     class FakePolicyRunner:
-        checkpoint_curriculum_stage_index: int | None = None
         refresh_if_due_called = False
 
         def reset(self) -> None:
@@ -569,9 +568,6 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
         def reset(self, *, seed: int | None = None) -> tuple[object, dict[str, object]]:
             assert seed == 123
             return object(), {"episode_step": 0}
-
-        def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
-            assert stage_index is None
 
         def render(self) -> RgbFrame:
             return np.zeros((1, 1, 3), dtype=np.uint8)

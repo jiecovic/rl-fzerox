@@ -193,7 +193,6 @@ def _run_attempt(
 ) -> AttemptRunResult:
     observation, info = env.reset(seed=seed)
     policy_runner.reset()
-    env.sync_checkpoint_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
     episode_return = 0.0
     terminated = False
     truncated = False

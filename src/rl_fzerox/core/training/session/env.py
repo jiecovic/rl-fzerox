@@ -143,7 +143,6 @@ def _build_worker_env(
         backend=emulator,
         config=config.env,
         reward_config=config.reward,
-        curriculum_config=config.curriculum,
         env_index=env_index,
     )
     env = maybe_wrap_training_auxiliary_state_observation(

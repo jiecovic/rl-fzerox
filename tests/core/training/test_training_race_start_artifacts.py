@@ -7,8 +7,6 @@ from pathlib import Path
 from pytest import MonkeyPatch
 
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
-    CurriculumStageConfig,
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
@@ -290,63 +288,6 @@ def test_materialize_train_run_config_generates_vehicle_variant(
     assert [variant.character_index for variant in capture.variants] == [4]
     assert [variant.machine_select_slot for variant in capture.variants] == [4]
     assert [variant.engine_setting_raw_value for variant in capture.variants] == [64]
-
-
-def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
-    tmp_path: Path,
-    monkeypatch: MonkeyPatch,
-) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    core_path.touch()
-    rom_path.touch()
-    _patch_fake_boot_materializer(monkeypatch, payload=b"stage")
-
-    config = TrainAppConfig(
-        seed=123,
-        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(),
-        curriculum=CurriculumConfig(
-            enabled=True,
-            stages=(
-                CurriculumStageConfig(
-                    name="stage",
-                    track_sampling=TrackSamplingConfig(
-                        enabled=True,
-                        entries=(
-                            TrackSamplingEntryConfig(
-                                id="stage_track",
-                                course_index=0,
-                                mode="time_attack",
-                                vehicle="blue_falcon",
-                                engine_setting_raw_value=50,
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-        policy=PolicyConfig(),
-        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
-    )
-    run_paths = build_run_paths(
-        output_root=config.train.output_root,
-        run_name=config.train.run_name,
-    )
-    ensure_run_dirs(run_paths)
-
-    materialized = materialize_train_run_config(
-        config,
-        run_paths=run_paths,
-        baseline_cache_root=tmp_path / "cache",
-    )
-
-    stage = materialized.curriculum.stages[0]
-    assert stage.track_sampling is not None
-    entry = stage.track_sampling.entries[0]
-    baseline_path = _required_baseline_path(entry)
-    assert baseline_path.parent == run_paths.baselines_dir
-    assert baseline_path.read_bytes() == b"stage"
 
 
 def test_cleanup_failed_run_preserves_explicit_run_dir_when_requested(tmp_path: Path) -> None:

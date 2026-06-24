@@ -84,7 +84,6 @@ class FrameRenderData:
     boost_lamp_level: float
     action_mask_branches: ActionMaskBranches
     policy_label: str | None
-    policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
     policy_experience_frames: int | None
     policy_deterministic: bool | None
@@ -373,7 +372,6 @@ def _draw_frame(
             boost_lamp_level=data.boost_lamp_level,
             action_mask_branches=data.action_mask_branches,
             policy_label=data.policy_label,
-            policy_curriculum_stage=data.policy_curriculum_stage,
             policy_num_timesteps=data.policy_num_timesteps,
             policy_experience_frames=data.policy_experience_frames,
             policy_deterministic=data.policy_deterministic,

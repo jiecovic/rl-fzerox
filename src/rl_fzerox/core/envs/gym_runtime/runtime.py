@@ -28,7 +28,6 @@ from rl_fzerox.core.policy.auxiliary_state.targets import (
 )
 from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EnvConfig,
     RewardConfig,
     TrackSamplingConfig,
@@ -49,7 +48,6 @@ class FZeroXEnvRuntime:
         backend: EmulatorBackend,
         config: EnvConfig,
         reward_config: RewardConfig | None = None,
-        curriculum_config: CurriculumConfig | None = None,
         env_index: int = 0,
     ) -> None:
         self.backend = backend
@@ -58,7 +56,6 @@ class FZeroXEnvRuntime:
             backend=backend,
             config=config,
             reward_config=reward_config,
-            curriculum_config=curriculum_config,
         )
         components = self._components
         self._renderer: RendererName = components.renderer
@@ -66,10 +63,8 @@ class FZeroXEnvRuntime:
         self._reset_coordinator = EngineResetCoordinator(
             backend=backend,
             config=config,
-            curriculum_config=curriculum_config,
             env_index=env_index,
         )
-        self._reset_coordinator.set_curriculum_stage(self._mask_controller.stage_index)
         self._step_runtime = GymStepRuntime(config=config, components=components)
         self._episode = components.episode
 
@@ -107,18 +102,6 @@ class FZeroXEnvRuntime:
         """Return the flat mask and branch view from one mask computation."""
 
         return self._mask_controller.action_mask_snapshot()
-
-    def set_curriculum_stage(self, stage_index: int) -> None:
-        """Switch the active curriculum stage for subsequent action masks."""
-
-        self._mask_controller.set_curriculum_stage(stage_index)
-        self._reset_coordinator.set_curriculum_stage(self._mask_controller.stage_index)
-
-    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
-        """Align watch-time stage masks with the loaded checkpoint metadata."""
-
-        self._mask_controller.sync_checkpoint_stage(stage_index)
-        self._reset_coordinator.set_curriculum_stage(self._mask_controller.stage_index)
 
     def set_track_sampling_weights(self, weights_by_track_id: dict[str, float]) -> None:
         """Update adaptive reset weights used by step-balanced track sampling."""
@@ -172,18 +155,6 @@ class FZeroXEnvRuntime:
         """Align the next sequential watch reset to a specific configured course."""
 
         self._reset_coordinator.set_next_sequential_course(course_id)
-
-    @property
-    def curriculum_stage_index(self) -> int | None:
-        """Return the active curriculum stage index, if any."""
-
-        return self._mask_controller.stage_index
-
-    @property
-    def curriculum_stage_name(self) -> str | None:
-        """Return the active curriculum stage name, if any."""
-
-        return self._mask_controller.stage_name
 
     def auxiliary_state_targets(self) -> StateVector:
         """Return the current hidden auxiliary-state target vector."""

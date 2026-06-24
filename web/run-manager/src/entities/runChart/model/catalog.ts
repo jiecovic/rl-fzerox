@@ -14,7 +14,6 @@ export const RUN_CHART_GROUPS = [
   { id: "action", title: "Actions" },
   { id: "state", title: "State" },
   { id: "episode", title: "Episodes" },
-  { id: "curriculum", title: "Curriculum" },
   { id: "sampling", title: "Sampling" },
   { id: "other", title: "Other" },
 ] as const;
@@ -23,7 +22,6 @@ export type RunChartGroupId = (typeof RUN_CHART_GROUPS)[number]["id"];
 
 export const INITIAL_GROUP_OPEN: Record<RunChartGroupId, boolean> = {
   action: true,
-  curriculum: false,
   episode: true,
   optimization: true,
   other: false,
@@ -72,11 +70,6 @@ const EXPLICIT_CHARTS = [
 ] as const satisfies readonly RunChartDescriptor[];
 
 const METRIC_TITLE_OVERRIDES: Record<string, string> = {
-  "curriculum/batch_size": "Batch size",
-  "curriculum/clip_range": "Clip range",
-  "curriculum/ent_coef": "Entropy coefficient",
-  "curriculum/learning_rate": "Learning rate",
-  "curriculum/n_epochs": "Epochs",
   "episode/airborne_episode_rate": "Airborne episode rate",
   "episode/airborne_failure_rate": "Airborne failure rate",
   "episode/airborne_finish_rate": "Airborne finish rate",
@@ -211,9 +204,6 @@ function chartGroupForMetricKey(key: string): RunChartGroupId {
   }
   if (key.startsWith("episode/")) {
     return "episode";
-  }
-  if (key.startsWith("curriculum/")) {
-    return "curriculum";
   }
   if (key.startsWith("track_sampling/")) {
     return "sampling";

@@ -28,13 +28,6 @@ from rl_fzerox.core.runtime_spec.schema.common import (
     TrackSamplingMode,
     WatchFpsSetting,
 )
-from rl_fzerox.core.runtime_spec.schema.curriculum import (
-    CurriculumConfig,
-    CurriculumStageConfig,
-    CurriculumTrainOverridesConfig,
-    CurriculumTriggerConfig,
-    PerTrackLapsCompletedTriggerConfig,
-)
 from rl_fzerox.core.runtime_spec.schema.env import (
     EmulatorConfig,
     EnvConfig,
@@ -77,10 +70,6 @@ __all__ = [
     "AdaptiveEngineTuningConfig",
     "ContinuousAirBrakeMode",
     "CareerModeRaceSetupConfig",
-    "CurriculumConfig",
-    "CurriculumStageConfig",
-    "CurriculumTrainOverridesConfig",
-    "CurriculumTriggerConfig",
     "EmulatorConfig",
     "EnvConfig",
     "ExtractorConfig",
@@ -88,7 +77,6 @@ __all__ = [
     "ObservationConfig",
     "ObservationPresetName",
     "ObservationStateComponentConfig",
-    "PerTrackLapsCompletedTriggerConfig",
     "PolicyActionBiasConfig",
     "PolicyAuxiliaryStateConfig",
     "PolicyAuxiliaryStateLossConfig",

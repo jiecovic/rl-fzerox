@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
 from rl_fzerox.core.runtime_spec.schema import (
-    CurriculumConfig,
     EnvConfig,
     TrainAppConfig,
     TrainConfig,
@@ -27,9 +26,7 @@ def build_callbacks(
     env_config: EnvConfig | None = None,
     train_app_config: TrainAppConfig | None = None,
     train_config: TrainConfig,
-    curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
-    initial_curriculum_stage_index: int | None = None,
     initial_engine_tuning_state: EngineTuningRuntimeState | None = None,
     engine_tuning_controller: EngineTuningTrainingController | None = None,
     track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None = None,
@@ -47,9 +44,6 @@ def build_callbacks(
 
     from rl_fzerox.core.training.session.callbacks.sb3.artifacts import (
         RollingArtifactCallback,
-    )
-    from rl_fzerox.core.training.session.callbacks.sb3.curriculum import (
-        CurriculumCallback,
     )
     from rl_fzerox.core.training.session.callbacks.sb3.engine_tuning import (
         EngineTuningCallback,
@@ -113,7 +107,6 @@ def build_callbacks(
             )
         deficit_controller = DeficitBudgetTrackSamplingController.from_configs(
             env_config=env_config,
-            curriculum_config=curriculum_config,
             restored_state=runtime_persistence.load(),
         )
         if deficit_controller is not None:
@@ -121,7 +114,6 @@ def build_callbacks(
                 DeficitBudgetTrackSamplingCallback(
                     controller=deficit_controller,
                     env_config=env_config,
-                    curriculum_config=curriculum_config,
                     rotation_manager=_x_cup_rotation_manager(
                         train_app_config=train_app_config,
                         run_paths=run_paths,
@@ -136,7 +128,6 @@ def build_callbacks(
         if deficit_controller is None:
             track_balance_controller = StepBalancedTrackSamplingController.from_configs(
                 env_config=env_config,
-                curriculum_config=curriculum_config,
                 restored_state=runtime_persistence.load(),
             )
             if track_balance_controller is not None:
@@ -144,7 +135,6 @@ def build_callbacks(
                     StepBalancedTrackSamplingCallback(
                         controller=track_balance_controller,
                         env_config=env_config,
-                        curriculum_config=curriculum_config,
                         rotation_manager=_x_cup_rotation_manager(
                             train_app_config=train_app_config,
                             run_paths=run_paths,
@@ -154,14 +144,6 @@ def build_callbacks(
                         alt_baseline_projection=alt_baseline_projection,
                     )
                 )
-    if curriculum_config.enabled:
-        callbacks.append(
-            CurriculumCallback(
-                curriculum_config,
-                env_config=env_config,
-                initial_stage_index=initial_curriculum_stage_index,
-            )
-        )
     callbacks.extend(callback for callback in extra_callbacks if isinstance(callback, BaseCallback))
     return CallbackList(callbacks)
 
