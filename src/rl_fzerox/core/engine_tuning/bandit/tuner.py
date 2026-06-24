@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/engine_tuning/bandit.py
+# src/rl_fzerox/core/engine_tuning/bandit/tuner.py
 """Aggregate bandit backend for adaptive engine tuning.
 
 The bandit is the maintained reset-time tuner. It aggregates default-baseline
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from random import Random
 
-from rl_fzerox.core.engine_tuning.bandit_sampling import (
+from rl_fzerox.core.engine_tuning.bandit.sampling import (
     _bandit_greedy_engine_setting,
     _candidate_estimate,
     _candidate_uncertainty,

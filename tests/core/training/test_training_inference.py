@@ -461,7 +461,7 @@ def test_policy_runner_injects_zero_auxiliary_targets_for_aux_enabled_policy(
     aux_targets = fake_policy.last_aux_observation.get("auxiliary_state_targets")
     aux_targets_array = _array_action(aux_targets)
     assert aux_targets_array.shape == (39,)
-    assert float(np.max(aux_targets_array)) == 0.0
+    assert aux_targets_array.tolist() == [0.0] * 39
 
 
 def test_non_recurrent_auxiliary_policy_accepts_runner_recurrent_kwargs() -> None:

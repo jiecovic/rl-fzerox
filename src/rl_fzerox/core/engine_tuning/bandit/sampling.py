@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/engine_tuning/bandit_sampling.py
+# src/rl_fzerox/core/engine_tuning/bandit/sampling.py
 """Sampling and greedy projection helpers for the bandit engine tuner."""
 
 from __future__ import annotations

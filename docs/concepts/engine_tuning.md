@@ -230,8 +230,8 @@ The finish-rate model is the standard Beta-Bernoulli update used in Thompson
 sampling for Bernoulli rewards. The finish-time model is lighter: it uses an
 aggregate mean plus a Gaussian uncertainty draw, not a full Bayesian time model.
 
-The code path for the maintained backend is
-`src/rl_fzerox/core/engine_tuning/bandit_sampling.py`.
+The maintained backend lives under
+`src/rl_fzerox/core/engine_tuning/bandit/`.
 
 ## References
 
