@@ -95,6 +95,24 @@ docs-open file="README.md":
     output="local/preview/${stem//\//_}.html"; \
     xdg-open "$output"
 
+# Render every tracked Markdown file to local/preview.
+docs-preview-all:
+    @set -euo pipefail; \
+    git ls-files '*.md' | while IFS= read -r file; do \
+        just docs-preview "$file" >/dev/null; \
+    done; \
+    count="$(git ls-files '*.md' | wc -l)"; \
+    echo "Rendered $count Markdown files to local/preview"
+
+# Render every tracked Markdown file and open the docs index preview.
+docs-open-all:
+    @just docs-preview-all
+    @if [ -f local/preview/docs_index.html ]; then \
+        xdg-open local/preview/docs_index.html; \
+    else \
+        xdg-open local/preview/README.html; \
+    fi
+
 # Launch the main F-Zero X app with the Python SQLite API.
 fzerox:
     @EGL_PLATFORM="${EGL_PLATFORM:-x11}" PYTHONPATH=src "{{python_bin}}" -m rl_fzerox.apps.run_manager
