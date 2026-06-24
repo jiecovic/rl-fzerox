@@ -183,6 +183,7 @@ const vehicleConfigSchema = z
     adaptive_engine_tuner_backend: engineTunerBackendSchema.default("bandit"),
     adaptive_engine_tuner_objective: engineTunerObjectiveSchema.default("finish_time"),
     adaptive_engine_safe_finish_rate_threshold: z.number().min(0).max(1).default(0.9),
+    adaptive_engine_min_finish_rate_observations: z.number().int().min(0).max(4096).default(10),
     adaptive_engine_bandit_bucket_raw_values: z
       .array(z.number().int().min(ENGINE_SLIDER.minStep).max(ENGINE_SLIDER.maxStep))
       .min(1)

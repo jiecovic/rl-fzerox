@@ -211,6 +211,8 @@ export function VehicleSection({
                   defaultConfig.vehicle.adaptive_engine_tuner_objective,
                 adaptive_engine_safe_finish_rate_threshold:
                   defaultConfig.vehicle.adaptive_engine_safe_finish_rate_threshold,
+                adaptive_engine_min_finish_rate_observations:
+                  defaultConfig.vehicle.adaptive_engine_min_finish_rate_observations,
                 adaptive_engine_uniform_exploration:
                   defaultConfig.vehicle.adaptive_engine_uniform_exploration,
                 adaptive_engine_greedy_plateau_seconds:

@@ -14,12 +14,12 @@ from random import Random
 from rl_fzerox.core.engine_tuning.bandit_sampling import (
     _bandit_greedy_engine_setting,
     _candidate_estimate,
-    _candidate_observation_count,
     _candidate_uncertainty,
     _EngineEstimate,
     _EngineProjection,
     _sample_engine_setting,
     _selection_probabilities,
+    _warmup_candidates,
 )
 from rl_fzerox.core.engine_tuning.state import (
     EngineTuningCandidateState,
@@ -67,17 +67,13 @@ class BanditEngineTuner:
             return self._choice_for(context, selected, estimate=estimate, sampled_score=None)
 
         projection = self._context_projection(context, candidates)
-        unobserved = tuple(
-            engine_raw
-            for engine_raw in candidates
-            if _candidate_observation_count(
-                projection.estimates[engine_raw],
-                objective=projection.objective,
-            )
-            <= 0
+        warmup_candidates = _warmup_candidates(
+            projection=projection,
+            candidates=candidates,
+            min_finish_rate_observations=self._settings.min_finish_rate_observations,
         )
-        if unobserved:
-            selected = rng.choice(unobserved)
+        if warmup_candidates:
+            selected = rng.choice(warmup_candidates)
             estimate = projection.estimates[selected]
             return self._choice_for(context, selected, estimate=estimate, sampled_score=None)
 
@@ -129,6 +125,7 @@ class BanditEngineTuner:
             uniform_exploration=self._settings.uniform_exploration,
             safe_finish_rate_threshold=self._settings.safe_finish_rate_threshold,
             prior_finish_time_seconds=self._settings.prior_finish_time_seconds,
+            min_finish_rate_observations=self._settings.min_finish_rate_observations,
             seed=seed,
             draws=draws,
         )

@@ -41,6 +41,7 @@ def _selection_probabilities(
     uniform_exploration: float,
     safe_finish_rate_threshold: float,
     prior_finish_time_seconds: float,
+    min_finish_rate_observations: int,
     seed: int,
     draws: int,
 ) -> dict[int, float]:
@@ -53,6 +54,7 @@ def _selection_probabilities(
         candidates=candidates,
         safe_finish_rate_threshold=safe_finish_rate_threshold,
         prior_finish_time_seconds=prior_finish_time_seconds,
+        min_finish_rate_observations=min_finish_rate_observations,
         seed=seed,
         draws=draws,
     )
@@ -69,21 +71,20 @@ def _model_probabilities(
     candidates: tuple[int, ...],
     safe_finish_rate_threshold: float,
     prior_finish_time_seconds: float,
+    min_finish_rate_observations: int,
     seed: int,
     draws: int,
 ) -> dict[int, float]:
-    unobserved = tuple(
-        engine_raw
-        for engine_raw in candidates
-        if _candidate_observation_count(
-            projection.estimates[engine_raw],
-            objective=projection.objective,
-        )
-        <= 0
+    warmup_candidates = _warmup_candidates(
+        projection=projection,
+        candidates=candidates,
+        min_finish_rate_observations=min_finish_rate_observations,
     )
-    if unobserved:
+    if warmup_candidates:
         return {
-            engine_raw: (1.0 / len(unobserved) if engine_raw in unobserved else 0.0)
+            engine_raw: (
+                1.0 / len(warmup_candidates) if engine_raw in warmup_candidates else 0.0
+            )
             for engine_raw in candidates
         }
 
@@ -100,6 +101,35 @@ def _model_probabilities(
         )
         counts[selected] += 1
     return {engine_raw: counts[engine_raw] / draw_count for engine_raw in candidates}
+
+
+def _warmup_candidates(
+    *,
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+    min_finish_rate_observations: int,
+) -> tuple[int, ...]:
+    minimum = max(0, int(min_finish_rate_observations))
+    return tuple(
+        engine_raw
+        for engine_raw in candidates
+        if _candidate_needs_warmup(
+            projection.estimates[engine_raw],
+            objective=projection.objective,
+            min_finish_rate_observations=minimum,
+        )
+    )
+
+
+def _candidate_needs_warmup(
+    estimate: _EngineEstimate,
+    *,
+    objective: EngineTunerObjective,
+    min_finish_rate_observations: int,
+) -> bool:
+    if objective in {"finish_rate", "safe_finish_time"}:
+        return estimate.episode_count < max(0, int(min_finish_rate_observations))
+    return _candidate_observation_count(estimate, objective=objective) <= 0
 
 
 def _sample_engine_setting(

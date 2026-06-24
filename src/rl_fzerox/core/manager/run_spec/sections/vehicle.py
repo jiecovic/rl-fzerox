@@ -57,6 +57,10 @@ class ManagedVehicleConfig(BaseModel):
         ge=0.0,
         le=1.0,
     )
+    adaptive_engine_min_finish_rate_observations: NonNegativeInt = Field(
+        default=ENGINE_TUNER_DEFAULTS.min_finish_rate_observations,
+        le=4096,
+    )
     adaptive_engine_stat_decay: float = Field(
         default=ENGINE_TUNER_DEFAULTS.stat_decay,
         gt=0.0,
@@ -110,6 +114,7 @@ class ManagedVehicleConfig(BaseModel):
             data.pop("adaptive_engine_tuner_objective", None)
             data.pop("adaptive_engine_bandit_bucket_raw_values", None)
             data.pop("adaptive_engine_safe_finish_rate_threshold", None)
+            data.pop("adaptive_engine_min_finish_rate_observations", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "gaussian_process":
             data.pop("adaptive_engine_stat_decay", None)
         if isinstance(data, dict) and self.adaptive_engine_tuner_backend != "mlp_ensemble":

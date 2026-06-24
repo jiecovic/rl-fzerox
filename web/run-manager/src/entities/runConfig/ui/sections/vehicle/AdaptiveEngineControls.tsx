@@ -7,7 +7,12 @@ import {
   engineSliderStepPercentLabel,
 } from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
-import { NumberField, RangeNumberField, SegmentedChoiceStrip } from "@/shared/ui/configFields";
+import {
+  IntegerField,
+  NumberField,
+  RangeNumberField,
+  SegmentedChoiceStrip,
+} from "@/shared/ui/configFields";
 
 interface AdaptiveEngineControlsProps {
   config: ManagedRunConfig;
@@ -134,6 +139,21 @@ export function AdaptiveEngineControls({
             value={vehicle.adaptive_engine_safe_finish_rate_threshold}
             onChange={(adaptive_engine_safe_finish_rate_threshold) =>
               onChange({ adaptive_engine_safe_finish_rate_threshold })
+            }
+          />
+        ) : null}
+        {isBanditBackend &&
+        (vehicle.adaptive_engine_tuner_objective === "safe_finish_time" ||
+          vehicle.adaptive_engine_tuner_objective === "finish_rate") ? (
+          <IntegerField
+            help="Episodes per engine bucket before finish-rate sampling uses the observed finish/fail ratio."
+            label="Rate warmup"
+            max={4096}
+            min={0}
+            resetValue={defaultVehicle.adaptive_engine_min_finish_rate_observations}
+            value={vehicle.adaptive_engine_min_finish_rate_observations}
+            onChange={(adaptive_engine_min_finish_rate_observations) =>
+              onChange({ adaptive_engine_min_finish_rate_observations })
             }
           />
         ) : null}

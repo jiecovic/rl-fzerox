@@ -99,7 +99,7 @@ with the highest draw.
 Selection works in this order:
 
 1. `uniform_exploration` can choose any bucket from a flat distribution.
-2. Buckets with no useful observations are sampled first.
+2. Buckets below the active warmup count are sampled first.
 3. Observed buckets are sampled with a Thompson-sampling-style draw.
 
 Notation:
@@ -154,15 +154,21 @@ count.
 The sampled `p_a` is not the next episode result. It is one plausible finish
 rate for bucket `a` given the observed finishes and failures.
 
+For objectives that use finish rate, `min_finish_rate_observations` controls the
+warmup floor. The default is `10` episodes per bucket and context. Until a bucket
+reaches that count, training sampling treats it as under-sampled and keeps it in
+the coverage pool before applying the Beta finish-rate inference.
+
 ### Safe Finish Time
 
 `safe_finish_time` uses **constrained Thompson sampling**:
 
-1. Draw `p_a` from the Beta finish-rate model.
-2. Build a sampled feasible set from buckets whose `p_a` clears
+1. Sample buckets below `min_finish_rate_observations` first.
+2. Draw `p_a` from the Beta finish-rate model.
+3. Build a sampled feasible set from buckets whose `p_a` clears
    `safe_finish_rate_threshold`.
-3. Draw finish-time scores from the Gaussian time model.
-4. Choose the fastest sampled finish-time score inside the feasible set.
+4. Draw finish-time scores from the Gaussian time model.
+5. Choose the fastest sampled finish-time score inside the feasible set.
 
 In notation:
 
@@ -184,10 +190,11 @@ rollout to collect its first finish-time observation.
 
 The implemented training rule follows that constrained draw:
 
-1. Draw `p_a` from the Beta finish-rate model.
-2. Keep buckets whose sampled `p_a` clears `safe_finish_rate_threshold`.
-3. First sample feasible buckets with no measured finish time.
-4. Otherwise choose the fastest sampled finish-time score among buckets with
+1. Sample below-warmup buckets before model inference.
+2. Draw `p_a` from the Beta finish-rate model.
+3. Keep buckets whose sampled `p_a` clears `safe_finish_rate_threshold`.
+4. First sample feasible buckets with no measured finish time.
+5. Otherwise choose the fastest sampled finish-time score among buckets with
    finish times.
 
 When no bucket clears the threshold, selection uses sampled finish rate

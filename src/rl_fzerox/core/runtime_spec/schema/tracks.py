@@ -201,6 +201,9 @@ class AdaptiveEngineTuningConfig(BaseModel):
         ge=0.0,
         le=1.0,
     )
+    min_finish_rate_observations: NonNegativeInt = (
+        ENGINE_TUNER_DEFAULTS.min_finish_rate_observations
+    )
     stat_decay: float = Field(default=ENGINE_TUNER_DEFAULTS.stat_decay, gt=0.0, lt=1.0)
     prior_finish_time_seconds: PositiveFloat = ENGINE_TUNER_DEFAULTS.prior_finish_time_seconds
     exploration_scale: NonNegativeFloat = ENGINE_TUNER_DEFAULTS.exploration_seconds
@@ -234,6 +237,7 @@ class AdaptiveEngineTuningConfig(BaseModel):
             data.pop("reward_fingerprint", None)
             data.pop("bucket_raw_values", None)
             data.pop("safe_finish_rate_threshold", None)
+            data.pop("min_finish_rate_observations", None)
         if isinstance(data, dict) and self.backend == "bandit":
             data.pop("greedy_plateau_tolerance_seconds", None)
         if isinstance(data, dict) and self.backend != "gaussian_process":

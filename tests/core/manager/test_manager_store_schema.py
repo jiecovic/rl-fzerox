@@ -164,6 +164,7 @@ def test_mlp_engine_tuner_snapshot_omits_gp_only_fields() -> None:
 
     assert vehicle["adaptive_engine_tuner_backend"] == "mlp_ensemble"
     assert "adaptive_engine_uniform_exploration" in vehicle
+    assert "adaptive_engine_min_finish_rate_observations" not in vehicle
     assert "adaptive_engine_stat_decay" not in vehicle
     assert "adaptive_engine_ensemble_members" in vehicle
     assert "adaptive_engine_exploration_scale" not in vehicle
@@ -189,6 +190,7 @@ def test_bandit_engine_tuner_snapshot_omits_experimental_backend_fields() -> Non
     assert vehicle["adaptive_engine_tuner_backend"] == "bandit"
     assert vehicle["adaptive_engine_bandit_bucket_raw_values"] == [44, 54, 64, 74, 84]
     assert "adaptive_engine_uniform_exploration" in vehicle
+    assert vehicle["adaptive_engine_min_finish_rate_observations"] == 10
     assert "adaptive_engine_stat_decay" not in vehicle
     assert "adaptive_engine_ensemble_members" not in vehicle
 

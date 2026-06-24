@@ -362,6 +362,76 @@ def test_bandit_backend_explores_unobserved_buckets_before_resampling() -> None:
     assert probabilities == {54: 0.5, 64: 0.0, 74: 0.5}
 
 
+def test_bandit_finish_rate_warmup_samples_under_evidenced_buckets() -> None:
+    context = EngineTuningContext(
+        course_key="mute_city",
+        vehicle_id="blue_falcon",
+    )
+    tuner = OrderedEngineTuner(
+        settings=BanditEngineTunerSettings(
+            objective="finish_rate",
+            min_raw_value=44,
+            max_raw_value=84,
+            bucket_raw_values=(44, 64, 84),
+            min_finish_rate_observations=3,
+            uniform_exploration=0.0,
+        ),
+    )
+    tuner.record_many(
+        (
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=44,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=90_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=44,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=91_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=44,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=92_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=64,
+                completion_fraction=0.2,
+                finished=False,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=84,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=93_000,
+            ),
+            EngineTuningEpisodeOutcome(
+                context=context,
+                engine_setting_raw_value=84,
+                completion_fraction=1.0,
+                finished=True,
+                race_time_ms=94_000,
+            ),
+        )
+    )
+
+    probabilities = {
+        estimate.engine_setting_raw_value: estimate.probability
+        for estimate in tuner.distribution(context, seed=123, draws=128)
+    }
+
+    assert probabilities == {44: 0.0, 64: 0.5, 84: 0.5}
+    assert tuner.recommendation(context).engine_setting_raw_value == 44
+
+
 def test_bandit_safe_finish_time_samples_uncertain_failed_buckets() -> None:
     context = EngineTuningContext(
         course_key="mute_city",
@@ -376,6 +446,7 @@ def test_bandit_safe_finish_time_samples_uncertain_failed_buckets() -> None:
             prior_finish_time_seconds=85.0,
             exploration_seconds=60.0,
             safe_finish_rate_threshold=0.5,
+            min_finish_rate_observations=0,
             uniform_exploration=0.0,
         ),
     )
@@ -424,6 +495,7 @@ def test_bandit_safe_finish_time_does_not_starve_no_finish_buckets() -> None:
             prior_finish_time_seconds=333.0,
             exploration_seconds=50.0,
             safe_finish_rate_threshold=0.85,
+            min_finish_rate_observations=0,
             uniform_exploration=0.0,
         ),
     )

@@ -44,6 +44,7 @@ class EngineTunerDefaults:
     stat_decay: float = 0.995
     prior_finish_time_seconds: float = 200.0
     exploration_seconds: float = 30.0
+    min_finish_rate_observations: int = 10
     mlp_ensemble_members: int = 5
     mlp_randomized_prior_seconds: float = 30.0
     mlp_hidden_dim: int = 32
@@ -86,6 +87,7 @@ class BanditEngineTunerSettings(EngineTunerCommonSettings):
     bucket_raw_values: tuple[int, ...] = ENGINE_TUNER_DEFAULTS.bandit_bucket_raw_values
     exploration_seconds: float = ENGINE_TUNER_DEFAULTS.exploration_seconds
     safe_finish_rate_threshold: float = ENGINE_TUNER_DEFAULTS.safe_finish_rate_threshold
+    min_finish_rate_observations: int = ENGINE_TUNER_DEFAULTS.min_finish_rate_observations
 
 
 @dataclass(frozen=True, slots=True)
