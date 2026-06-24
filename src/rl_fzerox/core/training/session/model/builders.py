@@ -55,18 +55,14 @@ def build_ppo_model(
     env_config: EnvConfig | None = None,
     tensorboard_log: str | None,
 ):
-    """Construct the configured PPO-family model for the current run."""
+    """Compatibility entrypoint for PPO-family model tests and callers."""
 
-    effective_algorithm = resolve_effective_training_algorithm(
-        train_config=train_config,
-    )
-    return _build_ppo_family_model(
+    return build_training_model(
         train_env=train_env,
         train_config=train_config,
         policy_config=policy_config,
         env_config=env_config,
         tensorboard_log=tensorboard_log,
-        effective_algorithm=effective_algorithm,
     )
 
 
