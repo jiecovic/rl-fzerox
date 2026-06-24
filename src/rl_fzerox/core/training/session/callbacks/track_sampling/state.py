@@ -6,6 +6,80 @@ from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True, slots=True)
+class TrackSamplingGenerationStats:
+    episode_count: int = 0
+    finished_episode_count: int = 0
+    success_sample_count: int = 0
+    ema_completion_fraction: float | None = None
+
+    @classmethod
+    def from_entry(cls, entry: TrackSamplingRuntimeEntry) -> TrackSamplingGenerationStats:
+        return cls(
+            episode_count=entry.generation_episode_count,
+            finished_episode_count=entry.generation_finished_episode_count,
+            success_sample_count=entry.generation_success_sample_count,
+            ema_completion_fraction=entry.generation_ema_completion_fraction,
+        )
+
+    def merged(
+        self,
+        other: TrackSamplingGenerationStats,
+    ) -> TrackSamplingGenerationStats:
+        return TrackSamplingGenerationStats(
+            episode_count=self.episode_count + other.episode_count,
+            finished_episode_count=self.finished_episode_count + other.finished_episode_count,
+            success_sample_count=self.success_sample_count + other.success_sample_count,
+            ema_completion_fraction=_merged_generation_ema_completion_fraction(self, other),
+        )
+
+    def reset(self) -> TrackSamplingGenerationStats:
+        return TrackSamplingGenerationStats()
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingGeneratedCourseMetadata:
+    slot: int | None = None
+    generation: int | None = None
+    course_id: str | None = None
+    name: str | None = None
+    course_hash: str | None = None
+    seed: int | None = None
+    segment_count: int | None = None
+    length: float | None = None
+
+    @classmethod
+    def from_entry(
+        cls,
+        entry: TrackSamplingRuntimeEntry,
+    ) -> TrackSamplingGeneratedCourseMetadata:
+        return cls(
+            slot=entry.generated_course_slot,
+            generation=entry.generated_course_generation,
+            course_id=entry.generated_course_id,
+            name=entry.generated_course_name,
+            course_hash=entry.generated_course_hash,
+            seed=entry.generated_course_seed,
+            segment_count=entry.generated_course_segment_count,
+            length=entry.generated_course_length,
+        )
+
+    def merged(
+        self,
+        other: TrackSamplingGeneratedCourseMetadata,
+    ) -> TrackSamplingGeneratedCourseMetadata:
+        return TrackSamplingGeneratedCourseMetadata(
+            slot=_merged_optional_int(self.slot, other.slot),
+            generation=_merged_optional_int(self.generation, other.generation),
+            course_id=_merged_optional_str(self.course_id, other.course_id),
+            name=_merged_optional_str(self.name, other.name),
+            course_hash=_merged_optional_str(self.course_hash, other.course_hash),
+            seed=_merged_optional_int(self.seed, other.seed),
+            segment_count=_merged_optional_int(self.segment_count, other.segment_count),
+            length=_merged_optional_float(self.length, other.length),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class TrackSamplingRuntimeEntry:
     track_id: str
     course_key: str
@@ -34,6 +108,14 @@ class TrackSamplingRuntimeEntry:
     generated_course_seed: int | None = None
     generated_course_segment_count: int | None = None
     generated_course_length: float | None = None
+
+    @property
+    def generation_stats(self) -> TrackSamplingGenerationStats:
+        return TrackSamplingGenerationStats.from_entry(self)
+
+    @property
+    def generated_course(self) -> TrackSamplingGeneratedCourseMetadata:
+        return TrackSamplingGeneratedCourseMetadata.from_entry(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,36 +253,10 @@ def aggregate_runtime_entries(
         course_key = entry.course_key
         existing = grouped.get(course_key)
         if existing is None:
-            grouped[course_key] = TrackSamplingRuntimeEntry(
-                track_id=course_key,
-                course_key=course_key,
-                label=entry.label,
-                base_weight=entry.base_weight,
-                current_weight=entry.current_weight,
-                completed_frames=entry.completed_frames,
-                episode_count=entry.episode_count,
-                finished_episode_count=entry.finished_episode_count,
-                success_sample_count=entry.success_sample_count,
-                ema_episode_frames=entry.ema_episode_frames,
-                ema_completion_fraction=entry.ema_completion_fraction,
-                completion_sample_count=entry.completion_sample_count,
-                completion_fraction_total=entry.completion_fraction_total,
-                ema_finish_rate=entry.ema_finish_rate,
-                current_problem_score=entry.current_problem_score,
-                generation_episode_count=entry.generation_episode_count,
-                generation_finished_episode_count=entry.generation_finished_episode_count,
-                generation_success_sample_count=entry.generation_success_sample_count,
-                generation_ema_completion_fraction=entry.generation_ema_completion_fraction,
-                generated_course_slot=entry.generated_course_slot,
-                generated_course_generation=entry.generated_course_generation,
-                generated_course_id=entry.generated_course_id,
-                generated_course_name=entry.generated_course_name,
-                generated_course_hash=entry.generated_course_hash,
-                generated_course_seed=entry.generated_course_seed,
-                generated_course_segment_count=entry.generated_course_segment_count,
-                generated_course_length=entry.generated_course_length,
-            )
+            grouped[course_key] = replace(entry, track_id=course_key, course_key=course_key)
             continue
+        generation_stats = existing.generation_stats.merged(entry.generation_stats)
+        generated_course = existing.generated_course.merged(entry.generated_course)
         grouped[course_key] = TrackSamplingRuntimeEntry(
             track_id=course_key,
             course_key=course_key,
@@ -221,51 +277,18 @@ def aggregate_runtime_entries(
             ),
             ema_finish_rate=_merged_ema_finish_rate(existing, entry),
             current_problem_score=_merged_problem_score(existing, entry),
-            generation_episode_count=(
-                existing.generation_episode_count + entry.generation_episode_count
-            ),
-            generation_finished_episode_count=(
-                existing.generation_finished_episode_count + entry.generation_finished_episode_count
-            ),
-            generation_success_sample_count=(
-                existing.generation_success_sample_count + entry.generation_success_sample_count
-            ),
-            generation_ema_completion_fraction=_merged_generation_ema_completion_fraction(
-                existing,
-                entry,
-            ),
-            generated_course_slot=_merged_optional_int(
-                existing.generated_course_slot,
-                entry.generated_course_slot,
-            ),
-            generated_course_generation=_merged_optional_int(
-                existing.generated_course_generation,
-                entry.generated_course_generation,
-            ),
-            generated_course_id=_merged_optional_str(
-                existing.generated_course_id,
-                entry.generated_course_id,
-            ),
-            generated_course_name=_merged_optional_str(
-                existing.generated_course_name,
-                entry.generated_course_name,
-            ),
-            generated_course_hash=_merged_optional_str(
-                existing.generated_course_hash,
-                entry.generated_course_hash,
-            ),
-            generated_course_seed=_merged_optional_int(
-                existing.generated_course_seed,
-                entry.generated_course_seed,
-            ),
-            generated_course_segment_count=_merged_optional_int(
-                existing.generated_course_segment_count,
-                entry.generated_course_segment_count,
-            ),
-            generated_course_length=_merged_optional_float(
-                existing.generated_course_length,
-                entry.generated_course_length,
-            ),
+            generation_episode_count=generation_stats.episode_count,
+            generation_finished_episode_count=generation_stats.finished_episode_count,
+            generation_success_sample_count=generation_stats.success_sample_count,
+            generation_ema_completion_fraction=generation_stats.ema_completion_fraction,
+            generated_course_slot=generated_course.slot,
+            generated_course_generation=generated_course.generation,
+            generated_course_id=generated_course.course_id,
+            generated_course_name=generated_course.name,
+            generated_course_hash=generated_course.course_hash,
+            generated_course_seed=generated_course.seed,
+            generated_course_segment_count=generated_course.segment_count,
+            generated_course_length=generated_course.length,
         )
     return tuple(grouped[course_key] for course_key in sorted(grouped))
 
@@ -286,18 +309,21 @@ def replace_runtime_generation(
 ) -> TrackSamplingRuntimeState:
     """Carry slot sampling history forward while resetting current-course stats."""
 
+    generated_course = TrackSamplingGeneratedCourseMetadata(
+        slot=generated_course_slot,
+        generation=generated_course_generation,
+        course_id=generated_course_id,
+        name=generated_course_name,
+        course_hash=generated_course_hash,
+        seed=generated_course_seed,
+        segment_count=generated_course_segment_count,
+        length=generated_course_length,
+    )
     entries = tuple(
         _replacement_runtime_entry(
             entry,
             replacement_label=replacement_label,
-            generated_course_slot=generated_course_slot,
-            generated_course_generation=generated_course_generation,
-            generated_course_id=generated_course_id,
-            generated_course_name=generated_course_name,
-            generated_course_hash=generated_course_hash,
-            generated_course_seed=generated_course_seed,
-            generated_course_segment_count=generated_course_segment_count,
-            generated_course_length=generated_course_length,
+            generated_course=generated_course,
         )
         if entry.course_key == course_key
         else entry
@@ -310,30 +336,24 @@ def _replacement_runtime_entry(
     entry: TrackSamplingRuntimeEntry,
     *,
     replacement_label: str,
-    generated_course_slot: int | None,
-    generated_course_generation: int | None,
-    generated_course_id: str | None,
-    generated_course_name: str | None,
-    generated_course_hash: str | None,
-    generated_course_seed: int | None,
-    generated_course_segment_count: int | None,
-    generated_course_length: float | None,
+    generated_course: TrackSamplingGeneratedCourseMetadata,
 ) -> TrackSamplingRuntimeEntry:
+    generation_stats = entry.generation_stats.reset()
     return replace(
         entry,
         label=replacement_label,
-        generation_episode_count=0,
-        generation_finished_episode_count=0,
-        generation_success_sample_count=0,
-        generation_ema_completion_fraction=None,
-        generated_course_slot=generated_course_slot,
-        generated_course_generation=generated_course_generation,
-        generated_course_id=generated_course_id,
-        generated_course_name=generated_course_name,
-        generated_course_hash=generated_course_hash,
-        generated_course_seed=generated_course_seed,
-        generated_course_segment_count=generated_course_segment_count,
-        generated_course_length=generated_course_length,
+        generation_episode_count=generation_stats.episode_count,
+        generation_finished_episode_count=generation_stats.finished_episode_count,
+        generation_success_sample_count=generation_stats.success_sample_count,
+        generation_ema_completion_fraction=generation_stats.ema_completion_fraction,
+        generated_course_slot=generated_course.slot,
+        generated_course_generation=generated_course.generation,
+        generated_course_id=generated_course.course_id,
+        generated_course_name=generated_course.name,
+        generated_course_hash=generated_course.course_hash,
+        generated_course_seed=generated_course.seed,
+        generated_course_segment_count=generated_course.segment_count,
+        generated_course_length=generated_course.length,
     )
 
 
@@ -406,21 +426,20 @@ def _merged_problem_score(
 
 
 def _merged_generation_ema_completion_fraction(
-    left: TrackSamplingRuntimeEntry,
-    right: TrackSamplingRuntimeEntry,
+    left: TrackSamplingGenerationStats,
+    right: TrackSamplingGenerationStats,
 ) -> float | None:
-    if left.generation_ema_completion_fraction is None:
-        return right.generation_ema_completion_fraction
-    if right.generation_ema_completion_fraction is None:
-        return left.generation_ema_completion_fraction
-    left_weight = max(left.generation_episode_count, 1)
-    right_weight = max(right.generation_episode_count, 1)
+    if left.ema_completion_fraction is None:
+        return right.ema_completion_fraction
+    if right.ema_completion_fraction is None:
+        return left.ema_completion_fraction
+    left_weight = max(left.episode_count, 1)
+    right_weight = max(right.episode_count, 1)
     total_weight = left_weight + right_weight
     if total_weight <= 0:
         return None
     return (
-        left.generation_ema_completion_fraction * left_weight
-        + right.generation_ema_completion_fraction * right_weight
+        left.ema_completion_fraction * left_weight + right.ema_completion_fraction * right_weight
     ) / total_weight
 
 

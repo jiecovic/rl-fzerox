@@ -39,6 +39,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.persistence import
 from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     DeficitBudgetCourseSchedulerState,
     DeficitBudgetSchedulerState,
+    TrackSamplingGeneratedCourseMetadata,
+    TrackSamplingGenerationStats,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
     replace_runtime_generation,
@@ -65,6 +67,8 @@ __all__ = (
     "TrackSamplingMaterializedArtifact",
     "TrackSamplingAltBaseline",
     "TrackSamplingCourseEntry",
+    "TrackSamplingGeneratedCourseMetadata",
+    "TrackSamplingGenerationStats",
     "TrackSamplingRuntimePersistence",
     "TrackSamplingRuntimeState",
     "XCupRotationFailure",
