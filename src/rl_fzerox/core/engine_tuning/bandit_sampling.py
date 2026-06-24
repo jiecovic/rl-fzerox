@@ -155,21 +155,17 @@ def _sample_safe_finish_time_engine_setting(
     safe_candidates = tuple(
         engine_raw
         for engine_raw in candidates
-        if (
-            sampled[engine_raw].finish_rate >= threshold
-            and projection.estimates[engine_raw].finish_count > 0
-        )
+        if sampled[engine_raw].finish_rate >= threshold
     )
     midpoint = _candidate_midpoint(candidates)
     if safe_candidates:
         selected = max(
             safe_candidates,
-            key=lambda engine_raw: (
-                sampled[engine_raw].finish_time_score,
-                sampled[engine_raw].finish_rate,
-                projection.estimates[engine_raw].finish_count,
-                -abs(engine_raw - midpoint),
-                -engine_raw,
+            key=lambda engine_raw: _safe_finish_time_selection_key(
+                projection.estimates[engine_raw],
+                sampled[engine_raw],
+                engine_raw=engine_raw,
+                midpoint=midpoint,
             ),
         )
         return selected, sampled[selected].finish_time_score
@@ -184,6 +180,36 @@ def _sample_safe_finish_time_engine_setting(
         ),
     )
     return selected, sampled[selected].finish_rate
+
+
+def _safe_finish_time_selection_key(
+    estimate: _EngineEstimate,
+    sample: _SafeFinishTimeSample,
+    *,
+    engine_raw: int,
+    midpoint: float,
+) -> tuple[bool, float, float, int, float, int]:
+    if estimate.finish_count <= 0:
+        # The finish-time model only has a real timing observation after a
+        # successful finish. Once the sampled safety posterior clears the
+        # constraint, collect that first timing observation before ranking the
+        # arm against measured finish times.
+        return (
+            True,
+            sample.finish_rate,
+            -float(estimate.episode_count),
+            estimate.finish_count,
+            -abs(engine_raw - midpoint),
+            -engine_raw,
+        )
+    return (
+        False,
+        sample.finish_time_score,
+        sample.finish_rate,
+        estimate.finish_count,
+        -abs(engine_raw - midpoint),
+        -engine_raw,
+    )
 
 
 def _sample_finish_rate_engine_setting(
@@ -293,6 +319,8 @@ def _candidate_uncertainty(
 ) -> float:
     if objective == "finish_rate":
         return _beta_finish_rate_std(candidate.finish_count, candidate.episode_count)
+    if objective == "safe_finish_time":
+        return max(0.25, float(exploration_seconds)) / max(1.0, candidate.finish_count) ** 0.5
     return max(0.25, float(exploration_seconds)) / max(1.0, candidate.decayed_count) ** 0.5
 
 

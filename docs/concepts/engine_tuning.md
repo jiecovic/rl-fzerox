@@ -156,17 +156,46 @@ rate for bucket `a` given the observed finishes and failures.
 
 ### Safe Finish Time
 
-`safe_finish_time` combines both pieces:
+`safe_finish_time` uses **constrained Thompson sampling**:
 
 1. Draw `p_a` from the Beta finish-rate model.
-2. Draw a finish-time score from the Gaussian score model.
-3. Keep buckets whose sampled `p_a` clears `safe_finish_rate_threshold` and that
-   have at least one real finish.
-4. Choose the fastest sampled finish-time score inside that safe set.
+2. Build a sampled feasible set from buckets whose `p_a` clears
+   `safe_finish_rate_threshold`.
+3. Draw finish-time scores from the Gaussian time model.
+4. Choose the fastest sampled finish-time score inside the feasible set.
+
+In notation:
+
+```math
+A_\mathrm{safe} =
+\{a \mid \tilde{p}_a \ge \tau\}
+```
+
+```math
+a^* = \operatorname*{arg\,max}_{a \in A_\mathrm{safe}} \tilde{s}_a
+```
+
+where `tau` is `safe_finish_rate_threshold`.
+
+The finish-time model only learns from successful finishes. A failed episode
+updates the Beta finish-rate model, but it is not a timing observation. If a
+zero-finish bucket enters the sampled feasible set, training sampling gives it a
+rollout to collect its first finish-time observation.
+
+The implemented training rule follows that constrained draw:
+
+1. Draw `p_a` from the Beta finish-rate model.
+2. Keep buckets whose sampled `p_a` clears `safe_finish_rate_threshold`.
+3. First sample feasible buckets with no measured finish time.
+4. Otherwise choose the fastest sampled finish-time score among buckets with
+   finish times.
 
 When no bucket clears the threshold, selection uses sampled finish rate
 first and sampled finish time second. This keeps exploration focused on buckets
 that still need reliability.
+
+Greedy evaluation is stricter than training-time sampling: it only treats a
+bucket as safe after at least one real finish.
 
 ## Objectives
 
@@ -200,6 +229,8 @@ The code path for the maintained backend is
 ## References
 
 - [Russo et al., A Tutorial on Thompson Sampling](https://arxiv.org/abs/1707.02038)
+- [Daulton et al., Thompson Sampling for Contextual Bandit Problems with
+  Auxiliary Safety Constraints](https://arxiv.org/abs/1911.00638)
 - [Kaufmann, Korda, and Munos, Thompson Sampling: An Asymptotically Optimal
   Finite-Time Analysis](https://arxiv.org/abs/1205.4217)
 - [Agrawal and Goyal, Further Optimal Regret Bounds for Thompson
