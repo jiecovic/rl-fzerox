@@ -27,6 +27,21 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
 
 
 @dataclass(frozen=True, slots=True)
+class TrackSamplingRuntimeLoadDefaults:
+    """Defaults used when loading older runtime-state snapshots."""
+
+    adaptive_completion_weight: float = 0.35
+    adaptive_target_completion: float = 0.9
+    adaptive_min_confidence_episodes: int = 24
+    adaptive_confidence_scale: float = 4.0
+    deficit_budget_difficulty_metric: str = "completion_ema"
+    deficit_budget_warmup_min_episodes_per_course: int = 0
+
+
+_RUNTIME_LOAD_DEFAULTS = TrackSamplingRuntimeLoadDefaults()
+
+
+@dataclass(frozen=True, slots=True)
 class TrackSamplingRuntimePersistence:
     """Load/save boundary for manager DB or standalone file-backed state."""
 
@@ -186,21 +201,26 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
         update_episodes=update_episodes,
         ema_alpha=ema_alpha,
         max_weight_scale=max_weight_scale,
-        adaptive_completion_weight=(
-            0.35 if adaptive_completion_weight is None else max(0.0, adaptive_completion_weight)
+        adaptive_completion_weight=_min_float_or_default(
+            adaptive_completion_weight,
+            default=_RUNTIME_LOAD_DEFAULTS.adaptive_completion_weight,
+            minimum=0.0,
         ),
-        adaptive_target_completion=(
-            0.9
-            if adaptive_target_completion is None
-            else max(0.0, min(1.0, adaptive_target_completion))
+        adaptive_target_completion=_clamped_float_or_default(
+            adaptive_target_completion,
+            default=_RUNTIME_LOAD_DEFAULTS.adaptive_target_completion,
+            minimum=0.0,
+            maximum=1.0,
         ),
-        adaptive_min_confidence_episodes=(
-            24
-            if adaptive_min_confidence_episodes is None
-            else max(1, adaptive_min_confidence_episodes)
+        adaptive_min_confidence_episodes=_min_int_or_default(
+            adaptive_min_confidence_episodes,
+            default=_RUNTIME_LOAD_DEFAULTS.adaptive_min_confidence_episodes,
+            minimum=1,
         ),
-        adaptive_confidence_scale=(
-            4.0 if adaptive_confidence_scale is None else max(1.0, adaptive_confidence_scale)
+        adaptive_confidence_scale=_min_float_or_default(
+            adaptive_confidence_scale,
+            default=_RUNTIME_LOAD_DEFAULTS.adaptive_confidence_scale,
+            minimum=1.0,
         ),
         update_count=update_count,
         episodes_since_update=episodes_since_update,
@@ -208,10 +228,10 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
         deficit_budget_difficulty_metric=_deficit_budget_difficulty_metric(
             deficit_budget_difficulty_metric,
         ),
-        deficit_budget_warmup_min_episodes_per_course=(
-            0
-            if deficit_budget_warmup_min_episodes_per_course is None
-            else max(0, deficit_budget_warmup_min_episodes_per_course)
+        deficit_budget_warmup_min_episodes_per_course=_min_int_or_default(
+            deficit_budget_warmup_min_episodes_per_course,
+            default=_RUNTIME_LOAD_DEFAULTS.deficit_budget_warmup_min_episodes_per_course,
+            minimum=0,
         ),
         deficit_budget_scheduler=deficit_budget_scheduler,
     )
@@ -533,7 +553,35 @@ def _mapping_optional_float(mapping: Mapping[str, Any], key: str) -> float | Non
     return float(value)
 
 
+def _min_int_or_default(
+    value: int | None,
+    *,
+    default: int,
+    minimum: int,
+) -> int:
+    return default if value is None else max(minimum, value)
+
+
+def _min_float_or_default(
+    value: float | None,
+    *,
+    default: float,
+    minimum: float,
+) -> float:
+    return default if value is None else max(minimum, value)
+
+
+def _clamped_float_or_default(
+    value: float | None,
+    *,
+    default: float,
+    minimum: float,
+    maximum: float,
+) -> float:
+    return default if value is None else max(minimum, min(maximum, value))
+
+
 def _deficit_budget_difficulty_metric(value: str | None) -> str:
     if value in {"completion_ema", "finish_ema", "mixed"}:
         return value
-    return "completion_ema"
+    return _RUNTIME_LOAD_DEFAULTS.deficit_budget_difficulty_metric
