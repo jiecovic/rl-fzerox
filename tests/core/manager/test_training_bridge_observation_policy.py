@@ -3,15 +3,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.domain.observations import (
-    CustomResolutionChoice,
-    SourceCropResolutionChoice,
-)
 from rl_fzerox.core.envs.observations.state import state_feature_names
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.architecture.preview import policy_architecture_preview
 from rl_fzerox.core.manager.training import (
     build_managed_train_app_config,
+)
+from rl_fzerox.core.runtime_spec.schema import (
+    CustomResolutionChoice,
+    SourceCropResolutionChoice,
 )
 
 

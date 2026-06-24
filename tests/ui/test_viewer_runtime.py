@@ -7,7 +7,6 @@ import pytest
 
 from fzerox_emulator.arrays import Float32Array, UInt8Array
 from rl_fzerox.core.career_mode.policy import CareerModePolicyControl
-from rl_fzerox.core.domain.observations import CustomResolutionChoice
 from rl_fzerox.core.envs.observations import (
     ImageStateObservation,
     observation_state,
@@ -18,6 +17,7 @@ from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     CareerModeRaceSetupConfig,
+    CustomResolutionChoice,
     EmulatorConfig,
     EnvConfig,
     ObservationConfig,

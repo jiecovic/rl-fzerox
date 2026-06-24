@@ -9,16 +9,18 @@ from rl_fzerox.core.domain.observations import (
     ActionHistoryControlName,
     ObservationCourseContextName,
     ObservationRendererName,
-    ObservationResolutionConfig,
     ObservationStateComponentName,
     ObservationStateComponentSettings,
-    PresetResolutionChoice,
     TrackPositionProgressSourceName,
-    resolve_observation_geometry,
 )
 from rl_fzerox.core.manager.run_spec.common import (
     ObservationResizeFilter,
     StackMode,
+)
+from rl_fzerox.core.runtime_spec.schema.observations import (
+    ObservationResolutionConfig,
+    PresetResolutionChoice,
+    resolve_observation_geometry,
 )
 
 

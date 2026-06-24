@@ -35,8 +35,14 @@ from rl_fzerox.core.runtime_spec.schema.env import (
     RewardCourseOverrideConfig,
 )
 from rl_fzerox.core.runtime_spec.schema.observations import (
+    CustomResolutionChoice,
     ObservationConfig,
+    ObservationResolutionConfig,
+    ObservationResolutionMode,
     ObservationStateComponentConfig,
+    PresetResolutionChoice,
+    SourceCropResolutionChoice,
+    resolve_observation_geometry,
 )
 from rl_fzerox.core.runtime_spec.schema.policy import (
     ExtractorConfig,
@@ -70,12 +76,15 @@ __all__ = [
     "AdaptiveEngineTuningConfig",
     "ContinuousAirBrakeMode",
     "CareerModeRaceSetupConfig",
+    "CustomResolutionChoice",
     "EmulatorConfig",
     "EnvConfig",
     "ExtractorConfig",
     "NetArchConfig",
     "ObservationConfig",
     "ObservationPresetName",
+    "ObservationResolutionConfig",
+    "ObservationResolutionMode",
     "ObservationStateComponentConfig",
     "PolicyActionBiasConfig",
     "PolicyAuxiliaryStateConfig",
@@ -84,6 +93,8 @@ __all__ = [
     "PolicyRecurrentConfig",
     "RewardConfig",
     "RewardCourseOverrideConfig",
+    "PresetResolutionChoice",
+    "SourceCropResolutionChoice",
     "StateFeatureDropoutGroupConfig",
     "TrackConfig",
     "TrackRecordEntryConfig",
@@ -99,4 +110,5 @@ __all__ = [
     "WatchFpsSetting",
     "WatchRecordingConfig",
     "XCupRotationConfig",
+    "resolve_observation_geometry",
 ]

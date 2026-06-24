@@ -1,25 +1,16 @@
 # src/rl_fzerox/core/domain/observations/image.py
-"""Shared observation-image geometry vocabulary.
-
-Manager run-spec, derived runtime manifests, and the frontend all need the same
-small set of preset names plus a bounded custom-resolution escape hatch. This
-module owns that common language so shape math does not drift across layers.
-"""
+"""Shared observation-image geometry vocabulary."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Annotated, Final, Literal
-
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Final, Literal
 
 type ObservationPresetName = Literal[
     "crop_72x96",
     "crop_84x84",
 ]
-type ObservationResolutionMode = Literal["preset", "custom", "source_crop"]
-type ObservationResizeFilter = Literal["nearest", "bilinear"]
 type ObservationRendererName = Literal["angrylion", "gliden64"]
 
 
@@ -81,45 +72,6 @@ OBSERVATION_PRESET_GEOMETRY_BY_NAME: Final[MappingProxyType[str, ObservationPres
 )
 
 
-class PresetResolutionChoice(BaseModel):
-    """Preset-backed observation resolution."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    mode: Literal["preset"] = "preset"
-    preset: ObservationPresetName = OBSERVATION_IMAGE_GEOMETRY.default_preset
-
-
-class CustomResolutionChoice(BaseModel):
-    """Custom fixed observation resolution."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    mode: Literal["custom"] = "custom"
-    height: int = Field(
-        ge=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.min_dimension,
-        le=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_height,
-    )
-    width: int = Field(
-        ge=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.min_dimension,
-        le=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_width,
-    )
-
-
-class SourceCropResolutionChoice(BaseModel):
-    """Use the renderer-native crop size without target downsampling."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    mode: Literal["source_crop"] = "source_crop"
-
-
-type ObservationResolutionConfig = Annotated[
-    PresetResolutionChoice | CustomResolutionChoice | SourceCropResolutionChoice,
-    Field(discriminator="mode"),
-]
-
-
 def preset_geometry(preset: ObservationPresetName) -> tuple[int, int]:
     """Return `(height, width)` for one stable preset name."""
 
@@ -136,19 +88,3 @@ def source_crop_geometry(renderer: ObservationRendererName) -> tuple[int, int]:
         if geometry.renderer == renderer:
             return geometry.height, geometry.width
     raise ValueError(f"Unsupported observation renderer: {renderer!r}")
-
-
-def resolve_observation_geometry(
-    *,
-    resolution: ObservationResolutionConfig,
-    renderer: ObservationRendererName | None = None,
-) -> tuple[int, int]:
-    """Return the active `(height, width)` pair for one observation config."""
-
-    if isinstance(resolution, PresetResolutionChoice):
-        return preset_geometry(resolution.preset)
-    if isinstance(resolution, CustomResolutionChoice):
-        return int(resolution.height), int(resolution.width)
-    if renderer is None:
-        raise ValueError("renderer must be set for source-crop observation resolution")
-    return source_crop_geometry(renderer)

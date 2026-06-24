@@ -8,9 +8,6 @@ from pydantic import PositiveFloat
 from rl_fzerox.core.domain.observations import (
     ObservationPresetName as DomainObservationPresetName,
 )
-from rl_fzerox.core.domain.observations import (
-    ObservationResizeFilter as DomainObservationResizeFilter,
-)
 from rl_fzerox.core.domain.track_sampling import (
     DeficitBudgetDifficultyMetric as DomainDeficitBudgetDifficultyMetric,
 )
@@ -22,6 +19,6 @@ type WatchFpsSetting = PositiveFloat | Literal["auto", "unlimited"]
 type TrackSamplingMode = RuntimeTrackSamplingMode
 type DeficitBudgetDifficultyMetric = DomainDeficitBudgetDifficultyMetric
 type ObservationPresetName = DomainObservationPresetName
-type ObservationResizeFilter = DomainObservationResizeFilter
+type ObservationResizeFilter = Literal["nearest", "bilinear"]
 type ActionMaskOverrides = dict[str, tuple[int, ...]]
 type ContinuousAirBrakeMode = Literal["always", "disable_on_ground", "off"]

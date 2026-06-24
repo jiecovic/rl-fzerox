@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 from pydantic import (
     BaseModel,
@@ -15,19 +15,78 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.observations import (
+    OBSERVATION_IMAGE_GEOMETRY,
     ActionHistoryControlName,
     ObservationCourseContextName,
-    ObservationResolutionConfig,
+    ObservationPresetName,
+    ObservationRendererName,
     ObservationStateComponentName,
     ObservationStateComponentSettings,
-    PresetResolutionChoice,
     TrackPositionProgressSourceName,
-    resolve_observation_geometry,
+    preset_geometry,
+    source_crop_geometry,
 )
 from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.runtime_spec.schema.common import (
     ObservationResizeFilter,
 )
+
+type ObservationResolutionMode = Literal["preset", "custom", "source_crop"]
+
+
+class PresetResolutionChoice(BaseModel):
+    """Preset-backed observation resolution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["preset"] = "preset"
+    preset: ObservationPresetName = OBSERVATION_IMAGE_GEOMETRY.default_preset
+
+
+class CustomResolutionChoice(BaseModel):
+    """Custom fixed observation resolution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["custom"] = "custom"
+    height: int = Field(
+        ge=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.min_dimension,
+        le=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_height,
+    )
+    width: int = Field(
+        ge=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.min_dimension,
+        le=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_width,
+    )
+
+
+class SourceCropResolutionChoice(BaseModel):
+    """Use the renderer-native crop size without target downsampling."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["source_crop"] = "source_crop"
+
+
+type ObservationResolutionConfig = Annotated[
+    PresetResolutionChoice | CustomResolutionChoice | SourceCropResolutionChoice,
+    Field(discriminator="mode"),
+]
+
+
+def resolve_observation_geometry(
+    *,
+    resolution: ObservationResolutionConfig,
+    renderer: ObservationRendererName | None = None,
+) -> tuple[int, int]:
+    """Return the active `(height, width)` pair for one observation config."""
+
+    if isinstance(resolution, PresetResolutionChoice):
+        return preset_geometry(resolution.preset)
+    if isinstance(resolution, CustomResolutionChoice):
+        return int(resolution.height), int(resolution.width)
+    if renderer is None:
+        raise ValueError("renderer must be set for source-crop observation resolution")
+    return source_crop_geometry(renderer)
 
 
 class ObservationStateComponentConfig(BaseModel):
