@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/race_difficulty.py
+# src/rl_fzerox/core/domain/race/difficulty.py
 from __future__ import annotations
 
 from collections.abc import Mapping

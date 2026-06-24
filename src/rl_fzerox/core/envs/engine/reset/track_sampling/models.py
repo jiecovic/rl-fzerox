@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.race import RaceDifficultyName
 from rl_fzerox.core.runtime_spec.schema import TrackRecordsConfig
 from rl_fzerox.core.runtime_spec.track_sampling_identity import (
     track_sampling_course_key,

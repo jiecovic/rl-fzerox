@@ -1,7 +1,7 @@
 # tests/core/domain/test_training_algorithms.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS
 
 
 def test_training_algorithm_capability_groups_are_derived_from_supported_algorithms() -> None:

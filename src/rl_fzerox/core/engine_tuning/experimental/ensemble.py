@@ -10,7 +10,7 @@ from random import Random
 
 import torch
 
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )

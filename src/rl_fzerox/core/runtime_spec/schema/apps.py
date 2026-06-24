@@ -13,7 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, TrainAlgorithmName
+from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema.common import WatchFpsSetting
 from rl_fzerox.core.runtime_spec.schema.env import EmulatorConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.runtime_spec.schema.policy import PolicyConfig

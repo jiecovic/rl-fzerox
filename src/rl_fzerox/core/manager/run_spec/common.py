@@ -7,23 +7,23 @@ from typing import Literal
 
 from pydantic import PositiveInt
 
-from rl_fzerox.core.domain.engine_tuning import (
+from rl_fzerox.core.domain.courses import (
+    DeficitBudgetDifficultyMetric as DeficitBudgetDifficultyMetric,
+)
+from rl_fzerox.core.domain.courses import (
+    ManagedTrackSamplingMode,
+)
+from rl_fzerox.core.domain.engine import (
     EngineTunerBackend as EngineTunerBackend,
 )
-from rl_fzerox.core.domain.engine_tuning import (
+from rl_fzerox.core.domain.engine import (
     EngineTunerObjective as EngineTunerObjective,
 )
-from rl_fzerox.core.domain.lean import LeanOutputMode as LeanOutputMode
 from rl_fzerox.core.domain.observations import (
     ObservationPresetName,
 )
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
-from rl_fzerox.core.domain.track_sampling import (
-    DeficitBudgetDifficultyMetric as DeficitBudgetDifficultyMetric,
-)
-from rl_fzerox.core.domain.track_sampling import (
-    ManagedTrackSamplingMode,
-)
+from rl_fzerox.core.domain.race import LeanOutputMode as LeanOutputMode
+from rl_fzerox.core.domain.race import RaceDifficultyName
 from rl_fzerox.core.policy.activations import ActivationName as ActivationName
 from rl_fzerox.core.runtime_spec.schema.common import (
     ObservationResizeFilter as ObservationResizeFilter,

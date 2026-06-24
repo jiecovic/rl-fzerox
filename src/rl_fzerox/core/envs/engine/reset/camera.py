@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
-from rl_fzerox.core.domain.camera import (
+from rl_fzerox.core.domain.race import (
     CAMERA_SETTING_BY_NAME,
     CAMERA_SETTINGS,
     CameraSettingName,

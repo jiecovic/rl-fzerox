@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, NonNegativeFloat, PositiveInt, model_validator
 
-from rl_fzerox.core.domain.camera import CameraSettingName
+from rl_fzerox.core.domain.race import CameraSettingName
 from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 
 

@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/training_algorithms.py
+# src/rl_fzerox/core/domain/policy/training_algorithms.py
 """Training algorithm names and capability groups shared across the repo."""
 
 from __future__ import annotations

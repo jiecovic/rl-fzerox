@@ -5,14 +5,14 @@ from typing import Literal
 
 from pydantic import PositiveFloat
 
-from rl_fzerox.core.domain.observations import (
-    ObservationPresetName as DomainObservationPresetName,
-)
-from rl_fzerox.core.domain.track_sampling import (
+from rl_fzerox.core.domain.courses import (
     DeficitBudgetDifficultyMetric as DomainDeficitBudgetDifficultyMetric,
 )
-from rl_fzerox.core.domain.track_sampling import (
+from rl_fzerox.core.domain.courses import (
     RuntimeTrackSamplingMode,
+)
+from rl_fzerox.core.domain.observations import (
+    ObservationPresetName as DomainObservationPresetName,
 )
 
 type WatchFpsSetting = PositiveFloat | Literal["auto", "unlimited"]

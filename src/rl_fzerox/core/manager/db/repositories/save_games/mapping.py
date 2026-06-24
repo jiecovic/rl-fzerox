@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
+from rl_fzerox.core.domain.engine import engine_percent_to_slider_step
 from rl_fzerox.core.manager.db.models.save_games import (
     SaveGameAttemptModel,
     SaveGameCourseSetupModel,

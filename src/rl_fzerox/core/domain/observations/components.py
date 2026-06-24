@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from rl_fzerox.core.domain.track_position import height_above_ground_feature
+from rl_fzerox.core.domain.observations.track_position import height_above_ground_feature
 
 type ActionHistoryControlName = Literal[
     "steer",

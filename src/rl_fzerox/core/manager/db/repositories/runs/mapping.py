@@ -9,7 +9,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
+from rl_fzerox.core.domain.engine import ENGINE_SLIDER
 from rl_fzerox.core.manager.db.models.metadata import LineageGroupModel
 from rl_fzerox.core.manager.db.models.runs import RunModel
 from rl_fzerox.core.manager.db.models.runtime import (

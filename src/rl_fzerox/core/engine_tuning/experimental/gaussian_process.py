@@ -9,7 +9,7 @@ from random import Random
 
 import torch
 
-from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
+from rl_fzerox.core.domain.engine import ENGINE_SLIDER
 from rl_fzerox.core.engine_tuning.experimental.greedy import (
     StableGreedySelection,
     stable_greedy_engine_setting,

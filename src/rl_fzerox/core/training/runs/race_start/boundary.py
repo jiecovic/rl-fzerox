@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/runs/race_start/boundary.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.race_difficulty import race_difficulty_raw_value
+from rl_fzerox.core.domain.race import race_difficulty_raw_value
 from rl_fzerox.core.training.runs.race_start.models import RaceStartVariant
 
 

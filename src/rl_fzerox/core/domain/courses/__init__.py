@@ -9,6 +9,12 @@ from .lookups import (
     built_in_course_refs_by_cup,
 )
 from .model import CourseInfo, CourseRecord, CourseRecords
+from .sampling import (
+    DeficitBudgetDifficultyMetric,
+    ManagedTrackSamplingMode,
+    RuntimeTrackSamplingMode,
+    TrackSamplingMode,
+)
 from .x_cup import (
     X_CUP_COURSE,
     GeneratedXCupCourseIdentity,
@@ -26,7 +32,11 @@ __all__ = [
     "CourseInfo",
     "CourseRecord",
     "CourseRecords",
+    "DeficitBudgetDifficultyMetric",
     "GeneratedXCupCourseIdentity",
+    "ManagedTrackSamplingMode",
+    "RuntimeTrackSamplingMode",
+    "TrackSamplingMode",
     "X_CUP_COURSE",
     "XCupCourseSpec",
     "XCupGeneratedCourseKind",

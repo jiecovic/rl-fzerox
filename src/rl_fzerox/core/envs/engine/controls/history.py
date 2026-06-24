@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from fzerox_emulator import RaceControlState
-from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
+from rl_fzerox.core.domain.race import DEFAULT_LEAN_MODE, LeanMode
 from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer
 from rl_fzerox.core.envs.engine.controls.air_brake import AirBrakePulseState
 from rl_fzerox.core.envs.engine.controls.boost import BoostTimingState

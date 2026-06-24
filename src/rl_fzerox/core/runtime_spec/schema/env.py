@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.domain.camera import CameraSettingName
+from rl_fzerox.core.domain.race import CameraSettingName
 from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 from rl_fzerox.core.runtime_spec.schema.actions import ActionConfig
 from rl_fzerox.core.runtime_spec.schema.observations import ObservationConfig

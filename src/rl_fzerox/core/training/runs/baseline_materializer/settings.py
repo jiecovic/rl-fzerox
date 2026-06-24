@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rl_fzerox.core.domain.engine_setting import engine_percent_to_slider_step
+from rl_fzerox.core.domain.engine import engine_percent_to_slider_step
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
 

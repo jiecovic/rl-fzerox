@@ -10,7 +10,7 @@ from gymnasium import spaces
 
 from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import Float32Array, StateVector
-from rl_fzerox.core.domain.track_position import height_above_ground_feature
+from rl_fzerox.core.domain.observations import height_above_ground_feature
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active, telemetry_can_boost
 from rl_fzerox.core.envs.track_bounds import track_edge_state

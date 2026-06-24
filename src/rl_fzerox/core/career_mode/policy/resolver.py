@@ -11,7 +11,7 @@ from rl_fzerox.core.career_mode.course_setup import (
 )
 from rl_fzerox.core.career_mode.navigation import course_id_from_info
 from rl_fzerox.core.career_mode.policy.runtime import CareerModePolicyControl
-from rl_fzerox.core.domain.camera import CameraSettingName
+from rl_fzerox.core.domain.race import CameraSettingName
 from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig

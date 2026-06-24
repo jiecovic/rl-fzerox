@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS
 from rl_fzerox.core.policy.activations import resolve_policy_activation_fn
 from rl_fzerox.core.policy.auxiliary_state.policies import (
     AuxiliaryStateMaskableHybridActionMultiInputPolicy,

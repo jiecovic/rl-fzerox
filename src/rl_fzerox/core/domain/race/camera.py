@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/camera.py
+# src/rl_fzerox/core/domain/race/camera.py
 """String-backed camera setting names shared by config and engine sync."""
 
 from __future__ import annotations

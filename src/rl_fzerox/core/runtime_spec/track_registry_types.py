@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.race import RaceDifficultyName
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/cnn.py
+# src/rl_fzerox/core/domain/policy/cnn.py
 from __future__ import annotations
 
 from dataclasses import dataclass

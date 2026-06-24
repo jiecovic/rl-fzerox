@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/track_sampling.py
+# src/rl_fzerox/core/domain/courses/sampling.py
 """Track-sampling mode names shared by runtime and managed configs."""
 
 from __future__ import annotations

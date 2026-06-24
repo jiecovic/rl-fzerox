@@ -9,7 +9,7 @@ from rl_fzerox.core.career_mode.navigation.types import (
     ObservedMenuScreen,
 )
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
-from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
+from rl_fzerox.core.domain.engine import ENGINE_SLIDER
 from rl_fzerox.core.runtime_info import (
     bool_info,
     optional_float_info,

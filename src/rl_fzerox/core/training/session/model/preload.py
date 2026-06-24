@@ -7,7 +7,7 @@ from typing import Protocol, TypeGuard, TypeVar
 from stable_baselines3.common.utils import FloatSchedule
 from torch import nn
 
-from rl_fzerox.core.domain.training_algorithms import TrainAlgorithmName
+from rl_fzerox.core.domain.policy import TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainAppConfig, TrainConfig
 from rl_fzerox.core.training.runs import (
     load_train_run_config,

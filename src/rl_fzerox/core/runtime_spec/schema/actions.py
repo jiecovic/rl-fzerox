@@ -31,7 +31,7 @@ from rl_fzerox.core.domain.actions import (
     ActionMaskSpec,
     compile_action_mask_values,
 )
-from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode, LeanOutputMode
+from rl_fzerox.core.domain.race import DEFAULT_LEAN_MODE, LeanMode, LeanOutputMode
 from rl_fzerox.core.runtime_spec.schema.common import (
     ActionMaskOverrides,
     ContinuousAirBrakeMode,

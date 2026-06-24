@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from rl_fzerox.core.career_mode.progress.unlocks import build_unlock_progress
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     engine_percent_to_slider_step,
     validate_engine_slider_step,
 )

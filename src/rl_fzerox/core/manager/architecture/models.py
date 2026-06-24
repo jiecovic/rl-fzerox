@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from rl_fzerox.core.domain.cnn import CnnActivationName, CnnLayerKind
 from rl_fzerox.core.domain.observations import ObservationPresetName, ObservationStateComponentName
+from rl_fzerox.core.domain.policy import CnnActivationName, CnnLayerKind
 
 
 class SelectOption(BaseModel):

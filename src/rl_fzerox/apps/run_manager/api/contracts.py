@@ -6,7 +6,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )

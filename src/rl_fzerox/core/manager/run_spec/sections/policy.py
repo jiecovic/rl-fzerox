@@ -13,7 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.domain.cnn import (
+from rl_fzerox.core.domain.policy import (
     CnnActivationName,
     CnnLayerKind,
     is_activation_cnn_layer,

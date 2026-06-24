@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/manager/architecture/preview/params.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.cnn import (
+from rl_fzerox.core.domain.policy import (
     is_activation_cnn_layer,
     is_pooling_cnn_layer,
     is_residual_cnn_layer,

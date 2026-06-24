@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from rl_fzerox.core.domain.courses import X_CUP_COURSE
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, is_race_difficulty_name
+from rl_fzerox.core.domain.race import RaceDifficultyName, is_race_difficulty_name
 from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     atomic_write_json,
     cache_write_lock,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from rl_fzerox.core.domain.engine_setting import centered_engine_slider_buckets
+from rl_fzerox.core.domain.engine import centered_engine_slider_buckets
 from rl_fzerox.core.engine_tuning import (
     ENGINE_TUNING_STATE_VERSION,
     BanditEngineTunerSettings,

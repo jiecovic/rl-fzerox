@@ -8,7 +8,7 @@ from typing import Literal, Protocol
 
 from fzerox_emulator import EmulatorBackend, ResetState
 from rl_fzerox.core.domain.courses import XCupGeneratedCourseKind
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.race import RaceDifficultyName
 
 BaselineArtifactSource = Literal["existing", "cache", "generated"]
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from fzerox_emulator import RaceControlState
-from rl_fzerox.core.domain.lean import (
+from rl_fzerox.core.domain.race import (
     DEFAULT_LEAN_MODE,
     LeanMode,
 )

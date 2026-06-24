@@ -6,7 +6,7 @@ from typing import Any
 import torch as th
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS
 from rl_fzerox.core.runtime_spec.schema import EnvConfig, PolicyConfig, TrainConfig
 from rl_fzerox.core.training.session.model.action_bias import apply_initial_action_biases
 from rl_fzerox.core.training.session.model.algorithms import (

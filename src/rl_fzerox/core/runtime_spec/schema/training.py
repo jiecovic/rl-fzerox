@@ -16,7 +16,7 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.domain.training_algorithms import (
+from rl_fzerox.core.domain.policy import (
     TRAINING_ALGORITHMS,
     TrainAlgorithmName,
 )

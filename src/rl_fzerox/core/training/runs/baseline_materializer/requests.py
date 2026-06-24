@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/requests.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, default_gp_difficulty
+from rl_fzerox.core.domain.race import RaceDifficultyName, default_gp_difficulty
 from rl_fzerox.core.runtime_spec.schema import TrackConfig, TrackSamplingEntryConfig
 
 from .models import BaselineRequest

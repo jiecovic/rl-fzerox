@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.race import RaceDifficultyName
 from rl_fzerox.core.envs.engine.reset.gp_race import retarget_gp_race_baseline
 from rl_fzerox.core.envs.engine.reset.time_attack import retarget_time_attack_baseline
 from rl_fzerox.core.envs.engine.reset.tracks import SelectedTrack

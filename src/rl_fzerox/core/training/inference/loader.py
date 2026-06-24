@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Protocol, TypeGuard
 
 from fzerox_emulator.arrays import ActionMask, BoolArray, PolicyState
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path

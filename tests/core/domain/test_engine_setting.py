@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
     centered_engine_slider_buckets,
     engine_percent_to_slider_step,

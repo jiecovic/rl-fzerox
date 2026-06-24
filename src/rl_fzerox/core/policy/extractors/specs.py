@@ -8,7 +8,7 @@ from typing import Literal
 from gymnasium import spaces
 from stable_baselines3.common.preprocessing import is_image_space_channels_first
 
-from rl_fzerox.core.domain.cnn import (
+from rl_fzerox.core.domain.policy import (
     CnnActivationName,
     CnnLayerKind,
     is_activation_cnn_layer,

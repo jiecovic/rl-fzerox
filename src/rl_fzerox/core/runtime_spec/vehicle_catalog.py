@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
     engine_slider_step_to_display_percent,
     validate_engine_slider_step,

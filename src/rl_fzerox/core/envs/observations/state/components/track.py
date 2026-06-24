@@ -7,8 +7,8 @@ from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.observations import (
     ObservationStateComponentSettings,
     TrackPositionProgressSourceName,
+    height_above_ground_feature,
 )
-from rl_fzerox.core.domain.track_position import height_above_ground_feature
 from rl_fzerox.core.envs.observations.state.types import StateFeature
 from rl_fzerox.core.envs.observations.state.utils import clamp
 from rl_fzerox.core.envs.track_bounds import track_edge_state

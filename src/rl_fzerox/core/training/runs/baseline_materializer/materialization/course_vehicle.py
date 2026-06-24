@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from rl_fzerox.core.domain.courses import X_CUP_COURSE
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.race import RaceDifficultyName
 from rl_fzerox.core.envs.engine.info import read_live_telemetry
 from rl_fzerox.core.envs.engine.reset.session import sync_reset_presentation
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id

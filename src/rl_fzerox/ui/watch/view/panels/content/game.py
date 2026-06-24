@@ -5,7 +5,7 @@ import math
 from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
     engine_percent_to_slider_step,
     engine_value_to_slider_step,

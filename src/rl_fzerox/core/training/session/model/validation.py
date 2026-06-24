@@ -4,7 +4,7 @@ from __future__ import annotations
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainAppConfig
 
 

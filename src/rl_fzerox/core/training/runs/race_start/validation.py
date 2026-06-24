@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend
-from rl_fzerox.core.domain.engine_setting import validate_engine_slider_step
-from rl_fzerox.core.domain.race_difficulty import race_difficulty_names
+from rl_fzerox.core.domain.engine import validate_engine_slider_step
+from rl_fzerox.core.domain.race import race_difficulty_names
 from rl_fzerox.core.training.runs.race_start.boundary import (
     race_start_gp_difficulty_raw_value,
 )

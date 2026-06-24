@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from rl_fzerox.core.domain.courses import built_in_course_ref_by_id, built_in_course_refs_by_cup
-from rl_fzerox.core.domain.race_difficulty import (
+from rl_fzerox.core.domain.race import (
     RaceDifficultyName,
     default_gp_difficulty,
     is_race_difficulty_name,

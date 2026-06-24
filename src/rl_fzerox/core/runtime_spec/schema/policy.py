@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
 
-from rl_fzerox.core.domain.cnn import (
+from rl_fzerox.core.domain.policy import (
     CnnActivationName,
     CnnLayerKind,
     is_activation_cnn_layer,

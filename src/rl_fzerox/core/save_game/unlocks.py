@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from rl_fzerox.core.domain.race_difficulty import (
+from rl_fzerox.core.domain.race import (
     RACE_DIFFICULTIES,
     RaceDifficultyName,
     race_difficulty_raw_value,

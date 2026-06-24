@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.core.domain.race_difficulty import (
+from rl_fzerox.core.domain.race import (
     RaceDifficultyName,
     is_race_difficulty_name,
     race_difficulty_names,

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from random import Random
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, race_difficulty_raw_value
+from rl_fzerox.core.domain.race import RaceDifficultyName, race_difficulty_raw_value
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,7 +13,7 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, X_CUP_COURSE
-from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
+from rl_fzerox.core.domain.race import default_gp_difficulty
 from rl_fzerox.core.manager.run_spec.common import (
     DeficitBudgetDifficultyMetric,
     GpDifficulty,

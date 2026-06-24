@@ -23,7 +23,7 @@ from rl_fzerox.core.career_mode.navigation import (
     phase_from_step,
     raw_step,
 )
-from rl_fzerox.core.domain.race_difficulty import (
+from rl_fzerox.core.domain.race import (
     is_race_difficulty_name,
     race_difficulty_raw_value,
 )

@@ -26,6 +26,10 @@ from rl_fzerox.core.domain.observations.image import (
     preset_geometry,
     source_crop_geometry,
 )
+from rl_fzerox.core.domain.observations.track_position import (
+    TrackPositionFeatureSpec,
+    height_above_ground_feature,
+)
 
 __all__ = (
     "ActionHistoryControlName",
@@ -42,8 +46,10 @@ __all__ = (
     "ObservationStateComponentSettings",
     "StateComponentFeaturePolicy",
     "StateComponentsSettings",
+    "TrackPositionFeatureSpec",
     "TrackPositionProgressSourceName",
     "default_excluded_state_feature_names",
+    "height_above_ground_feature",
     "preset_geometry",
     "source_crop_geometry",
     "state_feature_default_enabled",

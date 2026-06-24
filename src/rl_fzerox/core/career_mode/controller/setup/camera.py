@@ -12,7 +12,7 @@ from rl_fzerox.core.career_mode.navigation import (
     in_gp_race,
     raw_step,
 )
-from rl_fzerox.core.domain.camera import CameraSettingName
+from rl_fzerox.core.domain.race import CameraSettingName
 from rl_fzerox.core.envs.engine.info import telemetry_info
 from rl_fzerox.core.envs.engine.reset.camera import (
     CAMERA_SYNC_CONTROLS,

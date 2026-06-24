@@ -7,11 +7,11 @@ from dataclasses import dataclass, field
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.courses import X_CUP_COURSE
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
     engine_value_to_slider_step,
 )
-from rl_fzerox.core.domain.race_difficulty import is_race_difficulty_name
+from rl_fzerox.core.domain.race import is_race_difficulty_name
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_character_index
 
 TrackRecordKey = str

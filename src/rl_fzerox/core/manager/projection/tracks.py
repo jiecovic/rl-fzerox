@@ -7,7 +7,7 @@ from rl_fzerox.core.domain.courses import (
     generated_x_cup_course_identity,
     generated_x_cup_slot_key,
 )
-from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
+from rl_fzerox.core.domain.race import default_gp_difficulty
 from rl_fzerox.core.manager.projection.engine_tuning import adaptive_engine_tuning_config
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.track_sampling_identity import track_sampling_entry_id

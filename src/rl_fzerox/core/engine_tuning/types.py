@@ -6,14 +6,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from rl_fzerox.core.domain.engine_setting import (
+from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
+    EngineTunerBackend,
+    EngineTunerObjective,
     centered_engine_slider_buckets,
     engine_percent_to_slider_step,
     engine_slider_steps,
     validate_engine_slider_bucket_values,
 )
-from rl_fzerox.core.domain.engine_tuning import EngineTunerBackend, EngineTunerObjective
 
 
 @dataclass(frozen=True, slots=True)

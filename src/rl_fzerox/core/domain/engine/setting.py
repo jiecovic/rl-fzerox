@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/engine_setting.py
+# src/rl_fzerox/core/domain/engine/setting.py
 """Canonical F-Zero X engine-slider values.
 
 The in-game engine slider is not a decimal percent. Menu probing shows it has

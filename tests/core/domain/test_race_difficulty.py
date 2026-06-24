@@ -1,7 +1,7 @@
 # tests/core/domain/test_race_difficulty.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.race_difficulty import (
+from rl_fzerox.core.domain.race import (
     RACE_DIFFICULTIES,
     default_gp_difficulty,
     is_race_difficulty_name,
