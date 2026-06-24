@@ -56,19 +56,6 @@ DEFICIT_QUEUE_SETTINGS = DeficitQueueSettings()
 
 _DEFICIT_LANES: tuple[TrackSamplingDeficitLane, ...] = ("uniform", "adaptive")
 
-_CRASH_TERMINATION_REASONS = frozenset(
-    {
-        "crashed",
-        "damage",
-        "depleted",
-        "energy_depleted",
-        "falling_off_track",
-        "off_track",
-        "retired",
-        "spinning_out",
-    }
-)
-
 
 class DeficitBudgetTrackSamplingController:
     """Assign reset courses from deterministic step-budget deficit accounts."""
@@ -111,7 +98,6 @@ class DeficitBudgetTrackSamplingController:
         self._accounted_env_steps = {course_key: 0 for course_key in self._course_keys}
         self._scheduler_env_steps = {course_key: 0 for course_key in self._course_keys}
         self._ema_problem = {course_key: 0.0 for course_key in self._course_keys}
-        self._crash_episode_count = {course_key: 0 for course_key in self._course_keys}
         self._rollouts_since_weight_update = 0
         self.update_count = 0
         restored = self._restore_state(restored_state)
@@ -223,8 +209,6 @@ class DeficitBudgetTrackSamplingController:
                 completion_fraction=episode_completion_fraction(episode),
                 finished=finished,
             )
-            if _episode_crashed(episode):
-                self._crash_episode_count[course_key] += 1
 
     def maybe_update_weights(self) -> bool:
         self._rollouts_since_weight_update += 1
@@ -417,10 +401,11 @@ class DeficitBudgetTrackSamplingController:
     def _seed_legacy_deficit_steps_from_accounted_steps(self) -> None:
         """Rebuild deficit debt from old runtime states without scheduler accounts.
 
-        LEGACY: remove after all active manager DBs have persisted
-        deficit_budget_scheduler state. This fallback is intentionally isolated
-        because aggregate measurement stats cannot reconstruct exact scheduler
-        debt, especially when alt baselines contributed reset steps.
+        LEGACY: remove once persisted runtime states without
+        deficit_budget_scheduler are no longer supported. The fallback is
+        intentionally isolated because aggregate measurement stats cannot
+        reconstruct exact scheduler debt, especially when alt baselines
+        contributed reset steps.
         """
 
         total_steps = sum(self._accounted_env_steps.values())
@@ -666,13 +651,6 @@ class DeficitBudgetTrackSamplingController:
         if lane == "uniform":
             self._uniform_assignment_count += 1
             self._last_uniform_assignment_index[course_key] = self._uniform_assignment_count
-
-
-def _episode_crashed(episode: Mapping[str, object]) -> bool:
-    reason = episode.get("termination_reason")
-    if not isinstance(reason, str):
-        return False
-    return reason in _CRASH_TERMINATION_REASONS
 
 
 def _clamped_fraction(value: float) -> float:
