@@ -200,6 +200,37 @@ describe("RunTrackPoolPanel", () => {
     expect(screen.queryByText(selectedCourses[0]?.display_name ?? "")).not.toBeInTheDocument();
   });
 
+  it("shows track-pool stats and alt baselines for a single selected course", () => {
+    const firstCup = configMetadataFixture.track_cups[0];
+    if (firstCup?.course_ids[0] === undefined) {
+      throw new Error("fixture cup must provide at least one course");
+    }
+    const selectedCourseIds = [firstCup.course_ids[0]];
+    const selectedCourse = configMetadataFixture.built_in_courses.find(
+      (course) => course.id === selectedCourseIds[0],
+    );
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isClearingAltBaselines={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onClearAltBaselines={() => undefined}
+        onReset={() => undefined}
+        run={runFixture({
+          config: runConfigWithSelectedCourses(selectedCourseIds),
+        })}
+        state={trackSamplingStateForCourses(selectedCourseIds)}
+      />,
+    );
+
+    expect(screen.getByText("Track pool")).toBeInTheDocument();
+    expect(screen.getByText(selectedCourse?.display_name ?? "")).toBeInTheDocument();
+    expect(screen.getByText("Alt baselines (0)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sample 100.0%" })).toBeInTheDocument();
+  });
+
   it("supports keyboard navigation across cup tabs", async () => {
     const user = userEvent.setup();
     const firstCup = configMetadataFixture.track_cups[0];

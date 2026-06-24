@@ -113,11 +113,11 @@ export function buildTrackPoolView(
 }
 
 export function showTrackSamplingState(state: TrackSamplingRuntimeState | null) {
-  return state !== null && state.entries.length > 1;
+  return state !== null && state.entries.length > 0;
 }
 
 export function expectsTrackSamplingState(run: ManagedRunDetail, totalCourses: number) {
-  return usesDynamicTrackSampling(run.config.tracks.sampling_mode) && totalCourses > 1;
+  return usesDynamicTrackSampling(run.config.tracks.sampling_mode) && totalCourses > 0;
 }
 
 export function trackSamplingUpdatedLabel(run: ManagedRunDetail) {
