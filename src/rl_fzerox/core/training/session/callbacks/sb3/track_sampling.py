@@ -12,6 +12,10 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainConfig,
 )
 from rl_fzerox.core.training.session.callbacks.metrics import episode_dicts, info_sequence
+from rl_fzerox.core.training.session.callbacks.sb3.env_adapter import (
+    TrainingEnvAdapter,
+    training_env_adapter,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     DEFICIT_QUEUE_SETTINGS,
     DeficitBudgetTrackSamplingController,
@@ -98,10 +102,13 @@ class _TrackSamplingRuntimeCallback(BaseCallback):
         self._runtime_persistence.save(self._controller_runtime_state())
         self._runtime_state_dirty = False
 
+    def _env(self) -> TrainingEnvAdapter:
+        return training_env_adapter(self.training_env)
+
     def _publish_track_sampling_config(self, config: TrackSamplingConfig) -> None:
         if self._alt_baseline_projection is not None:
             config = self._alt_baseline_projection.project_fresh(config)
-        self.training_env.env_method("set_track_sampling_config", config)
+        self._env().set_track_sampling_config(config)
 
     def _record_log_values(self, values: Mapping[str, object]) -> None:
         for key, value in values.items():
@@ -175,10 +182,7 @@ class StepBalancedTrackSamplingCallback(_TrackSamplingRuntimeCallback):
         return self._controller.runtime_state()
 
     def _on_training_start(self) -> None:
-        self.training_env.env_method(
-            "set_track_sampling_weights",
-            self._controller.current_weights(),
-        )
+        self._env().set_track_sampling_weights(self._controller.current_weights())
         self._save_runtime_state()
 
     def _on_step(self) -> bool:
@@ -200,10 +204,10 @@ class StepBalancedTrackSamplingCallback(_TrackSamplingRuntimeCallback):
                 restored_state=runtime_state,
             )
             weights = self._controller.current_weights()
-            self.training_env.env_method("set_track_sampling_weights", weights)
+            self._env().set_track_sampling_weights(weights)
             self._finish_x_cup_rotation(rotation_update)
         elif weights is not None:
-            self.training_env.env_method("set_track_sampling_weights", weights)
+            self._env().set_track_sampling_weights(weights)
             self._save_runtime_state()
         return True
 
@@ -300,10 +304,7 @@ class DeficitBudgetTrackSamplingCallback(_TrackSamplingRuntimeCallback):
         return True
 
     def _refill_env_queues(self) -> None:
-        raw_lengths = self.training_env.env_method("track_sampling_reset_queue_length")
-        queue_lengths = tuple(
-            int(length) if isinstance(length, int | float) else 0 for length in raw_lengths
-        )
+        queue_lengths = self._env().track_sampling_reset_queue_lengths()
         self._extend_env_queues(
             self._controller.refill_queues(
                 queue_lengths,
@@ -312,7 +313,7 @@ class DeficitBudgetTrackSamplingCallback(_TrackSamplingRuntimeCallback):
         )
 
     def _replace_env_queues(self) -> None:
-        self.training_env.env_method("clear_track_sampling_reset_queue")
+        self._env().clear_track_sampling_reset_queue()
         self._controller.clear_reserved_assignments()
         self._extend_env_queues(
             self._controller.initial_queues(
@@ -329,10 +330,9 @@ class DeficitBudgetTrackSamplingCallback(_TrackSamplingRuntimeCallback):
         for env_index, queued_resets in queues.items():
             if not queued_resets:
                 continue
-            self.training_env.env_method(
-                "extend_track_sampling_reset_queue",
-                tuple(queued_resets),
-                indices=[env_index],
+            self._env().extend_track_sampling_reset_queue(
+                env_index=env_index,
+                queued_resets=queued_resets,
             )
 
 
@@ -360,7 +360,7 @@ class AltBaselineSyncCallback(BaseCallback):
         next_track_sampling = self._projection.refreshed_track_sampling()
         if next_track_sampling is None:
             return
-        self.training_env.env_method("set_track_sampling_config", next_track_sampling)
+        training_env_adapter(self.training_env).set_track_sampling_config(next_track_sampling)
 
 
 def _rebuild_track_sampling_controller(

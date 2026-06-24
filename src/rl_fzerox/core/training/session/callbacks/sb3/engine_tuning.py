@@ -6,6 +6,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from rl_fzerox.core.engine_tuning import EngineTuningResetSampler
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingSession
 from rl_fzerox.core.training.session.callbacks.metrics import episode_dicts, info_sequence
+from rl_fzerox.core.training.session.callbacks.sb3.env_adapter import training_env_adapter
 
 
 class EngineTuningCallback(BaseCallback):
@@ -40,7 +41,4 @@ class EngineTuningCallback(BaseCallback):
             self.logger.record(key, value)
 
     def _publish_sampler(self, sampler: EngineTuningResetSampler) -> None:
-        self.training_env.env_method(
-            "set_engine_tuning_sampler",
-            sampler,
-        )
+        training_env_adapter(self.training_env).set_engine_tuning_sampler(sampler)
