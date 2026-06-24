@@ -275,25 +275,17 @@ def generate_generic_mode_state(
     emulator_type: Callable[..., StateSavingEmulator],
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
 ) -> str:
-    runtime_dir = cache_root / "runtime" / "generic" / cache_state_path.stem
-    runtime_dir.mkdir(parents=True, exist_ok=True)
-    tmp_state_path = cache_state_path.with_name(
-        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
-    )
-    emulator = emulator_type(
-        core_path=context.core_path,
-        rom_path=context.rom_path,
-        runtime_dir=runtime_dir,
-        baseline_state_path=None,
-        renderer=context.renderer,
-    )
-    try:
+    def materialize(emulator: StateSavingEmulator) -> None:
         generic_mode_seed_materializer(emulator=emulator, mode=mode)
-        emulator.save_state(tmp_state_path)
-    finally:
-        emulator.close()
-    os.replace(tmp_state_path, cache_state_path)
-    return sha256_file(cache_state_path)
+
+    return _generate_state_file(
+        cache_state_path=cache_state_path,
+        runtime_dir=cache_root / "runtime" / "generic" / cache_state_path.stem,
+        baseline_state_path=None,
+        context=context,
+        emulator_type=emulator_type,
+        materialize=materialize,
+    )
 
 
 def generate_course_vehicle_state(
@@ -320,19 +312,8 @@ def generate_course_vehicle_state(
         emulator_type=emulator_type,
         generic_mode_seed_materializer=generic_mode_seed_materializer,
     )
-    runtime_dir = cache_root / "runtime" / "course_vehicle" / cache_state_path.stem
-    runtime_dir.mkdir(parents=True, exist_ok=True)
-    tmp_state_path = cache_state_path.with_name(
-        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
-    )
-    emulator = emulator_type(
-        core_path=context.core_path,
-        rom_path=context.rom_path,
-        runtime_dir=runtime_dir,
-        baseline_state_path=generic_state_path,
-        renderer=context.renderer,
-    )
-    try:
+
+    def materialize(emulator: StateSavingEmulator) -> None:
         menu_seed_race_start_materializer(
             emulator=emulator,
             variant=RaceStartVariant(
@@ -354,11 +335,15 @@ def generate_course_vehicle_state(
             telemetry=telemetry,
             info={},
         )
-        emulator.save_state(tmp_state_path)
-    finally:
-        emulator.close()
-    os.replace(tmp_state_path, cache_state_path)
-    return sha256_file(cache_state_path)
+
+    return _generate_state_file(
+        cache_state_path=cache_state_path,
+        runtime_dir=cache_root / "runtime" / "course_vehicle" / cache_state_path.stem,
+        baseline_state_path=generic_state_path,
+        context=context,
+        emulator_type=emulator_type,
+        materialize=materialize,
+    )
 
 
 def generate_x_cup_state(
@@ -374,19 +359,10 @@ def generate_x_cup_state(
 ) -> tuple[str, XCupMaterializedCourse]:
     defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
     vehicle = vehicle_by_id(vehicle_id)
-    runtime_dir = cache_root / "runtime" / X_CUP_COURSE.cache_dir / cache_state_path.stem
-    runtime_dir.mkdir(parents=True, exist_ok=True)
-    tmp_state_path = cache_state_path.with_name(
-        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
-    )
-    emulator = emulator_type(
-        core_path=context.core_path,
-        rom_path=context.rom_path,
-        runtime_dir=runtime_dir,
-        baseline_state_path=None,
-        renderer=context.renderer,
-    )
-    try:
+    course: XCupMaterializedCourse | None = None
+
+    def materialize(emulator: StateSavingEmulator) -> None:
+        nonlocal course
         course = materialize_x_cup_race_start_from_boot(
             emulator=emulator,
             variant=RaceStartVariant(
@@ -408,11 +384,47 @@ def generate_x_cup_state(
             telemetry=telemetry,
             info={},
         )
+
+    materialized_sha256 = _generate_state_file(
+        cache_state_path=cache_state_path,
+        runtime_dir=cache_root / "runtime" / X_CUP_COURSE.cache_dir / cache_state_path.stem,
+        baseline_state_path=None,
+        context=context,
+        emulator_type=emulator_type,
+        materialize=materialize,
+    )
+    if course is None:
+        raise RuntimeError("X Cup materialization did not return generated course metadata")
+    return materialized_sha256, course
+
+
+def _generate_state_file(
+    *,
+    cache_state_path: Path,
+    runtime_dir: Path,
+    baseline_state_path: Path | None,
+    context: BaselineMaterializerContext,
+    emulator_type: Callable[..., StateSavingEmulator],
+    materialize: Callable[[StateSavingEmulator], None],
+) -> str:
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    tmp_state_path = cache_state_path.with_name(
+        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
+    )
+    emulator = emulator_type(
+        core_path=context.core_path,
+        rom_path=context.rom_path,
+        runtime_dir=runtime_dir,
+        baseline_state_path=baseline_state_path,
+        renderer=context.renderer,
+    )
+    try:
+        materialize(emulator)
         emulator.save_state(tmp_state_path)
     finally:
         emulator.close()
     os.replace(tmp_state_path, cache_state_path)
-    return sha256_file(cache_state_path), course
+    return sha256_file(cache_state_path)
 
 
 def _read_x_cup_metadata(metadata_path: Path) -> XCupMaterializedCourse:
