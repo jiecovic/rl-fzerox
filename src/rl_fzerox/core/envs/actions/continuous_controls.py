@@ -12,6 +12,28 @@ from fzerox_emulator.arrays import ContinuousAction, DiscreteAction
 from rl_fzerox.core.envs.actions.base import ActionBranchValue, ActionValue
 
 
+class _PwmDutyAccumulator:
+    """Convert duty-cycle intent into deterministic binary button pulses."""
+
+    def __init__(self) -> None:
+        self._phase = 0.0
+
+    def reset(self) -> None:
+        self._phase = 0.0
+
+    def pulse(self, duty: float) -> bool:
+        if duty <= 0.0:
+            self.reset()
+            return False
+
+        self._phase += duty
+        if self._phase < 1.0:
+            return False
+
+        self._phase -= 1.0
+        return True
+
+
 class ContinuousDriveDecoder:
     """Decode one continuous drive axis into the game's binary accelerate button."""
 
@@ -25,15 +47,15 @@ class ContinuousDriveDecoder:
         self._deadzone = deadzone
         self._full_threshold = full_threshold
         self._min_thrust = min_thrust
-        self._pwm_phase = 0.0
+        self._pwm = _PwmDutyAccumulator()
 
     def reset(self) -> None:
         """Clear deterministic PWM phase so episodes start from neutral drive."""
 
-        self._pwm_phase = 0.0
+        self._pwm.reset()
 
     def decode(self, drive: float) -> bool:
-        return self._pwm_drive_pressed(
+        return self._pwm.pulse(
             continuous_drive_gas_level(
                 drive,
                 deadzone=self._deadzone,
@@ -41,18 +63,6 @@ class ContinuousDriveDecoder:
                 min_thrust=self._min_thrust,
             )
         )
-
-    def _pwm_drive_pressed(self, duty: float) -> bool:
-        if duty <= 0.0:
-            self._pwm_phase = 0.0
-            return False
-
-        self._pwm_phase += duty
-        if self._pwm_phase < 1.0:
-            return False
-
-        self._pwm_phase -= 1.0
-        return True
 
 
 class ContinuousButtonPwmDecoder:
@@ -68,12 +78,12 @@ class ContinuousButtonPwmDecoder:
         self._deadzone = deadzone
         self._full_threshold = full_threshold
         self._min_duty = min_duty
-        self._pwm_phase = 0.0
+        self._pwm = _PwmDutyAccumulator()
 
     def reset(self) -> None:
         """Clear deterministic PWM phase so episodes start from neutral button state."""
 
-        self._pwm_phase = 0.0
+        self._pwm.reset()
 
     def decode(self, value: float) -> bool:
         duty = _positive_button_pwm_duty_cycle(
@@ -82,16 +92,7 @@ class ContinuousButtonPwmDecoder:
             full_threshold=self._full_threshold,
             min_duty=self._min_duty,
         )
-        if duty <= 0.0:
-            self._pwm_phase = 0.0
-            return False
-
-        self._pwm_phase += duty
-        if self._pwm_phase < 1.0:
-            return False
-
-        self._pwm_phase -= 1.0
-        return True
+        return self._pwm.pulse(duty)
 
 
 def continuous_action_array(
