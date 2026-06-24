@@ -224,6 +224,8 @@ def _training_memory_summary(
     observation_space: spaces.Space[object],
     batch_size: int,
 ) -> _TrainingMemorySummary:
+    """Estimate startup memory pressure without allocating a rollout buffer."""
+
     device = _model_device(model)
     parameter_summary = _model_parameter_summary(model)
     minibatch_observation_bytes = _minibatch_observation_bytes(
@@ -348,6 +350,8 @@ def _minibatch_observation_bytes(
 
 
 def _minibatch_box_bytes(space: spaces.Box, *, batch_size: int) -> int:
+    """Estimate float32 tensor storage for one SB3 minibatch observation."""
+
     value_count = max(1, int(batch_size)) * prod(int(dim) for dim in space.shape)
     tensor_element_size = 4
     return value_count * tensor_element_size

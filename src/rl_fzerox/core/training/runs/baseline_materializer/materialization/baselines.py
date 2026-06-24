@@ -43,6 +43,13 @@ def materialize_baseline_impl(
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
     menu_seed_race_start_materializer: RaceStartMaterializer,
 ) -> BaselineArtifact:
+    """Return one run-local baseline artifact for a resolved request.
+
+    The global cache owns expensive emulator materialization. This layer owns
+    the run-local hardlink/copy and metadata projection that downstream run
+    management uses as the durable manifest.
+    """
+
     reused_artifact = _reuse_existing_run_baseline(request, run_paths=run_paths)
     if reused_artifact is not None:
         return reused_artifact
@@ -127,6 +134,8 @@ def _materialize_x_cup_baseline(
     context: BaselineMaterializerContext,
     emulator_type: Callable[..., StateSavingEmulator],
 ) -> BaselineArtifact:
+    """Materialize a generated-course baseline and bind it to its slot generation."""
+
     if request.mode != X_CUP_COURSE.race_mode:
         raise ValueError(f"X Cup baseline generation requires mode={X_CUP_COURSE.race_mode}")
     seed = _required_request_generated_seed(request)
@@ -196,6 +205,13 @@ def _reuse_existing_run_baseline(
     *,
     run_paths: RunPaths,
 ) -> BaselineArtifact | None:
+    """Reuse only current-schema baselines already owned by this run.
+
+    Continuation must not silently pull arbitrary external save states into a
+    managed run. External/generated inputs go back through materialization so
+    metadata and cache identity remain complete.
+    """
+
     if run_paths.fresh_run or request.source_state_path is None:
         return None
 

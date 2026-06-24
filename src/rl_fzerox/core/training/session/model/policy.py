@@ -56,6 +56,14 @@ def build_policy_kwargs(
     env_config: EnvConfig | None,
     value_head_key: str,
 ) -> dict[str, object]:
+    """Build SB3 policy kwargs from project config.
+
+    SB3 expects policy constructor kwargs as a loose dict, so this function is
+    the narrow translation boundary from typed runtime config to the dynamic
+    library API. Keep action-head names here in sync with configured-hybrid
+    action layouts and actor regularization.
+    """
+
     from gymnasium import spaces
 
     from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCnnExtractor

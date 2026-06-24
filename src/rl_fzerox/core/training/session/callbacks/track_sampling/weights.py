@@ -49,6 +49,13 @@ def blend_course_sampling_weights(
     debt_weights: Mapping[str, CourseSamplingWeights],
     steady_state_share: float,
 ) -> dict[str, CourseSamplingWeights]:
+    """Blend long-term target shares with immediate frame debt.
+
+    Pure debt scheduling can starve a course after one long episode overpays its
+    target. A small steady-state share keeps every target reachable while debt
+    remains the main correction signal.
+    """
+
     steady_total = sum(weights.reset_weight for weights in steady_state_weights.values())
     debt_total = sum(weights.reset_weight for weights in debt_weights.values())
     if steady_total <= 0.0 or debt_total <= 0.0:
@@ -81,6 +88,8 @@ def adaptive_difficulty_bonus(
     finished_episode_count: int,
     success_sample_count: int,
 ) -> float:
+    """Raise target share for courses whose recent attempts underperform."""
+
     if sampling_mode != "adaptive_step_balanced":
         return 1.0
     if max_weight_scale <= 1.0 or completion_weight <= 0.0 or target_completion <= 0.0:
@@ -206,5 +215,7 @@ def finish_rate_confidence(
     success_sample_count: int,
     update_episodes: int,
 ) -> float:
+    """Delay finish-rate pressure until several update windows have samples."""
+
     confidence_episodes = max(1, int(update_episodes)) * 4
     return max(0.0, min(1.0, success_sample_count / confidence_episodes))

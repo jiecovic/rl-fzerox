@@ -157,6 +157,13 @@ class _RatioAccumulator:
 
 @dataclass
 class RolloutInfoAccumulator:
+    """Accumulate one SB3 rollout's sparse env info into stable TensorBoard keys.
+
+    Step-level metrics may be present every env step, while episode metrics only
+    appear in terminal `info["episode"]` payloads. Keeping those paths separate
+    prevents missing terminal data from being interpreted as zero-valued samples.
+    """
+
     state_metrics: dict[str, _MeanAccumulator] = field(
         default_factory=lambda: {
             spec.info_key: _MeanAccumulator() for spec in ROLLOUT_INFO_LOG_SPECS.state_metrics
@@ -198,6 +205,8 @@ class RolloutInfoAccumulator:
     episode_count: int = 0
 
     def add_infos(self, infos: Sequence[object]) -> None:
+        """Consume raw VecEnv info payloads without assuming every key is present."""
+
         for spec in ROLLOUT_INFO_LOG_SPECS.state_metrics:
             values = _numeric_values(infos, spec.info_key)
             if values:
@@ -251,6 +260,8 @@ class RolloutInfoAccumulator:
                 self.truncation_counts[truncation_reason] += 1
 
     def record_to(self, logger: CallbackLogger) -> None:
+        """Emit only metrics that have at least one real sample."""
+
         for spec in ROLLOUT_INFO_LOG_SPECS.state_metrics:
             mean = self.state_metrics[spec.info_key].mean()
             if mean is not None:
@@ -301,6 +312,8 @@ class RolloutInfoAccumulator:
 
 
 def info_sequence(infos: object) -> Sequence[Mapping[str, object]] | None:
+    """Normalize SB3 callback locals into mappings and ignore malformed entries."""
+
     if isinstance(infos, tuple):
         return tuple(info for info in infos if isinstance(info, Mapping))
     if isinstance(infos, list):
@@ -309,6 +322,8 @@ def info_sequence(infos: object) -> Sequence[Mapping[str, object]] | None:
 
 
 def episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
+    """Extract terminal episode summaries emitted by Monitor-style wrappers."""
+
     episodes: list[dict[str, object]] = []
     for info in infos:
         if not isinstance(info, Mapping):

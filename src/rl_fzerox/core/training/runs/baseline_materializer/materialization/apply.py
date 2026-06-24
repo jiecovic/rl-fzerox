@@ -49,6 +49,14 @@ def materialize_run_baselines_impl(
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
     menu_seed_race_start_materializer: RaceStartMaterializer,
 ) -> TrainAppConfig:
+    """Resolve every configured reset baseline to run-local state files.
+
+    Managed training treats the run config as the source of truth. This pass may
+    reuse global cache states, but the returned config always points at files
+    owned by the current run so later archive/export/delete operations do not
+    depend on cache retention.
+    """
+
     resolved_cache_root = (
         (cache_root or BASELINE_MATERIALIZER_SETTINGS.cache_root).expanduser().resolve()
     )
@@ -189,6 +197,8 @@ def _materialize_track_sampling(
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
     menu_seed_race_start_materializer: RaceStartMaterializer,
 ) -> TrackSamplingConfig:
+    """Materialize track-sampling entries after expanding reset variants."""
+
     if not config.entries:
         return config
     entries_to_materialize = _expanded_baseline_variant_entries(
@@ -299,6 +309,8 @@ def _baseline_variant_seed(
     baseline_variant_index: int,
     run_seed: int | None,
 ) -> int:
+    """Derive stable per-run opponent-grid seeds without sharing RNG state."""
+
     parts = (
         "baseline_variant",
         str(0 if run_seed is None else run_seed),

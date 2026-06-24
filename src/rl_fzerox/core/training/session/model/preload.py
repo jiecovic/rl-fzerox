@@ -146,6 +146,8 @@ def _source_auxiliary_state_signature(
     train_config: TrainConfig,
     resume_run_dir: Path,
 ) -> _AuxiliaryStateSignature:
+    """Resolve source aux-head shape from manager metadata or saved manifests."""
+
     if train_config.resume_source_auxiliary_state_enabled is not None:
         if not train_config.resume_source_auxiliary_state_enabled:
             return None
@@ -160,6 +162,8 @@ def _source_algorithm(
     train_config: TrainConfig,
     resume_run_dir: Path,
 ) -> TrainAlgorithmName:
+    """Resolve source algorithm before choosing SB3 load/set-parameter behavior."""
+
     if train_config.resume_source_algorithm is not None:
         return train_config.resume_source_algorithm
     _raise_if_managed_source_metadata_missing(train_config)
@@ -247,6 +251,13 @@ def _auxiliary_state_signature_from_config(
 
 
 def _current_model_auxiliary_state_signature(model: object) -> _AuxiliaryStateSignature:
+    """Read the current aux-head shape from the built torch module.
+
+    We inspect the module instead of trusting config because full-model resume
+    restores serialized policy internals, and weights-only resume may target a
+    freshly built policy with a compatible but not identical config source.
+    """
+
     policy = getattr(model, "policy", None)
     heads = getattr(policy, "_auxiliary_state_heads", None)
     if heads is None:

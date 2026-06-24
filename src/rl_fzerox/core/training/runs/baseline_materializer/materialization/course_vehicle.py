@@ -57,6 +57,13 @@ def ensure_course_vehicle_baseline(
     baseline_variant_count: int | None = None,
     baseline_variant_seed: int | None = None,
 ) -> Path:
+    """Cache the exact race-start state before run-local projection.
+
+    The key includes runtime fingerprints, renderer, course, vehicle and
+    optional GP grid seed. The caller still owns linking/copying this cached
+    state into the run's baseline directory.
+    """
+
     payload = course_vehicle_cache_payload(
         mode=mode,
         course_index=course_index,
@@ -106,6 +113,12 @@ def ensure_generic_mode_baseline(
     emulator_type: Callable[..., StateSavingEmulator],
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
 ) -> Path:
+    """Cache the reusable menu state that course-specific starts build from.
+
+    This state is intentionally mode-only. Course, vehicle and GP grid choices
+    happen in the child materialization step.
+    """
+
     payload = generic_mode_cache_payload(mode=mode, context=context)
     cache_key = sha256_json(payload)
     cache_state_path = generic_mode_state_path(cache_root, mode=mode, cache_key=cache_key)
@@ -142,6 +155,8 @@ def ensure_x_cup_baseline(
     context: BaselineMaterializerContext,
     emulator_type: Callable[..., StateSavingEmulator],
 ) -> tuple[Path, XCupMaterializedCourse]:
+    """Cache one generated-course state and return metadata needed for rotation."""
+
     payload = x_cup_cache_payload(
         seed=seed,
         course_hash=course_hash,
@@ -214,6 +229,8 @@ def _ensure_cached_state(
     cache_kind: str,
     generate_metadata: Callable[[], dict[str, object]],
 ) -> Path:
+    """Generate one cache state once and publish state+metadata together."""
+
     cache_metadata_path = cache_state_path.with_suffix(".json")
     if cache_entry_is_current(
         cache_state_path=cache_state_path,
@@ -290,6 +307,8 @@ def generate_course_vehicle_state(
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
     menu_seed_race_start_materializer: RaceStartMaterializer,
 ) -> str:
+    """Generate an exact race-start state from the cheaper generic menu seed."""
+
     defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
     vehicle = vehicle_by_id(vehicle_id)
     generic_state_path = ensure_generic_mode_baseline(
@@ -344,6 +363,8 @@ def generate_x_cup_state(
     context: BaselineMaterializerContext,
     emulator_type: Callable[..., StateSavingEmulator],
 ) -> tuple[str, XCupMaterializedCourse]:
+    """Generate an X Cup race-start state and return its parsed course metadata."""
+
     defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
     vehicle = vehicle_by_id(vehicle_id)
     course: XCupMaterializedCourse | None = None
@@ -394,6 +415,8 @@ def _generate_state_file(
     emulator_type: Callable[..., StateSavingEmulator],
     materialize: Callable[[StateSavingEmulator], None],
 ) -> str:
+    """Run emulator materialization in an isolated runtime dir and atomically publish."""
+
     runtime_dir.mkdir(parents=True, exist_ok=True)
     tmp_state_path = cache_state_path.with_name(
         f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"

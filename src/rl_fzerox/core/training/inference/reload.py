@@ -61,6 +61,13 @@ class PolicyHotReloader:
         return _mtime_utc(self._loaded_policy.policy_path)
 
     def refresh(self, policy: object) -> PolicyReloadResult:
+        """Reload policy weights and metadata if the watched artifact moved or changed.
+
+        Metadata may change without a policy file rewrite, for example when a
+        manager updates checkpoint step counts after export. Keep metadata fresh
+        even when the in-memory policy object can be reused.
+        """
+
         try:
             policy_path = resolve_policy_artifact_path(
                 self._loaded_policy.run_dir,

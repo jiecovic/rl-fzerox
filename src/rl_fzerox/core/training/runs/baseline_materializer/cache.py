@@ -6,7 +6,7 @@ import json
 import os
 import shutil
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -19,7 +19,7 @@ from .settings import BASELINE_MATERIALIZER_SETTINGS
 
 
 @contextmanager
-def cache_write_lock(cache_state_path: Path) -> Iterator[None]:
+def cache_write_lock(cache_state_path: Path) -> Generator[None]:
     """Serialize generation for one cache key."""
 
     lock_path = cache_state_path.with_suffix(f"{cache_state_path.suffix}.lock")
@@ -53,6 +53,8 @@ def course_vehicle_cache_payload(
     baseline_variant_count: int | None = None,
     baseline_variant_seed: int | None = None,
 ) -> dict[str, object]:
+    """Return the content identity for a reusable course/vehicle baseline."""
+
     defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
     vehicle = vehicle_by_id(vehicle_id)
     payload: dict[str, object] = {
@@ -91,6 +93,8 @@ def x_cup_cache_payload(
     race_intro_target_timer: int | None,
     context: BaselineMaterializerContext,
 ) -> dict[str, object]:
+    """Return the content identity for a generated X Cup baseline."""
+
     defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
     vehicle = vehicle_by_id(vehicle_id)
     return {
@@ -117,6 +121,8 @@ def generic_mode_cache_payload(
     mode: str,
     context: BaselineMaterializerContext,
 ) -> dict[str, object]:
+    """Return the content identity for a menu-state seed baseline."""
+
     return {
         "schema_version": BASELINE_MATERIALIZER_SETTINGS.schema_version,
         "materializer_mode": f"generic_mode_seed_{mode}",
@@ -127,6 +133,12 @@ def generic_mode_cache_payload(
 
 
 def runtime_fingerprint_payload(context: BaselineMaterializerContext) -> dict[str, str]:
+    """Fingerprint runtime inputs that change save-state compatibility.
+
+    Paths are intentionally excluded. Moving the same ROM/core should reuse the
+    cache, while changing bytes at the same path must invalidate it.
+    """
+
     return {
         "core_sha256": sha256_file(context.core_path),
         "rom_sha256": sha256_file(context.rom_path),
