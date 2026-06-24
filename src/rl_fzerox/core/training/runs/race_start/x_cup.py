@@ -7,19 +7,19 @@ from dataclasses import dataclass
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
-from rl_fzerox.core.training.runs.race_start.boot import (
-    _press_until_mode,
-    _release_input,
-    _select_machine,
-    _step_until_ready_from_boot,
-    _tap_menu_right,
-    _unlock_everything,
-    _wait_until_mode,
-)
 from rl_fzerox.core.training.runs.race_start.boundary import (
     race_start_gp_difficulty_raw_value,
 )
 from rl_fzerox.core.training.runs.race_start.models import MENU_TIMING, RaceStartVariant
+from rl_fzerox.core.training.runs.race_start.navigation import (
+    press_until_mode,
+    release_input,
+    select_machine,
+    step_until_ready_from_boot,
+    tap_menu_right,
+    unlock_everything,
+    wait_until_mode,
+)
 from rl_fzerox.core.training.runs.race_start.validation import validate_variant
 
 
@@ -51,38 +51,38 @@ def materialize_x_cup_race_start_from_boot(
     validate_variant(variant)
 
     emulator.reset()
-    _release_input(emulator)
+    release_input(emulator)
     emulator.step_frames(MENU_TIMING.boot_frames, capture_video=False)
 
-    _press_until_mode(emulator, target_mode="main_menu")
+    press_until_mode(emulator, target_mode="main_menu")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-    _unlock_everything(emulator)
+    unlock_everything(emulator)
     emulator.step_frames(MENU_TIMING.post_unlock_settle_frames, capture_video=False)
 
-    _press_until_mode(emulator, target_mode="course_select")
+    press_until_mode(emulator, target_mode="course_select")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
     _select_x_cup(emulator)
     emulator.randomize_game_rng(rng_seed)
 
-    _press_until_mode(emulator, target_mode="machine_select")
+    press_until_mode(emulator, target_mode="machine_select")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-    _select_machine(emulator, variant)
-    _wait_until_mode(emulator, target_mode="machine_settings")
+    select_machine(emulator, variant)
+    wait_until_mode(emulator, target_mode="machine_settings")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
     _write_x_cup_machine_setup(emulator, variant)
 
-    _press_until_mode(
+    press_until_mode(
         emulator,
         target_mode=X_CUP_COURSE.race_mode,
         require_race_mode=True,
     )
-    _step_until_ready_from_boot(emulator, variant)
+    step_until_ready_from_boot(emulator, variant)
     return _materialized_course(emulator)
 
 
 def _select_x_cup(emulator: EmulatorBackend) -> None:
     for _ in range(X_CUP_COURSE.menu_right_presses_from_jack):
-        _tap_menu_right(emulator)
+        tap_menu_right(emulator)
     telemetry = emulator.try_read_telemetry()
     if not _is_x_cup_course_selection(telemetry):
         course_index = None if telemetry is None else telemetry.course_index
