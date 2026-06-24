@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 
 from rl_fzerox.core.engine_tuning.state.candidate import EngineTuningCandidateState
 from rl_fzerox.core.engine_tuning.state.model import EngineTuningModelState
+from rl_fzerox.core.engine_tuning.state.objectives import project_candidate_for_objective
 from rl_fzerox.core.engine_tuning.types import EngineTunerObjective
 
 ENGINE_TUNING_STATE_VERSION = 7
@@ -108,7 +109,8 @@ def engine_tuning_state_with_objective(
     candidates = tuple(
         candidate
         for candidate in (
-            item.with_active_objective(
+            project_candidate_for_objective(
+                item,
                 objective,
                 safe_finish_rate_threshold=safe_finish_rate_threshold,
                 prior_finish_time_seconds=prior_finish_time_seconds,

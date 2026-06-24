@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from rl_fzerox.core.engine_tuning.types import EngineTunerObjective
-
 
 def _clamp_unit_interval(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
@@ -196,71 +194,4 @@ class EngineTuningCandidateState:
             self,
             decayed_count=self.decayed_count * clamped_decay,
             decayed_score_total=self.decayed_score_total * clamped_decay,
-        )
-
-    def with_active_objective(
-        self,
-        objective: EngineTunerObjective,
-        *,
-        safe_finish_rate_threshold: float = 0.9,
-        prior_finish_time_seconds: float = 200.0,
-    ) -> EngineTuningCandidateState | None:
-        """Return this candidate with active scoring rebuilt for an objective."""
-
-        if objective == "finish_rate":
-            if not self.has_valid_episode_statistics:
-                return None
-            best_score = 1.0 if self.finish_count > 0 else 0.0
-            finish_score_total = float(self.finish_count)
-            return replace(
-                self,
-                score_count=self.episode_count,
-                decayed_count=float(self.episode_count),
-                decayed_score_total=finish_score_total,
-                score_total=finish_score_total,
-                best_score=best_score,
-            )
-        if objective == "safe_finish_time":
-            if not self.has_valid_episode_statistics:
-                return None
-            finish_rate = self.finish_rate_score or 0.0
-            threshold = _clamp_unit_interval(safe_finish_rate_threshold)
-            prior_penalty = max(1.0, float(prior_finish_time_seconds))
-            if finish_rate >= threshold and self.finish_count > 0:
-                mean_finish_score = self.finish_score_total / self.finish_count
-                score_total = mean_finish_score * self.episode_count
-                best_score = self.best_finish_score
-            else:
-                # Safe mode treats reliability as a hard gate. Below the gate, arms
-                # compete by finish-rate gap instead of raw speed.
-                gap = max(0.0, threshold - finish_rate)
-                score_total = -prior_penalty * float(self.episode_count) * (1.0 + gap)
-                best_score = -prior_penalty * (1.0 + gap)
-            return replace(
-                self,
-                score_count=self.episode_count,
-                decayed_count=float(self.episode_count),
-                decayed_score_total=score_total,
-                score_total=score_total,
-                best_score=best_score,
-            )
-        if self.finish_count <= 0:
-            finish_score_total = 0.0
-            best_finish_score = None
-        else:
-            finish_score_total = (
-                self.finish_score_total
-                if self.finish_score_total != 0.0 or self.best_finish_score is not None
-                else self.score_total
-            )
-            best_finish_score = (
-                self.best_finish_score if self.best_finish_score is not None else self.best_score
-            )
-        return replace(
-            self,
-            score_count=self.finish_count,
-            decayed_count=float(self.finish_count),
-            decayed_score_total=finish_score_total,
-            score_total=finish_score_total,
-            best_score=best_finish_score,
         )
