@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/actions/__init__.py
 from collections.abc import Callable
 
-from rl_fzerox.core.domain.action_adapters import ActionAdapterName
+from rl_fzerox.core.domain.actions import ActionAdapterName
 from rl_fzerox.core.envs.actions.base import (
     ActionAdapter,
     ActionValue,

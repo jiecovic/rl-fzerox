@@ -26,8 +26,8 @@ from pydantic import (
 )
 
 from fzerox_emulator.control.spin import DEFAULT_SPIN_COOLDOWN_FRAMES
-from rl_fzerox.core.domain.action_adapters import ActionAdapterName
-from rl_fzerox.core.domain.action_values import (
+from rl_fzerox.core.domain.actions import (
+    ActionAdapterName,
     ActionMaskSpec,
     compile_action_mask_values,
 )

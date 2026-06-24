@@ -1,14 +1,9 @@
 # src/rl_fzerox/core/domain/action_adapters.py
-"""Shared action-adapter name type for the managed runtime surface."""
+"""Compatibility facade for action-adapter domain names."""
 
 from __future__ import annotations
 
-from typing import Literal
-
-type ActionAdapterName = Literal[
-    "configured_discrete",
-    "configured_hybrid",
-]
+from rl_fzerox.core.domain.actions import ActionAdapterName
 
 __all__ = [
     "ActionAdapterName",
