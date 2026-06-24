@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import sqrt
 from random import Random
 
 from rl_fzerox.core.engine_tuning.state import EngineTuningCandidateState
@@ -117,6 +118,12 @@ def _sample_engine_setting(
             threshold=threshold,
             prior_finish_time_seconds=prior_finish_time_seconds,
         )
+    if projection.objective == "finish_rate":
+        return _sample_finish_rate_engine_setting(
+            projection=projection,
+            candidates=candidates,
+            rng=rng,
+        )
     sampled_scores = _sample_scores(projection=projection, candidates=candidates, rng=rng)
     selected = max(
         candidates,
@@ -179,6 +186,33 @@ def _sample_safe_finish_time_engine_setting(
     return selected, sampled[selected].finish_rate
 
 
+def _sample_finish_rate_engine_setting(
+    *,
+    projection: _EngineProjection,
+    candidates: tuple[int, ...],
+    rng: Random,
+) -> tuple[int, float]:
+    sampled_rates = {
+        engine_raw: _sample_finish_rate(projection.estimates[engine_raw], rng=rng)
+        for engine_raw in candidates
+    }
+    midpoint = _candidate_midpoint(candidates)
+    selected = max(
+        candidates,
+        key=lambda engine_raw: (
+            sampled_rates[engine_raw],
+            projection.estimates[engine_raw].finish_rate
+            if projection.estimates[engine_raw].finish_rate is not None
+            else float("-inf"),
+            projection.estimates[engine_raw].finish_count,
+            projection.estimates[engine_raw].episode_count,
+            -abs(engine_raw - midpoint),
+            -engine_raw,
+        ),
+    )
+    return selected, sampled_rates[selected]
+
+
 @dataclass(frozen=True, slots=True)
 class _SafeFinishTimeSample:
     finish_rate: float
@@ -191,8 +225,7 @@ def _sample_safe_finish_time_candidate(
     rng: Random,
     prior_finish_time_seconds: float,
 ) -> _SafeFinishTimeSample:
-    failures = max(0, estimate.episode_count - estimate.finish_count)
-    finish_rate = rng.betavariate(1.0 + estimate.finish_count, 1.0 + failures)
+    finish_rate = _sample_finish_rate(estimate, rng=rng)
     mean_finish_score = (
         estimate.mean_finish_score
         if estimate.mean_finish_score is not None
@@ -203,6 +236,11 @@ def _sample_safe_finish_time_candidate(
         finish_rate=finish_rate,
         finish_time_score=finish_time_score,
     )
+
+
+def _sample_finish_rate(estimate: _EngineEstimate, *, rng: Random) -> float:
+    failures = max(0, estimate.episode_count - estimate.finish_count)
+    return rng.betavariate(1.0 + estimate.finish_count, 1.0 + failures)
 
 
 def _sample_scores(
@@ -250,9 +288,20 @@ def _candidate_observation_count(
 def _candidate_uncertainty(
     candidate: EngineTuningCandidateState,
     *,
+    objective: EngineTunerObjective,
     exploration_seconds: float,
 ) -> float:
+    if objective == "finish_rate":
+        return _beta_finish_rate_std(candidate.finish_count, candidate.episode_count)
     return max(0.25, float(exploration_seconds)) / max(1.0, candidate.decayed_count) ** 0.5
+
+
+def _beta_finish_rate_std(finish_count: int, episode_count: int) -> float:
+    failures = max(0, int(episode_count) - int(finish_count))
+    alpha = 1.0 + max(0, int(finish_count))
+    beta = 1.0 + failures
+    total = alpha + beta
+    return sqrt((alpha * beta) / (total * total * (total + 1.0)))
 
 
 def _candidate_midpoint(candidates: tuple[int, ...]) -> float:

@@ -258,6 +258,47 @@ def test_bandit_can_score_finish_rate_objective() -> None:
     )
 
 
+def test_bandit_finish_rate_sampling_uses_beta_bernoulli_scale() -> None:
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            objective="finish_rate",
+            min_raw_value=44,
+            max_raw_value=84,
+            bucket_raw_values=(44, 84),
+            uniform_exploration=0.0,
+        )
+    )
+    episodes = [
+        _successful_engine_episode(engine_raw=44, race_time_ms=80_000)
+        for _ in range(8)
+    ]
+    episodes.extend(
+        _engine_episode(engine_raw=44, termination_reason="retired") for _ in range(2)
+    )
+    episodes.extend(
+        _successful_engine_episode(engine_raw=84, race_time_ms=78_000)
+        for _ in range(2)
+    )
+    episodes.extend(
+        _engine_episode(engine_raw=84, termination_reason="retired") for _ in range(8)
+    )
+
+    assert controller.record_episodes(tuple(episodes))
+
+    snapshot = controller.reset_sampler_snapshot((context,))
+    estimates = {
+        candidate.engine_setting_raw_value: candidate
+        for candidate in snapshot.contexts[0].candidates
+    }
+    assert estimates[44].probability > estimates[84].probability
+    assert estimates[44].mean_score == pytest.approx(0.8)
+    assert estimates[84].mean_score == pytest.approx(0.2)
+    assert 0.0 < estimates[44].sampled_score < 0.25
+
+
 def test_bandit_safe_finish_time_requires_finish_rate_before_time() -> None:
     context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
     controller = EngineTuningTrainingController(

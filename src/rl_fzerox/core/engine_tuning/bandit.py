@@ -231,7 +231,10 @@ class BanditEngineTuner:
         if candidate is None:
             return _EngineEstimate(
                 mean_score=self._prior_score(),
-                uncertainty_score=max(0.0, float(self._settings.exploration_seconds)),
+                uncertainty_score=_prior_uncertainty(
+                    objective=self._settings.objective,
+                    exploration_seconds=self._settings.exploration_seconds,
+                ),
                 exact_score_count=0,
                 episode_count=0,
                 finish_count=0,
@@ -243,7 +246,10 @@ class BanditEngineTuner:
         if candidate.mean_score is None or candidate.active_score_count <= 0:
             return _EngineEstimate(
                 mean_score=self._prior_score(),
-                uncertainty_score=max(0.0, float(self._settings.exploration_seconds)),
+                uncertainty_score=_prior_uncertainty(
+                    objective=self._settings.objective,
+                    exploration_seconds=self._settings.exploration_seconds,
+                ),
                 exact_score_count=0,
                 episode_count=candidate.episode_count,
                 finish_count=candidate.finish_count,
@@ -257,6 +263,7 @@ class BanditEngineTuner:
             mean_score=candidate.mean_score,
             uncertainty_score=_candidate_uncertainty(
                 candidate,
+                objective=self._settings.objective,
                 exploration_seconds=self._settings.exploration_seconds,
             ),
             exact_score_count=candidate.active_score_count,
@@ -449,6 +456,16 @@ def _objective_score(
             finish_time_ms,
         )
     return (1.0 if finish_time_ms is not None else 0.0, finish_time_ms)
+
+
+def _prior_uncertainty(
+    *,
+    objective: str,
+    exploration_seconds: float,
+) -> float:
+    if objective == "finish_rate":
+        return (1.0 / 12.0) ** 0.5
+    return max(0.0, float(exploration_seconds))
 
 
 def _bandit_state_or_empty(
