@@ -12,17 +12,16 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingConfig,
     TrainConfig,
 )
-from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.metrics import episode_dicts, info_sequence
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     DEFICIT_QUEUE_SETTINGS,
     DeficitBudgetTrackSamplingController,
     StepBalancedTrackSamplingController,
     TrackSamplingAltBaseline,
-    TrackSamplingMaterializedArtifact,
     TrackSamplingRuntimePersistence,
     TrackSamplingRuntimeState,
     XCupRotationManager,
+    XCupRotationUpdate,
     alt_baseline_signature,
     apply_alt_baselines_to_track_sampling,
     replace_runtime_generation,
@@ -74,7 +73,88 @@ class AltBaselineProjectionState:
         )
 
 
-class StepBalancedTrackSamplingCallback(BaseCallback):
+class _TrackSamplingRuntimeCallback(BaseCallback):
+    def __init__(
+        self,
+        *,
+        env_config: EnvConfig,
+        curriculum_config: CurriculumConfig,
+        rotation_manager: XCupRotationManager | None,
+        runtime_persistence: TrackSamplingRuntimePersistence,
+        alt_baseline_projection: AltBaselineProjectionState | None,
+    ) -> None:
+        super().__init__(verbose=0)
+        self._env_config = env_config
+        self._curriculum_config = curriculum_config
+        self._rotation_manager = rotation_manager
+        self._runtime_persistence = runtime_persistence
+        self._alt_baseline_projection = alt_baseline_projection
+        self._runtime_state_dirty = False
+
+    def _controller_runtime_state(self) -> TrackSamplingRuntimeState:
+        raise NotImplementedError
+
+    def _on_training_end(self) -> None:
+        self._save_runtime_state()
+
+    def _save_runtime_state(self) -> None:
+        self._runtime_persistence.save(self._controller_runtime_state())
+        self._runtime_state_dirty = False
+
+    def _publish_track_sampling_config(self, config: TrackSamplingConfig) -> None:
+        if self._alt_baseline_projection is not None:
+            config = self._alt_baseline_projection.project_fresh(config)
+        self.training_env.env_method("set_track_sampling_config", config)
+
+    def _record_log_values(self, values: Mapping[str, object]) -> None:
+        for key, value in values.items():
+            self.logger.record(key, value)
+
+    def _begin_x_cup_rotation(
+        self,
+        runtime_state: TrackSamplingRuntimeState,
+    ) -> tuple[TrackSamplingRuntimeState, XCupRotationUpdate] | None:
+        rotation_manager = self._rotation_manager
+        rotation_update = (
+            None
+            if rotation_manager is None
+            else rotation_manager.rotate_once(
+                env_config=self._env_config,
+                state=runtime_state,
+            )
+        )
+        if rotation_update is None:
+            return None
+        replaced_state = replace_runtime_generation(
+            runtime_state,
+            course_key=rotation_update.replaced_course_key,
+            replacement_label=rotation_update.replacement_label,
+            generated_course_slot=rotation_update.generated_course_slot,
+            generated_course_generation=rotation_update.generated_course_generation,
+            generated_course_id=rotation_update.generated_course_id,
+            generated_course_name=rotation_update.generated_course_name,
+            generated_course_hash=rotation_update.generated_course_hash,
+            generated_course_seed=rotation_update.generated_course_seed,
+            generated_course_segment_count=rotation_update.generated_course_segment_count,
+            generated_course_length=rotation_update.generated_course_length,
+        )
+        self._env_config = rotation_update.env_config
+        self._publish_track_sampling_config(self._env_config.track_sampling)
+        return replaced_state, rotation_update
+
+    def _finish_x_cup_rotation(self, rotation_update: XCupRotationUpdate) -> None:
+        persist_artifacts = self._runtime_persistence.replace_materialized_artifacts
+        if persist_artifacts is not None:
+            persist_artifacts(rotation_update.materialized_artifacts)
+        persist_slots = self._runtime_persistence.replace_generated_x_cup_slots
+        if persist_slots is not None:
+            persist_slots(rotation_update.generated_x_cup_slots)
+        if self._rotation_manager is not None:
+            self._rotation_manager.commit(rotation_update)
+        self._save_runtime_state()
+
+
+class StepBalancedTrackSamplingCallback(_TrackSamplingRuntimeCallback):
     """Refresh track sampling weights from completed-episode frame counts."""
 
     def __init__(
@@ -87,14 +167,17 @@ class StepBalancedTrackSamplingCallback(BaseCallback):
         runtime_persistence: TrackSamplingRuntimePersistence,
         alt_baseline_projection: AltBaselineProjectionState | None,
     ) -> None:
-        super().__init__(verbose=0)
+        super().__init__(
+            env_config=env_config,
+            curriculum_config=curriculum_config,
+            rotation_manager=rotation_manager,
+            runtime_persistence=runtime_persistence,
+            alt_baseline_projection=alt_baseline_projection,
+        )
         self._controller = controller
-        self._env_config = env_config
-        self._curriculum_config = curriculum_config
-        self._rotation_manager = rotation_manager
-        self._runtime_persistence = runtime_persistence
-        self._alt_baseline_projection = alt_baseline_projection
-        self._runtime_state_dirty = False
+
+    def _controller_runtime_state(self) -> TrackSamplingRuntimeState:
+        return self._controller.runtime_state()
 
     def _on_training_start(self) -> None:
         self.training_env.env_method(
@@ -114,31 +197,9 @@ class StepBalancedTrackSamplingCallback(BaseCallback):
         weights = self._controller.record_episodes(episodes)
         self._runtime_state_dirty = True
         runtime_state = self._controller.runtime_state()
-        rotation_manager = self._rotation_manager
-        rotation_update = (
-            None
-            if rotation_manager is None
-            else rotation_manager.rotate_once(
-                env_config=self._env_config,
-                state=runtime_state,
-            )
-        )
-        if rotation_update is not None:
-            runtime_state = replace_runtime_generation(
-                runtime_state,
-                course_key=rotation_update.replaced_course_key,
-                replacement_label=rotation_update.replacement_label,
-                generated_course_slot=rotation_update.generated_course_slot,
-                generated_course_generation=rotation_update.generated_course_generation,
-                generated_course_id=rotation_update.generated_course_id,
-                generated_course_name=rotation_update.generated_course_name,
-                generated_course_hash=rotation_update.generated_course_hash,
-                generated_course_seed=rotation_update.generated_course_seed,
-                generated_course_segment_count=rotation_update.generated_course_segment_count,
-                generated_course_length=rotation_update.generated_course_length,
-            )
-            self._env_config = rotation_update.env_config
-            self._publish_track_sampling_config(self._env_config.track_sampling)
+        rotation = self._begin_x_cup_rotation(runtime_state)
+        if rotation is not None:
+            runtime_state, rotation_update = rotation
             self._controller = _rebuild_track_sampling_controller(
                 env_config=self._env_config,
                 curriculum_config=self._curriculum_config,
@@ -146,52 +207,19 @@ class StepBalancedTrackSamplingCallback(BaseCallback):
             )
             weights = self._controller.current_weights()
             self.training_env.env_method("set_track_sampling_weights", weights)
-            self._save_materialized_artifacts(rotation_update.materialized_artifacts)
-            self._save_generated_x_cup_slots(rotation_update.generated_x_cup_slots)
-            if rotation_manager is not None:
-                rotation_manager.commit(rotation_update)
-            self._save_runtime_state()
+            self._finish_x_cup_rotation(rotation_update)
         elif weights is not None:
             self.training_env.env_method("set_track_sampling_weights", weights)
             self._save_runtime_state()
         return True
 
     def _on_rollout_end(self) -> None:
-        for key, value in self._controller.log_values().items():
-            self.logger.record(key, value)
+        self._record_log_values(self._controller.log_values())
         if self._runtime_state_dirty:
             self._save_runtime_state()
 
-    def _on_training_end(self) -> None:
-        self._save_runtime_state()
 
-    def _save_runtime_state(self) -> None:
-        self._runtime_persistence.save(self._controller.runtime_state())
-        self._runtime_state_dirty = False
-
-    def _save_materialized_artifacts(
-        self,
-        artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
-    ) -> None:
-        persist = self._runtime_persistence.replace_materialized_artifacts
-        if persist is not None:
-            persist(artifacts)
-
-    def _save_generated_x_cup_slots(
-        self,
-        slots: tuple[GeneratedXCupSlot, ...],
-    ) -> None:
-        persist = self._runtime_persistence.replace_generated_x_cup_slots
-        if persist is not None:
-            persist(slots)
-
-    def _publish_track_sampling_config(self, config: TrackSamplingConfig) -> None:
-        if self._alt_baseline_projection is not None:
-            config = self._alt_baseline_projection.project_fresh(config)
-        self.training_env.env_method("set_track_sampling_config", config)
-
-
-class DeficitBudgetTrackSamplingCallback(BaseCallback):
+class DeficitBudgetTrackSamplingCallback(_TrackSamplingRuntimeCallback):
     """Schedule reset queues from deterministic per-course step deficits."""
 
     def __init__(
@@ -205,16 +233,19 @@ class DeficitBudgetTrackSamplingCallback(BaseCallback):
         alt_baseline_projection: AltBaselineProjectionState | None,
         train_config: TrainConfig,
     ) -> None:
-        super().__init__(verbose=0)
+        super().__init__(
+            env_config=env_config,
+            curriculum_config=curriculum_config,
+            rotation_manager=rotation_manager,
+            runtime_persistence=runtime_persistence,
+            alt_baseline_projection=alt_baseline_projection,
+        )
         self._controller = controller
-        self._env_config = env_config
-        self._curriculum_config = curriculum_config
-        self._rotation_manager = rotation_manager
-        self._runtime_persistence = runtime_persistence
-        self._alt_baseline_projection = alt_baseline_projection
         self._train_config = train_config
-        self._runtime_state_dirty = False
         self._rollout_budget_bootstrapped = False
+
+    def _controller_runtime_state(self) -> TrackSamplingRuntimeState:
+        return self._controller.runtime_state()
 
     def _on_training_start(self) -> None:
         self._add_rollout_budget()
@@ -258,53 +289,23 @@ class DeficitBudgetTrackSamplingCallback(BaseCallback):
         if self._controller.maybe_update_weights():
             self._replace_env_queues()
             self._runtime_state_dirty = True
-        for key, value in self._controller.log_values().items():
-            self.logger.record(key, value)
+        self._record_log_values(self._controller.log_values())
         if self._runtime_state_dirty:
             self._save_runtime_state()
 
-    def _on_training_end(self) -> None:
-        self._save_runtime_state()
-
     def _maybe_rotate_x_cup(self) -> bool:
         runtime_state = self._controller.runtime_state()
-        rotation_manager = self._rotation_manager
-        rotation_update = (
-            None
-            if rotation_manager is None
-            else rotation_manager.rotate_once(
-                env_config=self._env_config,
-                state=runtime_state,
-            )
-        )
-        if rotation_update is None:
+        rotation = self._begin_x_cup_rotation(runtime_state)
+        if rotation is None:
             return False
-        runtime_state = replace_runtime_generation(
-            runtime_state,
-            course_key=rotation_update.replaced_course_key,
-            replacement_label=rotation_update.replacement_label,
-            generated_course_slot=rotation_update.generated_course_slot,
-            generated_course_generation=rotation_update.generated_course_generation,
-            generated_course_id=rotation_update.generated_course_id,
-            generated_course_name=rotation_update.generated_course_name,
-            generated_course_hash=rotation_update.generated_course_hash,
-            generated_course_seed=rotation_update.generated_course_seed,
-            generated_course_segment_count=rotation_update.generated_course_segment_count,
-            generated_course_length=rotation_update.generated_course_length,
-        )
-        self._env_config = rotation_update.env_config
-        self._publish_track_sampling_config(self._env_config.track_sampling)
+        runtime_state, rotation_update = rotation
         self._controller = _rebuild_deficit_budget_track_sampling_controller(
             env_config=self._env_config,
             curriculum_config=self._curriculum_config,
             restored_state=runtime_state,
         )
         self._replace_env_queues()
-        self._save_materialized_artifacts(rotation_update.materialized_artifacts)
-        self._save_generated_x_cup_slots(rotation_update.generated_x_cup_slots)
-        if rotation_manager is not None:
-            rotation_manager.commit(rotation_update)
-        self._save_runtime_state()
+        self._finish_x_cup_rotation(rotation_update)
         return True
 
     def _refill_env_queues(self) -> None:
@@ -342,31 +343,6 @@ class DeficitBudgetTrackSamplingCallback(BaseCallback):
                 tuple(queued_resets),
                 indices=[env_index],
             )
-
-    def _save_runtime_state(self) -> None:
-        self._runtime_persistence.save(self._controller.runtime_state())
-        self._runtime_state_dirty = False
-
-    def _save_materialized_artifacts(
-        self,
-        artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
-    ) -> None:
-        persist = self._runtime_persistence.replace_materialized_artifacts
-        if persist is not None:
-            persist(artifacts)
-
-    def _save_generated_x_cup_slots(
-        self,
-        slots: tuple[GeneratedXCupSlot, ...],
-    ) -> None:
-        persist = self._runtime_persistence.replace_generated_x_cup_slots
-        if persist is not None:
-            persist(slots)
-
-    def _publish_track_sampling_config(self, config: TrackSamplingConfig) -> None:
-        if self._alt_baseline_projection is not None:
-            config = self._alt_baseline_projection.project_fresh(config)
-        self.training_env.env_method("set_track_sampling_config", config)
 
 
 class AltBaselineSyncCallback(BaseCallback):
