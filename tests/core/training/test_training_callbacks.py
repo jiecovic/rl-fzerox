@@ -225,6 +225,44 @@ def test_alt_baseline_callback_syncs_stable_entries_in_mixed_x_cup_run(
     assert projected.entries[2].generated_course_kind == X_CUP_COURSE.generated_kind
 
 
+def test_build_callbacks_loads_track_sampling_runtime_state_once(tmp_path: Path) -> None:
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    load_count = 0
+
+    def load_runtime_state():
+        nonlocal load_count
+        load_count += 1
+        return None
+
+    build_callbacks(
+        env_config=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="adaptive_step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(id="mute_city", course_id="mute_city"),
+                    TrackSamplingEntryConfig(id="silence", course_id="silence"),
+                ),
+            )
+        ),
+        train_config=TrainConfig(
+            algorithm="maskable_hybrid_action_ppo",
+            num_envs=1,
+            n_steps=4,
+            batch_size=4,
+            device="cpu",
+        ),
+        run_paths=run_paths,
+        track_sampling_runtime_persistence=TrackSamplingRuntimePersistence(
+            load=load_runtime_state,
+            save=lambda _: None,
+        ),
+    )
+
+    assert load_count == 1
+
+
 def _checkpoint_files(path: Path) -> set[str]:
     return {child.name for child in path.iterdir()}
 

@@ -17,10 +17,12 @@ from rl_fzerox.core.training.runs.baseline_materializer.materialization.baseline
 from rl_fzerox.core.training.runs.baseline_materializer.models import (
     BaselineArtifact,
     BaselineMaterializerContext,
-    BaselineRequest,
     GenericModeSeedMaterializer,
     RaceStartMaterializer,
     StateSavingEmulator,
+)
+from rl_fzerox.core.training.runs.baseline_materializer.projection import (
+    baseline_artifact_entry_update,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.requests import (
     can_generate_track_config,
@@ -158,10 +160,7 @@ def _materialize_primary_track_baseline(
     )
     return (
         track_config.model_copy(
-            update=_materialized_request_update(
-                request=track_request,
-                artifact=artifact,
-            )
+            update=baseline_artifact_entry_update(artifact=artifact, request=track_request)
         ),
         artifact,
     )
@@ -337,40 +336,8 @@ def _materialized_track_sampling_entry(
         menu_seed_race_start_materializer=menu_seed_race_start_materializer,
     )
     return entry.model_copy(
-        update=_materialized_request_update(
-            request=request,
-            artifact=artifact,
-        )
+        update=baseline_artifact_entry_update(artifact=artifact, request=request)
     )
-
-
-def _materialized_request_update(
-    *,
-    request: BaselineRequest,
-    artifact: BaselineArtifact,
-) -> dict[str, object]:
-    update: dict[str, object] = {"baseline_state_path": artifact.state_path}
-    if artifact.source_course_index is not None:
-        update["source_course_index"] = artifact.source_course_index
-    elif request.course_index is not None:
-        update["source_course_index"] = request.course_index
-    if artifact.source_vehicle is not None:
-        update["source_vehicle"] = artifact.source_vehicle
-    elif request.vehicle is not None:
-        update["source_vehicle"] = request.vehicle
-    if artifact.source_gp_difficulty is not None:
-        update["source_gp_difficulty"] = artifact.source_gp_difficulty
-    elif request.gp_difficulty is not None:
-        update["source_gp_difficulty"] = request.gp_difficulty
-    if artifact.source_engine_setting_raw_value is not None:
-        update["source_engine_setting_raw_value"] = artifact.source_engine_setting_raw_value
-    elif request.engine_setting_raw_value is not None:
-        update["source_engine_setting_raw_value"] = request.engine_setting_raw_value
-    if artifact.generated_course_segment_count is not None:
-        update["generated_course_segment_count"] = artifact.generated_course_segment_count
-    if artifact.generated_course_length is not None:
-        update["generated_course_length"] = artifact.generated_course_length
-    return update
 
 
 def _track_sampling_progress_message(

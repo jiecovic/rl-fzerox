@@ -31,9 +31,11 @@ from rl_fzerox.core.runtime_spec.x_cup_slots import (
 from rl_fzerox.core.training.runs import RunPaths, save_train_run_config
 from rl_fzerox.core.training.runs.baseline_materializer import (
     BASELINE_MATERIALIZER_SETTINGS,
-    BaselineArtifact,
     BaselineMaterializerContext,
     materialize_baseline,
+)
+from rl_fzerox.core.training.runs.baseline_materializer.projection import (
+    baseline_artifact_entry_update,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.requests import (
     request_from_track_entry,
@@ -289,7 +291,7 @@ class XCupRotationManager:
             cache_root=self._cache_root,
             context=context,
         )
-        return entry.model_copy(update=_materialized_entry_update(artifact))
+        return entry.model_copy(update=baseline_artifact_entry_update(artifact=artifact))
 
     def _prune_inactive_x_cup_baselines(
         self,
@@ -436,23 +438,6 @@ def _replacement_entry(
         "log_per_course": False,
     }
     return entry.model_copy(update=update)
-
-
-def _materialized_entry_update(artifact: BaselineArtifact) -> dict[str, object]:
-    update: dict[str, object] = {"baseline_state_path": artifact.state_path}
-    if artifact.source_course_index is not None:
-        update["source_course_index"] = artifact.source_course_index
-    if artifact.source_vehicle is not None:
-        update["source_vehicle"] = artifact.source_vehicle
-    if artifact.source_gp_difficulty is not None:
-        update["source_gp_difficulty"] = artifact.source_gp_difficulty
-    if artifact.source_engine_setting_raw_value is not None:
-        update["source_engine_setting_raw_value"] = artifact.source_engine_setting_raw_value
-    if artifact.generated_course_segment_count is not None:
-        update["generated_course_segment_count"] = artifact.generated_course_segment_count
-    if artifact.generated_course_length is not None:
-        update["generated_course_length"] = artifact.generated_course_length
-    return update
 
 
 def _materialization_failure(

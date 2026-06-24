@@ -222,6 +222,37 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert "episode/spin_episode_masked_rate" not in logger.records
 
 
+def test_rollout_info_accumulator_ignores_boolean_numeric_values() -> None:
+    accumulator = RolloutInfoAccumulator()
+
+    accumulator.add_infos(
+        [
+            {
+                "speed_kph": True,
+                "airborne_frames": True,
+                "frames_run": 2,
+                "episode": {
+                    "race_laps_completed": False,
+                    "termination_reason": "finished",
+                },
+            },
+            {
+                "speed_kph": 120.0,
+                "airborne_frames": 1,
+                "frames_run": 4,
+                "episode": {
+                    "race_laps_completed": 3,
+                    "termination_reason": "finished",
+                },
+            },
+        ]
+    )
+
+    assert accumulator.state_metrics["speed_kph"].mean() == 120.0
+    assert accumulator.frame_ratios["state/airborne_frame_ratio"].ratio() == 0.25
+    assert accumulator.episode_metrics["race_laps_completed"].mean() == 3.0
+
+
 def test_info_sequence_accepts_tuple_infos() -> None:
     infos = ({"race_distance": 10.0}, {"race_distance": 12.0})
 

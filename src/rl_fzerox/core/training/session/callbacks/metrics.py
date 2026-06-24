@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Protocol, TypeGuard
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,10 +333,10 @@ def _episode_was_airborne(episode: dict[str, object]) -> bool:
 def _numeric_values(infos: Sequence[object], key: str) -> list[float]:
     values: list[float] = []
     for info in infos:
-        if not isinstance(info, dict):
+        if not isinstance(info, Mapping):
             continue
         value = info.get(key)
-        if isinstance(value, int | float):
+        if _is_real_number(value):
             values.append(float(value))
     return values
 
@@ -349,7 +349,7 @@ def _positive_values(
 ) -> list[bool]:
     values: list[bool] = []
     for info in infos:
-        if not isinstance(info, dict):
+        if not isinstance(info, Mapping):
             continue
         if key not in info:
             if missing_value is not None:
@@ -371,11 +371,11 @@ def _numeric_pair_values(
 ) -> list[tuple[float, float]]:
     values: list[tuple[float, float]] = []
     for info in infos:
-        if not isinstance(info, dict):
+        if not isinstance(info, Mapping):
             continue
         numerator = info.get(numerator_key)
         denominator = info.get(denominator_key)
-        if isinstance(numerator, int | float) and isinstance(denominator, int | float):
+        if _is_real_number(numerator) and _is_real_number(denominator):
             values.append((float(numerator), float(denominator)))
     return values
 
@@ -387,6 +387,10 @@ def _numeric_episode_values(
     values: list[float] = []
     for episode in episodes:
         value = episode.get(key)
-        if isinstance(value, int | float):
+        if _is_real_number(value):
             values.append(float(value))
     return values
+
+
+def _is_real_number(value: object) -> TypeGuard[int | float]:
+    return isinstance(value, int | float) and not isinstance(value, bool)

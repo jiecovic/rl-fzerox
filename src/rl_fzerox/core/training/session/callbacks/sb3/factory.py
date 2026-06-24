@@ -98,6 +98,7 @@ def build_callbacks(
             runtime_persistence = file_track_sampling_runtime_persistence(
                 run_paths.track_sampling_state_path
             )
+        restored_track_sampling_state = runtime_persistence.load()
         alt_baseline_projection: AltBaselineProjectionState | None = None
         if runtime_persistence.load_alt_baselines is not None:
             alt_baseline_projection = AltBaselineProjectionState(
@@ -111,7 +112,7 @@ def build_callbacks(
             )
         deficit_controller = DeficitBudgetTrackSamplingController.from_configs(
             env_config=env_config,
-            restored_state=runtime_persistence.load(),
+            restored_state=restored_track_sampling_state,
         )
         if deficit_controller is not None:
             callbacks.append(
@@ -132,7 +133,7 @@ def build_callbacks(
         if deficit_controller is None:
             track_balance_controller = StepBalancedTrackSamplingController.from_configs(
                 env_config=env_config,
-                restored_state=runtime_persistence.load(),
+                restored_state=restored_track_sampling_state,
             )
             if track_balance_controller is not None:
                 callbacks.append(
