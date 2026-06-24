@@ -9,6 +9,7 @@ toward a first stable version.
 - Concepts
   - [Courses and race modes](concepts/courses.md)
   - [Policy inputs](concepts/policy_inputs.md)
+  - [PPO](concepts/ppo.md)
   - [Baseline materialization](concepts/baselines.md)
   - [Generated X-Cup courses](concepts/x_cup.md)
   - [Engine tuning](concepts/engine_tuning.md)
