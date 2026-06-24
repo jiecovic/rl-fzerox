@@ -4,7 +4,7 @@ from __future__ import annotations
 import shlex
 import subprocess
 import threading
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,7 +17,7 @@ def fresh_process_log(
     *,
     command: Sequence[str],
     cwd: Path,
-) -> Iterator[BinaryIO]:
+) -> Generator[BinaryIO]:
     """Open a per-launch process log without carrying stale failures forward."""
 
     log_path.parent.mkdir(parents=True, exist_ok=True)

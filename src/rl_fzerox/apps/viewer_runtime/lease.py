@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 import signal
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,7 +46,7 @@ def manager_viewer_lease_session(
     *,
     db_path: Path | None,
     lease_id: str | None,
-) -> Iterator[ViewerLeaseSession]:
+) -> Generator[ViewerLeaseSession]:
     """Clear a manager viewer lease when the current process exits."""
 
     lease_session = ViewerLeaseSession(db_path=db_path, lease_id=lease_id, pid=os.getpid())

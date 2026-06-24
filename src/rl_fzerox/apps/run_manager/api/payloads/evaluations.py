@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Literal, TypedDict
+from typing import Literal
+
+from typing_extensions import TypedDict
 
 from rl_fzerox.core.evaluation.models import (
     EvaluationCheckpointArtifact,

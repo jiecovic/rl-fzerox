@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -37,7 +37,7 @@ def manager_engine(db_path: Path) -> Engine:
 
 
 @contextmanager
-def manager_session(db_path: Path) -> Iterator[Session]:
+def manager_session(db_path: Path) -> Generator[Session]:
     """Open one transactional SQLAlchemy session for a manager operation."""
 
     engine = manager_engine(db_path)

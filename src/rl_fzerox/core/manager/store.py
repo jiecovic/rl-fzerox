@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -588,7 +588,7 @@ class ManagerStore(EvaluationStoreMixin, SaveGameStoreMixin):
         return self._orm_engine
 
     @contextmanager
-    def _orm_session(self) -> Iterator[Session]:
+    def _orm_session(self) -> Generator[Session]:
         with Session(self._manager_engine(), expire_on_commit=False) as session:
             with session.begin():
                 yield session

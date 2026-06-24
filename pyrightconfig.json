@@ -1,6 +1,7 @@
 {
   "typeCheckingMode": "standard",
   "pythonVersion": "3.11",
+  "reportDeprecated": "warning",
   "reportMissingParameterType": "warning",
   "reportUnknownParameterType": "none",
   "include": ["src", "tests", "scripts/check_numpy_typing.py"],
