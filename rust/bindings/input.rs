@@ -21,7 +21,9 @@ pub fn joypad_mask(buttons: &Bound<'_, PyTuple>) -> PyResult<u16> {
     let mut mask = 0_u16;
 
     for button in buttons.iter() {
-        let button_id: u32 = button.extract()?;
+        let button_id: u32 = button.extract().map_err(|error| {
+            PyValueError::new_err(format!("joypad button id has invalid type: {error}"))
+        })?;
         if button_id >= JOYPAD_BIT_WIDTH {
             return Err(PyValueError::new_err(format!(
                 "Invalid joypad button id {button_id}; expected 0..{}",

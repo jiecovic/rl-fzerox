@@ -10,7 +10,7 @@ use pyo3::types::{PyBytes, PyDict};
 use crate::bindings::emulator::telemetry::telemetry_to_py;
 use crate::bindings::emulator::{PyEmulator, PyTelemetry};
 use crate::bindings::error::map_core_error;
-use crate::bindings::payload::{optional_item, required_item};
+use crate::bindings::payload::{optional_extract, required_extract};
 use crate::core::game::race_start::{RaceStartMode, RaceStartSetup};
 use crate::core::input::ControllerState;
 
@@ -202,21 +202,29 @@ struct RaceStartBindingRequest {
 
 impl RaceStartBindingRequest {
     fn from_py_dict(request: &Bound<'_, PyDict>) -> PyResult<Self> {
-        let mode_raw: String = required_item(request, RACE_START_PAYLOAD, "mode")?.extract()?;
+        let mode_raw: String = required_extract(request, RACE_START_PAYLOAD, "mode")?;
         let mode = parse_race_start_mode(&mode_raw)?;
         let setup = RaceStartSetup {
-            course_index: required_item(request, RACE_START_PAYLOAD, "course_index")?.extract()?,
-            character_index: required_item(request, RACE_START_PAYLOAD, "character_index")?
-                .extract()?,
-            machine_skin_index: optional_item(request, "machine_skin_index", -1)?,
-            engine_setting_raw_value: required_item(
+            course_index: required_extract(request, RACE_START_PAYLOAD, "course_index")?,
+            character_index: required_extract(request, RACE_START_PAYLOAD, "character_index")?,
+            machine_skin_index: optional_extract(
+                request,
+                RACE_START_PAYLOAD,
+                "machine_skin_index",
+                -1,
+            )?,
+            engine_setting_raw_value: required_extract(
                 request,
                 RACE_START_PAYLOAD,
                 "engine_setting_raw_value",
-            )?
-            .extract()?,
-            total_lap_count: optional_item(request, "total_lap_count", 3)?,
-            gp_difficulty_raw_value: optional_item(request, "gp_difficulty_raw_value", -1)?,
+            )?,
+            total_lap_count: optional_extract(request, RACE_START_PAYLOAD, "total_lap_count", 3)?,
+            gp_difficulty_raw_value: optional_extract(
+                request,
+                RACE_START_PAYLOAD,
+                "gp_difficulty_raw_value",
+                -1,
+            )?,
         };
         Ok(Self { mode, setup })
     }

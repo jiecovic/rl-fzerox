@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
 
 use crate::bindings::error::map_core_error;
+use crate::bindings::payload::optional_extract;
 use crate::core::error::CoreError;
 use crate::core::host::Host;
 use crate::core::observation::{ObservationLayout, ObservationPreset};
@@ -22,6 +23,9 @@ mod telemetry;
 pub use state::encode_state_flags;
 pub use step::{PyStepStatus, PyStepSummary};
 pub use telemetry::{PyPlayerTelemetry, PyTelemetry};
+
+const FRAME_OBSERVATION_OPTIONS: &str = "frame observation options";
+const OBSERVATION_IMAGE_REQUEST: &str = "observation image request";
 
 #[derive(Debug)]
 struct FrameObservationOptions {
@@ -53,24 +57,32 @@ impl FrameObservationOptions {
             return Ok(parsed);
         };
 
-        if let Some(value) = options.get_item("stack_mode")? {
-            parsed.stack_mode = value.extract()?;
-        }
-        if let Some(value) = options.get_item("minimap_layer")? {
-            parsed.minimap_layer = value.extract()?;
-        }
-        if let Some(value) = options.get_item("resize_filter")? {
-            parsed.resize_filter = value.extract()?;
-        }
-        if let Some(value) = options.get_item("minimap_resize_filter")? {
-            parsed.minimap_resize_filter = value.extract()?;
-        }
-        if let Some(value) = options.get_item("height")? {
-            parsed.height = Some(value.extract()?);
-        }
-        if let Some(value) = options.get_item("width")? {
-            parsed.width = Some(value.extract()?);
-        }
+        parsed.stack_mode = optional_extract(
+            options,
+            FRAME_OBSERVATION_OPTIONS,
+            "stack_mode",
+            parsed.stack_mode,
+        )?;
+        parsed.minimap_layer = optional_extract(
+            options,
+            FRAME_OBSERVATION_OPTIONS,
+            "minimap_layer",
+            parsed.minimap_layer,
+        )?;
+        parsed.resize_filter = optional_extract(
+            options,
+            FRAME_OBSERVATION_OPTIONS,
+            "resize_filter",
+            parsed.resize_filter,
+        )?;
+        parsed.minimap_resize_filter = optional_extract(
+            options,
+            FRAME_OBSERVATION_OPTIONS,
+            "minimap_resize_filter",
+            parsed.minimap_resize_filter,
+        )?;
+        parsed.height = optional_extract(options, FRAME_OBSERVATION_OPTIONS, "height", None)?;
+        parsed.width = optional_extract(options, FRAME_OBSERVATION_OPTIONS, "width", None)?;
         Ok(parsed)
     }
 }
@@ -107,30 +119,40 @@ impl ObservationImageRequest {
         options: &Bound<'_, PyDict>,
     ) -> PyResult<Self> {
         let mut parsed = Self::default();
-        if let Some(value) = options.get_item("preset")? {
-            parsed.preset = value.extract()?;
-        }
-        if let Some(value) = options.get_item("frame_stack")? {
-            parsed.frame_stack = value.extract()?;
-        }
-        if let Some(value) = options.get_item("stack_mode")? {
-            parsed.stack_mode = value.extract()?;
-        }
-        if let Some(value) = options.get_item("minimap_layer")? {
-            parsed.minimap_layer = value.extract()?;
-        }
-        if let Some(value) = options.get_item("resize_filter")? {
-            parsed.resize_filter = value.extract()?;
-        }
-        if let Some(value) = options.get_item("minimap_resize_filter")? {
-            parsed.minimap_resize_filter = value.extract()?;
-        }
-        if let Some(value) = options.get_item("height")? {
-            parsed.height = Some(value.extract()?);
-        }
-        if let Some(value) = options.get_item("width")? {
-            parsed.width = Some(value.extract()?);
-        }
+        parsed.preset =
+            optional_extract(options, OBSERVATION_IMAGE_REQUEST, "preset", parsed.preset)?;
+        parsed.frame_stack = optional_extract(
+            options,
+            OBSERVATION_IMAGE_REQUEST,
+            "frame_stack",
+            parsed.frame_stack,
+        )?;
+        parsed.stack_mode = optional_extract(
+            options,
+            OBSERVATION_IMAGE_REQUEST,
+            "stack_mode",
+            parsed.stack_mode,
+        )?;
+        parsed.minimap_layer = optional_extract(
+            options,
+            OBSERVATION_IMAGE_REQUEST,
+            "minimap_layer",
+            parsed.minimap_layer,
+        )?;
+        parsed.resize_filter = optional_extract(
+            options,
+            OBSERVATION_IMAGE_REQUEST,
+            "resize_filter",
+            parsed.resize_filter,
+        )?;
+        parsed.minimap_resize_filter = optional_extract(
+            options,
+            OBSERVATION_IMAGE_REQUEST,
+            "minimap_resize_filter",
+            parsed.minimap_resize_filter,
+        )?;
+        parsed.height = optional_extract(options, OBSERVATION_IMAGE_REQUEST, "height", None)?;
+        parsed.width = optional_extract(options, OBSERVATION_IMAGE_REQUEST, "width", None)?;
         Ok(parsed)
     }
 }

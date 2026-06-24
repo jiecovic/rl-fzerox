@@ -5,7 +5,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::bindings::emulator::telemetry::PyPlayerTelemetry;
-use crate::bindings::payload::{optional_item, required_item, set_py_dict_items};
+use crate::bindings::payload::{
+    optional_extract, payload_type_error, required_extract, required_item, set_py_dict_items,
+};
 use crate::core::telemetry::TelemetrySnapshot;
 
 const TELEMETRY_PAYLOAD: &str = "telemetry snapshot";
@@ -192,31 +194,60 @@ impl PyTelemetry {
 }
 
 fn telemetry_from_dict(data: &Bound<'_, PyDict>) -> PyResult<PyTelemetry> {
-    let difficulty_name: Option<String> = optional_item(data, "difficulty_name", None)?;
-    let camera_setting_name: Option<String> = optional_item(data, "camera_setting_name", None)?;
+    let difficulty_name: Option<String> =
+        optional_extract(data, TELEMETRY_PAYLOAD, "difficulty_name", None)?;
+    let camera_setting_name: Option<String> =
+        optional_extract(data, TELEMETRY_PAYLOAD, "camera_setting_name", None)?;
     Ok(PyTelemetry {
-        total_lap_count: required_item(data, TELEMETRY_PAYLOAD, "total_lap_count")?.extract()?,
-        difficulty_raw: optional_item(data, "difficulty_raw", 0)?,
+        total_lap_count: required_extract(data, TELEMETRY_PAYLOAD, "total_lap_count")?,
+        difficulty_raw: optional_extract(data, TELEMETRY_PAYLOAD, "difficulty_raw", 0)?,
         difficulty_name: difficulty_name.unwrap_or_else(|| "novice".to_owned()),
-        camera_setting_raw: optional_item(data, "camera_setting_raw", 2)?,
+        camera_setting_raw: optional_extract(data, TELEMETRY_PAYLOAD, "camera_setting_raw", 2)?,
         camera_setting_name: camera_setting_name.unwrap_or_else(|| "regular".to_owned()),
-        race_intro_timer: optional_item(data, "race_intro_timer", 0)?,
-        game_mode_raw: required_item(data, TELEMETRY_PAYLOAD, "game_mode_raw")?.extract()?,
-        game_mode_name: required_item(data, TELEMETRY_PAYLOAD, "game_mode_name")?.extract()?,
-        menu_selected_mode_raw: optional_item(data, "menu_selected_mode_raw", 0)?,
-        menu_difficulty_state_raw: optional_item(data, "menu_difficulty_state_raw", 0)?,
-        menu_difficulty_cursor_raw: optional_item(data, "menu_difficulty_cursor_raw", 0)?,
-        menu_transition_state_raw: optional_item(data, "menu_transition_state_raw", 0)?,
-        menu_current_ghost_type_raw: optional_item(data, "menu_current_ghost_type_raw", 0)?,
-        queued_game_mode_raw: optional_item(data, "queued_game_mode_raw", 0)?,
-        in_race_mode: required_item(data, TELEMETRY_PAYLOAD, "in_race_mode")?.extract()?,
-        total_racers: required_item(data, TELEMETRY_PAYLOAD, "total_racers")?.extract()?,
-        gp_final_rank: optional_item(data, "gp_final_rank", 0)?,
-        gp_points: optional_item(data, "gp_points", 0)?,
-        course_index: required_item(data, TELEMETRY_PAYLOAD, "course_index")?.extract()?,
-        course_segment_count: optional_item(data, "course_segment_count", 0)?,
-        course_length: optional_item(data, "course_length", 0.0)?,
-        player: required_item(data, TELEMETRY_PAYLOAD, "player")?.extract()?,
+        race_intro_timer: optional_extract(data, TELEMETRY_PAYLOAD, "race_intro_timer", 0)?,
+        game_mode_raw: required_extract(data, TELEMETRY_PAYLOAD, "game_mode_raw")?,
+        game_mode_name: required_extract(data, TELEMETRY_PAYLOAD, "game_mode_name")?,
+        menu_selected_mode_raw: optional_extract(
+            data,
+            TELEMETRY_PAYLOAD,
+            "menu_selected_mode_raw",
+            0,
+        )?,
+        menu_difficulty_state_raw: optional_extract(
+            data,
+            TELEMETRY_PAYLOAD,
+            "menu_difficulty_state_raw",
+            0,
+        )?,
+        menu_difficulty_cursor_raw: optional_extract(
+            data,
+            TELEMETRY_PAYLOAD,
+            "menu_difficulty_cursor_raw",
+            0,
+        )?,
+        menu_transition_state_raw: optional_extract(
+            data,
+            TELEMETRY_PAYLOAD,
+            "menu_transition_state_raw",
+            0,
+        )?,
+        menu_current_ghost_type_raw: optional_extract(
+            data,
+            TELEMETRY_PAYLOAD,
+            "menu_current_ghost_type_raw",
+            0,
+        )?,
+        queued_game_mode_raw: optional_extract(data, TELEMETRY_PAYLOAD, "queued_game_mode_raw", 0)?,
+        in_race_mode: required_extract(data, TELEMETRY_PAYLOAD, "in_race_mode")?,
+        total_racers: required_extract(data, TELEMETRY_PAYLOAD, "total_racers")?,
+        gp_final_rank: optional_extract(data, TELEMETRY_PAYLOAD, "gp_final_rank", 0)?,
+        gp_points: optional_extract(data, TELEMETRY_PAYLOAD, "gp_points", 0)?,
+        course_index: required_extract(data, TELEMETRY_PAYLOAD, "course_index")?,
+        course_segment_count: optional_extract(data, TELEMETRY_PAYLOAD, "course_segment_count", 0)?,
+        course_length: optional_extract(data, TELEMETRY_PAYLOAD, "course_length", 0.0)?,
+        player: required_item(data, TELEMETRY_PAYLOAD, "player")?
+            .extract()
+            .map_err(|error| payload_type_error(TELEMETRY_PAYLOAD, "player", error))?,
     })
 }
 

@@ -14,7 +14,7 @@ use crate::bindings::emulator::{
     ObservationImageRequest, PyEmulator, parse_observation_layout, parse_resize_filter,
 };
 use crate::bindings::error::map_core_error;
-use crate::bindings::payload::{optional_item, required_dict, required_item};
+use crate::bindings::payload::{optional_extract, required_dict, required_extract, required_list};
 use crate::core::host::SpinRequest;
 use crate::core::host::{ObservationRenderConfig, RepeatedStepConfig};
 use crate::core::input::RaceControlState;
@@ -184,7 +184,7 @@ impl RepeatObservationBindingRequest {
         let observation_request = required_dict(request, REPEAT_PAYLOAD, "observation")?;
         let step_config = repeated_step_config(&step_request)?;
         let observation = observation_request_from_dict(&observation_request)?;
-        let capture_audio = optional_item(request, "capture_audio", false)?;
+        let capture_audio = optional_extract(request, REPEAT_PAYLOAD, "capture_audio", false)?;
         Ok(Self {
             step_config,
             observation,
@@ -197,8 +197,7 @@ impl RepeatMultiObservationBindingRequest {
     fn from_py_dict(request: &Bound<'_, PyDict>) -> PyResult<Self> {
         let step_request = required_dict(request, REPEAT_PAYLOAD, "step")?;
         let step_config = repeated_step_config(&step_request)?;
-        let observations_raw = required_item(request, REPEAT_PAYLOAD, "observations")?;
-        let observations_list = observations_raw.cast::<PyList>()?;
+        let observations_list = required_list(request, REPEAT_PAYLOAD, "observations")?;
         if observations_list.is_empty() {
             return Err(pyo3::exceptions::PyValueError::new_err(
                 "observations must contain at least one observation recipe",
@@ -221,39 +220,58 @@ fn repeated_step_config(request: &Bound<'_, PyDict>) -> PyResult<RepeatedStepCon
     let race_controls = race_control_state(request)?;
     Ok(RepeatedStepConfig {
         race_controls,
-        action_repeat: required_item(request, REPEAT_STEP_PAYLOAD, "action_repeat")?.extract()?,
-        stuck_min_speed_kph: required_item(request, REPEAT_STEP_PAYLOAD, "stuck_min_speed_kph")?
-            .extract()?,
-        energy_loss_epsilon: required_item(request, REPEAT_STEP_PAYLOAD, "energy_loss_epsilon")?
-            .extract()?,
-        max_episode_steps: required_item(request, REPEAT_STEP_PAYLOAD, "max_episode_steps")?
-            .extract()?,
-        progress_frontier_stall_limit_frames: optional_item(
+        action_repeat: required_extract(request, REPEAT_STEP_PAYLOAD, "action_repeat")?,
+        stuck_min_speed_kph: required_extract(request, REPEAT_STEP_PAYLOAD, "stuck_min_speed_kph")?,
+        energy_loss_epsilon: required_extract(request, REPEAT_STEP_PAYLOAD, "energy_loss_epsilon")?,
+        max_episode_steps: required_extract(request, REPEAT_STEP_PAYLOAD, "max_episode_steps")?,
+        progress_frontier_stall_limit_frames: optional_extract(
             request,
+            REPEAT_STEP_PAYLOAD,
             "progress_frontier_stall_limit_frames",
             None,
         )?,
-        progress_frontier_epsilon: optional_item(request, "progress_frontier_epsilon", 100.0)?,
-        terminate_on_energy_depleted: optional_item(request, "terminate_on_energy_depleted", true)?,
-        lean_timer_assist: optional_item(request, "lean_timer_assist", false)?,
-        spin_request: parse_spin_request(&optional_item(
+        progress_frontier_epsilon: optional_extract(
             request,
+            REPEAT_STEP_PAYLOAD,
+            "progress_frontier_epsilon",
+            100.0,
+        )?,
+        terminate_on_energy_depleted: optional_extract(
+            request,
+            REPEAT_STEP_PAYLOAD,
+            "terminate_on_energy_depleted",
+            true,
+        )?,
+        lean_timer_assist: optional_extract(
+            request,
+            REPEAT_STEP_PAYLOAD,
+            "lean_timer_assist",
+            false,
+        )?,
+        spin_request: parse_spin_request(&optional_extract(
+            request,
+            REPEAT_STEP_PAYLOAD,
             "spin_request",
             String::from("none"),
         )?)?,
-        spin_cooldown_frames: optional_item(request, "spin_cooldown_frames", 120)?,
+        spin_cooldown_frames: optional_extract(
+            request,
+            REPEAT_STEP_PAYLOAD,
+            "spin_cooldown_frames",
+            120,
+        )?,
     })
 }
 
 fn race_control_state(request: &Bound<'_, PyDict>) -> PyResult<RaceControlState> {
     Ok(RaceControlState {
-        gas: optional_item(request, "gas", false)?,
-        air_brake: optional_item(request, "air_brake", false)?,
-        boost: optional_item(request, "boost", false)?,
-        lean_left: optional_item(request, "lean_left", false)?,
-        lean_right: optional_item(request, "lean_right", false)?,
-        stick_x: optional_item(request, "stick_x", 0.0)?,
-        pitch: optional_item(request, "pitch", 0.0)?,
+        gas: optional_extract(request, REPEAT_STEP_PAYLOAD, "gas", false)?,
+        air_brake: optional_extract(request, REPEAT_STEP_PAYLOAD, "air_brake", false)?,
+        boost: optional_extract(request, REPEAT_STEP_PAYLOAD, "boost", false)?,
+        lean_left: optional_extract(request, REPEAT_STEP_PAYLOAD, "lean_left", false)?,
+        lean_right: optional_extract(request, REPEAT_STEP_PAYLOAD, "lean_right", false)?,
+        stick_x: optional_extract(request, REPEAT_STEP_PAYLOAD, "stick_x", 0.0)?,
+        pitch: optional_extract(request, REPEAT_STEP_PAYLOAD, "pitch", 0.0)?,
     })
 }
 
