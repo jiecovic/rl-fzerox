@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/gym_runtime/stepping.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from gymnasium import spaces
 
 from fzerox_emulator import RaceControlState, SpinRequest
@@ -18,6 +20,15 @@ from rl_fzerox.core.envs.engine.controls import (
 from rl_fzerox.core.envs.engine.stepping import EnvStepRequest, WatchEnvStep
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.runtime_spec.schema import EnvConfig
+
+
+@dataclass(frozen=True)
+class _GymStepInput:
+    control_state: RaceControlState
+    action_repeat: int
+    requested_control_state: RaceControlState
+    action_drive_axis: float | None
+    spin_request: SpinRequest
 
 
 class GymStepRuntime:
@@ -44,25 +55,17 @@ class GymStepRuntime:
         self,
         action: ActionValue,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self._step_decoded_action(
-            self._components.action_adapter.decode_request(action),
-            action_drive_axis=action_drive_axis(
-                action,
-                self._components.action_adapter.action_space,
-                drive_axis_index=self._components.action_config.continuous_drive_axis_index(),
-            ),
-        )
+        return self._run_step(
+            self._policy_step_input(action),
+            capture_display_frames=False,
+        ).gym_result()
 
     def step_watch(self, action: ActionValue) -> WatchEnvStep:
         """Step a policy action while collecting watch-only intermediate frames."""
 
-        return self._step_decoded_action_watch(
-            self._components.action_adapter.decode_request(action),
-            action_drive_axis=action_drive_axis(
-                action,
-                self._components.action_adapter.action_space,
-                drive_axis_index=self._components.action_config.continuous_drive_axis_index(),
-            ),
+        return self._run_step(
+            self._policy_step_input(action),
+            capture_display_frames=True,
         )
 
     def action_to_control_state(self, action: ActionValue) -> RaceControlState:
@@ -76,11 +79,15 @@ class GymStepRuntime:
         *,
         spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self._step_control_state(
-            control_state,
-            action_drive_axis=None,
-            spin_request=spin_request,
-        )
+        return self._run_step(
+            self._control_step_input(
+                control_state,
+                action_repeat=self._config.action_repeat,
+                action_drive_axis=None,
+                spin_request=spin_request,
+            ),
+            capture_display_frames=False,
+        ).gym_result()
 
     def step_control_watch(
         self,
@@ -90,10 +97,14 @@ class GymStepRuntime:
     ) -> WatchEnvStep:
         """Step manual controls while collecting watch-only intermediate frames."""
 
-        return self._step_control_state_watch(
-            control_state,
-            action_drive_axis=None,
-            spin_request=spin_request,
+        return self._run_step(
+            self._control_step_input(
+                control_state,
+                action_repeat=self._config.action_repeat,
+                action_drive_axis=None,
+                spin_request=spin_request,
+            ),
+            capture_display_frames=True,
         )
 
     def step_frame(
@@ -104,129 +115,98 @@ class GymStepRuntime:
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         """Advance one frame through the same reward path used by step()."""
 
-        episode = self._components.episode
         requested_control_state = (
-            episode.held_control_state if control_state is None else control_state
+            self._components.episode.held_control_state
+            if control_state is None
+            else control_state
         )
-        episode.held_control_state = self._apply_control_semantics(requested_control_state)
-        return self._run_env_step(
-            episode.held_control_state,
-            action_repeat=1,
-            requested_control_state=requested_control_state,
-            action_drive_axis=None,
-            spin_request=spin_request,
+        return self._run_step(
+            self._control_step_input(
+                requested_control_state,
+                action_repeat=1,
+                action_drive_axis=None,
+                spin_request=spin_request,
+            ),
+            capture_display_frames=False,
+        ).gym_result()
+
+    def _policy_step_input(self, action: ActionValue) -> _GymStepInput:
+        return self._decoded_step_input(
+            self._components.action_adapter.decode_request(action),
+            action_drive_axis=action_drive_axis(
+                action,
+                self._components.action_adapter.action_space,
+                drive_axis_index=self._components.action_config.continuous_drive_axis_index(),
+            ),
         )
 
-    def _step_control_state(
-        self,
-        control_state: RaceControlState,
-        *,
-        action_drive_axis: float | None,
-        spin_request: SpinRequest = "none",
-    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        requested_control_state = control_state
-        applied_control_state = self._apply_control_semantics(requested_control_state)
-        self._components.episode.held_control_state = applied_control_state
-        return self._run_env_step(
-            applied_control_state,
-            action_repeat=self._config.action_repeat,
-            requested_control_state=requested_control_state,
-            action_drive_axis=action_drive_axis,
-            spin_request=spin_request,
-        )
-
-    def _step_decoded_action(
-        self,
-        decoded_action: DecodedAction,
-        *,
-        action_drive_axis: float | None,
-    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        requested_control_state = decoded_action.control_state
-        applied_control_state = self._apply_control_semantics(requested_control_state)
-        spin_request = self._apply_spin_semantics(decoded_action.spin_request)
-        self._components.episode.held_control_state = applied_control_state
-        return self._run_env_step(
-            applied_control_state,
-            action_repeat=self._config.action_repeat,
-            requested_control_state=requested_control_state,
-            action_drive_axis=action_drive_axis,
-            spin_request=spin_request,
-        )
-
-    def _step_control_state_watch(
-        self,
-        control_state: RaceControlState,
-        *,
-        action_drive_axis: float | None,
-        spin_request: SpinRequest = "none",
-    ) -> WatchEnvStep:
-        requested_control_state = control_state
-        applied_control_state = self._apply_control_semantics(requested_control_state)
-        self._components.episode.held_control_state = applied_control_state
-        return self._run_env_step_result(
-            applied_control_state,
-            action_repeat=self._config.action_repeat,
-            requested_control_state=requested_control_state,
-            action_drive_axis=action_drive_axis,
-            spin_request=spin_request,
-            capture_display_frames=True,
-        )
-
-    def _step_decoded_action_watch(
-        self,
-        decoded_action: DecodedAction,
-        *,
-        action_drive_axis: float | None,
-    ) -> WatchEnvStep:
-        requested_control_state = decoded_action.control_state
-        applied_control_state = self._apply_control_semantics(requested_control_state)
-        spin_request = self._apply_spin_semantics(decoded_action.spin_request)
-        self._components.episode.held_control_state = applied_control_state
-        return self._run_env_step_result(
-            applied_control_state,
-            action_repeat=self._config.action_repeat,
-            requested_control_state=requested_control_state,
-            action_drive_axis=action_drive_axis,
-            spin_request=spin_request,
-            capture_display_frames=True,
-        )
-
-    def _run_env_step(
+    def _control_step_input(
         self,
         control_state: RaceControlState,
         *,
         action_repeat: int,
-        requested_control_state: RaceControlState | None = None,
-        action_drive_axis: float | None = None,
-        spin_request: SpinRequest = "none",
-    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self._run_env_step_result(
-            control_state,
+        action_drive_axis: float | None,
+        spin_request: SpinRequest,
+    ) -> _GymStepInput:
+        requested_control_state = control_state
+        applied_control_state = self._apply_control_semantics(requested_control_state)
+        return self._prepared_step_input(
+            applied_control_state,
             action_repeat=action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
             spin_request=spin_request,
-            capture_display_frames=False,
-        ).gym_result()
+        )
 
-    def _run_env_step_result(
+    def _decoded_step_input(
         self,
-        control_state: RaceControlState,
+        decoded_action: DecodedAction,
+        *,
+        action_drive_axis: float | None,
+    ) -> _GymStepInput:
+        requested_control_state = decoded_action.control_state
+        applied_control_state = self._apply_control_semantics(requested_control_state)
+        spin_request = self._apply_spin_semantics(decoded_action.spin_request)
+        return self._prepared_step_input(
+            applied_control_state,
+            action_repeat=self._config.action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            spin_request=spin_request,
+        )
+
+    def _prepared_step_input(
+        self,
+        applied_control_state: RaceControlState,
         *,
         action_repeat: int,
-        requested_control_state: RaceControlState | None,
+        requested_control_state: RaceControlState,
         action_drive_axis: float | None,
         spin_request: SpinRequest,
+    ) -> _GymStepInput:
+        self._components.episode.held_control_state = applied_control_state
+        return _GymStepInput(
+            control_state=applied_control_state,
+            action_repeat=action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            spin_request=spin_request,
+        )
+
+    def _run_step(
+        self,
+        step_input: _GymStepInput,
+        *,
         capture_display_frames: bool,
     ) -> WatchEnvStep:
         components = self._components
         assembly = components.step_assembler.run(
             EnvStepRequest(
-                control_state=control_state,
-                action_repeat=action_repeat,
-                requested_control_state=requested_control_state,
-                action_drive_axis=action_drive_axis,
-                spin_request=spin_request,
+                control_state=step_input.control_state,
+                action_repeat=step_input.action_repeat,
+                requested_control_state=step_input.requested_control_state,
+                action_drive_axis=step_input.action_drive_axis,
+                spin_request=step_input.spin_request,
                 capture_display_frames=capture_display_frames,
                 capture_audio=False,
                 active_track=components.episode.active_track,

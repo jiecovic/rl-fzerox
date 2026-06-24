@@ -84,6 +84,29 @@ def test_watch_step_captures_each_repeated_display_frame():
     assert watch_step.info["repeat_index"] == 2
 
 
+def test_control_watch_step_captures_each_repeated_display_frame() -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=3,
+            action=configured_discrete_action("steer", "gas"),
+        ),
+    )
+    control_state = RaceControlState(gas=True, stick_x=-0.5)
+
+    env.reset(seed=7)
+    watch_step = env.step_control_watch(control_state)
+
+    assert backend.frame_index == 3
+    assert backend.capture_video_flags == [True, True, True]
+    assert backend.last_race_control_state == control_state
+    assert not isinstance(watch_step.display_frames, tuple)
+    assert watch_step.display_frames.shape[0] == 3
+    assert _image_obs(watch_step.observation).shape == (84, 84, 12)
+    assert watch_step.info["repeat_index"] == 2
+
+
 def test_step_clips_reward_and_exposes_raw_reward_diagnostics() -> None:
     backend = ScriptedStepBackend(
         [
