@@ -228,7 +228,7 @@ fn read_system_info(get_system_info: RetroGetSystemInfoFn) -> SystemInfo {
 fn load_library(core_path: &Path) -> Result<Library, CoreError> {
     unsafe { Library::new(core_path) }.map_err(|error| CoreError::LoadLibrary {
         path: core_path.to_path_buf(),
-        message: error.to_string(),
+        source: error,
     })
 }
 
@@ -236,7 +236,7 @@ fn load_symbol<T: Copy>(library: &Library, symbol_name: &[u8]) -> Result<T, Core
     let symbol: Symbol<'_, T> =
         unsafe { library.get(symbol_name) }.map_err(|error| CoreError::MissingSymbol {
             symbol: printable_symbol(symbol_name),
-            message: error.to_string(),
+            source: error,
         })?;
     Ok(*symbol)
 }

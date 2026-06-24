@@ -67,7 +67,7 @@ impl Host {
 
         let rom_bytes = std::fs::read(rom_path).map_err(|error| CoreError::ReadFile {
             path: rom_path.to_path_buf(),
-            message: error.to_string(),
+            source: error,
         })?;
         validate_supported_rom(rom_path, &rom_bytes)?;
 

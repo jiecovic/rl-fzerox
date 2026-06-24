@@ -10,7 +10,7 @@ use libretro_sys::LogCallback;
 
 use super::stack::{StackedObservationBuffer, StackedObservationKey};
 use super::util::{log_callback, path_to_c_string, runtime_root_for_core};
-use crate::core::error::CoreError;
+use crate::core::error::{CoreError, HardwareRenderError};
 use crate::core::host::hardware::HardwareRenderContext;
 use crate::core::input::ControllerState;
 use crate::core::minimap::MinimapLayerRenderer;
@@ -52,7 +52,7 @@ pub struct CallbackState {
     pub(super) frame_serial: u64,
     pub(super) pixel_format: PixelLayout,
     pub(super) hardware_render: Option<HardwareRenderContext>,
-    pub(super) hardware_render_error: Option<String>,
+    pub(super) hardware_render_error: Option<HardwareRenderError>,
     pub(super) log_callback: LogCallback,
     pub(super) geometry: Option<(usize, usize)>,
 }
@@ -91,7 +91,7 @@ impl CallbackState {
         };
         std::fs::create_dir_all(&system_dir).map_err(|error| CoreError::CreateDirectory {
             path: system_dir.clone(),
-            message: error.to_string(),
+            source: error,
         })?;
 
         Ok(Self {

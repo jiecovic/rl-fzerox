@@ -2,42 +2,55 @@
 //! Error types shared across the native libretro host, video pipeline, and
 //! telemetry readers.
 
-use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
+use thiserror::Error;
+
 /// Domain-specific failures raised by the native host and exposed to Python.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum CoreError {
+    #[error("Libretro core not found: {0}")]
     MissingCore(PathBuf),
+    #[error("ROM not found: {0}")]
     MissingRom(PathBuf),
+    #[error("The emulator host is already closed")]
     AlreadyClosed,
+    #[error("The libretro core does not expose save-state support")]
     UnsupportedSaveState,
-    MemoryUnavailable {
-        memory_id: u32,
-    },
+    #[error("The libretro core does not expose memory id {memory_id}")]
+    MemoryUnavailable { memory_id: u32 },
+    #[error(
+        "Memory range is out of bounds for memory id {memory_id}: offset={offset}, length={length}, available={available}"
+    )]
     MemoryOutOfRange {
         memory_id: u32,
         offset: usize,
         length: usize,
         available: usize,
     },
-    InvalidSaveRamSize {
-        expected: usize,
-        actual: usize,
-    },
+    #[error("Save RAM buffer has wrong size: expected {expected} bytes, got {actual}")]
+    InvalidSaveRamSize { expected: usize, actual: usize },
+    #[error("The libretro core failed to serialize its current state")]
     SerializeFailed,
+    #[error("The libretro core failed to restore a saved state")]
     UnserializeFailed,
+    #[error("Could not create directory '{path}': {source}")]
     CreateDirectory {
         path: PathBuf,
-        message: String,
+        #[source]
+        source: std::io::Error,
     },
+    #[error("Could not read '{path}': {source}")]
     ReadFile {
         path: PathBuf,
-        message: String,
+        #[source]
+        source: std::io::Error,
     },
-    InvalidRomHeader {
-        path: PathBuf,
-    },
+    #[error("Unsupported ROM '{path}': not a recognized N64 ROM image")]
+    InvalidRomHeader { path: PathBuf },
+    #[error(
+        "Unsupported ROM '{path}': detected title='{title}', game_code='{game_code}', revision={revision}; expected title='{expected_title}', game_code='{expected_game_code}', revision={expected_revision}. This project uses fixed RAM offsets for the US F-Zero X ROM."
+    )]
     UnsupportedRom {
         path: PathBuf,
         title: String,
@@ -47,43 +60,43 @@ pub enum CoreError {
         expected_game_code: &'static str,
         expected_revision: u8,
     },
+    #[error("Could not write '{path}': {source}")]
     WriteFile {
         path: PathBuf,
-        message: String,
+        #[source]
+        source: std::io::Error,
     },
-    InvalidPath {
-        path: PathBuf,
-    },
+    #[error("Path contains unsupported NUL byte: {path}")]
+    InvalidPath { path: PathBuf },
+    #[error("Could not load libretro core '{path}': {source}")]
     LoadLibrary {
         path: PathBuf,
-        message: String,
+        #[source]
+        source: libloading::Error,
     },
+    #[error("Missing libretro symbol '{symbol}': {source}")]
     MissingSymbol {
         symbol: String,
-        message: String,
+        #[source]
+        source: libloading::Error,
     },
-    UnsupportedApiVersion {
-        actual: u32,
-        expected: u32,
-    },
-    InvalidStepRepeatCount {
-        count: usize,
-    },
-    LoadGameFailed {
-        path: PathBuf,
-    },
-    HardwareRenderFailed {
-        message: String,
-    },
-    InvalidObservationPreset {
-        name: String,
-    },
-    InvalidResizeFilter {
-        name: String,
-    },
-    ResizeFailed {
-        message: String,
-    },
+    #[error("Unsupported libretro API version {actual} (expected {expected})")]
+    UnsupportedApiVersion { actual: u32, expected: u32 },
+    #[error("Invalid repeated env-step frame count {count}")]
+    InvalidStepRepeatCount { count: usize },
+    #[error("Libretro core could not load ROM '{path}'")]
+    LoadGameFailed { path: PathBuf },
+    #[error("Hardware renderer setup failed: {0}")]
+    HardwareRenderFailed(#[from] HardwareRenderError),
+    #[error("Unknown observation preset '{name}'")]
+    InvalidObservationPreset { name: String },
+    #[error("Unknown video resize filter '{name}'")]
+    InvalidResizeFilter { name: String },
+    #[error("Video resize failed: {message}")]
+    ResizeFailed { message: String },
+    #[error(
+        "Invalid video crop for frame {frame_width}x{frame_height}: top={top}, bottom={bottom}, left={left}, right={right}"
+    )]
     InvalidVideoCrop {
         frame_width: usize,
         frame_height: usize,
@@ -92,181 +105,49 @@ pub enum CoreError {
         left: usize,
         right: usize,
     },
+    #[error(
+        "Video buffer range is out of bounds: offset={offset}, length={length}, available={available}"
+    )]
     InvalidVideoBuffer {
         offset: usize,
         length: usize,
         available: usize,
     },
-    InvalidRaceStartSetup {
-        message: String,
-    },
+    #[error("Invalid F-Zero X race-start setup: {message}")]
+    InvalidRaceStartSetup { message: String },
+    #[error("The emulator did not produce a video frame")]
     NoFrameAvailable,
 }
 
-impl Display for CoreError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MissingCore(path) => {
-                write!(formatter, "Libretro core not found: {}", path.display())
-            }
-            Self::MissingRom(path) => {
-                write!(formatter, "ROM not found: {}", path.display())
-            }
-            Self::AlreadyClosed => {
-                write!(formatter, "The emulator host is already closed")
-            }
-            Self::UnsupportedSaveState => {
-                write!(
-                    formatter,
-                    "The libretro core does not expose save-state support"
-                )
-            }
-            Self::MemoryUnavailable { memory_id } => {
-                write!(
-                    formatter,
-                    "The libretro core does not expose memory id {memory_id}"
-                )
-            }
-            Self::MemoryOutOfRange {
-                memory_id,
-                offset,
-                length,
-                available,
-            } => {
-                write!(
-                    formatter,
-                    "Memory read is out of range for memory id {memory_id}: offset={offset}, length={length}, available={available}"
-                )
-            }
-            Self::InvalidSaveRamSize { expected, actual } => {
-                write!(
-                    formatter,
-                    "Save RAM buffer has wrong size: expected {expected} bytes, got {actual}"
-                )
-            }
-            Self::SerializeFailed => {
-                write!(
-                    formatter,
-                    "The libretro core failed to serialize its current state"
-                )
-            }
-            Self::UnserializeFailed => {
-                write!(
-                    formatter,
-                    "The libretro core failed to restore a saved state"
-                )
-            }
-            Self::CreateDirectory { path, message } => {
-                write!(
-                    formatter,
-                    "Could not create directory '{}': {message}",
-                    path.display()
-                )
-            }
-            Self::ReadFile { path, message } => {
-                write!(formatter, "Could not read '{}': {message}", path.display())
-            }
-            Self::InvalidRomHeader { path } => {
-                write!(
-                    formatter,
-                    "Unsupported ROM '{}': not a recognized N64 ROM image",
-                    path.display()
-                )
-            }
-            Self::UnsupportedRom {
-                path,
-                title,
-                game_code,
-                revision,
-                expected_title,
-                expected_game_code,
-                expected_revision,
-            } => {
-                write!(
-                    formatter,
-                    "Unsupported ROM '{}': detected title='{title}', game_code='{game_code}', revision={revision}; expected title='{expected_title}', game_code='{expected_game_code}', revision={expected_revision}. This project uses fixed RAM offsets for the US F-Zero X ROM.",
-                    path.display()
-                )
-            }
-            Self::WriteFile { path, message } => {
-                write!(formatter, "Could not write '{}': {message}", path.display())
-            }
-            Self::InvalidPath { path } => {
-                write!(
-                    formatter,
-                    "Path contains unsupported NUL byte: {}",
-                    path.display()
-                )
-            }
-            Self::LoadLibrary { path, message } => {
-                write!(
-                    formatter,
-                    "Could not load libretro core '{}': {message}",
-                    path.display()
-                )
-            }
-            Self::MissingSymbol { symbol, message } => {
-                write!(formatter, "Missing libretro symbol '{symbol}': {message}")
-            }
-            Self::UnsupportedApiVersion { actual, expected } => {
-                write!(
-                    formatter,
-                    "Unsupported libretro API version {actual} (expected {expected})"
-                )
-            }
-            Self::InvalidStepRepeatCount { count } => {
-                write!(formatter, "Invalid repeated env-step frame count {count}")
-            }
-            Self::LoadGameFailed { path } => {
-                write!(
-                    formatter,
-                    "Libretro core could not load ROM '{}'",
-                    path.display()
-                )
-            }
-            Self::HardwareRenderFailed { message } => {
-                write!(formatter, "Hardware renderer setup failed: {message}")
-            }
-            Self::InvalidObservationPreset { name } => {
-                write!(formatter, "Unknown observation preset '{name}'")
-            }
-            Self::InvalidResizeFilter { name } => {
-                write!(formatter, "Unknown video resize filter '{name}'")
-            }
-            Self::ResizeFailed { message } => {
-                write!(formatter, "Video resize failed: {message}")
-            }
-            Self::InvalidVideoCrop {
-                frame_width,
-                frame_height,
-                top,
-                bottom,
-                left,
-                right,
-            } => {
-                write!(
-                    formatter,
-                    "Invalid video crop for frame {frame_width}x{frame_height}: top={top}, bottom={bottom}, left={left}, right={right}"
-                )
-            }
-            Self::InvalidVideoBuffer {
-                offset,
-                length,
-                available,
-            } => {
-                write!(
-                    formatter,
-                    "Video buffer range is out of bounds: offset={offset}, length={length}, available={available}"
-                )
-            }
-            Self::InvalidRaceStartSetup { message } => {
-                write!(formatter, "Invalid F-Zero X race-start setup: {message}")
-            }
-            Self::NoFrameAvailable => {
-                write!(formatter, "The emulator did not produce a video frame")
-            }
-        }
-    }
+/// Failures specific to the native OpenGL/EGL frontend used by hardware renderers.
+#[derive(Clone, Debug, Error)]
+pub enum HardwareRenderError {
+    #[error("hardware context {context_type} is not supported by this host yet")]
+    UnsupportedContext { context_type: String },
+    #[error("SET_HW_RENDER received null callback")]
+    NullCallback,
+    #[error("could not load {library}: {message}")]
+    LoadLibrary {
+        library: &'static str,
+        message: String,
+    },
+    #[error("missing {library} symbol '{symbol}': {message}")]
+    MissingSymbol {
+        library: &'static str,
+        symbol: String,
+        message: String,
+    },
+    #[error("invalid C symbol name '{symbol}': {message}")]
+    InvalidSymbolName { symbol: String, message: String },
+    #[error("missing GL symbol '{symbol}'")]
+    MissingGlSymbol { symbol: String },
+    #[error("{call} returned null")]
+    NullHandle { call: &'static str },
+    #[error("{call} returned no usable EGL config")]
+    NoConfig { call: &'static str },
+    #[error("{call} failed with {egl_error}")]
+    EglCallFailed {
+        call: &'static str,
+        egl_error: String,
+    },
 }
-
-impl std::error::Error for CoreError {}

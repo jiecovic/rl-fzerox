@@ -173,7 +173,7 @@ impl Host {
             self.callbacks.set_controller_state(base_controller_state);
         }
         let watch_capture_audio = capture.capture_audio();
-        let step_result = with_silenced_stdio(|| {
+        let step_result: Result<RepeatedStepExecution, CoreError> = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
             let mut execution =
                 RepeatedStepExecution::new(StepSummary::default(), config.action_repeat, capture);

@@ -44,7 +44,7 @@ impl Host {
         let baseline_state =
             std::fs::read(baseline_state_path).map_err(|error| CoreError::ReadFile {
                 path: baseline_state_path.to_path_buf(),
-                message: error.to_string(),
+                source: error,
             })?;
         self.load_baseline_from_state_bytes(&baseline_state)
     }
@@ -127,13 +127,13 @@ impl Host {
         {
             std::fs::create_dir_all(parent).map_err(|error| CoreError::CreateDirectory {
                 path: parent.to_path_buf(),
-                message: error.to_string(),
+                source: error,
             })?;
         }
 
         std::fs::write(path, state).map_err(|error| CoreError::WriteFile {
             path: path.to_path_buf(),
-            message: error.to_string(),
+            source: error,
         })
     }
 

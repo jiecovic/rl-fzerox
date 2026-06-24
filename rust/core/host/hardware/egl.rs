@@ -8,6 +8,11 @@ use std::sync::OnceLock;
 use libloading::Library;
 use libretro_sys::{HwContextType, HwRenderCallback};
 
+use crate::core::error::HardwareRenderError;
+
+const EGL_LIBRARY: &str = "libEGL.so.1";
+const GL_LIBRARY: &str = "libGL.so.1";
+
 // EGL enum values mirror the external C headers.
 #[derive(Clone, Copy)]
 struct EglProtocolValues {
@@ -115,31 +120,24 @@ pub(super) struct EglFns {
 }
 
 impl EglFns {
-    fn load() -> Result<Self, String> {
-        // SAFETY: Loading process-global EGL/GL shared libraries is required to
-        // resolve the C entry points used by the hardware-render frontend.
-        let library = Box::leak(Box::new(unsafe {
-            Library::new("libEGL.so.1").map_err(|error| error.to_string())?
-        }));
-        // SAFETY: Same as above for fallback GL symbols not exposed through EGL.
-        let gl_library = Box::leak(Box::new(unsafe {
-            Library::new("libGL.so.1").map_err(|error| error.to_string())?
-        }));
+    fn load() -> Result<Self, HardwareRenderError> {
+        let library = load_library(EGL_LIBRARY)?;
+        let gl_library = load_library(GL_LIBRARY)?;
         Ok(Self {
             _library: library,
             gl_library,
-            get_display: symbol(library, b"eglGetDisplay\0")?,
-            initialize: symbol(library, b"eglInitialize\0")?,
-            choose_config: symbol(library, b"eglChooseConfig\0")?,
-            bind_api: symbol(library, b"eglBindAPI\0")?,
-            create_pbuffer_surface: symbol(library, b"eglCreatePbufferSurface\0")?,
-            create_context: symbol(library, b"eglCreateContext\0")?,
-            make_current: symbol(library, b"eglMakeCurrent\0")?,
-            destroy_surface: symbol(library, b"eglDestroySurface\0")?,
-            destroy_context: symbol(library, b"eglDestroyContext\0")?,
-            terminate: symbol(library, b"eglTerminate\0")?,
-            get_error: symbol(library, b"eglGetError\0")?,
-            get_proc_address: symbol(library, b"eglGetProcAddress\0")?,
+            get_display: symbol(EGL_LIBRARY, library, b"eglGetDisplay\0")?,
+            initialize: symbol(EGL_LIBRARY, library, b"eglInitialize\0")?,
+            choose_config: symbol(EGL_LIBRARY, library, b"eglChooseConfig\0")?,
+            bind_api: symbol(EGL_LIBRARY, library, b"eglBindAPI\0")?,
+            create_pbuffer_surface: symbol(EGL_LIBRARY, library, b"eglCreatePbufferSurface\0")?,
+            create_context: symbol(EGL_LIBRARY, library, b"eglCreateContext\0")?,
+            make_current: symbol(EGL_LIBRARY, library, b"eglMakeCurrent\0")?,
+            destroy_surface: symbol(EGL_LIBRARY, library, b"eglDestroySurface\0")?,
+            destroy_context: symbol(EGL_LIBRARY, library, b"eglDestroyContext\0")?,
+            terminate: symbol(EGL_LIBRARY, library, b"eglTerminate\0")?,
+            get_error: symbol(EGL_LIBRARY, library, b"eglGetError\0")?,
+            get_proc_address: symbol(EGL_LIBRARY, library, b"eglGetProcAddress\0")?,
             get_platform_display_ext: optional_symbol(library, b"eglGetPlatformDisplayEXT\0"),
         })
     }
@@ -168,12 +166,12 @@ impl EglFns {
     }
 }
 
-pub(super) fn egl_fns() -> Result<&'static EglFns, String> {
-    static EGL: OnceLock<Result<EglFns, String>> = OnceLock::new();
+pub(super) fn egl_fns() -> Result<&'static EglFns, HardwareRenderError> {
+    static EGL: OnceLock<Result<EglFns, HardwareRenderError>> = OnceLock::new();
     EGL.get_or_init(EglFns::load).as_ref().map_err(Clone::clone)
 }
 
-pub(super) fn create_display(egl: &EglFns) -> Result<EglDisplay, String> {
+pub(super) fn create_display(egl: &EglFns) -> Result<EglDisplay, HardwareRenderError> {
     if let Some(get_platform_display_ext) = egl.get_platform_display_ext {
         // SAFETY: The optional platform-display entry point is resolved from
         // EGL and accepts null native-display/attribute pointers for surfaceless.
@@ -196,9 +194,11 @@ pub(super) fn create_display(egl: &EglFns) -> Result<EglDisplay, String> {
     Ok(display)
 }
 
-fn initialize_display(egl: &EglFns, display: EglDisplay) -> Result<(), String> {
+fn initialize_display(egl: &EglFns, display: EglDisplay) -> Result<(), HardwareRenderError> {
     if display.is_null() {
-        return Err("eglGetDisplay returned null".to_owned());
+        return Err(HardwareRenderError::NullHandle {
+            call: "eglGetDisplay",
+        });
     }
     let mut major = 0;
     let mut minor = 0;
@@ -206,12 +206,18 @@ fn initialize_display(egl: &EglFns, display: EglDisplay) -> Result<(), String> {
     // valid local variables.
     let ok = unsafe { (egl.initialize)(display, &mut major, &mut minor) };
     if ok == EGL_VALUES.false_value {
-        return Err(format!("eglInitialize failed with {}", egl.error_hex()));
+        return Err(HardwareRenderError::EglCallFailed {
+            call: "eglInitialize",
+            egl_error: egl.error_hex(),
+        });
     }
     Ok(())
 }
 
-pub(super) fn choose_config(egl: &EglFns, display: EglDisplay) -> Result<EglConfig, String> {
+pub(super) fn choose_config(
+    egl: &EglFns,
+    display: EglDisplay,
+) -> Result<EglConfig, HardwareRenderError> {
     let attributes = [
         EGL_VALUES.surface_type,
         EGL_VALUES.pbuffer_bit,
@@ -240,8 +246,16 @@ pub(super) fn choose_config(egl: &EglFns, display: EglDisplay) -> Result<EglConf
             &mut config_count,
         )
     };
-    if ok == EGL_VALUES.false_value || config_count == 0 || config.is_null() {
-        return Err(format!("eglChooseConfig failed with {}", egl.error_hex()));
+    if ok == EGL_VALUES.false_value {
+        return Err(HardwareRenderError::EglCallFailed {
+            call: "eglChooseConfig",
+            egl_error: egl.error_hex(),
+        });
+    }
+    if config_count == 0 || config.is_null() {
+        return Err(HardwareRenderError::NoConfig {
+            call: "eglChooseConfig",
+        });
     }
     Ok(config)
 }
@@ -250,7 +264,7 @@ pub(super) fn create_surface(
     egl: &EglFns,
     display: EglDisplay,
     config: EglConfig,
-) -> Result<EglSurface, String> {
+) -> Result<EglSurface, HardwareRenderError> {
     let attributes = [
         EGL_VALUES.width,
         PBUFFER_SIZE.width,
@@ -262,23 +276,23 @@ pub(super) fn create_surface(
     // NUL-terminated with EGL_NONE.
     let surface = unsafe { (egl.create_pbuffer_surface)(display, config, attributes.as_ptr()) };
     if surface.is_null() {
-        return Err(format!(
-            "eglCreatePbufferSurface failed with {}",
-            egl.error_hex()
-        ));
+        return Err(HardwareRenderError::EglCallFailed {
+            call: "eglCreatePbufferSurface",
+            egl_error: egl.error_hex(),
+        });
     }
     Ok(surface)
 }
 
-pub(super) fn bind_opengl_api(egl: &EglFns) -> Result<(), String> {
+pub(super) fn bind_opengl_api(egl: &EglFns) -> Result<(), HardwareRenderError> {
     // SAFETY: Binding the OpenGL API is a process-local EGL operation with no
     // borrowed pointers.
     let ok = unsafe { (egl.bind_api)(EGL_VALUES.opengl_api) };
     if ok == EGL_VALUES.false_value {
-        return Err(format!(
-            "eglBindAPI(OpenGL) failed with {}",
-            egl.error_hex()
-        ));
+        return Err(HardwareRenderError::EglCallFailed {
+            call: "eglBindAPI(OpenGL)",
+            egl_error: egl.error_hex(),
+        });
     }
     Ok(())
 }
@@ -288,14 +302,17 @@ pub(super) fn create_context(
     display: EglDisplay,
     config: EglConfig,
     callback: &HwRenderCallback,
-) -> Result<EglContext, String> {
+) -> Result<EglContext, HardwareRenderError> {
     let attributes = context_attributes(callback);
     // SAFETY: `display`/`config` were returned by EGL and attributes is
     // NUL-terminated with EGL_NONE.
     let context =
         unsafe { (egl.create_context)(display, config, ptr::null_mut(), attributes.as_ptr()) };
     if context.is_null() {
-        return Err(format!("eglCreateContext failed with {}", egl.error_hex()));
+        return Err(HardwareRenderError::EglCallFailed {
+            call: "eglCreateContext",
+            egl_error: egl.error_hex(),
+        });
     }
     Ok(context)
 }
@@ -320,12 +337,15 @@ pub(super) fn make_current(
     display: EglDisplay,
     surface: EglSurface,
     context: EglContext,
-) -> Result<(), String> {
+) -> Result<(), HardwareRenderError> {
     // SAFETY: `display`, `surface`, and `context` are EGL handles owned by the
     // hardware-render context.
     let ok = unsafe { (egl.make_current)(display, surface, surface, context) };
     if ok == EGL_VALUES.false_value {
-        return Err(format!("eglMakeCurrent failed with {}", egl.error_hex()));
+        return Err(HardwareRenderError::EglCallFailed {
+            call: "eglMakeCurrent",
+            egl_error: egl.error_hex(),
+        });
     }
     Ok(())
 }
@@ -350,7 +370,22 @@ pub(super) fn context_type(value: libc::c_uint) -> Option<HwContextType> {
     }
 }
 
-fn symbol<T>(library: &'static Library, name: &[u8]) -> Result<T, String>
+fn load_library(name: &'static str) -> Result<&'static Library, HardwareRenderError> {
+    // SAFETY: Loading process-global EGL/GL shared libraries is required to
+    // resolve the C entry points used by the hardware-render frontend.
+    unsafe { Library::new(name) }
+        .map(|library| Box::leak(Box::new(library)) as &'static Library)
+        .map_err(|error| HardwareRenderError::LoadLibrary {
+            library: name,
+            message: error.to_string(),
+        })
+}
+
+fn symbol<T>(
+    library_name: &'static str,
+    library: &'static Library,
+    name: &[u8],
+) -> Result<T, HardwareRenderError>
 where
     T: Copy,
 {
@@ -360,7 +395,11 @@ where
         library
             .get::<T>(name)
             .map(|symbol| *symbol)
-            .map_err(|error| error.to_string())
+            .map_err(|error| HardwareRenderError::MissingSymbol {
+                library: library_name,
+                symbol: printable_symbol(name),
+                message: error.to_string(),
+            })
     }
 }
 
@@ -370,4 +409,14 @@ where
 {
     // SAFETY: Same invariant as `symbol`; failure is represented as `None`.
     unsafe { library.get::<T>(name).map(|symbol| *symbol).ok() }
+}
+
+fn printable_symbol(symbol_name: &[u8]) -> String {
+    symbol_name
+        .strip_suffix(b"\0")
+        .unwrap_or(symbol_name)
+        .iter()
+        .copied()
+        .map(char::from)
+        .collect()
 }

@@ -3,6 +3,8 @@
 
 use std::ffi::{CString, c_void};
 
+use crate::core::error::HardwareRenderError;
+
 use super::egl::egl_fns;
 
 #[derive(Clone, Copy)]
@@ -34,7 +36,7 @@ pub(super) struct GlFns {
 }
 
 impl GlFns {
-    pub(super) fn load() -> Result<Self, String> {
+    pub(super) fn load() -> Result<Self, HardwareRenderError> {
         Ok(Self {
             read_pixels: gl_symbol("glReadPixels")?,
             pixel_storei: gl_symbol("glPixelStorei")?,
@@ -64,14 +66,20 @@ pub(super) fn flip_rgb_rows_into(
     }
 }
 
-fn gl_symbol<T>(name: &str) -> Result<T, String>
+fn gl_symbol<T>(name: &str) -> Result<T, HardwareRenderError>
 where
     T: Copy,
 {
-    let symbol_name = CString::new(name).map_err(|error| error.to_string())?;
+    let symbol_name =
+        CString::new(name).map_err(|error| HardwareRenderError::InvalidSymbolName {
+            symbol: name.to_owned(),
+            message: error.to_string(),
+        })?;
     let pointer = egl_fns()?.proc_address(symbol_name.as_c_str());
     if pointer.is_null() {
-        return Err(format!("missing GL symbol {name}"));
+        return Err(HardwareRenderError::MissingGlSymbol {
+            symbol: name.to_owned(),
+        });
     }
     // SAFETY: EGL returned a non-null pointer for the requested GL symbol and
     // the caller chooses `T` to match that exact symbol signature.

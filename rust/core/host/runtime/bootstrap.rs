@@ -45,8 +45,8 @@ impl Host {
         });
         if loaded {
             self.reset_hardware_context()
-        } else if let Some(message) = self.callbacks.take_hardware_render_error() {
-            Err(CoreError::HardwareRenderFailed { message })
+        } else if let Some(error) = self.callbacks.take_hardware_render_error() {
+            Err(CoreError::from(error))
         } else {
             Err(CoreError::LoadGameFailed {
                 path: self.rom_path.clone(),

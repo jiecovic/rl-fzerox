@@ -10,6 +10,7 @@ use std::ptr;
 
 use libretro_sys::{HW_FRAME_BUFFER_VALID, HwContextResetFn, HwContextType, HwRenderCallback};
 
+use crate::core::error::HardwareRenderError;
 use crate::core::video::VideoFrame;
 
 mod callbacks;
@@ -34,16 +35,15 @@ pub struct HardwareRenderContext {
 }
 
 impl HardwareRenderContext {
-    pub fn from_callback(callback: &mut HwRenderCallback) -> Result<Self, String> {
+    pub fn from_callback(callback: &mut HwRenderCallback) -> Result<Self, HardwareRenderError> {
         let context_type = context_type(callback.context_type);
         if !matches!(
             context_type,
             Some(HwContextType::OpenGL | HwContextType::OpenGLCore)
         ) {
-            return Err(format!(
-                "hardware context {:?} is not supported by this host yet",
-                context_type
-            ));
+            return Err(HardwareRenderError::UnsupportedContext {
+                context_type: format!("{context_type:?}"),
+            });
         }
 
         let egl = egl_fns()?;
@@ -74,7 +74,7 @@ impl HardwareRenderContext {
         data == HW_FRAME_BUFFER_VALID
     }
 
-    pub fn reset_core_context(&self) -> Result<(), String> {
+    pub fn reset_core_context(&self) -> Result<(), HardwareRenderError> {
         make_current(self.egl, self.display, self.surface, self.context)?;
         // SAFETY: The callback comes from libretro's hardware-render contract
         // and is invoked after this host has made the matching EGL context current.
