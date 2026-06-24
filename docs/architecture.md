@@ -24,6 +24,13 @@ run manager UI
 The manager run spec is the editable source of truth. `runtime_spec` configs are
 validated launch/watch snapshots derived from it.
 
+The main runtime concepts are documented separately:
+
+- [Courses and race modes](concepts/courses.md)
+- [Baseline materialization](concepts/baselines.md)
+- [Generated X-Cup courses](concepts/x_cup.md)
+- [Adaptive engine tuning](concepts/engine_tuning.md)
+
 ## Main Packages
 
 - `src/rl_fzerox/apps/run_manager/`
