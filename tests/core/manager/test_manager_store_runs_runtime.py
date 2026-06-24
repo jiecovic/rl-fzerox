@@ -171,7 +171,7 @@ def test_manager_store_persists_track_sampling_runtime_state(tmp_path: Path) -> 
         managed_runs_root=tmp_path / "runs",
     )
     state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=2,
         update_episodes=5,
         ema_alpha=0.1,
@@ -485,7 +485,7 @@ def test_manager_store_updates_track_sampling_rows_incrementally(tmp_path: Path)
         ema_completion_fraction=0.4,
     )
     state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=2,
         update_episodes=5,
         ema_alpha=0.1,

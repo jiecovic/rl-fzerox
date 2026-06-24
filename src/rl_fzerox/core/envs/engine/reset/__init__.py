@@ -20,7 +20,6 @@ from rl_fzerox.core.envs.engine.reset.tracks import (
     TrackSamplingDeficitLane,
     TrackSamplingLimits,
     TrackSamplingQueuedReset,
-    select_reset_track,
     select_reset_track_by_course_id,
 )
 
@@ -39,7 +38,6 @@ __all__ = [
     "TrackSamplingQueuedReset",
     "load_track_baseline",
     "reset_race_state",
-    "select_reset_track",
     "select_reset_track_by_course_id",
     "sync_camera_setting",
 ]

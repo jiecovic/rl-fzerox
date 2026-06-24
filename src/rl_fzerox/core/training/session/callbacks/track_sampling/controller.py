@@ -26,7 +26,6 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
 from rl_fzerox.core.training.session.callbacks.track_sampling.weights import (
     STEP_BALANCE_SCHEDULER_SETTINGS,
     CourseSamplingWeights,
-    adaptive_target_bonus,
     blend_course_sampling_weights,
     distribute_course_weight,
     expected_episode_frames,
@@ -46,10 +45,6 @@ class StepBalancedTrackSamplingController:
         update_episodes: int,
         ema_alpha: float,
         max_weight_scale: float,
-        adaptive_completion_weight: float = 0.35,
-        adaptive_target_completion: float = 0.9,
-        adaptive_min_confidence_episodes: int = 24,
-        adaptive_confidence_scale: float = 4.0,
         x_cup_generation_ema_alpha: float = 0.3,
         log_details: bool = False,
         restored_state: TrackSamplingRuntimeState | None = None,
@@ -74,10 +69,6 @@ class StepBalancedTrackSamplingController:
         self._update_episodes = max(1, int(update_episodes))
         self._ema_alpha = max(0.0, min(1.0, float(ema_alpha)))
         self._max_weight_scale = max(1.0, float(max_weight_scale))
-        self._adaptive_completion_weight = max(0.0, float(adaptive_completion_weight))
-        self._adaptive_target_completion = max(0.0, min(1.0, float(adaptive_target_completion)))
-        self._adaptive_min_confidence_episodes = max(1, int(adaptive_min_confidence_episodes))
-        self._adaptive_confidence_scale = max(1.0, float(adaptive_confidence_scale))
         self._x_cup_generation_ema_alpha = max(0.0, min(1.0, float(x_cup_generation_ema_alpha)))
         self._log_details = log_details
         self._episodes_since_update = 0
@@ -110,12 +101,6 @@ class StepBalancedTrackSamplingController:
             update_episodes=settings.step_balance_update_episodes,
             ema_alpha=settings.step_balance_ema_alpha,
             max_weight_scale=settings.step_balance_max_weight_scale,
-            adaptive_completion_weight=settings.adaptive_step_balance_completion_weight,
-            adaptive_target_completion=settings.adaptive_step_balance_target_completion,
-            adaptive_min_confidence_episodes=(
-                settings.adaptive_step_balance_min_confidence_episodes
-            ),
-            adaptive_confidence_scale=settings.adaptive_step_balance_confidence_scale,
             x_cup_generation_ema_alpha=settings.x_cup_rotation.ema_alpha,
             log_details=settings.step_balance_log_details,
             restored_state=restored_state,
@@ -188,10 +173,10 @@ class StepBalancedTrackSamplingController:
             update_episodes=self._update_episodes,
             ema_alpha=self._ema_alpha,
             max_weight_scale=self._max_weight_scale,
-            adaptive_completion_weight=self._adaptive_completion_weight,
-            adaptive_target_completion=self._adaptive_target_completion,
-            adaptive_min_confidence_episodes=self._adaptive_min_confidence_episodes,
-            adaptive_confidence_scale=self._adaptive_confidence_scale,
+            adaptive_completion_weight=0.0,
+            adaptive_target_completion=0.0,
+            adaptive_min_confidence_episodes=1,
+            adaptive_confidence_scale=1.0,
             deficit_budget_difficulty_metric="completion_ema",
             update_count=self.update_count,
             episodes_since_update=self._episodes_since_update,
@@ -222,8 +207,7 @@ class StepBalancedTrackSamplingController:
     def _course_sampling_weights(self) -> dict[str, CourseSamplingWeights]:
         reference_length = self._reference_episode_length()
         target_frame_weights = {
-            course_key: stats.base_weight * self._target_frame_bonus(stats)
-            for course_key, stats in self._stats.items()
+            course_key: stats.base_weight for course_key, stats in self._stats.items()
         }
         total_target_frame_weight = sum(target_frame_weights.values())
         total_completed_frames = sum(stats.completed_frames for stats in self._stats.values())
@@ -291,11 +275,6 @@ class StepBalancedTrackSamplingController:
             reset_weight=target_frame_weight / episode_frames,
             frame_debt=0.0,
         )
-
-    def _target_frame_bonus(self, stats: TrackStepStats) -> float:
-        if self._sampling_mode != "adaptive_step_balanced":
-            return 1.0
-        return self._adaptive_completion_bonus(stats)
 
     def _total_base_weight(self) -> float:
         return sum(stats.base_weight for stats in self._stats.values())
@@ -365,17 +344,3 @@ class StepBalancedTrackSamplingController:
         self._episodes_since_update = max(0, int(restored_state.episodes_since_update))
         self.update_count = max(0, int(restored_state.update_count))
         return restored_any
-
-    def _adaptive_completion_bonus(self, stats: TrackStepStats) -> float:
-        return adaptive_target_bonus(
-            sampling_mode=self._sampling_mode,
-            max_weight_scale=self._max_weight_scale,
-            completion_weight=self._adaptive_completion_weight,
-            target_completion=self._adaptive_target_completion,
-            update_episodes=self._update_episodes,
-            min_confidence_episodes=self._adaptive_min_confidence_episodes,
-            confidence_scale=self._adaptive_confidence_scale,
-            completion_fraction=stats.ema_completion_fraction,
-            finished_episode_count=stats.finished_episode_count,
-            success_sample_count=stats.success_sample_count,
-        )

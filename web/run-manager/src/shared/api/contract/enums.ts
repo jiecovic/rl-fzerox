@@ -17,8 +17,6 @@ export const gpDifficultySchema = z.enum(["novice", "standard", "expert", "maste
 export const TRACK_SAMPLING_MODES = [
   "equal",
   "step_balanced",
-  // Hidden from new backend metadata, but accepted for legacy saved configs.
-  "adaptive_step_balanced",
   "deficit_budget",
   "fixed_env",
 ] as const;

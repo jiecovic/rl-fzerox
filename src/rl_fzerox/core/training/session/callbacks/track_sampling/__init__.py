@@ -45,11 +45,6 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeState,
     replace_runtime_generation,
 )
-from rl_fzerox.core.training.session.callbacks.track_sampling.weights import (
-    adaptive_confidence_bonus,
-    adaptive_difficulty_bonus,
-    adaptive_target_bonus,
-)
 from rl_fzerox.core.training.session.callbacks.track_sampling.x_cup_rotation import (
     XCupRotationFailure,
     XCupRotationManager,
@@ -74,9 +69,6 @@ __all__ = (
     "XCupRotationFailure",
     "XCupRotationManager",
     "XCupRotationUpdate",
-    "adaptive_confidence_bonus",
-    "adaptive_difficulty_bonus",
-    "adaptive_target_bonus",
     "alt_baseline_signature",
     "apply_alt_baselines_to_track_sampling",
     "deficit_budget_scheduler_state_json",

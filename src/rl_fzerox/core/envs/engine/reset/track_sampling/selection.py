@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from fractions import Fraction
 from functools import reduce
 from math import gcd
-from random import Random, choice, random
+from random import Random, choice
 from typing import TypeVar
 
 from rl_fzerox.core.engine_tuning import (
@@ -32,7 +32,7 @@ _T = TypeVar("_T")
 
 
 class TrackResetSelector:
-    """Select reset baselines using either iid random or per-env balanced cycling."""
+    """Select reset baselines using the configured course sampler."""
 
     def __init__(self, *, env_index: int = 0) -> None:
         self._env_index = max(0, int(env_index))
@@ -49,14 +49,7 @@ class TrackResetSelector:
         engine_tuning_sampler: EngineTuningResetSampler | None = None,
         engine_tuning_selection: EngineTuningSelectionMode = "sample",
     ) -> SelectedTrack | None:
-        if config.sampling_mode == "random":
-            return select_reset_track(
-                config,
-                seed=seed,
-                engine_tuning_sampler=engine_tuning_sampler,
-                engine_tuning_selection=engine_tuning_selection,
-            )
-        if config.sampling_mode == "balanced":
+        if config.sampling_mode == "equal":
             return self._select_balanced(
                 config,
                 sampling_mode=config.sampling_mode,
@@ -64,7 +57,7 @@ class TrackResetSelector:
                 engine_tuning_sampler=engine_tuning_sampler,
                 engine_tuning_selection=engine_tuning_selection,
             )
-        if config.sampling_mode in {"step_balanced", "adaptive_step_balanced"}:
+        if config.sampling_mode == "step_balanced":
             return select_reset_track_by_course_weight(
                 config,
                 seed=seed,
@@ -233,36 +226,6 @@ def select_reset_track_by_course_id(
             engine_tuning_selection=engine_tuning_selection,
         )
     return None
-
-
-def select_reset_track(
-    config: TrackSamplingConfig,
-    *,
-    seed: int | None,
-    sampling_mode: str = "random",
-    engine_tuning_sampler: EngineTuningResetSampler | None = None,
-    engine_tuning_selection: EngineTuningSelectionMode = "sample",
-) -> SelectedTrack | None:
-    """Select one configured reset baseline with deterministic seeding when available."""
-
-    if not config.enabled:
-        return None
-    entries = _selectable_entries(config.entries)
-    if not entries:
-        raise ValueError("track sampling is enabled but has no entries")
-
-    total_weight = sum(float(entry.weight) for entry in entries)
-    if total_weight <= 0.0:
-        raise ValueError("track sampling requires at least one positive entry weight")
-    sample = (Random(seed).random() if seed is not None else random()) * total_weight
-    return _selected_track_from_entry(
-        _weighted_entry(entries, sample=sample),
-        sampling_mode=sampling_mode,
-        seed=seed,
-        engine_tuning_config=config.engine_tuning,
-        engine_tuning_sampler=engine_tuning_sampler,
-        engine_tuning_selection=engine_tuning_selection,
-    )
 
 
 def select_reset_track_by_course_weight(

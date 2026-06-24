@@ -17,24 +17,12 @@ from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
     return {
         "enabled": True,
-        "sampling_mode": _runtime_track_sampling_mode(config),
+        "sampling_mode": config.tracks.sampling_mode,
         "entries": _track_sampling_entries(config),
         "baseline_variant_count": config.tracks.baseline_variant_count,
         "step_balance_update_episodes": config.tracks.step_balance_update_episodes,
         "step_balance_ema_alpha": config.tracks.step_balance_ema_alpha,
         "step_balance_max_weight_scale": config.tracks.step_balance_max_weight_scale,
-        "adaptive_step_balance_completion_weight": (
-            config.tracks.adaptive_step_balance_completion_weight
-        ),
-        "adaptive_step_balance_target_completion": (
-            config.tracks.adaptive_step_balance_target_completion
-        ),
-        "adaptive_step_balance_min_confidence_episodes": (
-            config.tracks.adaptive_step_balance_min_confidence_episodes
-        ),
-        "adaptive_step_balance_confidence_scale": (
-            config.tracks.adaptive_step_balance_confidence_scale
-        ),
         "deficit_budget_uniform_fraction": config.tracks.deficit_budget_uniform_fraction,
         "deficit_budget_focus_sharpness": config.tracks.deficit_budget_focus_sharpness,
         "deficit_budget_ema_alpha": config.tracks.deficit_budget_ema_alpha,
@@ -57,13 +45,6 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
         },
         "engine_tuning": _engine_tuning(config),
     }
-
-
-def _runtime_track_sampling_mode(config: ManagedRunConfig) -> str:
-    sampling_mode = config.tracks.sampling_mode
-    if sampling_mode == "equal":
-        return "balanced"
-    return sampling_mode
 
 
 def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]:

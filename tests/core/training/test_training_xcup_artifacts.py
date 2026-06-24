@@ -85,7 +85,7 @@ def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="x_cup_abcd1234",
@@ -217,7 +217,7 @@ def test_generated_slot_state_restores_rotated_x_cup_entries_for_managed_continu
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="adaptive_step_balanced",
+                sampling_mode="step_balanced",
                 entries=(saved_entry,),
                 x_cup_rotation=XCupRotationConfig(enabled=True),
             ),

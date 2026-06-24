@@ -122,5 +122,5 @@ def _selected_track(*, mode: str, alt_baseline_id: str | None) -> SelectedTrack:
         generated_course_length=None,
         log_per_course=False,
         records=None,
-        sampling_mode="balanced",
+        sampling_mode="equal",
     )

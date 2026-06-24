@@ -396,7 +396,7 @@ def test_balanced_track_sampling_cycles_with_env_index_offset(tmp_path: Path) ->
         action_repeat=1,
         track_sampling=TrackSamplingConfig(
             enabled=True,
-            sampling_mode="balanced",
+            sampling_mode="equal",
             entries=tuple(
                 TrackSamplingEntryConfig(id=track_id, baseline_state_path=baseline_path)
                 for track_id, baseline_path in baseline_paths.items()
@@ -411,7 +411,7 @@ def test_balanced_track_sampling_cycles_with_env_index_offset(tmp_path: Path) ->
 
     assert env_zero_ids == ["mute", "silence", "sand", "forest", "mute"]
     assert env_two_info["track_id"] == "sand"
-    assert env_two_info["track_sampling_mode"] == "balanced"
+    assert env_two_info["track_sampling_mode"] == "equal"
     assert env_two_info["track_sampling_cycle_position"] == 2
 
 
@@ -423,7 +423,7 @@ def test_balanced_track_sampling_respects_weights(tmp_path: Path) -> None:
             action_repeat=1,
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute",
@@ -453,7 +453,7 @@ def test_sequential_track_sampling_uses_config_order_for_watch(tmp_path: Path) -
             action_repeat=1,
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute",
@@ -634,10 +634,10 @@ def test_sequential_track_sampling_can_jump_to_runtime_course_key_for_watch(
     assert third_info["track_course_id"] == "mute_city"
 
 
-@pytest.mark.parametrize("sampling_mode", ("step_balanced", "adaptive_step_balanced"))
+@pytest.mark.parametrize("sampling_mode", ("step_balanced", "step_balanced"))
 def test_dynamic_track_sampling_accepts_runtime_weight_updates(
     tmp_path: Path,
-    sampling_mode: Literal["step_balanced", "adaptive_step_balanced"],
+    sampling_mode: Literal["step_balanced", "step_balanced"],
 ) -> None:
     baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
     env = FZeroXEnv(

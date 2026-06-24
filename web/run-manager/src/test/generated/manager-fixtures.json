@@ -1452,10 +1452,6 @@
     },
     "seed": 123,
     "tracks": {
-      "adaptive_step_balance_completion_weight": 0.35,
-      "adaptive_step_balance_confidence_scale": 4.0,
-      "adaptive_step_balance_min_confidence_episodes": 24,
-      "adaptive_step_balance_target_completion": 0.9,
       "deficit_budget_difficulty_metric": "completion_ema",
       "deficit_budget_ema_alpha": 0.02,
       "deficit_budget_focus_sharpness": 1.0,

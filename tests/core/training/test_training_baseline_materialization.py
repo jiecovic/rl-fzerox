@@ -302,7 +302,7 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute_city",
@@ -367,7 +367,7 @@ def test_materialize_track_sampling_expands_gp_baseline_variants(
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 baseline_variant_count=3,
                 entries=(
                     TrackSamplingEntryConfig(
@@ -440,7 +440,7 @@ def test_materialize_track_sampling_reuses_gp_baseline_variants_across_run_seeds
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 baseline_variant_count=3,
                 entries=(
                     TrackSamplingEntryConfig(
@@ -502,7 +502,7 @@ def test_materialize_track_sampling_does_not_expand_time_attack_baselines(
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 baseline_variant_count=4,
                 entries=(
                     TrackSamplingEntryConfig(

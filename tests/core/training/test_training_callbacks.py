@@ -239,7 +239,7 @@ def test_build_callbacks_loads_track_sampling_runtime_state_once(tmp_path: Path)
         env_config=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="adaptive_step_balanced",
+                sampling_mode="step_balanced",
                 entries=(
                     TrackSamplingEntryConfig(id="mute_city", course_id="mute_city"),
                     TrackSamplingEntryConfig(id="silence", course_id="silence"),

@@ -39,6 +39,19 @@ def default_gp_difficulties() -> tuple[GpDifficulty, ...]:
     return (default_gp_difficulty(),)
 
 
+_REMOVED_TRACK_SAMPLING_FIELDS = (
+    "adaptive_step_balance_completion_weight",
+    "adaptive_step_balance_confidence_scale",
+    "adaptive_step_balance_min_confidence_episodes",
+    "adaptive_step_balance_target_completion",
+)
+_RENAMED_TRACK_SAMPLING_MODES = {
+    "adaptive_step_balanced": "step_balanced",
+    "balanced": "equal",
+    "random": "equal",
+}
+
+
 class ManagedXCupAutoRegenerationConfig(BaseModel):
     """Manager-owned policy for rotating solved generated X Cup slots."""
 
@@ -92,10 +105,6 @@ class ManagedTracksConfig(BaseModel):
     step_balance_update_episodes: int = Field(default=5, ge=1)
     step_balance_ema_alpha: float = Field(default=0.1, gt=0.0, le=1.0)
     step_balance_max_weight_scale: float = Field(default=5.0, ge=1.0)
-    adaptive_step_balance_completion_weight: float = Field(default=0.35, ge=0.0)
-    adaptive_step_balance_target_completion: float = Field(default=0.9, ge=0.0, le=1.0)
-    adaptive_step_balance_min_confidence_episodes: int = Field(default=24, ge=1)
-    adaptive_step_balance_confidence_scale: float = Field(default=4.0, ge=1.0)
     deficit_budget_uniform_fraction: float = Field(default=0.7, ge=0.0, le=1.0)
     deficit_budget_focus_sharpness: float = Field(default=1.0, ge=0.0)
     deficit_budget_ema_alpha: float = Field(default=0.02, gt=0.0, le=1.0)
@@ -104,6 +113,22 @@ class ManagedTracksConfig(BaseModel):
     deficit_budget_warmup_min_episodes_per_course: int = Field(default=10, ge=0)
     deficit_budget_uniform_staleness_rotations: float = Field(default=2.0, ge=0.0)
     selected_course_ids: tuple[str, ...] = Field(default_factory=default_selected_course_ids)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_removed_fields(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        cleaned = dict(data)
+        sampling_mode = cleaned.get("sampling_mode")
+        if isinstance(sampling_mode, str):
+            cleaned["sampling_mode"] = _RENAMED_TRACK_SAMPLING_MODES.get(
+                sampling_mode,
+                sampling_mode,
+            )
+        for field_name in _REMOVED_TRACK_SAMPLING_FIELDS:
+            cleaned.pop(field_name, None)
+        return cleaned
 
     def active_course_count(self) -> int:
         """Return distinct reset targets exposed to course sampling."""

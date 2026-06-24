@@ -31,6 +31,18 @@ from rl_fzerox.core.runtime_spec.schema.common import (
     TrackSamplingMode,
 )
 
+_REMOVED_TRACK_SAMPLING_FIELDS = (
+    "adaptive_step_balance_completion_weight",
+    "adaptive_step_balance_confidence_scale",
+    "adaptive_step_balance_min_confidence_episodes",
+    "adaptive_step_balance_target_completion",
+)
+_RENAMED_TRACK_SAMPLING_MODES = {
+    "adaptive_step_balanced": "step_balanced",
+    "balanced": "equal",
+    "random": "equal",
+}
+
 
 class TrackRecordEntryConfig(BaseModel):
     """One human reference time for a track."""
@@ -255,15 +267,11 @@ class TrackSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
-    sampling_mode: TrackSamplingMode = "random"
+    sampling_mode: TrackSamplingMode = "equal"
     entries: tuple[TrackSamplingEntryConfig, ...] = ()
     step_balance_update_episodes: PositiveInt = 5
     step_balance_ema_alpha: float = Field(default=0.1, gt=0.0, le=1.0)
     step_balance_max_weight_scale: PositiveFloat = 5.0
-    adaptive_step_balance_completion_weight: float = Field(default=0.35, ge=0.0)
-    adaptive_step_balance_target_completion: float = Field(default=0.9, ge=0.0, le=1.0)
-    adaptive_step_balance_min_confidence_episodes: PositiveInt = 24
-    adaptive_step_balance_confidence_scale: PositiveFloat = 4.0
     deficit_budget_uniform_fraction: float = Field(default=0.7, ge=0.0, le=1.0)
     deficit_budget_focus_sharpness: float = Field(default=1.0, ge=0.0)
     deficit_budget_ema_alpha: float = Field(default=0.02, gt=0.0, le=1.0)
@@ -276,14 +284,28 @@ class TrackSamplingConfig(BaseModel):
     x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
     engine_tuning: AdaptiveEngineTuningConfig = Field(default_factory=AdaptiveEngineTuningConfig)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_removed_fields(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        cleaned = dict(data)
+        sampling_mode = cleaned.get("sampling_mode")
+        if isinstance(sampling_mode, str):
+            cleaned["sampling_mode"] = _RENAMED_TRACK_SAMPLING_MODES.get(
+                sampling_mode,
+                sampling_mode,
+            )
+        for field_name in _REMOVED_TRACK_SAMPLING_FIELDS:
+            cleaned.pop(field_name, None)
+        return cleaned
+
     @model_validator(mode="after")
     def _validate_entries_when_enabled(self) -> TrackSamplingConfig:
         if self.enabled and not self.entries:
             raise ValueError("env.track_sampling.entries must not be empty when enabled")
         if self.step_balance_max_weight_scale < 1.0:
             raise ValueError("track_sampling.step_balance_max_weight_scale must be >= 1.0")
-        if self.adaptive_step_balance_confidence_scale < 1.0:
-            raise ValueError("track_sampling.adaptive_step_balance_confidence_scale must be >= 1.0")
         return self
 
 

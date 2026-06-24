@@ -43,10 +43,6 @@ interface CourseSamplingPanelProps {
   metadata: ConfigMetadata;
   samplingDefaults: Pick<
     TracksConfig,
-    | "adaptive_step_balance_completion_weight"
-    | "adaptive_step_balance_confidence_scale"
-    | "adaptive_step_balance_min_confidence_episodes"
-    | "adaptive_step_balance_target_completion"
     | "deficit_budget_ema_alpha"
     | "deficit_budget_difficulty_metric"
     | "deficit_budget_focus_sharpness"
@@ -215,10 +211,7 @@ export function CourseSamplingPanel({
   samplingDefaults,
   updateTracks,
 }: CourseSamplingPanelProps) {
-  const usesDynamicStepBalancing =
-    config.tracks.sampling_mode === "step_balanced" ||
-    config.tracks.sampling_mode === "adaptive_step_balanced";
-  const usesAdaptiveStepBalancing = config.tracks.sampling_mode === "adaptive_step_balanced";
+  const usesStepBalancing = config.tracks.sampling_mode === "step_balanced";
   const usesDeficitBudget = config.tracks.sampling_mode === "deficit_budget";
   const usesFixedEnvAssignment = config.tracks.sampling_mode === "fixed_env";
   return (
@@ -249,7 +242,7 @@ export function CourseSamplingPanel({
                 }),
             }))}
           />
-          {usesDynamicStepBalancing ? (
+          {usesStepBalancing ? (
             <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
               <IntegerField
                 help="Episodes collected before recomputing course weights."
@@ -267,13 +260,14 @@ export function CourseSamplingPanel({
                 value={config.tracks.step_balance_ema_alpha}
                 onChange={(value) => updateTracks({ step_balance_ema_alpha: value })}
               />
-              {usesAdaptiveStepBalancing ? (
-                <AdaptiveSamplingFields
-                  config={config}
-                  defaultConfig={defaultConfig}
-                  updateTracks={updateTracks}
-                />
-              ) : null}
+              <NumberField
+                help="Caps how far one course weight can rise above its base weight."
+                label="Max weight scale"
+                resetValue={defaultConfig.tracks.step_balance_max_weight_scale}
+                step="0.1"
+                value={config.tracks.step_balance_max_weight_scale}
+                onChange={(value) => updateTracks({ step_balance_max_weight_scale: value })}
+              />
             </div>
           ) : null}
           {usesFixedEnvAssignment ? <FixedEnvAssignmentPreview config={config} /> : null}
@@ -326,61 +320,6 @@ function allowedFixedCourseCounts(numEnvs: number): number[] {
     }
   }
   return counts;
-}
-
-function AdaptiveSamplingFields({
-  config,
-  defaultConfig,
-  updateTracks,
-}: {
-  config: ManagedRunConfig;
-  defaultConfig: ManagedRunConfig;
-  updateTracks: TrackUpdate;
-}) {
-  return (
-    <>
-      <NumberField
-        help="Caps the adaptive frame-budget boost for low-completion courses. Reset frequency is still converted from target frame share using recent episode length."
-        label="Max target scale"
-        resetValue={defaultConfig.tracks.step_balance_max_weight_scale}
-        step="0.1"
-        value={config.tracks.step_balance_max_weight_scale}
-        onChange={(value) => updateTracks({ step_balance_max_weight_scale: value })}
-      />
-      <IntegerField
-        help="Courses below this many sampled episodes receive extra pressure before difficulty takes over."
-        label="Min confidence episodes"
-        min={1}
-        resetValue={defaultConfig.tracks.adaptive_step_balance_min_confidence_episodes}
-        value={config.tracks.adaptive_step_balance_min_confidence_episodes}
-        onChange={(value) => updateTracks({ adaptive_step_balance_min_confidence_episodes: value })}
-      />
-      <NumberField
-        help="Maximum target-share multiplier for courses that have not reached the confidence sample count."
-        label="Confidence scale"
-        resetValue={defaultConfig.tracks.adaptive_step_balance_confidence_scale}
-        step="0.1"
-        value={config.tracks.adaptive_step_balance_confidence_scale}
-        onChange={(value) => updateTracks({ adaptive_step_balance_confidence_scale: value })}
-      />
-      <NumberField
-        help="How strongly low completion raises a course's step-budget share."
-        label="Completion weight"
-        resetValue={defaultConfig.tracks.adaptive_step_balance_completion_weight}
-        step="0.05"
-        value={config.tracks.adaptive_step_balance_completion_weight}
-        onChange={(value) => updateTracks({ adaptive_step_balance_completion_weight: value })}
-      />
-      <NumberField
-        help="Courses below this completion fraction get extra sampling pressure."
-        label="Target completion"
-        resetValue={defaultConfig.tracks.adaptive_step_balance_target_completion}
-        step="0.01"
-        value={config.tracks.adaptive_step_balance_target_completion}
-        onChange={(value) => updateTracks({ adaptive_step_balance_target_completion: value })}
-      />
-    </>
-  );
 }
 
 function DeficitBudgetFields({

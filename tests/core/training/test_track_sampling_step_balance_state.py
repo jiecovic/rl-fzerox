@@ -318,7 +318,7 @@ def test_step_balance_controller_recomputes_restored_weights_from_ema_stats() ->
 
 def test_step_balance_controller_keeps_over_budget_courses_sampleable() -> None:
     restored = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=1,
         update_episodes=2,
         ema_alpha=1.0,
@@ -363,13 +363,11 @@ def test_step_balance_controller_keeps_over_budget_courses_sampleable() -> None:
         resolved_courses=resolved_track_sampling_courses(
             {"failed_over_budget": 1.0, "under_budget": 1.0}
         ),
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=1,
         update_episodes=2,
         ema_alpha=1.0,
         max_weight_scale=5.0,
-        adaptive_completion_weight=0.35,
-        adaptive_target_completion=0.9,
         restored_state=restored,
     )
 

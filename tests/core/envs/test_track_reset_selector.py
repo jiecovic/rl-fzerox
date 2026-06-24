@@ -11,7 +11,6 @@ from rl_fzerox.core.engine_tuning import (
 )
 from rl_fzerox.core.envs.engine.reset import (
     TrackResetSelector,
-    select_reset_track,
     select_reset_track_by_course_id,
 )
 from rl_fzerox.core.runtime_spec.schema import (
@@ -24,7 +23,7 @@ from rl_fzerox.core.runtime_spec.schema import (
 def test_select_reset_track_by_course_id_uses_matching_entry() -> None:
     config = TrackSamplingConfig(
         enabled=True,
-        sampling_mode="balanced",
+        sampling_mode="equal",
         entries=(
             TrackSamplingEntryConfig(
                 id="mute_city",
@@ -52,7 +51,7 @@ def test_select_reset_track_by_course_id_uses_matching_entry() -> None:
 def test_select_reset_track_by_course_id_can_label_external_scheduler() -> None:
     config = TrackSamplingConfig(
         enabled=True,
-        sampling_mode="balanced",
+        sampling_mode="equal",
         entries=(
             TrackSamplingEntryConfig(
                 id="silence",
@@ -105,7 +104,7 @@ def test_alt_baseline_selection_reports_base_track_id(tmp_path: Path) -> None:
         ),
     )
 
-    selected = select_reset_track(config, seed=123)
+    selected = TrackResetSelector().select(config, seed=123)
 
     assert selected is not None
     info = selected.info()
@@ -138,7 +137,7 @@ def test_reset_selector_skips_missing_alt_baseline_entries(tmp_path: Path) -> No
         ),
     )
 
-    selected = select_reset_track(config, seed=123)
+    selected = TrackResetSelector().select(config, seed=123)
 
     assert selected is not None
     assert selected.id == "mute_city_gp_race_novice_blue_falcon"
@@ -148,7 +147,7 @@ def test_track_reset_selector_resyncs_when_entry_metadata_changes() -> None:
     selector = TrackResetSelector()
     original = TrackSamplingConfig(
         enabled=True,
-        sampling_mode="balanced",
+        sampling_mode="equal",
         entries=(
             TrackSamplingEntryConfig(
                 id="mute_city",
@@ -182,7 +181,7 @@ def test_track_reset_selector_resyncs_when_entry_metadata_changes() -> None:
 def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
     config = TrackSamplingConfig(
         enabled=True,
-        sampling_mode="balanced",
+        sampling_mode="equal",
         engine_tuning=AdaptiveEngineTuningConfig(
             enabled=True,
             min_raw_value=60,

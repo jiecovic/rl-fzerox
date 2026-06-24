@@ -14,7 +14,6 @@ export const RACE_MODE_DESCRIPTIONS: Record<TracksConfig["race_mode"], string> =
 export const TRACK_SAMPLING_DESCRIPTIONS: Record<TracksConfig["sampling_mode"], string> = {
   equal: "Sample courses uniformly by episode.",
   step_balanced: "Bias toward courses with fewer recent frames.",
-  adaptive_step_balanced: "Legacy adaptive step-balanced mode. Prefer deficit budget.",
   deficit_budget:
     "Deterministically spend step-budget slices: equal coverage plus difficulty focus.",
   fixed_env: "Pin each vector env slot to one course for deterministic per-rollout coverage.",

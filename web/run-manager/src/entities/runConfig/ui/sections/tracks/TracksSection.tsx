@@ -77,14 +77,6 @@ export function TracksSection({
   };
 
   const samplingDefaults = {
-    adaptive_step_balance_completion_weight:
-      defaultConfig.tracks.adaptive_step_balance_completion_weight,
-    adaptive_step_balance_confidence_scale:
-      defaultConfig.tracks.adaptive_step_balance_confidence_scale,
-    adaptive_step_balance_min_confidence_episodes:
-      defaultConfig.tracks.adaptive_step_balance_min_confidence_episodes,
-    adaptive_step_balance_target_completion:
-      defaultConfig.tracks.adaptive_step_balance_target_completion,
     deficit_budget_ema_alpha: defaultConfig.tracks.deficit_budget_ema_alpha,
     deficit_budget_difficulty_metric: defaultConfig.tracks.deficit_budget_difficulty_metric,
     deficit_budget_focus_sharpness: defaultConfig.tracks.deficit_budget_focus_sharpness,
@@ -100,10 +92,6 @@ export function TracksSection({
     step_balance_update_episodes: defaultConfig.tracks.step_balance_update_episodes,
   } satisfies Pick<
     TracksConfig,
-    | "adaptive_step_balance_completion_weight"
-    | "adaptive_step_balance_confidence_scale"
-    | "adaptive_step_balance_min_confidence_episodes"
-    | "adaptive_step_balance_target_completion"
     | "deficit_budget_ema_alpha"
     | "deficit_budget_difficulty_metric"
     | "deficit_budget_focus_sharpness"

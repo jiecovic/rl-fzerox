@@ -4,7 +4,6 @@ from __future__ import annotations
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
-    adaptive_target_bonus,
 )
 
 
@@ -129,8 +128,7 @@ def _target_step_shares(state: TrackSamplingRuntimeState) -> dict[str, float]:
     if state.sampling_mode == "deficit_budget":
         return _deficit_budget_target_step_shares(state)
     raw_targets = {
-        entry.course_key: max(0.0, float(entry.base_weight)) * _target_step_bonus(state, entry)
-        for entry in state.entries
+        entry.course_key: max(0.0, float(entry.base_weight)) for entry in state.entries
     }
     total_target = sum(raw_targets.values())
     if total_target <= 0.0:
@@ -154,21 +152,3 @@ def _deficit_budget_target_step_shares(
         + adaptive_fraction * (max(0.0, float(entry.current_weight)) / total_weight)
         for entry in state.entries
     }
-
-
-def _target_step_bonus(
-    state: TrackSamplingRuntimeState,
-    entry: TrackSamplingRuntimeEntry,
-) -> float:
-    return adaptive_target_bonus(
-        sampling_mode=state.sampling_mode,
-        max_weight_scale=state.max_weight_scale,
-        completion_weight=state.adaptive_completion_weight,
-        target_completion=state.adaptive_target_completion,
-        update_episodes=state.update_episodes,
-        min_confidence_episodes=state.adaptive_min_confidence_episodes,
-        confidence_scale=state.adaptive_confidence_scale,
-        completion_fraction=entry.ema_completion_fraction,
-        finished_episode_count=entry.finished_episode_count,
-        success_sample_count=entry.success_sample_count,
-    )

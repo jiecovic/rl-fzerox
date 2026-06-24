@@ -49,7 +49,7 @@ def test_materialize_train_run_config_reports_track_sampling_progress(
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute_city",
@@ -123,7 +123,7 @@ def test_materialize_train_run_config_generates_race_start_engine_variant(
             race_intro_target_timer=38,
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="silence",
@@ -189,7 +189,7 @@ def test_materialize_train_run_config_reuses_target_variant_cache_without_source
                 race_intro_target_timer=38,
                 track_sampling=TrackSamplingConfig(
                     enabled=True,
-                    sampling_mode="balanced",
+                    sampling_mode="equal",
                     entries=(
                         TrackSamplingEntryConfig(
                             id="silence",
@@ -258,7 +258,7 @@ def test_materialize_train_run_config_generates_vehicle_variant(
         env=EnvConfig(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode="balanced",
+                sampling_mode="equal",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="silence",

@@ -34,11 +34,12 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert "custom" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "time_attack" in {mode["value"] for mode in payload["race_modes"]}
     assert "master" in {mode["value"] for mode in payload["gp_difficulties"]}
-    assert "step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}
-    assert "adaptive_step_balanced" not in {
-        mode["value"] for mode in payload["track_sampling_modes"]
+    assert {mode["value"] for mode in payload["track_sampling_modes"]} == {
+        "step_balanced",
+        "deficit_budget",
+        "fixed_env",
+        "equal",
     }
-    assert "deficit_budget" in {mode["value"] for mode in payload["track_sampling_modes"]}
     assert "jack" in {cup["id"] for cup in payload["track_cups"]}
     assert "mute_city" in {course["id"] for course in payload["built_in_courses"]}
     assert "blue_falcon" in {vehicle["id"] for vehicle in payload["vehicles"]}

@@ -63,7 +63,7 @@ def episode_completion_fraction(episode: Mapping[str, object]) -> float | None:
 
 
 def uses_step_balance_scheduler(sampling_mode: str) -> bool:
-    return sampling_mode in {"step_balanced", "adaptive_step_balanced"}
+    return sampling_mode == "step_balanced"
 
 
 def uses_track_sampling_runtime_mode(sampling_mode: str) -> bool:

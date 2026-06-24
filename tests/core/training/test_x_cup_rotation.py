@@ -131,7 +131,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     env_config = EnvConfig(
         track_sampling=TrackSamplingConfig(
             enabled=True,
-            sampling_mode="adaptive_step_balanced",
+            sampling_mode="step_balanced",
             entries=(entry,),
             x_cup_rotation=XCupRotationConfig(
                 enabled=True,
@@ -174,7 +174,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     )
     manager = XCupRotationManager(config=train_config, run_paths=run_paths, cache_root=tmp_path)
     state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=2,
         update_episodes=1,
         ema_alpha=1.0,
@@ -379,7 +379,7 @@ def test_x_cup_rotation_preserves_duplicate_slot_id_difficulty_entries(
     env_config = EnvConfig(
         track_sampling=TrackSamplingConfig(
             enabled=True,
-            sampling_mode="adaptive_step_balanced",
+            sampling_mode="step_balanced",
             entries=old_entries,
             x_cup_rotation=XCupRotationConfig(
                 enabled=True,
@@ -433,7 +433,7 @@ def test_x_cup_rotation_preserves_duplicate_slot_id_difficulty_entries(
         fake_materialize_baseline,
     )
     state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=2,
         update_episodes=1,
         ema_alpha=1.0,
@@ -533,7 +533,7 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
     env_config = EnvConfig(
         track_sampling=TrackSamplingConfig(
             enabled=True,
-            sampling_mode="adaptive_step_balanced",
+            sampling_mode="step_balanced",
             entries=(entry,),
             x_cup_rotation=XCupRotationConfig(
                 enabled=True,
@@ -574,7 +574,7 @@ def test_x_cup_rotation_replaces_hard_slot_at_episode_cap(
         fake_materialize_baseline,
     )
     state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=2,
         update_episodes=1,
         ema_alpha=1.0,
@@ -669,7 +669,7 @@ def _x_cup_rotation_failure_fixture(
     env_config = EnvConfig(
         track_sampling=TrackSamplingConfig(
             enabled=True,
-            sampling_mode="adaptive_step_balanced",
+            sampling_mode="step_balanced",
             entries=(entry,),
             x_cup_rotation=XCupRotationConfig(
                 enabled=True,
@@ -685,7 +685,7 @@ def _x_cup_rotation_failure_fixture(
         train=TrainConfig(output_root=tmp_path / "runs", run_name=run_name),
     )
     state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=2,
         update_episodes=1,
         ema_alpha=1.0,

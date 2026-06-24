@@ -251,9 +251,6 @@ export function trackSamplingModeLabel(
   if (samplingMode === "fixed_env") {
     return "fixed env assignment";
   }
-  if (samplingMode === "adaptive_step_balanced") {
-    return "adaptive step-balanced";
-  }
   if (samplingMode === "deficit_budget") {
     return "deficit budget";
   }
@@ -272,7 +269,6 @@ function usesDynamicTrackSampling(
 ) {
   return (
     samplingMode === "step_balanced" ||
-    samplingMode === "adaptive_step_balanced" ||
     samplingMode === "deficit_budget" ||
     samplingMode === "fixed_env"
   );

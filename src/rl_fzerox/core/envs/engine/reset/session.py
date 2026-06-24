@@ -224,10 +224,7 @@ class EngineResetCoordinator:
         self,
         config: TrackSamplingConfig,
     ) -> TrackSamplingConfig:
-        if (
-            config.sampling_mode not in {"step_balanced", "adaptive_step_balanced"}
-            or not self._track_sampling_weight_overrides
-        ):
+        if config.sampling_mode != "step_balanced" or not self._track_sampling_weight_overrides:
             return config
         entries = _track_sampling_entries_with_weight_overrides(
             config.entries,

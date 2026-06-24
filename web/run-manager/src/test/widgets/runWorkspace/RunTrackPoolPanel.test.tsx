@@ -490,7 +490,7 @@ describe("RunTrackPoolPanel", () => {
     expect(screen.getByText("Master · frame 2400 · 2026-06-13 17:05:00 UTC")).toBeInTheDocument();
   });
 
-  it("renders the adaptive step-balanced mode label", () => {
+  it("renders the step-balanced mode label", () => {
     const firstCup = configMetadataFixture.track_cups[0];
     if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
       throw new Error("fixture cup must provide at least two courses");
@@ -510,19 +510,19 @@ describe("RunTrackPoolPanel", () => {
             ...managedRunConfigFixture,
             tracks: {
               ...managedRunConfigFixture.tracks,
-              sampling_mode: "adaptive_step_balanced",
+              sampling_mode: "step_balanced",
               selected_course_ids: selectedCourseIds as string[],
             },
           },
         })}
         state={{
           ...trackSamplingStateForCourses(selectedCourseIds),
-          sampling_mode: "adaptive_step_balanced",
+          sampling_mode: "step_balanced",
         }}
       />,
     );
 
-    expect(screen.getByText(/adaptive step-balanced/i)).toBeInTheDocument();
+    expect(screen.getByText(/step-balanced/i)).toBeInTheDocument();
   });
 
   it("shows generated X Cup courses from runtime sampling state", () => {
@@ -579,14 +579,14 @@ describe("RunTrackPoolPanel", () => {
             ...managedRunConfigFixture,
             tracks: {
               ...managedRunConfigFixture.tracks,
-              sampling_mode: "adaptive_step_balanced",
+              sampling_mode: "deficit_budget",
               selected_course_ids: selectedCourseIds as string[],
             },
           },
         })}
         state={{
           ...trackSamplingStateForCourses(selectedCourseIds),
-          sampling_mode: "adaptive_step_balanced",
+          sampling_mode: "deficit_budget",
           entries: trackSamplingStateForCourses(selectedCourseIds).entries.map((entry, index) => ({
             ...entry,
             step_share: index === 0 ? 0.4 : 0.6,

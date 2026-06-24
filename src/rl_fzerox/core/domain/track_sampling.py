@@ -5,25 +5,14 @@ from __future__ import annotations
 
 from typing import Literal
 
-type RuntimeTrackSamplingMode = Literal[
-    "random",
-    "balanced",
-    "step_balanced",
-    # Accepted for older train manifests and saved configs. New manager UI flows
-    # hide it until the policy for legacy cleanup changes.
-    "adaptive_step_balanced",
-    "fixed_env",
-    "deficit_budget",
-]
-type ManagedTrackSamplingMode = Literal[
+type TrackSamplingMode = Literal[
     "equal",
     "step_balanced",
-    # Accepted for older managed configs. New manager UI flows hide it until the
-    # policy for legacy cleanup changes.
-    "adaptive_step_balanced",
     "fixed_env",
     "deficit_budget",
 ]
+type RuntimeTrackSamplingMode = TrackSamplingMode
+type ManagedTrackSamplingMode = TrackSamplingMode
 type DeficitBudgetDifficultyMetric = Literal[
     "completion_ema",
     "finish_ema",

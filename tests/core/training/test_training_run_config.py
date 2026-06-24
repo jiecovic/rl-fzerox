@@ -92,6 +92,89 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert merged_watch_config.watch.render_fps == 30.0
 
 
+def test_load_train_run_config_ignores_removed_adaptive_step_balance_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    train_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="legacy_tracks"),
+    )
+    run_paths = build_run_paths(
+        output_root=train_config.train.output_root,
+        run_name=train_config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+    config_path = save_train_run_config(config=train_config, run_dir=run_paths.run_dir)
+    saved = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
+    assert isinstance(saved, dict)
+    env_data = saved.setdefault("env", {})
+    assert isinstance(env_data, dict)
+    track_sampling = env_data.setdefault("track_sampling", {})
+    assert isinstance(track_sampling, dict)
+    track_sampling.update(
+        {
+            "adaptive_step_balance_completion_weight": 1.0,
+            "adaptive_step_balance_confidence_scale": 4.0,
+            "adaptive_step_balance_min_confidence_episodes": 24,
+            "adaptive_step_balance_target_completion": 0.8,
+            "sampling_mode": "adaptive_step_balanced",
+        }
+    )
+    OmegaConf.save(config=OmegaConf.create(saved), f=str(config_path))
+
+    loaded_config = load_train_run_config(run_paths.run_dir)
+    serialized_track_sampling = loaded_config.env.track_sampling.model_dump(mode="json")
+
+    assert loaded_config.env.track_sampling.sampling_mode == "step_balanced"
+    assert "adaptive_step_balance_completion_weight" not in serialized_track_sampling
+    assert "adaptive_step_balance_confidence_scale" not in serialized_track_sampling
+    assert "adaptive_step_balance_min_confidence_episodes" not in serialized_track_sampling
+    assert "adaptive_step_balance_target_completion" not in serialized_track_sampling
+
+
+def test_load_train_run_config_maps_removed_track_sampling_mode_names(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    for old_mode, expected_mode in {
+        "adaptive_step_balanced": "step_balanced",
+        "balanced": "equal",
+        "random": "equal",
+    }.items():
+        train_config = TrainAppConfig(
+            seed=123,
+            emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+            train=TrainConfig(output_root=tmp_path / "runs", run_name=f"legacy_{old_mode}"),
+        )
+        run_paths = build_run_paths(
+            output_root=train_config.train.output_root,
+            run_name=train_config.train.run_name,
+        )
+        ensure_run_dirs(run_paths)
+        config_path = save_train_run_config(config=train_config, run_dir=run_paths.run_dir)
+        saved = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
+        assert isinstance(saved, dict)
+        env_data = saved.setdefault("env", {})
+        assert isinstance(env_data, dict)
+        track_sampling = env_data.setdefault("track_sampling", {})
+        assert isinstance(track_sampling, dict)
+        track_sampling["sampling_mode"] = old_mode
+        OmegaConf.save(config=OmegaConf.create(saved), f=str(config_path))
+
+        loaded_config = load_train_run_config(run_paths.run_dir)
+
+        assert loaded_config.env.track_sampling.sampling_mode == expected_mode
+
+
 def test_save_train_run_config_persists_configured_action_layout(
     tmp_path: Path,
 ) -> None:

@@ -170,7 +170,7 @@ def test_track_sampling_payload_uses_runtime_generated_x_cup_metadata() -> None:
 def test_replace_runtime_generation_keeps_slot_history_and_resets_current_generation() -> None:
     slot_key = generated_x_cup_slot_key(0)
     state = TrackSamplingRuntimeState(
-        sampling_mode="adaptive_step_balanced",
+        sampling_mode="step_balanced",
         action_repeat=2,
         update_episodes=2,
         ema_alpha=1.0,
