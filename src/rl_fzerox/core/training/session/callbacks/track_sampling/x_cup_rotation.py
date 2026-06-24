@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
+from typing import Literal
 
 from rl_fzerox.core.domain.x_cup import (
     X_CUP_COURSE,
@@ -48,6 +49,8 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
 
 _LOG = logging.getLogger(__name__)
 
+XCupRotationFailureKind = Literal["retryable", "blocked"]
+
 
 @dataclass(frozen=True, slots=True)
 class XCupRotationUpdate:
@@ -70,6 +73,15 @@ class XCupRotationUpdate:
     generated_x_cup_slots: tuple[GeneratedXCupSlot, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class XCupRotationFailure:
+    """Most recent materialization failure for one generated X Cup slot."""
+
+    course_key: str
+    kind: XCupRotationFailureKind
+    message: str
+
+
 class XCupRotationManager:
     """Materialize and commit replacement baselines for solved X Cup slots."""
 
@@ -90,6 +102,7 @@ class XCupRotationManager:
             float(materialization_retry_delay_seconds),
         )
         self._materialization_retry_after_by_course_key: dict[str, float] = {}
+        self._materialization_failures_by_course_key: dict[str, XCupRotationFailure] = {}
         self._cache_root = (
             BASELINE_MATERIALIZER_SETTINGS.cache_root
             if cache_root is None
@@ -121,21 +134,18 @@ class XCupRotationManager:
         )
         if eligible is None:
             return None
+        if self._materialization_blocked(eligible.course_key):
+            return None
         if self._materialization_retry_deferred(eligible.course_key):
             return None
 
         old_entries = groups[eligible.course_key]
         try:
             replacement_entries = self._materialized_replacement_entries(old_entries)
-        except Exception:
-            self._defer_materialization_retry(eligible.course_key)
-            _LOG.warning(
-                "x cup rotation materialization failed for %s; "
-                "keeping existing baselines and retrying later",
-                eligible.course_key,
-                exc_info=True,
-            )
+        except Exception as exc:
+            self._record_materialization_failure(eligible.course_key, exc)
             return None
+        self._materialization_failures_by_course_key.pop(eligible.course_key, None)
         self._materialization_retry_after_by_course_key.pop(eligible.course_key, None)
         entries = _replace_generated_x_cup_group_entries(
             track_sampling.entries,
@@ -174,6 +184,15 @@ class XCupRotationManager:
             generated_x_cup_slots=generated_slots,
         )
 
+    def materialization_failure(self, course_key: str) -> XCupRotationFailure | None:
+        """Return the latest materialization failure for a generated slot."""
+
+        return self._materialization_failures_by_course_key.get(course_key)
+
+    def _materialization_blocked(self, course_key: str) -> bool:
+        failure = self._materialization_failures_by_course_key.get(course_key)
+        return failure is not None and failure.kind == "blocked"
+
     def _materialization_retry_deferred(self, course_key: str) -> bool:
         retry_after = self._materialization_retry_after_by_course_key.get(course_key)
         if retry_after is None:
@@ -186,6 +205,28 @@ class XCupRotationManager:
     def _defer_materialization_retry(self, course_key: str) -> None:
         self._materialization_retry_after_by_course_key[course_key] = (
             monotonic() + self._materialization_retry_delay_seconds
+        )
+
+    def _record_materialization_failure(self, course_key: str, exc: Exception) -> None:
+        failure = _materialization_failure(course_key=course_key, exc=exc)
+        self._materialization_failures_by_course_key[course_key] = failure
+        if failure.kind == "retryable":
+            self._defer_materialization_retry(course_key)
+            _LOG.warning(
+                "x cup rotation materialization failed for %s; "
+                "keeping existing baselines and retrying later: %s",
+                course_key,
+                failure.message,
+                exc_info=True,
+            )
+            return
+        self._materialization_retry_after_by_course_key.pop(course_key, None)
+        _LOG.error(
+            "x cup rotation materialization is blocked for %s; "
+            "keeping existing baselines until the config changes: %s",
+            course_key,
+            failure.message,
+            exc_info=True,
         )
 
     def commit(self, update: XCupRotationUpdate) -> None:
@@ -412,6 +453,16 @@ def _materialized_entry_update(artifact: BaselineArtifact) -> dict[str, object]:
     if artifact.generated_course_length is not None:
         update["generated_course_length"] = artifact.generated_course_length
     return update
+
+
+def _materialization_failure(
+    *,
+    course_key: str,
+    exc: Exception,
+) -> XCupRotationFailure:
+    kind: XCupRotationFailureKind = "blocked" if isinstance(exc, ValueError) else "retryable"
+    message = str(exc) or type(exc).__name__
+    return XCupRotationFailure(course_key=course_key, kind=kind, message=message)
 
 
 def _required_single_slot(entries: Sequence[TrackSamplingEntryConfig]) -> int:
