@@ -3,13 +3,23 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import TypedDict
+from typing import Literal, TypedDict
 
-from rl_fzerox.core.evaluation.models import EvaluationCheckpointSnapshot, EvaluationTargetSpec
+from rl_fzerox.core.evaluation.models import (
+    EvaluationCheckpointArtifact,
+    EvaluationCheckpointSnapshot,
+    EvaluationDevice,
+    EvaluationPolicyMode,
+    EvaluationTargetSpec,
+)
 from rl_fzerox.core.manager import (
     ManagedEvaluation,
     ManagedEvaluationBaselineSuite,
     ManagedEvaluationPreset,
+)
+from rl_fzerox.core.manager.models import (
+    EvaluationBaselineSuiteStatus,
+    ManagedEvaluationStatus,
 )
 
 JsonObject = Mapping[str, object]
@@ -28,6 +38,19 @@ class EvaluationProgressPayload(TypedDict):
     completed_attempts: int
     total_attempts: int | None
     result_status: str | None
+
+
+class EvaluationCheckpointPayload(TypedDict):
+    source_run_id: str | None
+    source_run_name: str | None
+    artifact: EvaluationCheckpointArtifact
+    source_policy_path: str
+    copied_policy_path: str
+    source_model_path: str | None
+    copied_model_path: str | None
+    local_num_timesteps: int | None
+    lineage_num_timesteps: int | None
+    source_mtime_ns: str | None
 
 
 class EvaluationMetricSummaryPayload(TypedDict):
@@ -68,7 +91,7 @@ class EvaluationAttemptSummaryPayload(TypedDict):
 
 
 class EvaluationRuntimePayload(TypedDict):
-    device: str
+    device: EvaluationDevice
     worker_count: int
 
 
@@ -82,11 +105,79 @@ class EvaluationResultSummaryPayload(TypedDict):
     attempts: list[EvaluationAttemptSummaryPayload]
 
 
+class EvaluationBaselineSuitePayload(TypedDict):
+    id: str
+    preset_id: str
+    preset_version: int
+    status: EvaluationBaselineSuiteStatus
+    suite_dir: str
+    manifest_path: str | None
+    error_message: str | None
+    created_at: str | None
+    updated_at: str | None
+    materialized_at: str | None
+
+
+class EvaluationPayload(TypedDict):
+    id: str
+    name: str
+    status: ManagedEvaluationStatus
+    evaluation_dir: str
+    source_run_id: str | None
+    source_artifact: EvaluationCheckpointArtifact | None
+    preset_id: str
+    preset_version: int
+    policy_mode: EvaluationPolicyMode
+    seed: int
+    target: EvaluationTargetPayload
+    config: dict[str, object]
+    checkpoint: EvaluationCheckpointPayload
+    created_at: str
+    updated_at: str
+    started_at: str | None
+    finished_at: str | None
+    result_json_path: str | None
+    error_message: str | None
+    progress: EvaluationProgressPayload
+    result_summary: EvaluationResultSummaryPayload | None
+    baseline_suite: EvaluationBaselineSuitePayload
+
+
+class EvaluationPresetPayload(TypedDict):
+    id: str
+    name: str
+    version: int
+    seed: int
+    renderer: Literal["angrylion", "gliden64"]
+    target: EvaluationTargetPayload
+    builtin: bool
+    created_at: str
+    updated_at: str
+
+
+class EvaluationsPayload(TypedDict):
+    evaluations: list[EvaluationPayload]
+    presets: list[EvaluationPresetPayload]
+    baseline_suites: list[EvaluationBaselineSuitePayload]
+
+
+class EvaluationResponsePayload(TypedDict):
+    evaluation: EvaluationPayload
+
+
+class EvaluationPresetResponsePayload(TypedDict):
+    preset: EvaluationPresetPayload
+
+
+class DeleteResponsePayload(TypedDict):
+    deleted: bool
+
+
 def evaluation_payload(
     evaluation: ManagedEvaluation,
     *,
     baseline_suite: ManagedEvaluationBaselineSuite,
-) -> dict[str, object]:
+) -> EvaluationPayload:
     """Return one evaluation record payload."""
 
     result_file = _read_result_file(evaluation)
@@ -118,7 +209,7 @@ def evaluation_payload(
     }
 
 
-def evaluation_preset_payload(preset: ManagedEvaluationPreset) -> dict[str, object]:
+def evaluation_preset_payload(preset: ManagedEvaluationPreset) -> EvaluationPresetPayload:
     """Return one persisted evaluation-preset payload."""
 
     return {
@@ -136,7 +227,7 @@ def evaluation_preset_payload(preset: ManagedEvaluationPreset) -> dict[str, obje
 
 def evaluation_baseline_suite_payload(
     suite: ManagedEvaluationBaselineSuite,
-) -> dict[str, object]:
+) -> EvaluationBaselineSuitePayload:
     """Return one preset-version baseline-suite payload."""
 
     return {
@@ -164,7 +255,7 @@ def _target_payload(target: EvaluationTargetSpec) -> EvaluationTargetPayload:
     }
 
 
-def _checkpoint_payload(checkpoint: EvaluationCheckpointSnapshot) -> dict[str, object]:
+def _checkpoint_payload(checkpoint: EvaluationCheckpointSnapshot) -> EvaluationCheckpointPayload:
     # Nanosecond mtimes exceed JavaScript's safe integer range. Keep the Python
     # model and persisted spec numeric, but expose the API value losslessly.
     return {
@@ -308,10 +399,9 @@ def _runtime_payload(value: object) -> EvaluationRuntimePayload | None:
     runtime = _object_mapping(value)
     if runtime is None:
         return None
-    worker_count = runtime.get("worker_count")
     return {
-        "device": _string_or_default(runtime.get("device"), "cuda"),
-        "worker_count": worker_count if isinstance(worker_count, int) and worker_count >= 1 else 1,
+        "device": _device_or_default(runtime.get("device")),
+        "worker_count": _worker_count_or_default(runtime.get("worker_count")),
     }
 
 
@@ -353,6 +443,20 @@ def _string_or_default(value: object, default: str) -> str:
 
 def _string_or_none(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _device_or_default(value: object) -> EvaluationDevice:
+    if value == "cpu":
+        return "cpu"
+    if value == "cuda":
+        return "cuda"
+    return "cuda"
+
+
+def _worker_count_or_default(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 1
+    return value if value >= 1 else 1
 
 
 def _int_or_none(value: object) -> int | None:

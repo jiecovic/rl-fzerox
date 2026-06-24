@@ -213,3 +213,61 @@ def test_evaluation_payload_includes_result_summary(tmp_path: Path) -> None:
     assert summary["attempts"][0]["seed"] == "18446744073709551615"
     assert summary["attempts"][0]["position"] == 1
     assert summary["attempts"][1]["position"] == 30
+
+
+def test_evaluation_payload_normalizes_runtime_contract_values(tmp_path: Path) -> None:
+    result_path = tmp_path / "evaluation.summary.json"
+    result_path.write_text(
+        json.dumps(
+            {
+                "kind": "evaluation_summary",
+                "schema_version": 1,
+                "result": {
+                    "status": "partial",
+                    "runtime": {"device": "metal", "worker_count": True},
+                    "attempts": [],
+                },
+                "metrics": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    evaluation = ManagedEvaluation(
+        id="eval-001",
+        name="Eval 1",
+        status="running",
+        evaluation_dir=tmp_path,
+        source_run_id="run-001",
+        source_artifact="latest",
+        preset_id="time_attack_all_courses",
+        preset_version=1,
+        policy_mode="deterministic",
+        seed=123,
+        target=EvaluationTargetSpec(mode="time_attack_course", repeats_per_target=1),
+        config=default_managed_run_config(),
+        checkpoint=EvaluationCheckpointSnapshot(
+            source_run_id="run-001",
+            source_run_name="Run 1",
+            artifact="latest",
+            source_policy_path="local/runs/run-001/checkpoints/latest/policy.zip",
+            copied_policy_path="local/evaluations/eval-001/checkpoint_snapshot/policy.zip",
+        ),
+        result_json_path=result_path,
+        created_at="2026-06-22T10:00:00+00:00",
+        updated_at="2026-06-22T10:00:00+00:00",
+    )
+    baseline_suite = ManagedEvaluationBaselineSuite(
+        id="time_attack_all_courses-v1",
+        preset_id="time_attack_all_courses",
+        preset_version=1,
+        status="ready",
+        suite_dir=tmp_path / "_baseline_suites" / "time_attack_all_courses-v1",
+        created_at="2026-06-22T10:00:00+00:00",
+        updated_at="2026-06-22T10:00:00+00:00",
+    )
+
+    payload = evaluation_payload(evaluation, baseline_suite=baseline_suite)
+
+    summary = payload["result_summary"]
+    assert summary is not None
+    assert summary["runtime"] == {"device": "cuda", "worker_count": 1}

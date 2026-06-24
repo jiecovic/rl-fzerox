@@ -9,6 +9,11 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     StartEvaluationRequest,
 )
 from rl_fzerox.apps.run_manager.api.payloads.evaluations import (
+    DeleteResponsePayload,
+    EvaluationPayload,
+    EvaluationPresetResponsePayload,
+    EvaluationResponsePayload,
+    EvaluationsPayload,
     evaluation_baseline_suite_payload,
     evaluation_payload,
     evaluation_preset_payload,
@@ -18,7 +23,7 @@ from rl_fzerox.core.evaluation.models import EvaluationTargetSpec
 from rl_fzerox.core.manager import ManagedEvaluation, ManagedEvaluationBaselineSuite, ManagerStore
 
 
-def evaluations_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
+def evaluations_payload(store: ManagerStore) -> EvaluationsPayload:
     """Return all manager-owned evaluations."""
 
     baseline_suites = store.list_evaluation_baseline_suites()
@@ -42,7 +47,7 @@ def create_evaluation_payload(
     store: ManagerStore,
     request: CreateEvaluationRequest,
     name: str,
-) -> dict[str, dict[str, object]]:
+) -> EvaluationResponsePayload:
     """Create one immutable checkpoint snapshot for future evaluation execution."""
 
     try:
@@ -64,7 +69,7 @@ def create_evaluation_preset_payload(
     store: ManagerStore,
     request: CreateEvaluationPresetRequest,
     name: str,
-) -> dict[str, dict[str, object]]:
+) -> EvaluationPresetResponsePayload:
     """Create one custom immutable benchmark preset."""
 
     target = EvaluationTargetSpec(
@@ -86,7 +91,10 @@ def create_evaluation_preset_payload(
     return {"preset": evaluation_preset_payload(preset)}
 
 
-def delete_evaluation_preset_payload(store: ManagerStore, preset_id: str) -> dict[str, bool]:
+def delete_evaluation_preset_payload(
+    store: ManagerStore,
+    preset_id: str,
+) -> DeleteResponsePayload:
     """Delete one unused custom benchmark preset."""
 
     try:
@@ -96,7 +104,7 @@ def delete_evaluation_preset_payload(store: ManagerStore, preset_id: str) -> dic
     return {"deleted": deleted}
 
 
-def delete_evaluation_payload(store: ManagerStore, evaluation_id: str) -> dict[str, bool]:
+def delete_evaluation_payload(store: ManagerStore, evaluation_id: str) -> DeleteResponsePayload:
     """Delete one created evaluation snapshot."""
 
     try:
@@ -110,7 +118,7 @@ def update_evaluation_payload(
     store: ManagerStore,
     evaluation_id: str,
     name: str,
-) -> dict[str, dict[str, object]]:
+) -> EvaluationResponsePayload:
     """Rename one manager-owned evaluation."""
 
     try:
@@ -126,7 +134,7 @@ def start_evaluation_payload(
     store: ManagerStore,
     evaluation_id: str,
     request: StartEvaluationRequest,
-) -> dict[str, dict[str, object]]:
+) -> EvaluationResponsePayload:
     """Start or retry one inactive evaluation snapshot."""
 
     try:
@@ -144,7 +152,7 @@ def start_evaluation_payload(
 def cancel_evaluation_payload(
     store: ManagerStore,
     evaluation_id: str,
-) -> dict[str, dict[str, object]]:
+) -> EvaluationResponsePayload:
     """Request cooperative cancellation for one running evaluation."""
 
     try:
@@ -159,7 +167,7 @@ def cancel_evaluation_payload(
 def _evaluation_payload_with_suite(
     store: ManagerStore,
     evaluation: ManagedEvaluation,
-) -> dict[str, object]:
+) -> EvaluationPayload:
     suites_by_preset = {
         (suite.preset_id, suite.preset_version): suite
         for suite in store.list_evaluation_baseline_suites()
