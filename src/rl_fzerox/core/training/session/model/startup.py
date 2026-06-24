@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from math import prod
 from typing import TYPE_CHECKING
 
@@ -53,114 +54,120 @@ def print_training_startup(
 ) -> None:
     """Print one compact startup summary for the current train run."""
 
+    startup_summary = _training_startup_summary(
+        model=model,
+        train_env=train_env,
+        config=config,
+        run_paths=run_paths,
+    )
     try:
         from rich.console import Console
         from rich.panel import Panel
         from rich.table import Table
     except ImportError:
-        _print_plain_startup(
-            model=model,
-            train_env=train_env,
-            config=config,
-            run_paths=run_paths,
-        )
+        _print_plain_startup(startup_summary)
         return
 
     console = Console()
-    effective_algorithm = resolve_effective_training_algorithm(
-        train_config=config.train,
-    )
     summary = Table(show_header=False, box=None, pad_edge=False)
     summary.add_column(style="bold cyan")
     summary.add_column()
-    summary.add_row("run_dir", str(run_paths.run_dir))
-    summary.add_row("runtime_root", str(run_paths.runtime_root))
-    summary.add_row("device", str(_model_device(model)))
-    summary.add_row("seed", str(config.seed))
-    summary.add_row("observation", str(train_env.observation_space))
-    summary.add_row("action", str(train_env.action_space))
-    memory_summary = _training_memory_summary(
-        model=model,
-        observation_space=train_env.observation_space,
-        batch_size=config.train.batch_size,
-    )
-    summary.add_row(
-        "train",
-        " ".join(
-            _training_summary_parts(
-                train_config=config.train,
-                effective_algorithm=effective_algorithm,
-            )
-        ),
-    )
-    if config.policy.recurrent.enabled:
-        summary.add_row(
-            "lstm",
-            " ".join(
-                [
-                    f"hidden={config.policy.recurrent.hidden_size}",
-                    f"layers={config.policy.recurrent.n_lstm_layers}",
-                    f"shared={config.policy.recurrent.shared_lstm}",
-                    f"critic={config.policy.recurrent.enable_critic_lstm}",
-                ]
-            ),
-        )
+    summary.add_row("run_dir", startup_summary.run_dir)
+    summary.add_row("runtime_root", startup_summary.runtime_root)
+    summary.add_row("device", startup_summary.device)
+    summary.add_row("seed", startup_summary.seed)
+    summary.add_row("observation", startup_summary.observation_space)
+    summary.add_row("action", startup_summary.action_space)
+    summary.add_row("train", startup_summary.train)
+    if startup_summary.lstm is not None:
+        summary.add_row("lstm", startup_summary.lstm)
     console.print(Panel(summary, title="Training", expand=False))
     console.print(
         Panel(
-            _memory_summary_table(memory_summary),
+            _memory_summary_table(startup_summary.memory),
             title="Memory",
             expand=False,
         )
     )
-    console.print(Panel(_model_policy_text(model), title="Policy", expand=False))
+    console.print(Panel(startup_summary.policy, title="Policy", expand=False))
 
 
-def _print_plain_startup(
+@dataclass(frozen=True, slots=True)
+class _TrainingStartupSummary:
+    run_dir: str
+    runtime_root: str
+    device: str
+    seed: str
+    observation_space: str
+    action_space: str
+    train: str
+    lstm: str | None
+    memory: _TrainingMemorySummary
+    policy: str
+
+
+def _training_startup_summary(
     *,
     model: object,
     train_env: VecEnv,
     config: TrainAppConfig,
     run_paths: RunPaths,
-) -> None:
+) -> _TrainingStartupSummary:
     effective_algorithm = resolve_effective_training_algorithm(
         train_config=config.train,
     )
-    print(f"run_dir: {run_paths.run_dir}")
-    print(f"runtime_root: {run_paths.runtime_root}")
-    print(f"device: {_model_device(model)}")
-    print(f"seed: {config.seed}")
-    print(f"observation_space: {train_env.observation_space}")
-    print(f"action_space: {train_env.action_space}")
     memory_summary = _training_memory_summary(
         model=model,
         observation_space=train_env.observation_space,
         batch_size=config.train.batch_size,
     )
-    print(
-        "train: "
-        + " ".join(
-            _training_summary_parts(
-                train_config=config.train,
-                effective_algorithm=effective_algorithm,
-            )
+    train = " ".join(
+        _training_summary_parts(
+            train_config=config.train,
+            effective_algorithm=effective_algorithm,
         )
     )
+    lstm = None
     if config.policy.recurrent.enabled:
-        print(
-            "lstm: "
-            f"hidden={config.policy.recurrent.hidden_size} "
-            f"layers={config.policy.recurrent.n_lstm_layers} "
-            f"shared={config.policy.recurrent.shared_lstm} "
-            f"critic={config.policy.recurrent.enable_critic_lstm}"
+        lstm = " ".join(
+            [
+                f"hidden={config.policy.recurrent.hidden_size}",
+                f"layers={config.policy.recurrent.n_lstm_layers}",
+                f"shared={config.policy.recurrent.shared_lstm}",
+                f"critic={config.policy.recurrent.enable_critic_lstm}",
+            ]
         )
+    return _TrainingStartupSummary(
+        run_dir=str(run_paths.run_dir),
+        runtime_root=str(run_paths.runtime_root),
+        device=str(_model_device(model)),
+        seed=str(config.seed),
+        observation_space=str(train_env.observation_space),
+        action_space=str(train_env.action_space),
+        train=train,
+        lstm=lstm,
+        memory=memory_summary,
+        policy=_model_policy_text(model),
+    )
+
+
+def _print_plain_startup(summary: _TrainingStartupSummary) -> None:
+    print(f"run_dir: {summary.run_dir}")
+    print(f"runtime_root: {summary.runtime_root}")
+    print(f"device: {summary.device}")
+    print(f"seed: {summary.seed}")
+    print(f"observation_space: {summary.observation_space}")
+    print(f"action_space: {summary.action_space}")
+    print(f"train: {summary.train}")
+    if summary.lstm is not None:
+        print(f"lstm: {summary.lstm}")
     print("memory:")
-    print(f"  params: {memory_summary.parameter_count}")
-    if memory_summary.cuda_now is not None:
-        print(f"  cuda_now: {memory_summary.cuda_now}")
-    if memory_summary.cuda_estimate is not None:
-        print(f"  cuda_est: {memory_summary.cuda_estimate}")
-    print(_model_policy_text(model))
+    print(f"  params: {summary.memory.parameter_count}")
+    if summary.memory.cuda_now is not None:
+        print(f"  cuda_now: {summary.memory.cuda_now}")
+    if summary.memory.cuda_estimate is not None:
+        print(f"  cuda_est: {summary.memory.cuda_estimate}")
+    print(summary.policy)
 
 
 def _training_summary_parts(
@@ -182,17 +189,11 @@ def _training_summary_parts(
     return parts
 
 
+@dataclass(frozen=True, slots=True)
 class _TrainingMemorySummary:
-    def __init__(
-        self,
-        *,
-        parameter_count: str,
-        cuda_now: str | None,
-        cuda_estimate: str | None,
-    ) -> None:
-        self.parameter_count = parameter_count
-        self.cuda_now = cuda_now
-        self.cuda_estimate = cuda_estimate
+    parameter_count: str
+    cuda_now: str | None
+    cuda_estimate: str | None
 
 
 def _memory_summary_table(memory_summary: _TrainingMemorySummary):
@@ -209,19 +210,12 @@ def _memory_summary_table(memory_summary: _TrainingMemorySummary):
     return summary
 
 
+@dataclass(frozen=True, slots=True)
 class _ModelParameterSummary:
-    def __init__(
-        self,
-        *,
-        total_count: int,
-        trainable_count: int,
-        total_bytes: int,
-        trainable_bytes: int,
-    ) -> None:
-        self.total_count = total_count
-        self.trainable_count = trainable_count
-        self.total_bytes = total_bytes
-        self.trainable_bytes = trainable_bytes
+    total_count: int
+    trainable_count: int
+    total_bytes: int
+    trainable_bytes: int
 
 
 def _training_memory_summary(
