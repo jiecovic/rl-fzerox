@@ -56,6 +56,45 @@ run-manager-check:
 run-manager-build:
     npm run --prefix web/run-manager build
 
+# Render one Markdown file to local/preview with GitHub-style CSS and MathJax.
+docs-preview file="README.md":
+    @set -euo pipefail; \
+    if ! command -v pandoc >/dev/null 2>&1; then \
+        echo "pandoc is not installed. On Arch: sudo pacman -S pandoc"; \
+        exit 1; \
+    fi; \
+    if ! command -v curl >/dev/null 2>&1; then \
+        echo "curl is required to fetch the preview CSS"; \
+        exit 1; \
+    fi; \
+    input="{{file}}"; \
+    if [ ! -f "$input" ]; then \
+        echo "Markdown file not found: $input"; \
+        exit 1; \
+    fi; \
+    preview_dir="local/preview"; \
+    css_path="$preview_dir/github-markdown.css"; \
+    mkdir -p "$preview_dir"; \
+    if [ ! -f "$css_path" ]; then \
+        curl -fsSL https://raw.githubusercontent.com/sindresorhus/github-markdown-css/main/github-markdown.css -o "$css_path"; \
+    fi; \
+    stem="${input#./}"; \
+    stem="${stem%.*}"; \
+    title="${stem##*/}"; \
+    output="$preview_dir/${stem//\//_}.html"; \
+    pandoc -f gfm+tex_math_dollars -t html5 -s --mathjax -V body-class=markdown-body --metadata title="$title" --css github-markdown.css "$input" -o "$output"; \
+    echo "$output"
+
+# Render one Markdown file and open the generated local preview in the browser.
+docs-open file="README.md":
+    @just docs-preview "{{file}}"
+    @set -euo pipefail; \
+    input="{{file}}"; \
+    stem="${input#./}"; \
+    stem="${stem%.*}"; \
+    output="local/preview/${stem//\//_}.html"; \
+    xdg-open "$output"
+
 # Launch the main F-Zero X app with the Python SQLite API.
 fzerox:
     @EGL_PLATFORM="${EGL_PLATFORM:-x11}" PYTHONPATH=src "{{python_bin}}" -m rl_fzerox.apps.run_manager
