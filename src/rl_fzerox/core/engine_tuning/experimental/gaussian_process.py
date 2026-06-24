@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/engine_tuning/gaussian_process.py
+# src/rl_fzerox/core/engine_tuning/experimental/gaussian_process.py
 """Gaussian-process engine tuner backend."""
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import torch
 from linear_operator import LinearOperator
 
 from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
-from rl_fzerox.core.engine_tuning.sampling import (
+from rl_fzerox.core.engine_tuning.experimental.greedy import (
     StableGreedySelection,
     stable_greedy_engine_setting,
 )

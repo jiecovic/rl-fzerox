@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/engine_tuning/ensemble.py
+# src/rl_fzerox/core/engine_tuning/experimental/ensemble.py
 """Bootstrapped MLP ensemble backend for adaptive engine tuning."""
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from rl_fzerox.core.domain.engine_setting import (
     ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )
-from rl_fzerox.core.engine_tuning.sampling import (
+from rl_fzerox.core.engine_tuning.experimental.greedy import (
     StableGreedySelection,
     stable_greedy_engine_setting,
 )
@@ -219,33 +219,6 @@ class MlpEnsembleEngineTuner:
         if finish_time_ms is None:
             return self._prior_score()
         return finish_time_score(finish_time_ms)
-
-    def _best_choice_from_scores(
-        self,
-        *,
-        context: EngineTuningContext,
-        candidates: tuple[int, ...],
-        projection: _EngineProjection,
-        member_index: int,
-    ) -> EngineTuningChoice:
-        best: EngineTuningChoice | None = None
-        for engine_raw in candidates:
-            estimate = projection.estimates[engine_raw]
-            scores = projection.member_scores.get(engine_raw, ())
-            sampled_score = (
-                estimate.mean_score if not scores else scores[min(member_index, len(scores) - 1)]
-            )
-            choice = self._choice_for(
-                context,
-                engine_raw,
-                estimate=estimate,
-                sampled_score=sampled_score,
-            )
-            if best is None or _better_choice(choice, best, candidates=candidates):
-                best = choice
-        if best is None:
-            raise ValueError("adaptive engine tuning has no engine candidates")
-        return best
 
     def _choice_for(
         self,
@@ -851,19 +824,3 @@ def _concat_last_dim(tensors: tuple[torch.Tensor, ...]) -> torch.Tensor:
 
 def _member_seed(member_index: int) -> int:
     return 104_729 + int(member_index) * 7_919
-
-
-def _better_choice(
-    candidate: EngineTuningChoice,
-    current: EngineTuningChoice,
-    *,
-    candidates: tuple[int, ...],
-) -> bool:
-    if candidate.sampled_score != current.sampled_score:
-        return candidate.sampled_score > current.sampled_score
-    midpoint = (candidates[0] + candidates[-1]) / 2.0
-    candidate_distance = abs(candidate.engine_setting_raw_value - midpoint)
-    current_distance = abs(current.engine_setting_raw_value - midpoint)
-    if candidate_distance != current_distance:
-        return candidate_distance < current_distance
-    return candidate.engine_setting_raw_value < current.engine_setting_raw_value

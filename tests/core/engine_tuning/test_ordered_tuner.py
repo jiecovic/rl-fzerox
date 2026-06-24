@@ -16,7 +16,7 @@ from rl_fzerox.core.engine_tuning import (
     MlpEnsembleEngineTunerSettings,
     OrderedEngineTuner,
 )
-from rl_fzerox.core.engine_tuning.sampling import (
+from rl_fzerox.core.engine_tuning.experimental.greedy import (
     StableGreedySelection,
     stable_greedy_engine_setting,
 )
