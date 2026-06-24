@@ -271,20 +271,12 @@ def test_bandit_finish_rate_sampling_uses_beta_bernoulli_scale() -> None:
             uniform_exploration=0.0,
         )
     )
-    episodes = [
-        _successful_engine_episode(engine_raw=44, race_time_ms=80_000)
-        for _ in range(8)
-    ]
+    episodes = [_successful_engine_episode(engine_raw=44, race_time_ms=80_000) for _ in range(8)]
+    episodes.extend(_engine_episode(engine_raw=44, termination_reason="retired") for _ in range(2))
     episodes.extend(
-        _engine_episode(engine_raw=44, termination_reason="retired") for _ in range(2)
+        _successful_engine_episode(engine_raw=84, race_time_ms=78_000) for _ in range(2)
     )
-    episodes.extend(
-        _successful_engine_episode(engine_raw=84, race_time_ms=78_000)
-        for _ in range(2)
-    )
-    episodes.extend(
-        _engine_episode(engine_raw=84, termination_reason="retired") for _ in range(8)
-    )
+    episodes.extend(_engine_episode(engine_raw=84, termination_reason="retired") for _ in range(8))
 
     assert controller.record_episodes(tuple(episodes))
 

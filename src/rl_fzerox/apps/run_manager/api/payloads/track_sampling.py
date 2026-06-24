@@ -127,9 +127,7 @@ def _target_step_shares(state: TrackSamplingRuntimeState) -> dict[str, float]:
         return {entry.course_key: 0.0 for entry in state.entries}
     if state.sampling_mode == "deficit_budget":
         return _deficit_budget_target_step_shares(state)
-    raw_targets = {
-        entry.course_key: max(0.0, float(entry.base_weight)) for entry in state.entries
-    }
+    raw_targets = {entry.course_key: max(0.0, float(entry.base_weight)) for entry in state.entries}
     total_target = sum(raw_targets.values())
     if total_target <= 0.0:
         return {entry.course_key: 0.0 for entry in state.entries}

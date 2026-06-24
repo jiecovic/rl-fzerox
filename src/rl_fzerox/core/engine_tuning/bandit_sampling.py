@@ -82,9 +82,7 @@ def _model_probabilities(
     )
     if warmup_candidates:
         return {
-            engine_raw: (
-                1.0 / len(warmup_candidates) if engine_raw in warmup_candidates else 0.0
-            )
+            engine_raw: (1.0 / len(warmup_candidates) if engine_raw in warmup_candidates else 0.0)
             for engine_raw in candidates
         }
 
@@ -183,9 +181,7 @@ def _sample_safe_finish_time_engine_setting(
         for engine_raw in candidates
     }
     safe_candidates = tuple(
-        engine_raw
-        for engine_raw in candidates
-        if sampled[engine_raw].finish_rate >= threshold
+        engine_raw for engine_raw in candidates if sampled[engine_raw].finish_rate >= threshold
     )
     midpoint = _candidate_midpoint(candidates)
     if safe_candidates:
