@@ -189,33 +189,6 @@ class DeficitBudgetLedger:
         self._uniform_assignment_count = max(0, int(state.uniform_assignment_count))
         return True
 
-    def seed_legacy_deficit_steps_from_accounted_steps(
-        self,
-        *,
-        accounted_env_steps: Mapping[str, int],
-        uniform_fraction: float,
-        adaptive_fractions: Mapping[str, float],
-    ) -> None:
-        total_steps = sum(accounted_env_steps.values())
-        if total_steps <= 0:
-            return
-        uniform_fraction = _clamped_fraction(uniform_fraction)
-        adaptive_fraction = 1.0 - uniform_fraction
-        uniform_share = 1.0 / len(self._course_keys)
-        self._lane_deficit_steps["uniform"] = 0.0
-        self._lane_deficit_steps["adaptive"] = 0.0
-        for course_key in self._course_keys:
-            actual_steps = float(accounted_env_steps[course_key])
-            self._deficit_steps["uniform"][course_key] = uniform_fraction * (
-                total_steps * uniform_share - actual_steps
-            )
-            self._deficit_steps["adaptive"][course_key] = adaptive_fraction * (
-                total_steps * adaptive_fractions[course_key] - actual_steps
-            )
-            self._lane_deficit_steps["uniform"] += self._deficit_steps["uniform"][course_key]
-            self._lane_deficit_steps["adaptive"] += self._deficit_steps["adaptive"][course_key]
-            self.ensure_scheduler_env_steps_at_least(course_key, accounted_env_steps[course_key])
-
     def state(self) -> DeficitBudgetSchedulerState:
         return DeficitBudgetSchedulerState(
             uniform_lane_deficit_steps=self._lane_deficit_steps["uniform"],

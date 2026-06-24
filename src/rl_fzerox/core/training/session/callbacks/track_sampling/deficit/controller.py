@@ -85,14 +85,13 @@ class DeficitBudgetTrackSamplingController:
         self._ema_problem = {course_key: 0.0 for course_key in self._course_keys}
         self._rollouts_since_weight_update = 0
         self.update_count = 0
-        restored = self._restore_state(restored_state)
+        self._restore_state(restored_state)
         self._seed_problem_scores_from_restored_stats()
         self._recompute_target_weights()
         scheduler_state = (
             None if restored_state is None else restored_state.deficit_budget_scheduler
         )
-        if restored and not self._ledger.restore_scheduler_state(scheduler_state):
-            self._seed_legacy_ledger_from_accounted_steps()
+        self._ledger.restore_scheduler_state(scheduler_state)
 
     @classmethod
     def from_configs(
@@ -236,11 +235,6 @@ class DeficitBudgetTrackSamplingController:
             )
         return refills
 
-    def next_course_key(self, *, fallback_assignment_steps: float = 1.0) -> str:
-        """Return only the scheduled course id for legacy tests and callers."""
-
-        return self.next_queued_reset(fallback_assignment_steps=fallback_assignment_steps).course_id
-
     def next_queued_reset(
         self,
         *,
@@ -352,22 +346,6 @@ class DeficitBudgetTrackSamplingController:
         self.update_count = max(0, int(restored_state.update_count))
         self._rollouts_since_weight_update = max(0, int(restored_state.episodes_since_update))
         return restored_any
-
-    def _seed_legacy_ledger_from_accounted_steps(self) -> None:
-        """Rebuild deficit debt from old runtime states without scheduler accounts.
-
-        LEGACY: remove once persisted runtime states without
-        deficit_budget_scheduler are no longer supported. The fallback is
-        intentionally isolated because aggregate measurement stats cannot
-        reconstruct exact scheduler debt, especially when alt baselines
-        contributed reset steps.
-        """
-
-        self._ledger.seed_legacy_deficit_steps_from_accounted_steps(
-            accounted_env_steps=self._accounted_env_steps,
-            uniform_fraction=self._settings.uniform_fraction,
-            adaptive_fractions=self._adaptive_target_fractions(),
-        )
 
     def _update_problem_scores(self) -> None:
         alpha = self._settings.ema_alpha

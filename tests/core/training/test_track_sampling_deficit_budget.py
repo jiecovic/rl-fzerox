@@ -447,7 +447,7 @@ def test_deficit_budget_controller_reserves_queue_assignments_fairly() -> None:
 
     controller.add_rollout_budget(total_steps=200)
     assignments = tuple(
-        controller.next_course_key(fallback_assignment_steps=100.0) for _ in range(4)
+        _next_course_key(controller, fallback_assignment_steps=100.0) for _ in range(4)
     )
 
     assert assignments.count("mute") == 2
@@ -719,7 +719,7 @@ def test_deficit_budget_controller_prefers_courses_with_positive_step_debt() -> 
     controller.add_rollout_budget(total_steps=200)
     controller.record_step_infos(({"track_id": "mute"},) * 75)
 
-    assert controller.next_course_key(fallback_assignment_steps=1.0) == "silence"
+    assert _next_course_key(controller, fallback_assignment_steps=1.0) == "silence"
 
 
 def test_deficit_budget_controller_charges_steps_to_their_queue_lane() -> None:
@@ -800,7 +800,7 @@ def test_deficit_budget_controller_keeps_alt_baselines_out_of_runtime_stats() ->
     assert scheduler is not None
     scheduler_steps = {entry.course_key: entry.scheduler_env_steps for entry in scheduler.entries}
     assert scheduler_steps == {"mute": 40, "silence": 0}
-    assert controller.next_course_key(fallback_assignment_steps=1.0) == "silence"
+    assert _next_course_key(controller, fallback_assignment_steps=1.0) == "silence"
 
 
 def test_deficit_budget_controller_restores_exact_scheduler_debt() -> None:
@@ -883,7 +883,7 @@ def test_deficit_budget_controller_restores_exact_scheduler_debt() -> None:
         seed=7,
     )
 
-    assert controller.next_course_key(fallback_assignment_steps=100.0) == "crash"
+    assert _next_course_key(controller, fallback_assignment_steps=100.0) == "crash"
     runtime = controller.runtime_state()
     assert runtime.deficit_budget_scheduler is not None
     restored_steps = {
@@ -891,74 +891,6 @@ def test_deficit_budget_controller_restores_exact_scheduler_debt() -> None:
         for entry in runtime.deficit_budget_scheduler.entries
     }
     assert restored_steps == {"balanced": 1000, "crash": 100}
-
-
-def test_deficit_budget_controller_legacy_restores_step_debt_from_accounted_totals() -> None:
-    restored = TrackSamplingRuntimeState(
-        sampling_mode="deficit_budget",
-        action_repeat=1,
-        update_episodes=20,
-        ema_alpha=0.02,
-        max_weight_scale=3.0,
-        adaptive_completion_weight=0.0,
-        adaptive_target_completion=1.0,
-        adaptive_min_confidence_episodes=1,
-        adaptive_confidence_scale=3.0,
-        update_count=1,
-        episodes_since_update=0,
-        entries=(
-            TrackSamplingRuntimeEntry(
-                track_id="balanced",
-                course_key="balanced",
-                label="Balanced",
-                base_weight=1.0,
-                current_weight=1.0,
-                completed_frames=1000,
-                episode_count=10,
-                finished_episode_count=10,
-                success_sample_count=10,
-                ema_episode_frames=100.0,
-                ema_completion_fraction=1.0,
-            ),
-            TrackSamplingRuntimeEntry(
-                track_id="crash",
-                course_key="crash",
-                label="Crash",
-                base_weight=1.0,
-                current_weight=1.0,
-                completed_frames=100,
-                episode_count=10,
-                finished_episode_count=0,
-                success_sample_count=10,
-                ema_episode_frames=10.0,
-                ema_completion_fraction=0.1,
-            ),
-        ),
-    )
-    controller = DeficitBudgetTrackSamplingController(
-        resolved_courses=resolved_track_sampling_courses(
-            {"balanced": 1.0, "crash": 1.0},
-            course_keys={"balanced": "balanced", "crash": "crash"},
-            log_keys={"balanced": "balanced", "crash": "crash"},
-            labels={"balanced": "Balanced", "crash": "Crash"},
-            log_enabled={"balanced": True, "crash": True},
-        ),
-        action_repeat=1,
-        settings=DeficitBudgetSettings(
-            uniform_fraction=1.0,
-            focus_sharpness=1.0,
-            ema_alpha=0.02,
-            weight_update_rollouts=20,
-        ),
-        restored_state=restored,
-        seed=7,
-    )
-
-    assignments = tuple(
-        controller.next_course_key(fallback_assignment_steps=100.0) for _ in range(4)
-    )
-
-    assert assignments == ("crash",) * 4
 
 
 def test_deficit_budget_controller_uses_episode_ema_as_assignment_cost() -> None:
@@ -1001,7 +933,7 @@ def test_deficit_budget_controller_uses_episode_ema_as_assignment_cost() -> None
     controller.record_step_infos(({"track_id": "long"},) * 100)
 
     assignments = tuple(
-        controller.next_course_key(fallback_assignment_steps=100.0) for _ in range(5)
+        _next_course_key(controller, fallback_assignment_steps=100.0) for _ in range(5)
     )
 
     assert assignments == ("short",) * 5
@@ -1256,6 +1188,16 @@ def _runtime_entries(
     controller: DeficitBudgetTrackSamplingController,
 ) -> dict[str, TrackSamplingRuntimeEntry]:
     return {entry.course_key: entry for entry in controller.runtime_state().entries}
+
+
+def _next_course_key(
+    controller: DeficitBudgetTrackSamplingController,
+    *,
+    fallback_assignment_steps: float,
+) -> str:
+    return controller.next_queued_reset(
+        fallback_assignment_steps=fallback_assignment_steps,
+    ).course_id
 
 
 def _scheduler_entries(
