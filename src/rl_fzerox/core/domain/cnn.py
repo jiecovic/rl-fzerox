@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
-CnnActivationName: TypeAlias = Literal["relu", "gelu"]
+type CnnActivationName = Literal["relu", "gelu"]
 
-CnnLayerKind: TypeAlias = Literal[
+type CnnLayerKind = Literal[
     "conv",
     "residual_pre",
     "residual_post",

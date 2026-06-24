@@ -4,15 +4,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, TypeAlias
+from typing import Literal
 
-EvaluationMode: TypeAlias = Literal["time_attack_course", "gp_course"]
-EvaluationCheckpointArtifact: TypeAlias = Literal["latest", "best", "final"]
-EvaluationPolicyMode: TypeAlias = Literal["deterministic", "stochastic"]
-EvaluationDevice: TypeAlias = Literal["cpu", "cuda"]
-EvaluationRunStatus: TypeAlias = Literal["completed", "failed", "cancelled", "partial"]
-AttemptStatus: TypeAlias = Literal["succeeded", "failed", "cancelled", "partial"]
-CourseResultStatus: TypeAlias = Literal["finished", "retired", "crashed", "truncated", "failed"]
+type EvaluationMode = Literal["time_attack_course", "gp_course"]
+type EvaluationCheckpointArtifact = Literal["latest", "best", "final"]
+type EvaluationPolicyMode = Literal["deterministic", "stochastic"]
+type EvaluationDevice = Literal["cpu", "cuda"]
+type EvaluationRunStatus = Literal["completed", "failed", "cancelled", "partial"]
+type AttemptStatus = Literal["succeeded", "failed", "cancelled", "partial"]
+type CourseResultStatus = Literal["finished", "retired", "crashed", "truncated", "failed"]
 
 
 @dataclass(frozen=True, slots=True)

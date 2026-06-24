@@ -22,7 +22,7 @@ Full Master cups playlist:
 ## Requirements
 
 - Linux userspace, either native Linux or Windows with WSL2
-- Python 3.11 or newer
+- Python 3.12 or newer
 - Rust toolchain with Cargo
 - Node.js 20.19+, 22.12+, or 24+, with npm
 - `just`
@@ -39,7 +39,7 @@ active Python environment.
 git clone https://github.com/jiecovic/rl-fzerox.git
 cd rl-fzerox
 
-python -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[dev,watch,train]"

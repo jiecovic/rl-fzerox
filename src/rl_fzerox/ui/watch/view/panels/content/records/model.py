@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeAlias
 
-RecordInfo: TypeAlias = dict[str, object]
+type RecordInfo = dict[str, object]
 
 
 @dataclass(frozen=True, slots=True)

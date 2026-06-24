@@ -10,7 +10,7 @@ authoring-era aliases.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from pydantic import (
     BaseModel,
@@ -37,8 +37,8 @@ from rl_fzerox.core.runtime_spec.schema.common import (
     ContinuousAirBrakeMode,
 )
 
-ConfiguredContinuousAxis: TypeAlias = Literal["steer", "drive", "air_brake", "pitch"]
-ConfiguredDiscreteAxis: TypeAlias = Literal[
+type ConfiguredContinuousAxis = Literal["steer", "drive", "air_brake", "pitch"]
+type ConfiguredDiscreteAxis = Literal[
     "steer",
     "gas",
     "air_brake",

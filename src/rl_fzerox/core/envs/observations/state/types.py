@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
 import numpy as np
 
@@ -11,8 +11,8 @@ from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
 )
 
-ObservationMode: TypeAlias = Literal["image", "image_state"]
-ActionHistoryControl: TypeAlias = ActionHistoryControlName
+type ObservationMode = Literal["image", "image_state"]
+type ActionHistoryControl = ActionHistoryControlName
 
 
 @dataclass(frozen=True, slots=True)

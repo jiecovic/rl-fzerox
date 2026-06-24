@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol, TypeAlias
+from typing import Protocol
 
 from rl_fzerox.core.evaluation.artifacts import write_evaluation_result_files
 from rl_fzerox.core.evaluation.models import (
@@ -23,9 +23,9 @@ from rl_fzerox.core.evaluation.models import (
 )
 from rl_fzerox.core.seed import derive_seed
 
-ProgressCallback: TypeAlias = Callable[[EvaluationRunResult], None]
-CancelCheck: TypeAlias = Callable[[], bool]
-Clock: TypeAlias = Callable[[], str]
+type ProgressCallback = Callable[[EvaluationRunResult], None]
+type CancelCheck = Callable[[], bool]
+type Clock = Callable[[], str]
 
 
 @dataclass(frozen=True, slots=True)

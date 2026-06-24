@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from rl_fzerox.core.domain.track_position import height_above_ground_feature
 
-ActionHistoryControlName: TypeAlias = Literal[
+type ActionHistoryControlName = Literal[
     "steer",
     "gas",
     "thrust",
@@ -15,13 +15,13 @@ ActionHistoryControlName: TypeAlias = Literal[
     "lean",
     "pitch",
 ]
-ObservationCourseContextName: TypeAlias = Literal["none", "one_hot_builtin"]
-TrackPositionProgressSourceName: TypeAlias = Literal[
+type ObservationCourseContextName = Literal["none", "one_hot_builtin"]
+type TrackPositionProgressSourceName = Literal[
     "lap_progress",
     "segment_progress",
     "none",
 ]
-ObservationStateComponentName: TypeAlias = Literal[
+type ObservationStateComponentName = Literal[
     "vehicle_state",
     "machine_context",
     "track_position",
@@ -80,4 +80,4 @@ def state_feature_default_enabled(
     return feature_name not in default_excluded_state_feature_names(component_name)
 
 
-StateComponentsSettings: TypeAlias = tuple[ObservationStateComponentSettings, ...]
+type StateComponentsSettings = tuple[ObservationStateComponentSettings, ...]

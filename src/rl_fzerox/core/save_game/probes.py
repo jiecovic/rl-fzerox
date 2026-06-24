@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from rl_fzerox.core.save_game.sram import SaveRamSummary, summarize_save_ram
 
-MemoryProbeRegion: TypeAlias = Literal["save_ram", "system_ram"]
-MemoryProbeFormat: TypeAlias = Literal[
+type MemoryProbeRegion = Literal["save_ram", "system_ram"]
+type MemoryProbeFormat = Literal[
     "bytes",
     "bitset_u8",
     "u8",
@@ -19,7 +19,7 @@ MemoryProbeFormat: TypeAlias = Literal[
     "u32_be",
     "u32_le",
 ]
-MemoryProbeValue: TypeAlias = int | str | tuple[int, ...]
+type MemoryProbeValue = int | str | tuple[int, ...]
 
 MEMORY_PROBE_REGIONS: tuple[MemoryProbeRegion, ...] = ("save_ram", "system_ram")
 MEMORY_PROBE_FORMATS: tuple[MemoryProbeFormat, ...] = (

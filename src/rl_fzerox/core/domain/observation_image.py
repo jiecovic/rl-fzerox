@@ -10,17 +10,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Annotated, Final, Literal, TypeAlias
+from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ObservationPresetName: TypeAlias = Literal[
+type ObservationPresetName = Literal[
     "crop_72x96",
     "crop_84x84",
 ]
-ObservationResolutionMode: TypeAlias = Literal["preset", "custom", "source_crop"]
-ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
-ObservationRendererName: TypeAlias = Literal["angrylion", "gliden64"]
+type ObservationResolutionMode = Literal["preset", "custom", "source_crop"]
+type ObservationResizeFilter = Literal["nearest", "bilinear"]
+type ObservationRendererName = Literal["angrylion", "gliden64"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,7 +114,7 @@ class SourceCropResolutionChoice(BaseModel):
     mode: Literal["source_crop"] = "source_crop"
 
 
-ObservationResolutionConfig: TypeAlias = Annotated[
+type ObservationResolutionConfig = Annotated[
     PresetResolutionChoice | CustomResolutionChoice | SourceCropResolutionChoice,
     Field(discriminator="mode"),
 ]

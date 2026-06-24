@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from rl_fzerox.core.engine_tuning import (
     BanditEngineTunerSettings,
@@ -21,7 +21,7 @@ from rl_fzerox.core.training.session.artifacts import (
     load_engine_tuning_checkpoint_state,
 )
 
-EngineTuningSourceAction: TypeAlias = Literal["convert", "discard"]
+type EngineTuningSourceAction = Literal["convert", "discard"]
 
 
 def prepare_engine_tuning_fork_source(

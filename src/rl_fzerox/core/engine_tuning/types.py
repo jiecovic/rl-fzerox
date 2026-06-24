@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from rl_fzerox.core.domain.engine_setting import (
     ENGINE_SLIDER,
@@ -115,7 +115,7 @@ class MlpEnsembleEngineTunerSettings(EngineTunerCommonSettings):
     warmup_successes: int = ENGINE_TUNER_DEFAULTS.mlp_warmup_successes
 
 
-EngineTunerSettings: TypeAlias = (
+type EngineTunerSettings = (
     BanditEngineTunerSettings | GaussianProcessEngineTunerSettings | MlpEnsembleEngineTunerSettings
 )
 

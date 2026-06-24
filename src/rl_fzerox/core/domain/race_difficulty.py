@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias, TypeGuard
+from typing import Literal, TypeGuard
 
-RaceDifficultyName: TypeAlias = Literal["novice", "standard", "expert", "master"]
+type RaceDifficultyName = Literal["novice", "standard", "expert", "master"]
 
 
 @dataclass(frozen=True, slots=True)

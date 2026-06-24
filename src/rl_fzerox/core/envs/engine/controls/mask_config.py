@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeAlias
 
 from fzerox_emulator.arrays import ActionMask
 from rl_fzerox.core.envs.actions import ActionAdapter
 
-ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
-ActionMaskBranches: TypeAlias = dict[str, tuple[bool, ...]]
+type ActionMaskOverrides = dict[str, tuple[int, ...]]
+type ActionMaskBranches = dict[str, tuple[bool, ...]]
 
 
 @dataclass(frozen=True, slots=True)

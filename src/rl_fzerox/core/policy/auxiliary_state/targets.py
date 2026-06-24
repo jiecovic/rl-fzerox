@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Literal, TypeAlias, TypeGuard
+from typing import Literal, TypeGuard
 
 import numpy as np
 from gymnasium import spaces
@@ -27,8 +27,8 @@ def _builtin_course_observation_feature_names() -> tuple[str, ...]:
     )
 
 
-AuxiliaryStateTargetKind: TypeAlias = Literal["scalar", "binary", "categorical"]
-AuxiliaryStateDecodedValue: TypeAlias = float | int | dict[str, float | int | None | list[float]]
+type AuxiliaryStateTargetKind = Literal["scalar", "binary", "categorical"]
+type AuxiliaryStateDecodedValue = float | int | dict[str, float | int | None | list[float]]
 
 
 @dataclass(frozen=True, slots=True)

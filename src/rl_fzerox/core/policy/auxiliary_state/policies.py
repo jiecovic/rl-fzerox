@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TypeAlias, TypedDict, Unpack
+from typing import TypedDict, Unpack
 
 import torch
 from gymnasium import spaces
@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-_Sb3Observation: TypeAlias = NumpyArray | dict[str, NumpyArray]
+type _Sb3Observation = NumpyArray | dict[str, NumpyArray]
 
 
 class _HybridPolicyKwargs(TypedDict, total=False):

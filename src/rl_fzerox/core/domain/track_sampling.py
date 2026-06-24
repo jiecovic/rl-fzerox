@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
-RuntimeTrackSamplingMode: TypeAlias = Literal[
+type RuntimeTrackSamplingMode = Literal[
     "random",
     "balanced",
     "step_balanced",
@@ -15,7 +15,7 @@ RuntimeTrackSamplingMode: TypeAlias = Literal[
     "fixed_env",
     "deficit_budget",
 ]
-ManagedTrackSamplingMode: TypeAlias = Literal[
+type ManagedTrackSamplingMode = Literal[
     "equal",
     "step_balanced",
     # Accepted for older managed configs. New manager UI flows hide it until the
@@ -24,7 +24,7 @@ ManagedTrackSamplingMode: TypeAlias = Literal[
     "fixed_env",
     "deficit_budget",
 ]
-DeficitBudgetDifficultyMetric: TypeAlias = Literal[
+type DeficitBudgetDifficultyMetric = Literal[
     "completion_ema",
     "finish_ema",
     "mixed",

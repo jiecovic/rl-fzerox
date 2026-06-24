@@ -5,12 +5,12 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from rl_fzerox.core.seed import derive_seed
 
-XCupGeneratedCourseKind: TypeAlias = Literal["x_cup"]
-XCupRaceMode: TypeAlias = Literal["gp_race"]
+type XCupGeneratedCourseKind = Literal["x_cup"]
+type XCupRaceMode = Literal["gp_race"]
 
 
 @dataclass(frozen=True, slots=True)

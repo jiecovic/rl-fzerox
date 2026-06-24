@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import NotRequired, TypeAlias, TypedDict
+from typing import NotRequired, TypedDict
 
 import numpy as np
 from gymnasium import spaces
@@ -14,7 +14,7 @@ from rl_fzerox.core.domain.observation_components import StateComponentsSettings
 from .image import build_image_observation_space
 from .state import ObservationMode, state_vector_spec, telemetry_state_vector
 
-ImageObservation: TypeAlias = ObservationFrame
+type ImageObservation = ObservationFrame
 
 
 class ImageStateObservation(TypedDict):
@@ -23,7 +23,7 @@ class ImageStateObservation(TypedDict):
     auxiliary_state_targets: NotRequired[StateVector]
 
 
-ObservationValue: TypeAlias = ImageObservation | ImageStateObservation
+type ObservationValue = ImageObservation | ImageStateObservation
 
 __all__ = [
     "ImageObservation",

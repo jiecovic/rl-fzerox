@@ -5,7 +5,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from typing import Literal, Protocol, TypeAlias
+from typing import Literal, Protocol
 
 from rl_fzerox.apps.run_manager.launching.processes import fresh_process_log
 from rl_fzerox.core.manager import ManagerStore
@@ -16,7 +16,7 @@ from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
 WatchLaunchStatus = Literal["started", "already_running"]
-WatchRenderer: TypeAlias = RendererName
+type WatchRenderer = RendererName
 WATCH_STARTUP_TIMEOUT_SECONDS = 8.0
 
 

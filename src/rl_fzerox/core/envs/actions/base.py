@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol, TypeAlias, TypeGuard, runtime_checkable
+from typing import Protocol, TypeGuard, runtime_checkable
 
 import numpy as np
 from gymnasium import spaces
@@ -11,10 +11,10 @@ from gymnasium import spaces
 from fzerox_emulator import RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, DiscreteAction, Float32Array, NumpyArray
 
-ActionScalar: TypeAlias = int | float | np.integer | np.floating
-ActionBranchValue: TypeAlias = ActionScalar | Sequence[ActionScalar] | NumpyArray
-HybridActionValue: TypeAlias = Mapping[str, ActionBranchValue]
-ActionValue: TypeAlias = ActionBranchValue | HybridActionValue
+type ActionScalar = int | float | np.integer | np.floating
+type ActionBranchValue = ActionScalar | Sequence[ActionScalar] | NumpyArray
+type HybridActionValue = Mapping[str, ActionBranchValue]
+type ActionValue = ActionBranchValue | HybridActionValue
 
 
 @dataclass(frozen=True, slots=True)

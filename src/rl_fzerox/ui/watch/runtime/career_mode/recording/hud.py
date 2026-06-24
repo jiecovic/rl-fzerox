@@ -2,14 +2,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TypeAlias
 
 import numpy as np
 
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.runtime_info import bool_info, float_info
 
-_RgbColor: TypeAlias = tuple[int, int, int]
+type _RgbColor = tuple[int, int, int]
 
 INPUT_HUD_INFO_KEYS = (
     "watch_recording_input_hud",

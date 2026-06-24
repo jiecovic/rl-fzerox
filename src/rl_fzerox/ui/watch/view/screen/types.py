@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol, TypeAlias
+from typing import Any, Literal, Protocol
 
 from rl_fzerox.ui.watch.view.screen.theme import Color
 
-PygameModule: TypeAlias = Any
-PygameRect: TypeAlias = Any
-PygameSurface: TypeAlias = Any
-MouseRect: TypeAlias = tuple[int, int, int, int]
-StatusIcon: TypeAlias = Literal["none", "in_range", "outside", "toggle_on", "toggle_off"]
+type PygameModule = Any
+type PygameRect = Any
+type PygameSurface = Any
+type MouseRect = tuple[int, int, int, int]
+type StatusIcon = Literal["none", "in_range", "outside", "toggle_on", "toggle_off"]
 
 
 class TextSurface(Protocol):

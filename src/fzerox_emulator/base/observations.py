@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias, TypedDict
+from typing import Literal, TypedDict
 
-ObservationStackMode: TypeAlias = Literal["rgb", "gray", "luma_chroma"]
-ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
+type ObservationStackMode = Literal["rgb", "gray", "luma_chroma"]
+type ObservationResizeFilter = Literal["nearest", "bilinear"]
 
 
 class FrameObservationOptions(TypedDict, total=False):

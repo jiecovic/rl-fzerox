@@ -13,9 +13,8 @@ from __future__ import annotations
 import ast
 import sys
 from pathlib import Path
-from typing import TypeAlias
 
-PathIssue: TypeAlias = tuple[Path, int, int, str]
+type PathIssue = tuple[Path, int, int, str]
 
 _CENTRAL_ARRAY_ALIAS_MODULE = Path("src/fzerox_emulator/arrays.py")
 _FORBIDDEN_NUMPY_ANNOTATION_NAMES = {

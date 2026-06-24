@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from rl_fzerox.core.evaluation.models import (
     AttemptStatus,
@@ -16,7 +16,7 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationRunResult,
 )
 
-EvaluationMetricGroupKind: TypeAlias = Literal["overall", "cup", "course"]
+type EvaluationMetricGroupKind = Literal["overall", "cup", "course"]
 
 
 @dataclass(frozen=True, slots=True)

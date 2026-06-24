@@ -1,10 +1,10 @@
 # src/rl_fzerox/core/domain/action_values.py
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
-ActionMaskPreset: TypeAlias = Literal["unrestricted"]
-ActionBranchValue: TypeAlias = Literal[
+type ActionMaskPreset = Literal["unrestricted"]
+type ActionBranchValue = Literal[
     "idle",
     "engaged",
     "left",
@@ -15,8 +15,8 @@ ActionBranchValue: TypeAlias = Literal[
     "up",
     "up_full",
 ]
-ActionMaskValue: TypeAlias = int | ActionBranchValue
-ActionMaskSpec: TypeAlias = ActionMaskPreset | tuple[ActionMaskValue, ...]
+type ActionMaskValue = int | ActionBranchValue
+type ActionMaskSpec = ActionMaskPreset | tuple[ActionMaskValue, ...]
 
 DISCRETE_ACTION_BRANCH_VALUES: dict[str, tuple[ActionBranchValue, ...]] = {
     "gas": ("idle", "engaged"),

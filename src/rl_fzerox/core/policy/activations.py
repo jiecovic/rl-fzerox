@@ -1,9 +1,9 @@
 # src/rl_fzerox/core/policy/activations.py
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
-ActivationName: TypeAlias = Literal["relu", "tanh", "gelu"]
+type ActivationName = Literal["relu", "tanh", "gelu"]
 
 
 def resolve_policy_activation_fn(name: str):

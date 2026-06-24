@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
-TrainAlgorithmName: TypeAlias = Literal[
+type TrainAlgorithmName = Literal[
     "maskable_hybrid_action_ppo",
     "maskable_hybrid_recurrent_ppo",
 ]

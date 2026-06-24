@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from pydantic import PositiveInt
 
@@ -46,4 +46,4 @@ ConvProfile = Literal[
     "impala_large",
     "custom",
 ]
-FeatureDim: TypeAlias = PositiveInt | Literal["auto"]
+type FeatureDim = PositiveInt | Literal["auto"]

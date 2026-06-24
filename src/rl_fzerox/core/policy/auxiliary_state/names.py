@@ -1,9 +1,9 @@
 # src/rl_fzerox/core/policy/auxiliary_state/names.py
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
-AuxiliaryStateTargetName: TypeAlias = Literal[
+type AuxiliaryStateTargetName = Literal[
     "vehicle_state.speed_norm",
     "vehicle_state.energy_frac",
     "vehicle_state.reverse_active",

@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
-ActionAdapterName: TypeAlias = Literal[
+type ActionAdapterName = Literal[
     "configured_discrete",
     "configured_hybrid",
 ]

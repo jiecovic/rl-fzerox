@@ -1,15 +1,15 @@
 # src/rl_fzerox/core/domain/lean.py
 from __future__ import annotations
 
-from typing import Final, Literal, TypeAlias
+from typing import Final, Literal
 
-LeanOutputMode: TypeAlias = Literal[
+type LeanOutputMode = Literal[
     "three_way",
     "four_way_categorical",
     "independent_buttons",
 ]
 
-LeanMode: TypeAlias = Literal[
+type LeanMode = Literal[
     "minimum_hold",
     "release_cooldown",
     "timer_assist",

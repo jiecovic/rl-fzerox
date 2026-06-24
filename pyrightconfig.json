@@ -1,6 +1,6 @@
 {
   "typeCheckingMode": "standard",
-  "pythonVersion": "3.11",
+  "pythonVersion": "3.12",
   "reportDeprecated": "warning",
   "reportMissingParameterType": "warning",
   "reportUnknownParameterType": "none",

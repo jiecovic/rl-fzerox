@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
-SpinRequest: TypeAlias = Literal["none", "left", "right"]
+type SpinRequest = Literal["none", "left", "right"]
 
 DEFAULT_SPIN_COOLDOWN_FRAMES = 120
 

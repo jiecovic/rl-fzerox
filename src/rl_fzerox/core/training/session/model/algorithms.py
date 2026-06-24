@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/session/model/algorithms.py
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING
 
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, TrainConfig
@@ -12,13 +12,13 @@ if TYPE_CHECKING:
         MaskableHybridRecurrentPPO,
     )
 
-    PpoTrainingAlgorithmClass: TypeAlias = (
+    type PpoTrainingAlgorithmClass = (
         type[MaskableHybridActionPPO] | type[MaskableHybridRecurrentPPO]
     )
-    TrainingAlgorithmClass: TypeAlias = PpoTrainingAlgorithmClass
+    type TrainingAlgorithmClass = PpoTrainingAlgorithmClass
 else:
-    PpoTrainingAlgorithmClass: TypeAlias = type
-    TrainingAlgorithmClass: TypeAlias = type
+    type PpoTrainingAlgorithmClass = type
+    type TrainingAlgorithmClass = type
 
 
 def training_requires_action_masks(config: TrainAppConfig) -> bool:
