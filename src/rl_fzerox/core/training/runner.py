@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from operator import attrgetter
+from typing import Protocol
 
 from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
-from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig, TrainAppConfig, TrainConfig
 from rl_fzerox.core.runtime_spec.x_cup_slots import generated_x_cup_slots_from_track_sampling
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import (
@@ -17,6 +19,7 @@ from rl_fzerox.core.training.runs import (
     resolve_policy_artifact_path,
     save_train_run_config,
 )
+from rl_fzerox.core.training.runs.paths import RunPaths
 from rl_fzerox.core.training.session import (
     build_callbacks,
     build_tensorboard_logger,
@@ -34,10 +37,30 @@ from rl_fzerox.core.training.session import (
     validate_training_algorithm_config,
     validate_training_baseline_state,
 )
+from rl_fzerox.core.training.session.artifacts import (
+    ModelSaveable,
+    PolicyArtifactMetadata,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimePersistence,
     materialized_track_sampling_artifacts,
 )
+
+
+class _TrainingEnv(Protocol):
+    def close(self) -> object: ...
+
+
+class _TrainingModel(ModelSaveable, Protocol):
+    num_timesteps: int
+
+    def set_logger(self, logger: object) -> object: ...
+
+
+@dataclass(frozen=True, slots=True)
+class _EngineTuningSession:
+    initial_state: EngineTuningRuntimeState | None
+    controller: EngineTuningTrainingController | None
 
 
 def run_training(
@@ -53,137 +76,52 @@ def run_training(
     """Run one training session from the composed train config."""
 
     seed_process(config.seed)
-    run_paths = (
-        continue_run_paths(config.train.continue_run_dir)
-        if config.train.continue_run_dir is not None
-        else (
-            explicit_run_paths(config.train.explicit_run_dir)
-            if config.train.explicit_run_dir is not None
-            else reserve_run_paths(
-                output_root=config.train.output_root,
-                run_name=config.train.run_name,
-            )
-        )
-    )
+    run_paths = _resolve_run_paths(config)
     _report_startup(
         startup_reporter,
         "startup_prepare",
         f"Using run directory {run_paths.run_dir}",
     )
     validate_training_algorithm_config(config)
-    train_env = None
-    model = None
+    train_env: _TrainingEnv | None = None
+    model: _TrainingModel | None = None
 
     try:
-        ensure_run_dirs(run_paths)
-        _report_startup(
-            startup_reporter,
-            "startup_prepare",
-            "Resolving run-local config and baseline state",
-        )
-        run_config = resolve_train_run_config(
+        run_config = _prepare_run_config(
             config=config,
             run_paths=run_paths,
             startup_reporter=startup_reporter,
+            track_sampling_runtime_persistence=track_sampling_runtime_persistence,
         )
-        if track_sampling_runtime_persistence is not None:
-            publish_artifacts = track_sampling_runtime_persistence.replace_materialized_artifacts
-            if publish_artifacts is not None:
-                publish_artifacts(
-                    materialized_track_sampling_artifacts(run_config.env.track_sampling)
-                )
-            publish_generated_slots = (
-                track_sampling_runtime_persistence.replace_generated_x_cup_slots
-            )
-            if publish_generated_slots is not None:
-                publish_generated_slots(
-                    generated_x_cup_slots_from_track_sampling(run_config.env.track_sampling)
-                )
-        validate_training_baseline_state(run_config)
-        _report_startup(
-            startup_reporter,
-            "startup_prepare",
-            "Building training environments",
-        )
-        train_env = build_training_env(run_config, run_paths)
-        _report_startup(
-            startup_reporter,
-            "startup_prepare",
-            "Building policy and optimizer",
-        )
-        model = build_training_model(
-            train_env=train_env,
-            train_config=run_config.train,
-            policy_config=run_config.policy,
-            env_config=run_config.env,
-            tensorboard_log=None,
-        )
-        if run_config.train.resume_run_dir is not None:
-            _report_startup(
-                startup_reporter,
-                "startup_resume",
-                f"Loading {run_config.train.resume_artifact} checkpoint",
-            )
-        model = maybe_resume_training_model(
-            model=model,
-            train_env=train_env,
-            train_config=run_config.train,
-            policy_config=run_config.policy,
-        )
-        initial_engine_tuning_state = _resume_engine_tuning_state(run_config)
-        engine_tuning_controller = _engine_tuning_controller(
-            run_config,
-            state=initial_engine_tuning_state,
-        )
-        _report_startup(
-            startup_reporter,
-            "startup_prepare",
-            "Saving frozen run config",
-        )
-        save_train_run_config(config=run_config, run_dir=run_paths.run_dir)
-        model.set_logger(
-            build_tensorboard_logger(
-                run_paths,
-                step_offset=run_config.train.tensorboard_step_offset,
-            )
-        )
-        _report_startup(
-            startup_reporter,
-            "startup_prepare",
-            "TensorBoard logger ready",
-        )
-        print_training_startup(
-            model=model,
-            train_env=train_env,
-            config=run_config,
+        train_env = _build_training_environment(
+            run_config=run_config,
             run_paths=run_paths,
+            startup_reporter=startup_reporter,
         )
-        if run_config.train.save_latest_checkpoint:
-            _report_startup(
-                startup_reporter,
-                "startup_checkpoint",
-                "Writing initial latest checkpoint",
-            )
-            save_latest_artifacts(
-                model,
-                run_paths,
-                engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
-                policy_metadata=current_policy_artifact_metadata(
-                    model,
-                    lineage_step_offset=run_config.train.tensorboard_step_offset,
-                ),
-            )
-        callbacks = build_callbacks(
+        model = _build_or_resume_training_model(
+            run_config=run_config,
+            train_env=train_env,
+            startup_reporter=startup_reporter,
+        )
+        engine_tuning = _build_engine_tuning_session(run_config)
+        _prepare_training_outputs(
+            run_config=run_config,
+            run_paths=run_paths,
+            train_env=train_env,
+            model=model,
+            engine_tuning=engine_tuning,
+            startup_reporter=startup_reporter,
+        )
+        callbacks = _build_training_callbacks(
             env_config=run_config.env,
             train_app_config=run_config,
             train_config=run_config.train,
             run_paths=run_paths,
-            initial_engine_tuning_state=initial_engine_tuning_state,
-            engine_tuning_controller=engine_tuning_controller,
+            engine_tuning=engine_tuning,
             track_sampling_runtime_persistence=track_sampling_runtime_persistence,
             extra_callbacks=(
                 *extra_callbacks,
-                *(factory(engine_tuning_controller) for factory in extra_callback_factories),
+                *(factory(engine_tuning.controller) for factory in extra_callback_factories),
             ),
         )
         masking_required = training_requires_action_masks(run_config)
@@ -192,54 +130,14 @@ def run_training(
             "startup_training",
             "Starting training loop",
         )
-        reset_num_timesteps = run_config.train.resume_mode != "full_model"
-        learn_total_timesteps = _learn_total_timesteps(
+        _train_and_save(
+            run_config=run_config,
+            run_paths=run_paths,
             model=model,
-            configured_total_timesteps=run_config.train.total_timesteps,
-            reset_num_timesteps=reset_num_timesteps,
+            callbacks=callbacks,
+            masking_required=masking_required,
+            engine_tuning=engine_tuning,
         )
-        try:
-            if learn_total_timesteps > 0:
-                _learn_model(
-                    model=model,
-                    total_timesteps=learn_total_timesteps,
-                    callback=callbacks,
-                    use_masking=masking_required,
-                    progress_bar=True,
-                    reset_num_timesteps=reset_num_timesteps,
-                )
-        except Exception:
-            if model.num_timesteps > 0 and run_config.train.save_latest_checkpoint:
-                save_latest_artifacts(
-                    model,
-                    run_paths,
-                    engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
-                    policy_metadata=current_policy_artifact_metadata(
-                        model,
-                        lineage_step_offset=run_config.train.tensorboard_step_offset,
-                    ),
-                )
-            raise
-        save_artifacts_atomically(
-            model=model,
-            model_path=run_paths.final_model_path,
-            policy_path=run_paths.final_policy_path,
-            engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
-            policy_metadata=current_policy_artifact_metadata(
-                model,
-                lineage_step_offset=run_config.train.tensorboard_step_offset,
-            ),
-        )
-        if run_config.train.save_latest_checkpoint:
-            save_latest_artifacts(
-                model,
-                run_paths,
-                engine_tuning_state=_engine_tuning_state(engine_tuning_controller),
-                policy_metadata=current_policy_artifact_metadata(
-                    model,
-                    lineage_step_offset=run_config.train.tensorboard_step_offset,
-                ),
-            )
     except Exception:
         cleanup_failed_run(
             run_paths,
@@ -250,6 +148,260 @@ def run_training(
     finally:
         if train_env is not None:
             train_env.close()
+
+
+def _resolve_run_paths(config: TrainAppConfig) -> RunPaths:
+    if config.train.continue_run_dir is not None:
+        return continue_run_paths(config.train.continue_run_dir)
+    if config.train.explicit_run_dir is not None:
+        return explicit_run_paths(config.train.explicit_run_dir)
+    return reserve_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+
+
+def _prepare_run_config(
+    *,
+    config: TrainAppConfig,
+    run_paths: RunPaths,
+    startup_reporter: Callable[[str, str], None] | None,
+    track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None,
+) -> TrainAppConfig:
+    ensure_run_dirs(run_paths)
+    _report_startup(
+        startup_reporter,
+        "startup_prepare",
+        "Resolving run-local config and baseline state",
+    )
+    run_config = resolve_train_run_config(
+        config=config,
+        run_paths=run_paths,
+        startup_reporter=startup_reporter,
+    )
+    _publish_initial_track_sampling_state(
+        run_config,
+        track_sampling_runtime_persistence=track_sampling_runtime_persistence,
+    )
+    validate_training_baseline_state(run_config)
+    return run_config
+
+
+def _publish_initial_track_sampling_state(
+    run_config: TrainAppConfig,
+    *,
+    track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None,
+) -> None:
+    if track_sampling_runtime_persistence is None:
+        return
+
+    publish_artifacts = track_sampling_runtime_persistence.replace_materialized_artifacts
+    if publish_artifacts is not None:
+        publish_artifacts(materialized_track_sampling_artifacts(run_config.env.track_sampling))
+
+    publish_generated_slots = track_sampling_runtime_persistence.replace_generated_x_cup_slots
+    if publish_generated_slots is not None:
+        publish_generated_slots(
+            generated_x_cup_slots_from_track_sampling(run_config.env.track_sampling)
+        )
+
+
+def _build_training_environment(
+    *,
+    run_config: TrainAppConfig,
+    run_paths: RunPaths,
+    startup_reporter: Callable[[str, str], None] | None,
+) -> _TrainingEnv:
+    _report_startup(
+        startup_reporter,
+        "startup_prepare",
+        "Building training environments",
+    )
+    return build_training_env(run_config, run_paths)
+
+
+def _build_or_resume_training_model(
+    *,
+    run_config: TrainAppConfig,
+    train_env: _TrainingEnv,
+    startup_reporter: Callable[[str, str], None] | None,
+) -> _TrainingModel:
+    _report_startup(
+        startup_reporter,
+        "startup_prepare",
+        "Building policy and optimizer",
+    )
+    model = build_training_model(
+        train_env=train_env,
+        train_config=run_config.train,
+        policy_config=run_config.policy,
+        env_config=run_config.env,
+        tensorboard_log=None,
+    )
+    if run_config.train.resume_run_dir is not None:
+        _report_startup(
+            startup_reporter,
+            "startup_resume",
+            f"Loading {run_config.train.resume_artifact} checkpoint",
+        )
+    return maybe_resume_training_model(
+        model=model,
+        train_env=train_env,
+        train_config=run_config.train,
+        policy_config=run_config.policy,
+    )
+
+
+def _build_engine_tuning_session(config: TrainAppConfig) -> _EngineTuningSession:
+    initial_state = _resume_engine_tuning_state(config)
+    return _EngineTuningSession(
+        initial_state=initial_state,
+        controller=_engine_tuning_controller(config, state=initial_state),
+    )
+
+
+def _prepare_training_outputs(
+    *,
+    run_config: TrainAppConfig,
+    run_paths: RunPaths,
+    train_env: _TrainingEnv,
+    model: _TrainingModel,
+    engine_tuning: _EngineTuningSession,
+    startup_reporter: Callable[[str, str], None] | None,
+) -> None:
+    _report_startup(
+        startup_reporter,
+        "startup_prepare",
+        "Saving frozen run config",
+    )
+    save_train_run_config(config=run_config, run_dir=run_paths.run_dir)
+    model.set_logger(
+        build_tensorboard_logger(
+            run_paths,
+            step_offset=run_config.train.tensorboard_step_offset,
+        )
+    )
+    _report_startup(
+        startup_reporter,
+        "startup_prepare",
+        "TensorBoard logger ready",
+    )
+    print_training_startup(
+        model=model,
+        train_env=train_env,
+        config=run_config,
+        run_paths=run_paths,
+    )
+    if run_config.train.save_latest_checkpoint:
+        _report_startup(
+            startup_reporter,
+            "startup_checkpoint",
+            "Writing initial latest checkpoint",
+        )
+        _save_latest_checkpoint(
+            run_config=run_config,
+            run_paths=run_paths,
+            model=model,
+            engine_tuning=engine_tuning,
+        )
+
+
+def _build_training_callbacks(
+    *,
+    env_config: EnvConfig,
+    train_app_config: TrainAppConfig,
+    train_config: TrainConfig,
+    run_paths: RunPaths,
+    engine_tuning: _EngineTuningSession,
+    track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None,
+    extra_callbacks: Sequence[object],
+) -> object:
+    return build_callbacks(
+        env_config=env_config,
+        train_app_config=train_app_config,
+        train_config=train_config,
+        run_paths=run_paths,
+        initial_engine_tuning_state=engine_tuning.initial_state,
+        engine_tuning_controller=engine_tuning.controller,
+        track_sampling_runtime_persistence=track_sampling_runtime_persistence,
+        extra_callbacks=extra_callbacks,
+    )
+
+
+def _train_and_save(
+    *,
+    run_config: TrainAppConfig,
+    run_paths: RunPaths,
+    model: _TrainingModel,
+    callbacks: object,
+    masking_required: bool,
+    engine_tuning: _EngineTuningSession,
+) -> None:
+    reset_num_timesteps = run_config.train.resume_mode != "full_model"
+    learn_total_timesteps = _learn_total_timesteps(
+        model=model,
+        configured_total_timesteps=run_config.train.total_timesteps,
+        reset_num_timesteps=reset_num_timesteps,
+    )
+    try:
+        if learn_total_timesteps > 0:
+            _learn_model(
+                model=model,
+                total_timesteps=learn_total_timesteps,
+                callback=callbacks,
+                use_masking=masking_required,
+                progress_bar=True,
+                reset_num_timesteps=reset_num_timesteps,
+            )
+    except Exception:
+        if model.num_timesteps > 0 and run_config.train.save_latest_checkpoint:
+            _save_latest_checkpoint(
+                run_config=run_config,
+                run_paths=run_paths,
+                model=model,
+                engine_tuning=engine_tuning,
+            )
+        raise
+
+    save_artifacts_atomically(
+        model=model,
+        model_path=run_paths.final_model_path,
+        policy_path=run_paths.final_policy_path,
+        engine_tuning_state=_engine_tuning_state(engine_tuning.controller),
+        policy_metadata=_policy_artifact_metadata(run_config, model),
+    )
+    if run_config.train.save_latest_checkpoint:
+        _save_latest_checkpoint(
+            run_config=run_config,
+            run_paths=run_paths,
+            model=model,
+            engine_tuning=engine_tuning,
+        )
+
+
+def _save_latest_checkpoint(
+    *,
+    run_config: TrainAppConfig,
+    run_paths: RunPaths,
+    model: _TrainingModel,
+    engine_tuning: _EngineTuningSession,
+) -> None:
+    save_latest_artifacts(
+        model,
+        run_paths,
+        engine_tuning_state=_engine_tuning_state(engine_tuning.controller),
+        policy_metadata=_policy_artifact_metadata(run_config, model),
+    )
+
+
+def _policy_artifact_metadata(
+    run_config: TrainAppConfig,
+    model: _TrainingModel,
+) -> PolicyArtifactMetadata:
+    return current_policy_artifact_metadata(
+        model,
+        lineage_step_offset=run_config.train.tensorboard_step_offset,
+    )
 
 
 def _report_startup(
