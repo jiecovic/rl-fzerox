@@ -110,10 +110,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "sector_alpha",
-        "Sector Alpha",
-        "queen",
-        6,
+        id="sector_alpha",
+        display_name="Sector Alpha",
+        cup="queen",
+        course_index=6,
         records=course_record(
             "Sector+%CE%B1",
             best_time_ms=57440,
@@ -127,10 +127,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "red_canyon",
-        "Red Canyon",
-        "queen",
-        7,
+        id="red_canyon",
+        display_name="Red Canyon",
+        cup="queen",
+        course_index=7,
         records=course_record(
             "Red+Canyon",
             best_time_ms=53255,
@@ -144,10 +144,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "devils_forest_2",
-        "Devil's Forest 2",
-        "queen",
-        8,
+        id="devils_forest_2",
+        display_name="Devil's Forest 2",
+        cup="queen",
+        course_index=8,
         records=course_record(
             "Devil%27s+Forest+2",
             best_time_ms=60118,
@@ -161,10 +161,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "mute_city_2",
-        "Mute City 2",
-        "queen",
-        9,
+        id="mute_city_2",
+        display_name="Mute City 2",
+        cup="queen",
+        course_index=9,
         records=course_record(
             "Mute+City+2",
             best_time_ms=54893,
@@ -178,10 +178,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "big_blue_2",
-        "Big Blue 2",
-        "queen",
-        10,
+        id="big_blue_2",
+        display_name="Big Blue 2",
+        cup="queen",
+        course_index=10,
         records=course_record(
             "Big+Blue+2",
             best_time_ms=47084,
@@ -195,10 +195,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "white_land",
-        "White Land",
-        "queen",
-        11,
+        id="white_land",
+        display_name="White Land",
+        cup="queen",
+        course_index=11,
         records=course_record(
             "White+Land",
             best_time_ms=69077,
@@ -212,10 +212,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "fire_field",
-        "Fire Field",
-        "king",
-        12,
+        id="fire_field",
+        display_name="Fire Field",
+        cup="king",
+        course_index=12,
         records=course_record(
             "Fire+Field",
             best_time_ms=41540,
@@ -229,10 +229,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "silence_2",
-        "Silence 2",
-        "king",
-        13,
+        id="silence_2",
+        display_name="Silence 2",
+        cup="king",
+        course_index=13,
         records=course_record(
             "Silence+2",
             best_time_ms=63435,
@@ -246,10 +246,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "sector_beta",
-        "Sector Beta",
-        "king",
-        14,
+        id="sector_beta",
+        display_name="Sector Beta",
+        cup="king",
+        course_index=14,
         records=course_record(
             "Sector+%C3%9F",
             best_time_ms=57533,
@@ -263,10 +263,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "red_canyon_2",
-        "Red Canyon 2",
-        "king",
-        15,
+        id="red_canyon_2",
+        display_name="Red Canyon 2",
+        cup="king",
+        course_index=15,
         records=course_record(
             "Red+Canyon+2",
             best_time_ms=60657,
@@ -280,10 +280,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "white_land_2",
-        "White Land 2",
-        "king",
-        16,
+        id="white_land_2",
+        display_name="White Land 2",
+        cup="king",
+        course_index=16,
         records=course_record(
             "White+Land+2",
             best_time_ms=34273,
@@ -297,10 +297,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "mute_city_3",
-        "Mute City 3",
-        "king",
-        17,
+        id="mute_city_3",
+        display_name="Mute City 3",
+        cup="king",
+        course_index=17,
         records=course_record(
             "Mute+City+3",
             best_time_ms=50551,
@@ -314,10 +314,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "rainbow_road",
-        "Rainbow Road",
-        "joker",
-        18,
+        id="rainbow_road",
+        display_name="Rainbow Road",
+        cup="joker",
+        course_index=18,
         records=course_record(
             "Rainbow+Road",
             best_time_ms=90020,
@@ -331,10 +331,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "devils_forest_3",
-        "Devil's Forest 3",
-        "joker",
-        19,
+        id="devils_forest_3",
+        display_name="Devil's Forest 3",
+        cup="joker",
+        course_index=19,
         records=course_record(
             "Devil%27s+Forest+3",
             best_time_ms=57668,
@@ -348,10 +348,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "space_plant",
-        "Space Plant",
-        "joker",
-        20,
+        id="space_plant",
+        display_name="Space Plant",
+        cup="joker",
+        course_index=20,
         records=course_record(
             "Space+Plant",
             best_time_ms=70257,
@@ -365,10 +365,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "sand_ocean_2",
-        "Sand Ocean 2",
-        "joker",
-        21,
+        id="sand_ocean_2",
+        display_name="Sand Ocean 2",
+        cup="joker",
+        course_index=21,
         records=course_record(
             "Sand+Ocean+2",
             best_time_ms=64423,
@@ -382,10 +382,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "port_town_2",
-        "Port Town 2",
-        "joker",
-        22,
+        id="port_town_2",
+        display_name="Port Town 2",
+        cup="joker",
+        course_index=22,
         records=course_record(
             "Port+Town+2",
             best_time_ms=78952,
@@ -399,10 +399,10 @@ BUILT_IN_COURSES: tuple[CourseInfo, ...] = (
         ),
     ),
     CourseInfo(
-        "big_hand",
-        "Big Hand",
-        "joker",
-        23,
+        id="big_hand",
+        display_name="Big Hand",
+        cup="joker",
+        course_index=23,
         records=course_record(
             "Big+Hand",
             best_time_ms=107083,
