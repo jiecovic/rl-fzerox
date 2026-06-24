@@ -240,11 +240,11 @@ def test_policy_runner_reloads_updated_policy_artifact(
     os.utime(policy_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference.runner.resolve_policy_artifact_path",
+        "rl_fzerox.core.training.inference.reload.resolve_policy_artifact_path",
         lambda run_dir, *, artifact: policy_path,
     )
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference.runner._load_saved_policy",
+        "rl_fzerox.core.training.inference.reload._load_saved_policy",
         lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
     )
 
@@ -533,11 +533,11 @@ def test_policy_runner_exposes_reload_error_until_success(
     os.utime(policy_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference.runner.resolve_policy_artifact_path",
+        "rl_fzerox.core.training.inference.reload.resolve_policy_artifact_path",
         lambda run_dir, *, artifact: policy_path,
     )
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference.runner._load_saved_policy",
+        "rl_fzerox.core.training.inference.reload._load_saved_policy",
         lambda path, *, run_dir=None, device="cpu", algorithm=None: (_ for _ in ()).throw(
             RuntimeError("bad checkpoint")
         ),
@@ -549,7 +549,7 @@ def test_policy_runner_exposes_reload_error_until_success(
     assert runner.last_reload_error == "bad checkpoint"
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference.runner._load_saved_policy",
+        "rl_fzerox.core.training.inference.reload._load_saved_policy",
         lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
     )
 

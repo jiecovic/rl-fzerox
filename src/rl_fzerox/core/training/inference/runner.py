@@ -1,26 +1,14 @@
 # src/rl_fzerox/core/training/inference/runner.py
 from __future__ import annotations
 
-import time
-from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol, TypeGuard
 
-import numpy as np
-from gymnasium import spaces
-
-from fzerox_emulator.arrays import ActionMask, BoolArray, ObservationFrame, PolicyState
+from fzerox_emulator.arrays import ActionMask, BoolArray, PolicyState
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.observations import ImageStateObservation, ObservationValue
+from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.policy.auxiliary_state import (
     AuxiliaryStateTargetName,
-    auxiliary_state_target_spec,
-)
-from rl_fzerox.core.policy.auxiliary_state.observations import (
-    auxiliary_state_targets_field,
-    mapping_has_auxiliary_state_targets,
 )
 from rl_fzerox.core.training.inference.activations import (
     PolicyCnnActivation,
@@ -28,28 +16,15 @@ from rl_fzerox.core.training.inference.activations import (
 )
 from rl_fzerox.core.training.inference.loader import (
     _load_saved_policy,
-    _policy_mtime_ns,
     _policy_supports_action_masks,
     _predict_policy_action,
 )
-from rl_fzerox.core.training.inference.metadata import (
-    _loaded_policy_metadata_fields,
-    _policy_metadata_mtime_ns,
-)
+from rl_fzerox.core.training.inference.metadata import _loaded_policy_metadata_fields
+from rl_fzerox.core.training.inference.observations import observation_for_policy
+from rl_fzerox.core.training.inference.recurrent import RecurrentInferenceState
+from rl_fzerox.core.training.inference.reload import PolicyHotReloader
+from rl_fzerox.core.training.inference.types import LoadedPolicy
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
-
-
-@dataclass(frozen=True)
-class LoadedPolicy:
-    """Resolved policy-only artifact metadata for watch mode."""
-
-    run_dir: Path
-    policy_path: Path
-    artifact: str
-    device: str = "cpu"
-    algorithm: str | None = None
-    num_timesteps: int | None = None
-    lineage_num_timesteps: int | None = None
 
 
 class _AuxiliaryStatePredictor(Protocol):
@@ -67,71 +42,65 @@ class PolicyRunner:
     """Small inference wrapper around one saved policy artifact."""
 
     def __init__(self, loaded_policy: LoadedPolicy, policy: object) -> None:
-        self._loaded_policy = loaded_policy
+        self._reloader = PolicyHotReloader(loaded_policy)
         self._policy = policy
         self._supports_action_masks = _policy_supports_action_masks(policy)
-        self._policy_mtime_ns = _policy_mtime_ns(loaded_policy.policy_path)
-        self._policy_metadata_mtime_ns = _policy_metadata_mtime_ns(loaded_policy.policy_path)
-        self._last_reload_monotonic = time.monotonic()
-        self._next_refresh_check_monotonic = 0.0
-        self._reload_error: str | None = None
-        self._last_reload_error: str | None = None
-        self._predict_state: PolicyState = None
-        self._episode_start = np.array([True], dtype=bool)
+        self._recurrent = RecurrentInferenceState()
 
     @property
     def label(self) -> str:
         """Return a short label for the currently loaded run."""
 
-        return self._loaded_policy.run_dir.name
+        return self._reloader.loaded_policy.run_dir.name
 
     @property
     def reload_age_seconds(self) -> float:
         """Return how long ago the current policy artifact was loaded."""
 
-        return max(0.0, time.monotonic() - self._last_reload_monotonic)
+        return self._reloader.reload_age_seconds
 
     @property
     def reload_error(self) -> str | None:
         """Return the latest hot-reload failure, if any."""
 
-        return self._reload_error
+        return self._reloader.reload_error
 
     @property
     def last_reload_error(self) -> str | None:
         """Return the last hot-reload failure, even if a later reload succeeded."""
 
-        return self._last_reload_error
+        return self._reloader.last_reload_error
 
     @property
     def checkpoint_num_timesteps(self) -> int | None:
         """Return the lineage-aware experience saved with the current checkpoint, if any."""
 
-        return self._loaded_policy.lineage_num_timesteps or self._loaded_policy.num_timesteps
+        loaded_policy = self._reloader.loaded_policy
+        return loaded_policy.lineage_num_timesteps or loaded_policy.num_timesteps
 
     @property
     def checkpoint_local_num_timesteps(self) -> int | None:
         """Return checkpoint timesteps local to the loaded run."""
 
-        return self._loaded_policy.num_timesteps
+        return self._reloader.loaded_policy.num_timesteps
 
     @property
     def checkpoint_policy_path(self) -> Path:
         """Return the concrete policy checkpoint path currently loaded."""
 
-        return self._loaded_policy.policy_path
+        return self._reloader.loaded_policy.policy_path
 
     @property
     def checkpoint_policy_mtime_ns(self) -> int:
         """Return the file mtime for the concrete policy checkpoint."""
 
-        return self._policy_mtime_ns
+        return self._reloader.policy_mtime_ns
 
     @property
     def checkpoint_policy_mtime_utc(self) -> str:
         """Return the checkpoint file mtime as an ISO-8601 UTC timestamp."""
 
-        return _mtime_utc(self._loaded_policy.policy_path)
+        return self._reloader.policy_mtime_utc
 
     @property
     def supports_action_masks(self) -> bool:
@@ -142,22 +111,18 @@ class PolicyRunner:
     def refresh(self) -> None:
         """Reload artifact metadata if the watched policy checkpoint changed on disk."""
 
-        self._maybe_reload()
+        self._refresh_policy()
 
     def refresh_if_due(self, *, interval_seconds: float) -> None:
         """Refresh at most once per interval unless the interval is zero."""
 
-        now = time.monotonic()
-        if now < self._next_refresh_check_monotonic:
-            return
-        self._next_refresh_check_monotonic = now + max(0.0, float(interval_seconds))
-        self.refresh()
+        result = self._reloader.refresh_if_due(self._policy, interval_seconds=interval_seconds)
+        self._apply_reload_result(result.policy, policy_changed=result.policy_changed)
 
     def reset(self) -> None:
         """Reset any recurrent inference state for a fresh episode."""
 
-        self._predict_state = None
-        self._episode_start = np.array([True], dtype=bool)
+        self._recurrent.reset()
 
     def predict(
         self,
@@ -170,18 +135,17 @@ class PolicyRunner:
         """Predict one action for the current observation."""
 
         if refresh:
-            self._maybe_reload()
-        policy_observation = self._observation_for_policy(observation)
+            self._refresh_policy()
+        policy_observation = observation_for_policy(self._policy, observation)
         action, next_state = _predict_policy_action(
             self._policy,
             policy_observation,
-            state=self._predict_state,
-            episode_start=self._episode_start,
+            state=self._recurrent.predict_state,
+            episode_start=self._recurrent.episode_start,
             deterministic=deterministic,
             action_masks=action_masks if self._supports_action_masks else None,
         )
-        self._predict_state = next_state
-        self._episode_start = np.array([False], dtype=bool)
+        self._recurrent.advance(next_state)
         return action
 
     def cnn_activations(
@@ -190,7 +154,7 @@ class PolicyRunner:
     ) -> tuple[PolicyCnnActivation, ...]:
         """Return watch/debug CNN activations for the current policy."""
 
-        policy_observation = self._observation_for_policy(observation)
+        policy_observation = observation_for_policy(self._policy, observation)
         return collect_policy_cnn_activations(self._policy, policy_observation)
 
     def auxiliary_state_predictions(
@@ -205,87 +169,22 @@ class PolicyRunner:
         if predictor is None:
             return None
         return predictor.predict_auxiliary_state(
-            self._observation_for_policy(observation),
-            state=self._predict_state,
-            episode_start=self._episode_start,
+            observation_for_policy(self._policy, observation),
+            state=self._recurrent.predict_state,
+            episode_start=self._recurrent.episode_start,
             target_names=target_names,
         )
 
-    def _observation_for_policy(self, observation: ObservationValue) -> ObservationValue:
-        observation_space = _policy_observation_space(self._policy)
-        if isinstance(observation_space, spaces.Box):
-            return _adapt_box_observation_for_policy(observation, observation_space)
-        if not isinstance(observation_space, spaces.Dict):
-            return observation
-        dict_space = observation_space
-        observation = _adapt_dict_observation_for_policy(observation, dict_space)
-        field_name = auxiliary_state_targets_field()
-        dict_fields = getattr(dict_space, "spaces", {})
-        if not isinstance(dict_fields, Mapping) or field_name not in dict_fields:
-            return observation
-        if not isinstance(observation, dict):
-            raise TypeError("Auxiliary-state policy expects dict observations")
-        if mapping_has_auxiliary_state_targets(observation):
-            return observation
+    def _refresh_policy(self) -> None:
+        result = self._reloader.refresh(self._policy)
+        self._apply_reload_result(result.policy, policy_changed=result.policy_changed)
 
-        zeros = np.zeros(auxiliary_state_target_spec().count, dtype=np.float32)
-        augmented_observation: ImageStateObservation = {
-            "image": observation["image"],
-            "state": observation["state"],
-            "auxiliary_state_targets": zeros,
-        }
-        return augmented_observation
-
-    def _maybe_reload(self) -> None:
-        try:
-            policy_path = resolve_policy_artifact_path(
-                self._loaded_policy.run_dir,
-                artifact=self._loaded_policy.artifact,
-            )
-        except FileNotFoundError:
+    def _apply_reload_result(self, policy: object, *, policy_changed: bool) -> None:
+        if not policy_changed:
             return
-
-        policy_mtime_ns = _policy_mtime_ns(policy_path)
-        policy_changed = (
-            policy_path != self._loaded_policy.policy_path
-            or policy_mtime_ns != self._policy_mtime_ns
-        )
-        policy_metadata_mtime_ns = _policy_metadata_mtime_ns(policy_path)
-        metadata_changed = (
-            policy_path != self._loaded_policy.policy_path
-            or policy_metadata_mtime_ns != self._policy_metadata_mtime_ns
-        )
-        if not policy_changed and not metadata_changed:
-            return
-
-        if policy_changed:
-            try:
-                policy = _load_saved_policy(
-                    policy_path,
-                    run_dir=self._loaded_policy.run_dir,
-                    device=self._loaded_policy.device,
-                    algorithm=self._loaded_policy.algorithm,
-                )
-            except Exception as exc:
-                self._reload_error = str(exc)
-                self._last_reload_error = self._reload_error
-                return
-            self._policy = policy
-            self._supports_action_masks = _policy_supports_action_masks(policy)
-            self._policy_mtime_ns = policy_mtime_ns
-            self._last_reload_monotonic = time.monotonic()
-            self._reload_error = None
-            self.reset()
-
-        self._loaded_policy = LoadedPolicy(
-            run_dir=self._loaded_policy.run_dir,
-            policy_path=policy_path,
-            artifact=self._loaded_policy.artifact,
-            device=self._loaded_policy.device,
-            algorithm=self._loaded_policy.algorithm,
-            **_loaded_policy_metadata_fields(policy_path=policy_path),
-        )
-        self._policy_metadata_mtime_ns = policy_metadata_mtime_ns
+        self._policy = policy
+        self._supports_action_masks = _policy_supports_action_masks(policy)
+        self.reset()
 
 
 def load_policy_runner(
@@ -326,17 +225,6 @@ __all__ = [
 ]
 
 
-def _policy_observation_space(policy: object) -> spaces.Space | None:
-    observation_space = getattr(policy, "observation_space", None)
-    if isinstance(observation_space, spaces.Space):
-        return observation_space
-    inner_policy = getattr(policy, "policy", None)
-    inner_observation_space = getattr(inner_policy, "observation_space", None)
-    if isinstance(inner_observation_space, spaces.Space):
-        return inner_observation_space
-    return None
-
-
 def _policy_auxiliary_state_predictor(policy: object) -> _AuxiliaryStatePredictor | None:
     if _has_auxiliary_state_predictor(policy):
         return policy
@@ -348,63 +236,3 @@ def _policy_auxiliary_state_predictor(policy: object) -> _AuxiliaryStatePredicto
 
 def _has_auxiliary_state_predictor(policy: object) -> TypeGuard[_AuxiliaryStatePredictor]:
     return callable(getattr(policy, "predict_auxiliary_state", None))
-
-
-def _adapt_box_observation_for_policy(
-    observation: ObservationValue,
-    observation_space: spaces.Box,
-) -> ObservationValue:
-    if isinstance(observation, dict):
-        return observation
-    return _adapt_image_array_for_space(observation, observation_space)
-
-
-def _adapt_dict_observation_for_policy(
-    observation: ObservationValue,
-    observation_space: spaces.Dict,
-) -> ObservationValue:
-    if not isinstance(observation, dict):
-        return observation
-
-    image_space = observation_space.spaces.get("image")
-    if not isinstance(image_space, spaces.Box):
-        return observation
-
-    image = observation["image"]
-    adapted_image = _adapt_image_array_for_space(image, image_space)
-    if adapted_image is image:
-        return observation
-    adapted_observation: ImageStateObservation = {
-        "image": adapted_image,
-        "state": observation["state"],
-    }
-    auxiliary_state_targets = observation.get("auxiliary_state_targets")
-    if isinstance(auxiliary_state_targets, np.ndarray):
-        adapted_observation["auxiliary_state_targets"] = auxiliary_state_targets
-    return adapted_observation
-
-
-def _adapt_image_array_for_space(
-    image: ObservationFrame,
-    observation_space: spaces.Box,
-) -> ObservationFrame:
-    """Adapt channels-last image observations to channels-first policy spaces."""
-
-    expected_shape = tuple(int(value) for value in observation_space.shape)
-    if image.shape == expected_shape:
-        return image
-    if len(expected_shape) != 3 or image.ndim != 3:
-        return image
-
-    expected_channels, expected_height, expected_width = expected_shape
-    if image.shape == (expected_height, expected_width, expected_channels):
-        return np.transpose(image, (2, 0, 1))
-    return image
-
-
-def _mtime_utc(path: Path) -> str:
-    return (
-        datetime.fromtimestamp(path.stat().st_mtime, UTC)
-        .isoformat(timespec="seconds")
-        .replace("+00:00", "Z")
-    )
