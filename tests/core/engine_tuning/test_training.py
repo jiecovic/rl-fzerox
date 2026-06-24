@@ -288,7 +288,11 @@ def test_bandit_finish_rate_sampling_uses_beta_bernoulli_scale() -> None:
     assert estimates[44].probability > estimates[84].probability
     assert estimates[44].mean_score == pytest.approx(0.8)
     assert estimates[84].mean_score == pytest.approx(0.2)
-    assert 0.0 < estimates[44].sampled_score < 0.25
+    assert 0.0 < estimates[44].uncertainty_score < 0.25
+    choice = snapshot.choose(context, selection="greedy", seed=123)
+    assert choice is not None
+    assert choice.sampled_score == pytest.approx(choice.mean_score)
+    assert choice.uncertainty_score == pytest.approx(estimates[44].uncertainty_score)
 
 
 def test_bandit_safe_finish_time_requires_finish_rate_before_time() -> None:

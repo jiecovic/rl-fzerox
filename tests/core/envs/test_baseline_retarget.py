@@ -100,6 +100,7 @@ def _selected_track(*, mode: str, alt_baseline_id: str | None) -> SelectedTrack:
         engine_tuning_vehicle_id=None,
         engine_tuning_sampled_score=None,
         engine_tuning_mean_score=None,
+        engine_tuning_uncertainty_score=None,
         engine_tuning_finish_count=None,
         source_vehicle="blue_falcon",
         source_course_index=0,

@@ -358,6 +358,9 @@ def _selected_track_from_entry(
         ),
         engine_tuning_sampled_score=None if engine_choice is None else engine_choice.sampled_score,
         engine_tuning_mean_score=None if engine_choice is None else engine_choice.mean_score,
+        engine_tuning_uncertainty_score=(
+            None if engine_choice is None else engine_choice.uncertainty_score
+        ),
         engine_tuning_finish_count=None if engine_choice is None else engine_choice.finish_count,
         source_vehicle=entry.source_vehicle,
         source_course_index=entry.source_course_index,

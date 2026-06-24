@@ -22,7 +22,7 @@ class EngineTuningResetCandidate:
     engine_setting_raw_value: int
     probability: float
     mean_score: float
-    sampled_score: float
+    uncertainty_score: float
     score_count: int
     finish_count: int
     estimated_finish_time_ms: int
@@ -31,11 +31,14 @@ class EngineTuningResetCandidate:
     def choice(self, context: EngineTuningContext) -> EngineTuningChoice:
         """Return the env-facing choice diagnostics for this candidate."""
 
+        # Reset workers sample from cached probabilities, not from the tuner
+        # posterior, so no fresh posterior score sample exists here.
         return EngineTuningChoice(
             context=context,
             engine_setting_raw_value=self.engine_setting_raw_value,
-            sampled_score=self.sampled_score,
+            sampled_score=self.mean_score,
             mean_score=self.mean_score,
+            uncertainty_score=self.uncertainty_score,
             score_count=self.score_count,
             finish_count=self.finish_count,
             estimated_finish_time_ms=self.estimated_finish_time_ms,

@@ -233,6 +233,7 @@ class MlpEnsembleEngineTuner:
             engine_setting_raw_value=engine_raw,
             sampled_score=estimate.mean_score if sampled_score is None else sampled_score,
             mean_score=estimate.mean_score,
+            uncertainty_score=estimate.uncertainty_score,
             score_count=estimate.exact_finish_count,
             finish_count=estimate.exact_finish_count,
             estimated_finish_time_ms=finish_time_ms_from_score(estimate.mean_score),

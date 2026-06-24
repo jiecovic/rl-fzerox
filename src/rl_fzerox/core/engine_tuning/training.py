@@ -120,7 +120,7 @@ class EngineTuningTrainingController:
                             engine_setting_raw_value=estimate.engine_setting_raw_value,
                             probability=estimate.probability,
                             mean_score=estimate.mean_score,
-                            sampled_score=estimate.uncertainty_score,
+                            uncertainty_score=estimate.uncertainty_score,
                             score_count=estimate.score_count,
                             finish_count=estimate.finish_count,
                             estimated_finish_time_ms=estimate.estimated_finish_time_ms,

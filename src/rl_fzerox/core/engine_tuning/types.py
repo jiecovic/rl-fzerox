@@ -142,6 +142,7 @@ class EngineTuningChoice:
     engine_setting_raw_value: int
     sampled_score: float
     mean_score: float
+    uncertainty_score: float | None
     finish_count: int
     estimated_finish_time_ms: int
     best_finish_time_ms: int | None

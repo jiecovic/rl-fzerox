@@ -69,6 +69,7 @@ class SelectedTrack:
     engine_tuning_vehicle_id: str | None
     engine_tuning_sampled_score: float | None
     engine_tuning_mean_score: float | None
+    engine_tuning_uncertainty_score: float | None
     engine_tuning_finish_count: int | None
     source_vehicle: str | None
     source_course_index: int | None
@@ -137,6 +138,7 @@ class SelectedTrack:
             "engine_tuning_vehicle_id": self.engine_tuning_vehicle_id,
             "engine_tuning_sampled_score": self.engine_tuning_sampled_score,
             "engine_tuning_mean_score": self.engine_tuning_mean_score,
+            "engine_tuning_uncertainty_score": self.engine_tuning_uncertainty_score,
             "engine_tuning_finish_count": self.engine_tuning_finish_count,
             "track_sampling_cycle_position": self.cycle_position,
             "track_sampling_deficit_lane": self.deficit_budget_lane,

@@ -211,7 +211,7 @@ def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
                         engine_setting_raw_value=70,
                         probability=1.0,
                         mean_score=-80.0,
-                        sampled_score=-80.0,
+                        uncertainty_score=3.0,
                         score_count=2,
                         finish_count=2,
                         estimated_finish_time_ms=80_000,
@@ -230,6 +230,9 @@ def test_track_reset_selector_applies_adaptive_engine_choice() -> None:
     assert selected.engine_tuning_context_key == "mute_city|blue_falcon"
     assert selected.engine_tuning_course_key == "mute_city"
     assert selected.engine_tuning_vehicle_id == "blue_falcon"
+    assert selected.engine_tuning_sampled_score == -80.0
+    assert selected.engine_tuning_mean_score == -80.0
+    assert selected.info()["engine_tuning_uncertainty_score"] == 3.0
 
 
 def test_fixed_env_track_sampling_pins_course_by_env_index() -> None:
