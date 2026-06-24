@@ -61,6 +61,7 @@ def course_vehicle_cache_payload(
         "mode": mode,
         "gp_difficulty": gp_difficulty,
         "renderer": context.renderer,
+        **runtime_fingerprint_payload(context),
         "course_index": course_index,
         "vehicle": vehicle_id,
         "vehicle_character_index": vehicle.character_index,
@@ -98,6 +99,7 @@ def x_cup_cache_payload(
         "mode": X_CUP_COURSE.race_mode,
         "gp_difficulty": gp_difficulty,
         "renderer": context.renderer,
+        **runtime_fingerprint_payload(context),
         "course_index": X_CUP_COURSE.course_index,
         "x_cup_seed": seed,
         "x_cup_course_hash": course_hash,
@@ -120,6 +122,14 @@ def generic_mode_cache_payload(
         "materializer_mode": f"generic_mode_seed_{mode}",
         "mode": mode,
         "renderer": context.renderer,
+        **runtime_fingerprint_payload(context),
+    }
+
+
+def runtime_fingerprint_payload(context: BaselineMaterializerContext) -> dict[str, str]:
+    return {
+        "core_sha256": sha256_file(context.core_path),
+        "rom_sha256": sha256_file(context.rom_path),
     }
 
 

@@ -97,6 +97,73 @@ def test_materialize_train_run_config_reuses_baseline_materializer_cache(
     assert len(list(cache_root.rglob("*.state"))) == 2
 
 
+def test_materialize_train_run_config_keys_cache_by_runtime_fingerprints(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    cache_root = tmp_path / "cache"
+    core_path.write_bytes(b"core-v1")
+    rom_path.write_bytes(b"rom-v1")
+    capture = _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(camera_setting="close_behind"),
+        track=TrackConfig(
+            id="mute_city",
+            course_index=0,
+            mode="time_attack",
+            vehicle="blue_falcon",
+            engine_setting_raw_value=64,
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    first_run = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(first_run)
+    first_materialized = materialize_train_run_config(
+        config,
+        run_paths=first_run,
+        baseline_cache_root=cache_root,
+    )
+    core_path.write_bytes(b"core-v2")
+    rom_path.write_bytes(b"rom-v2")
+    second_run = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(second_run)
+    second_materialized = materialize_train_run_config(
+        config,
+        run_paths=second_run,
+        baseline_cache_root=cache_root,
+    )
+
+    assert first_materialized.emulator.baseline_state_path is not None
+    assert second_materialized.emulator.baseline_state_path is not None
+    first_metadata = json.loads(
+        first_materialized.emulator.baseline_state_path.with_suffix(".json").read_text(
+            encoding="utf-8"
+        )
+    )
+    second_metadata = json.loads(
+        second_materialized.emulator.baseline_state_path.with_suffix(".json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert first_metadata["cache_key"] != second_metadata["cache_key"]
+    assert first_metadata["core_sha256"] != second_metadata["core_sha256"]
+    assert first_metadata["rom_sha256"] != second_metadata["rom_sha256"]
+    assert capture.generic_modes == ["time_attack", "time_attack"]
+    assert len(list(cache_root.rglob("*.state"))) == 4
+
+
 def test_materialize_train_run_config_regenerates_stale_run_local_baseline_for_in_place_continue(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
