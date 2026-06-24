@@ -4,7 +4,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
-from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
+from rl_fzerox.core.engine_tuning.training import (
+    EngineTuningTrainingController,
+    EngineTuningTrainingSession,
+)
 from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     TrainAppConfig,
@@ -47,7 +50,6 @@ def build_callbacks(
     )
     from rl_fzerox.core.training.session.callbacks.sb3.engine_tuning import (
         EngineTuningCallback,
-        engine_tuning_contexts,
     )
     from rl_fzerox.core.training.session.callbacks.sb3.rollout_logging import (
         InfoLoggingCallback,
@@ -73,8 +75,10 @@ def build_callbacks(
     if engine_tuning_controller is not None and env_config is not None:
         callbacks.append(
             EngineTuningCallback(
-                controller=engine_tuning_controller,
-                contexts=engine_tuning_contexts(env_config),
+                session=EngineTuningTrainingSession.from_track_sampling(
+                    controller=engine_tuning_controller,
+                    track_sampling=env_config.track_sampling,
+                ),
             )
         )
     callbacks.extend(

@@ -6,10 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fzerox_emulator import Emulator
-from rl_fzerox.core.engine_tuning import EngineTuningContext
+from rl_fzerox.core.engine_tuning.contexts import engine_tuning_contexts_for_track_sampling
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
@@ -117,7 +116,7 @@ class WatchEngineTuningStateCache:
 
         if not track_sampling.engine_tuning.enabled:
             return
-        contexts = _watch_engine_tuning_contexts(track_sampling)
+        contexts = engine_tuning_contexts_for_track_sampling(track_sampling)
         policy_path = _watch_policy_artifact_path(self.config)
         signature = _engine_tuning_signature(
             policy_path=policy_path,
@@ -178,13 +177,3 @@ def _file_identity(path: Path) -> tuple[int | None, int | None]:
     except OSError:
         return None, None
     return stat_result.st_mtime_ns, stat_result.st_size
-
-
-def _watch_engine_tuning_contexts(
-    track_sampling: TrackSamplingConfig,
-) -> tuple[EngineTuningContext, ...]:
-    contexts: dict[str, EngineTuningContext] = {}
-    for entry in track_sampling.entries:
-        context = engine_tuning_context_for_entry(entry)
-        contexts.setdefault(context.key, context)
-    return tuple(contexts[key] for key in sorted(contexts))

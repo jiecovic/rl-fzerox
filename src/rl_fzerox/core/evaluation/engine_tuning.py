@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rl_fzerox.core.engine_tuning.contexts import engine_tuning_contexts_for_track_sampling
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
-from rl_fzerox.core.envs.engine.reset.track_sampling import engine_tuning_context_for_entry
 from rl_fzerox.core.evaluation.env_control import (
     set_engine_tuning_sampler,
     set_engine_tuning_selection,
@@ -27,7 +27,7 @@ def configure_evaluation_engine_tuning(
     if not track_sampling.enabled or not track_sampling.engine_tuning.enabled:
         return
 
-    contexts = tuple(engine_tuning_context_for_entry(entry) for entry in track_sampling.entries)
+    contexts = engine_tuning_contexts_for_track_sampling(track_sampling)
     if not contexts:
         return
 

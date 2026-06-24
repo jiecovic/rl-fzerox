@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from zlib import crc32
 
 from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
+from rl_fzerox.core.engine_tuning.contexts import engine_tuning_contexts_for_track_sampling
 from rl_fzerox.core.engine_tuning.sampling import (
     EngineTuningResetCandidate,
     EngineTuningResetContext,
@@ -22,9 +23,54 @@ from rl_fzerox.core.engine_tuning.tuner import (
     EngineTuningEpisodeOutcome,
     OrderedEngineTuner,
 )
-from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
+from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig, TrackSamplingConfig
 
 RESET_SAMPLER_DISTRIBUTION_DRAWS = 64
+
+
+@dataclass(frozen=True, slots=True)
+class EngineTuningRolloutUpdate:
+    sampler_snapshot: EngineTuningResetSampler | None
+    log_values: dict[str, float]
+
+
+@dataclass(slots=True)
+class EngineTuningTrainingSession:
+    """Coordinate training-time tuner updates independently of SB3 callbacks."""
+
+    controller: EngineTuningTrainingController
+    contexts: tuple[EngineTuningContext, ...]
+    _sampler_dirty: bool = field(default=False, init=False, repr=False)
+
+    @classmethod
+    def from_track_sampling(
+        cls,
+        *,
+        controller: EngineTuningTrainingController,
+        track_sampling: TrackSamplingConfig,
+    ) -> EngineTuningTrainingSession:
+        return cls(
+            controller=controller,
+            contexts=engine_tuning_contexts_for_track_sampling(track_sampling),
+        )
+
+    def initial_sampler_snapshot(self) -> EngineTuningResetSampler:
+        return self.controller.reset_sampler_snapshot(self.contexts)
+
+    def record_episodes(self, episodes: Sequence[Mapping[str, object]]) -> None:
+        if self.controller.record_episodes(episodes):
+            self._sampler_dirty = True
+
+    def finish_rollout(self) -> EngineTuningRolloutUpdate:
+        rollout_changed = self.controller.record_rollout_episodes()
+        sampler_snapshot = None
+        if self._sampler_dirty or rollout_changed:
+            sampler_snapshot = self.controller.reset_sampler_snapshot(self.contexts)
+            self._sampler_dirty = False
+        return EngineTuningRolloutUpdate(
+            sampler_snapshot=sampler_snapshot,
+            log_values=self.controller.log_values(),
+        )
 
 
 @dataclass(slots=True)

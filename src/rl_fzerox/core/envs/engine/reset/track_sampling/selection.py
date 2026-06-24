@@ -8,13 +8,12 @@ from math import gcd
 from random import Random, choice, random
 from typing import TypeVar
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.engine_tuning import (
     EngineTuningChoice,
-    EngineTuningContext,
     EngineTuningResetSampler,
     EngineTuningSelectionMode,
 )
+from rl_fzerox.core.engine_tuning.contexts import engine_tuning_context_for_entry
 from rl_fzerox.core.envs.engine.reset.track_sampling.models import (
     TRACK_SAMPLING_LIMITS,
     SelectedTrack,
@@ -458,26 +457,6 @@ def _engine_tuning_choice(
         engine_tuning_context_for_entry(entry),
         selection=selection,
         seed=seed,
-    )
-
-
-def engine_tuning_context_for_entry(entry: TrackSamplingEntryConfig) -> EngineTuningContext:
-    """Return the adaptive engine-tuning context for one materialized reset entry."""
-
-    return EngineTuningContext(
-        course_key=_engine_tuning_course_key(entry),
-        vehicle_id=entry.vehicle or entry.source_vehicle or "unknown",
-    )
-
-
-def _engine_tuning_course_key(entry: TrackSamplingEntryConfig) -> str:
-    if entry.generated_course_kind == X_CUP_COURSE.generated_kind:
-        return "x_cup"
-    return (
-        entry.runtime_course_key
-        or entry.course_id
-        or entry.course_ref
-        or (f"course_index:{entry.course_index}" if entry.course_index is not None else entry.id)
     )
 
 

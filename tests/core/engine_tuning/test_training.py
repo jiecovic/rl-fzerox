@@ -5,12 +5,19 @@ from typing import Literal
 
 import pytest
 
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.engine_tuning import EngineTuningContext
+from rl_fzerox.core.engine_tuning.contexts import engine_tuning_contexts_for_track_sampling
 from rl_fzerox.core.engine_tuning.training import (
     EngineTuningTrainingController,
+    EngineTuningTrainingSession,
     engine_tuning_outcome_from_episode,
 )
-from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    AdaptiveEngineTuningConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+)
 
 DEFAULT_BANDIT_BUCKETS = (0, 13, 26, 38, 51, 64, 77, 90, 102, 115, 128)
 
@@ -73,6 +80,74 @@ def test_bandit_reset_sampler_uses_best_observed_bucket_as_greedy() -> None:
     snapshot = controller.reset_sampler_snapshot((context,))
 
     assert snapshot.contexts[0].greedy_engine_setting_raw_value == 26
+
+
+def test_training_session_publishes_sampler_only_after_dirty_rollout() -> None:
+    context = EngineTuningContext(course_key="mute_city", vehicle_id="blue_falcon")
+    controller = EngineTuningTrainingController(
+        AdaptiveEngineTuningConfig(
+            enabled=True,
+            backend="bandit",
+            min_raw_value=0,
+            max_raw_value=128,
+            bucket_raw_values=DEFAULT_BANDIT_BUCKETS,
+            uniform_exploration=0.0,
+        )
+    )
+    session = EngineTuningTrainingSession(controller=controller, contexts=(context,))
+
+    assert session.finish_rollout().sampler_snapshot is None
+
+    session.record_episodes((_successful_engine_episode(engine_raw=26, race_time_ms=80_000),))
+    update = session.finish_rollout()
+
+    assert update.sampler_snapshot is not None
+    assert update.sampler_snapshot.contexts[0].greedy_engine_setting_raw_value == 26
+    assert update.log_values == {}
+    assert session.finish_rollout().sampler_snapshot is None
+
+
+def test_engine_tuning_contexts_from_track_sampling_are_unique_and_sorted() -> None:
+    contexts = engine_tuning_contexts_for_track_sampling(
+        TrackSamplingConfig(
+            enabled=True,
+            entries=(
+                TrackSamplingEntryConfig(
+                    id="second",
+                    course_id="silence",
+                    vehicle="golden_fox",
+                ),
+                TrackSamplingEntryConfig(
+                    id="first",
+                    course_id="mute_city",
+                    vehicle="blue_falcon",
+                ),
+                TrackSamplingEntryConfig(
+                    id="duplicate",
+                    course_id="mute_city",
+                    vehicle="blue_falcon",
+                ),
+                TrackSamplingEntryConfig(
+                    id="generated",
+                    course_id="x_cup_abcd1234",
+                    mode=X_CUP_COURSE.race_mode,
+                    course_index=X_CUP_COURSE.course_index,
+                    vehicle="blue_falcon",
+                    generated_course_kind=X_CUP_COURSE.generated_kind,
+                    generated_course_seed=1234,
+                    generated_course_hash="abcd1234",
+                    generated_course_slot=0,
+                    generated_course_generation=1,
+                ),
+            ),
+        )
+    )
+
+    assert [context.key for context in contexts] == [
+        "mute_city|blue_falcon",
+        "silence|golden_fox",
+        "x_cup|blue_falcon",
+    ]
 
 
 def test_bandit_records_failed_episode_returns_as_diagnostics() -> None:
