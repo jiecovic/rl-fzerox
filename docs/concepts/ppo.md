@@ -20,7 +20,7 @@ L_\mathrm{policy} =
 -\mathbb{E}\left[
 \min\left(
 r_t(\theta) A_t,\;
-\operatorname{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) A_t
+\mathrm{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) A_t
 \right)
 \right]
 ```

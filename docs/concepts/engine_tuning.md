@@ -178,7 +178,7 @@ A_\mathrm{safe} =
 ```
 
 ```math
-a^* = \operatorname*{arg\,max}_{a \in A_\mathrm{safe}} \tilde{s}_a
+a^* = \mathrm{argmax}_{a \in A_\mathrm{safe}} \tilde{s}_a
 ```
 
 where `tau` is `safe_finish_rate_threshold`.
