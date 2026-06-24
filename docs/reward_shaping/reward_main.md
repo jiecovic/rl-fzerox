@@ -1,46 +1,54 @@
 # Reward Main
 
-`reward_main` is the current canonical reward profile.
+The reward uses F-Zero X's **race progress from RAM**. The game advances that
+value along the **course spline/centerline**.
 
-It is a spline-frontier reward: the agent receives progress only when it moves
-the episode frontier forward into new distance buckets. This keeps reward tied
-to newly covered track progress instead of repeatedly paying the same local
-position.
+The reward tracker turns that RAM progress into **one-way progress buckets**:
 
-## Main Terms
+- each bucket can pay at most once per episode
+- driving backward or oscillating over the same section does not pay again
+- progress can be suspended while the machine is too far outside track bounds
 
-The profile combines:
+Main signal: **gated progress reward**.
 
-- frontier progress bucket rewards
-- optional time, reverse, and slow-speed penalties
-- lap completion and race-position bonuses
-- KO star rewards for GP races
-- progress multipliers for energy refill, dirt, and ice surfaces
-- boost request and boost-pad event rewards
-- lean, air-brake, grounded-pitch, impact, and energy-change shaping
-- airborne landing reward support
-- failure and truncation penalties
-- optional per-step reward clipping
+For a fixed course, the total available progress reward is mostly fixed: finish
+the same course and you cross the same progress buckets. PPO still prefers
+getting that reward earlier because **discounting** makes future rewards worth
+less than immediate rewards.
 
-Energy gain reward is proportional to energy gained in the step. Energy-refill
-progress rewards remain progress-gated so refill behavior cannot be farmed by
-going backward over the same local region.
+`time_penalty_per_frame` can add extra **time pressure**. Use it carefully: if
+it is too strong, the policy can learn to avoid long episodes instead of
+learning to finish the race.
 
-Impact penalty is frame-based and covers native impact/recoil signals exposed by
-the emulator summary. It replaces the older separate damage streak/ramp style.
+## Speed Multiplier
 
-## Configuration
+The **speed multiplier curve** can scale progress reward by current speed. Keep
+it moderate: if it dominates, the policy may chase speed instead of clean course
+progress.
 
-The public runtime schema is `RewardConfig` in
-`src/rl_fzerox/core/runtime_spec/schema/env.py`. Manager-owned run specs project
-their reward section into that schema before launch.
+## Other Shaping Knobs
 
-Course-specific overrides are available through `reward.course_overrides`. Each
-override inherits the base `reward_main` weights and replaces only the fields it
-sets.
+The run manager exposes additional reward knobs around the main progress signal,
+including:
 
-## Ownership
+- speed and race-position progress multipliers
+- per-frame time penalty
+- lap completion and finish-position bonuses
+- off-track recovery reward
+- dirt, ice, and energy-refill progress multipliers
+- energy gain and energy loss terms
+- manual boost request reward
+- boost-pad reward
+- air-brake, spin, and lean request penalties
+- impact and grounded-pitch penalties
+- airborne landing reward
+- KO star reward in GP races
+- failure, truncation, and per-step clipping
 
-Rust/native stepping provides the frame summary and telemetry used by reward
-calculation. Python owns the reward terms, episode-local frontier tracking, and
-the final Gym reward/info breakdown.
+These are **secondary shaping terms**. They should help the policy learn useful
+driving behavior without replacing progress as the core objective.
+
+## Overrides
+
+**Course-specific reward overrides** can adjust individual fields for tracks
+that need different shaping. Unset fields inherit the base `reward_main` values.

@@ -1,8 +1,7 @@
 # Generated X-Cup Courses
 
-X-Cup is not a fixed list of tracks. The game generates a course layout from RNG
-state after selecting X-Cup. The project models those generated layouts as
-runtime course slots.
+X-Cup generates a course layout from RNG state after selecting X-Cup. The
+project models those generated layouts as runtime course slots.
 
 ## Slots
 
@@ -49,9 +48,8 @@ replaced after enough episodes and sufficient completion. The current defaults
 are a completion threshold of 0.9, at least 24 episodes, and an EMA alpha of
 0.3 for completion tracking.
 
-Rotation does not mean "X-Cup is six normal courses". It means the training pool
-contains generated-course slots. A slot behaves like one course target for
-sampling, stats, and engine tuning.
+Rotation samples from generated-course slots in the training pool. Each slot is
+treated as a course target for sampling, statistics, and engine tuning.
 
 ## Persistence
 
@@ -64,7 +62,6 @@ runs. Mutable generated-course state belongs to the manager DB.
 
 ## Evaluation
 
-Evaluation presets should treat X-Cup as a generated-course benchmark only when
-the generated-course lifecycle is part of the benchmark. For ordinary fixed
-course evaluation, X-Cup should stay out of the fixed 24-course set.
-
+Evaluation presets can treat X-Cup as a generated-course benchmark when the
+generated-course lifecycle is part of the benchmark. Ordinary fixed-course
+evaluation uses the 24 built-in courses.

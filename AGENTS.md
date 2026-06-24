@@ -136,6 +136,35 @@ extending, and reviewing.
 - Add brief docstrings or comments where they materially reduce reader effort.
 - For complex subsystems, document the core concepts, data flow, and extension
   points close to the code.
+- Do not use a broad `concepts/` directory as a catch-all. Separate docs by
+  reader need:
+  - user docs for basic operation and common workflows
+  - theory docs for modeling choices and tradeoffs
+  - architecture docs for implementation ownership and data flow
+  - development docs for tooling and contribution workflow
+- Keep user docs short and practical. Start with what the user wants to do, then
+  list the necessary commands, settings, or UI steps. Avoid background prose.
+- Do not try to fully document every subsystem in one pass. Establish the
+  minimal map first, then expand one topic at a time when it is actively being
+  clarified.
+- Keep theory docs separate from architecture. Theory explains why a design
+  exists; architecture explains where state lives and how code paths connect.
+- Start from F-Zero X language before introducing project terms. Use concrete
+  examples like "Mute City, GP Race, Master, Blue Falcon, ENG 50" before naming
+  internal objects or schemas.
+- Do not open docs with internal nouns such as "course target",
+  "materialization", "runtime projection", "backend", or "source of truth".
+- Prefer tables, short rules, and examples over long narrative sections.
+  Equations and schema fields belong only where they directly clarify a decision
+  the reader must make.
+- Avoid negative framing in final docs. Define what a concept is before
+  mentioning what it is not.
+- Do not carry conversational corrections, review back-and-forth, or planning
+  residue into documentation prose.
+- Avoid main-flow phrasing that argues against a misunderstanding.
+- Use short `Note:` or `Non-goals:` sections only when an exclusion materially
+  helps users understand an API boundary or workflow.
+- Keep documentation standalone, neutral, and implementation-focused.
 
 ### Copyrighted Runtime Assets
 

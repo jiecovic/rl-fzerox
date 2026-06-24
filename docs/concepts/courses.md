@@ -1,63 +1,105 @@
-# Courses and Race Modes
+# Training Targets and Race Modes
 
-This project treats a "course" as a reset target for training, evaluation, and
-watch playback. A target is more than a visible track name: it also includes the
-race mode, GP difficulty when applicable, vehicle, engine setting, and the
-run-local baseline savestate used to enter the race.
+In the run manager you choose the **training targets** for a run. A target is
+one concrete F-Zero X race start:
 
-## Fixed Courses
+- course
+- race mode
+- GP difficulty, if GP Race is used
+- selected ship/vehicle
+- engine setting
 
-The fixed F-Zero X course pool is the set of built-in courses exposed by the run
-manager. In the UI these are grouped by cup:
+For each target, the run manager creates or reuses a baseline savestate. That
+file lets the emulator reset directly back to the exact race start.
+
+## Built-In Courses
+
+The normal F-Zero X courses are built into the game. In the UI they are grouped
+by cup:
 
 - Jack Cup
 - Queen Cup
 - King Cup
 - Joker Cup
 
-The selector currently treats those 24 fixed courses as ordinary reusable
-training/evaluation targets. X-Cup is handled separately because the game
-generates the course layout at runtime.
+For training, evaluation, and watch playback, you can select any subset of those
+24 tracks.
+
+## X-Cup
+
+X-Cup can also be part of the training targets. It behaves differently from the
+built-in courses because F-Zero X generates the track layout at runtime.
+
+See [Generated X-Cup Courses](x_cup.md) for the generated-course details.
 
 ## Race Modes
 
-`gp_race` is the normal Grand Prix race mode. It has opponents, a vehicle, and
-one GP difficulty. In managed evaluations the preset should choose exactly one
-GP difficulty for a GP target. A multi-difficulty benchmark would be a different
-benchmark definition, not one ambiguous preset.
+`gp_race` is the normal Grand Prix mode: opponents, one selected ship/vehicle,
+engine setting, and one GP difficulty.
 
-`time_attack` is a single-course time-trial mode. It has no opponent grid and no
-GP difficulty. Time Attack baselines are therefore simpler and do not need GP
-opponent-grid variants.
+`time_attack` is a single-track time trial without opponent grid or GP
+difficulty.
 
-## Track Sampling Entries
+### GP Race Starts
 
-Training can sample among multiple reset targets. Each
-`TrackSamplingEntryConfig` is one reset candidate with stable identity and
-materialized baseline information:
+F-Zero X GP Race is cup-based. The normal game flow plays each cup in order.
 
-- `course_id` is the logical fixed or generated course id when known.
-- `runtime_course_key` is the sampling key used by runtime statistics.
-- `course_index` is the game/menu course index used during materialization.
-- `mode` is usually `gp_race` or `time_attack`.
-- `gp_difficulty` applies only to GP race mode.
-- `baseline_state_path` points to the run-local savestate after materialization.
-- `source_*` fields preserve the original materialization target after a
-  run-local baseline file has been written.
+For training, the materializer creates a baseline savestate for the requested GP
+target. It navigates to a GP race setup, writes the requested course/setup into
+RAM, then forces the game to rebuild the race start. The result is a reset state
+for one specific course, difficulty, selected ship/vehicle, and engine setting.
 
-The `runtime_course_key` matters for generated courses and for stable statistics.
-It lets a generated X-Cup slot keep its runtime identity even when the generated
-course id changes after rotation.
+## Course Sampling
 
-## Evaluation Targets
+If a run has multiple training targets, the course sampler decides which target
+the next reset uses.
 
-Evaluation presets describe benchmark environment targets: mode, selected
-courses or cups, GP difficulty, renderer, seed, repeats, and runtime settings.
-They should not own the source checkpoint, checkpoint artifact such as `latest`,
-policy mode, device, or copied model files. Those belong to the evaluation
-snapshot/run.
+### Equal
 
-For cross-course evaluation summaries, course-level statistics are usually more
-useful than global "best time" or total env steps. Finish distribution, weakest
-courses, completion, and per-course position/return are the meaningful signals.
+`equal` cycles through the selected targets evenly. It is useful when every
+target should get roughly the same number of resets.
 
+Note: `equal` balances reset count. A target with longer episodes can still
+receive more total training frames.
+
+### Step Balanced
+
+`step_balanced` balances by training frames instead of reset count. That matters
+because one target can produce much longer episodes than another.
+
+The sampler tracks how many frames each target has already received and raises
+the reset weight for targets that are behind their frame share.
+
+### Fixed Env
+
+`fixed_env` pins each parallel env worker to one target slot. This gives
+deterministic per-rollout coverage, but it only fits when the number of envs can
+cover the selected targets cleanly.
+
+### Deficit Budget
+
+`deficit_budget` assigns resets from step-budget accounts. Each rollout adds a
+new budget, and targets build up deficit when they have received fewer env steps
+than their current target share.
+
+The budget is split into two lanes:
+
+- **uniform lane**: keeps broad coverage across all selected targets
+- **difficulty lane**: focuses targets with low completion or finish rate
+
+`deficit_budget_uniform_fraction` controls the split. With the default `0.7`,
+70% of the budget stays uniform and 30% can focus difficult targets.
+
+The difficulty lane uses one selected metric based on recent EMA stats:
+
+- `completion_ema`: focus targets with low completion
+- `finish_ema`: focus targets with low finish rate
+- `mixed`: use the worse of completion and finish rate
+
+`deficit_budget_focus_sharpness` controls how aggressively the difficulty lane
+focuses the weakest targets. Higher values concentrate more budget on the worst
+targets.
+
+`deficit_budget_warmup_min_episodes_per_course` keeps the sampler broad until
+each target has enough samples. `deficit_budget_uniform_staleness_rotations`
+prevents the uniform lane from ignoring a target for too long.

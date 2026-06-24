@@ -27,9 +27,10 @@ validated launch/watch snapshots derived from it.
 The main runtime concepts are documented separately:
 
 - [Courses and race modes](concepts/courses.md)
+- [Policy inputs](concepts/policy_inputs.md)
 - [Baseline materialization](concepts/baselines.md)
 - [Generated X-Cup courses](concepts/x_cup.md)
-- [Adaptive engine tuning](concepts/engine_tuning.md)
+- [Engine tuning](concepts/engine_tuning.md)
 
 ## Main Packages
 

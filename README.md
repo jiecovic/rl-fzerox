@@ -67,7 +67,7 @@ the run manager. The run manager also stores its SQLite DB, generated baselines,
 TensorBoard views, and training runs under `local/`. None of those local files
 are included in git.
 
-The small bundled minimap mask files are described in
+The default ROM and libretro core paths are listed in
 [docs/runtime_assets.md](docs/runtime_assets.md).
 
 ## F-Zero X App
