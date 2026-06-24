@@ -55,7 +55,7 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
             config,
             store=store,
             run_id=run.id,
-            include_artifacts=False,
+            include_artifacts=True,
         )
     if run.source_snapshot_dir is not None and run.source_artifact is not None:
         if run.source_run_id is None:

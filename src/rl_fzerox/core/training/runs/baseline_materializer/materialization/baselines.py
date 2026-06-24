@@ -8,6 +8,7 @@ from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, is_race_di
 from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     atomic_write_json,
+    cache_write_lock,
     course_vehicle_cache_payload,
     link_or_copy_file,
     run_state_path,
@@ -65,6 +66,28 @@ def materialize_baseline_impl(
     source_vehicle_id = _request_vehicle_id(request)
     source_gp_difficulty = _request_gp_difficulty(request)
     source_engine_raw_value = _source_engine_setting_raw_value()
+    payload = course_vehicle_cache_payload(
+        mode=_required_request_mode(request),
+        course_index=source_course_index,
+        gp_difficulty=source_gp_difficulty,
+        vehicle_id=source_vehicle_id,
+        camera_setting=request.camera_setting,
+        race_intro_target_timer=context.race_intro_target_timer,
+        baseline_variant_index=request.baseline_variant_index,
+        baseline_variant_count=request.baseline_variant_count,
+        baseline_variant_seed=request.baseline_variant_seed,
+        context=context,
+    )
+    cache_key = sha256_json(payload)
+    target_state_path = run_state_path(run_paths, label=request.label, cache_key=cache_key)
+    target_metadata_path = target_state_path.with_suffix(".json")
+    reused_run_artifact = _reuse_current_run_baseline(
+        target_state_path=target_state_path,
+        cache_key=cache_key,
+    )
+    if reused_run_artifact is not None:
+        return reused_run_artifact
+
     cache_state_path = ensure_course_vehicle_baseline(
         mode=_validated_request_mode(_required_request_mode(request)),
         label=request.label,
@@ -81,40 +104,32 @@ def materialize_baseline_impl(
         generic_mode_seed_materializer=generic_mode_seed_materializer,
         menu_seed_race_start_materializer=menu_seed_race_start_materializer,
     )
-    payload = course_vehicle_cache_payload(
-        mode=_required_request_mode(request),
-        course_index=source_course_index,
-        gp_difficulty=source_gp_difficulty,
-        vehicle_id=source_vehicle_id,
-        camera_setting=request.camera_setting,
-        race_intro_target_timer=context.race_intro_target_timer,
-        baseline_variant_index=request.baseline_variant_index,
-        baseline_variant_count=request.baseline_variant_count,
-        baseline_variant_seed=request.baseline_variant_seed,
-        context=context,
-    )
-    cache_key = sha256_json(payload)
-    target_state_path = run_state_path(run_paths, label=request.label, cache_key=cache_key)
-    target_metadata_path = target_state_path.with_suffix(".json")
-    if not target_state_path.is_file():
-        link_or_copy_file(cache_state_path, target_state_path)
-    if not target_metadata_path.is_file():
-        cache_metadata_path = cache_state_path.with_suffix(".json")
-        atomic_write_json(
-            target_metadata_path,
-            {
-                **payload,
-                "cache_key": cache_key,
-                "cache_kind": "exact_run_baseline",
-                "materialized_state_sha256": _required_materialized_state_sha256(
-                    cache_metadata_path
-                ),
-                "source_course_index": source_course_index,
-                "source_vehicle": source_vehicle_id,
-                "source_gp_difficulty": source_gp_difficulty,
-                "source_engine_setting_raw_value": source_engine_raw_value,
-            },
-        )
+    with cache_write_lock(target_state_path):
+        if (
+            _current_run_baseline_metadata(
+                target_state_path=target_state_path,
+                cache_key=cache_key,
+            )
+            is None
+        ):
+            target_state_path.unlink(missing_ok=True)
+            link_or_copy_file(cache_state_path, target_state_path)
+            cache_metadata_path = cache_state_path.with_suffix(".json")
+            atomic_write_json(
+                target_metadata_path,
+                {
+                    **payload,
+                    "cache_key": cache_key,
+                    "cache_kind": "exact_run_baseline",
+                    "materialized_state_sha256": _required_materialized_state_sha256(
+                        cache_metadata_path
+                    ),
+                    "source_course_index": source_course_index,
+                    "source_vehicle": source_vehicle_id,
+                    "source_gp_difficulty": source_gp_difficulty,
+                    "source_engine_setting_raw_value": source_engine_raw_value,
+                },
+            )
     return BaselineArtifact(
         state_path=target_state_path,
         metadata_path=target_metadata_path,
@@ -173,20 +188,27 @@ def _materialize_x_cup_baseline(
     cache_key = sha256_json(payload)
     target_state_path = run_state_path(run_paths, label=request.label, cache_key=cache_key)
     target_metadata_path = target_state_path.with_suffix(".json")
-    if not target_state_path.is_file():
-        link_or_copy_file(cache_state_path, target_state_path)
-    if not target_metadata_path.is_file():
-        cache_metadata_path = cache_state_path.with_suffix(".json")
-        atomic_write_json(
-            target_metadata_path,
-            {
-                **payload,
-                "cache_key": cache_key,
-                "materialized_state_sha256": _required_materialized_state_sha256(
-                    cache_metadata_path
-                ),
-            },
-        )
+    with cache_write_lock(target_state_path):
+        if (
+            _current_run_baseline_metadata(
+                target_state_path=target_state_path,
+                cache_key=cache_key,
+            )
+            is None
+        ):
+            target_state_path.unlink(missing_ok=True)
+            link_or_copy_file(cache_state_path, target_state_path)
+            cache_metadata_path = cache_state_path.with_suffix(".json")
+            atomic_write_json(
+                target_metadata_path,
+                {
+                    **payload,
+                    "cache_key": cache_key,
+                    "materialized_state_sha256": _required_materialized_state_sha256(
+                        cache_metadata_path
+                    ),
+                },
+            )
     return BaselineArtifact(
         state_path=target_state_path,
         metadata_path=target_metadata_path,
@@ -243,9 +265,63 @@ def _reuse_existing_run_baseline(
     if schema_version != BASELINE_MATERIALIZER_SETTINGS.schema_version:
         return None
 
-    return BaselineArtifact(
+    return _baseline_artifact_from_metadata(
         state_path=source_state_path,
-        metadata_path=metadata_path,
+        metadata=metadata,
+        cache_key=cache_key,
+    )
+
+
+def _reuse_current_run_baseline(
+    *,
+    target_state_path: Path,
+    cache_key: str,
+) -> BaselineArtifact | None:
+    metadata = _current_run_baseline_metadata(
+        target_state_path=target_state_path,
+        cache_key=cache_key,
+    )
+    if metadata is None:
+        return None
+    return _baseline_artifact_from_metadata(
+        state_path=target_state_path,
+        metadata=metadata,
+        cache_key=cache_key,
+    )
+
+
+def _current_run_baseline_metadata(
+    *,
+    target_state_path: Path,
+    cache_key: str,
+) -> dict[str, object] | None:
+    if not target_state_path.is_file():
+        return None
+    metadata_path = target_state_path.with_suffix(".json")
+    if not metadata_path.is_file():
+        return None
+    try:
+        metadata = read_metadata(metadata_path)
+    except (OSError, ValueError):
+        return None
+    if metadata.get("cache_kind") != "exact_run_baseline":
+        return None
+    if metadata.get("cache_key") != cache_key:
+        return None
+    if metadata.get("schema_version") != BASELINE_MATERIALIZER_SETTINGS.schema_version:
+        return None
+    return metadata
+
+
+def _baseline_artifact_from_metadata(
+    *,
+    state_path: Path,
+    metadata: dict[str, object],
+    cache_key: str,
+) -> BaselineArtifact:
+    return BaselineArtifact(
+        state_path=state_path,
+        metadata_path=state_path.with_suffix(".json"),
         cache_key=cache_key,
         source_course_index=_optional_metadata_int(metadata, "source_course_index"),
         source_vehicle=_optional_metadata_str(metadata, "source_vehicle"),

@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import time
+import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -140,8 +141,8 @@ def runtime_fingerprint_payload(context: BaselineMaterializerContext) -> dict[st
     """
 
     return {
-        "core_sha256": sha256_file(context.core_path),
-        "rom_sha256": sha256_file(context.rom_path),
+        "core_sha256": context.core_sha256,
+        "rom_sha256": context.rom_sha256,
     }
 
 
@@ -167,12 +168,21 @@ def x_cup_state_path(cache_root: Path, *, label: str, cache_key: str) -> Path:
 
 def link_or_copy_file(source_path: Path, destination_path: Path) -> None:
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    if destination_path.exists():
-        destination_path.unlink()
+    destination_path.unlink(missing_ok=True)
     try:
         os.link(source_path, destination_path)
+        return
     except OSError:
-        shutil.copy2(source_path, destination_path)
+        pass
+
+    tmp_path = destination_path.with_name(
+        f".{destination_path.stem}.{os.getpid()}.{uuid.uuid4().hex}.tmp{destination_path.suffix}"
+    )
+    try:
+        shutil.copy2(source_path, tmp_path)
+        os.replace(tmp_path, destination_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def safe_filename(value: str) -> str:
@@ -201,6 +211,12 @@ def sha256_json(data: dict[str, object]) -> str:
 
 
 def atomic_write_json(target_path: Path, data: dict[str, object]) -> None:
-    tmp_path = target_path.with_name(f".{target_path.stem}.tmp{target_path.suffix}")
-    tmp_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp_path, target_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target_path.with_name(
+        f".{target_path.stem}.{os.getpid()}.{uuid.uuid4().hex}.tmp{target_path.suffix}"
+    )
+    try:
+        tmp_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(tmp_path, target_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)

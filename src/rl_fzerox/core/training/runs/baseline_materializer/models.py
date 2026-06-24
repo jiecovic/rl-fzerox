@@ -63,7 +63,8 @@ class BaselineMaterializerContext:
     rom_path: Path
     renderer: str
     race_intro_target_timer: int | None
-    run_seed: int | None
+    core_sha256: str
+    rom_sha256: str
 
 
 RaceStartMaterializer = Callable[..., None]

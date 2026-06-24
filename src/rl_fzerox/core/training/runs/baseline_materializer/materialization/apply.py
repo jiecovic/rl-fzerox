@@ -11,6 +11,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingEntryConfig,
     TrainAppConfig,
 )
+from rl_fzerox.core.training.runs.baseline_materializer.cache import sha256_file
 from rl_fzerox.core.training.runs.baseline_materializer.materialization.baselines import (
     materialize_baseline_impl,
 )
@@ -65,7 +66,8 @@ def materialize_run_baselines_impl(
         rom_path=config.emulator.rom_path,
         renderer=config.emulator.renderer,
         race_intro_target_timer=config.env.race_intro_target_timer,
-        run_seed=config.seed,
+        core_sha256=sha256_file(config.emulator.core_path),
+        rom_sha256=sha256_file(config.emulator.rom_path),
     )
     track_config = config.track
     emulator_baseline_path = config.emulator.baseline_state_path
@@ -204,7 +206,6 @@ def _materialize_track_sampling(
     entries_to_materialize = _expanded_baseline_variant_entries(
         config.entries,
         baseline_variant_count=config.baseline_variant_count,
-        run_seed=context.run_seed,
     )
     total_entries = len(entries_to_materialize)
     _report_startup(
@@ -243,7 +244,6 @@ def _expanded_baseline_variant_entries(
     entries: tuple[TrackSamplingEntryConfig, ...],
     *,
     baseline_variant_count: int,
-    run_seed: int | None,
 ) -> tuple[TrackSamplingEntryConfig, ...]:
     if baseline_variant_count <= 1:
         return entries
@@ -257,7 +257,6 @@ def _expanded_baseline_variant_entries(
                 entry,
                 baseline_variant_index=variant_index,
                 baseline_variant_count=baseline_variant_count,
-                run_seed=run_seed,
             )
             for variant_index in range(baseline_variant_count)
         )
@@ -282,7 +281,6 @@ def _baseline_variant_entry(
     *,
     baseline_variant_index: int,
     baseline_variant_count: int,
-    run_seed: int | None,
 ) -> TrackSamplingEntryConfig:
     # Variant entries share a scheduler group, so course-level weight overrides
     # still target one course while resets fan out across its materialized grids.
@@ -298,7 +296,6 @@ def _baseline_variant_entry(
         update["baseline_variant_seed"] = _baseline_variant_seed(
             entry,
             baseline_variant_index=baseline_variant_index,
-            run_seed=run_seed,
         )
     return entry.model_copy(update=update)
 
@@ -307,13 +304,11 @@ def _baseline_variant_seed(
     entry: TrackSamplingEntryConfig,
     *,
     baseline_variant_index: int,
-    run_seed: int | None,
 ) -> int:
-    """Derive stable per-run opponent-grid seeds without sharing RNG state."""
+    """Derive stable reusable opponent-grid seeds without sharing RNG state."""
 
     parts = (
         "baseline_variant",
-        str(0 if run_seed is None else run_seed),
         entry.id,
         str(entry.course_id or ""),
         str(entry.runtime_course_key or ""),

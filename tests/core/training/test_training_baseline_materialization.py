@@ -364,6 +364,68 @@ def test_materialize_track_sampling_expands_gp_baseline_variants(
     ]
 
 
+def test_materialize_track_sampling_reuses_gp_baseline_variants_across_run_seeds(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
+                baseline_variant_count=3,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city_gp",
+                        course_id="mute_city",
+                        runtime_course_key="mute_city",
+                        course_index=0,
+                        mode="gp_race",
+                        gp_difficulty="novice",
+                        vehicle="blue_falcon",
+                        engine_setting_raw_value=50,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    cache_root = tmp_path / "cache"
+    first_run = build_run_paths(output_root=config.train.output_root, run_name="first")
+    second_run = build_run_paths(output_root=config.train.output_root, run_name="second")
+    ensure_run_dirs(first_run)
+    ensure_run_dirs(second_run)
+
+    first_materialized = materialize_train_run_config(
+        config,
+        run_paths=first_run,
+        baseline_cache_root=cache_root,
+    )
+    second_materialized = materialize_train_run_config(
+        config.model_copy(update={"seed": 999}),
+        run_paths=second_run,
+        baseline_cache_root=cache_root,
+    )
+
+    first_entries = first_materialized.env.track_sampling.entries
+    second_entries = second_materialized.env.track_sampling.entries
+    assert [entry.baseline_variant_seed for entry in first_entries] == [
+        entry.baseline_variant_seed for entry in second_entries
+    ]
+    assert [_required_baseline_path(entry).name for entry in first_entries] == [
+        _required_baseline_path(entry).name for entry in second_entries
+    ]
+
+
 def test_materialize_track_sampling_does_not_expand_time_attack_baselines(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,

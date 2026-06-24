@@ -173,6 +173,7 @@ def _restore_entry_artifact(
 ) -> TrackSamplingEntryConfig:
     update: dict[str, object] = {
         "id": artifact.entry_id,
+        "runtime_course_key": artifact.course_key,
         "baseline_state_path": artifact.baseline_state_path,
     }
     if artifact.source_course_index is not None:
@@ -187,4 +188,17 @@ def _restore_entry_artifact(
         update["generated_course_segment_count"] = artifact.generated_course_segment_count
     if artifact.generated_course_length is not None:
         update["generated_course_length"] = artifact.generated_course_length
+    if artifact.generated_course_slot is not None:
+        update["generated_course_slot"] = artifact.generated_course_slot
+    if artifact.generated_course_generation is not None:
+        update["generated_course_generation"] = artifact.generated_course_generation
+    if artifact.generated_course_id is not None:
+        update["course_id"] = artifact.generated_course_id
+    if artifact.generated_course_name is not None:
+        update["course_name"] = artifact.generated_course_name
+        update["display_name"] = artifact.generated_course_name
+    if artifact.generated_course_hash is not None:
+        update["generated_course_hash"] = artifact.generated_course_hash
+    if artifact.generated_course_seed is not None:
+        update["generated_course_seed"] = artifact.generated_course_seed
     return entry.model_copy(update=update)

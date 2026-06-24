@@ -34,6 +34,7 @@ from rl_fzerox.core.training.runs.baseline_materializer import (
     BaselineMaterializerContext,
     materialize_baseline,
 )
+from rl_fzerox.core.training.runs.baseline_materializer.cache import sha256_file
 from rl_fzerox.core.training.runs.baseline_materializer.projection import (
     baseline_artifact_entry_update,
 )
@@ -110,6 +111,8 @@ class XCupRotationManager:
             if cache_root is None
             else cache_root.expanduser().resolve()
         )
+        self._core_sha256 = sha256_file(config.emulator.core_path)
+        self._rom_sha256 = sha256_file(config.emulator.rom_path)
         self._slots_by_index = _slots_by_index(
             generated_x_cup_slots_from_track_sampling(config.env.track_sampling)
         )
@@ -283,7 +286,8 @@ class XCupRotationManager:
             rom_path=self._config.emulator.rom_path,
             renderer=self._config.emulator.renderer,
             race_intro_target_timer=self._config.env.race_intro_target_timer,
-            run_seed=self._config.seed,
+            core_sha256=self._core_sha256,
+            rom_sha256=self._rom_sha256,
         )
         request = request_from_track_entry(
             entry,
