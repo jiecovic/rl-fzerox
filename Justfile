@@ -44,6 +44,11 @@ py-test: native
     @PYTHONPATH=src "{{python_bin}}" -c 'import sys; print(f"pytest interpreter: {sys.executable}"); import fzerox_emulator._native as native; print(f"native module: {native.__file__}")'
     PYTHONPATH=src "{{python_bin}}" -m pytest
 
+# Run Python tests against the currently installed native extension.
+py-test-no-native *pytest_args:
+    @PYTHONPATH=src "{{python_bin}}" -c 'import sys; print(f"pytest interpreter: {sys.executable}"); import fzerox_emulator._native as native; print(f"native module: {native.__file__}")'
+    PYTHONPATH=src "{{python_bin}}" -m pytest {{pytest_args}}
+
 # Install the local React run-manager frontend dependencies.
 run-manager-install:
     npm install --prefix web/run-manager

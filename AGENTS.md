@@ -194,6 +194,8 @@ extending, and reviewing.
   - `just py-fmt`
   - `just py-lint`
   - `just py-test`
+  - `just py-test-no-native` for Python-only checks against the currently
+    installed native extension, without rebuilding Rust
 - Full repo checks:
   - `just fmt-check`
   - `just lint`
