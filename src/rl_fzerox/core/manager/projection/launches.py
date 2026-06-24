@@ -56,6 +56,21 @@ def build_managed_resume_train_app_config(
         run_id=run_id,
         run_dir=run_dir,
     )
+    return apply_managed_resume_train_config(
+        train_config,
+        run_dir=run_dir,
+        tensorboard_step_offset=tensorboard_step_offset,
+    )
+
+
+def apply_managed_resume_train_config(
+    train_config: TrainAppConfig,
+    *,
+    run_dir: Path,
+    tensorboard_step_offset: int = 0,
+) -> TrainAppConfig:
+    """Mark an existing runtime train config for in-place full-model resume."""
+
     return train_config.model_copy(
         update={
             "train": train_config.train.model_copy(

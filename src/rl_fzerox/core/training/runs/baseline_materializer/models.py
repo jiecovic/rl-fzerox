@@ -4,11 +4,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from fzerox_emulator import EmulatorBackend, ResetState
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.domain.x_cup import XCupGeneratedCourseKind
+
+BaselineArtifactSource = Literal["existing", "cache", "generated"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +49,7 @@ class BaselineArtifact:
     state_path: Path
     metadata_path: Path
     cache_key: str
+    source: BaselineArtifactSource
     source_course_index: int | None = None
     source_vehicle: str | None = None
     source_gp_difficulty: RaceDifficultyName | None = None

@@ -164,6 +164,66 @@ def test_materialize_train_run_config_keys_cache_by_runtime_fingerprints(
     assert len(list(cache_root.rglob("*.state"))) == 4
 
 
+def test_materialize_train_run_config_does_not_reexpand_saved_variant_entries(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    capture = _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            camera_setting="close_behind",
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                baseline_variant_count=8,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city_gp_race_master_blue_falcon__variant_2",
+                        course_id="mute_city",
+                        runtime_course_key="mute_city",
+                        course_name="Mute City",
+                        course_index=0,
+                        mode="gp_race",
+                        gp_difficulty="master",
+                        vehicle="blue_falcon",
+                        engine_setting_raw_value=64,
+                        baseline_variant_index=1,
+                        baseline_variant_count=8,
+                        baseline_variant_seed=14_629_459_847_334_955_741,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    assert len(materialized.env.track_sampling.entries) == 1
+    entry = materialized.env.track_sampling.entries[0]
+    assert entry.id == "mute_city_gp_race_master_blue_falcon__variant_2"
+    assert entry.baseline_variant_index == 1
+    assert entry.baseline_variant_seed == 14_629_459_847_334_955_741
+    assert len(capture.variants) == 1
+    assert capture.variants[0].rng_seed == 14_629_459_847_334_955_741
+
+
 def test_materialize_train_run_config_regenerates_stale_run_local_baseline_for_in_place_continue(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,

@@ -11,6 +11,7 @@ from rl_fzerox.core.manager.projection.compat import (
     fork_compatibility_signature,
 )
 from rl_fzerox.core.manager.projection.launches import (
+    apply_managed_resume_train_config,
     build_managed_fork_train_app_config,
     build_managed_resume_train_app_config,
     build_managed_train_app_config,
@@ -36,6 +37,7 @@ from rl_fzerox.core.manager.projection.watch import (
 
 __all__ = [
     "build_action_data",
+    "apply_managed_resume_train_config",
     "build_managed_fork_train_app_config",
     "build_managed_resume_train_app_config",
     "build_managed_train_app_config",

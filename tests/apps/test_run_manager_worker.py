@@ -41,7 +41,11 @@ def test_startup_reporter_raises_for_pending_manager_stop(tmp_path: Path) -> Non
     reporter = _startup_reporter(store=store, run_id=run.id, launch_token="token-1")
 
     with pytest.raises(RunControlSignal, match="stop"):
-        reporter("startup_materialize", "Materializing track sampling baselines: 0/2 complete")
+        reporter(
+            "startup_materialize",
+            "Resolving track sampling baselines: 0/2 complete "
+            "(existing 0, cache 0, generated 0); next Mute City",
+        )
 
 
 def test_background_worker_heartbeat_refreshes_worker_lease(tmp_path: Path) -> None:

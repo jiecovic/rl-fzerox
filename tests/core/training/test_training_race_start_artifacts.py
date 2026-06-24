@@ -91,13 +91,18 @@ def test_materialize_train_run_config_reports_track_sampling_progress(
     materialize_messages = [
         message for kind, message in startup_messages if kind == "startup_materialize"
     ]
-    assert "Materializing track sampling baselines for 2 entries" in materialize_messages
+    assert "Resolving track sampling baselines for 2 entries" in materialize_messages
     assert (
-        "Materializing track sampling baselines: 0/2 complete; next Mute City"
-        in materialize_messages
+        "Resolving track sampling baselines: 0/2 complete "
+        "(existing 0, cache 0, generated 0); next Mute City" in materialize_messages
     )
     assert (
-        "Materializing track sampling baselines: 1/2 complete; next Silence" in materialize_messages
+        "Resolving track sampling baselines: 1/2 complete "
+        "(existing 0, cache 0, generated 1); next Silence" in materialize_messages
+    )
+    assert (
+        "Resolved track sampling baselines: 2/2 complete "
+        "(existing 0, cache 0, generated 2)" in materialize_messages
     )
 
 

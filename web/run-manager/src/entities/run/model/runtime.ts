@@ -124,11 +124,38 @@ export function lineageStepsLabel(run: ManagedRun): string {
 }
 
 export function latestStartupMessage(run: ManagedRun): string | null {
+  const startupEvent = latestStartupEvent(run);
+  if (startupEvent === null) {
+    return null;
+  }
+  return startupEvent.message;
+}
+
+export function latestActiveStartupMessage(run: ManagedRun): string | null {
+  const startupEvent = latestStartupEvent(run);
+  if (startupEvent === null) {
+    return null;
+  }
+  if (run.runtime === null) {
+    return startupEvent.message;
+  }
+  const startupTime = Date.parse(startupEvent.created_at);
+  const runtimeTime = Date.parse(run.runtime.updated_at);
+  if (Number.isNaN(startupTime) || Number.isNaN(runtimeTime)) {
+    return null;
+  }
+  return startupTime > runtimeTime ? startupEvent.message : null;
+}
+
+function latestStartupEvent(run: ManagedRun): { created_at: string; message: string } | null {
   const startupEvent = run.recent_events.find((event) => event.kind.startsWith("startup_"));
   if (startupEvent === undefined) {
     return null;
   }
-  return startupEvent.message;
+  return {
+    created_at: startupEvent.created_at,
+    message: startupEvent.message,
+  };
 }
 
 export function latestFailureMessage(run: ManagedRun): string | null {

@@ -150,25 +150,32 @@ def managed_watch_train_config(
     if run is None:
         raise ValueError(f"managed run not found: {run_id}")
     lineage_frame_offset = lineage_frame_offset_for_run(store, run)
-    train_config = build_managed_train_app_config(
-        run.config,
-        run_id=run.id,
-        run_dir=run.run_dir,
-    )
-    train_config = restore_managed_runtime_track_sampling(
-        train_config,
-        store=store,
-        run_id=run.id,
-        include_artifacts=True,
-    )
-    return (
-        run.run_dir,
-        materialize_train_run_config(
+    try:
+        train_config = load_train_run_config_for_watch(run.run_dir)
+    except FileNotFoundError:
+        train_config = build_managed_train_app_config(
+            run.config,
+            run_id=run.id,
+            run_dir=run.run_dir,
+        )
+        train_config = restore_managed_runtime_track_sampling(
+            train_config,
+            store=store,
+            run_id=run.id,
+            include_artifacts=True,
+        )
+        train_config = materialize_train_run_config(
             train_config,
             run_paths=continue_run_paths(run.run_dir),
-        ),
-        lineage_frame_offset,
-    )
+        )
+    else:
+        train_config = restore_managed_runtime_track_sampling(
+            train_config,
+            store=store,
+            run_id=run.id,
+            include_artifacts=True,
+        )
+    return (run.run_dir, train_config, lineage_frame_offset)
 
 
 def lineage_frame_offset_for_run(store: ManagerStore, run: ManagedRun) -> int | None:

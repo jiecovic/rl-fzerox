@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from rl_fzerox.core.runtime_spec.schema import (
@@ -17,6 +18,7 @@ from rl_fzerox.core.training.runs.baseline_materializer.materialization.baseline
 )
 from rl_fzerox.core.training.runs.baseline_materializer.models import (
     BaselineArtifact,
+    BaselineArtifactSource,
     BaselineMaterializerContext,
     GenericModeSeedMaterializer,
     RaceStartMaterializer,
@@ -38,6 +40,24 @@ from rl_fzerox.core.training.runs.track_baselines import (
     single_active_track_entry,
     track_config_from_sampling_entry,
 )
+
+
+@dataclass(slots=True)
+class _BaselineMaterializationProgress:
+    existing: int = 0
+    cache: int = 0
+    generated: int = 0
+
+    def record(self, source: BaselineArtifactSource) -> None:
+        if source == "existing":
+            self.existing += 1
+        elif source == "cache":
+            self.cache += 1
+        else:
+            self.generated += 1
+
+    def summary(self) -> str:
+        return f"existing {self.existing}, cache {self.cache}, generated {self.generated}"
 
 
 def materialize_run_baselines_impl(
@@ -211,9 +231,10 @@ def _materialize_track_sampling(
     _report_startup(
         startup_reporter,
         "startup_materialize",
-        f"Materializing {sampling_label} baselines for {total_entries} entries",
+        f"Resolving {sampling_label} baselines for {total_entries} entries",
     )
     entries: list[TrackSamplingEntryConfig] = []
+    progress = _BaselineMaterializationProgress()
     for entry_index, entry in enumerate(entries_to_materialize, start=1):
         _report_startup(
             startup_reporter,
@@ -223,20 +244,30 @@ def _materialize_track_sampling(
                 entry=entry,
                 complete_count=entry_index - 1,
                 total_entries=total_entries,
+                progress=progress,
             ),
         )
-        entries.append(
-            _materialized_track_sampling_entry(
-                entry,
-                run_paths=run_paths,
-                cache_root=cache_root,
-                camera_setting=camera_setting,
-                context=context,
-                emulator_type=emulator_type,
-                generic_mode_seed_materializer=generic_mode_seed_materializer,
-                menu_seed_race_start_materializer=menu_seed_race_start_materializer,
-            )
+        materialized_entry, artifact = _materialized_track_sampling_entry(
+            entry,
+            run_paths=run_paths,
+            cache_root=cache_root,
+            camera_setting=camera_setting,
+            context=context,
+            emulator_type=emulator_type,
+            generic_mode_seed_materializer=generic_mode_seed_materializer,
+            menu_seed_race_start_materializer=menu_seed_race_start_materializer,
         )
+        entries.append(materialized_entry)
+        progress.record(artifact.source)
+    _report_startup(
+        startup_reporter,
+        "startup_materialize",
+        _track_sampling_complete_message(
+            sampling_label=sampling_label,
+            total_entries=total_entries,
+            progress=progress,
+        ),
+    )
     return config.model_copy(update={"entries": tuple(entries)})
 
 
@@ -269,6 +300,7 @@ def _entry_supports_baseline_variants(entry: TrackSamplingEntryConfig) -> bool:
     # baselines should preserve the captured state exactly.
     return (
         entry.mode == "gp_race"
+        and entry.baseline_variant_index is None
         and entry.alt_baseline_id is None
         and entry.generated_course_kind is None
         and entry.course_index is not None
@@ -331,7 +363,7 @@ def _materialized_track_sampling_entry(
     emulator_type: Callable[..., StateSavingEmulator],
     generic_mode_seed_materializer: GenericModeSeedMaterializer,
     menu_seed_race_start_materializer: RaceStartMaterializer,
-) -> TrackSamplingEntryConfig:
+) -> tuple[TrackSamplingEntryConfig, BaselineArtifact]:
     request = request_from_track_entry(entry, camera_setting=camera_setting)
     artifact = materialize_baseline_impl(
         request,
@@ -342,8 +374,9 @@ def _materialized_track_sampling_entry(
         generic_mode_seed_materializer=generic_mode_seed_materializer,
         menu_seed_race_start_materializer=menu_seed_race_start_materializer,
     )
-    return entry.model_copy(
-        update=baseline_artifact_entry_update(artifact=artifact, request=request)
+    return (
+        entry.model_copy(update=baseline_artifact_entry_update(artifact=artifact, request=request)),
+        artifact,
     )
 
 
@@ -353,11 +386,24 @@ def _track_sampling_progress_message(
     entry: TrackSamplingEntryConfig,
     complete_count: int,
     total_entries: int,
+    progress: _BaselineMaterializationProgress,
 ) -> str:
     course_label = entry.course_name or entry.display_name or entry.course_id or entry.id
     return (
-        f"Materializing {sampling_label} baselines: "
-        f"{complete_count}/{total_entries} complete; next {course_label}"
+        f"Resolving {sampling_label} baselines: {complete_count}/{total_entries} complete "
+        f"({progress.summary()}); next {course_label}"
+    )
+
+
+def _track_sampling_complete_message(
+    *,
+    sampling_label: str,
+    total_entries: int,
+    progress: _BaselineMaterializationProgress,
+) -> str:
+    return (
+        f"Resolved {sampling_label} baselines: {total_entries}/{total_entries} complete "
+        f"({progress.summary()})"
     )
 
 

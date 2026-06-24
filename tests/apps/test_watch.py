@@ -15,12 +15,15 @@ from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     PolicyConfig,
     RewardConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
     TrainAppConfig,
     TrainConfig,
     WatchAppConfig,
     WatchConfig,
 )
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
+from rl_fzerox.core.training.runs import save_train_run_config
 from rl_fzerox.ui.watch.app import run_viewer
 from rl_fzerox.ui.watch.runtime import WatchWorker
 from rl_fzerox.ui.watch.runtime.policy import (
@@ -205,6 +208,81 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     assert config.emulator.core_path == core_path
     assert config.train == train_config.train
     assert config.policy == train_config.policy
+
+
+def test_resolve_watch_app_config_uses_managed_run_manifest_without_rematerializing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    run = store.create_run(
+        run_id="manifest-watch",
+        name="Manifest Watch",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "manifest-watch",
+    )
+    run.run_dir.mkdir(parents=True)
+    manifest_entry = TrackSamplingEntryConfig(
+        id="manifest_mute_city",
+        course_id="mute_city",
+        course_name="Mute City",
+        course_index=0,
+        mode="gp_race",
+        gp_difficulty="master",
+        vehicle="blue_falcon",
+        baseline_state_path=run.run_dir / "baselines" / "manifest-baseline.state",
+        baseline_variant_index=1,
+        baseline_variant_count=8,
+        baseline_variant_seed=1234,
+    )
+    save_train_run_config(
+        config=TrainAppConfig(
+            seed=7,
+            emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+            env=EnvConfig(
+                action_repeat=5,
+                track_sampling=TrackSamplingConfig(
+                    enabled=True,
+                    entries=(manifest_entry,),
+                    baseline_variant_count=8,
+                ),
+            ),
+            policy=PolicyConfig(),
+            train=TrainConfig(output_root=tmp_path / "runs", run_name="manifest-watch"),
+        ),
+        run_dir=run.run_dir,
+    )
+
+    def fail_materialize_train_run_config(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("managed watch should use the saved manifest")
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
+        fail_materialize_train_run_config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
+        lambda config, **_kwargs: config,
+    )
+
+    config = resolve_watch_app_config(
+        policy_run_dir=None,
+        policy_artifact="latest",
+        manager_db_path=db_path,
+        managed_run_id=run.id,
+        overrides=[],
+    )
+
+    assert config.watch.policy_run_dir == run.run_dir.resolve()
+    assert config.watch.manager_db_path == db_path.resolve()
+    assert config.watch.managed_run_id == run.id
+    assert config.env.action_repeat == 5
+    assert config.env.track_sampling.entries[0].id == "manifest_mute_city"
 
 
 def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(

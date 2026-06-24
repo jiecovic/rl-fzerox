@@ -6,11 +6,17 @@ from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.manager.projection.runtime import restore_managed_runtime_track_sampling
 from rl_fzerox.core.manager.training import (
+    apply_managed_resume_train_config,
     build_managed_fork_train_app_config,
     build_managed_resume_train_app_config,
     build_managed_train_app_config,
 )
-from rl_fzerox.core.training.runs import RUN_LAYOUT, RunPaths, continue_run_paths
+from rl_fzerox.core.training.runs import (
+    RUN_LAYOUT,
+    RunPaths,
+    continue_run_paths,
+    load_train_run_config,
+)
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimePersistence,
 )
@@ -45,12 +51,7 @@ def _track_sampling_runtime_persistence(
 
 def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool):
     if resume:
-        config = build_managed_resume_train_app_config(
-            run.config,
-            run_id=run.id,
-            run_dir=run.run_dir,
-            tensorboard_step_offset=run.lineage_step_offset,
-        )
+        config = _resume_train_config(run=run)
         return restore_managed_runtime_track_sampling(
             config,
             store=store,
@@ -89,6 +90,23 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
         run.config,
         run_id=run.id,
         run_dir=run.run_dir,
+    )
+
+
+def _resume_train_config(*, run: ManagedRun):
+    try:
+        train_config = load_train_run_config(run.run_dir)
+    except FileNotFoundError:
+        return build_managed_resume_train_app_config(
+            run.config,
+            run_id=run.id,
+            run_dir=run.run_dir,
+            tensorboard_step_offset=run.lineage_step_offset,
+        )
+    return apply_managed_resume_train_config(
+        train_config,
+        run_dir=run.run_dir,
+        tensorboard_step_offset=run.lineage_step_offset,
     )
 
 

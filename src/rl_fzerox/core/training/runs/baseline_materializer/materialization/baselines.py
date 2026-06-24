@@ -10,17 +10,22 @@ from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     atomic_write_json,
     cache_write_lock,
     course_vehicle_cache_payload,
+    course_vehicle_state_path,
     link_or_copy_file,
     run_state_path,
     sha256_json,
+    x_cup_cache_payload,
+    x_cup_state_path,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.materialization.course_vehicle import (
+    cache_entry_is_current,
     ensure_course_vehicle_baseline,
     ensure_x_cup_baseline,
     read_metadata,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.models import (
     BaselineArtifact,
+    BaselineArtifactSource,
     BaselineMaterializerContext,
     BaselineRequest,
     GenericModeSeedMaterializer,
@@ -79,11 +84,23 @@ def materialize_baseline_impl(
         context=context,
     )
     cache_key = sha256_json(payload)
+    cache_state_path = course_vehicle_state_path(
+        cache_root,
+        label=request.label,
+        cache_key=cache_key,
+    )
+    cache_was_current = cache_entry_is_current(
+        cache_state_path=cache_state_path,
+        cache_metadata_path=cache_state_path.with_suffix(".json"),
+        expected_kind="course_vehicle_baseline",
+        expected_cache_key=cache_key,
+    )
     target_state_path = run_state_path(run_paths, label=request.label, cache_key=cache_key)
     target_metadata_path = target_state_path.with_suffix(".json")
     reused_run_artifact = _reuse_current_run_baseline(
         target_state_path=target_state_path,
         cache_key=cache_key,
+        source="existing",
     )
     if reused_run_artifact is not None:
         return reused_run_artifact
@@ -134,6 +151,7 @@ def materialize_baseline_impl(
         state_path=target_state_path,
         metadata_path=target_metadata_path,
         cache_key=cache_key,
+        source="cache" if cache_was_current else "generated",
         source_course_index=source_course_index,
         source_vehicle=source_vehicle_id,
         source_gp_difficulty=source_gp_difficulty,
@@ -158,6 +176,27 @@ def _materialize_x_cup_baseline(
     source_vehicle_id = _request_vehicle_id(request)
     source_gp_difficulty = _request_gp_difficulty(request)
     source_engine_raw_value = _source_engine_setting_raw_value()
+    cache_payload = x_cup_cache_payload(
+        seed=seed,
+        course_hash=course_hash,
+        gp_difficulty=source_gp_difficulty,
+        vehicle_id=source_vehicle_id,
+        camera_setting=request.camera_setting,
+        race_intro_target_timer=context.race_intro_target_timer,
+        context=context,
+    )
+    x_cup_cache_key = sha256_json(cache_payload)
+    expected_cache_state_path = x_cup_state_path(
+        cache_root,
+        label=request.label,
+        cache_key=x_cup_cache_key,
+    )
+    cache_was_current = cache_entry_is_current(
+        cache_state_path=expected_cache_state_path,
+        cache_metadata_path=expected_cache_state_path.with_suffix(".json"),
+        expected_kind=X_CUP_COURSE.baseline_cache_kind,
+        expected_cache_key=x_cup_cache_key,
+    )
     cache_state_path, course = ensure_x_cup_baseline(
         label=request.label,
         seed=seed,
@@ -188,6 +227,13 @@ def _materialize_x_cup_baseline(
     cache_key = sha256_json(payload)
     target_state_path = run_state_path(run_paths, label=request.label, cache_key=cache_key)
     target_metadata_path = target_state_path.with_suffix(".json")
+    reused_run_artifact = _reuse_current_run_baseline(
+        target_state_path=target_state_path,
+        cache_key=cache_key,
+        source="existing",
+    )
+    if reused_run_artifact is not None:
+        return reused_run_artifact
     with cache_write_lock(target_state_path):
         if (
             _current_run_baseline_metadata(
@@ -213,6 +259,7 @@ def _materialize_x_cup_baseline(
         state_path=target_state_path,
         metadata_path=target_metadata_path,
         cache_key=cache_key,
+        source="cache" if cache_was_current else "generated",
         source_course_index=X_CUP_COURSE.course_index,
         source_vehicle=source_vehicle_id,
         source_gp_difficulty=source_gp_difficulty,
@@ -269,6 +316,7 @@ def _reuse_existing_run_baseline(
         state_path=source_state_path,
         metadata=metadata,
         cache_key=cache_key,
+        source="existing",
     )
 
 
@@ -276,6 +324,7 @@ def _reuse_current_run_baseline(
     *,
     target_state_path: Path,
     cache_key: str,
+    source: BaselineArtifactSource,
 ) -> BaselineArtifact | None:
     metadata = _current_run_baseline_metadata(
         target_state_path=target_state_path,
@@ -287,6 +336,7 @@ def _reuse_current_run_baseline(
         state_path=target_state_path,
         metadata=metadata,
         cache_key=cache_key,
+        source=source,
     )
 
 
@@ -318,11 +368,13 @@ def _baseline_artifact_from_metadata(
     state_path: Path,
     metadata: dict[str, object],
     cache_key: str,
+    source: BaselineArtifactSource,
 ) -> BaselineArtifact:
     return BaselineArtifact(
         state_path=state_path,
         metadata_path=state_path.with_suffix(".json"),
         cache_key=cache_key,
+        source=source,
         source_course_index=_optional_metadata_int(metadata, "source_course_index"),
         source_vehicle=_optional_metadata_str(metadata, "source_vehicle"),
         source_gp_difficulty=_optional_metadata_race_difficulty(metadata, "source_gp_difficulty"),
