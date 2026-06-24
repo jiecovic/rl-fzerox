@@ -71,52 +71,31 @@ def ensure_course_vehicle_baseline(
     )
     cache_key = sha256_json(payload)
     cache_state_path = course_vehicle_state_path(cache_root, label=label, cache_key=cache_key)
-    cache_metadata_path = cache_state_path.with_suffix(".json")
-    if cache_entry_is_current(
-        cache_state_path=cache_state_path,
-        cache_metadata_path=cache_metadata_path,
-        expected_kind="course_vehicle_baseline",
-        expected_cache_key=cache_key,
-    ):
-        return cache_state_path
 
-    with cache_write_lock(cache_state_path):
-        if not cache_entry_is_current(
+    def generate() -> dict[str, object]:
+        materialized_sha256 = generate_course_vehicle_state(
+            mode=mode,
+            course_index=course_index,
+            gp_difficulty=gp_difficulty,
+            vehicle_id=vehicle_id,
+            camera_setting=camera_setting,
+            baseline_variant_seed=baseline_variant_seed,
             cache_state_path=cache_state_path,
-            cache_metadata_path=cache_metadata_path,
-            expected_kind="course_vehicle_baseline",
-            expected_cache_key=cache_key,
-        ):
-            cache_state_path.unlink(missing_ok=True)
-            cache_metadata_path.unlink(missing_ok=True)
-            cache_state_path.parent.mkdir(parents=True, exist_ok=True)
-            materialized_sha256 = generate_course_vehicle_state(
-                mode=mode,
-                course_index=course_index,
-                gp_difficulty=gp_difficulty,
-                vehicle_id=vehicle_id,
-                camera_setting=camera_setting,
-                baseline_variant_seed=baseline_variant_seed,
-                cache_state_path=cache_state_path,
-                cache_root=cache_root,
-                context=context,
-                emulator_type=emulator_type,
-                generic_mode_seed_materializer=generic_mode_seed_materializer,
-                menu_seed_race_start_materializer=menu_seed_race_start_materializer,
-            )
-        else:
-            materialized_sha256 = _required_materialized_state_sha256(cache_metadata_path)
-        if not cache_metadata_path.is_file():
-            atomic_write_json(
-                cache_metadata_path,
-                {
-                    **payload,
-                    "cache_key": cache_key,
-                    "cache_kind": "course_vehicle_baseline",
-                    "materialized_state_sha256": materialized_sha256,
-                },
-            )
-    return cache_state_path
+            cache_root=cache_root,
+            context=context,
+            emulator_type=emulator_type,
+            generic_mode_seed_materializer=generic_mode_seed_materializer,
+            menu_seed_race_start_materializer=menu_seed_race_start_materializer,
+        )
+        return {"materialized_state_sha256": materialized_sha256}
+
+    return _ensure_cached_state(
+        cache_state_path=cache_state_path,
+        payload=payload,
+        cache_key=cache_key,
+        cache_kind="course_vehicle_baseline",
+        generate_metadata=generate,
+    )
 
 
 def ensure_generic_mode_baseline(
@@ -130,46 +109,25 @@ def ensure_generic_mode_baseline(
     payload = generic_mode_cache_payload(mode=mode, context=context)
     cache_key = sha256_json(payload)
     cache_state_path = generic_mode_state_path(cache_root, mode=mode, cache_key=cache_key)
-    cache_metadata_path = cache_state_path.with_suffix(".json")
-    if cache_entry_is_current(
-        cache_state_path=cache_state_path,
-        cache_metadata_path=cache_metadata_path,
-        expected_kind="generic_mode_seed",
-        expected_cache_key=cache_key,
-    ):
-        return cache_state_path
 
-    with cache_write_lock(cache_state_path):
-        if not cache_entry_is_current(
+    def generate() -> dict[str, object]:
+        materialized_sha256 = generate_generic_mode_state(
+            mode=mode,
             cache_state_path=cache_state_path,
-            cache_metadata_path=cache_metadata_path,
-            expected_kind="generic_mode_seed",
-            expected_cache_key=cache_key,
-        ):
-            cache_state_path.unlink(missing_ok=True)
-            cache_metadata_path.unlink(missing_ok=True)
-            cache_state_path.parent.mkdir(parents=True, exist_ok=True)
-            materialized_sha256 = generate_generic_mode_state(
-                mode=mode,
-                cache_state_path=cache_state_path,
-                cache_root=cache_root,
-                context=context,
-                emulator_type=emulator_type,
-                generic_mode_seed_materializer=generic_mode_seed_materializer,
-            )
-        else:
-            materialized_sha256 = _required_materialized_state_sha256(cache_metadata_path)
-        if not cache_metadata_path.is_file():
-            atomic_write_json(
-                cache_metadata_path,
-                {
-                    **payload,
-                    "cache_key": cache_key,
-                    "cache_kind": "generic_mode_seed",
-                    "materialized_state_sha256": materialized_sha256,
-                },
-            )
-    return cache_state_path
+            cache_root=cache_root,
+            context=context,
+            emulator_type=emulator_type,
+            generic_mode_seed_materializer=generic_mode_seed_materializer,
+        )
+        return {"materialized_state_sha256": materialized_sha256}
+
+    return _ensure_cached_state(
+        cache_state_path=cache_state_path,
+        payload=payload,
+        cache_key=cache_key,
+        cache_kind="generic_mode_seed",
+        generate_metadata=generate,
+    )
 
 
 def ensure_x_cup_baseline(
@@ -196,50 +154,32 @@ def ensure_x_cup_baseline(
     cache_key = sha256_json(payload)
     cache_state_path = x_cup_state_path(cache_root, label=label, cache_key=cache_key)
     cache_metadata_path = cache_state_path.with_suffix(".json")
-    if cache_entry_is_current(
-        cache_state_path=cache_state_path,
-        cache_metadata_path=cache_metadata_path,
-        expected_kind=X_CUP_COURSE.baseline_cache_kind,
-        expected_cache_key=cache_key,
-    ):
-        return cache_state_path, _read_x_cup_metadata(cache_metadata_path)
 
-    with cache_write_lock(cache_state_path):
-        if not cache_entry_is_current(
+    def generate() -> dict[str, object]:
+        materialized_sha256, course = generate_x_cup_state(
+            seed=seed,
+            gp_difficulty=gp_difficulty,
+            vehicle_id=vehicle_id,
+            camera_setting=camera_setting,
             cache_state_path=cache_state_path,
-            cache_metadata_path=cache_metadata_path,
-            expected_kind=X_CUP_COURSE.baseline_cache_kind,
-            expected_cache_key=cache_key,
-        ):
-            cache_state_path.unlink(missing_ok=True)
-            cache_metadata_path.unlink(missing_ok=True)
-            cache_state_path.parent.mkdir(parents=True, exist_ok=True)
-            materialized_sha256, course = generate_x_cup_state(
-                seed=seed,
-                gp_difficulty=gp_difficulty,
-                vehicle_id=vehicle_id,
-                camera_setting=camera_setting,
-                cache_state_path=cache_state_path,
-                cache_root=cache_root,
-                context=context,
-                emulator_type=emulator_type,
-            )
-        else:
-            materialized_sha256 = _required_materialized_state_sha256(cache_metadata_path)
-            course = _read_x_cup_metadata(cache_metadata_path)
-        if not cache_metadata_path.is_file():
-            atomic_write_json(
-                cache_metadata_path,
-                {
-                    **payload,
-                    "cache_key": cache_key,
-                    "cache_kind": X_CUP_COURSE.baseline_cache_kind,
-                    "materialized_state_sha256": materialized_sha256,
-                    "generated_course_segment_count": course.segment_count,
-                    "generated_course_length": course.course_length,
-                },
-            )
-    return cache_state_path, course
+            cache_root=cache_root,
+            context=context,
+            emulator_type=emulator_type,
+        )
+        return {
+            "materialized_state_sha256": materialized_sha256,
+            "generated_course_segment_count": course.segment_count,
+            "generated_course_length": course.course_length,
+        }
+
+    _ensure_cached_state(
+        cache_state_path=cache_state_path,
+        payload=payload,
+        cache_key=cache_key,
+        cache_kind=X_CUP_COURSE.baseline_cache_kind,
+        generate_metadata=generate,
+    )
+    return cache_state_path, _read_x_cup_metadata(cache_metadata_path)
 
 
 def cache_entry_is_current(
@@ -264,6 +204,53 @@ def read_metadata(metadata_path: Path) -> dict[str, object]:
     if not isinstance(raw_metadata, dict):
         raise ValueError(f"Baseline metadata must be a JSON object: {metadata_path}")
     return raw_metadata
+
+
+def _ensure_cached_state(
+    *,
+    cache_state_path: Path,
+    payload: dict[str, object],
+    cache_key: str,
+    cache_kind: str,
+    generate_metadata: Callable[[], dict[str, object]],
+) -> Path:
+    cache_metadata_path = cache_state_path.with_suffix(".json")
+    if cache_entry_is_current(
+        cache_state_path=cache_state_path,
+        cache_metadata_path=cache_metadata_path,
+        expected_kind=cache_kind,
+        expected_cache_key=cache_key,
+    ):
+        return cache_state_path
+
+    with cache_write_lock(cache_state_path):
+        if not cache_entry_is_current(
+            cache_state_path=cache_state_path,
+            cache_metadata_path=cache_metadata_path,
+            expected_kind=cache_kind,
+            expected_cache_key=cache_key,
+        ):
+            cache_state_path.unlink(missing_ok=True)
+            cache_metadata_path.unlink(missing_ok=True)
+            cache_state_path.parent.mkdir(parents=True, exist_ok=True)
+            metadata_update = generate_metadata()
+        else:
+            metadata_update = {
+                "materialized_state_sha256": _required_materialized_state_sha256(
+                    cache_metadata_path,
+                )
+            }
+        if not cache_metadata_path.is_file():
+            atomic_write_json(
+                cache_metadata_path,
+                {
+                    **payload,
+                    "cache_key": cache_key,
+                    "cache_kind": cache_kind,
+                    **metadata_update,
+                },
+            )
+    return cache_state_path
 
 
 def generate_generic_mode_state(
