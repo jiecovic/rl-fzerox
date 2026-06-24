@@ -83,7 +83,12 @@ def save_track_sampling_runtime_state(
 
 
 def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
-    """Serialize one sampler state snapshot for DB or file persistence."""
+    """Serialize one sampler state snapshot for DB or file persistence.
+
+    Keep entry fields in lockstep with TrackSamplingRuntimeEntry. Missing
+    optional fields are handled only in the JSON loader so old snapshots have an
+    explicit compatibility boundary.
+    """
 
     data = {
         "version": 1,
@@ -238,6 +243,8 @@ def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeSta
 
 
 def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingRuntimeEntry]:
+    """Decode persisted entry JSON and clamp counters back to model invariants."""
+
     entries: list[TrackSamplingRuntimeEntry] = []
     for raw_entry in raw_entries:
         if not isinstance(raw_entry, Mapping):

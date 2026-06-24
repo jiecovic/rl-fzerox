@@ -81,6 +81,16 @@ class TrackSamplingGeneratedCourseMetadata:
 
 @dataclass(frozen=True, slots=True)
 class TrackSamplingRuntimeEntry:
+    """Persisted per-course sampler stats.
+
+    episode_count counts terminal samples with usable frame counts.
+    finished_episode_count is the subset that finished the race.
+    success_sample_count means the sampler saw a valid episode sample, not that
+    the race was won or completed. completion_sample_count only counts samples
+    with a progress fraction, so it may lag episode_count. generation_* counters
+    are scoped to the current generated X Cup course and reset on rotation.
+    """
+
     track_id: str
     course_key: str
     label: str
@@ -156,6 +166,8 @@ class TrackSamplingRuntimeState:
 
 @dataclass(slots=True)
 class TrackStepStats:
+    """Mutable training-time mirror of TrackSamplingRuntimeEntry counters."""
+
     base_weight: float
     completed_frames: int = 0
     episode_count: int = 0

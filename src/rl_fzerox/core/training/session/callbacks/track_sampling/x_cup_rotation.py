@@ -120,7 +120,11 @@ class XCupRotationManager:
         env_config: EnvConfig,
         state: TrackSamplingRuntimeState,
     ) -> XCupRotationUpdate | None:
-        """Return one replacement update if an X Cup slot is ready."""
+        """Materialize one replacement update without changing durable ownership."""
+
+        # Rotation is two-phase: rotate_once() prepares a replacement so the
+        # callback can publish config and save runtime state first. commit() is
+        # the only phase that writes the manifest and prunes inactive baselines.
 
         track_sampling = env_config.track_sampling
         rotation = track_sampling.x_cup_rotation
@@ -232,7 +236,7 @@ class XCupRotationManager:
         )
 
     def commit(self, update: XCupRotationUpdate) -> None:
-        """Persist one successful env replacement and prune inactive states."""
+        """Finalize one published env replacement and prune inactive states."""
 
         self._config = update.train_config
         self._slots_by_index = _slots_by_index(update.generated_x_cup_slots)
