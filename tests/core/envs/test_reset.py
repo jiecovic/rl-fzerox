@@ -1,7 +1,6 @@
 # tests/core/envs/test_reset.py
 import pickle
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import pytest
@@ -634,10 +633,8 @@ def test_sequential_track_sampling_can_jump_to_runtime_course_key_for_watch(
     assert third_info["track_course_id"] == "mute_city"
 
 
-@pytest.mark.parametrize("sampling_mode", ("step_balanced", "step_balanced"))
 def test_dynamic_track_sampling_accepts_runtime_weight_updates(
     tmp_path: Path,
-    sampling_mode: Literal["step_balanced", "step_balanced"],
 ) -> None:
     baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
     env = FZeroXEnv(
@@ -646,7 +643,7 @@ def test_dynamic_track_sampling_accepts_runtime_weight_updates(
             action_repeat=1,
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                sampling_mode=sampling_mode,
+                sampling_mode="step_balanced",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute",
@@ -664,13 +661,13 @@ def test_dynamic_track_sampling_accepts_runtime_weight_updates(
     first_info = env.reset(seed=123)[1]
 
     assert first_info["track_id"] in {"mute", "silence"}
-    assert first_info["track_sampling_mode"] == sampling_mode
+    assert first_info["track_sampling_mode"] == "step_balanced"
 
     env.set_track_sampling_weights({"mute": 0.0, "silence": 1.0})
     sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
 
     assert sampled_ids == ["silence", "silence", "silence", "silence"]
-    assert env.reset(seed=123)[1]["track_sampling_mode"] == sampling_mode
+    assert env.reset(seed=123)[1]["track_sampling_mode"] == "step_balanced"
 
 
 def test_step_balanced_track_sampling_excludes_zero_weighted_courses(
