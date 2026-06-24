@@ -11,12 +11,16 @@ from __future__ import annotations
 
 from random import Random
 
-from rl_fzerox.core.engine_tuning.bandit.sampling import (
+from rl_fzerox.core.engine_tuning.bandit.greedy import (
     _bandit_greedy_engine_setting,
+)
+from rl_fzerox.core.engine_tuning.bandit.projection import (
     _candidate_estimate,
     _candidate_uncertainty,
     _EngineEstimate,
     _EngineProjection,
+)
+from rl_fzerox.core.engine_tuning.bandit.sampling import (
     _sample_engine_setting,
     _selection_probabilities,
     _warmup_candidates,
