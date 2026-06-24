@@ -5,7 +5,7 @@ from pathlib import Path
 
 from rl_fzerox.apps.run_manager.worker.cli import _mark_worker_boot_failure
 from rl_fzerox.apps.run_manager.worker.config import _resolved_train_config
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
+from rl_fzerox.core.domain.courses import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,

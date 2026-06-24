@@ -1,7 +1,7 @@
 # tests/core/domain/test_x_cup.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.x_cup import (
+from rl_fzerox.core.domain.courses import (
     X_CUP_COURSE,
     generated_x_cup_course_identity,
     generated_x_cup_slot_key,

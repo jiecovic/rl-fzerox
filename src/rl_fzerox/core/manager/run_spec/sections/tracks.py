@@ -12,9 +12,8 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, X_CUP_COURSE
 from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.manager.run_spec.common import (
     DeficitBudgetDifficultyMetric,
     GpDifficulty,

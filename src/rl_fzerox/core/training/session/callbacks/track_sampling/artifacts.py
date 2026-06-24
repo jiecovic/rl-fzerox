@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackSamplingEntryConfig
 

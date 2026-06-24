@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/grouping.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 
 from .model import (
     BUILT_IN_COURSES_PER_CUP,

@@ -5,7 +5,7 @@ from typing import Literal
 
 import pytest
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.engine_tuning import EngineTuningContext
 from rl_fzerox.core.engine_tuning.contexts import engine_tuning_contexts_for_track_sampling
 from rl_fzerox.core.engine_tuning.training import (

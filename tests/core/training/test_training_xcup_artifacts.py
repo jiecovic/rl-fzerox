@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
+from rl_fzerox.core.domain.courses import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
     restore_generated_x_cup_entries_from_slots,
 )

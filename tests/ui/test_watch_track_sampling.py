@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,

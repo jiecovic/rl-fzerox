@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagedRunConfig, default_managed_run_config
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,

@@ -11,7 +11,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs.paths import RunPaths
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.training.runs.race_start.boundary import (
     race_start_gp_difficulty_raw_value,
 )

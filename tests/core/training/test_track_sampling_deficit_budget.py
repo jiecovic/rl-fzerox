@@ -6,7 +6,7 @@ import pytest
 from rl_fzerox.apps.run_manager.api.payloads.track_sampling import (
     track_sampling_state_payload,
 )
-from rl_fzerox.core.domain.x_cup import generated_x_cup_slot_key
+from rl_fzerox.core.domain.courses import generated_x_cup_slot_key
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     DeficitBudgetCourseSchedulerState,
     DeficitBudgetSchedulerState,

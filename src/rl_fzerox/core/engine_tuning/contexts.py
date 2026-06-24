@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/engine_tuning/contexts.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.engine_tuning.types import EngineTuningContext
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
 

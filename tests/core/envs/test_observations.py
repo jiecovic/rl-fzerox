@@ -5,8 +5,8 @@ from gymnasium import spaces
 
 from fzerox_emulator import stacked_observation_channels
 from fzerox_emulator.arrays import RgbFrame
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.domain.observations import ObservationStateComponentSettings
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.envs.course_effects import CourseEffect
 from rl_fzerox.core.envs.observations import (
     action_history_settings_for_observation,

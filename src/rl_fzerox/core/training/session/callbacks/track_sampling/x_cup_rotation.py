@@ -11,7 +11,7 @@ from pathlib import Path
 from time import monotonic
 from typing import Literal
 
-from rl_fzerox.core.domain.x_cup import (
+from rl_fzerox.core.domain.courses import (
     X_CUP_COURSE,
     GeneratedXCupCourseIdentity,
     generated_x_cup_course_identity,

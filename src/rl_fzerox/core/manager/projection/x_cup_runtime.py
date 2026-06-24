@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingConfig,
     TrackSamplingEntryConfig,

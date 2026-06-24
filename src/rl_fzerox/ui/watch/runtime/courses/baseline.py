@@ -10,7 +10,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from fzerox_emulator import Emulator
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session.callbacks.track_sampling import (

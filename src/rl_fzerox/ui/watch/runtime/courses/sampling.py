@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
     restore_generated_x_cup_track_sampling_artifacts,

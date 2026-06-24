@@ -17,9 +17,9 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.domain.courses import X_CUP_COURSE, XCupGeneratedCourseKind
 from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, XCupGeneratedCourseKind
 from rl_fzerox.core.engine_tuning.types import (
     ENGINE_TUNER_DEFAULTS,
     EngineTunerBackend,

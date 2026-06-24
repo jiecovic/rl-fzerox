@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/x_cup.py
+# src/rl_fzerox/core/domain/courses/x_cup.py
 from __future__ import annotations
 
 import hashlib

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
+from rl_fzerox.core.domain.courses import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
     EnvConfig,
