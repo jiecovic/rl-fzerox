@@ -7,9 +7,7 @@ from dataclasses import dataclass
 from math import sqrt
 from random import Random
 
-import gpytorch
 import torch
-from linear_operator import LinearOperator
 
 from rl_fzerox.core.domain.engine_setting import ENGINE_SLIDER
 from rl_fzerox.core.engine_tuning.experimental.greedy import (
@@ -302,32 +300,6 @@ class _EnginePosterior:
     covariance: torch.Tensor
 
 
-class _EngineGPModel(gpytorch.models.ExactGP):
-    def __init__(
-        self,
-        *,
-        train_x: torch.Tensor,
-        train_y: torch.Tensor,
-        likelihood: gpytorch.likelihoods.FixedNoiseGaussianLikelihood,
-        prior_score: float,
-        lengthscale: float,
-        outputscale: float,
-    ) -> None:
-        super().__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
-        self.mean_module.constant = train_x.new_tensor(prior_score)
-        self.covar_module.base_kernel.lengthscale = train_x.new_tensor(lengthscale)
-        self.covar_module.outputscale = train_x.new_tensor(outputscale)
-        for parameter in self.parameters():
-            parameter.requires_grad_(False)
-
-    def forward(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
-        mean = _call_gpytorch_mean(self.mean_module, x)
-        covariance = _call_gpytorch_covariance(self.covar_module, x)
-        return gpytorch.distributions.MultivariateNormal(mean, covariance)
-
-
 def _candidate_from_state(
     state: EngineTuningRuntimeState,
     context: EngineTuningContext,
@@ -382,30 +354,88 @@ def _gp_posterior(
             for candidate in observed_candidates
         ]
     ).double()
-    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
-        noise=train_noise,
-        learn_additional_noise=False,
-    )
-    model = _EngineGPModel(
+    test_x = torch.Tensor(
+        [[_normalize_engine_raw(raw_value)] for raw_value in candidate_raw_values]
+    ).double()
+    posterior = _exact_gp_posterior(
         train_x=train_x,
         train_y=train_y,
-        likelihood=likelihood,
+        train_noise=train_noise,
+        test_x=test_x,
         prior_score=prior_score,
         lengthscale=_smoothing_bandwidth(settings) / float(ENGINE_SLIDER.max_step),
         outputscale=max(1.0, float(settings.exploration_seconds)) ** 2,
     )
-    model.eval()
-    likelihood.eval()
-    test_x = torch.Tensor(
-        [[_normalize_engine_raw(raw_value)] for raw_value in candidate_raw_values]
-    ).double()
-    with torch.no_grad(), gpytorch.settings.fast_pred_var(), gpytorch.settings.debug(False):
-        posterior = _predict_gp_posterior(model, test_x)
     means = tuple(float(value) for value in posterior.mean.detach().cpu().tolist())
-    variances = posterior.variance.detach().clamp_min(1e-9).cpu().tolist()
+    variances = posterior.covariance.diag().detach().clamp_min(1e-9).cpu().tolist()
     stds = tuple(sqrt(float(value)) for value in variances)
-    covariance = posterior.covariance_matrix.detach().cpu()
+    covariance = posterior.covariance.detach().cpu()
     return _EnginePosterior(means=means, stds=stds, covariance=covariance)
+
+
+@dataclass(frozen=True, slots=True)
+class _TorchPosterior:
+    mean: torch.Tensor
+    covariance: torch.Tensor
+
+
+def _exact_gp_posterior(
+    *,
+    train_x: torch.Tensor,
+    train_y: torch.Tensor,
+    train_noise: torch.Tensor,
+    test_x: torch.Tensor,
+    prior_score: float,
+    lengthscale: float,
+    outputscale: float,
+) -> _TorchPosterior:
+    kernel_train = _rbf_kernel(
+        train_x,
+        train_x,
+        lengthscale=lengthscale,
+        outputscale=outputscale,
+    )
+    kernel_train = kernel_train + torch.diag(train_noise.clamp_min(1e-9))
+    kernel_train = _add_jitter(kernel_train)
+    kernel_cross = _rbf_kernel(
+        train_x,
+        test_x,
+        lengthscale=lengthscale,
+        outputscale=outputscale,
+    )
+    kernel_test = _rbf_kernel(
+        test_x,
+        test_x,
+        lengthscale=lengthscale,
+        outputscale=outputscale,
+    )
+
+    centered_y = train_y - train_y.new_full(train_y.shape, float(prior_score))
+    alpha = torch.linalg.solve(kernel_train, centered_y.unsqueeze(1))
+    mean = test_x.new_full((test_x.shape[0],), float(prior_score)) + (
+        kernel_cross.T @ alpha
+    ).squeeze(1)
+    covariance = kernel_test - kernel_cross.T @ torch.linalg.solve(kernel_train, kernel_cross)
+    covariance = (covariance + covariance.T) * 0.5
+    return _TorchPosterior(mean=mean, covariance=covariance)
+
+
+def _rbf_kernel(
+    left: torch.Tensor,
+    right: torch.Tensor,
+    *,
+    lengthscale: float,
+    outputscale: float,
+) -> torch.Tensor:
+    scale = max(1e-9, float(lengthscale))
+    distances = (left[:, None, :] - right[None, :, :]).pow(2).sum(dim=2)
+    return float(outputscale) * torch.exp(-0.5 * distances / (scale * scale))
+
+
+def _add_jitter(matrix: torch.Tensor) -> torch.Tensor:
+    jitter = matrix.new_zeros(matrix.shape)
+    jitter.fill_diagonal_(1e-9)
+    return matrix + jitter
 
 
 def _sample_posterior_scores(
@@ -421,43 +451,6 @@ def _sample_posterior_scores(
         rng=rng,
     )
     return tuple(float(value) for value in sample_matrix[:, 0].tolist())
-
-
-def _call_gpytorch_mean(module: object, x: torch.Tensor) -> torch.Tensor:
-    """Call a GPyTorch mean module through a checked narrow boundary."""
-
-    if not callable(module):
-        raise TypeError("Expected GPyTorch mean module to be callable")
-    result = module(x)
-    if not isinstance(result, torch.Tensor):
-        raise TypeError("Expected GPyTorch mean module to return a tensor")
-    return result
-
-
-def _call_gpytorch_covariance(
-    module: object,
-    x: torch.Tensor,
-) -> torch.Tensor | LinearOperator:
-    """Call a GPyTorch covariance module through a checked narrow boundary."""
-
-    if not callable(module):
-        raise TypeError("Expected GPyTorch covariance module to be callable")
-    result = module(x)
-    if not isinstance(result, torch.Tensor | LinearOperator):
-        raise TypeError("Expected GPyTorch covariance module to return a covariance object")
-    return result
-
-
-def _predict_gp_posterior(
-    model: object,
-    x: torch.Tensor,
-) -> gpytorch.distributions.MultivariateNormal:
-    if not callable(model):
-        raise TypeError("Expected GPyTorch model to be callable")
-    posterior = model(x)
-    if not isinstance(posterior, gpytorch.distributions.MultivariateNormal):
-        raise TypeError("Expected GPyTorch model to return a posterior distribution")
-    return posterior
 
 
 def _projection_candidate_estimates(
