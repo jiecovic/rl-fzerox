@@ -13,7 +13,7 @@ from fzerox_emulator import (
     stacked_observation_channels,
 )
 from fzerox_emulator.arrays import ObservationFrame
-from rl_fzerox.core.domain.observation_image import preset_geometry
+from rl_fzerox.core.domain.observations import preset_geometry
 from rl_fzerox.core.envs.observations import (
     ObservationValue,
 )

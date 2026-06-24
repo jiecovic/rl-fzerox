@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
+from rl_fzerox.core.domain.observations import ObservationStateComponentSettings
 from rl_fzerox.core.envs.observations.state.components.core import (
     component_controls,
     component_int,

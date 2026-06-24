@@ -5,10 +5,10 @@ from typing import Literal
 
 from pydantic import PositiveFloat
 
-from rl_fzerox.core.domain.observation_image import (
+from rl_fzerox.core.domain.observations import (
     ObservationPresetName as DomainObservationPresetName,
 )
-from rl_fzerox.core.domain.observation_image import (
+from rl_fzerox.core.domain.observations import (
     ObservationResizeFilter as DomainObservationResizeFilter,
 )
 from rl_fzerox.core.domain.track_sampling import (

@@ -9,7 +9,7 @@ from gymnasium import spaces
 
 from fzerox_emulator import FZeroXTelemetry, ObservationSpec, ObservationStackMode
 from fzerox_emulator.arrays import ObservationFrame, StateVector
-from rl_fzerox.core.domain.observation_components import StateComponentsSettings
+from rl_fzerox.core.domain.observations import StateComponentsSettings
 
 from .image import build_image_observation_space
 from .state import ObservationMode, state_vector_spec, telemetry_state_vector

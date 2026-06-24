@@ -7,7 +7,7 @@ from typing import Literal
 import numpy as np
 
 from fzerox_emulator.arrays import Float32Array
-from rl_fzerox.core.domain.observation_components import (
+from rl_fzerox.core.domain.observations import (
     ActionHistoryControlName,
 )
 

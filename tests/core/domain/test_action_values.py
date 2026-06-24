@@ -3,21 +3,11 @@ from __future__ import annotations
 
 import pytest
 
-from rl_fzerox.core.domain.action_adapters import ActionAdapterName as LegacyActionAdapterName
-from rl_fzerox.core.domain.action_values import (
-    compile_action_mask_values as legacy_compile_action_mask_values,
-)
 from rl_fzerox.core.domain.actions import (
     ACTION_BRANCH_SPECS,
     DISCRETE_ACTION_BRANCH_VALUES,
-    ActionAdapterName,
     compile_action_mask_values,
 )
-
-
-def test_legacy_action_values_facade_reexports_public_helpers() -> None:
-    assert LegacyActionAdapterName is ActionAdapterName
-    assert legacy_compile_action_mask_values is compile_action_mask_values
 
 
 def test_action_branch_specs_capture_named_and_fixed_width_branches() -> None:

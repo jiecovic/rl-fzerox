@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/observation_components.py
+# src/rl_fzerox/core/domain/observations/components.py
 from __future__ import annotations
 
 from dataclasses import dataclass

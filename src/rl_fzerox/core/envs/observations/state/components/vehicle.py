@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
+from rl_fzerox.core.domain.observations import ObservationStateComponentSettings
 from rl_fzerox.core.envs.observations.state.types import OBSERVATION_STATE_DEFAULTS, StateFeature
 from rl_fzerox.core.envs.observations.state.utils import clamp
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active, telemetry_can_boost

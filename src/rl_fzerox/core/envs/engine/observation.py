@@ -7,7 +7,7 @@ from gymnasium import spaces
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from fzerox_emulator.arrays import ObservationFrame
-from rl_fzerox.core.domain.observation_components import (
+from rl_fzerox.core.domain.observations import (
     ActionHistoryControlName,
     StateComponentsSettings,
 )

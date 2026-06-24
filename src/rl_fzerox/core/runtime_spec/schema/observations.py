@@ -14,16 +14,14 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.domain.observation_components import (
+from rl_fzerox.core.domain.observations import (
     ActionHistoryControlName,
     ObservationCourseContextName,
+    ObservationResolutionConfig,
     ObservationStateComponentName,
     ObservationStateComponentSettings,
-    TrackPositionProgressSourceName,
-)
-from rl_fzerox.core.domain.observation_image import (
-    ObservationResolutionConfig,
     PresetResolutionChoice,
+    TrackPositionProgressSourceName,
     resolve_observation_geometry,
 )
 from rl_fzerox.core.runtime_spec.renderers import RendererName

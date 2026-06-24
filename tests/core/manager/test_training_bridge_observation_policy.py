@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.domain.observation_image import (
+from rl_fzerox.core.domain.observations import (
     CustomResolutionChoice,
     SourceCropResolutionChoice,
 )

@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/observations/state/__init__.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.observation_components import StateComponentsSettings
+from rl_fzerox.core.domain.observations import StateComponentsSettings
 
 from .api import (
     action_history_feature_names,

@@ -7,8 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from fzerox_emulator import ObservationImageRecipe
-from rl_fzerox.core.domain.observation_components import StateComponentsSettings
-from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
+from rl_fzerox.core.domain.observations import PresetResolutionChoice, StateComponentsSettings
 from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 from rl_fzerox.core.runtime_spec.schema import EnvConfig, ObservationConfig
 

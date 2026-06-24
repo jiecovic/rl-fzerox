@@ -25,7 +25,7 @@ from fzerox_emulator import (
     display_size,
 )
 from fzerox_emulator.arrays import ObservationFrame, Pcm16Samples, RgbFrame
-from rl_fzerox.core.domain.observation_image import ObservationPresetName, preset_geometry
+from rl_fzerox.core.domain.observations import ObservationPresetName, preset_geometry
 from tests.support.native_objects import make_telemetry
 
 _ObservationStackKey = tuple[str, int, ObservationStackMode, bool, object, object]

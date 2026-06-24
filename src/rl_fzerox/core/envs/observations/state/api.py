@@ -7,7 +7,7 @@ import numpy as np
 
 from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
-from rl_fzerox.core.domain.observation_components import StateComponentsSettings
+from rl_fzerox.core.domain.observations import StateComponentsSettings
 
 from .components import (
     action_history_settings_for_observation,

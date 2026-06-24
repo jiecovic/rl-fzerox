@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.domain.observation_components import (
+from rl_fzerox.core.domain.observations import (
     ObservationStateComponentSettings,
     StateComponentsSettings,
     default_excluded_state_feature_names,

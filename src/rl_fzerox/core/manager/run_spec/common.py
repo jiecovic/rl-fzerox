@@ -14,10 +14,10 @@ from rl_fzerox.core.domain.engine_tuning import (
     EngineTunerObjective as EngineTunerObjective,
 )
 from rl_fzerox.core.domain.lean import LeanOutputMode as LeanOutputMode
-from rl_fzerox.core.domain.observation_image import (
+from rl_fzerox.core.domain.observations import (
     ObservationPresetName,
 )
-from rl_fzerox.core.domain.observation_image import (
+from rl_fzerox.core.domain.observations import (
     ObservationResizeFilter as DomainObservationResizeFilter,
 )
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName

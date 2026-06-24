@@ -5,12 +5,10 @@ from collections.abc import Iterable
 
 from rl_fzerox.core.domain.camera import CAMERA_SETTINGS
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
-from rl_fzerox.core.domain.observation_components import (
+from rl_fzerox.core.domain.observations import (
+    OBSERVATION_IMAGE_GEOMETRY,
     ObservationStateComponentName,
     state_feature_default_enabled,
-)
-from rl_fzerox.core.domain.observation_image import (
-    OBSERVATION_IMAGE_GEOMETRY,
 )
 from rl_fzerox.core.domain.race_difficulty import race_difficulty_names
 from rl_fzerox.core.envs.observations.state.components import state_component_definition

@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from fzerox_emulator import ObservationImageRecipe
-from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
+from rl_fzerox.core.domain.observations import PresetResolutionChoice
 from rl_fzerox.core.runtime_spec.schema import EnvConfig, ObservationConfig
 from rl_fzerox.core.training.imitation import (
     BehaviorCloningBatch,

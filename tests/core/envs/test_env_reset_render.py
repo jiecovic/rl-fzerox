@@ -4,7 +4,7 @@ import pytest
 from gymnasium.spaces import Box
 
 from fzerox_emulator.arrays import ObservationFrame
-from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
+from rl_fzerox.core.domain.observations import PresetResolutionChoice
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.observations import ObservationStackMode
 from rl_fzerox.core.envs.observations.state import state_feature_names

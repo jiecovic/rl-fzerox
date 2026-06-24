@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
+from rl_fzerox.core.domain.observations import ObservationStateComponentSettings
 from rl_fzerox.core.envs.observations.state.types import StateFeature
 from rl_fzerox.core.envs.observations.state.utils import clamp
 

@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/domain/observation_image.py
+# src/rl_fzerox/core/domain/observations/image.py
 """Shared observation-image geometry vocabulary.
 
 Manager run-spec, derived runtime manifests, and the frontend all need the same

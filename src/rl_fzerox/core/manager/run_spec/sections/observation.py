@@ -5,17 +5,15 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_serializer, model_validator
 
-from rl_fzerox.core.domain.observation_components import (
+from rl_fzerox.core.domain.observations import (
     ActionHistoryControlName,
     ObservationCourseContextName,
-    ObservationStateComponentName,
-    ObservationStateComponentSettings,
-    TrackPositionProgressSourceName,
-)
-from rl_fzerox.core.domain.observation_image import (
     ObservationRendererName,
     ObservationResolutionConfig,
+    ObservationStateComponentName,
+    ObservationStateComponentSettings,
     PresetResolutionChoice,
+    TrackPositionProgressSourceName,
     resolve_observation_geometry,
 )
 from rl_fzerox.core.manager.run_spec.common import (
