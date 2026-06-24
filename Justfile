@@ -56,6 +56,9 @@ run-manager-check:
 run-manager-build:
     npm run --prefix web/run-manager build
 
+# Build and open the local Markdown documentation preview.
+docs: docs-open-all
+
 # Render one Markdown file to local/preview with GitHub-style CSS and MathJax.
 docs-preview file="README.md":
     @set -euo pipefail; \
@@ -81,8 +84,11 @@ docs-preview file="README.md":
     stem="${input#./}"; \
     stem="${stem%.*}"; \
     title="${stem##*/}"; \
-    output="$preview_dir/${stem//\//_}.html"; \
-    pandoc -f gfm+tex_math_dollars -t html5 -s --mathjax -V body-class=markdown-body --metadata title="$title" --css github-markdown.css "$input" -o "$output"; \
+    output="$preview_dir/$stem.html"; \
+    mkdir -p "$(dirname "$output")"; \
+    css_href="$(realpath --relative-to="$(dirname "$output")" "$css_path")"; \
+    pandoc -f gfm+tex_math_dollars -t html5 -s --mathjax -V body-class=markdown-body --metadata title="$title" --css "$css_href" "$input" -o "$output"; \
+    "{{python_bin}}" -c 'from pathlib import Path; import re, sys; p = Path(sys.argv[1]); text = p.read_text(encoding="utf-8"); text = re.sub("href=\"((?![a-zA-Z][a-zA-Z0-9+.-]*:)[^\"]+)\\.md(#[^\"]*)?\"", "href=\"\\1.html\\2\"", text); p.write_text(text, encoding="utf-8")' "$output"; \
     echo "$output"
 
 # Render one Markdown file and open the generated local preview in the browser.
@@ -92,7 +98,7 @@ docs-open file="README.md":
     input="{{file}}"; \
     stem="${input#./}"; \
     stem="${stem%.*}"; \
-    output="local/preview/${stem//\//_}.html"; \
+    output="local/preview/$stem.html"; \
     xdg-open "$output"
 
 # Render every tracked Markdown file to local/preview.
@@ -107,8 +113,8 @@ docs-preview-all:
 # Render every tracked Markdown file and open the docs index preview.
 docs-open-all:
     @just docs-preview-all
-    @if [ -f local/preview/docs_index.html ]; then \
-        xdg-open local/preview/docs_index.html; \
+    @if [ -f local/preview/docs/index.html ]; then \
+        xdg-open local/preview/docs/index.html; \
     else \
         xdg-open local/preview/README.html; \
     fi
