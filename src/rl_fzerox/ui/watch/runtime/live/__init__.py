@@ -1,4 +1,6 @@
 # src/rl_fzerox/ui/watch/runtime/live/__init__.py
+"""Live Watch runtime facade for normal policy/manual rollouts."""
+
 from rl_fzerox.ui.watch.runtime.live.session import (
     WatchEngineTuningStateCache,
     WatchRuntimeSession,

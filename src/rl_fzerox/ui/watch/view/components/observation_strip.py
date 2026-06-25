@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
+from rl_fzerox.ui.watch.view.components.cockpit.panel import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.game_view import _glass_overlay_surface
 from rl_fzerox.ui.watch.view.components.macro_legend import (
     _draw_macro_legend,

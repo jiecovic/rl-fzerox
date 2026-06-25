@@ -12,8 +12,10 @@ from pathlib import Path
 import numpy as np
 
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.ui.watch.runtime.career_mode.recording import (
+from rl_fzerox.ui.watch.runtime.career_mode.recording.summary.models import (
     _SegmentSummarySnapshot,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.recording.summary.writer import (
     write_segment_summary_files,
 )
 

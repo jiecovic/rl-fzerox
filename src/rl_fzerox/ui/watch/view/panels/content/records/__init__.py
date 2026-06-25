@@ -1,4 +1,6 @@
 # src/rl_fzerox/ui/watch/view/panels/content/records/__init__.py
+"""Track-record side-panel facade."""
+
 from __future__ import annotations
 
 from .sections import track_record_sections

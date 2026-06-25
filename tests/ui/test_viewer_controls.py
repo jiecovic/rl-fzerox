@@ -4,7 +4,7 @@ import pytest
 
 from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
-from rl_fzerox.ui.watch.runtime.snapshots import (
+from rl_fzerox.ui.watch.runtime.snapshots.build import (
     BOOST_LAMP_CONFIG,
     _next_boost_lamp_level,
 )

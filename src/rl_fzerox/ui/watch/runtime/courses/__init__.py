@@ -1,10 +1,14 @@
 # src/rl_fzerox/ui/watch/runtime/courses/__init__.py
+"""Watch course runtime facade.
+
+This facade exposes course-rotation and managed track-sampling types used by
+the live worker. Private baseline save helpers stay in `baseline`.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.ui.watch.runtime.courses.baseline import (
     AltBaselineSaveResult,
-    _save_baseline_state,
-    _save_managed_alt_baseline,
 )
 from rl_fzerox.ui.watch.runtime.courses.commands import (
     CourseCommandResult,
@@ -30,8 +34,6 @@ __all__ = [
     "TrackSamplingRefreshStatus",
     "WatchCourseRotation",
     "WatchCourseTarget",
-    "_save_baseline_state",
-    "_save_managed_alt_baseline",
     "apply_course_navigation_commands",
     "missing_generated_x_cup_baseline_paths",
     "next_watch_reset_after_episode",

@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rl_fzerox.ui.watch.runtime.career_mode.recording.paths import career_session_video_path
-from rl_fzerox.ui.watch.runtime.career_mode.recording.summary import (
+from rl_fzerox.ui.watch.runtime.career_mode.recording.summary.models import (
     _SegmentSummarySnapshot,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.recording.summary.writer import (
     _SessionSummaryWriter,
     write_segment_summary_files,
 )

@@ -1,12 +1,7 @@
 # src/rl_fzerox/ui/watch/view/components/cockpit/__init__.py
-from __future__ import annotations
+"""Cockpit-control drawing package marker.
 
-from rl_fzerox.ui.watch.view.components.cockpit.panel import (
-    _control_viz_panel_height,
-    _draw_control_viz,
-)
-
-__all__ = [
-    "_control_viz_panel_height",
-    "_draw_control_viz",
-]
+The package keeps the composite cockpit panel split across axis, button, speed,
+and thrust drawing modules. Call sites import concrete drawing helpers from the
+module that owns them.
+"""

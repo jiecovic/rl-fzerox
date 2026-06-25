@@ -12,10 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.ui.watch.runtime.career_mode.recording import (
+from rl_fzerox.ui.watch.runtime.career_mode.recording.finalizer import (
     _Mp4RecordingFinalizer,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.recording.paths import career_session_summary_path
+from rl_fzerox.ui.watch.runtime.career_mode.recording.summary.models import (
     _SegmentSummarySnapshot,
-    career_session_summary_path,
 )
 
 

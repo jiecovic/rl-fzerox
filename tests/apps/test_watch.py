@@ -18,7 +18,7 @@ from rl_fzerox.core.runtime_spec.schema import (
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.ui.watch.app import run_viewer
 from rl_fzerox.ui.watch.runtime import WatchWorker
-from rl_fzerox.ui.watch.runtime.policy import (
+from rl_fzerox.ui.watch.runtime.policy.runner import (
     _load_policy_runner,
     _policy_experience_frames,
 )
@@ -191,9 +191,7 @@ def test_resolve_watch_app_config_syncs_manifest_mirror_from_sqlite(
     )
     run.run_dir.mkdir(parents=True)
     (run.run_dir / "train_manifest.yaml").write_text(
-        "removed_top_level_field: stale\n"
-        "env:\n"
-        "  action_repeat: 99\n",
+        "removed_top_level_field: stale\nenv:\n  action_repeat: 99\n",
         encoding="utf-8",
     )
 

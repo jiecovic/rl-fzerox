@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
+from rl_fzerox.ui.watch.view.components.cockpit.panel import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
 from rl_fzerox.ui.watch.view.panels.rendering.text import (
     _centered_text_y,

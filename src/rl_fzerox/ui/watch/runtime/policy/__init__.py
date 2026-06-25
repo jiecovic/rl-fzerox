@@ -1,24 +1,7 @@
 # src/rl_fzerox/ui/watch/runtime/policy/__init__.py
-from rl_fzerox.ui.watch.runtime.policy.runner import (
-    _load_policy_runner,
-    _persist_reload_error,
-    _policy_deterministic,
-    _policy_experience_frames,
-    _policy_label,
-    _policy_num_timesteps,
-    _policy_reload_age_seconds,
-    _policy_reload_error,
-    _reset_policy_runner,
-)
+"""Policy runtime package marker.
 
-__all__ = [
-    "_load_policy_runner",
-    "_persist_reload_error",
-    "_policy_deterministic",
-    "_policy_experience_frames",
-    "_policy_label",
-    "_policy_num_timesteps",
-    "_policy_reload_age_seconds",
-    "_policy_reload_error",
-    "_reset_policy_runner",
-]
+Watch policy helpers are intentionally imported from their concrete modules:
+`runner` owns loading/reload metadata, `cnn` owns activation capture, and
+`visualization` owns paused-view auxiliary/CNN refreshes.
+"""

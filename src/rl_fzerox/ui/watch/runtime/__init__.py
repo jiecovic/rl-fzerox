@@ -1,4 +1,6 @@
 # src/rl_fzerox/ui/watch/runtime/__init__.py
+"""Runtime IPC facade used by Watch app and CLI entrypoints."""
+
 from rl_fzerox.ui.watch.runtime.ipc import (
     WatchSnapshot,
     WatchWorker,

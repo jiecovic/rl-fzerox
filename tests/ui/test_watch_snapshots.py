@@ -15,10 +15,12 @@ from rl_fzerox.core.runtime_spec.schema import (
 )
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
-from rl_fzerox.ui.watch.runtime.snapshots import (
-    _audio_chunks_for_frames,
+from rl_fzerox.ui.watch.runtime.snapshots.build import (
     _build_snapshot,
     _publish_step_snapshots,
+)
+from rl_fzerox.ui.watch.runtime.snapshots.frames import (
+    _audio_chunks_for_frames,
     _recording_frame_info,
 )
 from tests.ui.viewer_support import record_book, record_entry

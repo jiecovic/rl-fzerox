@@ -1,4 +1,10 @@
 # src/rl_fzerox/ui/watch/runtime/ipc/__init__.py
+"""Watch worker IPC facade.
+
+This package exposes the process-boundary message types, queues, and worker
+startup helpers shared by live Watch and Career Mode Watch.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.ui.watch.runtime.ipc.messages import (

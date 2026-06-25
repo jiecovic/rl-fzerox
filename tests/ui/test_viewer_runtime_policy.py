@@ -7,7 +7,7 @@ useful errors without repeatedly appending the same message.
 
 from pathlib import Path
 
-from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
+from rl_fzerox.ui.watch.runtime.policy.runner import _persist_reload_error
 
 
 def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:

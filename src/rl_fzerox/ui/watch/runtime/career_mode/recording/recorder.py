@@ -35,8 +35,6 @@ from rl_fzerox.ui.watch.runtime.career_mode.recording.paths import (
     career_segment_recording_path,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.recording.summary import (
-    _SegmentSummaryBuilder,
-    _SegmentSummarySnapshot,
     attempt_id,
     continuing_race_result,
     last_finished_attempt_id,
@@ -44,6 +42,10 @@ from rl_fzerox.ui.watch.runtime.career_mode.recording.summary import (
     post_gp_exit_frame,
     segment_label,
     utc_timestamp,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.recording.summary.models import (
+    _SegmentSummaryBuilder,
+    _SegmentSummarySnapshot,
 )
 
 RecordingSegmentStatus = Literal["succeeded", "failed"]
