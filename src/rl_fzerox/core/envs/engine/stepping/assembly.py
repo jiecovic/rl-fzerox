@@ -14,7 +14,13 @@ from fzerox_emulator import (
 from fzerox_emulator.boundary import StepStatusDict
 from rl_fzerox.core.envs.actions.continuous_controls import requested_gas_level
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
-from rl_fzerox.core.envs.rewards import RewardActionContext, RewardSummaryConfig, RewardTracker
+from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.envs.rewards import (
+    RewardActionContext,
+    RewardStep,
+    RewardSummaryConfig,
+    RewardTracker,
+)
 from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.runtime_spec.schema import EnvConfig
 from rl_fzerox.core.runtime_spec.schema.actions import ActionRuntimeConfig
@@ -74,6 +80,31 @@ class _EpisodeStepStatus:
     progress_frontier_initialized: bool
 
 
+@dataclass(frozen=True, slots=True)
+class _StepActionContext:
+    requested_control_state: RaceControlState
+    applied_control_state: RaceControlState
+    reward_context: RewardActionContext
+    gas_level: float
+    steer_level: float
+    lean_level: float
+    requested_lean_level: float
+    air_brake_requested: bool
+    air_brake_used: bool
+    boost_used: bool
+    lean_used: bool
+    spin_requested: bool
+    spin_started: bool
+    spin_active_frames: int
+
+
+@dataclass(frozen=True, slots=True)
+class _EpisodeStepCounters:
+    boost_pad_entries: int
+    boost_pad_entered: bool
+    airborne_frames: int
+
+
 @dataclass(slots=True)
 class EngineStepAssembler:
     """Assemble one native repeated-step result into Gym/watch env outputs."""
@@ -111,26 +142,121 @@ class EngineStepAssembler:
         requested_control_state = request.requested_control_state or request.control_state
         applied_control_state = request.control_state
         step_result = self._native_step(applied_control_state, request)
-        episode_status = (
-            _live_race_episode_status(
-                request=request,
-                step_result=step_result,
-                config=self.config,
-            )
-            if live_race_status
-            else _native_episode_status(
-                request=request,
-                step_result=step_result,
-                config=self.config,
-            )
+        episode_status = self._episode_status(
+            request=request,
+            step_result=step_result,
+            live_race_status=live_race_status,
         )
         status = episode_status.status
+        telemetry = step_result.telemetry
+        info = self._base_info(request)
+        action_context = self._step_action_context(
+            request=request,
+            step_result=step_result,
+            requested_control_state=requested_control_state,
+            applied_control_state=applied_control_state,
+        )
+        reward_step = self.reward_tracker.step_summary(
+            step_result.summary,
+            status,
+            telemetry,
+            action_context.reward_context,
+        )
+        reward = reward_step.reward
+        raw_reward = reward if reward_step.raw_reward is None else reward_step.raw_reward
+        terminated = status.terminated
+        truncated = status.truncated
+        counters = _episode_step_counters(
+            request=request,
+            step_result=step_result,
+        )
 
+        self._apply_step_info(
+            info,
+            request=request,
+            step_result=step_result,
+            status=status,
+            telemetry=telemetry,
+            action_context=action_context,
+            reward_step=reward_step,
+            reward=reward,
+            raw_reward=raw_reward,
+            counters=counters,
+        )
+        self._sync_post_step_controls(
+            info,
+            step_result=step_result,
+            status=status,
+            telemetry=telemetry,
+            action_context=action_context,
+        )
+
+        episode_return = request.episode_return + reward
+        observation = self._build_step_observation(
+            info,
+            step_result=step_result,
+            telemetry=telemetry,
+            episode_return=episode_return,
+        )
+
+        return EnvStepAssembly(
+            step=WatchEnvStep(
+                observation=observation,
+                reward=reward,
+                terminated=terminated,
+                truncated=truncated,
+                info=info,
+                display_frames=step_result.display_frames,
+                display_controller_masks=step_result.display_controller_masks,
+                audio_samples=step_result.audio_samples,
+                audio_frame_counts=step_result.audio_frame_counts,
+            ),
+            telemetry=telemetry,
+            requested_control_state=requested_control_state,
+            gas_level=action_context.gas_level,
+            episode_frame_count=status.step_count,
+            episode_stalled_steps=status.stalled_steps,
+            episode_progress_frontier_stalled_frames=(status.progress_frontier_stalled_frames),
+            episode_progress_frontier_distance=episode_status.progress_frontier_distance,
+            episode_progress_frontier_initialized=(episode_status.progress_frontier_initialized),
+            episode_return=episode_return,
+            episode_boost_pad_entries=counters.boost_pad_entries,
+            episode_airborne_frames=counters.airborne_frames,
+        )
+
+    def _episode_status(
+        self,
+        *,
+        request: EnvStepRequest,
+        step_result: BackendStepResult,
+        live_race_status: bool,
+    ) -> _EpisodeStepStatus:
+        if live_race_status:
+            return _live_race_episode_status(
+                request=request,
+                step_result=step_result,
+                config=self.config,
+            )
+        return _native_episode_status(
+            request=request,
+            step_result=step_result,
+            config=self.config,
+        )
+
+    def _base_info(self, request: EnvStepRequest) -> dict[str, object]:
         info = backend_step_info(self.backend)
         if request.active_track is not None:
             info.update(request.active_track.info())
+        return info
 
-        telemetry = step_result.telemetry
+    def _step_action_context(
+        self,
+        *,
+        request: EnvStepRequest,
+        step_result: BackendStepResult,
+        requested_control_state: RaceControlState,
+        applied_control_state: RaceControlState,
+    ) -> _StepActionContext:
         gas_level = requested_gas_level(
             control_state=requested_control_state,
             drive_axis=request.action_drive_axis,
@@ -142,22 +268,14 @@ class EngineStepAssembler:
         )
         steer_level = _clamped_axis(requested_control_state.stick_x)
         pitch_level = _clamped_axis(requested_control_state.pitch)
-        lean_level = signed_lean(lean_index_from_control(applied_control_state))
-        requested_lean_level = signed_lean(lean_index_from_control(requested_control_state))
-
         boost_used = applied_control_state.boost
         lean_used = applied_control_state.lean_left or applied_control_state.lean_right
         spin_requested = request.spin_request != "none"
-        spin_started = bool(step_result.summary.spin_macro_started)
-        spin_active_frames = int(step_result.summary.spin_macro_active_frames)
-        air_brake_requested = requested_control_state.air_brake
-        air_brake_used = applied_control_state.air_brake
-        reward_step = self.reward_tracker.step_summary(
-            step_result.summary,
-            status,
-            telemetry,
-            RewardActionContext(
-                air_brake_requested=air_brake_used,
+        return _StepActionContext(
+            requested_control_state=requested_control_state,
+            applied_control_state=applied_control_state,
+            reward_context=RewardActionContext(
+                air_brake_requested=applied_control_state.air_brake,
                 boost_requested=boost_used,
                 lean_requested=lean_used,
                 spin_requested=spin_requested,
@@ -167,21 +285,33 @@ class EngineStepAssembler:
                 pitch_deadzone=float(self.action_config.pitch_deadzone),
                 drive_axis=request.action_drive_axis,
             ),
-        )
-        reward = reward_step.reward
-        raw_reward = reward if reward_step.raw_reward is None else reward_step.raw_reward
-        reward_breakdown = dict(reward_step.breakdown)
-        terminated = status.terminated
-        truncated = status.truncated
-
-        episode_boost_pad_entries = request.episode_boost_pad_entries
-        boost_pad_entered = bool(step_result.summary.entered_dash_surface)
-        if boost_pad_entered:
-            episode_boost_pad_entries += 1
-        episode_airborne_frames = request.episode_airborne_frames + int(
-            step_result.summary.airborne_frames
+            gas_level=gas_level,
+            steer_level=steer_level,
+            lean_level=signed_lean(lean_index_from_control(applied_control_state)),
+            requested_lean_level=signed_lean(lean_index_from_control(requested_control_state)),
+            air_brake_requested=requested_control_state.air_brake,
+            air_brake_used=applied_control_state.air_brake,
+            boost_used=boost_used,
+            lean_used=lean_used,
+            spin_requested=spin_requested,
+            spin_started=bool(step_result.summary.spin_macro_started),
+            spin_active_frames=int(step_result.summary.spin_macro_active_frames),
         )
 
+    def _apply_step_info(
+        self,
+        info: dict[str, object],
+        *,
+        request: EnvStepRequest,
+        step_result: BackendStepResult,
+        status: StepStatus,
+        telemetry: FZeroXTelemetry | None,
+        action_context: _StepActionContext,
+        reward_step: RewardStep,
+        reward: float,
+        raw_reward: float,
+        counters: _EpisodeStepCounters,
+    ) -> None:
         info["step_reward"] = reward
         info["step_reward_raw"] = raw_reward
         info["step_reward_clipped"] = raw_reward != reward
@@ -201,30 +331,30 @@ class EngineStepAssembler:
         info["entered_crashed"] = bool(step_result.summary.entered_crashed)
         info["entered_retired"] = bool(step_result.summary.entered_retired)
         info["entered_finished"] = bool(step_result.summary.entered_finished)
-        info["episode_airborne_frames"] = episode_airborne_frames
-        info["boost_pad_entered"] = boost_pad_entered
-        info["gas_level"] = gas_level
-        info["steer_level"] = steer_level
-        info["lean_level"] = lean_level
-        info["lean_request_level"] = requested_lean_level
+        info["episode_airborne_frames"] = counters.airborne_frames
+        info["boost_pad_entered"] = counters.boost_pad_entered
+        info["gas_level"] = action_context.gas_level
+        info["steer_level"] = action_context.steer_level
+        info["lean_level"] = action_context.lean_level
+        info["lean_request_level"] = action_context.requested_lean_level
         info["lean_episode_masked"] = self.mask_controller.lean_episode_masked
         info["air_brake_episode_masked"] = self.mask_controller.air_brake_episode_masked
         info["spin_episode_masked"] = self.mask_controller.spin_episode_masked
-        info["gas_used"] = gas_level > 0.0
-        info["air_brake_requested"] = air_brake_requested
-        info["air_brake_used"] = air_brake_used
-        info["boost_used"] = boost_used
-        info["lean_used"] = lean_used
-        info["spin_requested"] = spin_requested
+        info["gas_used"] = action_context.gas_level > 0.0
+        info["air_brake_requested"] = action_context.air_brake_requested
+        info["air_brake_used"] = action_context.air_brake_used
+        info["boost_used"] = action_context.boost_used
+        info["lean_used"] = action_context.lean_used
+        info["spin_requested"] = action_context.spin_requested
         info["spin_request"] = request.spin_request
-        info["spin_started"] = spin_started
-        info["spin_macro_active_frames"] = spin_active_frames
+        info["spin_started"] = action_context.spin_started
+        info["spin_macro_active_frames"] = action_context.spin_active_frames
         info["lean_macro_owned_frames"] = int(step_result.summary.lean_macro_owned_frames)
         info["spin_macro_active"] = bool(status.spin_macro_active)
         info["spin_macro_frames_remaining"] = int(status.spin_macro_frames_remaining)
         info["spin_macro_cooldown_frames"] = int(status.spin_macro_cooldown_frames)
-        if reward_breakdown:
-            info["reward_breakdown"] = reward_breakdown
+        if reward_step.breakdown:
+            info["reward_breakdown"] = dict(reward_step.breakdown)
         if reward_step.debug_info:
             info.update(reward_step.debug_info)
         info["episode_step"] = status.step_count
@@ -237,13 +367,22 @@ class EngineStepAssembler:
             # Keep env info pickle-safe for SubprocVecEnv workers.
             info.update(telemetry_info(telemetry))
         info.update(self.reward_tracker.info(telemetry))
-        set_episode_boost_pad_info(info, episode_boost_pad_entries=episode_boost_pad_entries)
+        set_episode_boost_pad_info(info, episode_boost_pad_entries=counters.boost_pad_entries)
 
+    def _sync_post_step_controls(
+        self,
+        info: dict[str, object],
+        *,
+        step_result: BackendStepResult,
+        status: StepStatus,
+        telemetry: FZeroXTelemetry | None,
+        action_context: _StepActionContext,
+    ) -> None:
         self.control_state.record_step(
-            control_state=applied_control_state,
-            requested_control_state=requested_control_state,
+            control_state=action_context.applied_control_state,
+            requested_control_state=action_context.requested_control_state,
             frames_run=step_result.summary.frames_run,
-            gas_level=gas_level,
+            gas_level=action_context.gas_level,
         )
         spin_owns_lean = status.spin_macro_active or status.spin_macro_cooldown_frames > 0
         self.mask_controller.set_lean_allowed_values(
@@ -268,44 +407,27 @@ class EngineStepAssembler:
             mask_boost_when_airborne=self.action_config.mask_boost_when_airborne,
         )
 
+    def _build_step_observation(
+        self,
+        info: dict[str, object],
+        *,
+        step_result: BackendStepResult,
+        telemetry: FZeroXTelemetry | None,
+        episode_return: float,
+    ) -> ObservationValue:
         image_observation = step_result.observation
         observation = self.observation_builder.build_observation(
             image=image_observation,
             telemetry=telemetry,
             control_state=self.control_state,
         )
-        episode_return = request.episode_return + reward
         info["episode_return"] = episode_return
         ensure_monitor_info_keys(info)
         self.observation_builder.set_info(
             info,
             image_shape=tuple(int(value) for value in image_observation.shape),
         )
-
-        return EnvStepAssembly(
-            step=WatchEnvStep(
-                observation=observation,
-                reward=reward,
-                terminated=terminated,
-                truncated=truncated,
-                info=info,
-                display_frames=step_result.display_frames,
-                display_controller_masks=step_result.display_controller_masks,
-                audio_samples=step_result.audio_samples,
-                audio_frame_counts=step_result.audio_frame_counts,
-            ),
-            telemetry=telemetry,
-            requested_control_state=requested_control_state,
-            gas_level=gas_level,
-            episode_frame_count=status.step_count,
-            episode_stalled_steps=status.stalled_steps,
-            episode_progress_frontier_stalled_frames=(status.progress_frontier_stalled_frames),
-            episode_progress_frontier_distance=episode_status.progress_frontier_distance,
-            episode_progress_frontier_initialized=(episode_status.progress_frontier_initialized),
-            episode_return=episode_return,
-            episode_boost_pad_entries=episode_boost_pad_entries,
-            episode_airborne_frames=episode_airborne_frames,
-        )
+        return observation
 
     def _native_step(
         self,
@@ -370,6 +492,21 @@ def set_episode_boost_pad_info(
         info["boost_pad_entries_per_lap"] = None
         return
     info["boost_pad_entries_per_lap"] = episode_boost_pad_entries / float(laps_completed)
+
+
+def _episode_step_counters(
+    *,
+    request: EnvStepRequest,
+    step_result: BackendStepResult,
+) -> _EpisodeStepCounters:
+    boost_pad_entered = bool(step_result.summary.entered_dash_surface)
+    boost_pad_entries = request.episode_boost_pad_entries + int(boost_pad_entered)
+    airborne_frames = request.episode_airborne_frames + int(step_result.summary.airborne_frames)
+    return _EpisodeStepCounters(
+        boost_pad_entries=boost_pad_entries,
+        boost_pad_entered=boost_pad_entered,
+        airborne_frames=airborne_frames,
+    )
 
 
 def _clamped_axis(value: float) -> float:
