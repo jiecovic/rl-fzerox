@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/projection/runtime.py
+"""Runtime-state restoration helpers for managed training resumes."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.projection.x_cup_runtime import (

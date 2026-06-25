@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/common.py
+"""Shared ids, validation, and scalar coercions for manager registries."""
+
 from __future__ import annotations
 
 import os

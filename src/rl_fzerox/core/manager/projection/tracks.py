@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/projection/tracks.py
+"""Managed-run to training track-sampling projection."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.domain.courses import (

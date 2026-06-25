@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/drafts/fork_sources.py
+"""Filesystem snapshot handling for draft fork sources."""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/runs/runtime.py
+"""Runtime metrics, events, and fork-source updates for runs."""
+
 from __future__ import annotations
 
 from pathlib import Path

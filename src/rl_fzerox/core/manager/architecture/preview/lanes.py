@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/architecture/preview/lanes.py
+"""Diagram lane assembly for policy architecture previews."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.architecture.models import (

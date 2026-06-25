@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/lineages/metadata.py
+"""Lineage group metadata updates and normalization."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

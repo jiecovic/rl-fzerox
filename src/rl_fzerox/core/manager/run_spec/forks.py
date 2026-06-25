@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/run_spec/forks.py
+"""Managed config edits applied when resetting fork-specific bias."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.run_spec.run import ManagedRunConfig

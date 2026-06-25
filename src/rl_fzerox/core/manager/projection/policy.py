@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/projection/policy.py
+"""Managed-run to training policy-config projection."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig

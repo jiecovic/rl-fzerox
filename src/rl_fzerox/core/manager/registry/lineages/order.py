@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/lineages/order.py
+"""Helpers for stable lineage deletion ordering."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/architecture/metadata.py
+"""Metadata catalogs exposed to run-manager configuration forms."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable

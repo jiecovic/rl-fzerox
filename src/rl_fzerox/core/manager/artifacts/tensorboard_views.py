@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/artifacts/tensorboard_views.py
+"""Filesystem builder for generated TensorBoard lineage views."""
+
 from __future__ import annotations
 
 import re

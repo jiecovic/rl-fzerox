@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/models.py
+"""Dataclasses returned by the ManagerStore domain API."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

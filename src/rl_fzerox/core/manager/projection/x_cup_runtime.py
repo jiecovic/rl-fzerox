@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/projection/x_cup_runtime.py
+"""X-Cup runtime restoration from SQLite-managed generated slots."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

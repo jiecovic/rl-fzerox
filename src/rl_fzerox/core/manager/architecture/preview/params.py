@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/architecture/preview/params.py
+"""Parameter and shape estimators for architecture previews."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.domain.policy import (

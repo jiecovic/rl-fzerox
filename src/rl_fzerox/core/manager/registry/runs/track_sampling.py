@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/runs/track_sampling.py
+"""SQLite persistence for runtime track-sampling state."""
+
 from __future__ import annotations
 
 from pathlib import Path

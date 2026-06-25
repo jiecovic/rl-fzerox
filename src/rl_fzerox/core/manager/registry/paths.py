@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/paths.py
+"""Path resolution helpers for manager-owned local artifacts."""
+
 from __future__ import annotations
 
 from pathlib import Path

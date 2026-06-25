@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/architecture/preview/actions.py
+"""Action-branch preview helpers for policy architecture summaries."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.architecture.models import ActionBranchPreview

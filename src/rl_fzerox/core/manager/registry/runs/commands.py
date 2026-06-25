@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/runs/commands.py
+"""Run command request and acknowledgement registry operations."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

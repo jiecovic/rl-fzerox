@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/transfer/models.py
+"""Pydantic models for portable run bundle manifests."""
+
 from __future__ import annotations
 
 from typing import Literal

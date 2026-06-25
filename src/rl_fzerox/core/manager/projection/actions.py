@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/projection/actions.py
+"""Managed-run to training action-config projection."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig

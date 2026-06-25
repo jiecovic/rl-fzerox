@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/runs/workers.py
+"""Run worker lease registration and heartbeat operations."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/runs/lifecycle.py
+"""Run creation, lookup, and lifecycle status registry operations."""
+
 from __future__ import annotations
 
 import sqlite3

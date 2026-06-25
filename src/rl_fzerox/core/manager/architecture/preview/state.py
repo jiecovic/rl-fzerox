@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/architecture/preview/state.py
+"""Observation and state shape previews for managed configs."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.architecture.metadata import component_features

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/runs/alt_baselines.py
+"""Registry operations for track-sampling alternate baselines."""
+
 from __future__ import annotations
 
 from pathlib import Path

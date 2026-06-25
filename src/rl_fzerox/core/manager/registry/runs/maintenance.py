@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/runs/maintenance.py
+"""Maintenance tasks for stale workers and pending filesystem cleanup."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

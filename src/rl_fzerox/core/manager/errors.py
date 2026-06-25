@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/errors.py
+"""Exception types shared by manager registry and API layers."""
+
 from __future__ import annotations
 
 

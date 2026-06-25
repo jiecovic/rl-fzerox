@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/transfer/archive.py
+"""Import and export of portable managed run bundles."""
+
 from __future__ import annotations
 
 import shutil

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/tensorboard.py
+"""Registry facade for rebuilding TensorBoard lineage views."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/drafts/store.py
+"""Draft and template registry operations for managed run specs."""
+
 from __future__ import annotations
 
 from dataclasses import replace

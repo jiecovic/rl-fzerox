@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/architecture/models.py
+"""Pydantic models for manager metadata and policy architecture previews."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict

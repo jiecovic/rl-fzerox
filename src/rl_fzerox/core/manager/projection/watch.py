@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/projection/watch.py
+"""Managed-run to watch-app config projection."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

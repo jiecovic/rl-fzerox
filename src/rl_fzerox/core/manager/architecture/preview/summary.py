@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/architecture/preview/summary.py
+"""Top-level policy architecture preview assembly."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.manager.architecture.models import (

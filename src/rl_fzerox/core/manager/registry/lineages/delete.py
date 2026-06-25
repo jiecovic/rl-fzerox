@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/manager/registry/lineages/delete.py
+"""Deletion flows for managed runs and lineages."""
+
 from __future__ import annotations
 
 from pathlib import Path
