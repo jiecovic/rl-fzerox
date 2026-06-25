@@ -312,6 +312,7 @@ class EngineStepAssembler:
         raw_reward: float,
         counters: _EpisodeStepCounters,
     ) -> None:
+        summary = step_result.summary
         info["step_reward"] = reward
         info["step_reward_raw"] = raw_reward
         info["step_reward_clipped"] = raw_reward != reward
@@ -319,18 +320,18 @@ class EngineStepAssembler:
         info["step_reward_clip_abs_excess"] = abs(reward - raw_reward)
         info["step_reward_clip_positive"] = raw_reward > reward
         info["step_reward_clip_negative"] = raw_reward < reward
-        info["frames_run"] = int(step_result.summary.frames_run)
-        info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
-        info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
-        info["energy_gain_total"] = float(step_result.summary.energy_gain_total)
-        info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
-        info["impact_frames"] = int(step_result.summary.impact_frames)
-        info["airborne_frames"] = int(step_result.summary.airborne_frames)
-        info["entered_state_flags"] = int(step_result.summary.entered_state_flags)
-        info["entered_state_labels"] = tuple(step_result.summary.entered_state_labels)
-        info["entered_crashed"] = bool(step_result.summary.entered_crashed)
-        info["entered_retired"] = bool(step_result.summary.entered_retired)
-        info["entered_finished"] = bool(step_result.summary.entered_finished)
+        info["frames_run"] = int(summary.frames_run)
+        info["repeat_index"] = max(summary.frames_run - 1, 0)
+        info["energy_loss_total"] = float(summary.energy_loss_total)
+        info["energy_gain_total"] = float(summary.energy_gain_total)
+        info["damage_taken_frames"] = int(summary.damage_taken_frames)
+        info["impact_frames"] = int(summary.impact_frames)
+        info["airborne_frames"] = int(summary.airborne_frames)
+        info["entered_state_flags"] = int(summary.entered_state_flags)
+        info["entered_state_labels"] = tuple(summary.entered_state_labels)
+        info["entered_crashed"] = bool(summary.entered_crashed)
+        info["entered_retired"] = bool(summary.entered_retired)
+        info["entered_finished"] = bool(summary.entered_finished)
         info["episode_airborne_frames"] = counters.airborne_frames
         info["boost_pad_entered"] = counters.boost_pad_entered
         info["gas_level"] = action_context.gas_level
@@ -349,7 +350,7 @@ class EngineStepAssembler:
         info["spin_request"] = request.spin_request
         info["spin_started"] = action_context.spin_started
         info["spin_macro_active_frames"] = action_context.spin_active_frames
-        info["lean_macro_owned_frames"] = int(step_result.summary.lean_macro_owned_frames)
+        info["lean_macro_owned_frames"] = int(summary.lean_macro_owned_frames)
         info["spin_macro_active"] = bool(status.spin_macro_active)
         info["spin_macro_frames_remaining"] = int(status.spin_macro_frames_remaining)
         info["spin_macro_cooldown_frames"] = int(status.spin_macro_cooldown_frames)
@@ -378,10 +379,11 @@ class EngineStepAssembler:
         telemetry: FZeroXTelemetry | None,
         action_context: _StepActionContext,
     ) -> None:
+        summary = step_result.summary
         self.control_state.record_step(
             control_state=action_context.applied_control_state,
             requested_control_state=action_context.requested_control_state,
-            frames_run=step_result.summary.frames_run,
+            frames_run=summary.frames_run,
             gas_level=action_context.gas_level,
         )
         spin_owns_lean = status.spin_macro_active or status.spin_macro_cooldown_frames > 0
@@ -499,9 +501,10 @@ def _episode_step_counters(
     request: EnvStepRequest,
     step_result: BackendStepResult,
 ) -> _EpisodeStepCounters:
-    boost_pad_entered = bool(step_result.summary.entered_dash_surface)
+    summary = step_result.summary
+    boost_pad_entered = bool(summary.entered_dash_surface)
     boost_pad_entries = request.episode_boost_pad_entries + int(boost_pad_entered)
-    airborne_frames = request.episode_airborne_frames + int(step_result.summary.airborne_frames)
+    airborne_frames = request.episode_airborne_frames + int(summary.airborne_frames)
     return _EpisodeStepCounters(
         boost_pad_entries=boost_pad_entries,
         boost_pad_entered=boost_pad_entered,
