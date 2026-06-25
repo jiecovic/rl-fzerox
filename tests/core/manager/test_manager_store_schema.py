@@ -104,7 +104,7 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
     assert draft.config.reward.time_penalty_per_frame == 0.0
 
 
-def test_manager_config_ignores_removed_adaptive_step_balance_fields() -> None:
+def test_manager_config_rejects_removed_adaptive_step_balance_fields() -> None:
     config_data = default_managed_run_config().model_dump(mode="json")
     config_data["tracks"].update(
         {
@@ -116,35 +116,23 @@ def test_manager_config_ignores_removed_adaptive_step_balance_fields() -> None:
         }
     )
 
-    config = ManagedRunConfig.model_validate(config_data)
-    serialized_tracks = config.model_dump(mode="json")["tracks"]
-
-    assert config.tracks.sampling_mode == "step_balanced"
-    assert "adaptive_step_balance_completion_weight" not in serialized_tracks
-    assert "adaptive_step_balance_confidence_scale" not in serialized_tracks
-    assert "adaptive_step_balance_min_confidence_episodes" not in serialized_tracks
-    assert "adaptive_step_balance_target_completion" not in serialized_tracks
+    with pytest.raises(ValidationError):
+        ManagedRunConfig.model_validate(config_data)
 
 
-def test_manager_config_maps_removed_track_sampling_mode_names() -> None:
+@pytest.mark.parametrize("old_mode", ("adaptive_step_balanced", "balanced", "random"))
+def test_manager_config_rejects_removed_track_sampling_mode_names(old_mode: str) -> None:
     base_config_data = default_managed_run_config().model_dump(mode="json")
+    config_data = {
+        **base_config_data,
+        "tracks": {
+            **base_config_data["tracks"],
+            "sampling_mode": old_mode,
+        },
+    }
 
-    for old_mode, expected_mode in {
-        "adaptive_step_balanced": "step_balanced",
-        "balanced": "equal",
-        "random": "equal",
-    }.items():
-        config_data = {
-            **base_config_data,
-            "tracks": {
-                **base_config_data["tracks"],
-                "sampling_mode": old_mode,
-            },
-        }
-
-        config = ManagedRunConfig.model_validate(config_data)
-
-        assert config.tracks.sampling_mode == expected_mode
+    with pytest.raises(ValidationError):
+        ManagedRunConfig.model_validate(config_data)
 
 
 def test_mlp_engine_tuner_snapshot_omits_gp_only_fields() -> None:

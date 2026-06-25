@@ -38,18 +38,6 @@ from rl_fzerox.core.runtime_spec.schema.common import (
     TrackSamplingMode,
 )
 
-_REMOVED_TRACK_SAMPLING_FIELDS = (
-    "adaptive_step_balance_completion_weight",
-    "adaptive_step_balance_confidence_scale",
-    "adaptive_step_balance_min_confidence_episodes",
-    "adaptive_step_balance_target_completion",
-)
-_RENAMED_TRACK_SAMPLING_MODES = {
-    "adaptive_step_balanced": "step_balanced",
-    "balanced": "equal",
-    "random": "equal",
-}
-
 
 class TrackRecordEntryConfig(BaseModel):
     """One human reference time for a track."""
@@ -294,22 +282,6 @@ class TrackSamplingConfig(BaseModel):
     step_balance_log_details: bool = False
     x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
     engine_tuning: AdaptiveEngineTuningConfig = Field(default_factory=AdaptiveEngineTuningConfig)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _drop_removed_fields(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        cleaned = dict(data)
-        sampling_mode = cleaned.get("sampling_mode")
-        if isinstance(sampling_mode, str):
-            cleaned["sampling_mode"] = _RENAMED_TRACK_SAMPLING_MODES.get(
-                sampling_mode,
-                sampling_mode,
-            )
-        for field_name in _REMOVED_TRACK_SAMPLING_FIELDS:
-            cleaned.pop(field_name, None)
-        return cleaned
 
     @model_validator(mode="after")
     def _validate_entries_when_enabled(self) -> TrackSamplingConfig:
