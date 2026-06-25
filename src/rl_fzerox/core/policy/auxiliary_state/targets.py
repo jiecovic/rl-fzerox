@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/targets.py
-"""Central auxiliary-state target definitions and vectorization helpers."""
+"""Central auxiliary-state target catalog and vectorization logic.
+
+The catalog defines target order, kind, bounds, vector slots, and feature
+aliases. Vector builders translate emulator telemetry and observation features
+into the supervised format consumed by policy heads.
+"""
 
 from __future__ import annotations
 

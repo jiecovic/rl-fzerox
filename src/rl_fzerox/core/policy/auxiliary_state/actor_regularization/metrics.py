@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/auxiliary_state/actor_regularization/metrics.py
-"""Metric formatting helpers for actor regularization diagnostics."""
+"""Metric formatting helpers for actor regularization diagnostics.
+
+This module converts tensor loss state and sampled pitch actions into scalar
+logging values. Keeping key names here makes the mixin focus on loss flow.
+"""
 
 from __future__ import annotations
 

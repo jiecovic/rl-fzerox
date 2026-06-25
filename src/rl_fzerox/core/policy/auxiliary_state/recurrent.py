@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/auxiliary_state/recurrent.py
-"""Recurrent policy config helpers shared by policy construction."""
+"""Recurrent policy state helpers for inference and watch playback.
+
+The helper converts optional persisted LSTM state and episode-start flags into
+the tensor form expected by SB3X recurrent policies.
+"""
 
 from __future__ import annotations
 

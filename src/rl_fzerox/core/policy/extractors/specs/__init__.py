@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/extractors/specs/__init__.py
-"""Facade for CNN profile specs, custom parsing, and geometry validation."""
+"""Facade for CNN profile specs, custom parsing, and geometry validation.
+
+Callers keep importing ``policy.extractors.specs`` while the implementation is
+split into profiles, custom layer parsing, shape math, and shared data models.
+"""
 
 from __future__ import annotations
 

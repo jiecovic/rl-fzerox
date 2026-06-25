@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/auxiliary_state/actor_regularization/__init__.py
-"""Facade for actor-side auxiliary regularization helpers and mixins."""
+"""Facade for actor-side auxiliary regularization helpers and mixins.
+
+Regularization is split into distribution readers, pure tensor losses, metric
+formatting, and the policy mixin that combines them during action evaluation.
+"""
 
 from __future__ import annotations
 

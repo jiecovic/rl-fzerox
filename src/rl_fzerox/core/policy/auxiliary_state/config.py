@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/config.py
-"""Parsing helpers for auxiliary-state and actor-regularization config."""
+"""Config parsing helpers for auxiliary-state and actor-regularization options.
+
+Policy constructors receive plain mapping data from runtime schemas. This file
+normalizes that data into loss terms, head widths, action indexes, and numeric
+regularization knobs used by the mixins.
+"""
 
 from __future__ import annotations
 

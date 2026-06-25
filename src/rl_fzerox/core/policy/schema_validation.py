@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/schema_validation.py
-"""Shared validation rules for manager and runtime policy schemas."""
+"""Shared validation rules for manager and runtime policy schemas.
+
+Manager run specs and runtime configs keep separate Pydantic models. This module
+holds the policy-specific CNN and auxiliary-state validation rules they share.
+"""
 
 from __future__ import annotations
 

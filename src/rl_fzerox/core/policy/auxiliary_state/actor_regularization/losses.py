@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/actor_regularization/losses.py
-"""Pure tensor losses shared by actor regularization paths."""
+"""Pure tensor losses shared by actor regularization paths.
+
+The functions operate on already-resolved tensors and sample masks. They stay
+free of policy and distribution state so the mixin and metric code can reuse
+them directly.
+"""
 
 from __future__ import annotations
 

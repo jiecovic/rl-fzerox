@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/__init__.py
-"""Lazy facade for auxiliary-state target metadata and observation helpers."""
+"""Facade for auxiliary-state targets, observations, and prediction helpers.
+
+The subpackage owns RAM-derived supervised targets that can be attached to
+policy observations and predicted from policy latents. Heavy policy classes and
+target helpers stay behind lazy exports.
+"""
 
 from __future__ import annotations
 

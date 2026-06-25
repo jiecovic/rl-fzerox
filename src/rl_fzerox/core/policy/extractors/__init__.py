@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/extractors/__init__.py
-"""Public facade for policy CNN extractors, blocks, and convolution specs."""
+"""Public facade for policy extractors, CNN blocks, and convolution specs.
+
+Manager previews, runtime model builders, and tests import this package surface.
+Implementation files stay split by network construction, blocks, and spec
+resolution.
+"""
 
 from __future__ import annotations
 

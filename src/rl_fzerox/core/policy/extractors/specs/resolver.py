@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/extractors/specs/resolver.py
-"""CNN profile resolver for built-in and custom convolution specs."""
+"""CNN profile resolver for built-in and custom convolution specs.
+
+Runtime builders call this boundary with a profile name and optional custom
+layer config. The returned ``ConvSpec`` is ready for geometry validation and
+network construction.
+"""
 
 from __future__ import annotations
 

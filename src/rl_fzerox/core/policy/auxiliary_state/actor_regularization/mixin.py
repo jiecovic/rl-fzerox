@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/actor_regularization/mixin.py
-"""Policy mixin that composes actor regularization losses and metrics."""
+"""Policy mixin that composes actor regularization losses and metrics.
+
+The mixin reads action-group indexes and configured weights initialized by the
+auxiliary-state policy mixin. It evaluates optional pitch, steer, and lean
+regularization against the current action distribution.
+"""
 
 from __future__ import annotations
 

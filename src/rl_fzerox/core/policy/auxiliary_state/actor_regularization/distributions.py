@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/actor_regularization/distributions.py
-"""Distribution readers for actor regularization over hybrid action spaces."""
+"""Distribution readers for actor regularization over hybrid action spaces.
+
+These helpers extract means, standard deviations, entropies, and lean/pitch
+probabilities from SB3X hybrid distribution objects. Loss code receives plain
+tensors instead of probing the dynamic distribution shape itself.
+"""
 
 from __future__ import annotations
 

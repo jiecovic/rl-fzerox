@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/__init__.py
-"""Lazy public facade for policy extractors and auxiliary-state target helpers."""
+"""Lazy public facade for policy extractors and auxiliary-state helpers.
+
+Training, evaluation, and manager metadata import this package surface. The
+facade keeps those imports stable while delaying Torch/SB3X-heavy modules until
+a caller requests a concrete extractor or target helper.
+"""
 
 from __future__ import annotations
 

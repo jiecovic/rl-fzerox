@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/extractors/specs/profiles.py
-"""Built-in CNN layer profiles used by policy image extractors."""
+"""Built-in CNN layer profiles used by policy image extractors.
+
+The profiles define Nature-style, small IMPALA-style, and larger IMPALA-style
+stacks as ``ConvLayerSpec`` tuples. Network construction reads these specs
+without depending on how a profile was selected.
+"""
 
 from __future__ import annotations
 

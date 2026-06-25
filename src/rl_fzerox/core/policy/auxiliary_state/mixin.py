@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/mixin.py
-"""Policy mixin that wires auxiliary-state heads and losses into SB3X policies."""
+"""Shared policy mixin for auxiliary heads, actor regularization, and evaluation.
+
+Concrete SB3X policy classes call this mixin during construction and action
+evaluation. It owns auxiliary loss composition and prediction decoding while the
+policy classes keep feature extraction and recurrent flow explicit.
+"""
 
 from __future__ import annotations
 

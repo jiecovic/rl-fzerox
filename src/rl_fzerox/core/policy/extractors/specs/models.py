@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/extractors/specs/models.py
-"""Shared data models for policy CNN convolution specs."""
+"""Shared data models for policy CNN convolution specs.
+
+The dataclasses describe the compact internal representation used by built-in
+profiles, custom profile parsing, extractor construction, and architecture
+previews.
+"""
 
 from __future__ import annotations
 

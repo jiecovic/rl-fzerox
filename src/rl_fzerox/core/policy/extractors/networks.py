@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/extractors/networks.py
-"""CNN and image-state feature extractors for policy observations."""
+"""Policy feature extractors for image-only and image-plus-state observations.
+
+This module builds CNN trunks, optional scalar-state branches, fusion layers,
+and normalization around SB3 ``BaseFeaturesExtractor`` contracts.
+"""
 
 from __future__ import annotations
 

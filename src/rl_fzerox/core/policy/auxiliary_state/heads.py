@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/heads.py
-"""Auxiliary-state prediction heads attached to policy latent features."""
+"""Auxiliary-state prediction heads attached to policy latent features.
+
+The head bank groups scalar, binary, and categorical targets behind one optional
+trunk. Loss and prediction methods resolve target slots and metadata from
+``targets.py``.
+"""
 
 from __future__ import annotations
 

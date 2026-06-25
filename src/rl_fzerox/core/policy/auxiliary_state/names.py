@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/auxiliary_state/names.py
-"""Literal target-name types for auxiliary-state prediction config."""
+"""Literal target-name types for auxiliary-state prediction config.
+
+This module holds the static name vocabulary used by schemas and type checks.
+Target metadata, vector slots, and grounded-only support live in ``targets.py``.
+"""
 
 from __future__ import annotations
 

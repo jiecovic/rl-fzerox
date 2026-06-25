@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/target_tensors.py
-"""Target-tensor validation helpers for auxiliary-state loss computation."""
+"""Target-tensor validation helpers for auxiliary-state loss computation.
+
+Auxiliary losses require dict observations with the hidden target field
+attached. These helpers centralize tensor lookup, dtype conversion, and
+flattening.
+"""
 
 from __future__ import annotations
 

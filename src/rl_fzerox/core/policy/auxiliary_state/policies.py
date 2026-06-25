@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/auxiliary_state/policies.py
-"""SB3X policy classes with image-state extractors and auxiliary-state support."""
+"""SB3X policy classes with image-state extractors and auxiliary-state support.
+
+These classes adapt the project observation/action layout to SB3X hybrid
+policies. Non-recurrent and recurrent paths keep their feature flow explicit and
+share auxiliary action evaluation through the mixin.
+"""
 
 from __future__ import annotations
 

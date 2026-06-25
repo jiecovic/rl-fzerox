@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/extractors/specs/geometry.py
-"""CNN output-shape math and image-space validation for policy extractors."""
+"""CNN output-shape math and image-space validation for policy extractors.
+
+Extractor builders and manager previews use this module to resolve image layout,
+check that a conv stack fits, and compute flattened CNN dimensions.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/policy/extractors/specs/custom.py
-"""Parsing for manager/runtime custom CNN layer configs."""
+"""Custom CNN layer parsing for manager and runtime policy config.
+
+Input arrives as small mapping objects from Pydantic models. The parser converts
+them into ``ConvLayerSpec`` entries and validates layer geometry before network
+construction.
+"""
 
 from __future__ import annotations
 

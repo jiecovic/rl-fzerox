@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/auxiliary_state/observations.py
-"""Observation-dict helpers for hidden auxiliary-state target tensors."""
+"""Observation-dict helpers for hidden auxiliary-state target tensors.
+
+Training wrappers attach supervised target vectors under a reserved key. Policy
+loss code uses these helpers to detect, add, and read that field consistently.
+"""
 
 from __future__ import annotations
 

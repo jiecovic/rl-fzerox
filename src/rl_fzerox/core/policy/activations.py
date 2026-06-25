@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/activations.py
-"""Activation-name resolution for policy network configuration."""
+"""Activation-name vocabulary for policy network configuration.
+
+Runtime and manager schemas store compact string names. Extractor and policy
+builders call this module when they need the matching torch activation class.
+"""
 
 from __future__ import annotations
 

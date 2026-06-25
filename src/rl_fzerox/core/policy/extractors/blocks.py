@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/policy/extractors/blocks.py
-"""Residual CNN blocks used by F-Zero X policy feature extractors."""
+"""Residual and pooling CNN blocks used by policy feature extractors.
+
+The blocks translate declarative ``ConvLayerSpec`` entries into torch modules
+while preserving stable submodule names for checkpoint state dicts and tests.
+"""
 
 from __future__ import annotations
 
