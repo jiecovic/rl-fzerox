@@ -1,8 +1,10 @@
 # src/rl_fzerox/core/manager/store_api/save_games.py
+"""Save-game workflow methods mixed into the public ManagerStore facade."""
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.domain.engine import engine_percent_to_slider_step
@@ -16,17 +18,7 @@ from rl_fzerox.core.manager.models import (
     SaveGameStatus,
 )
 from rl_fzerox.core.manager.registry import save_games as save_game_registry
-
-if TYPE_CHECKING:
-    from rl_fzerox.core.manager.store import ManagerStore
-
-
-def _manager_store(store: object) -> ManagerStore:
-    from rl_fzerox.core.manager.store import ManagerStore
-
-    if not isinstance(store, ManagerStore):
-        raise TypeError("save-game store facade must be mixed into ManagerStore")
-    return store
+from rl_fzerox.core.manager.store_api.common import manager_store as _manager_store
 
 
 class SaveGameStoreMixin:

@@ -1,8 +1,10 @@
 # src/rl_fzerox/core/manager/store_api/evaluations.py
+"""Evaluation methods mixed into the public ManagerStore facade."""
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from rl_fzerox.core.evaluation.models import (
     EvaluationCheckpointArtifact,
@@ -15,17 +17,7 @@ from rl_fzerox.core.manager.models import (
     ManagedEvaluationPreset,
 )
 from rl_fzerox.core.manager.registry import evaluations as evaluation_registry
-
-if TYPE_CHECKING:
-    from rl_fzerox.core.manager.store import ManagerStore
-
-
-def _manager_store(store: object) -> ManagerStore:
-    from rl_fzerox.core.manager.store import ManagerStore
-
-    if not isinstance(store, ManagerStore):
-        raise TypeError("evaluation store facade must be mixed into ManagerStore")
-    return store
+from rl_fzerox.core.manager.store_api.common import manager_store as _manager_store
 
 
 class EvaluationStoreMixin:
