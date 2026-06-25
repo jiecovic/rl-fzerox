@@ -23,11 +23,3 @@ type AuxiliaryStateTargetName = Literal[
     "surface_state.on_ice_surface",
     "course_context.builtin_course_id",
 ]
-
-_GROUNDED_ONLY_TARGETS: frozenset[AuxiliaryStateTargetName] = frozenset(
-    ("track_position.edge_ratio",)
-)
-
-
-def auxiliary_state_target_supports_grounded_only(name: AuxiliaryStateTargetName) -> bool:
-    return name in _GROUNDED_ONLY_TARGETS

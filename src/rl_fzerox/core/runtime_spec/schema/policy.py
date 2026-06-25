@@ -13,8 +13,8 @@ from rl_fzerox.core.domain.policy import (
     validate_cnn_layer_geometry,
 )
 from rl_fzerox.core.policy.activations import ActivationName
-from rl_fzerox.core.policy.auxiliary_state.names import (
-    AuxiliaryStateTargetName,
+from rl_fzerox.core.policy.auxiliary_state.names import AuxiliaryStateTargetName
+from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_supports_grounded_only,
 )
 
