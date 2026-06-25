@@ -1,8 +1,3 @@
-# AGENTS.md
-
-These rules are repo-specific. Prefer existing local patterns and ownership
-boundaries over generic cleanup advice.
-
 ## Commit Messages
 
 Use Conventional Commits with a scope:
@@ -59,16 +54,11 @@ Examples:
 
 ## Source of Truth
 
-- Keep source-of-truth boundaries scoped. SQLite owns managed run-manager
-  control-plane state: run specs, status, lifecycle, relationships, selected
-  artifact ids, and mutable runtime metadata.
-- Treat filesystem manifests such as `train_manifest.yaml` as mirrors of the
-  SQLite-managed run spec, not as fallbacks.
-- Managed code must not infer run specs, lifecycle state, or mutable manager
-  state from `train_manifest.yaml`. Query/update SQLite explicitly for
-  control-plane state, then write or verify the manifest mirror.
-- Non-managed CLI paths may explicitly load a run directory as input, but that
-  must stay separate from managed run-manager behavior.
+- In managed run-manager flows, SQLite owns run specs, lifecycle, and mutable
+  manager state.
+- `train_manifest.yaml` is only a mirror of the managed run spec. Do not use it
+  as a fallback or source for managed behavior; write or verify it after reading
+  from SQLite.
 - If a touched area has mixed ownership, multiple sources of truth, legacy
   compatibility paths, or other structural debt, call that out before extending
   it. Prefer fixing the boundary over adding behavior on top of it.
@@ -79,17 +69,13 @@ Examples:
 
 ## Runtime Lifecycle
 
-- FSM/controller modules that own user-visible lifecycle must document states,
-  transitions, and permitted side effects close to the code.
-- Lifecycle boundaries such as success, failure, retry, and exit should be
-  emitted as explicit domain events or signals.
-- Worker modules should remain orchestration entrypoints for process IO,
-  command draining, timing, and resource cleanup.
-- Do not let workers become the source of truth for domain state transitions
-  when a controller/FSM already owns that flow.
-- Recording, logging, and persistence should consume explicit lifecycle signals
-  from the domain owner. Do not infer live control boundaries from manager DB
-  progress, telemetry byproducts, file existence, or frontend sync state.
+- Controllers/FSMs own user-visible lifecycle decisions. Document their states,
+  transitions, permitted side effects, and lifecycle events close to the code.
+- Workers own process IO, command draining, timing, and resource cleanup. They
+  should consume controller signals, not become a second lifecycle owner.
+- Recording, logging, and persistence should react to explicit lifecycle events,
+  not infer boundaries from DB progress, telemetry byproducts, files, or
+  frontend sync state.
 
 ## Implementation Standards
 
