@@ -131,24 +131,14 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
             latent_vf = self.mlp_extractor.forward_critic(vf_features)
 
         distribution = self._get_action_dist_from_latent(latent_pi)
-        distribution.apply_masking(action_masks)
-        log_prob = distribution.log_prob(actions)
-        values = self.value_net(latent_vf)
-        entropy = distribution.entropy()
-        aux_loss = self._combined_policy_auxiliary_loss(
+        return self._evaluate_action_with_auxiliary_loss(
             source_latent=source_latent,
+            latent_vf=latent_vf,
             distribution=distribution,
             actions=actions,
             obs=obs,
-            sample_mask=auxiliary_mask,
-        )
-        return PolicyActionEvaluation(
-            values=values,
-            log_prob=log_prob,
-            entropy=entropy,
-            aux_loss=aux_loss,
-            entropy_components=distribution.entropy_components() or {},
-            std_components=distribution.std_components(),
+            action_masks=action_masks,
+            auxiliary_mask=auxiliary_mask,
         )
 
     def predict_auxiliary_state(
@@ -246,24 +236,14 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         latent_pi = self.mlp_extractor.forward_actor(latent_pi_source)
         latent_vf = self.mlp_extractor.forward_critic(latent_vf_source)
         distribution = self._get_action_dist_from_latent(latent_pi)
-        distribution.apply_masking(action_masks)
-        log_prob = distribution.log_prob(actions)
-        values = self.value_net(latent_vf)
-        entropy = distribution.entropy()
-        aux_loss = self._combined_policy_auxiliary_loss(
+        return self._evaluate_action_with_auxiliary_loss(
             source_latent=latent_pi_source,
+            latent_vf=latent_vf,
             distribution=distribution,
             actions=actions,
             obs=obs,
-            sample_mask=auxiliary_mask,
-        )
-        return PolicyActionEvaluation(
-            values=values,
-            log_prob=log_prob,
-            entropy=entropy,
-            aux_loss=aux_loss,
-            entropy_components=distribution.entropy_components() or {},
-            std_components=distribution.std_components(),
+            action_masks=action_masks,
+            auxiliary_mask=auxiliary_mask,
         )
 
     def predict_auxiliary_state(

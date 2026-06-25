@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from typing import Protocol
 
 import torch
 from sb3x.common.auxiliary_losses import (
+    PolicyActionEvaluation,
     PolicyAuxiliaryLoss,
     combine_policy_auxiliary_losses,
 )
+from sb3x.common.maskable import MaybeMasks
 from stable_baselines3.common.type_aliases import PyTorchObs
 from torch import nn
 
@@ -44,7 +47,20 @@ from rl_fzerox.core.policy.auxiliary_state.targets import (
 )
 
 
+class _MaskedActionDistribution(Protocol):
+    def apply_masking(self, masks: MaybeMasks) -> None: ...
+
+    def log_prob(self, actions: torch.Tensor) -> torch.Tensor: ...
+
+    def entropy(self) -> torch.Tensor | None: ...
+
+    def entropy_components(self) -> Mapping[str, torch.Tensor] | None: ...
+
+    def std_components(self) -> Mapping[str, torch.Tensor]: ...
+
+
 class _AuxiliaryStatePolicyMixin(_ActorRegularizationMixin):
+    value_net: nn.Module
     _auxiliary_state_losses: tuple[AuxiliaryStateLossTerm, ...]
     _auxiliary_state_heads: AuxiliaryStateHeadBank | None
     _grounded_pitch_neutral_loss_weight: float
@@ -169,6 +185,37 @@ class _AuxiliaryStatePolicyMixin(_ActorRegularizationMixin):
                     sample_mask=sample_mask,
                 ),
             )
+        )
+
+    def _evaluate_action_with_auxiliary_loss(
+        self,
+        *,
+        source_latent: torch.Tensor,
+        latent_vf: torch.Tensor,
+        distribution: _MaskedActionDistribution,
+        actions: torch.Tensor,
+        obs: PyTorchObs,
+        action_masks: MaybeMasks,
+        auxiliary_mask: torch.Tensor | None,
+    ) -> PolicyActionEvaluation:
+        distribution.apply_masking(action_masks)
+        log_prob = distribution.log_prob(actions)
+        values = self.value_net(latent_vf)
+        entropy = distribution.entropy()
+        aux_loss = self._combined_policy_auxiliary_loss(
+            source_latent=source_latent,
+            distribution=distribution,
+            actions=actions,
+            obs=obs,
+            sample_mask=auxiliary_mask,
+        )
+        return PolicyActionEvaluation(
+            values=values,
+            log_prob=log_prob,
+            entropy=entropy,
+            aux_loss=aux_loss,
+            entropy_components=distribution.entropy_components() or {},
+            std_components=distribution.std_components(),
         )
 
     def _auxiliary_state_predictions(
