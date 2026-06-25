@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/schema/policy.py
+"""Runtime policy and feature-extractor schema.
+
+These models describe the SB3 policy/extractor shape after manager projection.
+Validation delegates CNN and auxiliary-state invariants to policy-owned helper
+functions so the schema stays aligned with the actual network builders.
+"""
+
 from __future__ import annotations
 
 from typing import Literal

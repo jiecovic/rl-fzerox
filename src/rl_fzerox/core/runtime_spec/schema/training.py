@@ -1,4 +1,12 @@
 # src/rl_fzerox/core/runtime_spec/schema/training.py
+"""Runtime training hyperparameter and execution-control schema.
+
+Managed runs get their durable state from the run manager and SQLite. The
+resume and continue fields here are launch-time controls projected into a
+training process; they are not a replacement source of truth for managed run
+metadata.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

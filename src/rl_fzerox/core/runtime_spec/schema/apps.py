@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/schema/apps.py
+"""Top-level runtime schemas for train, watch, and Career playback apps.
+
+These models compose emulator, env, reward, policy, track, and app-specific
+sections after manager run specs or CLI inputs have been projected into the
+runtime shape consumed by launchers.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -93,6 +100,9 @@ class WatchConfig(BaseModel):
 
     @model_validator(mode="after")
     def _default_split_fps(self) -> WatchConfig:
+        # Older runtime mirrors and partial override deltas may carry null FPS
+        # fields. Normalize them at the app boundary so runtime consumers see
+        # concrete playback settings.
         if self.control_fps is None:
             self.control_fps = "auto"
         if self.render_fps is None:

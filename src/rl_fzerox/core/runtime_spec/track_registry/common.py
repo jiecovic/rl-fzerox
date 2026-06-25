@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/runtime_spec/track_registry/common.py
+"""Small parsing helpers shared by track-registry expansion modules.
+
+These functions handle registry-safe ids, optional scalar conversion, guarded
+registry path resolution, and nested config-section lookup.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

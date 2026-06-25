@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/watch_overrides.py
+"""Direct watch override parsing for CLI and manager-launched playback.
+
+Watch sessions accept a small key=value override surface after inheriting a
+runtime config. This module keeps Hydra/config-group syntax out of that path
+and merges only plain string-keyed mappings into the watch app schema.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

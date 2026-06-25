@@ -1,4 +1,12 @@
 # src/rl_fzerox/core/runtime_spec/schema/observations.py
+"""Observation runtime schema and state-component validation.
+
+Image geometry, frame stacking, minimap settings, and optional scalar state
+components are validated here before env code builds observation spaces. The
+state-component feature checks deliberately call into env observation code so
+invalid feature selections fail at config load time.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

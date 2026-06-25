@@ -1,10 +1,20 @@
 # src/rl_fzerox/core/runtime_spec/x_cup_slots.py
+"""Extract active generated X-Cup slot identities from track sampling config.
+
+Training and UI code use these values to correlate generated-course slots,
+rotations, and runtime statistics without depending on the full sampling entry
+schema.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from rl_fzerox.core.domain.courses import X_CUP_COURSE
-from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
+from rl_fzerox.core.runtime_spec.schema.tracks import (
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+)
 
 
 @dataclass(frozen=True, slots=True)

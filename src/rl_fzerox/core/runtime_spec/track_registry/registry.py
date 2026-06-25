@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/track_registry/registry.py
+"""YAML registry loading for courses and concrete track entries.
+
+The registry combines built-in course metadata with optional project-local YAML
+entries. Higher-level expansion code turns these mappings into runtime schema
+models after references have been resolved.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

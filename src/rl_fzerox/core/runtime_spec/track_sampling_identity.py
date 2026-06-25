@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/track_sampling_identity.py
+"""Stable identity helpers for materialized track-sampling targets.
+
+Training callbacks, reset selection, and engine tuning need repeatable keys for
+course-level statistics and reset targets. This module keeps those ids derived
+from the same field order everywhere.
+"""
+
 from __future__ import annotations
 
 import re

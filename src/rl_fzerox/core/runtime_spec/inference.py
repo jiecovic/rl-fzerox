@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/runtime_spec/inference.py
-"""Inference-facing runtime config cleanup shared by eval and Career playback."""
+"""Inference-time projection helpers for train runtime configs.
+
+Evaluation, watch playback, and Career playback reuse training configs, but
+they should not replay stochastic train-only regularizers. This module keeps
+that cleanup in one place while preserving deterministic policy contracts.
+"""
 
 from __future__ import annotations
 

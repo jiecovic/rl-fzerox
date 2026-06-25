@@ -1,4 +1,12 @@
 # src/rl_fzerox/core/runtime_spec/paths.py
+"""Path resolution rules for serialized runtime configs.
+
+Runtime manifests and generated app configs can contain paths relative to a
+run/config directory, plus a small set of repo-root-relative paths used for
+local assets and checkpoints. Keeping those rules here prevents loaders from
+inventing incompatible path semantics.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

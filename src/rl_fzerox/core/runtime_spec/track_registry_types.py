@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/track_registry_types.py
+"""Typed values shared by track-registry expansion modules.
+
+These dataclasses keep registry roots, YAML keys, selected courses, and
+baseline variants explicit without scattering string constants through the
+expansion code.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

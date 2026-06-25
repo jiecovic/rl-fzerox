@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/track_registry/metadata.py
+"""Metadata enrichment for concrete track and track-sampling entries.
+
+This module copies stable course, vehicle, engine, and record metadata from
+registry entries into the flattened runtime shape used by manifests and env
+reset targets.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,6 +19,26 @@ from rl_fzerox.core.runtime_spec.vehicle_catalog import (
 
 from .common import optional_str, safe_id
 from .registry import load_course_config, registry_track_by_id
+
+_TRACK_ENTRY_INHERITED_METADATA_KEYS = frozenset(
+    {
+        "display_name",
+        "course_ref",
+        "course_id",
+        "course_name",
+        "course_index",
+        "mode",
+        "gp_difficulty",
+        "vehicle",
+        "vehicle_name",
+        "source_vehicle",
+        "engine_setting_raw_value",
+        "source_course_index",
+        "source_gp_difficulty",
+        "source_engine_setting_raw_value",
+        "records",
+    }
+)
 
 
 def enrich_concrete_entries(section: dict[str, object], config_root: Path) -> None:
@@ -76,23 +103,7 @@ def enrich_entry_with_registry_metadata(
             config_root=config_root,
         )
         for key, value in registry_entry.items():
-            if key in {
-                "display_name",
-                "course_ref",
-                "course_id",
-                "course_name",
-                "course_index",
-                "mode",
-                "gp_difficulty",
-                "vehicle",
-                "vehicle_name",
-                "source_vehicle",
-                "engine_setting_raw_value",
-                "source_course_index",
-                "source_gp_difficulty",
-                "source_engine_setting_raw_value",
-                "records",
-            }:
+            if key in _TRACK_ENTRY_INHERITED_METADATA_KEYS:
                 enriched.setdefault(key, value)
     return enriched
 

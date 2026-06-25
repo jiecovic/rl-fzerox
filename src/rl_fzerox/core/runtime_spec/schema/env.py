@@ -1,4 +1,12 @@
 # src/rl_fzerox/core/runtime_spec/schema/env.py
+"""Runtime environment, reward, and emulator configuration models.
+
+This file is the current env-facing schema bundle: rollout controls,
+track-sampling config, reward-shaping knobs, and libretro boot paths. Reward
+schemas are intentionally strict because these fields flow into training,
+evaluation, and watch manifests.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

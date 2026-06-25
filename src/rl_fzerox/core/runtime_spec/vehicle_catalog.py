@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/vehicle_catalog.py
+"""Stock vehicle and engine-slider metadata used before emulator boot.
+
+The catalog stores stable F-Zero X vehicle ids, display names, and menu
+positions for config projection and Career Mode setup. Runtime physics and RAM
+values stay in emulator/game-specific code.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

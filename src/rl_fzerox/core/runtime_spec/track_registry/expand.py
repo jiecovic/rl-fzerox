@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/runtime_spec/track_registry/expand.py
+"""Entry points for expanding compact track registry config sections.
+
+Loaders call this module before Pydantic validation so registry-backed track
+metadata and course selections become explicit runtime-schema entries.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

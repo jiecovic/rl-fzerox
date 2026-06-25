@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/track_registry/selection.py
+"""Course and baseline selectors used by track-registry expansion.
+
+Compact config can select individual courses, whole cups, and one baseline
+variant. This module resolves those selectors before metadata expansion builds
+the concrete runtime sampling entries.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -31,7 +38,7 @@ def entries_from_courses(
 ) -> list[dict[str, object]]:
     if not isinstance(raw_courses, list | tuple):
         raise TypeError("track_sampling.courses must be a list")
-    variant = baseline_variant(raw_baseline_spec, config_root=config_root)
+    variant = baseline_variant(raw_baseline_spec)
     entries: list[dict[str, object]] = []
     for raw_course in raw_courses:
         for selection in course_selections(raw_course, config_root=config_root):
@@ -109,8 +116,7 @@ def course_refs_by_cup(cup: str, *, config_root: Path) -> tuple[str, ...]:
     return tuple(matches)
 
 
-def baseline_variant(raw_baseline_spec: object, *, config_root: Path) -> BaselineVariant:
-    del config_root
+def baseline_variant(raw_baseline_spec: object) -> BaselineVariant:
     if not isinstance(raw_baseline_spec, Mapping):
         raise TypeError("track_sampling.baseline must be a mapping")
     mode = required_baseline_field(raw_baseline_spec, "mode")

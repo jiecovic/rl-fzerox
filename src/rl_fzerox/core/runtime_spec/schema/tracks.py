@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/runtime_spec/schema/tracks.py
+"""Track, sampling, X-Cup, and engine-tuning runtime schemas.
+
+The models in this file describe resolved reset targets and per-run sampling
+settings after registry expansion. They intentionally validate the concrete
+runtime shape used by env resets, training callbacks, and manifest mirrors.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

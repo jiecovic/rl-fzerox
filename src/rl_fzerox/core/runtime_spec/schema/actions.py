@@ -49,6 +49,17 @@ type ConfiguredDiscreteAxis = Literal[
     "spin",
     "pitch",
 ]
+_ACTION_MASK_BRANCH_NAMES: tuple[ConfiguredDiscreteAxis, ...] = (
+    "steer",
+    "gas",
+    "air_brake",
+    "boost",
+    "lean",
+    "lean_left",
+    "lean_right",
+    "spin",
+    "pitch",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,17 +98,7 @@ class ActionMaskConfig(BaseModel):
     spin: ActionMaskSpec | None = None
     pitch: ActionMaskSpec | None = None
 
-    @field_validator(
-        "steer",
-        "gas",
-        "air_brake",
-        "boost",
-        "lean",
-        "lean_left",
-        "lean_right",
-        "spin",
-        "pitch",
-    )
+    @field_validator(*_ACTION_MASK_BRANCH_NAMES)
     @classmethod
     def _validate_non_empty_mask_branch(
         cls,
@@ -114,17 +115,7 @@ class ActionMaskConfig(BaseModel):
         """Return the explicitly configured branch restrictions only."""
 
         overrides: dict[str, tuple[int, ...]] = {}
-        for branch_name in (
-            "steer",
-            "gas",
-            "air_brake",
-            "boost",
-            "lean",
-            "lean_left",
-            "lean_right",
-            "spin",
-            "pitch",
-        ):
+        for branch_name in _ACTION_MASK_BRANCH_NAMES:
             values = getattr(self, branch_name)
             if values is not None:
                 overrides[branch_name] = compile_action_mask_values(branch_name, values)
