@@ -29,14 +29,7 @@ from rl_fzerox.ui.watch.runtime.courses.baseline import (
 from rl_fzerox.ui.watch.runtime.courses.commands import (
     apply_course_navigation_commands,
 )
-from rl_fzerox.ui.watch.runtime.courses.navigation import (
-    WatchCourseRotation,
-    sync_watch_rotation_info,
-)
-from rl_fzerox.ui.watch.runtime.courses.sampling import (
-    ManagedTrackSamplingRefresh,
-    missing_generated_x_cup_baseline_paths,
-)
+from rl_fzerox.ui.watch.runtime.courses.navigation import sync_watch_rotation_info
 from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerClosed,
     WorkerError,
@@ -53,6 +46,7 @@ from rl_fzerox.ui.watch.runtime.live.reset import _sync_next_watch_reset_after_e
 from rl_fzerox.ui.watch.runtime.live.session import (
     open_watch_runtime_session,
 )
+from rl_fzerox.ui.watch.runtime.live.track_sampling import LiveTrackSamplingState
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
     toggle_watch_state_feature,
@@ -146,11 +140,7 @@ def _run_simulation_loop(
         live_visualization_enabled = False
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
-        active_track_sampling = config.env.track_sampling
-        course_rotation = WatchCourseRotation.from_entries(active_track_sampling.entries)
-        selected_reset_target_key = course_rotation.normalized_key(None)
-        persistent_locked_reset_target_key: str | None = None
-        track_sampling_refresh = ManagedTrackSamplingRefresh.from_config(config)
+        track_sampling_state = LiveTrackSamplingState.from_config(config)
         watch_zeroed_state_features = session.watch_zeroed_state_features
         live_series = EpisodeLiveSeriesTracker()
         last_live_series_publish_time = 0.0
@@ -199,69 +189,31 @@ def _run_simulation_loop(
                     manual_control_enabled=manual_control_enabled,
                     policy_reload_error=policy_reload_error,
                     cnn_activations=cnn_activations,
-                    active_track_sampling=active_track_sampling,
+                    active_track_sampling=track_sampling_state.active_track_sampling,
                     track_record_book=track_record_book,
                     live_episode_series=live_episode_series,
                 ),
             )
 
-        def refresh_track_sampling(*, force: bool = False) -> bool:
-            nonlocal active_track_sampling
-            nonlocal course_rotation
-            nonlocal persistent_locked_reset_target_key
-            nonlocal selected_reset_target_key
-
-            if track_sampling_refresh is None:
-                return False
-            refreshed_track_sampling = track_sampling_refresh.refreshed_config(
-                active_track_sampling,
-                force=force,
-            )
-            if refreshed_track_sampling is None:
-                return False
-
-            env.set_track_sampling_config(refreshed_track_sampling)
-            active_track_sampling = refreshed_track_sampling
-            course_rotation = WatchCourseRotation.from_entries(active_track_sampling.entries)
-            selected_reset_target_key = course_rotation.normalized_key(selected_reset_target_key)
-            if course_rotation.target_by_key(persistent_locked_reset_target_key) is None:
-                persistent_locked_reset_target_key = None
-                env.set_locked_reset_course(None)
-            return True
-
-        def track_sampling_ready_for_reset(*, force: bool = False) -> bool:
-            nonlocal active_track_sampling
-            nonlocal course_rotation
-            nonlocal persistent_locked_reset_target_key
-            nonlocal selected_reset_target_key
-
-            if track_sampling_refresh is None:
-                return True
-            status = track_sampling_refresh.refresh_status(active_track_sampling, force=force)
-            if status.refreshed_config is not None:
-                env.set_track_sampling_config(status.refreshed_config)
-                active_track_sampling = status.refreshed_config
-                course_rotation = WatchCourseRotation.from_entries(active_track_sampling.entries)
-                selected_reset_target_key = course_rotation.normalized_key(
-                    selected_reset_target_key
-                )
-                if course_rotation.target_by_key(persistent_locked_reset_target_key) is None:
-                    persistent_locked_reset_target_key = None
-                    env.set_locked_reset_course(None)
-            return status.ready_for_reset and not missing_generated_x_cup_baseline_paths(
-                active_track_sampling,
-            )
-
         while config.watch.episodes is None or episode < config.watch.episodes:
             force_track_sampling_check = True
-            while not track_sampling_ready_for_reset(force=force_track_sampling_check):
+            while not track_sampling_state.ready_for_reset(
+                env,
+                force=force_track_sampling_check,
+            ):
                 force_track_sampling_check = False
                 time.sleep(0.25)
-            engine_tuning_cache.refresh(env, track_sampling=active_track_sampling)
+            engine_tuning_cache.refresh(
+                env,
+                track_sampling=track_sampling_state.active_track_sampling,
+            )
             env.set_engine_tuning_selection("greedy" if deterministic_policy else "sample")
-            env.set_locked_reset_course(persistent_locked_reset_target_key)
-            if persistent_locked_reset_target_key is None and selected_reset_target_key is not None:
-                env.set_next_sequential_reset_course(selected_reset_target_key)
+            env.set_locked_reset_course(track_sampling_state.locked_reset_target_key)
+            if (
+                track_sampling_state.locked_reset_target_key is None
+                and track_sampling_state.selected_reset_target_key is not None
+            ):
+                env.set_next_sequential_reset_course(track_sampling_state.selected_reset_target_key)
             reset_seed = config.seed if episode == 0 else None
             raw_observation, raw_info = env.reset(seed=reset_seed)
             observation, info = apply_watch_state_feature_zeroing(
@@ -269,17 +221,15 @@ def _run_simulation_loop(
                 raw_info,
                 watch_zeroed_features=watch_zeroed_state_features,
             )
-            current_target = course_rotation.target_for_info(info)
-            if current_target is not None:
-                selected_reset_target_key = current_target.key
+            track_sampling_state.select_current_target(info)
             _reset_policy_runner(policy_runner)
             reset_info = dict(info)
             sync_watch_rotation_info(
                 info=info,
                 reset_info=reset_info,
-                rotation=course_rotation,
-                selected_reset_target_key=selected_reset_target_key,
-                locked_reset_target_key=persistent_locked_reset_target_key,
+                rotation=track_sampling_state.course_rotation,
+                selected_reset_target_key=track_sampling_state.selected_reset_target_key,
+                locked_reset_target_key=track_sampling_state.locked_reset_target_key,
             )
             current_control_state = env.last_requested_control_state
             current_gas_level = env.last_gas_level
@@ -350,7 +300,7 @@ def _run_simulation_loop(
                     return
                 if command_state.live_visualization_changed:
                     publish_snapshot()
-                if refresh_track_sampling() and commands.paused:
+                if track_sampling_state.refresh(env) and commands.paused:
                     publish_snapshot()
                 if commands.toggle_zeroed_state_feature_name is not None:
                     watch_zeroed_state_features = toggle_watch_state_feature(
@@ -368,12 +318,16 @@ def _run_simulation_loop(
                     env=env,
                     info=info,
                     reset_info=reset_info,
-                    rotation=course_rotation,
-                    selected_reset_target_key=selected_reset_target_key,
-                    locked_reset_target_key=persistent_locked_reset_target_key,
+                    rotation=track_sampling_state.course_rotation,
+                    selected_reset_target_key=track_sampling_state.selected_reset_target_key,
+                    locked_reset_target_key=track_sampling_state.locked_reset_target_key,
                 )
-                selected_reset_target_key = course_command.selected_reset_target_key
-                persistent_locked_reset_target_key = course_command.locked_reset_target_key
+                track_sampling_state.selected_reset_target_key = (
+                    course_command.selected_reset_target_key
+                )
+                track_sampling_state.locked_reset_target_key = (
+                    course_command.locked_reset_target_key
+                )
                 if course_command.reset_requested:
                     break
                 if course_command.lock_state_changed:
@@ -401,7 +355,7 @@ def _run_simulation_loop(
                             info["watch_alt_baseline_id"] = alt_save.baseline_id
                         if alt_save.state_path is not None:
                             info["watch_alt_baseline_state_path"] = str(alt_save.state_path)
-                        refresh_track_sampling(force=True)
+                        track_sampling_state.refresh(env, force=True)
                         publish_snapshot()
                     elif alt_save.handled:
                         save_notice.show("alt baseline skipped", now=time.perf_counter())
@@ -645,13 +599,13 @@ def _run_simulation_loop(
                 if target_control_seconds is not None:
                     now = time.perf_counter()
                     next_step_time = max(next_step_time + target_control_seconds, now)
-            selected_reset_target_key = _sync_next_watch_reset_after_episode(
+            track_sampling_state.selected_reset_target_key = _sync_next_watch_reset_after_episode(
                 env=env,
-                rotation=course_rotation,
+                rotation=track_sampling_state.course_rotation,
                 info=info,
                 episode_done=terminated or truncated,
-                selected_reset_target_key=selected_reset_target_key,
-                locked_reset_target_key=persistent_locked_reset_target_key,
+                selected_reset_target_key=track_sampling_state.selected_reset_target_key,
+                locked_reset_target_key=track_sampling_state.locked_reset_target_key,
             )
             episode += 1
     finally:

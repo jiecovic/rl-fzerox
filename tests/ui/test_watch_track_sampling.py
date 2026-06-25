@@ -21,7 +21,12 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import reset_variant_key
 from rl_fzerox.ui.watch.runtime.courses.baseline import _save_managed_alt_baseline
-from rl_fzerox.ui.watch.runtime.courses.sampling import ManagedTrackSamplingRefresh
+from rl_fzerox.ui.watch.runtime.courses.navigation import WatchCourseRotation
+from rl_fzerox.ui.watch.runtime.courses.sampling import (
+    ManagedTrackSamplingRefresh,
+    TrackSamplingRefreshStatus,
+)
+from rl_fzerox.ui.watch.runtime.live.track_sampling import LiveTrackSamplingState
 
 
 def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
@@ -188,6 +193,39 @@ def test_managed_watch_track_sampling_refresh_remembers_blocked_state_between_ch
     assert not status.ready_for_reset
 
 
+def test_live_track_sampling_state_refreshes_config_and_clears_stale_lock() -> None:
+    current_config = _plain_track_sampling_config(course_id="mute_city")
+    refreshed_config = _plain_track_sampling_config(course_id="silence")
+    env = _FakeTrackSamplingEnv()
+    state = _live_track_sampling_state(
+        current_config,
+        _FakeTrackSamplingRefresh(refreshed_config=refreshed_config),
+        selected_reset_target_key="mute_city",
+        locked_reset_target_key="mute_city",
+    )
+
+    assert state.refresh(env)
+
+    assert state.active_track_sampling == refreshed_config
+    assert state.selected_reset_target_key == "silence"
+    assert state.locked_reset_target_key is None
+    assert env.track_sampling_configs == [refreshed_config]
+    assert env.locked_reset_courses == [None]
+
+
+def test_live_track_sampling_state_waits_until_refresh_is_ready() -> None:
+    config = _plain_track_sampling_config(course_id="mute_city")
+    env = _FakeTrackSamplingEnv()
+    refresh = _FakeTrackSamplingRefresh(ready_for_reset=False)
+    state = _live_track_sampling_state(config, refresh)
+
+    assert not state.ready_for_reset(env, force=True)
+
+    assert refresh.status_forces == [True]
+    assert env.track_sampling_configs == []
+    assert env.locked_reset_courses == []
+
+
 def test_managed_watch_track_sampling_refresh_repairs_missing_current_baseline(
     tmp_path: Path,
 ) -> None:
@@ -332,6 +370,39 @@ def _track_sampling_config(
     )
 
 
+def _plain_track_sampling_config(*, course_id: str) -> TrackSamplingConfig:
+    return TrackSamplingConfig(
+        enabled=True,
+        entries=(
+            TrackSamplingEntryConfig(
+                id=f"{course_id}_entry",
+                course_id=course_id,
+                course_name=course_id,
+                display_name=course_id,
+                mode="time_attack",
+                vehicle="blue_falcon",
+            ),
+        ),
+    )
+
+
+def _live_track_sampling_state(
+    config: TrackSamplingConfig,
+    refresh: _FakeTrackSamplingRefresh,
+    *,
+    selected_reset_target_key: str | None = None,
+    locked_reset_target_key: str | None = None,
+) -> LiveTrackSamplingState:
+    rotation = WatchCourseRotation.from_entries(config.entries)
+    return LiveTrackSamplingState(
+        active_track_sampling=config,
+        course_rotation=rotation,
+        selected_reset_target_key=rotation.normalized_key(selected_reset_target_key),
+        locked_reset_target_key=locked_reset_target_key,
+        refresh_source=refresh,
+    )
+
+
 def _managed_x_cup_run_config():
     config = default_managed_run_config().model_copy(deep=True)
     config.tracks.race_mode = "gp_race"
@@ -395,3 +466,53 @@ def _touched(path: Path) -> Path:
 class _FakeStateSavingEmulator:
     def save_state(self, path: Path) -> None:
         path.write_bytes(b"state")
+
+
+class _FakeTrackSamplingEnv:
+    def __init__(self) -> None:
+        self.track_sampling_configs: list[TrackSamplingConfig] = []
+        self.locked_reset_courses: list[str | None] = []
+
+    def set_track_sampling_config(self, config: TrackSamplingConfig) -> None:
+        self.track_sampling_configs.append(config)
+
+    def set_locked_reset_course(self, target_key: str | None) -> None:
+        self.locked_reset_courses.append(target_key)
+
+
+class _FakeTrackSamplingRefresh:
+    def __init__(
+        self,
+        *,
+        refreshed_config: TrackSamplingConfig | None = None,
+        ready_for_reset: bool = True,
+    ) -> None:
+        self._refreshed_config = refreshed_config
+        self._ready_for_reset = ready_for_reset
+        self.refresh_forces: list[bool] = []
+        self.status_forces: list[bool] = []
+        self.refresh_configs: list[TrackSamplingConfig] = []
+        self.status_configs: list[TrackSamplingConfig] = []
+
+    def refreshed_config(
+        self,
+        current_config: TrackSamplingConfig,
+        *,
+        force: bool = False,
+    ) -> TrackSamplingConfig | None:
+        self.refresh_configs.append(current_config)
+        self.refresh_forces.append(force)
+        return self._refreshed_config
+
+    def refresh_status(
+        self,
+        current_config: TrackSamplingConfig,
+        *,
+        force: bool = False,
+    ) -> TrackSamplingRefreshStatus:
+        self.status_configs.append(current_config)
+        self.status_forces.append(force)
+        return TrackSamplingRefreshStatus(
+            refreshed_config=self._refreshed_config,
+            ready_for_reset=self._ready_for_reset,
+        )
