@@ -12,9 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from multiprocessing.context import BaseContext
 from pathlib import Path
-from typing import Literal
 
-from rl_fzerox.core.evaluation.artifacts import write_evaluation_result_files
 from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
 from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.models import (
@@ -23,6 +21,10 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationPolicyMode,
     EvaluationRunResult,
     EvaluationRuntimeSpec,
+)
+from rl_fzerox.core.evaluation.publishing import (
+    EvaluationResultPublisher,
+    attempts_in_index_order,
 )
 from rl_fzerox.core.evaluation.runner import (
     EvaluationAttemptJob,
@@ -73,27 +75,21 @@ def run_parallel_managed_evaluation(
 
     started_at_utc = _utc_now_text()
     attempts_by_index: dict[int, EvaluationAttemptResult] = {}
+    publisher = EvaluationResultPublisher(
+        spec=plan.spec,
+        runtime=runtime,
+        started_at_utc=started_at_utc,
+        result_dir=evaluation.evaluation_dir,
+    )
 
     if _cancel_requested(should_cancel):
-        return _publish_managed_evaluation_result(
-            evaluation,
-            plan=plan,
-            runtime=runtime,
+        return publisher.publish(
             status="cancelled",
-            started_at_utc=started_at_utc,
-            attempts_by_index=attempts_by_index,
+            attempts=attempts_in_index_order(attempts_by_index),
             closed_at_utc=_utc_now_text(),
         )
 
-    _publish_managed_evaluation_result(
-        evaluation,
-        plan=plan,
-        runtime=runtime,
-        status="partial",
-        started_at_utc=started_at_utc,
-        attempts_by_index=attempts_by_index,
-        closed_at_utc=None,
-    )
+    publisher.publish(status="partial")
 
     pool = ProcessPoolExecutor(
         max_workers=runtime.worker_count,
@@ -110,14 +106,9 @@ def run_parallel_managed_evaluation(
     )
 
     def publish_attempt_update(attempts: dict[int, EvaluationAttemptResult]) -> None:
-        _publish_managed_evaluation_result(
-            evaluation,
-            plan=plan,
-            runtime=runtime,
+        publisher.publish(
             status="partial",
-            started_at_utc=started_at_utc,
-            attempts_by_index=attempts,
-            closed_at_utc=None,
+            attempts=attempts_in_index_order(attempts),
         )
 
     try:
@@ -133,47 +124,17 @@ def run_parallel_managed_evaluation(
         pool.shutdown(wait=True, cancel_futures=True)
 
     if schedule_result.cancelled or _cancel_requested(should_cancel):
-        return _publish_managed_evaluation_result(
-            evaluation,
-            plan=plan,
-            runtime=runtime,
+        return publisher.publish(
             status="cancelled",
-            started_at_utc=started_at_utc,
-            attempts_by_index=schedule_result.attempts_by_index,
+            attempts=attempts_in_index_order(schedule_result.attempts_by_index),
             closed_at_utc=_utc_now_text(),
         )
 
-    return _publish_managed_evaluation_result(
-        evaluation,
-        plan=plan,
-        runtime=runtime,
+    return publisher.publish(
         status="completed",
-        started_at_utc=started_at_utc,
-        attempts_by_index=schedule_result.attempts_by_index,
+        attempts=attempts_in_index_order(schedule_result.attempts_by_index),
         closed_at_utc=_utc_now_text(),
     )
-
-
-def _publish_managed_evaluation_result(
-    evaluation: ManagedEvaluation,
-    *,
-    plan: EvaluationAttemptPlan,
-    runtime: EvaluationRuntimeSpec,
-    status: Literal["completed", "cancelled", "partial"],
-    started_at_utc: str,
-    attempts_by_index: dict[int, EvaluationAttemptResult],
-    closed_at_utc: str | None,
-) -> EvaluationRunResult:
-    result = EvaluationRunResult(
-        spec=plan.spec,
-        status=status,
-        runtime=runtime,
-        started_at_utc=started_at_utc,
-        closed_at_utc=closed_at_utc,
-        attempts=tuple(attempts_by_index[index] for index in sorted(attempts_by_index)),
-    )
-    write_evaluation_result_files(result, directory=evaluation.evaluation_dir)
-    return result
 
 
 def _run_parallel_attempt_schedule(

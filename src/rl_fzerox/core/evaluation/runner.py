@@ -9,7 +9,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-from rl_fzerox.core.evaluation.artifacts import write_evaluation_result_files
 from rl_fzerox.core.evaluation.models import (
     AttemptStatus,
     CourseResultStatus,
@@ -21,9 +20,9 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationRuntimeSpec,
     EvaluationSpec,
 )
+from rl_fzerox.core.evaluation.publishing import EvaluationResultPublisher, ProgressCallback
 from rl_fzerox.core.seed import derive_seed
 
-type ProgressCallback = Callable[[EvaluationRunResult], None]
 type CancelCheck = Callable[[], bool]
 type Clock = Callable[[], str]
 
@@ -99,29 +98,22 @@ def run_course_evaluation(
     started_at_utc = clock()
     attempts: list[EvaluationAttemptResult] = []
     policy_path = Path(run_spec.checkpoint.copied_policy_path)
-
-    _publish_result_update(
-        EvaluationRunResult(
-            spec=run_spec,
-            status="partial",
-            runtime=run_runtime,
-            started_at_utc=started_at_utc,
-            attempts=(),
-        ),
+    publisher = EvaluationResultPublisher(
+        spec=run_spec,
+        runtime=run_runtime,
+        started_at_utc=started_at_utc,
         result_dir=result_dir,
         on_update=on_update,
     )
 
+    publisher.publish(status="partial")
+
     for job in plan.jobs:
         if _cancel_requested(should_cancel):
-            return _publish_cancelled_result(
-                run_spec,
-                runtime=run_runtime,
-                started_at_utc=started_at_utc,
+            return publisher.publish(
+                status="cancelled",
                 attempts=attempts,
-                result_dir=result_dir,
-                on_update=on_update,
-                clock=clock,
+                closed_at_utc=clock(),
             )
         attempt_started_at_utc = clock()
         course_result = evaluation_course_result_for_target(
@@ -142,38 +134,19 @@ def run_course_evaluation(
                 closed_at_utc=clock(),
             )
         )
-        _publish_result_update(
-            EvaluationRunResult(
-                spec=run_spec,
-                status="partial",
-                runtime=run_runtime,
-                started_at_utc=started_at_utc,
-                attempts=tuple(attempts),
-            ),
-            result_dir=result_dir,
-            on_update=on_update,
-        )
+        publisher.publish(status="partial", attempts=attempts)
         if _cancel_requested(should_cancel):
-            return _publish_cancelled_result(
-                run_spec,
-                runtime=run_runtime,
-                started_at_utc=started_at_utc,
+            return publisher.publish(
+                status="cancelled",
                 attempts=attempts,
-                result_dir=result_dir,
-                on_update=on_update,
-                clock=clock,
+                closed_at_utc=clock(),
             )
 
-    result = EvaluationRunResult(
-        spec=run_spec,
+    return publisher.publish(
         status="completed",
-        runtime=run_runtime,
-        started_at_utc=started_at_utc,
         closed_at_utc=clock(),
-        attempts=tuple(attempts),
+        attempts=attempts,
     )
-    _publish_result_update(result, result_dir=result_dir, on_update=on_update)
-    return result
 
 
 def _cancel_requested(should_cancel: CancelCheck | None) -> bool:
@@ -203,28 +176,6 @@ def build_evaluation_attempt_plan(
         for index, target in enumerate(expanded_targets, start=1)
     )
     return EvaluationAttemptPlan(spec=run_spec, jobs=jobs)
-
-
-def _publish_cancelled_result(
-    spec: EvaluationSpec,
-    *,
-    runtime: EvaluationRuntimeSpec,
-    started_at_utc: str,
-    attempts: list[EvaluationAttemptResult],
-    result_dir: Path | None,
-    on_update: ProgressCallback | None,
-    clock: Clock,
-) -> EvaluationRunResult:
-    result = EvaluationRunResult(
-        spec=spec,
-        status="cancelled",
-        runtime=runtime,
-        started_at_utc=started_at_utc,
-        closed_at_utc=clock(),
-        attempts=tuple(attempts),
-    )
-    _publish_result_update(result, result_dir=result_dir, on_update=on_update)
-    return result
 
 
 def _expand_targets(
@@ -301,15 +252,3 @@ def _attempt_status(status: CourseResultStatus) -> AttemptStatus:
     if status == "truncated":
         return "partial"
     return "failed"
-
-
-def _publish_result_update(
-    result: EvaluationRunResult,
-    *,
-    result_dir: Path | None,
-    on_update: ProgressCallback | None,
-) -> None:
-    if result_dir is not None:
-        write_evaluation_result_files(result, directory=result_dir)
-    if on_update is not None:
-        on_update(result)
