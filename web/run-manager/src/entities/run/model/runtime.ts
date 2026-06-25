@@ -157,16 +157,69 @@ function formatRate(value: number): string {
 }
 
 function localSimGameTimeSeconds(run: ManagedRun): number | null {
+  const frames = localExperienceFrames(run);
+  return frames === null ? null : frames / 60;
+}
+
+function lineageSimGameTimeSeconds(run: ManagedRun, allRuns: ManagedRun[]): number | null {
+  const frames = lineageExperienceFrames(run, allRuns);
+  return frames === null ? null : frames / 60;
+}
+
+function localExperienceFrames(run: ManagedRun): number | null {
   const runtime = run.runtime;
   if (runtime === null) {
     return null;
   }
-  const actionRepeat = Math.max(run.action_repeat, 1);
-  return (runtime.num_timesteps * actionRepeat) / 60;
+  return Math.max(0, runtime.num_timesteps) * runActionRepeat(run);
 }
 
-function lineageSimGameTimeSeconds(run: ManagedRun, allRuns: ManagedRun[]): number | null {
-  return lineageAggregateSeconds(run, allRuns, localSimGameTimeSeconds);
+function lineageExperienceFrames(run: ManagedRun, allRuns: ManagedRun[]): number | null {
+  const localFrames = localExperienceFrames(run);
+  const lineageOffsetFrames = lineageFrameOffset(run, allRuns);
+  if (localFrames === null && lineageOffsetFrames === null) {
+    return null;
+  }
+  return (lineageOffsetFrames ?? 0) + (localFrames ?? 0);
+}
+
+function lineageFrameOffset(run: ManagedRun, allRuns: ManagedRun[]): number | null {
+  if (run.lineage_step_offset <= 0) {
+    return 0;
+  }
+
+  // Match watch experience semantics: known parent edges use the parent's
+  // action repeat; missing source history falls back to the stored lineage step
+  // offset in the current run's frame scale.
+  const runsById = new Map(allRuns.map((candidate) => [candidate.id, candidate]));
+  const visited = new Set<string>();
+  let totalFrames = 0;
+  let currentRun: ManagedRun | null = run;
+
+  while (currentRun !== null && !visited.has(currentRun.id)) {
+    visited.add(currentRun.id);
+    const parentRun: ManagedRun | null =
+      currentRun.parent_run_id === null ? null : (runsById.get(currentRun.parent_run_id) ?? null);
+    if (parentRun === null) {
+      totalFrames += Math.max(0, currentRun.lineage_step_offset) * runActionRepeat(currentRun);
+      return totalFrames;
+    }
+
+    const sourceSteps =
+      currentRun.source_num_timesteps ??
+      currentRun.lineage_step_offset - parentRun.lineage_step_offset;
+    if (sourceSteps < 0) {
+      return null;
+    }
+    totalFrames += sourceSteps * runActionRepeat(parentRun);
+    currentRun = parentRun;
+  }
+
+  return totalFrames;
+}
+
+function runActionRepeat(run: ManagedRun): number {
+  return Math.max(run.action_repeat, 1);
 }
 
 function envStepRateValue(run: ManagedRun): number | null {
