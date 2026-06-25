@@ -153,6 +153,9 @@ def raise_if_watch_exited_early(
     except subprocess.TimeoutExpired:
         return
 
+    if return_code == 0:
+        return
+
     detail = watch_failure_detail(log_path)
     if detail is None:
         raise RuntimeError(f"watch exited immediately with code {return_code}; see {log_path}")
@@ -196,10 +199,10 @@ def _watch_reaper(
     log_path: Path,
 ) -> None:
     return_code = process.wait()
-    if return_code == 0:
-        return
     store = ManagerStore(db_path)
     store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
+    if return_code == 0:
+        return
     store.append_run_event(
         run_id=run_id,
         kind="watch_failed",
