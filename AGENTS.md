@@ -156,17 +156,12 @@ Examples:
 - Add brief docstrings or comments where they materially reduce reader effort.
 - For complex subsystems, document core concepts, data flow, and extension
   points close to the code.
-- Do not use a broad `concepts/` directory as a catch-all. Separate docs by
-  reader need: user operation, theory, architecture, and development workflow.
 - Keep user docs short and practical. Start with what the user wants to do, then
   list the necessary commands, settings, or UI steps.
 - Do not try to fully document every subsystem in one pass. Establish the
   minimal map first, then expand one topic at a time.
 - Keep theory docs separate from architecture. Theory explains why a design
   exists; architecture explains where state lives and how code paths connect.
-- In user-facing docs, start from F-Zero X language before introducing project
-  terms. Use concrete examples like "Mute City, GP Race, Master, Blue Falcon,
-  ENG 50" before naming internal objects or schemas.
 - In user-facing docs, avoid opening with internal nouns such as "course
   target", "materialization", "runtime projection", "backend", or "source of
   truth".
