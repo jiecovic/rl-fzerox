@@ -83,10 +83,16 @@ class TrainActorRegularizationConfig(BaseModel):
 
 
 class TrainConfig(BaseModel):
-    """Training settings for the current run."""
+    """Training settings materialized for one process invocation.
+
+    The runtime schema stays flat because it is serialized as a manifest mirror.
+    Manager-owned flows must still project these controls from SQLite instead of
+    treating the manifest as an alternate source of truth.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
+    # Optimizer and rollout behavior.
     algorithm: TrainAlgorithmName = TRAINING_ALGORITHMS.default
     vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
@@ -108,6 +114,8 @@ class TrainConfig(BaseModel):
     actor_regularization: TrainActorRegularizationConfig = Field(
         default_factory=TrainActorRegularizationConfig
     )
+
+    # Checkpoint and logging cadence.
     stats_window_size: PositiveInt = 100
     checkpoint_every_rollouts: PositiveInt | None = None
     save_latest_checkpoint: bool = True
@@ -118,10 +126,16 @@ class TrainConfig(BaseModel):
     verbose: int = Field(default=0, ge=0, le=2)
     device: str = "auto"
     save_freq: PositiveInt = 1_000
+
+    # Runtime output location. Managed runs set explicit_run_dir from SQLite.
     output_root: Path = Path("local/runs")
     run_name: str = "ppo_cnn"
     tensorboard_step_offset: NonNegativeInt = 0
     explicit_run_dir: Path | None = None
+
+    # Resume controls for one training process launch.
+    # `continue_run_dir` means in-place full-model continuation of the same run.
+    # `resume_run_dir` can also point at a source run for weights-only forks.
     continue_run_dir: Path | None = None
     resume_run_dir: Path | None = None
     resume_source_algorithm: TrainAlgorithmName | None = None
@@ -133,43 +147,64 @@ class TrainConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_algorithm_specific_values(self) -> TrainConfig:
-        if self.resume_run_dir is None and self.resume_mode == "full_model":
-            raise ValueError("train.resume_mode=full_model requires train.resume_run_dir")
-        if self.resume_source_metadata_required:
-            if self.resume_run_dir is None:
-                raise ValueError(
-                    "train.resume_source_metadata_required requires train.resume_run_dir"
-                )
-            if self.resume_source_algorithm is None:
-                raise ValueError(
-                    "train.resume_source_metadata_required requires train.resume_source_algorithm"
-                )
-            if self.resume_source_auxiliary_state_enabled is None:
-                raise ValueError(
-                    "train.resume_source_metadata_required requires "
-                    "train.resume_source_auxiliary_state_enabled"
-                )
-        if (
-            self.explicit_run_dir is not None
-            and self.continue_run_dir is not None
-            and self.explicit_run_dir != self.continue_run_dir
-        ):
-            raise ValueError(
-                "train.explicit_run_dir must match train.continue_run_dir when both are set"
-            )
-        if self.continue_run_dir is not None:
-            if self.resume_run_dir is None:
-                raise ValueError("train.continue_run_dir requires train.resume_run_dir")
-            if self.resume_run_dir != self.continue_run_dir:
-                raise ValueError(
-                    "train.continue_run_dir must match train.resume_run_dir "
-                    "for in-place continuation"
-                )
-            if self.resume_mode != "full_model":
-                raise ValueError("train.continue_run_dir requires train.resume_mode=full_model")
-        group_keys = [group.feature_names for group in self.state_feature_dropout_groups]
-        if len(set(group_keys)) != len(group_keys):
-            raise ValueError(
-                "train.state_feature_dropout_groups must not contain duplicate feature groups"
-            )
+        _validate_resume_controls(self)
+        _validate_state_feature_dropout_groups(self.state_feature_dropout_groups)
         return self
+
+
+def _validate_resume_controls(config: TrainConfig) -> None:
+    _validate_full_model_resume(config)
+    _validate_required_resume_source_metadata(config)
+    _validate_in_place_continue_controls(config)
+
+
+def _validate_full_model_resume(config: TrainConfig) -> None:
+    if config.resume_run_dir is None and config.resume_mode == "full_model":
+        raise ValueError("train.resume_mode=full_model requires train.resume_run_dir")
+
+
+def _validate_required_resume_source_metadata(config: TrainConfig) -> None:
+    if not config.resume_source_metadata_required:
+        return
+    if config.resume_run_dir is None:
+        raise ValueError("train.resume_source_metadata_required requires train.resume_run_dir")
+    if config.resume_source_algorithm is None:
+        raise ValueError(
+            "train.resume_source_metadata_required requires train.resume_source_algorithm"
+        )
+    if config.resume_source_auxiliary_state_enabled is None:
+        raise ValueError(
+            "train.resume_source_metadata_required requires "
+            "train.resume_source_auxiliary_state_enabled"
+        )
+
+
+def _validate_in_place_continue_controls(config: TrainConfig) -> None:
+    if (
+        config.explicit_run_dir is not None
+        and config.continue_run_dir is not None
+        and config.explicit_run_dir != config.continue_run_dir
+    ):
+        raise ValueError(
+            "train.explicit_run_dir must match train.continue_run_dir when both are set"
+        )
+    if config.continue_run_dir is None:
+        return
+    if config.resume_run_dir is None:
+        raise ValueError("train.continue_run_dir requires train.resume_run_dir")
+    if config.resume_run_dir != config.continue_run_dir:
+        raise ValueError(
+            "train.continue_run_dir must match train.resume_run_dir for in-place continuation"
+        )
+    if config.resume_mode != "full_model":
+        raise ValueError("train.continue_run_dir requires train.resume_mode=full_model")
+
+
+def _validate_state_feature_dropout_groups(
+    groups: tuple[StateFeatureDropoutGroupConfig, ...],
+) -> None:
+    group_keys = [group.feature_names for group in groups]
+    if len(set(group_keys)) != len(group_keys):
+        raise ValueError(
+            "train.state_feature_dropout_groups must not contain duplicate feature groups"
+        )
