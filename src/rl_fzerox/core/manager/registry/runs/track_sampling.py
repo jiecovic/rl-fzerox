@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -31,6 +31,79 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
+
+
+# These fields use the same names and runtime types in ORM rows and domain
+# dataclasses. Seeds, paths, and scheduler JSON stay explicit because their
+# persisted representation intentionally differs from the domain object.
+_RUNTIME_STATE_FIELDS = (
+    "sampling_mode",
+    "action_repeat",
+    "update_episodes",
+    "ema_alpha",
+    "max_weight_scale",
+    "adaptive_completion_weight",
+    "adaptive_target_completion",
+    "adaptive_min_confidence_episodes",
+    "adaptive_confidence_scale",
+    "deficit_budget_difficulty_metric",
+    "deficit_budget_warmup_min_episodes_per_course",
+    "update_count",
+    "episodes_since_update",
+)
+
+_ENTRY_MIRROR_FIELDS = (
+    "track_id",
+    "course_key",
+    "label",
+    "base_weight",
+    "current_weight",
+    "completed_frames",
+    "episode_count",
+    "finished_episode_count",
+    "success_sample_count",
+    "completion_sample_count",
+    "completion_fraction_total",
+    "ema_episode_frames",
+    "ema_completion_fraction",
+    "ema_finish_rate",
+    "current_problem_score",
+    "generation_episode_count",
+    "generation_finished_episode_count",
+    "generation_success_sample_count",
+    "generation_ema_completion_fraction",
+)
+
+_GENERATED_COURSE_MIRROR_FIELDS = (
+    "generated_course_slot",
+    "generated_course_generation",
+    "generated_course_id",
+    "generated_course_name",
+    "generated_course_hash",
+    "generated_course_segment_count",
+    "generated_course_length",
+)
+
+_ARTIFACT_MIRROR_FIELDS = (
+    "course_key",
+    "reset_variant_key",
+    "entry_id",
+    "source_course_index",
+    "source_gp_difficulty",
+    "source_vehicle",
+    "source_engine_setting_raw_value",
+)
+
+_GENERATED_SLOT_MIRROR_FIELDS = (
+    "course_key",
+    "slot",
+    "generation",
+    "course_id",
+    "course_name",
+    "course_hash",
+    "segment_count",
+    "course_length",
+)
 
 
 def clear_run_track_sampling_state(store: ManagerStore, run_id: str) -> None:
@@ -74,22 +147,8 @@ def get_run_track_sampling_state(
     if runtime is None or not entries:
         return None
     return TrackSamplingRuntimeState(
-        sampling_mode=runtime.sampling_mode,
-        action_repeat=runtime.action_repeat,
-        update_episodes=runtime.update_episodes,
-        ema_alpha=runtime.ema_alpha,
-        max_weight_scale=runtime.max_weight_scale,
-        adaptive_completion_weight=runtime.adaptive_completion_weight,
-        adaptive_target_completion=runtime.adaptive_target_completion,
-        adaptive_min_confidence_episodes=runtime.adaptive_min_confidence_episodes,
-        adaptive_confidence_scale=runtime.adaptive_confidence_scale,
-        update_count=runtime.update_count,
-        episodes_since_update=runtime.episodes_since_update,
+        **_values_from_attrs(runtime, _RUNTIME_STATE_FIELDS),
         entries=tuple(_track_sampling_entry_from_model(entry) for entry in entries),
-        deficit_budget_difficulty_metric=runtime.deficit_budget_difficulty_metric,
-        deficit_budget_warmup_min_episodes_per_course=(
-            runtime.deficit_budget_warmup_min_episodes_per_course
-        ),
         deficit_budget_scheduler=load_deficit_budget_scheduler_state_json(
             runtime.deficit_budget_scheduler_json,
         ),
@@ -233,24 +292,10 @@ def _runtime_values(
 ) -> dict[str, object]:
     return {
         "run_id": run_id,
-        "sampling_mode": state.sampling_mode,
-        "action_repeat": state.action_repeat,
-        "update_episodes": state.update_episodes,
-        "ema_alpha": state.ema_alpha,
-        "max_weight_scale": state.max_weight_scale,
-        "adaptive_completion_weight": state.adaptive_completion_weight,
-        "adaptive_target_completion": state.adaptive_target_completion,
-        "adaptive_min_confidence_episodes": state.adaptive_min_confidence_episodes,
-        "adaptive_confidence_scale": state.adaptive_confidence_scale,
-        "deficit_budget_difficulty_metric": state.deficit_budget_difficulty_metric,
-        "deficit_budget_warmup_min_episodes_per_course": (
-            state.deficit_budget_warmup_min_episodes_per_course
-        ),
+        **_values_from_attrs(state, _RUNTIME_STATE_FIELDS),
         "deficit_budget_scheduler_json": deficit_budget_scheduler_state_json(
             state.deficit_budget_scheduler,
         ),
-        "update_count": state.update_count,
-        "episodes_since_update": state.episodes_since_update,
         "updated_at": updated_at,
     }
 
@@ -259,33 +304,8 @@ def _track_sampling_entry_from_model(
     entry: RunTrackSamplingEntryModel,
 ) -> TrackSamplingRuntimeEntry:
     return TrackSamplingRuntimeEntry(
-        track_id=entry.track_id,
-        course_key=entry.course_key,
-        label=entry.label,
-        base_weight=entry.base_weight,
-        current_weight=entry.current_weight,
-        completed_frames=entry.completed_frames,
-        episode_count=entry.episode_count,
-        finished_episode_count=entry.finished_episode_count,
-        success_sample_count=entry.success_sample_count,
-        completion_sample_count=entry.completion_sample_count,
-        completion_fraction_total=entry.completion_fraction_total,
-        ema_episode_frames=entry.ema_episode_frames,
-        ema_completion_fraction=entry.ema_completion_fraction,
-        ema_finish_rate=entry.ema_finish_rate,
-        current_problem_score=entry.current_problem_score,
-        generation_episode_count=entry.generation_episode_count,
-        generation_finished_episode_count=entry.generation_finished_episode_count,
-        generation_success_sample_count=entry.generation_success_sample_count,
-        generation_ema_completion_fraction=entry.generation_ema_completion_fraction,
-        generated_course_slot=entry.generated_course_slot,
-        generated_course_generation=entry.generated_course_generation,
-        generated_course_id=entry.generated_course_id,
-        generated_course_name=entry.generated_course_name,
-        generated_course_hash=entry.generated_course_hash,
+        **_values_from_attrs(entry, (*_ENTRY_MIRROR_FIELDS, *_GENERATED_COURSE_MIRROR_FIELDS)),
         generated_course_seed=_optional_int(entry.generated_course_seed),
-        generated_course_segment_count=entry.generated_course_segment_count,
-        generated_course_length=entry.generated_course_length,
     )
 
 
@@ -296,33 +316,8 @@ def _track_sampling_entry_values(
 ) -> dict[str, object]:
     return {
         "run_id": run_id,
-        "course_key": entry.course_key,
-        "track_id": entry.track_id,
-        "label": entry.label,
-        "base_weight": entry.base_weight,
-        "current_weight": entry.current_weight,
-        "completed_frames": entry.completed_frames,
-        "episode_count": entry.episode_count,
-        "finished_episode_count": entry.finished_episode_count,
-        "success_sample_count": entry.success_sample_count,
-        "completion_sample_count": entry.completion_sample_count,
-        "completion_fraction_total": entry.completion_fraction_total,
-        "ema_episode_frames": entry.ema_episode_frames,
-        "ema_completion_fraction": entry.ema_completion_fraction,
-        "ema_finish_rate": entry.ema_finish_rate,
-        "current_problem_score": entry.current_problem_score,
-        "generation_episode_count": entry.generation_episode_count,
-        "generation_finished_episode_count": entry.generation_finished_episode_count,
-        "generation_success_sample_count": entry.generation_success_sample_count,
-        "generation_ema_completion_fraction": entry.generation_ema_completion_fraction,
-        "generated_course_slot": entry.generated_course_slot,
-        "generated_course_generation": entry.generated_course_generation,
-        "generated_course_id": entry.generated_course_id,
-        "generated_course_name": entry.generated_course_name,
-        "generated_course_hash": entry.generated_course_hash,
+        **_values_from_attrs(entry, (*_ENTRY_MIRROR_FIELDS, *_GENERATED_COURSE_MIRROR_FIELDS)),
         "generated_course_seed": _optional_seed_text(entry.generated_course_seed),
-        "generated_course_segment_count": entry.generated_course_segment_count,
-        "generated_course_length": entry.generated_course_length,
     }
 
 
@@ -330,23 +325,11 @@ def _track_sampling_artifact_from_model(
     artifact: RunTrackSamplingArtifactModel,
 ) -> TrackSamplingMaterializedArtifact:
     return TrackSamplingMaterializedArtifact(
-        course_key=artifact.course_key,
-        reset_variant_key=artifact.reset_variant_key,
-        entry_id=artifact.entry_id,
+        **_values_from_attrs(artifact, _ARTIFACT_MIRROR_FIELDS),
         baseline_state_path=_stored_path(artifact.baseline_state_path),
         metadata_path=_stored_path(artifact.metadata_path),
-        source_course_index=artifact.source_course_index,
-        source_gp_difficulty=artifact.source_gp_difficulty,
-        source_vehicle=artifact.source_vehicle,
-        source_engine_setting_raw_value=artifact.source_engine_setting_raw_value,
-        generated_course_slot=artifact.generated_course_slot,
-        generated_course_generation=artifact.generated_course_generation,
-        generated_course_id=artifact.generated_course_id,
-        generated_course_name=artifact.generated_course_name,
-        generated_course_hash=artifact.generated_course_hash,
+        **_values_from_attrs(artifact, _GENERATED_COURSE_MIRROR_FIELDS),
         generated_course_seed=_optional_int(artifact.generated_course_seed),
-        generated_course_segment_count=artifact.generated_course_segment_count,
-        generated_course_length=artifact.generated_course_length,
     )
 
 
@@ -357,23 +340,11 @@ def _track_sampling_artifact_values(
 ) -> dict[str, object]:
     return {
         "run_id": run_id,
-        "course_key": artifact.course_key,
-        "reset_variant_key": artifact.reset_variant_key,
-        "entry_id": artifact.entry_id,
+        **_values_from_attrs(artifact, _ARTIFACT_MIRROR_FIELDS),
         "baseline_state_path": str(artifact.baseline_state_path),
         "metadata_path": str(artifact.metadata_path),
-        "source_course_index": artifact.source_course_index,
-        "source_gp_difficulty": artifact.source_gp_difficulty,
-        "source_vehicle": artifact.source_vehicle,
-        "source_engine_setting_raw_value": artifact.source_engine_setting_raw_value,
-        "generated_course_slot": artifact.generated_course_slot,
-        "generated_course_generation": artifact.generated_course_generation,
-        "generated_course_id": artifact.generated_course_id,
-        "generated_course_name": artifact.generated_course_name,
-        "generated_course_hash": artifact.generated_course_hash,
+        **_values_from_attrs(artifact, _GENERATED_COURSE_MIRROR_FIELDS),
         "generated_course_seed": _optional_seed_text(artifact.generated_course_seed),
-        "generated_course_segment_count": artifact.generated_course_segment_count,
-        "generated_course_length": artifact.generated_course_length,
     }
 
 
@@ -381,15 +352,8 @@ def _generated_x_cup_slot_from_model(
     slot: RunTrackSamplingGeneratedSlotModel,
 ) -> GeneratedXCupSlot:
     return GeneratedXCupSlot(
-        course_key=slot.course_key,
-        slot=slot.slot,
-        generation=slot.generation,
-        course_id=slot.course_id,
-        course_name=slot.course_name,
-        course_hash=slot.course_hash,
+        **_values_from_attrs(slot, _GENERATED_SLOT_MIRROR_FIELDS),
         course_seed=int(slot.course_seed),
-        segment_count=slot.segment_count,
-        course_length=slot.course_length,
     )
 
 
@@ -401,21 +365,18 @@ def _generated_x_cup_slot_values(
 ) -> dict[str, object]:
     return {
         "run_id": run_id,
-        "slot": slot.slot,
-        "course_key": slot.course_key,
-        "generation": slot.generation,
-        "course_id": slot.course_id,
-        "course_name": slot.course_name,
-        "course_hash": slot.course_hash,
+        **_values_from_attrs(slot, _GENERATED_SLOT_MIRROR_FIELDS),
         "course_seed": _optional_seed_text(slot.course_seed),
-        "segment_count": slot.segment_count,
-        "course_length": slot.course_length,
         "updated_at": updated_at,
     }
 
 
 def _stored_path(value: str) -> Path:
     return Path(value).expanduser().resolve()
+
+
+def _values_from_attrs(source: object, fields: tuple[str, ...]) -> dict[str, Any]:
+    return {field: getattr(source, field) for field in fields}
 
 
 def _optional_int(value: object) -> int | None:
