@@ -33,17 +33,7 @@ class PostActivationResidualConvBlock(nn.Module):
             stride=(1, 1),
             padding=layer_spec.padding,
         )
-        self.projection = (
-            nn.Conv2d(
-                in_channels,
-                layer_spec.out_channels,
-                kernel_size=(1, 1),
-                stride=layer_spec.stride,
-                padding=(0, 0),
-            )
-            if in_channels != layer_spec.out_channels or layer_spec.stride != (1, 1)
-            else nn.Identity()
-        )
+        self.projection = _residual_projection(in_channels, layer_spec)
         self.output_activation = nn.ReLU()
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
@@ -78,17 +68,7 @@ class PreActivationResidualConvBlock(nn.Module):
             stride=(1, 1),
             padding=layer_spec.padding,
         )
-        self.projection = (
-            nn.Conv2d(
-                in_channels,
-                layer_spec.out_channels,
-                kernel_size=(1, 1),
-                stride=layer_spec.stride,
-                padding=(0, 0),
-            )
-            if in_channels != layer_spec.out_channels or layer_spec.stride != (1, 1)
-            else nn.Identity()
-        )
+        self.projection = _residual_projection(in_channels, layer_spec)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         residual = self.projection(inputs)
@@ -105,4 +85,16 @@ def torch_pooling_layer(
         kernel_size=layer_spec.kernel_size,
         stride=layer_spec.stride,
         padding=layer_spec.padding,
+    )
+
+
+def _residual_projection(in_channels: int, layer_spec: ConvLayerSpec) -> nn.Module:
+    if in_channels == layer_spec.out_channels and layer_spec.stride == (1, 1):
+        return nn.Identity()
+    return nn.Conv2d(
+        in_channels,
+        layer_spec.out_channels,
+        kernel_size=(1, 1),
+        stride=layer_spec.stride,
+        padding=(0, 0),
     )

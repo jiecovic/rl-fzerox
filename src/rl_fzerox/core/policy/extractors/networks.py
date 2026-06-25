@@ -288,10 +288,7 @@ def _layer_norm_activation_layer(
 
 
 def _concat_features(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
-    output = left.new_empty(left.shape[0], left.shape[1] + right.shape[1])
-    output[:, : left.shape[1]] = left
-    output[:, left.shape[1] :] = right
-    return output
+    return torch.cat((left, right), dim=1)
 
 
 def _state_branch_mlp(
