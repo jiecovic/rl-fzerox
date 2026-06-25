@@ -14,30 +14,18 @@ from torch.nn import functional as F
 from .targets import (
     AuxiliaryStateDecodedValue,
     AuxiliaryStateTargetName,
+    auxiliary_state_target_names_by_kind,
     resolve_auxiliary_state_target,
 )
 
-_SCALAR_TARGET_NAMES: tuple[AuxiliaryStateTargetName, ...] = (
-    "vehicle_state.speed_norm",
-    "vehicle_state.energy_frac",
-    "vehicle_state.lateral_velocity_norm",
-    "track_position.lap_progress",
-    "track_position.edge_ratio",
-    "track_position.height_above_ground_norm",
-)
-_BINARY_TARGET_NAMES: tuple[AuxiliaryStateTargetName, ...] = (
-    "vehicle_state.reverse_active",
-    "vehicle_state.airborne",
-    "vehicle_state.can_boost",
-    "vehicle_state.boost_active",
-    "vehicle_state.sliding_active",
-    "track_position.outside_track_bounds",
-    "surface_state.on_refill_surface",
-    "surface_state.on_dirt_surface",
-    "surface_state.on_ice_surface",
-)
+_SCALAR_TARGET_NAMES = auxiliary_state_target_names_by_kind("scalar")
+_BINARY_TARGET_NAMES = auxiliary_state_target_names_by_kind("binary")
+_CATEGORICAL_TARGET_NAMES = auxiliary_state_target_names_by_kind("categorical")
 _SCALAR_HEAD_INDEX = {name: index for index, name in enumerate(_SCALAR_TARGET_NAMES)}
 _BINARY_HEAD_INDEX = {name: index for index, name in enumerate(_BINARY_TARGET_NAMES)}
+_COURSE_TARGET_NAME = _CATEGORICAL_TARGET_NAMES[0]
+_COURSE_TARGET_SPEC = resolve_auxiliary_state_target(_COURSE_TARGET_NAME)
+_COURSE_TARGET_WIDTH = _COURSE_TARGET_SPEC.vector_stop - _COURSE_TARGET_SPEC.vector_start
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +53,7 @@ def _requested_target_names(
     names: Sequence[AuxiliaryStateTargetName] | None,
 ) -> tuple[AuxiliaryStateTargetName, ...]:
     if names is None:
-        return _SCALAR_TARGET_NAMES + _BINARY_TARGET_NAMES + ("course_context.builtin_course_id",)
+        return _SCALAR_TARGET_NAMES + _BINARY_TARGET_NAMES + _CATEGORICAL_TARGET_NAMES
     return tuple(names)
 
 
@@ -78,7 +66,7 @@ def _needs_binary_head(names: Sequence[AuxiliaryStateTargetName]) -> bool:
 
 
 def _needs_course_head(names: Sequence[AuxiliaryStateTargetName]) -> bool:
-    return "course_context.builtin_course_id" in names
+    return _COURSE_TARGET_NAME in names
 
 
 class AuxiliaryStateHeadBank(nn.Module):
@@ -90,7 +78,7 @@ class AuxiliaryStateHeadBank(nn.Module):
         input_dim: int,
         head_arch: Sequence[int] = (),
         activation_fn: type[nn.Module] = nn.ReLU,
-        builtin_course_count: int = 24,
+        builtin_course_count: int | None = None,
     ) -> None:
         super().__init__()
         trunk_layers: list[nn.Module] = []
@@ -102,7 +90,10 @@ class AuxiliaryStateHeadBank(nn.Module):
         self.trunk = nn.Identity() if not trunk_layers else nn.Sequential(*trunk_layers)
         self.scalar_head = nn.Linear(trunk_input_dim, len(_SCALAR_TARGET_NAMES))
         self.binary_head = nn.Linear(trunk_input_dim, len(_BINARY_TARGET_NAMES))
-        self.course_head = nn.Linear(trunk_input_dim, builtin_course_count)
+        course_count = (
+            _COURSE_TARGET_WIDTH if builtin_course_count is None else int(builtin_course_count)
+        )
+        self.course_head = nn.Linear(trunk_input_dim, course_count)
 
     def loss(
         self,
@@ -232,12 +223,12 @@ class AuxiliaryStateHeadBank(nn.Module):
             probability = binary_logits[sample_index, _BINARY_HEAD_INDEX[name]].sigmoid()
             values[name] = float(probability.detach().cpu().item())
 
-        if "course_context.builtin_course_id" in requested_names:
+        if _COURSE_TARGET_NAME in requested_names:
             if course_logits is None:
                 raise RuntimeError("Categorical auxiliary prediction head is unavailable")
             course_probabilities = course_logits[sample_index].softmax(dim=0)
             course_confidence, course_index = course_probabilities.max(dim=0)
-            values["course_context.builtin_course_id"] = {
+            values[_COURSE_TARGET_NAME] = {
                 "index": int(course_index.detach().cpu().item()),
                 "confidence": float(course_confidence.detach().cpu().item()),
                 "probabilities": [

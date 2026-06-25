@@ -189,6 +189,12 @@ def supported_auxiliary_state_target_names() -> tuple[AuxiliaryStateTargetName, 
     return tuple(definition.name for definition in _TARGET_DEFINITIONS)
 
 
+def auxiliary_state_target_names_by_kind(
+    kind: AuxiliaryStateTargetKind,
+) -> tuple[AuxiliaryStateTargetName, ...]:
+    return tuple(definition.name for definition in _TARGET_DEFINITIONS if definition.kind == kind)
+
+
 def is_auxiliary_state_target_name(name: str) -> TypeGuard[AuxiliaryStateTargetName]:
     return name in _TARGET_DEFINITIONS_BY_NAME
 
