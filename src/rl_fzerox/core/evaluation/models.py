@@ -109,11 +109,7 @@ class EvaluationCourseResult:
     engine_setting_raw_value: int | None = None
     ko_stars: int | None = None
     failure_reason: str | None = None
-    boost_active_count: int | None = None
-    boost_active_frames: int | None = None
     boost_pad_entries: int | None = None
-    damage_event_count: int | None = None
-    minimum_height: float | None = None
     average_speed: float | None = None
 
 

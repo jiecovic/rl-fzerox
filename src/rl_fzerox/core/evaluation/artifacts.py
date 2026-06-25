@@ -114,12 +114,10 @@ def _detail_section(metrics: EvaluationMetrics) -> list[str]:
         "",
         (
             "| Scope | Success | Mean finish | Best finish | Env steps | Mean episode steps | "
-            "Mean return | Best return | Boost active | Boost frames | Boost pads | Damage | "
-            "Min height | Avg speed |"
+            "Mean return | Best return | Boost pads | Avg speed |"
         ),
         (
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
-            "---: | ---: | ---: | ---: |"
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
         ),
     ]
     for group in _metric_groups(metrics):
@@ -137,11 +135,7 @@ def _detail_section(metrics: EvaluationMetrics) -> list[str]:
                     _number(primary.mean_episode_length_steps),
                     _number(detail.mean_episode_return),
                     _number(detail.best_episode_return),
-                    _text(detail.boost_active_count),
-                    _text(detail.boost_active_frames),
                     _text(detail.boost_pad_entries),
-                    _text(detail.damage_event_count),
-                    _number(detail.minimum_height),
                     _number(detail.average_speed),
                 )
             )

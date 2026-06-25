@@ -34,11 +34,8 @@ def test_evaluation_metrics_aggregate_primary_and_detail_stats() -> None:
 
     assert metrics.overall.detail.mean_episode_return == pytest.approx(347.0)
     assert metrics.overall.detail.best_episode_return == 700.0
-    assert metrics.overall.detail.boost_active_count == 3
-    assert metrics.overall.detail.boost_active_frames == 100
     assert metrics.overall.detail.boost_pad_entries == 4
-    assert metrics.overall.detail.damage_event_count == 2
-    assert metrics.overall.detail.minimum_height == -10.0
+    assert metrics.overall.detail.average_speed == pytest.approx(703.3333333333334)
 
 
 def test_evaluation_metrics_break_down_by_course_and_cup() -> None:
@@ -59,8 +56,8 @@ def test_evaluation_metrics_break_down_by_course_and_cup() -> None:
     assert mute_city.primary.completion_rate == 0.7
     assert mute_city.primary.mean_finish_time_ms == 90_000.0
     assert mute_city.primary.total_env_steps == 3_700
-    assert mute_city.detail.damage_event_count == 2
-    assert mute_city.detail.minimum_height == -10.0
+    assert mute_city.detail.boost_pad_entries == 3
+    assert mute_city.detail.average_speed == pytest.approx(665.0)
 
 
 def test_evaluation_metrics_positions_are_conditioned_on_finished_courses() -> None:
@@ -160,11 +157,7 @@ def _sample_result() -> EvaluationRunResult:
                         env_steps=3_000,
                         episode_length_steps=3_000,
                         episode_return=500.0,
-                        boost_active_count=2,
-                        boost_active_frames=80,
                         boost_pad_entries=3,
-                        damage_event_count=1,
-                        minimum_height=-2.0,
                         average_speed=820.0,
                     ),
                     EvaluationCourseResult(
@@ -177,11 +170,7 @@ def _sample_result() -> EvaluationRunResult:
                         env_steps=3_200,
                         episode_length_steps=3_200,
                         episode_return=450.0,
-                        boost_active_count=1,
-                        boost_active_frames=20,
                         boost_pad_entries=1,
-                        damage_event_count=0,
-                        minimum_height=0.0,
                         average_speed=780.0,
                     ),
                 ),
@@ -205,8 +194,6 @@ def _sample_result() -> EvaluationRunResult:
                         env_steps=700,
                         episode_length_steps=700,
                         episode_return=-6.0,
-                        damage_event_count=1,
-                        minimum_height=-10.0,
                         average_speed=510.0,
                     ),
                 ),

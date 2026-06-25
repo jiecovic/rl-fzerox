@@ -47,11 +47,7 @@ class EvaluationDetailMetrics:
     mean_episode_return: float | None
     best_episode_return: float | None
     total_episode_return: float | None
-    boost_active_count: int
-    boost_active_frames: int
     boost_pad_entries: int
-    damage_event_count: int
-    minimum_height: float | None
     average_speed: float | None
 
 
@@ -257,11 +253,7 @@ def _detail_metrics(samples: _GroupSamples) -> EvaluationDetailMetrics:
         total_episode_return=(
             None if not samples.episode_returns else sum(samples.episode_returns)
         ),
-        boost_active_count=_sum_optional(course.boost_active_count for course in course_results),
-        boost_active_frames=_sum_optional(course.boost_active_frames for course in course_results),
         boost_pad_entries=_sum_optional(course.boost_pad_entries for course in course_results),
-        damage_event_count=_sum_optional(course.damage_event_count for course in course_results),
-        minimum_height=_min_optional(course.minimum_height for course in course_results),
         average_speed=_mean(
             tuple(
                 float(course.average_speed)
