@@ -13,7 +13,7 @@ from rl_fzerox.core.policy.auxiliary_state.observations import (
 )
 
 
-def _require_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor:
+def require_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor:
     if not isinstance(obs, Mapping):
         raise TypeError("Auxiliary-state policies require dict observations")
     field_name = auxiliary_state_targets_field()
@@ -24,7 +24,7 @@ def _require_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor:
     return aux_target_tensor.float().flatten(start_dim=1)
 
 
-def _optional_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor | None:
+def optional_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor | None:
     if not isinstance(obs, Mapping):
         return None
     field_name = auxiliary_state_targets_field()

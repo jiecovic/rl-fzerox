@@ -12,7 +12,7 @@ from rl_fzerox.core.policy.auxiliary_state.targets import (
 )
 
 
-def _auxiliary_state_loss_terms(
+def auxiliary_state_loss_terms(
     config: Mapping[str, object] | None,
 ) -> tuple[AuxiliaryStateLossTerm, ...]:
     if config is None:
@@ -42,7 +42,7 @@ def _auxiliary_state_loss_terms(
     return tuple(resolved)
 
 
-def _auxiliary_head_arch(config: Mapping[str, object] | None) -> tuple[int, ...]:
+def auxiliary_head_arch(config: Mapping[str, object] | None) -> tuple[int, ...]:
     if config is None:
         return ()
     raw_head_arch = config.get("head_arch")
@@ -59,7 +59,7 @@ def _auxiliary_head_arch(config: Mapping[str, object] | None) -> tuple[int, ...]
     return tuple(resolved)
 
 
-def _grounded_pitch_neutral_loss_weight(
+def grounded_pitch_neutral_loss_weight(
     config: Mapping[str, object] | None,
 ) -> float:
     return _non_negative_config_float(
@@ -70,7 +70,7 @@ def _grounded_pitch_neutral_loss_weight(
     )
 
 
-def _pitch_std_cap_loss_weight(
+def pitch_std_cap_loss_weight(
     config: Mapping[str, object] | None,
 ) -> float:
     return _non_negative_config_float(
@@ -81,7 +81,7 @@ def _pitch_std_cap_loss_weight(
     )
 
 
-def _grounded_pitch_std_cap(
+def grounded_pitch_std_cap(
     config: Mapping[str, object] | None,
 ) -> float:
     return _positive_config_float(
@@ -92,7 +92,7 @@ def _grounded_pitch_std_cap(
     )
 
 
-def _airborne_pitch_std_cap(
+def airborne_pitch_std_cap(
     config: Mapping[str, object] | None,
 ) -> float:
     return _positive_config_float(
@@ -103,7 +103,7 @@ def _airborne_pitch_std_cap(
     )
 
 
-def _steer_std_cap_loss_weight(
+def steer_std_cap_loss_weight(
     config: Mapping[str, object] | None,
 ) -> float:
     return _non_negative_config_float(
@@ -114,7 +114,7 @@ def _steer_std_cap_loss_weight(
     )
 
 
-def _steer_std_cap(
+def steer_std_cap(
     config: Mapping[str, object] | None,
 ) -> float:
     return _positive_config_float(
@@ -125,7 +125,7 @@ def _steer_std_cap(
     )
 
 
-def _steer_signed_balance_loss_weight(
+def steer_signed_balance_loss_weight(
     config: Mapping[str, object] | None,
 ) -> float:
     return _non_negative_config_float(
@@ -136,7 +136,7 @@ def _steer_signed_balance_loss_weight(
     )
 
 
-def _steer_signed_balance_deadzone(
+def steer_signed_balance_deadzone(
     config: Mapping[str, object] | None,
 ) -> float:
     return _non_negative_config_float(
@@ -147,7 +147,7 @@ def _steer_signed_balance_deadzone(
     )
 
 
-def _lean_signed_balance_loss_weight(
+def lean_signed_balance_loss_weight(
     config: Mapping[str, object] | None,
 ) -> float:
     return _non_negative_config_float(
@@ -158,7 +158,7 @@ def _lean_signed_balance_loss_weight(
     )
 
 
-def _lean_signed_balance_deadzone(
+def lean_signed_balance_deadzone(
     config: Mapping[str, object] | None,
 ) -> float:
     return _non_negative_config_float(
@@ -205,14 +205,14 @@ def _positive_config_float(
     return resolved
 
 
-def _axis_index(names: Sequence[str], axis: str) -> int | None:
+def axis_index(names: Sequence[str], axis: str) -> int | None:
     try:
         return tuple(names).index(axis)
     except ValueError:
         return None
 
 
-def _pitch_bucket_values(bucket_count: int) -> tuple[float, ...]:
+def pitch_bucket_values(bucket_count: int) -> tuple[float, ...]:
     neutral_index = int(bucket_count) // 2
     if neutral_index <= 0:
         return (0.0,)

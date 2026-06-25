@@ -13,8 +13,8 @@ from sb3x.common.auxiliary_losses import PolicyAuxiliaryLoss
 from stable_baselines3.common.type_aliases import PyTorchObs
 
 from rl_fzerox.core.policy.auxiliary_state.target_tensors import (
-    _optional_auxiliary_targets,
-    _require_auxiliary_targets,
+    optional_auxiliary_targets,
+    require_auxiliary_targets,
 )
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     resolve_auxiliary_state_target,
@@ -109,7 +109,7 @@ class _ActorRegularizationMixin:
                 add_loss(std_loss.total_loss)
                 metrics.update(std_loss.metrics)
 
-            aux_targets = _optional_auxiliary_targets(obs)
+            aux_targets = optional_auxiliary_targets(obs)
             if aux_targets is not None:
                 pitch_sample = self._pitch_action_sample(actions, reference=pitch_mean)
                 metrics.update(
@@ -178,7 +178,7 @@ class _ActorRegularizationMixin:
     ) -> tuple[torch.Tensor, torch.Tensor] | None:
         if self._grounded_pitch_neutral_loss_weight <= 0.0:
             return None
-        aux_targets = _require_auxiliary_targets(obs)
+        aux_targets = require_auxiliary_targets(obs)
         airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
         grounded = aux_targets[:, airborne_index] < 0.5
         loss_value, has_active_samples = _masked_mean(
@@ -246,7 +246,7 @@ class _ActorRegularizationMixin:
         if pitch_stats.log_std is not None:
             metrics["pitch/log_std"] = _metric_mean(pitch_stats.log_std, sample_mask)
 
-        aux_targets = _require_auxiliary_targets(obs)
+        aux_targets = require_auxiliary_targets(obs)
         airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
         airborne = aux_targets[:, airborne_index] >= 0.5
         scoped_losses = (

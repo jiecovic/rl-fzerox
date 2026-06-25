@@ -17,27 +17,27 @@ from rl_fzerox.core.policy.auxiliary_state.actor_regularization import (
     _ActorRegularizationMixin,
 )
 from rl_fzerox.core.policy.auxiliary_state.config import (
-    _airborne_pitch_std_cap,
-    _auxiliary_head_arch,
-    _auxiliary_state_loss_terms,
-    _axis_index,
-    _grounded_pitch_neutral_loss_weight,
-    _grounded_pitch_std_cap,
-    _lean_signed_balance_deadzone,
-    _lean_signed_balance_loss_weight,
-    _pitch_bucket_values,
-    _pitch_std_cap_loss_weight,
-    _steer_signed_balance_deadzone,
-    _steer_signed_balance_loss_weight,
-    _steer_std_cap,
-    _steer_std_cap_loss_weight,
+    airborne_pitch_std_cap,
+    auxiliary_head_arch,
+    auxiliary_state_loss_terms,
+    axis_index,
+    grounded_pitch_neutral_loss_weight,
+    grounded_pitch_std_cap,
+    lean_signed_balance_deadzone,
+    lean_signed_balance_loss_weight,
+    pitch_bucket_values,
+    pitch_std_cap_loss_weight,
+    steer_signed_balance_deadzone,
+    steer_signed_balance_loss_weight,
+    steer_std_cap,
+    steer_std_cap_loss_weight,
 )
 from rl_fzerox.core.policy.auxiliary_state.heads import (
     AuxiliaryStateHeadBank,
     AuxiliaryStateLossTerm,
 )
 from rl_fzerox.core.policy.auxiliary_state.target_tensors import (
-    _require_auxiliary_targets,
+    require_auxiliary_targets,
 )
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     AuxiliaryStateTargetName,
@@ -77,42 +77,42 @@ class _AuxiliaryStatePolicyMixin(_ActorRegularizationMixin):
         pitch_bucket_count: int = 5,
         activation_fn: type[nn.Module],
     ) -> None:
-        self._auxiliary_state_losses = _auxiliary_state_loss_terms(auxiliary_state)
+        self._auxiliary_state_losses = auxiliary_state_loss_terms(auxiliary_state)
         self._auxiliary_state_heads = (
             AuxiliaryStateHeadBank(
                 input_dim=input_dim,
-                head_arch=_auxiliary_head_arch(auxiliary_state),
+                head_arch=auxiliary_head_arch(auxiliary_state),
                 activation_fn=activation_fn,
             )
             if auxiliary_state is not None
             else None
         )
-        self._grounded_pitch_neutral_loss_weight = _grounded_pitch_neutral_loss_weight(
+        self._grounded_pitch_neutral_loss_weight = grounded_pitch_neutral_loss_weight(
             actor_regularization
         )
-        self._pitch_std_cap_loss_weight = _pitch_std_cap_loss_weight(actor_regularization)
-        self._grounded_pitch_std_cap = _grounded_pitch_std_cap(actor_regularization)
-        self._airborne_pitch_std_cap = _airborne_pitch_std_cap(actor_regularization)
-        self._steer_std_cap_loss_weight = _steer_std_cap_loss_weight(actor_regularization)
-        self._steer_std_cap = _steer_std_cap(actor_regularization)
-        self._steer_signed_balance_loss_weight = _steer_signed_balance_loss_weight(
+        self._pitch_std_cap_loss_weight = pitch_std_cap_loss_weight(actor_regularization)
+        self._grounded_pitch_std_cap = grounded_pitch_std_cap(actor_regularization)
+        self._airborne_pitch_std_cap = airborne_pitch_std_cap(actor_regularization)
+        self._steer_std_cap_loss_weight = steer_std_cap_loss_weight(actor_regularization)
+        self._steer_std_cap = steer_std_cap(actor_regularization)
+        self._steer_signed_balance_loss_weight = steer_signed_balance_loss_weight(
             actor_regularization
         )
-        self._steer_signed_balance_deadzone = _steer_signed_balance_deadzone(actor_regularization)
-        self._lean_signed_balance_loss_weight = _lean_signed_balance_loss_weight(
+        self._steer_signed_balance_deadzone = steer_signed_balance_deadzone(actor_regularization)
+        self._lean_signed_balance_loss_weight = lean_signed_balance_loss_weight(
             actor_regularization
         )
-        self._lean_signed_balance_deadzone = _lean_signed_balance_deadzone(actor_regularization)
+        self._lean_signed_balance_deadzone = lean_signed_balance_deadzone(actor_regularization)
         continuous_names = tuple(continuous_action_group_names)
         discrete_names = tuple(discrete_action_group_names)
-        self._continuous_steer_index = _axis_index(continuous_names, "steer")
-        self._continuous_pitch_index = _axis_index(continuous_names, "pitch")
-        self._discrete_pitch_index = _axis_index(discrete_names, "pitch")
-        self._discrete_lean_index = _axis_index(discrete_names, "lean")
-        self._discrete_lean_left_index = _axis_index(discrete_names, "lean_left")
-        self._discrete_lean_right_index = _axis_index(discrete_names, "lean_right")
+        self._continuous_steer_index = axis_index(continuous_names, "steer")
+        self._continuous_pitch_index = axis_index(continuous_names, "pitch")
+        self._discrete_pitch_index = axis_index(discrete_names, "pitch")
+        self._discrete_lean_index = axis_index(discrete_names, "lean")
+        self._discrete_lean_left_index = axis_index(discrete_names, "lean_left")
+        self._discrete_lean_right_index = axis_index(discrete_names, "lean_right")
         self._continuous_action_group_count = len(continuous_names)
-        self._pitch_bucket_values = _pitch_bucket_values(pitch_bucket_count)
+        self._pitch_bucket_values = pitch_bucket_values(pitch_bucket_count)
         if (
             self._pitch_actor_regularization_enabled()
             and self._continuous_pitch_index is None
@@ -141,7 +141,7 @@ class _AuxiliaryStatePolicyMixin(_ActorRegularizationMixin):
             return None
         return self._auxiliary_state_heads.loss(
             latent,
-            aux_targets=_require_auxiliary_targets(obs),
+            aux_targets=require_auxiliary_targets(obs),
             losses=self._auxiliary_state_losses,
             sample_mask=sample_mask,
         )
