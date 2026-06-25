@@ -59,14 +59,14 @@ Examples:
 
 ## Source of Truth
 
-- For managed run-manager flows, SQLite is the source of truth for run specs
-  and mutable runtime state.
+- Keep source-of-truth boundaries scoped. SQLite owns managed run-manager
+  control-plane state: run specs, status, lifecycle, relationships, selected
+  artifact ids, and mutable runtime metadata.
 - Treat filesystem manifests such as `train_manifest.yaml` as mirrors of the
-  SQLite-managed run spec, not as fallbacks or sources of truth.
-- Checkpoints, baselines, TensorBoard logs, and exported bundles are filesystem
-  artifacts. They may be authoritative for their own payloads, but managed code
-  must not infer run specs, lifecycle state, or mutable manager state from their
-  presence or contents.
+  SQLite-managed run spec, not as fallbacks.
+- Managed code must not infer run specs, lifecycle state, or mutable manager
+  state from `train_manifest.yaml`. Query/update SQLite explicitly for
+  control-plane state, then write or verify the manifest mirror.
 - Non-managed CLI paths may explicitly load a run directory as input, but that
   must stay separate from managed run-manager behavior.
 - If a touched area has mixed ownership, multiple sources of truth, legacy
