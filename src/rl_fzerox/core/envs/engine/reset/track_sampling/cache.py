@@ -4,6 +4,7 @@
 Loading baseline bytes through this cache avoids repeated disk reads while
 keeping a bounded memory budget for long multi-course training runs.
 """
+
 from __future__ import annotations
 
 from collections import OrderedDict

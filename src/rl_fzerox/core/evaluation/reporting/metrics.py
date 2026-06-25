@@ -233,9 +233,7 @@ def _primary_metrics(
         finish_rate=_ratio(finish_count, len(samples.course_results)),
         completion_rate=_mean(samples.completion_values),
         mean_finish_time_ms=_mean(samples.course_times_ms),
-        best_finish_time_ms=(
-            None if not samples.course_times_ms else min(samples.course_times_ms)
-        ),
+        best_finish_time_ms=(None if not samples.course_times_ms else min(samples.course_times_ms)),
         mean_total_race_time_ms=_mean(samples.total_race_times_ms),
         best_total_race_time_ms=(
             None if not samples.total_race_times_ms else min(samples.total_race_times_ms)
@@ -252,9 +250,7 @@ def _detail_metrics(samples: _GroupSamples) -> EvaluationDetailMetrics:
     course_results = samples.course_results
     return EvaluationDetailMetrics(
         mean_episode_return=_mean(samples.episode_returns),
-        best_episode_return=(
-            None if not samples.episode_returns else max(samples.episode_returns)
-        ),
+        best_episode_return=(None if not samples.episode_returns else max(samples.episode_returns)),
         total_episode_return=(
             None if not samples.episode_returns else sum(samples.episode_returns)
         ),

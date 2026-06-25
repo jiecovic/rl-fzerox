@@ -5,6 +5,7 @@ These features describe the current vehicle/race status that the policy may
 observe. Control history, course identity, and track geometry are handled by
 separate components.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping

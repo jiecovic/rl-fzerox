@@ -5,6 +5,7 @@ The public surface here exposes state feature specs, telemetry conversion, and
 action-history feature naming. Component-level feature ownership is kept in the
 `components` package.
 """
+
 from __future__ import annotations
 
 from rl_fzerox.core.domain.observations import StateComponentsSettings

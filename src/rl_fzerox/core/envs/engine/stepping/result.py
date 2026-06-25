@@ -4,6 +4,7 @@
 These dataclasses keep observation, reward, terminal flags, info dictionaries,
 and optional captured media together after one env step.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

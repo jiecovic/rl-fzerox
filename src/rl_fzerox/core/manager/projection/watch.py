@@ -70,11 +70,7 @@ def resolve_watch_app_config(
         config = apply_watch_config_delta(config, cli_override_delta)
     if policy_artifact is not None:
         config = config.model_copy(
-            update={
-                "watch": config.watch.model_copy(
-                    update={"policy_artifact": policy_artifact}
-                )
-            }
+            update={"watch": config.watch.model_copy(update={"policy_artifact": policy_artifact})}
         )
     config = config.model_copy(
         update={

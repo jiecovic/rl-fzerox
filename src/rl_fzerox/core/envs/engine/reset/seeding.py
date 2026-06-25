@@ -4,6 +4,7 @@
 Track sampling, reward episode state, action dropout, GP lives, and game RNG all
 derive from separate seed domains to avoid accidental coupling.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

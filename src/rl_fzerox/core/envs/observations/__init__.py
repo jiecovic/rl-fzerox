@@ -5,6 +5,7 @@ Runtime code imports from here when it needs Gym spaces, telemetry-to-vector
 conversion, or feature masking. The implementation stays split between image,
 state, and value modules so each observation mode has a clear owner.
 """
+
 from __future__ import annotations
 
 from fzerox_emulator import ObservationStackMode

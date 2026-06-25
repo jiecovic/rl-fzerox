@@ -4,6 +4,7 @@
 Lean has discrete left/right/neutral states plus optional timer-assist behavior,
 so its conversion and hold logic lives outside the generic action adapter.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace

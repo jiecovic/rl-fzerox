@@ -5,6 +5,7 @@ Auxiliary heads and frontend tools sometimes request a subset of state
 features. This module maps feature names to vector indices and applies that
 projection without changing how the base observation is produced.
 """
+
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence

@@ -5,6 +5,7 @@
 Profile modules decide how to turn that progress into shaped reward and when
 to gate or bucket payouts.
 """
+
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary

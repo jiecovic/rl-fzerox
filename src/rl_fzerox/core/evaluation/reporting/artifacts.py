@@ -121,9 +121,7 @@ def _detail_section(metrics: EvaluationMetrics) -> list[str]:
             "| Scope | Success | Mean finish | Best finish | Env steps | Mean episode steps | "
             "Mean return | Best return | Boost pads | Avg speed |"
         ),
-        (
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
-        ),
+        ("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"),
     ]
     for group in _metric_groups(metrics):
         primary = group.primary

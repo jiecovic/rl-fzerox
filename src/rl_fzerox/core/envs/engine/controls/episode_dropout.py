@@ -4,6 +4,7 @@
 Training can hide selected control branches for an entire episode. This module
 samples those per-episode branch decisions and keeps the runtime mask code small.
 """
+
 from __future__ import annotations
 
 import random

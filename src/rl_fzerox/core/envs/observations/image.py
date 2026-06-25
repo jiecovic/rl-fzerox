@@ -5,6 +5,7 @@ The emulator produces frame buffers; this module describes how stacking mode
 and frame count translate into Gym spaces and tensor shapes. Pixel capture and
 state-vector construction live elsewhere.
 """
+
 from __future__ import annotations
 
 import numpy as np

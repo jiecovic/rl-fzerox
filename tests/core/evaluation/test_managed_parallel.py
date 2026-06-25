@@ -33,8 +33,7 @@ def test_parallel_attempt_schedule_preserves_results_by_attempt_index() -> None:
     assert executor.submitted_indices == [1, 2, 3]
     assert updates == [(2,), (1, 2), (1, 2, 3)]
     attempt_ids = [
-        result.attempts_by_index[index].attempt_id
-        for index in sorted(result.attempts_by_index)
+        result.attempts_by_index[index].attempt_id for index in sorted(result.attempts_by_index)
     ]
     assert attempt_ids == [
         "attempt-0001",
@@ -85,9 +84,7 @@ class _FakeAttemptExecutor:
     completion_order: list[int]
     failing_indices: set[int] = field(default_factory=set)
     submitted_indices: list[int] = field(default_factory=list)
-    futures_by_index: dict[int, Future[EvaluationAttemptResult]] = field(
-        default_factory=dict
-    )
+    futures_by_index: dict[int, Future[EvaluationAttemptResult]] = field(default_factory=dict)
 
     def submit(self, job: EvaluationAttemptJob) -> Future[EvaluationAttemptResult]:
         future: Future[EvaluationAttemptResult] = Future()

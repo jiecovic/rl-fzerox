@@ -94,8 +94,7 @@ def test_baseline_suite_uses_projected_config_instead_of_existing_manifest(
     )
     config_path = save_train_run_config(config=config, run_dir=run_paths.run_dir)
     config_path.write_text(
-        config_path.read_text(encoding="utf-8")
-        + "\nremoved_top_level_field:\n  enabled: false\n",
+        config_path.read_text(encoding="utf-8") + "\nremoved_top_level_field:\n  enabled: false\n",
         encoding="utf-8",
     )
     rematerialized_config = config.model_copy(update={"seed": 456})

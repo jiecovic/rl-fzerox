@@ -4,6 +4,7 @@
 The functions here update masks for boost, lean, air brake, and spin as the live
 race state changes during an episode.
 """
+
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState

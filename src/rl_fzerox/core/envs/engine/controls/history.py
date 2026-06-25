@@ -4,6 +4,7 @@
 The tracker remembers applied and requested controls across steps so pulse,
 hold, action-history, and mask override behavior can be computed consistently.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -4,6 +4,7 @@
 This module isolates timing rules for air-brake inputs before the engine writes
 the final controller state to the emulator.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace

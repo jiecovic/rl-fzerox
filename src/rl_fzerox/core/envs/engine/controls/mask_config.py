@@ -4,6 +4,7 @@
 These small structures keep raw mask arrays connected to branch names and values
 so env, watch, and policy-drive code can inspect masks without guessing indices.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

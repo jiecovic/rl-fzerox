@@ -4,6 +4,7 @@
 The history stores normalized control branch values after runtime semantics, so
 state observations reflect what the env actually applied.
 """
+
 from __future__ import annotations
 
 from collections import deque

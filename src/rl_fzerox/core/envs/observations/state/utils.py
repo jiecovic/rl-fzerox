@@ -4,6 +4,7 @@
 Keep only observation-state-local helpers here. Shared env math should live in a
 more explicit module with a named responsibility.
 """
+
 from __future__ import annotations
 
 

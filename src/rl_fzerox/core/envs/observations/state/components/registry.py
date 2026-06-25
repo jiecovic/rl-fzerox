@@ -5,6 +5,7 @@ The registry defines the stable component order used for feature names, vector
 layout, and default inclusion. Keep new state components wired here so policy
 inputs remain predictable.
 """
+
 from __future__ import annotations
 
 from rl_fzerox.core.envs.observations.state.components.control_history import (

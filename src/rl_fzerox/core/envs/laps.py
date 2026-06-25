@@ -4,6 +4,7 @@
 The raw lap counter can advance before the visible lap display does, so rewards
 and logs route completed-lap calculations through this file.
 """
+
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry

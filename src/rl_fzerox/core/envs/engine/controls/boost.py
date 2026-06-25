@@ -4,6 +4,7 @@
 Boost handling is intentionally separated from action decoding so masking and
 runtime semantics can reason about button requests in frame units.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

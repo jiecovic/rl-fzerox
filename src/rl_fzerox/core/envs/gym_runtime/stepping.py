@@ -4,6 +4,7 @@
 This file decodes policy actions, applies runtime control semantics, invokes
 engine step assembly, and persists episode state after each Gym step.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -121,9 +122,7 @@ class GymStepRuntime:
         """Advance one frame through the same reward path used by step()."""
 
         requested_control_state = (
-            self._components.episode.held_control_state
-            if control_state is None
-            else control_state
+            self._components.episode.held_control_state if control_state is None else control_state
         )
         return self._run_step(
             self._control_step_input(

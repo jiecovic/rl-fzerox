@@ -4,6 +4,7 @@
 This file owns the current allowed values for each action branch and projects
 them into Gym-compatible mask arrays for policy and watch consumers.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

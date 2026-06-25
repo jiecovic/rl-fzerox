@@ -4,6 +4,7 @@
 Reward and observation code use this module to reason about off-track recovery
 through one shared edge-distance and radius fallback path.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

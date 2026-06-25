@@ -5,6 +5,7 @@ This file handles finish bonuses, crash/failure penalties, lap checks, and
 course-surface events that are naturally keyed off telemetry/status snapshots
 rather than long-lived tracker state.
 """
+
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus

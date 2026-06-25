@@ -5,6 +5,7 @@ The fields here are the config-facing knobs used by progress, events, energy,
 control, and recovery terms. Keep defaults conservative because run-manager
 configs often inherit them implicitly.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -5,6 +5,7 @@ This module owns the dataclasses and literals that describe observation-state
 layout. It intentionally contains no telemetry extraction logic so feature
 schema and value production remain separate.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

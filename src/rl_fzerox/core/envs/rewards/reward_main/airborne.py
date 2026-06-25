@@ -5,6 +5,7 @@ These helpers summarize jump airtime and peak height when the machine lands.
 The tracker owns the previous airborne state; this module only computes the
 landing measurements used by reward terms and debug output.
 """
+
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary

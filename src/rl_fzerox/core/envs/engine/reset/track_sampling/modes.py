@@ -4,6 +4,7 @@
 This module builds deterministic weighted cycles and per-env assignments used by
 equal, step-balanced, fixed-env, and deficit-budget sampling.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable

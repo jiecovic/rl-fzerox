@@ -4,6 +4,7 @@
 Runtime and UI code use this module to explain which selected branches violate
 the current mask while leaving controller and mask state untouched.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping

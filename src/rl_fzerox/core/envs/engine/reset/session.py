@@ -4,6 +4,7 @@
 `EngineResetCoordinator` is the reset-side owner of sampled targets, queued
 deficit resets, engine tuning choices, cached baselines, and reset seeds.
 """
+
 from __future__ import annotations
 
 import math

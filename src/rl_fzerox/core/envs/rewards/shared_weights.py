@@ -4,6 +4,7 @@
 Some reward helpers operate on the common progress and event fields through this
 small, explicit profile dependency.
 """
+
 from __future__ import annotations
 
 from typing import Protocol

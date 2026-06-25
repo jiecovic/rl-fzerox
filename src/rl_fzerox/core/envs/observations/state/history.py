@@ -5,6 +5,7 @@ The control-history component uses these helpers to derive stable feature names
 for prior action values and to clamp recorded controls into their configured
 observation ranges.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping

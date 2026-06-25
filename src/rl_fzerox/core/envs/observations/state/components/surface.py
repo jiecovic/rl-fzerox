@@ -5,6 +5,7 @@ Surface features expose whether the machine is on refill, dirt, ice, dash, jump,
 or related course effects. The raw effect decoding lives in course-effect
 helpers; this module only packages it for observation state.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping

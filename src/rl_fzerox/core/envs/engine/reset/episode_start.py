@@ -4,6 +4,7 @@
 This file prepares controller state, action masks, reward trackers, observation
 metadata, and the initial observation for Gym and watch runtimes.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

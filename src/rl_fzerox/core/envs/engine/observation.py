@@ -4,6 +4,7 @@
 This file owns image rendering, optional scalar-state concatenation, and the
 observation-space metadata emitted in env info dictionaries.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

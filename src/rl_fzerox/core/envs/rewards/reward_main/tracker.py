@@ -5,6 +5,7 @@
 frontiers, previous telemetry, airborne/refill state, and debug summaries.
 Individual term formulas live in sibling modules.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

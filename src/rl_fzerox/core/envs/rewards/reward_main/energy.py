@@ -5,6 +5,7 @@ The refill tracker prevents stationary refill surfaces from producing repeated
 reward. Energy-loss shaping remains separate from progress and terminal event
 logic so its cooldown state is easy to audit.
 """
+
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary

@@ -5,6 +5,7 @@ Component modules register `StateComponentDefinition` entries here and reuse
 the small helpers for typed feature extraction. The API layer consumes the
 resolved definitions rather than knowing individual component internals.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping

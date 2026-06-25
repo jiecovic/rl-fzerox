@@ -4,6 +4,7 @@
 The functions here convert backend and telemetry objects into pickle-safe dicts
 that can travel through Gym workers, monitor logs, and UI watch state.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
