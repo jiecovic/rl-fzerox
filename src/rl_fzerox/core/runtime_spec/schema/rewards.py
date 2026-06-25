@@ -23,10 +23,17 @@ from pydantic import (
 
 
 class RewardCourseOverrideConfig(BaseModel):
-    """Course-local reward overrides for fields in :class:`RewardConfig`."""
+    """Course-local reward overrides for fields in :class:`RewardConfig`.
+
+    Every field here mirrors one reward-main weight field and defaults to
+    ``None`` so omitted course-local settings inherit the base reward config.
+    Keep the explicit field list in sync with ``RewardConfig``; tests pin the
+    field set to catch drift when reward knobs are added.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
+    # Gated progress reward and speed/position scaling.
     time_penalty_per_frame: float | None = None
     progress_bucket_distance: NonNegativeFloat | None = None
     progress_bucket_reward: NonNegativeFloat | None = None
@@ -41,6 +48,7 @@ class RewardCourseOverrideConfig(BaseModel):
     progress_speed_curve_power: PositiveFloat | None = None
     position_progress_min_multiplier: NonNegativeFloat | None = None
     position_progress_max_multiplier: NonNegativeFloat | None = None
+    # Course-boundary, lap, and KO events.
     outside_track_recovery_reward: NonNegativeFloat | None = None
     outside_track_recovery_reward_cap: NonNegativeFloat | None = None
     outside_track_recovery_airborne_grace_frames: NonNegativeInt | None = None
@@ -49,6 +57,7 @@ class RewardCourseOverrideConfig(BaseModel):
     lap_completion_bonus: NonNegativeFloat | None = None
     lap_position_scale: NonNegativeFloat | None = None
     ko_star_reward: NonNegativeFloat | None = None
+    # Surface, energy, action-request, boost-pad, and landing shaping.
     energy_loss_epsilon: NonNegativeFloat | None = None
     energy_refill_progress_multiplier: float | None = Field(default=None, ge=1.0)
     dirt_progress_multiplier: float | None = Field(default=None, ge=0.0)
@@ -76,6 +85,7 @@ class RewardCourseOverrideConfig(BaseModel):
     boost_pad_reward_cannot_boost: NonNegativeFloat | None = None
     boost_pad_reward_can_boost: NonNegativeFloat | None = None
     boost_pad_reward_progress_window: PositiveFloat | None = None
+    # Episode termination and optional final clipping.
     failure_penalty: float | None = None
     truncation_penalty: float | None = None
     step_reward_clip_min: float | None = None
@@ -109,6 +119,7 @@ class RewardConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Literal["reward_main"] = "reward_main"
+    # Gated progress reward and speed/position scaling.
     time_penalty_per_frame: float = -0.005
     progress_bucket_distance: NonNegativeFloat = 1_000.0
     progress_bucket_reward: NonNegativeFloat = 1.0
@@ -123,6 +134,7 @@ class RewardConfig(BaseModel):
     progress_speed_curve_power: PositiveFloat = 1.0
     position_progress_min_multiplier: NonNegativeFloat = 1.0
     position_progress_max_multiplier: NonNegativeFloat = 1.0
+    # Course-boundary, lap, and KO events.
     outside_track_recovery_reward: NonNegativeFloat = 0.0
     outside_track_recovery_reward_cap: NonNegativeFloat = 0.1
     outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
@@ -131,6 +143,7 @@ class RewardConfig(BaseModel):
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     ko_star_reward: NonNegativeFloat = 0.0
+    # Surface, energy, action-request, boost-pad, and landing shaping.
     energy_loss_epsilon: NonNegativeFloat = 0.01
     energy_refill_progress_multiplier: float = Field(default=1.0, ge=1.0)
     dirt_progress_multiplier: float = Field(default=1.0, ge=0.0)
@@ -158,6 +171,7 @@ class RewardConfig(BaseModel):
     boost_pad_reward_cannot_boost: NonNegativeFloat = 0.0
     boost_pad_reward_can_boost: NonNegativeFloat = 0.0
     boost_pad_reward_progress_window: PositiveFloat = 1_000.0
+    # Episode termination, optional final clipping, and course-local overrides.
     failure_penalty: float = -20.0
     truncation_penalty: float = -20.0
     step_reward_clip_min: float | None = None

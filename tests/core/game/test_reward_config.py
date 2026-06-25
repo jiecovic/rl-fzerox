@@ -10,7 +10,7 @@ from rl_fzerox.core.envs.rewards import (
     build_reward_tracker,
     reward_tracker_names,
 )
-from rl_fzerox.core.runtime_spec.schema import RewardConfig
+from rl_fzerox.core.runtime_spec.schema import RewardConfig, RewardCourseOverrideConfig
 
 _COURSE_EFFECT_PIT = 1
 _COURSE_EFFECT_DIRT = 2
@@ -33,6 +33,16 @@ def test_reward_main_weight_fields_match_reward_config_schema() -> None:
     weight_fields = {field.name for field in fields(RewardMainWeights)}
     schema_fields = set(RewardConfig.model_fields) - {"name", "course_overrides"}
     assert weight_fields == schema_fields
+
+
+def test_reward_course_override_fields_match_reward_config_schema() -> None:
+    schema_fields = set(RewardConfig.model_fields) - {"name", "course_overrides"}
+
+    assert set(RewardCourseOverrideConfig.model_fields) == schema_fields
+    assert not any(
+        field.is_required() for field in RewardCourseOverrideConfig.model_fields.values()
+    )
+    assert all(field.default is None for field in RewardCourseOverrideConfig.model_fields.values())
 
 
 def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
