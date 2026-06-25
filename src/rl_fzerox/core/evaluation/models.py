@@ -15,6 +15,35 @@ type AttemptStatus = Literal["succeeded", "failed", "cancelled", "partial"]
 type CourseResultStatus = Literal["finished", "retired", "crashed", "truncated", "failed"]
 
 
+def _require_non_empty_text(value: object, field_name: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty string")
+
+
+def _require_text_items(values: tuple[str, ...], field_name: str) -> None:
+    for index, value in enumerate(values):
+        _require_non_empty_text(value, f"{field_name}[{index}]")
+
+
+def _require_minimum_int(value: object, field_name: str, minimum: int) -> None:
+    if not isinstance(value, int) or value < minimum:
+        raise ValueError(f"{field_name} must be at least {minimum}")
+
+
+def _require_optional_minimum_int(
+    value: int | None,
+    field_name: str,
+    minimum: int,
+) -> None:
+    if value is not None:
+        _require_minimum_int(value, field_name, minimum)
+
+
+def _require_optional_non_empty_text(value: str | None, field_name: str) -> None:
+    if value is not None:
+        _require_non_empty_text(value, field_name)
+
+
 @dataclass(frozen=True, slots=True)
 class EvaluationTargetSpec:
     """Declared target set for one evaluation run."""
@@ -25,6 +54,13 @@ class EvaluationTargetSpec:
     difficulties: tuple[str, ...] = ()
     vehicle_ids: tuple[str, ...] = ()
     repeats_per_target: int = 1
+
+    def __post_init__(self) -> None:
+        _require_text_items(self.course_ids, "course_ids")
+        _require_text_items(self.cup_ids, "cup_ids")
+        _require_text_items(self.difficulties, "difficulties")
+        _require_text_items(self.vehicle_ids, "vehicle_ids")
+        _require_minimum_int(self.repeats_per_target, "repeats_per_target", 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +80,15 @@ class EvaluationCourseTarget:
     vehicle_id: str | None = None
     baseline_state_path: str | None = None
     engine_setting_raw_value: int | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty_text(self.target_id, "target_id")
+        _require_non_empty_text(self.course_id, "course_id")
+        _require_optional_non_empty_text(self.course_name, "course_name")
+        _require_optional_non_empty_text(self.cup_id, "cup_id")
+        _require_optional_non_empty_text(self.difficulty, "difficulty")
+        _require_optional_non_empty_text(self.vehicle_id, "vehicle_id")
+        _require_optional_non_empty_text(self.baseline_state_path, "baseline_state_path")
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +111,19 @@ class EvaluationCheckpointSnapshot:
     lineage_num_timesteps: int | None = None
     source_mtime_ns: int | None = None
 
+    def __post_init__(self) -> None:
+        _require_non_empty_text(self.source_policy_path, "source_policy_path")
+        _require_non_empty_text(self.copied_policy_path, "copied_policy_path")
+        _require_optional_non_empty_text(self.source_model_path, "source_model_path")
+        _require_optional_non_empty_text(self.copied_model_path, "copied_model_path")
+        _require_optional_minimum_int(self.local_num_timesteps, "local_num_timesteps", 0)
+        _require_optional_minimum_int(
+            self.lineage_num_timesteps,
+            "lineage_num_timesteps",
+            0,
+        )
+        _require_optional_minimum_int(self.source_mtime_ns, "source_mtime_ns", 0)
+
 
 @dataclass(frozen=True, slots=True)
 class EvaluationSpec:
@@ -78,6 +136,15 @@ class EvaluationSpec:
     policy_mode: EvaluationPolicyMode = "deterministic"
     total_planned_attempts: int | None = None
 
+    def __post_init__(self) -> None:
+        _require_non_empty_text(self.evaluation_id, "evaluation_id")
+        _require_minimum_int(self.seed, "seed", 0)
+        _require_optional_minimum_int(
+            self.total_planned_attempts,
+            "total_planned_attempts",
+            1,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class EvaluationRuntimeSpec:
@@ -85,6 +152,9 @@ class EvaluationRuntimeSpec:
 
     device: EvaluationDevice = "cuda"
     worker_count: int = 1
+
+    def __post_init__(self) -> None:
+        _require_minimum_int(self.worker_count, "worker_count", 1)
 
 
 @dataclass(frozen=True, slots=True)
