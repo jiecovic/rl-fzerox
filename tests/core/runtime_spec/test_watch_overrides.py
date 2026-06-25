@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig, WatchConfig
 from rl_fzerox.core.runtime_spec.watch_overrides import (
     apply_watch_config_delta,
     direct_dotlist_override,
@@ -49,6 +49,22 @@ def test_apply_watch_config_delta_merges_nested_watch_sections(tmp_path: Path) -
     assert updated.watch.recording.session_mp4_enabled is True
     assert config.watch.render_fps == 60.0
     assert config.watch.recording.render_input_hud is False
+
+
+def test_watch_config_normalizes_null_fps_fields() -> None:
+    config = WatchConfig.model_validate({"control_fps": None, "render_fps": None})
+
+    assert config.control_fps == "auto"
+    assert config.render_fps == 60.0
+    assert config.model_dump(mode="json", exclude_none=False)["control_fps"] == "auto"
+    assert config.model_dump(mode="json", exclude_none=False)["render_fps"] == 60.0
+
+
+def test_watch_config_preserves_explicit_fps_fields() -> None:
+    config = WatchConfig(control_fps="unlimited", render_fps=30.0)
+
+    assert config.control_fps == "unlimited"
+    assert config.render_fps == 30.0
 
 
 def test_direct_dotlist_override_strips_leading_plus() -> None:

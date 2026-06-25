@@ -17,6 +17,7 @@ from pydantic import (
     Field,
     NonNegativeInt,
     PositiveInt,
+    field_validator,
     model_validator,
 )
 
@@ -28,6 +29,9 @@ from rl_fzerox.core.runtime_spec.schema.policy import PolicyConfig
 from rl_fzerox.core.runtime_spec.schema.rewards import RewardConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackConfig
 from rl_fzerox.core.runtime_spec.schema.training import TrainConfig
+
+WATCH_DEFAULT_CONTROL_FPS: WatchFpsSetting = "auto"
+WATCH_DEFAULT_RENDER_FPS: WatchFpsSetting = 60.0
 
 
 class CareerModeRaceSetupConfig(BaseModel):
@@ -76,8 +80,8 @@ class WatchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     episodes: int | None = Field(default=None, gt=0)
-    control_fps: WatchFpsSetting | None = None
-    render_fps: WatchFpsSetting | None = None
+    control_fps: WatchFpsSetting = WATCH_DEFAULT_CONTROL_FPS
+    render_fps: WatchFpsSetting = WATCH_DEFAULT_RENDER_FPS
     deterministic_policy: bool = True
     device: Literal["auto", "cpu", "cuda"] = "cpu"
     attempt_seed: int | None = Field(default=None, ge=0, le=(1 << 32) - 1)
@@ -100,15 +104,18 @@ class WatchConfig(BaseModel):
     recording: WatchRecordingConfig = Field(default_factory=WatchRecordingConfig)
     career_debug: WatchCareerDebugConfig = Field(default_factory=WatchCareerDebugConfig)
 
+    @field_validator("control_fps", mode="before")
+    @classmethod
+    def _default_control_fps(cls, value: object) -> object:
+        return WATCH_DEFAULT_CONTROL_FPS if value is None else value
+
+    @field_validator("render_fps", mode="before")
+    @classmethod
+    def _default_render_fps(cls, value: object) -> object:
+        return WATCH_DEFAULT_RENDER_FPS if value is None else value
+
     @model_validator(mode="after")
-    def _default_split_fps(self) -> WatchConfig:
-        # Older runtime mirrors and partial override deltas may carry null FPS
-        # fields. Normalize them at the app boundary so runtime consumers see
-        # concrete playback settings.
-        if self.control_fps is None:
-            self.control_fps = "auto"
-        if self.render_fps is None:
-            self.render_fps = 60.0
+    def _validate_recording_config(self) -> WatchConfig:
         if self.recording.enabled and self.recording.path is None:
             raise ValueError("watch.recording.path is required when recording is enabled")
         return self
