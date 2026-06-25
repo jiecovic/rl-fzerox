@@ -339,6 +339,19 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     }
 
 
+def test_manager_store_rejects_unexpected_schema_columns(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    with manager_session(store.db_path) as session:
+        session.connection().exec_driver_sql(
+            "ALTER TABLE evaluation_presets ADD COLUMN source_artifact TEXT"
+        )
+
+    recovered = ManagerStore(store.db_path)
+    with pytest.raises(RuntimeError, match="evaluation_presets has unexpected columns"):
+        recovered.initialize()
+
+
 def test_manager_store_rejects_removed_observation_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
