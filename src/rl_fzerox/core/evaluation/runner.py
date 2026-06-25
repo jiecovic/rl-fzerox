@@ -61,7 +61,6 @@ class SingleCourseEpisodeExecutor(Protocol):
         self,
         target: EvaluationCourseTarget,
         *,
-        policy_path: Path,
         policy_mode: EvaluationPolicyMode,
         seed: int,
     ) -> EvaluationCourseResult:
@@ -97,7 +96,6 @@ def run_course_evaluation(
     run_runtime = runtime or EvaluationRuntimeSpec()
     started_at_utc = clock()
     attempts: list[EvaluationAttemptResult] = []
-    policy_path = Path(run_spec.checkpoint.copied_policy_path)
     publisher = EvaluationResultPublisher(
         spec=run_spec,
         runtime=run_runtime,
@@ -119,7 +117,6 @@ def run_course_evaluation(
         course_result = evaluation_course_result_for_target(
             executor.run_course(
                 job.target,
-                policy_path=policy_path,
                 policy_mode=run_spec.policy_mode,
                 seed=job.seed,
             ),

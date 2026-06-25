@@ -25,17 +25,16 @@ from rl_fzerox.core.evaluation import (
 @dataclass
 class _FakeEpisodeExecutor:
     statuses: tuple[CourseResultStatus, ...]
-    calls: list[tuple[str, Path, EvaluationPolicyMode, int]]
+    calls: list[tuple[str, EvaluationPolicyMode, int]]
 
     def run_course(
         self,
         target: EvaluationCourseTarget,
         *,
-        policy_path: Path,
         policy_mode: EvaluationPolicyMode,
         seed: int,
     ) -> EvaluationCourseResult:
-        self.calls.append((target.target_id, policy_path, policy_mode, seed))
+        self.calls.append((target.target_id, policy_mode, seed))
         status = self.statuses[len(self.calls) - 1]
         return EvaluationCourseResult(
             course_id=target.course_id,
@@ -87,9 +86,8 @@ def test_course_runner_writes_progress_and_final_summary(
     assert result.spec.total_planned_attempts == 2
     assert [attempt.status for attempt in result.attempts] == ["succeeded", "failed"]
     assert result.attempts[0].course_results[0].engine_setting_raw_value == 90
-    assert executor.calls[0][1] == tmp_path / "checkpoints" / "latest" / "policy.zip"
-    assert executor.calls[0][2] == "deterministic"
-    assert executor.calls[0][3] != executor.calls[1][3]
+    assert executor.calls[0][1] == "deterministic"
+    assert executor.calls[0][2] != executor.calls[1][2]
     assert [update.status for update in updates] == [
         "partial",
         "partial",

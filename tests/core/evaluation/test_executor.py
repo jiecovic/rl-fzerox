@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 
@@ -139,7 +138,6 @@ def test_fzerox_single_course_executor_maps_finished_episode_info() -> None:
 
     result = executor.run_course(
         EvaluationCourseTarget(target_id="target", course_id="mute_city"),
-        policy_path=Path("checkpoints/latest/policy.zip"),
         policy_mode="deterministic",
         seed=123,
     )
@@ -186,7 +184,6 @@ def test_fzerox_single_course_executor_uses_controls_through_wrapped_env() -> No
 
     result = executor.run_course(
         EvaluationCourseTarget(target_id="target", course_id="mute_city"),
-        policy_path=Path("checkpoints/latest/policy.zip"),
         policy_mode="deterministic",
         seed=123,
     )
@@ -226,7 +223,6 @@ def test_fzerox_single_course_executor_truncates_at_step_limit() -> None:
             course_name="Sand Ocean",
             engine_setting_raw_value=64,
         ),
-        policy_path=Path("checkpoints/latest/policy.zip"),
         policy_mode="stochastic",
         seed=456,
     )
@@ -270,7 +266,6 @@ def test_fzerox_single_course_executor_reports_failed_gp_position_as_last() -> N
             course_id="white_land",
             difficulty="master",
         ),
-        policy_path=Path("checkpoints/latest/policy.zip"),
         policy_mode="deterministic",
         seed=789,
     )

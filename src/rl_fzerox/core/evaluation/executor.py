@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
 from fzerox_emulator.arrays import ActionMask
@@ -80,11 +79,9 @@ class FZeroXSingleCourseEpisodeExecutor:
         self,
         target: EvaluationCourseTarget,
         *,
-        policy_path: Path,
         policy_mode: EvaluationPolicyMode,
         seed: int,
     ) -> EvaluationCourseResult:
-        _ = policy_path
         if self.max_env_steps < 1:
             raise ValueError(f"max_env_steps must be at least 1, got {self.max_env_steps}")
 

@@ -48,7 +48,6 @@ type _AttemptUpdate = Callable[[dict[int, EvaluationAttemptResult]], None]
 class _ParallelEvaluationWorkerContext:
     env: object
     executor: FZeroXSingleCourseEpisodeExecutor
-    policy_path: Path
     policy_mode: EvaluationPolicyMode
 
 
@@ -228,7 +227,6 @@ def _initialize_parallel_evaluation_worker(
             policy_runner=policy_runner,
             max_env_steps=max_env_steps,
         ),
-        policy_path=Path(checkpoint.copied_policy_path),
         policy_mode=policy_mode,
     )
     atexit.register(_close_parallel_evaluation_worker)
@@ -240,7 +238,6 @@ def _run_parallel_evaluation_job(job: EvaluationAttemptJob) -> EvaluationAttempt
     course_result = evaluation_course_result_for_target(
         context.executor.run_course(
             job.target,
-            policy_path=context.policy_path,
             policy_mode=context.policy_mode,
             seed=job.seed,
         ),
