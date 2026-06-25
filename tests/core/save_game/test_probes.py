@@ -1,4 +1,5 @@
 # tests/core/save_game/test_probes.py
+"""Coverage for ad-hoc save/system memory probe parsing and reads."""
 
 from __future__ import annotations
 
@@ -68,6 +69,8 @@ def test_memory_probe_validation_rejects_invalid_definitions() -> None:
         parse_memory_probe_definition("x=bad:0:1:u8")
     with pytest.raises(ValueError, match="must have length 2"):
         parse_memory_probe_definition("x=save_ram:0:1:u16_be")
+    with pytest.raises(ValueError, match="length"):
+        parse_memory_probe_definition("x=save_ram:0:0:bytes")
 
 
 def test_read_memory_probes_rejects_out_of_range_reads() -> None:
@@ -75,3 +78,26 @@ def test_read_memory_probes_rejects_out_of_range_reads() -> None:
 
     with pytest.raises(ValueError, match="buffer has 3 bytes"):
         read_memory_probes({"save_ram": b"\x00\x01\x02"}, (definition,))
+
+
+def test_collect_memory_probe_report_requires_matching_readers() -> None:
+    with pytest.raises(ValueError, match="save-RAM reader"):
+        collect_memory_probe_report(
+            (MemoryProbeDefinition("save", "save_ram", 0, 1, "u8", "Save"),),
+            read_save_ram=None,
+        )
+
+    with pytest.raises(ValueError, match="system-RAM reader"):
+        collect_memory_probe_report(
+            (MemoryProbeDefinition("live", "system_ram", 0, 1, "u8", "Live"),),
+            read_save_ram=None,
+        )
+
+
+def test_collect_memory_probe_report_rejects_short_system_ram_reads() -> None:
+    with pytest.raises(ValueError, match="expected 2"):
+        collect_memory_probe_report(
+            (MemoryProbeDefinition("live", "system_ram", 0, 2, "u16_be", "Live"),),
+            read_save_ram=None,
+            read_system_ram=lambda _offset, _length: b"\x00",
+        )

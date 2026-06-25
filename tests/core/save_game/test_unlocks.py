@@ -1,4 +1,5 @@
 # tests/core/save_game/test_unlocks.py
+"""Coverage for raw SRA and libretro SRM F-Zero X unlock decoding."""
 
 import pytest
 
@@ -38,6 +39,21 @@ def test_decode_libretro_srm_gp_progress_with_byteswapped_sra_payload() -> None:
 def test_decode_rejects_unknown_save_bytes() -> None:
     with pytest.raises(FZeroXSaveDecodeError):
         decode_fzerox_unlock_state(bytes(FZEROX_SAVE_LAYOUT.raw_sra_size))
+
+
+def test_decode_accepts_oversized_raw_sra_buffer_by_reading_first_payload() -> None:
+    save_data = _logical_sra({"jack": 1}) + b"extra container bytes"
+
+    unlock_state = decode_fzerox_unlock_state(save_data)
+
+    assert unlock_state.gp_cup_cleared(difficulty="novice", cup_id="jack")
+
+
+def test_decode_clamps_out_of_range_gp_progress_for_derived_unlocks() -> None:
+    unlock_state = decode_fzerox_unlock_state(_logical_sra({"jack": 255}))
+
+    assert unlock_state.gp_cup_cleared(difficulty="master", cup_id="jack")
+    assert unlock_state.gp_clear_mark_count == 4
 
 
 def _logical_sra(cup_progress: dict[str, int]) -> bytes:

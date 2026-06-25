@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/save_game/unlocks.py
-"""Decode F-Zero X save-file unlock progress."""
+"""Decode known F-Zero X save-file unlock progress.
+
+The decoder accepts raw SRA payloads and libretro SRM containers, normalizes the
+byte order when needed, and extracts the small GP-progress surface Career Mode
+uses for cup, difficulty, and vehicle availability.
+"""
 
 from __future__ import annotations
 
@@ -84,7 +89,9 @@ class FZeroXUnlockState:
     def gp_clear_mark_count(self) -> int:
         """Return the number of GP clear marks represented by save progress."""
 
-        return sum(max(progress.raw_value, 0) for progress in self.gp_cup_progress)
+        return sum(
+            _normalized_gp_progress_value(progress.raw_value) for progress in self.gp_cup_progress
+        )
 
     @property
     def unlocked_vehicle_count(self) -> int:
@@ -99,7 +106,7 @@ class FZeroXUnlockState:
 
     def gp_cup_cleared(self, *, difficulty: RaceDifficultyName, cup_id: str) -> bool:
         clear_level = race_difficulty_raw_value(difficulty) + 1
-        return self._cup_progress_value(cup_id) >= clear_level
+        return _normalized_gp_progress_value(self._cup_progress_value(cup_id)) >= clear_level
 
     def _cup_progress_value(self, cup_id: str) -> int:
         for progress in self.gp_cup_progress:
@@ -145,11 +152,16 @@ def _decode_gp_progress(
 
 
 def _difficulty_for_progress(raw_value: int) -> RaceDifficultyName | None:
-    if raw_value <= 0:
+    progress_value = _normalized_gp_progress_value(raw_value)
+    if progress_value <= 0:
         return None
 
-    clear_index = min(raw_value, len(RACE_DIFFICULTIES)) - 1
+    clear_index = progress_value - 1
     return RACE_DIFFICULTIES[clear_index].name
+
+
+def _normalized_gp_progress_value(raw_value: int) -> int:
+    return max(0, min(raw_value, len(RACE_DIFFICULTIES)))
 
 
 def _logical_sra_payload(save_data: bytes, *, layout: FZeroXSaveLayout) -> bytes:

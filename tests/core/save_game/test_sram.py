@@ -1,4 +1,5 @@
 # tests/core/save_game/test_sram.py
+"""Coverage for offset-agnostic save-RAM summaries and diff reports."""
 
 from dataclasses import asdict
 
@@ -40,9 +41,22 @@ def test_diff_save_ram_can_truncate_reported_ranges() -> None:
     assert diff.truncated_ranges == 1
 
 
+def test_diff_save_ram_can_omit_reported_ranges() -> None:
+    before = bytes([0, 0, 0])
+    after = bytes([1, 0, 2])
+
+    diff = diff_save_ram(before, after, max_ranges=0)
+
+    assert diff.changed_bytes == 2
+    assert diff.changed_ranges == ()
+    assert diff.truncated_ranges == 2
+
+
 def test_diff_save_ram_rejects_mismatched_sizes() -> None:
     with pytest.raises(ValueError, match="same size"):
         diff_save_ram(b"\x00", b"\x00\x00")
+    with pytest.raises(ValueError, match="max_ranges"):
+        diff_save_ram(b"\x00", b"\x00", max_ranges=-1)
 
 
 def test_diff_save_ram_bits_reports_changed_bits() -> None:

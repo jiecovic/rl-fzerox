@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/save_game/sram.py
-"""Conservative summaries and byte diffs for portable F-Zero X save RAM."""
+"""Conservative summaries and byte diffs for portable F-Zero X save RAM.
+
+These helpers intentionally do not depend on mapped save offsets. They provide
+stable diagnostics for tooling that compares raw SRAM/SRM snapshots while the
+game-specific unlock decoder lives in `unlocks.py`.
+"""
 
 from __future__ import annotations
 
@@ -60,6 +65,13 @@ class SaveRamBitDiffReport:
     truncated_bits: int
 
 
+@dataclass(frozen=True, slots=True)
+class _RangeDiffResult:
+    changed_bytes: int
+    changed_ranges: tuple[SaveRamRangeDiff, ...]
+    total_ranges: int
+
+
 def summarize_save_ram(data: bytes) -> SaveRamSummary:
     """Return a stable, offset-agnostic summary for a save-RAM buffer."""
 
@@ -104,18 +116,13 @@ def diff_save_ram(before: bytes, after: bytes, *, max_ranges: int = 64) -> SaveR
     if max_ranges < 0:
         raise ValueError("max_ranges must be non-negative")
 
-    changed_offsets = [
-        index
-        for index, (left, right) in enumerate(zip(before, after, strict=True))
-        if left != right
-    ]
-    ranges = _changed_ranges(before, after, changed_offsets, max_ranges=max_ranges)
+    result = _changed_range_diffs(before, after, max_ranges=max_ranges)
     return SaveRamDiff(
         before=summarize_save_ram(before),
         after=summarize_save_ram(after),
-        changed_bytes=len(changed_offsets),
-        changed_ranges=ranges,
-        truncated_ranges=max(0, _range_count(changed_offsets) - len(ranges)),
+        changed_bytes=result.changed_bytes,
+        changed_ranges=result.changed_ranges,
+        truncated_ranges=max(0, result.total_ranges - len(result.changed_ranges)),
     )
 
 
@@ -151,31 +158,68 @@ def _bit_changes(
     return tuple(bit_changes)
 
 
-def _changed_ranges(
+def _changed_range_diffs(
     before: bytes,
     after: bytes,
-    changed_offsets: list[int],
     *,
     max_ranges: int,
-) -> tuple[SaveRamRangeDiff, ...]:
-    if not changed_offsets or max_ranges == 0:
-        return ()
-
+) -> _RangeDiffResult:
+    changed_bytes = 0
+    total_ranges = 0
     ranges: list[SaveRamRangeDiff] = []
-    start = changed_offsets[0]
-    previous = start
-    for offset in changed_offsets[1:]:
-        if offset == previous + 1:
-            previous = offset
-            continue
-        ranges.append(_range_diff(before, after, start, previous + 1))
-        if len(ranges) == max_ranges:
-            return tuple(ranges)
-        start = offset
-        previous = offset
+    range_start: int | None = None
+    previous_changed_offset: int | None = None
 
-    ranges.append(_range_diff(before, after, start, previous + 1))
-    return tuple(ranges[:max_ranges])
+    for offset, (left, right) in enumerate(zip(before, after, strict=True)):
+        if left == right:
+            if range_start is not None and previous_changed_offset is not None:
+                total_ranges += 1
+                _append_range_diff(
+                    ranges,
+                    before=before,
+                    after=after,
+                    start=range_start,
+                    end=previous_changed_offset + 1,
+                    max_ranges=max_ranges,
+                )
+                range_start = None
+                previous_changed_offset = None
+            continue
+
+        changed_bytes += 1
+        if range_start is None:
+            range_start = offset
+        previous_changed_offset = offset
+
+    if range_start is not None and previous_changed_offset is not None:
+        total_ranges += 1
+        _append_range_diff(
+            ranges,
+            before=before,
+            after=after,
+            start=range_start,
+            end=previous_changed_offset + 1,
+            max_ranges=max_ranges,
+        )
+
+    return _RangeDiffResult(
+        changed_bytes=changed_bytes,
+        changed_ranges=tuple(ranges),
+        total_ranges=total_ranges,
+    )
+
+
+def _append_range_diff(
+    ranges: list[SaveRamRangeDiff],
+    *,
+    before: bytes,
+    after: bytes,
+    start: int,
+    end: int,
+    max_ranges: int,
+) -> None:
+    if len(ranges) < max_ranges:
+        ranges.append(_range_diff(before, after, start, end))
 
 
 def _range_diff(before: bytes, after: bytes, start: int, end: int) -> SaveRamRangeDiff:
@@ -185,15 +229,3 @@ def _range_diff(before: bytes, after: bytes, start: int, end: int) -> SaveRamRan
         before_hex=before[start:end].hex(),
         after_hex=after[start:end].hex(),
     )
-
-
-def _range_count(changed_offsets: list[int]) -> int:
-    if not changed_offsets:
-        return 0
-    count = 1
-    previous = changed_offsets[0]
-    for offset in changed_offsets[1:]:
-        if offset != previous + 1:
-            count += 1
-        previous = offset
-    return count

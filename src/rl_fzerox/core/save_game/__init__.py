@@ -1,5 +1,11 @@
 # src/rl_fzerox/core/save_game/__init__.py
-"""F-Zero X save-game parsing and inspection helpers."""
+"""Public facade for F-Zero X save-game inspection helpers.
+
+This package keeps low-level save-RAM byte diffing, exploratory memory probes,
+and known unlock decoding separate from Career Mode orchestration. Callers can
+use this facade for stable data contracts while implementation modules keep the
+format-specific details local.
+"""
 
 from rl_fzerox.core.save_game.probes import (
     MEMORY_PROBE_FORMATS,

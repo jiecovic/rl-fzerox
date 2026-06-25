@@ -1,11 +1,16 @@
 # src/rl_fzerox/core/save_game/probes.py
-"""Typed memory probe reports for save-game reverse engineering."""
+"""Typed memory probe reports for save-game reverse engineering.
+
+Probe definitions describe small named slices of save RAM or live system RAM.
+The module reads only the requested ranges so debug tools can inspect candidate
+offsets without forcing full memory dumps into every caller.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypeGuard
 
 from rl_fzerox.core.save_game.sram import SaveRamSummary, summarize_save_ram
 
@@ -20,6 +25,14 @@ type MemoryProbeFormat = Literal[
     "u32_le",
 ]
 type MemoryProbeValue = int | str | tuple[int, ...]
+type _ProbeValueDecoder = Callable[[bytes], MemoryProbeValue]
+
+
+@dataclass(frozen=True, slots=True)
+class _MemoryProbeFormatSpec:
+    fixed_width: int | None
+    decode: _ProbeValueDecoder
+
 
 MEMORY_PROBE_REGIONS: tuple[MemoryProbeRegion, ...] = ("save_ram", "system_ram")
 MEMORY_PROBE_FORMATS: tuple[MemoryProbeFormat, ...] = (
@@ -31,6 +44,29 @@ MEMORY_PROBE_FORMATS: tuple[MemoryProbeFormat, ...] = (
     "u32_be",
     "u32_le",
 )
+_MEMORY_PROBE_FORMAT_SPECS: Mapping[MemoryProbeFormat, _MemoryProbeFormatSpec] = {
+    "bytes": _MemoryProbeFormatSpec(fixed_width=None, decode=lambda data: data.hex()),
+    "bitset_u8": _MemoryProbeFormatSpec(
+        fixed_width=None, decode=lambda data: _decode_bitset_u8(data)
+    ),
+    "u8": _MemoryProbeFormatSpec(fixed_width=1, decode=lambda data: data[0]),
+    "u16_be": _MemoryProbeFormatSpec(
+        fixed_width=2,
+        decode=lambda data: int.from_bytes(data, byteorder="big"),
+    ),
+    "u16_le": _MemoryProbeFormatSpec(
+        fixed_width=2,
+        decode=lambda data: int.from_bytes(data, byteorder="little"),
+    ),
+    "u32_be": _MemoryProbeFormatSpec(
+        fixed_width=4,
+        decode=lambda data: int.from_bytes(data, byteorder="big"),
+    ),
+    "u32_le": _MemoryProbeFormatSpec(
+        fixed_width=4,
+        decode=lambda data: int.from_bytes(data, byteorder="little"),
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,26 +223,16 @@ def _reading_from_bytes(
 
 
 def _decode_probe_value(data: bytes, value_format: MemoryProbeFormat) -> MemoryProbeValue:
-    match value_format:
-        case "bytes":
-            return data.hex()
-        case "bitset_u8":
-            return tuple(
-                byte_index * 8 + bit
-                for byte_index, byte in enumerate(data)
-                for bit in range(8)
-                if byte & (1 << bit)
-            )
-        case "u8":
-            return data[0]
-        case "u16_be":
-            return int.from_bytes(data, byteorder="big")
-        case "u16_le":
-            return int.from_bytes(data, byteorder="little")
-        case "u32_be":
-            return int.from_bytes(data, byteorder="big")
-        case "u32_le":
-            return int.from_bytes(data, byteorder="little")
+    return _MEMORY_PROBE_FORMAT_SPECS[value_format].decode(data)
+
+
+def _decode_bitset_u8(data: bytes) -> tuple[int, ...]:
+    return tuple(
+        byte_index * 8 + bit
+        for byte_index, byte in enumerate(data)
+        for bit in range(8)
+        if byte & (1 << bit)
+    )
 
 
 def _parse_region(value: str) -> MemoryProbeRegion:
@@ -220,23 +246,13 @@ def _parse_region(value: str) -> MemoryProbeRegion:
 
 
 def _parse_format(value: str) -> MemoryProbeFormat:
-    match value:
-        case "bytes":
-            return "bytes"
-        case "bitset_u8":
-            return "bitset_u8"
-        case "u8":
-            return "u8"
-        case "u16_be":
-            return "u16_be"
-        case "u16_le":
-            return "u16_le"
-        case "u32_be":
-            return "u32_be"
-        case "u32_le":
-            return "u32_le"
-        case _:
-            raise ValueError(f"unknown probe format {value!r}")
+    if _is_memory_probe_format(value):
+        return value
+    raise ValueError(f"unknown probe format {value!r}")
+
+
+def _is_memory_probe_format(value: str) -> TypeGuard[MemoryProbeFormat]:
+    return value in _MEMORY_PROBE_FORMAT_SPECS
 
 
 def _parse_non_negative_int(value: str, *, field: str) -> int:
@@ -261,14 +277,7 @@ def _parse_int(value: str, *, field: str) -> int:
 
 
 def _validate_probe_width(definition: MemoryProbeDefinition) -> None:
-    expected_widths = {
-        "u8": 1,
-        "u16_be": 2,
-        "u16_le": 2,
-        "u32_be": 4,
-        "u32_le": 4,
-    }
-    expected = expected_widths.get(definition.value_format)
+    expected = _MEMORY_PROBE_FORMAT_SPECS[definition.value_format].fixed_width
     if expected is not None and definition.length != expected:
         raise ValueError(
             f"{definition.value_format} probe {definition.key!r} must have length {expected}"
