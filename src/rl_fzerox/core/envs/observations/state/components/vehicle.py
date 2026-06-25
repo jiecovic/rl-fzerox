@@ -11,18 +11,16 @@ from rl_fzerox.core.envs.telemetry import telemetry_boost_active, telemetry_can_
 
 
 def vehicle_component_features(
-    component: ObservationStateComponentSettings,
+    _component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
-    del component
     return vehicle_state_features()
 
 
 def vehicle_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: ObservationStateComponentSettings,
-    action_history: Mapping[str, float],
+    _component: ObservationStateComponentSettings,
+    _action_history: Mapping[str, float],
 ) -> list[float]:
-    del component, action_history
     return vehicle_state_values(telemetry)
 
 

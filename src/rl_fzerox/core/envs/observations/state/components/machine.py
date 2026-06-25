@@ -27,18 +27,16 @@ MACHINE_CONTEXT_NORMALIZATION = MachineContextNormalization()
 
 
 def machine_context_component_features(
-    component: ObservationStateComponentSettings,
+    _component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
-    del component
     return machine_context_features()
 
 
 def machine_context_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: ObservationStateComponentSettings,
-    action_history: Mapping[str, float],
+    _component: ObservationStateComponentSettings,
+    _action_history: Mapping[str, float],
 ) -> list[float]:
-    del component, action_history
     return machine_context_values(telemetry)
 
 

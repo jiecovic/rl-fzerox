@@ -34,12 +34,11 @@ def control_history_component_features(
 
 
 def control_history_component_values(
-    telemetry: FZeroXTelemetry | None,
+    _telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
     split_lean_history: bool = False,
 ) -> list[float]:
-    del telemetry
     length = component_int(component, "length", default=2)
     controls = component_controls(
         component,

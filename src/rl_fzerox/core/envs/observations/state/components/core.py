@@ -24,7 +24,11 @@ from rl_fzerox.core.envs.observations.state.types import (
 
 @dataclass(frozen=True, slots=True)
 class StateComponentDefinition:
-    """One scalar-state component with schema and value builders kept together."""
+    """One scalar-state component with schema and value builders kept together.
+
+    Component builders share one adapter shape so the registry can call them
+    uniformly; individual components may ignore telemetry, config, or history.
+    """
 
     features: Callable[..., tuple[StateFeature, ...]]
     values: Callable[..., list[float]]

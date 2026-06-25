@@ -15,18 +15,16 @@ from rl_fzerox.core.envs.track_bounds import track_edge_state
 
 
 def track_position_component_features(
-    component: ObservationStateComponentSettings,
+    _component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
-    del component
     return track_position_features()
 
 
 def track_position_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
-    action_history: Mapping[str, float],
+    _action_history: Mapping[str, float],
 ) -> list[float]:
-    del action_history
     return track_position_values(
         telemetry,
         progress_source=component.progress_source or "lap_progress",
