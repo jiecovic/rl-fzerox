@@ -4,6 +4,7 @@
 The selector uses this module to combine static track config, engine tuning
 choice, baseline variants, and generated-course metadata into `SelectedTrack`.
 """
+
 from __future__ import annotations
 
 from rl_fzerox.core.engine_tuning import (
@@ -47,6 +48,25 @@ def selected_track_from_entry(
         seed=seed,
         engine_choice=engine_choice,
     )
+    source_setup = entry.source_setup_metadata()
+    baseline_variant = entry.baseline_variant_metadata()
+    alt_baseline = entry.alt_baseline_metadata()
+    generated_course = entry.generated_course_metadata()
+    baseline_variant_index = None if baseline_variant is None else baseline_variant.index
+    baseline_variant_count = None if baseline_variant is None else baseline_variant.count
+    baseline_variant_seed = None if baseline_variant is None else baseline_variant.seed
+    alt_baseline_id = None if alt_baseline is None else alt_baseline.id
+    alt_baseline_label = None if alt_baseline is None else alt_baseline.label
+    alt_baseline_source_entry_id = None if alt_baseline is None else alt_baseline.source_entry_id
+    generated_course_kind = None if generated_course is None else generated_course.kind
+    generated_course_seed = None if generated_course is None else generated_course.seed
+    generated_course_hash = None if generated_course is None else generated_course.course_hash
+    generated_course_slot = None if generated_course is None else generated_course.slot
+    generated_course_generation = None if generated_course is None else generated_course.generation
+    generated_course_segment_count = (
+        None if generated_course is None else generated_course.segment_count
+    )
+    generated_course_length = None if generated_course is None else generated_course.course_length
     return SelectedTrack(
         id=entry.id,
         display_name=entry.display_name,
@@ -79,27 +99,27 @@ def selected_track_from_entry(
             None if engine_choice is None else engine_choice.uncertainty_score
         ),
         engine_tuning_finish_count=None if engine_choice is None else engine_choice.finish_count,
-        source_vehicle=entry.source_vehicle,
-        source_course_index=entry.source_course_index,
-        source_gp_difficulty=entry.source_gp_difficulty,
-        source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
+        source_vehicle=source_setup.vehicle,
+        source_course_index=source_setup.course_index,
+        source_gp_difficulty=source_setup.gp_difficulty,
+        source_engine_setting_raw_value=source_setup.engine_setting_raw_value,
         baseline_group_id=entry.baseline_group_id,
         baseline_group_weight=(
             None if entry.baseline_group_weight is None else float(entry.baseline_group_weight)
         ),
-        baseline_variant_index=entry.baseline_variant_index,
-        baseline_variant_count=entry.baseline_variant_count,
-        baseline_variant_seed=entry.baseline_variant_seed,
-        alt_baseline_id=entry.alt_baseline_id,
-        alt_baseline_label=entry.alt_baseline_label,
-        alt_baseline_source_entry_id=entry.alt_baseline_source_entry_id,
-        generated_course_kind=entry.generated_course_kind,
-        generated_course_seed=entry.generated_course_seed,
-        generated_course_hash=entry.generated_course_hash,
-        generated_course_slot=entry.generated_course_slot,
-        generated_course_generation=entry.generated_course_generation,
-        generated_course_segment_count=entry.generated_course_segment_count,
-        generated_course_length=entry.generated_course_length,
+        baseline_variant_index=baseline_variant_index,
+        baseline_variant_count=baseline_variant_count,
+        baseline_variant_seed=baseline_variant_seed,
+        alt_baseline_id=alt_baseline_id,
+        alt_baseline_label=alt_baseline_label,
+        alt_baseline_source_entry_id=alt_baseline_source_entry_id,
+        generated_course_kind=generated_course_kind,
+        generated_course_seed=generated_course_seed,
+        generated_course_hash=generated_course_hash,
+        generated_course_slot=generated_course_slot,
+        generated_course_generation=generated_course_generation,
+        generated_course_segment_count=generated_course_segment_count,
+        generated_course_length=generated_course_length,
         log_per_course=entry.log_per_course,
         records=entry.records,
         sampling_mode=sampling_mode,

@@ -4,11 +4,15 @@
 Track sampling turns the selected training pool into concrete reset entries and
 per-reset scheduling parameters. Entries carry baseline, generated-course,
 vehicle, engine, and logging metadata because the reset sampler, callbacks, and
-engine tuner all need the same resolved target identity.
+engine tuner all need the same resolved target identity. The serialized entry
+shape stays flat for manifest stability; typed metadata views group related
+fields for code that needs to reason about source setup, variants, alternate
+baselines, or generated courses.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import (
@@ -36,6 +40,47 @@ from rl_fzerox.core.runtime_spec.track_sampling_identity import (
     track_sampling_course_key,
     track_sampling_reset_target_key,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingSourceSetupMetadata:
+    """Source race setup used to regenerate or retarget a baseline state."""
+
+    vehicle: str | None
+    course_index: int | None
+    gp_difficulty: RaceDifficultyName | None
+    engine_setting_raw_value: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingBaselineVariantMetadata:
+    """Opponent-grid variant metadata for materialized GP race baselines."""
+
+    index: int | None
+    count: int | None
+    seed: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingAltBaselineMetadata:
+    """Captured alternate baseline identity attached to a sampling entry."""
+
+    id: str | None
+    label: str | None
+    source_entry_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingGeneratedCourseMetadata:
+    """Generated-course identity and course-shape metadata for one entry."""
+
+    kind: XCupGeneratedCourseKind | None
+    seed: int | None
+    course_hash: str | None
+    slot: int | None
+    generation: int | None
+    segment_count: int | None
+    course_length: float | None
 
 
 class TrackSamplingEntryConfig(BaseModel):
@@ -88,6 +133,69 @@ class TrackSamplingEntryConfig(BaseModel):
     log_per_course: bool = True
     records: TrackRecordsConfig | None = None
 
+    def source_setup_metadata(self) -> TrackSamplingSourceSetupMetadata:
+        """Return source-race fields as one named value object."""
+
+        return TrackSamplingSourceSetupMetadata(
+            vehicle=self.source_vehicle,
+            course_index=self.source_course_index,
+            gp_difficulty=self.source_gp_difficulty,
+            engine_setting_raw_value=self.source_engine_setting_raw_value,
+        )
+
+    def baseline_variant_metadata(self) -> TrackSamplingBaselineVariantMetadata | None:
+        """Return baseline-variant metadata when any variant field is present."""
+
+        if not _any_value_present(
+            self.baseline_variant_index,
+            self.baseline_variant_count,
+            self.baseline_variant_seed,
+        ):
+            return None
+        return TrackSamplingBaselineVariantMetadata(
+            index=self.baseline_variant_index,
+            count=self.baseline_variant_count,
+            seed=self.baseline_variant_seed,
+        )
+
+    def alt_baseline_metadata(self) -> TrackSamplingAltBaselineMetadata | None:
+        """Return alternate-baseline metadata when any alt field is present."""
+
+        if not _any_value_present(
+            self.alt_baseline_id,
+            self.alt_baseline_label,
+            self.alt_baseline_source_entry_id,
+        ):
+            return None
+        return TrackSamplingAltBaselineMetadata(
+            id=self.alt_baseline_id,
+            label=self.alt_baseline_label,
+            source_entry_id=self.alt_baseline_source_entry_id,
+        )
+
+    def generated_course_metadata(self) -> TrackSamplingGeneratedCourseMetadata | None:
+        """Return generated-course metadata without changing the serialized shape."""
+
+        if not _any_value_present(
+            self.generated_course_kind,
+            self.generated_course_seed,
+            self.generated_course_hash,
+            self.generated_course_slot,
+            self.generated_course_generation,
+            self.generated_course_segment_count,
+            self.generated_course_length,
+        ):
+            return None
+        return TrackSamplingGeneratedCourseMetadata(
+            kind=self.generated_course_kind,
+            seed=self.generated_course_seed,
+            course_hash=self.generated_course_hash,
+            slot=self.generated_course_slot,
+            generation=self.generated_course_generation,
+            segment_count=self.generated_course_segment_count,
+            course_length=self.generated_course_length,
+        )
+
     def course_key(self) -> str:
         """Return the stable course/slot key used for stats and watch navigation."""
 
@@ -132,6 +240,10 @@ class TrackSamplingEntryConfig(BaseModel):
                 f"generated X Cup entries must use course_index={X_CUP_COURSE.course_index}"
             )
         return self
+
+
+def _any_value_present(*values: object | None) -> bool:
+    return any(value is not None for value in values)
 
 
 class TrackSamplingConfig(BaseModel):

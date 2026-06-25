@@ -57,6 +57,17 @@ def request_from_track_entry(
     *,
     camera_setting: str | None,
 ) -> BaselineRequest:
+    source_setup = entry.source_setup_metadata()
+    baseline_variant = entry.baseline_variant_metadata()
+    generated_course = entry.generated_course_metadata()
+    baseline_variant_index = None if baseline_variant is None else baseline_variant.index
+    baseline_variant_count = None if baseline_variant is None else baseline_variant.count
+    baseline_variant_seed = None if baseline_variant is None else baseline_variant.seed
+    generated_course_kind = None if generated_course is None else generated_course.kind
+    generated_course_seed = None if generated_course is None else generated_course.seed
+    generated_course_hash = None if generated_course is None else generated_course.course_hash
+    generated_course_slot = None if generated_course is None else generated_course.slot
+    generated_course_generation = None if generated_course is None else generated_course.generation
     label = _baseline_request_label(
         mode=entry.mode,
         course_id=entry.course_id,
@@ -76,20 +87,20 @@ def request_from_track_entry(
         gp_difficulty=_request_gp_difficulty(entry.mode, entry.gp_difficulty),
         vehicle=entry.vehicle,
         vehicle_name=entry.vehicle_name,
-        source_vehicle=entry.source_vehicle,
+        source_vehicle=source_setup.vehicle,
         engine_setting_raw_value=entry.engine_setting_raw_value,
-        source_course_index=entry.source_course_index,
-        source_gp_difficulty=entry.source_gp_difficulty,
-        source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
+        source_course_index=source_setup.course_index,
+        source_gp_difficulty=source_setup.gp_difficulty,
+        source_engine_setting_raw_value=source_setup.engine_setting_raw_value,
         camera_setting=camera_setting,
-        baseline_variant_index=entry.baseline_variant_index,
-        baseline_variant_count=entry.baseline_variant_count,
-        baseline_variant_seed=entry.baseline_variant_seed,
-        generated_course_kind=entry.generated_course_kind,
-        generated_course_seed=entry.generated_course_seed,
-        generated_course_hash=entry.generated_course_hash,
-        generated_course_slot=entry.generated_course_slot,
-        generated_course_generation=entry.generated_course_generation,
+        baseline_variant_index=baseline_variant_index,
+        baseline_variant_count=baseline_variant_count,
+        baseline_variant_seed=baseline_variant_seed,
+        generated_course_kind=generated_course_kind,
+        generated_course_seed=generated_course_seed,
+        generated_course_hash=generated_course_hash,
+        generated_course_slot=generated_course_slot,
+        generated_course_generation=generated_course_generation,
     )
 
 

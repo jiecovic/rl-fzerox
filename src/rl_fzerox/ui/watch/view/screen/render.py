@@ -295,12 +295,12 @@ def _track_sampling_records(
 ) -> tuple[dict[str, object], ...]:
     alt_counts_by_source_entry: dict[str, int] = {}
     for entry in entries:
-        source_entry_id = entry.alt_baseline_source_entry_id
-        if entry.alt_baseline_id is None or source_entry_id is None:
+        alt_baseline = entry.alt_baseline_metadata()
+        if alt_baseline is None or alt_baseline.id is None or alt_baseline.source_entry_id is None:
             continue
-        alt_counts_by_source_entry[source_entry_id] = (
+        alt_counts_by_source_entry[alt_baseline.source_entry_id] = (
             alt_counts_by_source_entry.get(
-                source_entry_id,
+                alt_baseline.source_entry_id,
                 0,
             )
             + 1
@@ -356,20 +356,24 @@ def _track_sampling_record(
         info["track_vehicle_name"] = entry.vehicle_name
     if entry.engine_setting_raw_value is not None:
         info["track_engine_setting_raw_value"] = int(entry.engine_setting_raw_value)
-    if entry.alt_baseline_id is not None:
-        info["track_alt_baseline_id"] = entry.alt_baseline_id
-    if entry.alt_baseline_label is not None:
-        info["track_alt_baseline_label"] = entry.alt_baseline_label
-    if entry.alt_baseline_source_entry_id is not None:
-        info["track_alt_baseline_source_entry_id"] = entry.alt_baseline_source_entry_id
-    if entry.generated_course_kind is not None:
-        info["track_generated_course_kind"] = entry.generated_course_kind
-    if entry.generated_course_slot is not None:
-        info["track_generated_course_slot"] = int(entry.generated_course_slot)
-    if entry.generated_course_generation is not None:
-        info["track_generated_course_generation"] = int(entry.generated_course_generation)
-    if entry.generated_course_hash is not None:
-        info["track_generated_course_hash"] = entry.generated_course_hash
+    alt_baseline = entry.alt_baseline_metadata()
+    if alt_baseline is not None:
+        if alt_baseline.id is not None:
+            info["track_alt_baseline_id"] = alt_baseline.id
+        if alt_baseline.label is not None:
+            info["track_alt_baseline_label"] = alt_baseline.label
+        if alt_baseline.source_entry_id is not None:
+            info["track_alt_baseline_source_entry_id"] = alt_baseline.source_entry_id
+    generated_course = entry.generated_course_metadata()
+    if generated_course is not None:
+        if generated_course.kind is not None:
+            info["track_generated_course_kind"] = generated_course.kind
+        if generated_course.slot is not None:
+            info["track_generated_course_slot"] = int(generated_course.slot)
+        if generated_course.generation is not None:
+            info["track_generated_course_generation"] = int(generated_course.generation)
+        if generated_course.course_hash is not None:
+            info["track_generated_course_hash"] = generated_course.course_hash
     if entry.records is not None:
         info.update(entry.records.info())
     return info

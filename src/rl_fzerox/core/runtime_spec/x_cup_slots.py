@@ -56,15 +56,16 @@ def generated_x_cup_slots_from_track_sampling(
 def generated_x_cup_slot_from_entry(
     entry: TrackSamplingEntryConfig,
 ) -> GeneratedXCupSlot | None:
-    if entry.generated_course_kind != X_CUP_COURSE.generated_kind:
+    generated_course = entry.generated_course_metadata()
+    if generated_course is None or generated_course.kind != X_CUP_COURSE.generated_kind:
         return None
     course_key = entry.runtime_course_key or entry.course_id or entry.id
     course_id = entry.course_id
     course_name = entry.course_name or entry.display_name
-    slot = entry.generated_course_slot
-    generation = entry.generated_course_generation
-    course_hash = entry.generated_course_hash
-    course_seed = entry.generated_course_seed
+    slot = generated_course.slot
+    generation = generated_course.generation
+    course_hash = generated_course.course_hash
+    course_seed = generated_course.seed
     if (
         course_id is None
         or course_name is None
@@ -83,12 +84,12 @@ def generated_x_cup_slot_from_entry(
         course_hash=course_hash,
         course_seed=int(course_seed),
         segment_count=(
-            None
-            if entry.generated_course_segment_count is None
-            else int(entry.generated_course_segment_count)
+            None if generated_course.segment_count is None else int(generated_course.segment_count)
         ),
         course_length=(
-            None if entry.generated_course_length is None else float(entry.generated_course_length)
+            None
+            if generated_course.course_length is None
+            else float(generated_course.course_length)
         ),
     )
 
