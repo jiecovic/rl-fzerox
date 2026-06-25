@@ -1,17 +1,33 @@
-# src/rl_fzerox/core/policy/auxiliary_state/actor_regularization.py
-"""Actor-side auxiliary regularization losses and metrics for policy training."""
+# src/rl_fzerox/core/policy/auxiliary_state/actor_regularization/mixin.py
+"""Policy mixin that composes actor regularization losses and metrics."""
 
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import Literal
 
 import torch
 from sb3x.common.auxiliary_losses import PolicyAuxiliaryLoss
 from stable_baselines3.common.type_aliases import PyTorchObs
 
+from rl_fzerox.core.policy.auxiliary_state.actor_regularization.distributions import (
+    _AxisDistributionStats,
+    _categorical_lean_expected_signed_values,
+    _continuous_action_log_std,
+    _continuous_action_mode,
+    _discrete_pitch_distribution_stats,
+    _split_lean_expected_signed_values,
+)
+from rl_fzerox.core.policy.auxiliary_state.actor_regularization.losses import (
+    _combined_mask,
+    _masked_mean,
+    _signed_balance_loss,
+    _std_cap_loss,
+)
+from rl_fzerox.core.policy.auxiliary_state.actor_regularization.metrics import (
+    _metric_mean,
+    _pitch_sample_metrics,
+    _signed_balance_metrics,
+)
 from rl_fzerox.core.policy.auxiliary_state.target_tensors import (
     optional_auxiliary_targets,
     require_auxiliary_targets,
@@ -19,22 +35,6 @@ from rl_fzerox.core.policy.auxiliary_state.target_tensors import (
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     resolve_auxiliary_state_target,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class _AxisDistributionStats:
-    mean: torch.Tensor
-    std: torch.Tensor
-    entropy: torch.Tensor
-    source: Literal["continuous", "discrete"]
-    log_std: torch.Tensor | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class _SignedBalanceLoss:
-    bias: torch.Tensor
-    loss_value: torch.Tensor
-    total_loss: torch.Tensor
 
 
 class _ActorRegularizationMixin:
@@ -377,230 +377,3 @@ class _ActorRegularizationMixin:
 
     def _lean_actor_regularization_enabled(self) -> bool:
         return self._lean_signed_balance_loss_weight > 0.0
-
-
-def _continuous_action_mode(distribution: object) -> torch.Tensor:
-    continuous_dist = getattr(distribution, "continuous_dist", None)
-    mode = getattr(continuous_dist, "mode", None)
-    if not callable(mode):
-        raise TypeError("Actor regularization requires a hybrid continuous distribution")
-    value = mode()
-    if not isinstance(value, torch.Tensor):
-        raise TypeError("Continuous distribution mode must return a tensor")
-    return value
-
-
-def _continuous_action_log_std(distribution: object) -> torch.Tensor:
-    continuous_log_std = getattr(distribution, "continuous_log_std", None)
-    if not callable(continuous_log_std):
-        raise TypeError("Actor regularization requires hybrid continuous log std access")
-    value = continuous_log_std()
-    if not isinstance(value, torch.Tensor):
-        raise TypeError("Continuous distribution log std must return a tensor")
-    log_std: torch.Tensor = value
-    if log_std.ndim != 2:
-        raise TypeError("Continuous distribution log std must be batched")
-    return log_std
-
-
-def _discrete_pitch_distribution_stats(
-    distribution: object,
-    *,
-    discrete_pitch_index: int,
-    bucket_values: tuple[float, ...],
-) -> _AxisDistributionStats:
-    branch_distribution = _discrete_branch_distribution(
-        distribution,
-        branch_index=discrete_pitch_index,
-    )
-    raw_probs = getattr(branch_distribution, "probs", None)
-    if not isinstance(raw_probs, torch.Tensor):
-        raise TypeError("Discrete pitch distribution must expose categorical probabilities")
-    probs: torch.Tensor = raw_probs
-    if probs.ndim != 2:
-        raise TypeError("Discrete pitch probabilities must be batched")
-    if probs.shape[1] != len(bucket_values):
-        raise ValueError("Discrete pitch bucket count does not match the pitch distribution shape")
-
-    bucket_tensor = probs.new_tensor(bucket_values).unsqueeze(0)
-    mean = (probs * bucket_tensor).sum(dim=1)
-    variance = (probs * (bucket_tensor - mean.unsqueeze(1)).square()).sum(dim=1)
-    std = variance.clamp(min=0.0).sqrt()
-
-    entropy_fn = getattr(branch_distribution, "entropy", None)
-    if not callable(entropy_fn):
-        raise TypeError("Discrete pitch distribution must expose entropy")
-    entropy = entropy_fn()
-    if not isinstance(entropy, torch.Tensor):
-        raise TypeError("Discrete pitch entropy must be a tensor")
-    return _AxisDistributionStats(mean=mean, std=std, entropy=entropy, source="discrete")
-
-
-def _categorical_lean_expected_signed_values(
-    distribution: object,
-    *,
-    branch_index: int,
-) -> torch.Tensor:
-    probs = _discrete_branch_probabilities(
-        distribution,
-        branch_index=branch_index,
-        label="categorical lean",
-    )
-    if probs.shape[1] not in {3, 4}:
-        raise ValueError("Categorical lean probabilities must have three or four values")
-    signed_values = probs.new_zeros((probs.shape[1],))
-    signed_values[1] = -1.0
-    signed_values[2] = 1.0
-    return (probs * signed_values.unsqueeze(0)).sum(dim=1)
-
-
-def _split_lean_expected_signed_values(
-    distribution: object,
-    *,
-    left_branch_index: int,
-    right_branch_index: int,
-) -> torch.Tensor:
-    left_probs = _discrete_branch_probabilities(
-        distribution,
-        branch_index=left_branch_index,
-        label="lean_left",
-    )
-    right_probs = _discrete_branch_probabilities(
-        distribution,
-        branch_index=right_branch_index,
-        label="lean_right",
-    )
-    if left_probs.shape[1] != 2 or right_probs.shape[1] != 2:
-        raise ValueError("Split lean probabilities must be binary")
-    return right_probs[:, 1] - left_probs[:, 1]
-
-
-def _discrete_branch_probabilities(
-    distribution: object,
-    *,
-    branch_index: int,
-    label: str,
-) -> torch.Tensor:
-    branch_distribution = _discrete_branch_distribution(
-        distribution,
-        branch_index=branch_index,
-    )
-    raw_probs = getattr(branch_distribution, "probs", None)
-    if not isinstance(raw_probs, torch.Tensor):
-        raise TypeError(f"Discrete {label} distribution must expose categorical probabilities")
-    probs: torch.Tensor = raw_probs
-    if probs.ndim != 2:
-        raise TypeError(f"Discrete {label} probabilities must be batched")
-    return probs
-
-
-def _discrete_branch_distribution(
-    distribution: object,
-    *,
-    branch_index: int,
-) -> object:
-    discrete_dist = getattr(distribution, "discrete_dist", None)
-    branches = getattr(discrete_dist, "distributions", None)
-    if not isinstance(branches, Sequence):
-        raise TypeError("Actor regularization requires a hybrid discrete distribution")
-    try:
-        return branches[branch_index]
-    except IndexError as exc:
-        raise ValueError("Discrete branch index is outside the distribution") from exc
-
-
-def _signed_balance_loss(
-    values: torch.Tensor,
-    *,
-    deadzone: float,
-    loss_weight: float,
-    sample_mask: torch.Tensor | None,
-) -> _SignedBalanceLoss | None:
-    if loss_weight <= 0.0:
-        return None
-    bias, has_active_samples = _masked_mean(values, sample_mask)
-    if not has_active_samples:
-        return None
-    loss_value = (bias.abs() - values.new_tensor(deadzone)).relu().square()
-    return _SignedBalanceLoss(
-        bias=bias,
-        loss_value=loss_value,
-        total_loss=loss_weight * loss_value,
-    )
-
-
-def _signed_balance_metrics(prefix: str, loss: _SignedBalanceLoss) -> dict[str, float]:
-    return {
-        f"{prefix}/signed_bias": float(loss.bias.detach().cpu().item()),
-        f"{prefix}/signed_balance_loss": float(loss.loss_value.detach().cpu().item()),
-        f"{prefix}/signed_balance_loss_weighted": float(loss.total_loss.detach().cpu().item()),
-    }
-
-
-def _pitch_sample_metrics(
-    *,
-    pitch_mean: torch.Tensor,
-    pitch_sample: torch.Tensor,
-    aux_targets: torch.Tensor,
-    sample_mask: torch.Tensor | None,
-) -> dict[str, float]:
-    airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
-    airborne = (aux_targets[:, airborne_index] >= 0.5).bool()
-    grounded = ~airborne
-    near_saturation = (pitch_sample.abs() > 0.95).to(dtype=pitch_mean.dtype)
-    metrics: dict[str, float] = {
-        "pitch/raw_sample_saturation_fraction": _metric_mean(near_saturation, sample_mask),
-    }
-    scoped_metrics = {
-        "pitch/mean_ground_abs": (pitch_mean.abs(), grounded),
-        "pitch/mean_air_abs": (pitch_mean.abs(), airborne),
-        "pitch/raw_sample_ground_abs": (pitch_sample.abs(), grounded),
-        "pitch/raw_sample_air_abs": (pitch_sample.abs(), airborne),
-    }
-    for name, (values, scope_mask) in scoped_metrics.items():
-        combined_mask = _combined_mask(scope_mask, sample_mask)
-        value, has_active_samples = _masked_mean(values, combined_mask)
-        if has_active_samples:
-            metrics[name] = float(value.detach().cpu().item())
-    return metrics
-
-
-def _metric_mean(values: torch.Tensor, sample_mask: torch.Tensor | None) -> float:
-    value, has_active_samples = _masked_mean(values, sample_mask)
-    if not has_active_samples:
-        return 0.0
-    return float(value.detach().cpu().item())
-
-
-def _std_cap_loss(
-    values: torch.Tensor,
-    *,
-    cap: float,
-    sample_mask: torch.Tensor | None,
-) -> torch.Tensor | None:
-    per_sample = (values - values.new_tensor(cap)).relu().square()
-    loss_value, has_active_samples = _masked_mean(per_sample, sample_mask)
-    if not has_active_samples:
-        return None
-    return loss_value
-
-
-def _combined_mask(
-    scope_mask: torch.Tensor,
-    sample_mask: torch.Tensor | None,
-) -> torch.Tensor:
-    if sample_mask is None:
-        return scope_mask.bool()
-    return scope_mask.bool() & sample_mask.bool()
-
-
-def _masked_mean(
-    values: torch.Tensor,
-    sample_mask: torch.Tensor | None,
-) -> tuple[torch.Tensor, bool]:
-    if sample_mask is None:
-        return values.mean(), values.numel() > 0
-    active_values = values[sample_mask]
-    if active_values.numel() == 0:
-        return values.new_zeros(()), False
-    return active_values.mean(), True
