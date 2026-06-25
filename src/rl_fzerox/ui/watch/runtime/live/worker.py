@@ -79,6 +79,9 @@ from rl_fzerox.ui.watch.runtime.snapshots.build import (
     _build_snapshot,
     _next_boost_lamp_level,
     _publish_step_snapshots,
+    _StepSnapshotDisplay,
+    _StepSnapshotFrameState,
+    _StepSnapshotPublishRequest,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry, _telemetry_to_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
@@ -581,50 +584,58 @@ def _run_simulation_loop(
                         live_episode_series = live_series.snapshot()
                         last_live_series_publish_time = current_time
                 _publish_step_snapshots(
-                    config=config,
-                    env=env,
-                    emulator=emulator,
-                    snapshot_queue=snapshot_queue,
-                    display_frames=display_frames,
-                    display_controller_masks=display_controller_masks,
-                    previous_observation=previous_observation,
-                    previous_info=save_notice.apply(previous_info, now=time.perf_counter()),
-                    previous_episode_reward=previous_episode_reward,
-                    previous_telemetry=previous_telemetry,
-                    final_observation=observation,
-                    final_info=save_notice.apply(info, now=time.perf_counter()),
-                    final_episode_reward=episode_reward,
-                    final_telemetry=live_telemetry,
-                    previous_control_state=previous_control_state,
-                    previous_gas_level=previous_gas_level,
-                    previous_action_mask_branches=previous_action_mask_branches,
-                    previous_policy_action=previous_policy_action,
-                    final_control_state=current_control_state,
-                    final_gas_level=current_gas_level,
-                    final_action_mask_branches=final_action_mask_branches,
-                    final_policy_action=current_policy_action,
-                    previous_auxiliary_predictions=previous_auxiliary_predictions,
-                    previous_auxiliary_targets=previous_auxiliary_targets,
-                    final_auxiliary_predictions=final_auxiliary_predictions,
-                    final_auxiliary_targets=final_auxiliary_targets,
-                    reset_info=reset_info,
-                    episode=episode,
-                    control_fps=control_rate.rate_hz(),
-                    target_control_fps=target_control_fps,
-                    target_control_seconds=target_control_seconds,
-                    boost_lamp_level=boost_lamp_level,
-                    policy_runner=policy_runner,
-                    deterministic_policy=deterministic_policy,
-                    policy_reload_error=policy_reload_error,
-                    cnn_activations=cnn_activations,
-                    # The full track-sampling config can be hundreds of KB when
-                    # race-start variants are enabled. Initial/reset snapshots
-                    # carry it for UI metadata; repeated display-frame snapshots
-                    # omit it so Watch does not pickle it every frame.
-                    active_track_sampling=None,
-                    track_record_book=track_record_book,
-                    manual_control_enabled=manual_control_enabled,
-                    live_episode_series=live_episode_series,
+                    _StepSnapshotPublishRequest(
+                        config=config,
+                        env=env,
+                        emulator=emulator,
+                        snapshot_queue=snapshot_queue,
+                        display=_StepSnapshotDisplay(
+                            display_frames=display_frames,
+                            display_controller_masks=display_controller_masks,
+                        ),
+                        previous=_StepSnapshotFrameState(
+                            observation=previous_observation,
+                            info=save_notice.apply(previous_info, now=time.perf_counter()),
+                            episode_reward=previous_episode_reward,
+                            telemetry=previous_telemetry,
+                            control_state=previous_control_state,
+                            gas_level=previous_gas_level,
+                            action_mask_branches=previous_action_mask_branches,
+                            policy_action=previous_policy_action,
+                            auxiliary_predictions=previous_auxiliary_predictions,
+                            auxiliary_targets=previous_auxiliary_targets,
+                        ),
+                        final=_StepSnapshotFrameState(
+                            observation=observation,
+                            info=save_notice.apply(info, now=time.perf_counter()),
+                            episode_reward=episode_reward,
+                            telemetry=live_telemetry,
+                            control_state=current_control_state,
+                            gas_level=current_gas_level,
+                            action_mask_branches=final_action_mask_branches,
+                            policy_action=current_policy_action,
+                            auxiliary_predictions=final_auxiliary_predictions,
+                            auxiliary_targets=final_auxiliary_targets,
+                        ),
+                        reset_info=reset_info,
+                        episode=episode,
+                        control_fps=control_rate.rate_hz(),
+                        target_control_fps=target_control_fps,
+                        target_control_seconds=target_control_seconds,
+                        boost_lamp_level=boost_lamp_level,
+                        policy_runner=policy_runner,
+                        deterministic_policy=deterministic_policy,
+                        manual_control_enabled=manual_control_enabled,
+                        policy_reload_error=policy_reload_error,
+                        cnn_activations=cnn_activations,
+                        # The full track-sampling config can be hundreds of KB when
+                        # race-start variants are enabled. Initial/reset snapshots
+                        # carry it for UI metadata; repeated display-frame snapshots
+                        # omit it so Watch does not pickle it every frame.
+                        active_track_sampling=None,
+                        track_record_book=track_record_book,
+                        live_episode_series=live_episode_series,
+                    )
                 )
                 committed_policy_action = current_policy_action
                 committed_action_mask_branches = final_action_mask_branches

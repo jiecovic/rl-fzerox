@@ -96,172 +96,148 @@ class _BoostLampConfig:
 BOOST_LAMP_CONFIG = _BoostLampConfig()
 
 
-def _publish_step_snapshots(
-    *,
-    config: WatchAppConfig,
-    env: _SnapshotEnv,
-    emulator: TelemetryReader,
-    snapshot_queue: WorkerMessageQueue,
-    display_frames: DisplayFrames,
-    display_controller_masks: ControllerMaskBatch = (),
-    audio_samples: Pcm16Samples = (),
-    audio_frame_counts: AudioFrameCounts = (),
-    previous_observation: ObservationValue,
-    previous_info: dict[str, object],
-    previous_episode_reward: float,
-    previous_telemetry: FZeroXTelemetry | None,
-    final_observation: ObservationValue,
-    final_info: dict[str, object],
-    final_episode_reward: float,
-    final_telemetry: FZeroXTelemetry | None,
-    reset_info: dict[str, object],
-    episode: int,
-    control_fps: float,
-    target_control_fps: float | None,
-    target_control_seconds: float | None,
-    boost_lamp_level: float,
-    policy_runner: PolicyRunner | None,
-    deterministic_policy: bool,
-    manual_control_enabled: bool,
-    policy_reload_error: str | None,
-    cnn_activations: CnnActivationSnapshot | None,
-    active_track_sampling: TrackSamplingConfig | None,
-    track_record_book: TrackRecordBook,
-    include_track_sampling: bool = False,
-    previous_control_state: RaceControlState | None = None,
-    previous_gas_level: float | None = None,
-    previous_action_mask_branches: ActionMaskBranches | None = None,
-    previous_policy_action: ActionValue | None = None,
-    final_control_state: RaceControlState | None = None,
-    final_gas_level: float | None = None,
-    final_action_mask_branches: ActionMaskBranches | None = None,
-    final_policy_action: ActionValue | None = None,
-    control_state: RaceControlState | None = None,
-    gas_level: float | None = None,
-    action_mask_branches: ActionMaskBranches | None = None,
-    policy_action: ActionValue | None = None,
-    previous_auxiliary_predictions: dict[str, object] | None = None,
-    previous_auxiliary_targets: dict[str, object] | None = None,
-    final_auxiliary_predictions: dict[str, object] | None = None,
-    final_auxiliary_targets: dict[str, object] | None = None,
-    live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
-    frame_interval_seconds: float | None = None,
-    frame_recorder: _FrameRecorder | None = None,
-) -> None:
-    resolved_control_state = control_state
-    if previous_control_state is None:
-        previous_control_state = resolved_control_state
-    if final_control_state is None:
-        final_control_state = (
-            resolved_control_state if resolved_control_state is not None else previous_control_state
-        )
-    if previous_control_state is None or final_control_state is None:
-        raise TypeError(
-            "Step snapshot publishing requires control state for hold and final frames."
-        )
+@dataclass(frozen=True, slots=True)
+class _StepSnapshotDisplay:
+    display_frames: DisplayFrames
+    display_controller_masks: ControllerMaskBatch = ()
+    audio_samples: Pcm16Samples = ()
+    audio_frame_counts: AudioFrameCounts = ()
 
-    resolved_gas_level = gas_level
-    if previous_gas_level is None:
-        previous_gas_level = resolved_gas_level
-    if final_gas_level is None:
-        final_gas_level = (
-            resolved_gas_level if resolved_gas_level is not None else previous_gas_level
-        )
-    if previous_gas_level is None or final_gas_level is None:
-        raise TypeError("Step snapshot publishing requires gas level for hold and final frames.")
 
-    default_action_mask_branches = (
-        env.action_mask_branches() if action_mask_branches is None else action_mask_branches
+@dataclass(frozen=True, slots=True)
+class _StepSnapshotFrameState:
+    observation: ObservationValue
+    info: dict[str, object]
+    episode_reward: float
+    telemetry: FZeroXTelemetry | None
+    control_state: RaceControlState
+    gas_level: float
+    action_mask_branches: ActionMaskBranches | None = None
+    policy_action: ActionValue | None = None
+    auxiliary_predictions: dict[str, object] | None = None
+    auxiliary_targets: dict[str, object] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _StepSnapshotPublishRequest:
+    config: WatchAppConfig
+    env: _SnapshotEnv
+    emulator: TelemetryReader
+    snapshot_queue: WorkerMessageQueue
+    display: _StepSnapshotDisplay
+    previous: _StepSnapshotFrameState
+    final: _StepSnapshotFrameState
+    reset_info: dict[str, object]
+    episode: int
+    control_fps: float
+    target_control_fps: float | None
+    target_control_seconds: float | None
+    boost_lamp_level: float
+    policy_runner: PolicyRunner | None
+    deterministic_policy: bool
+    manual_control_enabled: bool
+    policy_reload_error: str | None
+    cnn_activations: CnnActivationSnapshot | None
+    active_track_sampling: TrackSamplingConfig | None
+    track_record_book: TrackRecordBook
+    include_track_sampling: bool = False
+    live_episode_series: EpisodeLiveSeriesSnapshot | None = None
+    frame_interval_seconds: float | None = None
+    frame_recorder: _FrameRecorder | None = None
+
+
+def _publish_step_snapshots(request: _StepSnapshotPublishRequest) -> None:
+    default_action_mask_branches = request.env.action_mask_branches()
+    previous_action_mask_branches = (
+        default_action_mask_branches
+        if request.previous.action_mask_branches is None
+        else request.previous.action_mask_branches
     )
-    if previous_action_mask_branches is None:
-        previous_action_mask_branches = default_action_mask_branches
-    if final_action_mask_branches is None:
-        final_action_mask_branches = default_action_mask_branches
+    final_action_mask_branches = (
+        default_action_mask_branches
+        if request.final.action_mask_branches is None
+        else request.final.action_mask_branches
+    )
 
-    if previous_policy_action is None:
-        previous_policy_action = policy_action
-    if final_policy_action is None:
-        final_policy_action = policy_action
-
-    frames = _display_frames_or_fallback(display_frames, fallback=env.render())
+    frames = _display_frames_or_fallback(
+        request.display.display_frames,
+        fallback=request.env.render(),
+    )
     frame_control_states, exact_frame_controls = _display_controller_states(
-        display_controller_masks,
+        request.display.display_controller_masks,
         frames=frames,
-        fallback_previous=previous_control_state,
-        fallback_final=final_control_state,
+        fallback_previous=request.previous.control_state,
+        fallback_final=request.final.control_state,
     )
     audio_chunks = _audio_chunks_for_frames(
-        audio_samples,
-        audio_frame_counts,
+        request.display.audio_samples,
+        request.display.audio_frame_counts,
         frame_count=len(frames),
     )
-    if frame_interval_seconds is None and target_control_seconds is not None:
-        frame_interval_seconds = target_control_seconds / len(frames)
+    frame_interval_seconds = request.frame_interval_seconds
+    if frame_interval_seconds is None and request.target_control_seconds is not None:
+        frame_interval_seconds = request.target_control_seconds / len(frames)
     for index, frame in enumerate(frames):
         is_final_frame = index == len(frames) - 1
-        frame_info = final_info if is_final_frame else previous_info
-        if frame_recorder is not None:
-            frame_recorder.record_frame(
+        frame_state = request.final if is_final_frame else request.previous
+        if request.frame_recorder is not None:
+            request.frame_recorder.record_frame(
                 frame,
                 info=_recording_frame_info(
-                    frame_info,
+                    frame_state.info,
                     control_state=frame_control_states[index],
-                    render_input_hud=config.watch.recording.render_input_hud,
-                    policy_active=policy_runner is not None and not manual_control_enabled,
+                    render_input_hud=request.config.watch.recording.render_input_hud,
+                    policy_active=(
+                        request.policy_runner is not None and not request.manual_control_enabled
+                    ),
                 ),
                 audio_samples=audio_chunks[index],
             )
         publish_worker_message(
-            snapshot_queue,
+            request.snapshot_queue,
             _build_snapshot(
-                config=config,
-                env=env,
-                emulator=emulator,
+                config=request.config,
+                env=request.env,
+                emulator=request.emulator,
                 raw_frame=frame,
-                observation=final_observation if is_final_frame else previous_observation,
-                info=frame_info,
-                reset_info=reset_info,
-                episode=episode,
-                episode_reward=(
-                    final_episode_reward if is_final_frame else previous_episode_reward
-                ),
-                control_fps=control_fps,
-                target_control_fps=target_control_fps,
+                observation=frame_state.observation,
+                info=frame_state.info,
+                reset_info=request.reset_info,
+                episode=request.episode,
+                episode_reward=frame_state.episode_reward,
+                control_fps=request.control_fps,
+                target_control_fps=request.target_control_fps,
                 control_state=frame_control_states[index],
-                gas_level=final_gas_level if is_final_frame else previous_gas_level,
-                boost_lamp_level=boost_lamp_level,
+                gas_level=frame_state.gas_level,
+                boost_lamp_level=request.boost_lamp_level,
                 action_mask_branches=(
                     final_action_mask_branches
                     if is_final_frame or exact_frame_controls
                     else previous_action_mask_branches
                 ),
-                telemetry=final_telemetry if is_final_frame else previous_telemetry,
+                telemetry=frame_state.telemetry,
                 policy_action=(
-                    final_policy_action
+                    request.final.policy_action
                     if is_final_frame or exact_frame_controls
-                    else previous_policy_action
+                    else request.previous.policy_action
                 ),
-                policy_runner=policy_runner,
-                policy_auxiliary_state_predictions=(
-                    final_auxiliary_predictions
-                    if is_final_frame
-                    else previous_auxiliary_predictions
-                ),
-                policy_auxiliary_state_targets=(
-                    final_auxiliary_targets if is_final_frame else previous_auxiliary_targets
-                ),
-                deterministic_policy=deterministic_policy,
-                manual_control_enabled=manual_control_enabled,
-                policy_reload_error=policy_reload_error,
-                cnn_activations=cnn_activations,
+                policy_runner=request.policy_runner,
+                policy_auxiliary_state_predictions=frame_state.auxiliary_predictions,
+                policy_auxiliary_state_targets=frame_state.auxiliary_targets,
+                deterministic_policy=request.deterministic_policy,
+                manual_control_enabled=request.manual_control_enabled,
+                policy_reload_error=request.policy_reload_error,
+                cnn_activations=request.cnn_activations,
                 active_track_sampling=(
-                    active_track_sampling if include_track_sampling and is_final_frame else None
+                    request.active_track_sampling
+                    if request.include_track_sampling and is_final_frame
+                    else None
                 ),
-                track_record_book=track_record_book,
+                track_record_book=request.track_record_book,
                 action_hold_frame=index + 1,
                 action_hold_frames=len(frames),
                 policy_decision_frame=is_final_frame,
-                live_episode_series=live_episode_series if is_final_frame else None,
+                live_episode_series=request.live_episode_series if is_final_frame else None,
             ),
         )
         if frame_interval_seconds is not None and not is_final_frame:
