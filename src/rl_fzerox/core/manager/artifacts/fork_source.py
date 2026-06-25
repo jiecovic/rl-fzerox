@@ -4,7 +4,8 @@
 Each pinned fork source must be self-contained enough for a resumed child run
 to validate and reload its source checkpoint without reaching back into the
 parent run directory. That includes the resolved checkpoint artifacts and the
-saved train manifest used by resume/preload safety checks.
+train manifest mirror for inspection/export. Resume/preload metadata still
+comes from SQLite-projected run config, not from the mirror.
 """
 
 from __future__ import annotations

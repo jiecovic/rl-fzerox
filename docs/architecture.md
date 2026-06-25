@@ -48,10 +48,10 @@ The main runtime concepts are documented separately:
   registry operations, lineages, metrics, and artifact bookkeeping.
 
 - `src/rl_fzerox/core/runtime_spec/`
-  Lower-level Pydantic configs consumed by training, watch, and saved manifests.
+  Lower-level Pydantic configs consumed by training, watch, and manifest mirrors.
 
 - `src/rl_fzerox/core/training/runs/`
-  Run paths, saved config IO, race-start helpers, and baseline materialization.
+  Run paths, manifest mirror IO, race-start helpers, and baseline materialization.
 
 - `src/rl_fzerox/core/envs/`
   Gymnasium environment, action adapters, control masks, state/image
@@ -62,7 +62,7 @@ The main runtime concepts are documented separately:
   warm starts, checkpoint metadata, and inference loading.
 
 - `src/rl_fzerox/ui/watch/`
-  Pygame playback UI for managed runs and saved run configs.
+  Pygame playback UI for managed runs and projected runtime configs.
 
 - `src/fzerox_emulator/`
   Thin Python shim over the compiled PyO3 module.

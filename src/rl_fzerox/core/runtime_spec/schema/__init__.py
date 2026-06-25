@@ -1,10 +1,10 @@
 # src/rl_fzerox/core/runtime_spec/schema/__init__.py
 """Derived runtime schema package.
 
-This package groups the resolved config models consumed by env, training, watch,
-and saved manifests. It is intentionally separate from the manager-owned
-``run_spec`` authoring model, which compiles into this lower-level runtime
-shape through ``core.manager.projection``.
+This package groups the resolved config models consumed by env, training,
+watch, and manifest mirrors. It is intentionally separate from the
+manager-owned ``run_spec`` authoring model, which compiles into this
+lower-level runtime shape through ``core.manager.projection``.
 """
 
 from __future__ import annotations

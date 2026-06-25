@@ -93,7 +93,7 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
     assert entry.baseline_state_path is None
 
 
-def test_worker_resume_ignores_saved_manifest_runtime_baselines(tmp_path: Path) -> None:
+def test_worker_resume_ignores_stale_manifest_mirror_runtime_baselines(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "runs.db")
     config = default_managed_run_config().model_copy(deep=True)
     config.tracks.race_mode = "gp_race"
@@ -102,7 +102,7 @@ def test_worker_resume_ignores_saved_manifest_runtime_baselines(tmp_path: Path) 
     config.tracks.baseline_variant_count = 8
     run = store.create_run(
         run_id="runtime-manifest-resume",
-        name="Runtime manifest resume",
+        name="Runtime manifest mirror resume",
         config=config,
         explicit_run_dir=tmp_path / "runs" / "runtime-manifest-resume",
         lineage_step_offset=123_456,
