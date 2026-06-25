@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/snapshots.py
-"""Immutable checkpoint snapshots used by evaluation runs."""
+"""Copy immutable checkpoint snapshots for evaluation runs.
+
+Evaluation must not read a moving run checkpoint while training continues. This
+module copies or hardlinks the selected policy/model artifact into the
+evaluation directory and records enough metadata to reproduce what was run.
+"""
 
 from __future__ import annotations
 

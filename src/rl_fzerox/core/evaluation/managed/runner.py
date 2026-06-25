@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/managed/runner.py
-"""Run manager-owned evaluation records through the course evaluator."""
+"""Project manager evaluation records into executable evaluation runs.
+
+SQLite-owned evaluation records remain the source of truth. This runner builds
+the temporary train-like runtime config, materializes/reuses baseline suites,
+loads the frozen checkpoint copy, and chooses the single or parallel executor.
+"""
 
 from __future__ import annotations
 

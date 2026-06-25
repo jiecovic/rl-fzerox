@@ -1,5 +1,11 @@
 # src/rl_fzerox/core/evaluation/execution/env_control.py
-"""Access evaluation env controls through Gymnasium wrappers."""
+"""Resolve evaluation-only env controls through wrapper stacks.
+
+Training envs are commonly wrapped before evaluation uses them. These helpers
+look through transparent ``env`` chains so callers can lock reset targets,
+configure engine tuning, and read action masks without depending on the exact
+wrapper order.
+"""
 
 from __future__ import annotations
 

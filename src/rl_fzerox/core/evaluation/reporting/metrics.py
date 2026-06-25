@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/reporting/metrics.py
-"""Aggregate evaluation results into primary and diagnostic metrics."""
+"""Aggregate evaluation attempts into reportable metric groups.
+
+Primary metrics are stable policy-quality signals. Detail metrics are useful
+diagnostics that may vary with reward/config changes, so reporting keeps them
+separate from the headline comparison values.
+"""
 
 from __future__ import annotations
 
@@ -365,17 +370,6 @@ def _sum_optional(values: Iterable[int | float | None]) -> int:
         if isinstance(value, int | float):
             total += int(value)
     return total
-
-
-def _min_optional(values: Iterable[int | float | None]) -> float | None:
-    valid_values = tuple(
-        float(value)
-        for value in values
-        if isinstance(value, int | float) and not isinstance(value, bool)
-    )
-    if not valid_values:
-        return None
-    return min(valid_values)
 
 
 def _mean(values: tuple[int | float, ...]) -> float | None:

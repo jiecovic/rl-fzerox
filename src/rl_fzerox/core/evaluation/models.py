@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/models.py
-"""Immutable evaluation specs and result records."""
+"""Immutable evaluation specs, targets, runtime settings, and results.
+
+These dataclasses are the durable contract between manager records, execution,
+reporting artifacts, and frontend payloads. Their validation is intentionally
+limited to stable shape invariants; runtime semantics live in the owning runner.
+"""
 
 from __future__ import annotations
 

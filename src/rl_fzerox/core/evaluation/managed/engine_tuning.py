@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/managed/engine_tuning.py
-"""Evaluation-time engine-tuning reset configuration."""
+"""Configure engine-tuning choices for evaluation environments.
+
+Evaluation never updates tuner state. When a source policy has tuner artifacts,
+the env gets a greedy checkpoint-backed sampler so attempts run with the
+selected bucket instead of continuing exploratory training sampling.
+"""
 
 from __future__ import annotations
 

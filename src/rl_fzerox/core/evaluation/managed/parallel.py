@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/managed/parallel.py
-"""Process-parallel execution for manager-owned evaluations."""
+"""Process-parallel execution for manager-owned evaluations.
+
+This module owns worker-process setup, attempt scheduling, cancellation checks,
+and worker cleanup. It deliberately reuses the same attempt jobs and result
+publisher as the single-worker runner so lifecycle output stays consistent.
+"""
 
 from __future__ import annotations
 

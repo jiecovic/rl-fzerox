@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/__init__.py
-"""Evaluation result contract, aggregate metrics, and local artifact writing."""
+"""Public evaluation contracts and stable convenience exports.
+
+Most implementation lives under ``execution/``, ``managed/``, and
+``reporting/``. This facade keeps callers on the common result/spec API without
+requiring them to know the internal package layout.
+"""
 
 from rl_fzerox.core.evaluation.execution import (
     EvaluationAttemptJob,

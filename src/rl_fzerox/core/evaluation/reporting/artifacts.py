@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/reporting/artifacts.py
-"""Local JSON and Markdown artifacts for evaluation results."""
+"""Write local JSON and Markdown summaries for evaluation results.
+
+The JSON payload preserves the dataclass result plus aggregate metrics. The
+Markdown summary is intentionally compact: enough for quick inspection without
+becoming the source of truth for evaluation state.
+"""
 
 from __future__ import annotations
 

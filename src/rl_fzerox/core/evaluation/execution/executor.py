@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/execution/executor.py
-"""Concrete single-course evaluation executor for the training environment."""
+"""Drive one concrete F-Zero X course attempt.
+
+This file contains the low-level loop that locks the next reset target, asks a
+loaded policy runner for actions, steps the env, and converts terminal env info
+into an evaluation course result.
+"""
 
 from __future__ import annotations
 

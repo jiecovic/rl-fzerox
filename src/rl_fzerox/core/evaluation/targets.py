@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/targets.py
-"""Expand frozen evaluation specs into concrete runtime targets."""
+"""Expand frozen evaluation target specs into concrete track entries.
+
+Evaluation presets describe filters such as mode, course, cup, difficulty, and
+vehicle. This module resolves those filters against the materialized
+track-sampling config and returns only normal baseline entries.
+"""
 
 from __future__ import annotations
 

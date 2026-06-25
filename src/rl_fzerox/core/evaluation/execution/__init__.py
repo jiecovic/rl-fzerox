@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/execution/__init__.py
-"""Evaluation attempt execution, result publication, and env controls."""
+"""Course-attempt execution primitives.
+
+The execution package owns deterministic attempt planning, single-course
+runner orchestration, concrete env/policy driving, and shared result publishing.
+Manager-specific setup stays in ``evaluation.managed``.
+"""
 
 from rl_fzerox.core.evaluation.execution.executor import FZeroXSingleCourseEpisodeExecutor
 from rl_fzerox.core.evaluation.execution.runner import (

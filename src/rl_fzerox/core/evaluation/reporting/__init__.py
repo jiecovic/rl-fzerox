@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/reporting/__init__.py
-"""Evaluation metric aggregation and local report artifacts."""
+"""Evaluation reporting facade.
+
+This package turns immutable evaluation results into aggregate metric groups and
+writes the JSON/Markdown artifact mirror consumed by the run manager UI and
+local debugging workflows.
+"""
 
 from rl_fzerox.core.evaluation.reporting.artifacts import (
     EvaluationArtifactPaths,

@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/evaluation/execution/runner.py
-"""Evaluation orchestration for deterministic course-attempt suites."""
+"""Deterministic evaluation attempt planning and single-worker orchestration.
+
+The runner materializes target order and seeds before execution starts, delegates
+the actual env/policy loop to ``SingleCourseEpisodeExecutor``, and publishes
+partial/final result snapshots through the shared publisher.
+"""
 
 from __future__ import annotations
 
