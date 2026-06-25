@@ -81,6 +81,18 @@ class _CourseRecord:
     course: EvaluationCourseResult
 
 
+@dataclass(frozen=True, slots=True)
+class _GroupSamples:
+    course_results: tuple[EvaluationCourseResult, ...]
+    finished_courses: tuple[EvaluationCourseResult, ...]
+    completion_values: tuple[float, ...]
+    course_times_ms: tuple[int, ...]
+    finished_positions: tuple[int, ...]
+    total_race_times_ms: tuple[int, ...]
+    episode_lengths: tuple[int, ...]
+    episode_returns: tuple[float, ...]
+
+
 def aggregate_evaluation_metrics(result: EvaluationRunResult) -> EvaluationMetrics:
     """Return overall, cup, and course aggregates for an evaluation result."""
 
@@ -161,77 +173,103 @@ def _aggregate_group(
     attempts: tuple[EvaluationAttemptResult, ...],
     course_records: tuple[_CourseRecord, ...],
 ) -> EvaluationMetricGroup:
-    course_results = tuple(record.course for record in course_records)
-    attempt_count = len(attempts) if attempts else len(course_results)
-    success_count = _success_count(attempts, course_results)
-    finish_count = sum(1 for course in course_results if _course_finished(course.status))
-    finished_courses = tuple(course for course in course_results if _course_finished(course.status))
-    completion_values = tuple(
-        value for course in course_results if (value := _completion_value(course)) is not None
-    )
-    course_times = tuple(
-        int(course.race_time_ms)
-        for course in finished_courses
-        if course.race_time_ms is not None and course.race_time_ms > 0
-    )
-    finished_positions = tuple(
-        int(course.position)
-        for course in finished_courses
-        if course.position is not None and course.position > 0
-    )
-    total_race_times = tuple(
-        int(value)
-        for attempt in attempts
-        if (value := _attempt_total_race_time_ms(attempt)) is not None
-    )
-    episode_lengths = _episode_lengths(attempts, course_results)
-    returns = _episode_returns(attempts, course_results)
-    group = EvaluationMetricGroup(
+    samples = _group_samples(attempts=attempts, course_records=course_records)
+    return EvaluationMetricGroup(
         kind=kind,
         key=key,
         label=label,
-        primary=EvaluationPrimaryMetrics(
-            attempt_count=attempt_count,
-            success_count=success_count,
-            success_rate=_ratio(success_count, attempt_count),
-            finish_count=finish_count,
-            finish_rate=_ratio(finish_count, len(course_results)),
-            completion_rate=_mean(completion_values),
-            mean_finish_time_ms=_mean(course_times),
-            best_finish_time_ms=None if not course_times else min(course_times),
-            mean_total_race_time_ms=_mean(total_race_times),
-            best_total_race_time_ms=None if not total_race_times else min(total_race_times),
-            mean_position=_mean(finished_positions),
-            best_position=None if not finished_positions else min(finished_positions),
-            worst_position=None if not finished_positions else max(finished_positions),
-            total_env_steps=_total_env_steps(attempts, course_results),
-            mean_episode_length_steps=_mean(episode_lengths),
+        primary=_primary_metrics(attempts=attempts, samples=samples),
+        detail=_detail_metrics(samples),
+    )
+
+
+def _group_samples(
+    *,
+    attempts: tuple[EvaluationAttemptResult, ...],
+    course_records: tuple[_CourseRecord, ...],
+) -> _GroupSamples:
+    course_results = tuple(record.course for record in course_records)
+    finished_courses = tuple(course for course in course_results if _course_finished(course.status))
+    return _GroupSamples(
+        course_results=course_results,
+        finished_courses=finished_courses,
+        completion_values=tuple(
+            value for course in course_results if (value := _completion_value(course)) is not None
         ),
-        detail=EvaluationDetailMetrics(
-            mean_episode_return=_mean(returns),
-            best_episode_return=None if not returns else max(returns),
-            total_episode_return=None if not returns else sum(returns),
-            boost_active_count=_sum_optional(
-                course.boost_active_count for course in course_results
-            ),
-            boost_active_frames=_sum_optional(
-                course.boost_active_frames for course in course_results
-            ),
-            boost_pad_entries=_sum_optional(course.boost_pad_entries for course in course_results),
-            damage_event_count=_sum_optional(
-                course.damage_event_count for course in course_results
-            ),
-            minimum_height=_min_optional(course.minimum_height for course in course_results),
-            average_speed=_mean(
-                tuple(
-                    float(course.average_speed)
-                    for course in course_results
-                    if course.average_speed is not None
-                )
-            ),
+        course_times_ms=tuple(
+            int(course.race_time_ms)
+            for course in finished_courses
+            if course.race_time_ms is not None and course.race_time_ms > 0
+        ),
+        finished_positions=tuple(
+            int(course.position)
+            for course in finished_courses
+            if course.position is not None and course.position > 0
+        ),
+        total_race_times_ms=tuple(
+            int(value)
+            for attempt in attempts
+            if (value := _attempt_total_race_time_ms(attempt)) is not None
+        ),
+        episode_lengths=_episode_lengths(attempts, course_results),
+        episode_returns=_episode_returns(attempts, course_results),
+    )
+
+
+def _primary_metrics(
+    *,
+    attempts: tuple[EvaluationAttemptResult, ...],
+    samples: _GroupSamples,
+) -> EvaluationPrimaryMetrics:
+    attempt_count = len(attempts) if attempts else len(samples.course_results)
+    success_count = _success_count(attempts, samples.course_results)
+    finish_count = len(samples.finished_courses)
+    return EvaluationPrimaryMetrics(
+        attempt_count=attempt_count,
+        success_count=success_count,
+        success_rate=_ratio(success_count, attempt_count),
+        finish_count=finish_count,
+        finish_rate=_ratio(finish_count, len(samples.course_results)),
+        completion_rate=_mean(samples.completion_values),
+        mean_finish_time_ms=_mean(samples.course_times_ms),
+        best_finish_time_ms=(
+            None if not samples.course_times_ms else min(samples.course_times_ms)
+        ),
+        mean_total_race_time_ms=_mean(samples.total_race_times_ms),
+        best_total_race_time_ms=(
+            None if not samples.total_race_times_ms else min(samples.total_race_times_ms)
+        ),
+        mean_position=_mean(samples.finished_positions),
+        best_position=None if not samples.finished_positions else min(samples.finished_positions),
+        worst_position=None if not samples.finished_positions else max(samples.finished_positions),
+        total_env_steps=_total_env_steps(attempts, samples.course_results),
+        mean_episode_length_steps=_mean(samples.episode_lengths),
+    )
+
+
+def _detail_metrics(samples: _GroupSamples) -> EvaluationDetailMetrics:
+    course_results = samples.course_results
+    return EvaluationDetailMetrics(
+        mean_episode_return=_mean(samples.episode_returns),
+        best_episode_return=(
+            None if not samples.episode_returns else max(samples.episode_returns)
+        ),
+        total_episode_return=(
+            None if not samples.episode_returns else sum(samples.episode_returns)
+        ),
+        boost_active_count=_sum_optional(course.boost_active_count for course in course_results),
+        boost_active_frames=_sum_optional(course.boost_active_frames for course in course_results),
+        boost_pad_entries=_sum_optional(course.boost_pad_entries for course in course_results),
+        damage_event_count=_sum_optional(course.damage_event_count for course in course_results),
+        minimum_height=_min_optional(course.minimum_height for course in course_results),
+        average_speed=_mean(
+            tuple(
+                float(course.average_speed)
+                for course in course_results
+                if course.average_speed is not None
+            )
         ),
     )
-    return group
 
 
 def _success_count(
