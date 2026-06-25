@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/policies.py
+"""SB3X policy classes with image-state extractors and auxiliary-state support."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

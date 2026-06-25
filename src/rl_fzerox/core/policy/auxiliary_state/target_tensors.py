@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/target_tensors.py
+"""Target-tensor validation helpers for auxiliary-state loss computation."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

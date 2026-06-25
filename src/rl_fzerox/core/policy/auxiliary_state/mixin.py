@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/mixin.py
+"""Policy mixin that wires auxiliary-state heads and losses into SB3X policies."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

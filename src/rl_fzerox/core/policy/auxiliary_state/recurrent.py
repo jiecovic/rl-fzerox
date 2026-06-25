@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/recurrent.py
+"""Recurrent policy config helpers shared by policy construction."""
+
 from __future__ import annotations
 
 import numpy as np

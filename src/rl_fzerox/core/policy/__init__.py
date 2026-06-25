@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/__init__.py
+"""Lazy public facade for policy extractors and auxiliary-state target helpers."""
+
 from __future__ import annotations
 
 from importlib import import_module

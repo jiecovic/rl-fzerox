@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/activations.py
+"""Activation-name resolution for policy network configuration."""
+
 from __future__ import annotations
 
 from typing import Literal

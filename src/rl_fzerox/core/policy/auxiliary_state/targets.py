@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/targets.py
+"""Central auxiliary-state target definitions and vectorization helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

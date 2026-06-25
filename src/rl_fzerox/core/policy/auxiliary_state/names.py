@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/names.py
+"""Literal target-name types for auxiliary-state prediction config."""
+
 from __future__ import annotations
 
 from typing import Literal

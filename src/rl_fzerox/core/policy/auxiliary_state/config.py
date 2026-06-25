@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/config.py
+"""Parsing helpers for auxiliary-state and actor-regularization config."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

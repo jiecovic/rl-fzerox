@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/observations.py
+"""Observation-dict helpers for hidden auxiliary-state target tensors."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

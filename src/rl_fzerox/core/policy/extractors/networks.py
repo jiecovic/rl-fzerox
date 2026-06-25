@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/extractors/networks.py
+"""CNN and image-state feature extractors for policy observations."""
+
 from __future__ import annotations
 
 from typing import Literal

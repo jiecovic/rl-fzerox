@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/extractors/blocks.py
+"""Residual CNN blocks used by F-Zero X policy feature extractors."""
+
 from __future__ import annotations
 
 import torch

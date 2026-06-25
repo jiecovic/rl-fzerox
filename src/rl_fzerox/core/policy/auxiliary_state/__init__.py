@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/__init__.py
+"""Lazy facade for auxiliary-state target metadata and observation helpers."""
+
 from __future__ import annotations
 
 from importlib import import_module

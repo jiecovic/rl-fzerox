@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/heads.py
+"""Auxiliary-state prediction heads attached to policy latent features."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

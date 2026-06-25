@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/extractors/specs.py
+"""CNN profile definitions, custom layer parsing, and geometry validation."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

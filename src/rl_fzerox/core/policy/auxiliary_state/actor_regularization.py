@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/auxiliary_state/actor_regularization.py
+"""Actor-side auxiliary regularization losses and metrics for policy training."""
+
 from __future__ import annotations
 
 import math

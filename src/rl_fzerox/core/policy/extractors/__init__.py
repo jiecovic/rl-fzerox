@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/policy/extractors/__init__.py
+"""Public facade for policy CNN extractors, blocks, and convolution specs."""
+
 from __future__ import annotations
 
 from importlib import import_module
