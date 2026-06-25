@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/artifacts.py
+# src/rl_fzerox/core/evaluation/reporting/artifacts.py
 """Local JSON and Markdown artifacts for evaluation results."""
 
 from __future__ import annotations
@@ -8,12 +8,12 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from rl_fzerox.core.evaluation.metrics import (
+from rl_fzerox.core.evaluation.models import EvaluationAttemptResult, EvaluationRunResult
+from rl_fzerox.core.evaluation.reporting.metrics import (
     EvaluationMetricGroup,
     EvaluationMetrics,
     aggregate_evaluation_metrics,
 )
-from rl_fzerox.core.evaluation.models import EvaluationAttemptResult, EvaluationRunResult
 
 
 @dataclass(frozen=True, slots=True)

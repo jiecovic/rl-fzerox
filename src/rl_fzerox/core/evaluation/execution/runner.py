@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/runner.py
+# src/rl_fzerox/core/evaluation/execution/runner.py
 """Evaluation orchestration for deterministic course-attempt suites."""
 
 from __future__ import annotations
@@ -9,6 +9,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from rl_fzerox.core.evaluation.execution.publishing import (
+    EvaluationResultPublisher,
+    ProgressCallback,
+)
 from rl_fzerox.core.evaluation.models import (
     AttemptStatus,
     CourseResultStatus,
@@ -20,7 +24,6 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationRuntimeSpec,
     EvaluationSpec,
 )
-from rl_fzerox.core.evaluation.publishing import EvaluationResultPublisher, ProgressCallback
 from rl_fzerox.core.seed import derive_seed
 
 type CancelCheck = Callable[[], bool]

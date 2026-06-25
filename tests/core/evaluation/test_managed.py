@@ -7,8 +7,10 @@ from typing import Literal
 import pytest
 
 from rl_fzerox.core.engine_tuning import EngineTuningResetSampler
-from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
-from rl_fzerox.core.evaluation.managed import (
+from rl_fzerox.core.evaluation.managed.engine_tuning import (
+    configure_evaluation_engine_tuning,
+)
+from rl_fzerox.core.evaluation.managed.runner import (
     EvaluationBaselineSuite,
     _evaluation_baseline_suite,
     _materialize_baseline_suite,
@@ -109,7 +111,7 @@ def test_baseline_suite_uses_projected_config_instead_of_existing_manifest(
         return rematerialized_config
 
     monkeypatch.setattr(
-        "rl_fzerox.core.evaluation.managed.materialize_train_run_config",
+        "rl_fzerox.core.evaluation.managed.runner.materialize_train_run_config",
         fake_materialize_train_run_config,
     )
 
@@ -131,7 +133,7 @@ def test_evaluation_engine_tuning_uses_greedy_checkpoint_sampler(
 ) -> None:
     loaded_paths: list[Path] = []
     monkeypatch.setattr(
-        "rl_fzerox.core.evaluation.engine_tuning.load_engine_tuning_checkpoint_state",
+        "rl_fzerox.core.evaluation.managed.engine_tuning.load_engine_tuning_checkpoint_state",
         lambda path: loaded_paths.append(path) or None,
     )
     config = build_managed_train_app_config(

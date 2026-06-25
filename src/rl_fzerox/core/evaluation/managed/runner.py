@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/managed.py
+# src/rl_fzerox/core/evaluation/managed/runner.py
 """Run manager-owned evaluation records through the course evaluator."""
 
 from __future__ import annotations
@@ -9,17 +9,19 @@ from math import ceil
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
-from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
-from rl_fzerox.core.evaluation.managed_parallel import run_parallel_managed_evaluation
+from rl_fzerox.core.evaluation.execution.executor import FZeroXSingleCourseEpisodeExecutor
+from rl_fzerox.core.evaluation.execution.runner import (
+    build_evaluation_attempt_plan,
+    run_course_evaluation,
+)
+from rl_fzerox.core.evaluation.managed.engine_tuning import (
+    configure_evaluation_engine_tuning,
+)
+from rl_fzerox.core.evaluation.managed.parallel import run_parallel_managed_evaluation
 from rl_fzerox.core.evaluation.models import (
     EvaluationRunResult,
     EvaluationRuntimeSpec,
     EvaluationSpec,
-)
-from rl_fzerox.core.evaluation.runner import (
-    build_evaluation_attempt_plan,
-    run_course_evaluation,
 )
 from rl_fzerox.core.evaluation.targets import single_course_targets_from_config
 from rl_fzerox.core.manager.models import ManagedEvaluation

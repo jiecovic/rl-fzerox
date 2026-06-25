@@ -1,17 +1,13 @@
 # src/rl_fzerox/core/evaluation/__init__.py
 """Evaluation result contract, aggregate metrics, and local artifact writing."""
 
-from rl_fzerox.core.evaluation.artifacts import (
-    EvaluationArtifactPaths,
-    write_evaluation_result_files,
-)
-from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
-from rl_fzerox.core.evaluation.metrics import (
-    EvaluationDetailMetrics,
-    EvaluationMetricGroup,
-    EvaluationMetrics,
-    EvaluationPrimaryMetrics,
-    aggregate_evaluation_metrics,
+from rl_fzerox.core.evaluation.execution import (
+    EvaluationAttemptJob,
+    EvaluationAttemptPlan,
+    FZeroXSingleCourseEpisodeExecutor,
+    SingleCourseEpisodeExecutor,
+    build_evaluation_attempt_plan,
+    run_course_evaluation,
 )
 from rl_fzerox.core.evaluation.models import (
     AttemptStatus,
@@ -30,12 +26,14 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationSpec,
     EvaluationTargetSpec,
 )
-from rl_fzerox.core.evaluation.runner import (
-    EvaluationAttemptJob,
-    EvaluationAttemptPlan,
-    SingleCourseEpisodeExecutor,
-    build_evaluation_attempt_plan,
-    run_course_evaluation,
+from rl_fzerox.core.evaluation.reporting import (
+    EvaluationArtifactPaths,
+    EvaluationDetailMetrics,
+    EvaluationMetricGroup,
+    EvaluationMetrics,
+    EvaluationPrimaryMetrics,
+    aggregate_evaluation_metrics,
+    write_evaluation_result_files,
 )
 from rl_fzerox.core.evaluation.snapshots import (
     EvaluationCheckpointSource,

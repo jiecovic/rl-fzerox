@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/executor.py
+# src/rl_fzerox/core/evaluation/execution/executor.py
 """Concrete single-course evaluation executor for the training environment."""
 
 from __future__ import annotations
@@ -9,10 +9,10 @@ from typing import Protocol
 from fzerox_emulator.arrays import ActionMask
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.evaluation.env_control import (
+from rl_fzerox.core.evaluation.execution.env_control import (
     action_masks as env_action_masks,
 )
-from rl_fzerox.core.evaluation.env_control import (
+from rl_fzerox.core.evaluation.execution.env_control import (
     set_locked_reset_course,
 )
 from rl_fzerox.core.evaluation.models import (

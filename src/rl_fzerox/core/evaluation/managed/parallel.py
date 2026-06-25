@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/managed_parallel.py
+# src/rl_fzerox/core/evaluation/managed/parallel.py
 """Process-parallel execution for manager-owned evaluations."""
 
 from __future__ import annotations
@@ -13,24 +13,26 @@ from datetime import UTC, datetime
 from multiprocessing.context import BaseContext
 from pathlib import Path
 
-from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
-from rl_fzerox.core.evaluation.executor import FZeroXSingleCourseEpisodeExecutor
+from rl_fzerox.core.evaluation.execution.executor import FZeroXSingleCourseEpisodeExecutor
+from rl_fzerox.core.evaluation.execution.publishing import (
+    EvaluationResultPublisher,
+    attempts_in_index_order,
+)
+from rl_fzerox.core.evaluation.execution.runner import (
+    EvaluationAttemptJob,
+    EvaluationAttemptPlan,
+    evaluation_attempt_from_course_result,
+    evaluation_course_result_for_target,
+)
+from rl_fzerox.core.evaluation.managed.engine_tuning import (
+    configure_evaluation_engine_tuning,
+)
 from rl_fzerox.core.evaluation.models import (
     EvaluationAttemptResult,
     EvaluationCheckpointSnapshot,
     EvaluationPolicyMode,
     EvaluationRunResult,
     EvaluationRuntimeSpec,
-)
-from rl_fzerox.core.evaluation.publishing import (
-    EvaluationResultPublisher,
-    attempts_in_index_order,
-)
-from rl_fzerox.core.evaluation.runner import (
-    EvaluationAttemptJob,
-    EvaluationAttemptPlan,
-    evaluation_attempt_from_course_result,
-    evaluation_course_result_for_target,
 )
 from rl_fzerox.core.manager.models import ManagedEvaluation
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig

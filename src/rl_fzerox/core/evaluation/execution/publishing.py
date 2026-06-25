@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/publishing.py
+# src/rl_fzerox/core/evaluation/execution/publishing.py
 """Shared publication of evaluation progress and final results.
 
 Evaluation runners own execution, cancellation, and worker scheduling. This
@@ -13,7 +13,6 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from rl_fzerox.core.evaluation.artifacts import write_evaluation_result_files
 from rl_fzerox.core.evaluation.models import (
     EvaluationAttemptResult,
     EvaluationRunResult,
@@ -21,6 +20,7 @@ from rl_fzerox.core.evaluation.models import (
     EvaluationRuntimeSpec,
     EvaluationSpec,
 )
+from rl_fzerox.core.evaluation.reporting.artifacts import write_evaluation_result_files
 
 type ProgressCallback = Callable[[EvaluationRunResult], None]
 

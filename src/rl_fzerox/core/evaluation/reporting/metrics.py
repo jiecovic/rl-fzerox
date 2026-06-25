@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/metrics.py
+# src/rl_fzerox/core/evaluation/reporting/metrics.py
 """Aggregate evaluation results into primary and diagnostic metrics."""
 
 from __future__ import annotations

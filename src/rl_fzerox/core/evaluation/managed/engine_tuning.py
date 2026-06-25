@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/evaluation/engine_tuning.py
+# src/rl_fzerox/core/evaluation/managed/engine_tuning.py
 """Evaluation-time engine-tuning reset configuration."""
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from pathlib import Path
 
 from rl_fzerox.core.engine_tuning.contexts import engine_tuning_contexts_for_track_sampling
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
-from rl_fzerox.core.evaluation.env_control import (
+from rl_fzerox.core.evaluation.execution.env_control import (
     set_engine_tuning_sampler,
     set_engine_tuning_selection,
 )

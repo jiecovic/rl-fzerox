@@ -8,12 +8,12 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from rl_fzerox.core.evaluation.managed_parallel import _run_parallel_attempt_schedule
+from rl_fzerox.core.evaluation.execution.runner import EvaluationAttemptJob
+from rl_fzerox.core.evaluation.managed.parallel import _run_parallel_attempt_schedule
 from rl_fzerox.core.evaluation.models import (
     EvaluationAttemptResult,
     EvaluationCourseTarget,
 )
-from rl_fzerox.core.evaluation.runner import EvaluationAttemptJob
 
 
 def test_parallel_attempt_schedule_preserves_results_by_attempt_index() -> None:
