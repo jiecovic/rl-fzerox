@@ -486,7 +486,7 @@ class RewardMainTracker:
             breakdown["step_reward_clip"] = reward - raw_reward
 
         self._energy.advance_cooldown(summary.frames_run)
-        self._energy.finish_step(telemetry)
+        self._energy.finish_step()
         self._previous_airborne = telemetry.player.airborne
         self._landing_airborne_frames = (
             step_state.landing_airborne_frames if telemetry.player.airborne else 0

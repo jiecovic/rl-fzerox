@@ -16,8 +16,7 @@ class EnergyRefillRewardTracker:
     def cooldown_frames_remaining(self) -> int:
         return self._cooldown_frames_remaining
 
-    def reset(self, telemetry: FZeroXTelemetry | None) -> None:
-        del telemetry
+    def reset(self, _telemetry: FZeroXTelemetry | None) -> None:
         self._cooldown_frames_remaining = 0
 
     def reset_inactive(self) -> None:
@@ -94,8 +93,12 @@ class EnergyRefillRewardTracker:
             0,
         )
 
-    def finish_step(self, telemetry: FZeroXTelemetry) -> None:
-        del telemetry
+    def finish_step(self) -> None:
+        """Complete one reward step.
+
+        The hook exists beside the stateful reward trackers that do have
+        per-step finalization; energy refill currently only advances cooldown.
+        """
 
     def info(self) -> dict[str, object]:
         return {
