@@ -5,11 +5,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fzerox_emulator import ControllerState, RaceControlState, SpinRequest
+from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.envs.actions import (
     ActionValue,
     DecodedAction,
-    ResettableActionAdapter,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.engine.components import build_engine_runtime_components
@@ -18,14 +17,15 @@ from rl_fzerox.core.envs.engine.controls import (
     ActionMaskSnapshot,
     apply_control_semantics,
     apply_spin_semantics,
-    sync_dynamic_action_masks,
 )
-from rl_fzerox.core.envs.engine.controls.episode_dropout import sample_episode_action_masks
-from rl_fzerox.core.envs.engine.info import backend_step_info, telemetry_info
+from rl_fzerox.core.envs.engine.info import backend_step_info
 from rl_fzerox.core.envs.engine.reset import EngineResetSeeds
+from rl_fzerox.core.envs.engine.reset.episode_start import (
+    EpisodeStartSeeds,
+    begin_engine_episode_observation,
+)
 from rl_fzerox.core.envs.engine.stepping import (
     EnvStepRequest,
-    set_episode_boost_pad_info,
 )
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.policy_drive.frame import (
@@ -56,12 +56,9 @@ class PolicyDriveRuntime:
             config=self._config,
             reward_config=train_config.reward,
         )
-        self._renderer = components.renderer
+        self._components = components
         self._action_config = components.action_config
         self._action_adapter = components.action_adapter
-        self._observation_builder = components.observation_builder
-        self._reward_tracker = components.reward_tracker
-        self._reward_summary_config = self._reward_tracker.summary_config()
         self._mask_controller = components.mask_controller
         self._control_state = components.control_state
         self._step_assembler = components.step_assembler
@@ -85,76 +82,21 @@ class PolicyDriveRuntime:
         self._reset_seeds.remember_reset_seed(seed)
         self._episode.begin_reset(active_track=None)
         self._episode.uses_custom_baseline = False
-        self._backend.set_controller_state(ControllerState())
-        self._control_state.reset()
-        episode_action_masks = sample_episode_action_masks(
-            lean_probability=self._action_config.lean_episode_mask_probability,
-            air_brake_probability=self._action_config.air_brake_episode_mask_probability,
-            spin_probability=self._action_config.spin_episode_mask_probability,
-            seed=self._reset_seeds.action_episode_mask_seed(seed),
-            available_branches={
-                dimension.label for dimension in self._action_adapter.action_dimensions
-            },
-        )
-        self._episode.lean_episode_masked = episode_action_masks.lean
-        self._episode.air_brake_episode_masked = episode_action_masks.air_brake
-        self._episode.spin_episode_masked = episode_action_masks.spin
-        self._mask_controller.set_lean_episode_masked(self._episode.lean_episode_masked)
-        self._mask_controller.set_air_brake_episode_masked(self._episode.air_brake_episode_masked)
-        self._mask_controller.set_spin_episode_masked(self._episode.spin_episode_masked)
-        self._mask_controller.set_lean_allowed_values(
-            self._control_state.lean_action_mask_override()
-        )
-        self._mask_controller.set_air_brake_allowed_values(
-            self._control_state.air_brake_action_mask_override()
-        )
-        self._mask_controller.set_spin_allowed_values(None)
         telemetry = self._backend.try_read_telemetry()
-        sync_dynamic_action_masks(
-            mask_controller=self._mask_controller,
-            control_state=self._control_state,
+        info = backend_step_info(self._backend)
+        observation, info = begin_engine_episode_observation(
+            backend=self._backend,
+            config=self._config,
+            components=self._components,
+            seed=seed,
+            seeds=EpisodeStartSeeds(
+                action_episode_mask=self._reset_seeds.action_episode_mask_seed(seed),
+                reward_episode=self._reset_seeds.reward_episode_seed(seed),
+            ),
             telemetry=telemetry,
-            boost_min_energy_fraction=self._config.boost_min_energy_fraction,
-            mask_boost_when_active=self._action_config.mask_boost_when_active,
-            mask_boost_when_airborne=self._action_config.mask_boost_when_airborne,
-        )
-        self._episode.last_telemetry = telemetry
-        self._reward_tracker.reset(
-            telemetry,
-            episode_seed=self._reset_seeds.reward_episode_seed(seed),
+            info=info,
             course_id=course_id,
         )
-        self._reward_summary_config = self._reward_tracker.summary_config()
-        self._step_assembler.reward_summary_config = self._reward_summary_config
-        if isinstance(self._action_adapter, ResettableActionAdapter):
-            self._action_adapter.reset()
-
-        info = backend_step_info(self._backend)
-        info["seed"] = seed
-        if telemetry is not None:
-            info.update(telemetry_info(telemetry))
-        info.update(self._reward_tracker.info(telemetry))
-        set_episode_boost_pad_info(
-            info,
-            episode_boost_pad_entries=self._episode.boost_pad_entries,
-        )
-        info["episode_step"] = self._episode.frame_count
-        info["episode_return"] = self._episode.return_value
-        info["episode_airborne_frames"] = self._episode.airborne_frames
-        info["lean_episode_masked"] = self._episode.lean_episode_masked
-        info["air_brake_episode_masked"] = self._episode.air_brake_episode_masked
-        info["spin_episode_masked"] = self._episode.spin_episode_masked
-        image_observation = self._observation_builder.render_image()
-        observation = self._observation_builder.build_observation(
-            image=image_observation,
-            telemetry=telemetry,
-            control_state=self._control_state,
-        )
-        self._observation_builder.set_info(
-            info,
-            image_shape=tuple(int(value) for value in image_observation.shape),
-        )
-        self._episode.last_info = dict(info)
         self._reset_seeds.advance_reset_count()
         return observation, info
 
