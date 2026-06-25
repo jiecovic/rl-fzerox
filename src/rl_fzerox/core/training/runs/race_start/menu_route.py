@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/race_start/menu_route.py
+"""Static menu route definitions used by race-start materialization."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

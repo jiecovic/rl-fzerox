@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/artifacts.py
+"""Checkpoint and policy artifact path resolution for train run directories."""
+
 from __future__ import annotations
 
 from pathlib import Path

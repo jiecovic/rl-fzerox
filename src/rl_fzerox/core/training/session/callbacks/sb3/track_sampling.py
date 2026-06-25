@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3/track_sampling.py
+"""SB3 callbacks that publish dynamic track-sampling runtime state."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence

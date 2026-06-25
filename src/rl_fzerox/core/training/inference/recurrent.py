@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/recurrent.py
+"""Recurrent policy state helpers for step-by-step inference."""
+
 from __future__ import annotations
 
 import numpy as np

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/reload.py
+"""Hot-reload helpers for long-running policy inference sessions."""
+
 from __future__ import annotations
 
 import time

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3/engine_tuning.py
+"""SB3 callback bridge for online engine-tuning episode updates."""
+
 from __future__ import annotations
 
 from stable_baselines3.common.callbacks import BaseCallback

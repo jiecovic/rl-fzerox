@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/models.py
+"""Data contracts for baseline materialization requests and artifacts."""
+
 from __future__ import annotations
 
 from collections.abc import Callable

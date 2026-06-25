@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/builders.py
+"""SB3/sb3x model builder functions for configured training runs."""
+
 from __future__ import annotations
 
 from typing import Any

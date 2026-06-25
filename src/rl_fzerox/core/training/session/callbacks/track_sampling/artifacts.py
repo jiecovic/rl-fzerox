@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/artifacts.py
+"""Materialized baseline artifact snapshots derived from track-sampling config."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable

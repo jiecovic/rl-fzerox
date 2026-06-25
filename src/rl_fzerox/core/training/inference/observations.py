@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/observations.py
+"""Observation preparation for policy inference outside the training env."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

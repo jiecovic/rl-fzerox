@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/alt_baselines.py
+"""Projection of manager-owned alternate baselines into runtime sampling entries."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

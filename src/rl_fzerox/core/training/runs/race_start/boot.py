@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/race_start/boot.py
+"""Boot and menu-driving routines that create race-start save states."""
+
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend

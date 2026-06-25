@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/race_start/__init__.py
+"""Facade for race-start save-state materialization helpers."""
+
 from rl_fzerox.core.training.runs.race_start.boot import (
     materialize_generic_mode_seed,
     materialize_gp_race_menu_seed,

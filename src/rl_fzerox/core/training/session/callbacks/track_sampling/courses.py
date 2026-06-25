@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/courses.py
+"""Course grouping and metadata resolution for track-sampling runtime entries."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

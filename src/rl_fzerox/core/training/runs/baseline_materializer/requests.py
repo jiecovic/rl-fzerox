@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/requests.py
+"""Translate runtime track entries into concrete baseline materialization requests."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.domain.race import RaceDifficultyName, default_gp_difficulty

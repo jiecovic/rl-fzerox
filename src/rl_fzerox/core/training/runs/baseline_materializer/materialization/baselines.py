@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/materialization/baselines.py
+"""Create or reuse run-local baseline artifacts from cache materialization."""
+
 from __future__ import annotations
 
 from collections.abc import Callable

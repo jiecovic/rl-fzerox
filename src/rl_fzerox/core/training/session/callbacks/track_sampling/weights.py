@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/weights.py
+"""Weight and frame-debt calculations for step-balanced sampling."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/preload.py
+"""Model resume and checkpoint preload logic for training sessions."""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/algorithms.py
+"""Training algorithm resolution and action-mask capability checks."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

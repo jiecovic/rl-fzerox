@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3/env_adapter.py
+"""Narrow adapter around SB3 vector-env methods used by callbacks."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

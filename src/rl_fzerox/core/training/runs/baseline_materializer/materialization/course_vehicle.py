@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/materialization/course_vehicle.py
+"""Emulator-backed race-start materialization for course/vehicle baselines."""
+
 from __future__ import annotations
 
 import json

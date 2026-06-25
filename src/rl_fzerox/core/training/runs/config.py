@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/config.py
+"""Train-run config materialization and manifest mirror synchronization."""
+
 from __future__ import annotations
 
 import shutil

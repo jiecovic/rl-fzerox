@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/startup.py
+"""TensorBoard logger setup and human-readable training startup summaries."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable

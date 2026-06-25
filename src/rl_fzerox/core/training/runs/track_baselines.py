@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/track_baselines.py
+"""Validation helpers for run-local track baseline state paths."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.runtime_spec.schema import (

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/loader.py
+"""Policy/model checkpoint loading and typed inference runner creation."""
+
 from __future__ import annotations
 
 import inspect

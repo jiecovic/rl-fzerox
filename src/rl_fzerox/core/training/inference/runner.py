@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/runner.py
+"""Runtime wrapper that drives a loaded policy against prepared observations."""
+
 from __future__ import annotations
 
 from pathlib import Path

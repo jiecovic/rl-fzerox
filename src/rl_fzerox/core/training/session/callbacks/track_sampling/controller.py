@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/controller.py
+"""Step-balanced track-sampling controller and runtime-state restoration."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

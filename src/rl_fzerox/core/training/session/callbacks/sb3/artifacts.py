@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3/artifacts.py
+"""SB3 callbacks that persist latest/best policy artifacts."""
+
 from __future__ import annotations
 
 from stable_baselines3.common.callbacks import BaseCallback

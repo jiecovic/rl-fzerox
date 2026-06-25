@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/state.py
+"""Dataclasses and aggregation helpers for track-sampling runtime state."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

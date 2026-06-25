@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/settings.py
+"""Static baseline materializer paths, schema ids, and generic-mode defaults."""
+
 from __future__ import annotations
 
 import re

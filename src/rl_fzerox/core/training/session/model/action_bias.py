@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/action_bias.py
+"""Policy-head bias initialization derived from configured action priors."""
+
 from __future__ import annotations
 
 import json

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/deficit/controller.py
+"""Deficit-budget track-sampling controller and queue assignment policy."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

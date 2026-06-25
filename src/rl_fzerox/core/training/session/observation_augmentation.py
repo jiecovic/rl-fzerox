@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/observation_augmentation.py
+"""Image observation augmentation wrappers used during policy training."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/persistence.py
+"""JSON/file persistence for dynamic track-sampling runtime state."""
+
 from __future__ import annotations
 
 import json

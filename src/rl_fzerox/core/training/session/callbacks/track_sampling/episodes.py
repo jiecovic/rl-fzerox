@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/episodes.py
+"""Episode-info extraction helpers for track-sampling callbacks."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

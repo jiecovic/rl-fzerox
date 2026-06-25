@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/projection.py
+"""Projection helpers that write materialized baseline metadata onto configs."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.training.runs.baseline_materializer.models import (

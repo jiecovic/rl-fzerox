@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/validation.py
+"""Preflight validation for configured training algorithm combinations."""
+
 from __future__ import annotations
 
 from gymnasium import spaces

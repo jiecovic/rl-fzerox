@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/activations.py
+"""CNN activation capture helpers for loaded policy inference."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

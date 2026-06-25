@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/metadata.py
+"""Checkpoint metadata projection used by inference and watch tools."""
+
 from __future__ import annotations
 
 from pathlib import Path

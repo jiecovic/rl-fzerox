@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/cache.py
+"""Filesystem cache primitives for expensive baseline save-state generation."""
+
 from __future__ import annotations
 
 import hashlib

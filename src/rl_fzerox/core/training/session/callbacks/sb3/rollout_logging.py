@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3/rollout_logging.py
+"""SB3 rollout-end logging callback for rollout info accumulators."""
+
 from __future__ import annotations
 
 from stable_baselines3.common.callbacks import BaseCallback

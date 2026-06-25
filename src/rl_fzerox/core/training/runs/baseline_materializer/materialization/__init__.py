@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/materialization/__init__.py
+"""Facade for baseline materialization implementation entrypoints."""
+
 from rl_fzerox.core.training.runs.baseline_materializer.materialization.apply import (
     materialize_run_baselines_impl,
 )

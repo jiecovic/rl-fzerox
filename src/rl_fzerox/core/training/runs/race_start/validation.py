@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/race_start/validation.py
+"""Input validation for race-start menu materialization requests."""
+
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend

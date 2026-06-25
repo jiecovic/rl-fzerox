@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/race_start/exact.py
+"""Exact race-start capture loop for already selected course and vehicle setups."""
+
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/__init__.py
+"""Training model construction, resume, validation, and startup facade."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.policy.activations import resolve_policy_activation_fn

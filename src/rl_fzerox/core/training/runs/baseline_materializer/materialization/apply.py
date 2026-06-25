@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/materialization/apply.py
+"""Apply baseline materialization to complete train and watch configs."""
+
 from __future__ import annotations
 
 import hashlib

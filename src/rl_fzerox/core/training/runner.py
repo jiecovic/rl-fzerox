@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runner.py
+"""Top-level orchestration for one resolved SB3/sb3x training process."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence

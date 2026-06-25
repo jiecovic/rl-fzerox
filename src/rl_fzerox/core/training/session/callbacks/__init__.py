@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/__init__.py
+"""Public facade for training callback assembly and rollout info helpers."""
+
 from __future__ import annotations
 
 from .metrics import RolloutInfoAccumulator, info_sequence

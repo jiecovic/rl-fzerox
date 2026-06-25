@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/race_start/boundary.py
+"""Tiny protocol boundary for emulator state save operations."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.domain.race import race_difficulty_raw_value

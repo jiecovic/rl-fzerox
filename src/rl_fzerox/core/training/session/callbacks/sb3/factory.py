@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3/factory.py
+"""Callback assembly for SB3/sb3x training sessions."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

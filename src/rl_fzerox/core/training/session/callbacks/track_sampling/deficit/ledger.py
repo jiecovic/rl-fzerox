@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling/deficit/ledger.py
+"""Mutable deficit accounting used by the deficit-budget course sampler."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

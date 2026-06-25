@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/model/policy.py
+"""Policy keyword assembly for PPO model construction."""
+
 from __future__ import annotations
 
 from stable_baselines3.common.vec_env import VecEnv

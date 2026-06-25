@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/auxiliary_state.py
+"""Auxiliary state-prediction wiring for training policy configuration."""
+
 from __future__ import annotations
 
 import gymnasium as gym

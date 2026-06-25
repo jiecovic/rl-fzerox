@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/inference/types.py
+"""Typed containers shared by inference loading and execution."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

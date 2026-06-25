@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/race_start/models.py
+"""Race-start materialization request and mode types."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

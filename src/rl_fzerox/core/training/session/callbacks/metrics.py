@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/metrics.py
+"""Rollout info accumulation and scalar metric logging callbacks."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/env.py
+"""Training environment construction and Gym vector-env wrappers."""
+
 from __future__ import annotations
 
 import multiprocessing as mp

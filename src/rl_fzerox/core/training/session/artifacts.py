@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/artifacts.py
+"""Training artifact save/load, cleanup, and resolved config validation."""
+
 from __future__ import annotations
 
 import json

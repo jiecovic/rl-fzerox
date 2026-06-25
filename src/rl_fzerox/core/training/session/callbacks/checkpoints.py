@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/session/callbacks/checkpoints.py
+"""Periodic checkpoint callback construction for training sessions."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
