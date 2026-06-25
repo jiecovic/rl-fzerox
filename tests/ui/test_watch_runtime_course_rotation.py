@@ -7,7 +7,7 @@ keys used for GP difficulty and generated X-Cup slots.
 
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig
 from rl_fzerox.ui.watch.runtime.courses.navigation import WatchCourseRotation
-from rl_fzerox.ui.watch.runtime.live.worker import _sync_next_watch_reset_after_episode
+from rl_fzerox.ui.watch.runtime.live.reset import _sync_next_watch_reset_after_episode
 from tests.ui.watch_runtime_ipc_support import _sample_rotation, _SequentialResetEnv
 
 

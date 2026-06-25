@@ -5,7 +5,7 @@ Timed notices are copied into frame info only while active and must not mutate
 the source info object owned by the runtime loop.
 """
 
-from rl_fzerox.ui.watch.runtime.live.worker import _TimedWatchNotice
+from rl_fzerox.ui.watch.runtime.live.notices import _TimedWatchNotice
 
 
 def test_timed_watch_notice_persists_until_expiry_without_mutating_source() -> None:

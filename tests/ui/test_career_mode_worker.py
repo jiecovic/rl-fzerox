@@ -5,7 +5,9 @@ from pathlib import Path
 
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.ui.watch.runtime.career_mode.attempts import fail_running_attempts
-from rl_fzerox.ui.watch.runtime.career_mode.worker import _should_observe_policy_transition
+from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
+    should_observe_policy_transition,
+)
 
 
 def test_career_worker_marks_running_attempt_failed(tmp_path: Path) -> None:
@@ -38,7 +40,7 @@ def test_career_worker_marks_running_attempt_failed(tmp_path: Path) -> None:
 
 def test_career_worker_waits_for_race_exit_before_policy_start_observation() -> None:
     assert (
-        _should_observe_policy_transition(
+        should_observe_policy_transition(
             policy_owns_control=True,
             active_policy_started=False,
             info={"game_mode": "gp_race"},
@@ -46,7 +48,7 @@ def test_career_worker_waits_for_race_exit_before_policy_start_observation() -> 
         is False
     )
     assert (
-        _should_observe_policy_transition(
+        should_observe_policy_transition(
             policy_owns_control=True,
             active_policy_started=False,
             info={"game_mode": "gp_race", "termination_reason": "finished"},
@@ -54,7 +56,7 @@ def test_career_worker_waits_for_race_exit_before_policy_start_observation() -> 
         is False
     )
     assert (
-        _should_observe_policy_transition(
+        should_observe_policy_transition(
             policy_owns_control=True,
             active_policy_started=False,
             info={"game_mode": "gp_race_next_course", "termination_reason": "crashed"},
@@ -62,7 +64,7 @@ def test_career_worker_waits_for_race_exit_before_policy_start_observation() -> 
         is True
     )
     assert (
-        _should_observe_policy_transition(
+        should_observe_policy_transition(
             policy_owns_control=True,
             active_policy_started=True,
             info={"game_mode": "gp_race"},
@@ -70,7 +72,7 @@ def test_career_worker_waits_for_race_exit_before_policy_start_observation() -> 
         is True
     )
     assert (
-        _should_observe_policy_transition(
+        should_observe_policy_transition(
             policy_owns_control=False,
             active_policy_started=True,
             info={"game_mode": "gp_race_next_course", "termination_reason": "crashed"},

@@ -83,13 +83,6 @@ from rl_fzerox.ui.watch.runtime.timing import RateMeter
 if TYPE_CHECKING:
     from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
 
-__all__ = (
-    "_TimedWatchNotice",
-    "_refresh_paused_cnn_activations",
-    "_sync_next_watch_reset_after_episode",
-    "run_simulation_worker",
-)
-
 
 def run_simulation_worker(
     config: WatchAppConfig,

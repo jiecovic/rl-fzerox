@@ -10,9 +10,6 @@ from rl_fzerox.ui.watch.runtime.career_mode.attempts import (
     fail_running_attempts,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.loop import run_loaded_career_mode_loop
-from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
-    should_observe_policy_transition,
-)
 from rl_fzerox.ui.watch.runtime.career_mode.save_ram import (
     CareerModeSaveBinding,
     career_mode_save_binding_from_config,
@@ -103,16 +100,3 @@ def _mark_runner_failed(config: WatchAppConfig) -> None:
             save_game_id=save_binding.save_game_id,
             failure_reason=RUNNER_CLOSE_REASONS.failed,
         )
-
-
-def _should_observe_policy_transition(
-    *,
-    policy_owns_control: bool,
-    active_policy_started: bool,
-    info: dict[str, object],
-) -> bool:
-    return should_observe_policy_transition(
-        policy_owns_control=policy_owns_control,
-        active_policy_started=active_policy_started,
-        info=info,
-    )
