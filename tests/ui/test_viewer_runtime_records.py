@@ -18,7 +18,7 @@ from rl_fzerox.core.runtime_spec.schema import (
 )
 from rl_fzerox.ui.watch.records import TrackRecordBook, track_record_key
 from rl_fzerox.ui.watch.view.panels.content.records import track_record_sections
-from rl_fzerox.ui.watch.view.screen.render import (
+from rl_fzerox.ui.watch.view.screen.view_model import (
     _add_config_track_info,
     _track_pool_records,
 )

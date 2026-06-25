@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/view/screen/frame.py
 """Pygame window sizing, fonts, and full-frame Watch drawing.
 
-`screen.render` builds the view model; this module turns that data into pygame
+`screen.view_model` builds the frame data; this module turns that data into pygame
 surfaces, left-column overlays, side-panel rendering, and clickable hitboxes.
 """
 
@@ -9,20 +9,12 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass
 
 import numpy as np
 
-from fzerox_emulator import FZeroXTelemetry, RaceControlState
-from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
-from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from fzerox_emulator import FZeroXTelemetry
+from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.runtime_info import bool_info, int_info, optional_float_info
-from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
-from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
-from rl_fzerox.ui.watch.records import TrackRecordBook
-from rl_fzerox.ui.watch.runtime.policy.cnn import CnnActivationSnapshot
-from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.macro_legend import (
     _draw_macro_legend,
@@ -32,7 +24,6 @@ from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_control_viz_below_game,
 )
 from rl_fzerox.ui.watch.view.panels.core.model import _window_size
-from rl_fzerox.ui.watch.view.panels.core.tabs import PanelTabRegistry
 from rl_fzerox.ui.watch.view.panels.rendering.draw import SidePanelData, _draw_side_panel
 from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz, _control_viz_height
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
@@ -44,6 +35,7 @@ from rl_fzerox.ui.watch.view.screen.types import (
     ViewerFonts,
     ViewerHitboxes,
 )
+from rl_fzerox.ui.watch.view.screen.view_model import FrameRenderData
 
 _WINDOW_TITLE = "F-Zero X Watch"
 _WINDOW_ICON_SIZE = 32
@@ -57,73 +49,6 @@ _POST_GP_OVERLAY_MODES = frozenset(
         "unskippable_credits",
     }
 )
-
-
-@dataclass(frozen=True, slots=True)
-class FrameRenderData:
-    """Complete state snapshot needed to render one watch frame."""
-
-    raw_frame: RgbFrame
-    policy_observation_image: ObservationFrame | None
-    policy_observation_shape: tuple[int, ...] | None
-    policy_observation_layout_shape: tuple[int, ...]
-    policy_observation_layout_info: dict[str, object]
-    observation_state: StateVector | None
-    observation_state_reference: StateVector | None
-    observation_state_feature_names: tuple[str, ...]
-    policy_auxiliary_state_predictions: dict[str, object] | None
-    policy_auxiliary_state_targets: dict[str, object] | None
-    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
-    live_episode_series: EpisodeLiveSeriesSnapshot | None
-    episode: int
-    info: dict[str, object]
-    reset_info: dict[str, object]
-    episode_reward: float
-    paused: bool
-    recording_active: bool
-    control_state: RaceControlState
-    gas_level: float
-    thrust_warning_threshold: float | None
-    thrust_deadzone_threshold: float | None
-    thrust_full_threshold: float | None
-    boost_active: bool
-    boost_lamp_level: float
-    action_mask_branches: ActionMaskBranches
-    policy_label: str | None
-    policy_num_timesteps: int | None
-    policy_experience_frames: int | None
-    policy_deterministic: bool | None
-    manual_control_enabled: bool
-    policy_action: ActionValue | None
-    policy_reload_age_seconds: float | None
-    policy_reload_error: str | None
-    cnn_activations: CnnActivationSnapshot | None
-    track_record_book: TrackRecordBook
-    track_pool_records: tuple[dict[str, object], ...]
-    allow_record_course_jumps: bool
-    panel_tab_index: int
-    cnn_layer_tab_index: int
-    record_tab_index: int
-    panel_tabs: PanelTabRegistry
-    continuous_drive_deadzone: float
-    continuous_drive_enabled: bool
-    force_full_throttle: bool
-    continuous_pitch_enabled: bool
-    continuous_air_brake_axis_index: int | None
-    continuous_air_brake_deadzone: float
-    continuous_air_brake_full_threshold: float
-    continuous_air_brake_min_duty: float
-    continuous_air_brake_mode: str
-    continuous_air_brake_disabled: bool
-    action_repeat: int
-    max_episode_steps: int
-    progress_frontier_stall_limit_frames: int | None
-    stuck_min_speed_kph: float
-    telemetry: FZeroXTelemetry | None
-    emulator_renderer: str
-    watch_device: str
-    train_config: TrainConfig | None
-    policy_config: PolicyConfig | None
 
 
 def _create_fonts(pygame: PygameModule) -> ViewerFonts:

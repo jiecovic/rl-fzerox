@@ -41,7 +41,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _resolve_render_fps,
 )
-from rl_fzerox.ui.watch.view.screen.render import _add_career_mode_info
+from rl_fzerox.ui.watch.view.screen.view_model import _add_career_mode_info
 
 
 def test_career_mode_render_info_keeps_runtime_target_and_attempt(tmp_path: Path) -> None:

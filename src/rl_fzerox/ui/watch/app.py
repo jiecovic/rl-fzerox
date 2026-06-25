@@ -45,11 +45,9 @@ from rl_fzerox.ui.watch.view.screen.frame import (
     _ensure_screen,
     _watch_game_display_size,
 )
-from rl_fzerox.ui.watch.view.screen.render import (
-    draw_watch_frame,
-    track_pool_records_for_watch_snapshot,
-)
+from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
 from rl_fzerox.ui.watch.view.screen.types import PygameModule, ViewerHitboxes
+from rl_fzerox.ui.watch.view.screen.view_model import track_pool_records_for_watch_snapshot
 
 WatchWorkerFactory = Callable[[WatchAppConfig], WatchWorker]
 ViewerHeartbeat = Callable[[], bool]

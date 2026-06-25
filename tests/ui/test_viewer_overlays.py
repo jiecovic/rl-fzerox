@@ -10,7 +10,7 @@ from rl_fzerox.ui.watch.view.screen.frame import (
     _game_speed_overlay_label,
     _game_status_overlay_label,
 )
-from rl_fzerox.ui.watch.view.screen.render import _with_viewer_rates
+from rl_fzerox.ui.watch.view.screen.view_model import _with_viewer_rates
 
 
 def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:

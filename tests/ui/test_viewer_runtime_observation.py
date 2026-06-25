@@ -34,7 +34,7 @@ from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
     configured_watch_zeroed_features,
 )
-from rl_fzerox.ui.watch.view.screen.render import _observation_state_feature_names
+from rl_fzerox.ui.watch.view.screen.view_model import _observation_state_feature_names
 from tests.support.fakes import SyntheticBackend
 from tests.ui.viewer_runtime_support import PolicyStub, sample_image, sample_state
 
