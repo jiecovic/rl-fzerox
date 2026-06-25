@@ -95,6 +95,21 @@ Examples:
 - Before finishing meaningful changes, reread the touched surface end to end and
   remove obvious duplication.
 
+## Interfaces and Performance
+
+- Prefer composition and small capability interfaces over deep inheritance.
+- In Rust, use traits for project-owned behavior boundaries when they reduce
+  concrete coupling without hiding simple data flow.
+- In Python, use `Protocol` for small project-owned structural interfaces. Avoid
+  broad protocol layers around third-party dynamic libraries.
+- Keep hot loops allocation-light and data-oriented. Cache invariant lookups,
+  avoid repeated schema/object construction, and keep logging out of per-frame
+  paths unless explicitly sampled or gated.
+- Put emulator-hot, frame-processing, and large array work in Rust, NumPy, or
+  narrow helper functions instead of Python object-heavy loops.
+- Prefer measuring the hot path before micro-optimizing. Preserve readability
+  unless profiling or obvious algorithmic cost shows the code is hot.
+
 ## Typing
 
 - Prefer proper typing over escape hatches. Do not use `typing.cast` to bypass
