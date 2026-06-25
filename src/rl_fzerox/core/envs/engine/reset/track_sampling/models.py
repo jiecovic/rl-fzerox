@@ -97,15 +97,36 @@ class SelectedTrack:
     deficit_budget_lane: TrackSamplingDeficitLane | None = None
 
     def info(self) -> dict[str, object]:
-        source_entry_id = self.alt_baseline_source_entry_id or self.id
-        course_key = track_sampling_course_key(
+        source_entry_id = self._source_entry_id()
+        course_key = self._course_key(source_entry_id)
+        info = self._identity_info(source_entry_id, course_key)
+        info.update(self._engine_tuning_info())
+        info.update(self._sampling_state_info())
+        info.update(self._baseline_info())
+        info.update(self._generated_course_info())
+        info["track_log_per_course"] = self.log_per_course
+        if self.records is not None:
+            info.update(self.records.info())
+        return info
+
+    def _source_entry_id(self) -> str:
+        return self.alt_baseline_source_entry_id or self.id
+
+    def _course_key(self, source_entry_id: str) -> str:
+        return track_sampling_course_key(
             entry_id=source_entry_id,
             course_id=self.course_id,
             runtime_course_key=self.runtime_course_key,
             course_ref=self.course_ref,
             course_index=self.course_index,
         )
-        info = {
+
+    def _identity_info(
+        self,
+        source_entry_id: str,
+        course_key: str,
+    ) -> dict[str, object]:
+        return {
             "track_sampling_enabled": True,
             "track_sampling_mode": self.sampling_mode,
             "track_entry_id": self.id,
@@ -133,6 +154,10 @@ class SelectedTrack:
             "track_vehicle": self.vehicle,
             "track_vehicle_name": self.vehicle_name,
             "track_engine_setting_raw_value": self.engine_setting_raw_value,
+        }
+
+    def _engine_tuning_info(self) -> dict[str, object]:
+        return {
             "engine_tuning_context_key": self.engine_tuning_context_key,
             "engine_tuning_course_key": self.engine_tuning_course_key,
             "engine_tuning_vehicle_id": self.engine_tuning_vehicle_id,
@@ -140,8 +165,16 @@ class SelectedTrack:
             "engine_tuning_mean_score": self.engine_tuning_mean_score,
             "engine_tuning_uncertainty_score": self.engine_tuning_uncertainty_score,
             "engine_tuning_finish_count": self.engine_tuning_finish_count,
+        }
+
+    def _sampling_state_info(self) -> dict[str, object]:
+        return {
             "track_sampling_cycle_position": self.cycle_position,
             "track_sampling_deficit_lane": self.deficit_budget_lane,
+        }
+
+    def _baseline_info(self) -> dict[str, object]:
+        return {
             "track_baseline_group_id": self.baseline_group_id,
             "track_baseline_group_weight": self.baseline_group_weight,
             "track_baseline_variant_index": self.baseline_variant_index,
@@ -150,6 +183,10 @@ class SelectedTrack:
             "track_alt_baseline_id": self.alt_baseline_id,
             "track_alt_baseline_label": self.alt_baseline_label,
             "track_alt_baseline_source_entry_id": self.alt_baseline_source_entry_id,
+        }
+
+    def _generated_course_info(self) -> dict[str, object]:
+        return {
             "track_generated_course_kind": self.generated_course_kind,
             "track_generated_course_seed": self.generated_course_seed,
             "track_generated_course_hash": self.generated_course_hash,
@@ -157,8 +194,4 @@ class SelectedTrack:
             "track_generated_course_generation": self.generated_course_generation,
             "track_generated_course_segment_count": self.generated_course_segment_count,
             "track_generated_course_length": self.generated_course_length,
-            "track_log_per_course": self.log_per_course,
         }
-        if self.records is not None:
-            info.update(self.records.info())
-        return info

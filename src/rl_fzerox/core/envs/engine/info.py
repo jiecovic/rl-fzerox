@@ -119,6 +119,14 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
     """Project pickle-safe episode info from the live telemetry snapshot."""
 
     race_laps_completed = completed_race_laps(telemetry)
+    info = _telemetry_race_context_info(telemetry)
+    info.update(_telemetry_player_race_info(telemetry))
+    info.update(_telemetry_player_state_info(telemetry))
+    info.update(_telemetry_lap_progress_info(telemetry, race_laps_completed))
+    return info
+
+
+def _telemetry_race_context_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
     return {
         "game_mode": telemetry.game_mode_name,
         "game_mode_raw": telemetry.game_mode_raw,
@@ -135,6 +143,11 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "menu_transition_state_raw": telemetry.menu_transition_state_raw,
         "menu_current_ghost_type_raw": telemetry.menu_current_ghost_type_raw,
         "queued_game_mode_raw": telemetry.queued_game_mode_raw,
+    }
+
+
+def _telemetry_player_race_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
+    return {
         "total_lap_count": telemetry.total_lap_count,
         "race_time_ms": telemetry.player.race_time_ms,
         "race_distance": telemetry.player.race_distance,
@@ -144,10 +157,23 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "gp_points": telemetry.gp_points,
         "ko_star_count": telemetry.player.ko_star_count,
         "total_racers": telemetry.total_racers,
+    }
+
+
+def _telemetry_player_state_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
+    return {
         "termination_reason": telemetry.player.terminal_reason,
         "finished": telemetry.player.finished,
         "retired": telemetry.player.retired,
         "crashed": telemetry.player.crashed,
+    }
+
+
+def _telemetry_lap_progress_info(
+    telemetry: FZeroXTelemetry,
+    race_laps_completed: int,
+) -> dict[str, object]:
+    return {
         "lap": telemetry.player.lap,
         "laps_completed": race_laps_completed,
         "race_laps_completed": race_laps_completed,
