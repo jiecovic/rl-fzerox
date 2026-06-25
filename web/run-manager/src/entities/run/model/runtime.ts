@@ -122,6 +122,13 @@ export function latestActiveStartupMessage(run: ManagedRun): string | null {
   if (startupEvent === null) {
     return null;
   }
+  const failureEvent = latestFailureEvent(run);
+  if (
+    failureEvent !== null &&
+    eventTimestampIsAtOrAfter(failureEvent.created_at, startupEvent.created_at)
+  ) {
+    return null;
+  }
   if (run.runtime === null) {
     return startupEvent.message;
   }
@@ -145,11 +152,27 @@ function latestStartupEvent(run: ManagedRun): { created_at: string; message: str
 }
 
 export function latestFailureMessage(run: ManagedRun): string | null {
+  return latestFailureEvent(run)?.message ?? null;
+}
+
+function latestFailureEvent(run: ManagedRun): { created_at: string; message: string } | null {
   const failedEvent = run.recent_events.find((event) => event.kind === "failed");
   if (failedEvent === undefined) {
     return null;
   }
-  return failedEvent.message;
+  return {
+    created_at: failedEvent.created_at,
+    message: failedEvent.message,
+  };
+}
+
+function eventTimestampIsAtOrAfter(candidate: string, baseline: string): boolean {
+  const candidateTime = Date.parse(candidate);
+  const baselineTime = Date.parse(baseline);
+  if (Number.isNaN(candidateTime) || Number.isNaN(baselineTime)) {
+    return false;
+  }
+  return candidateTime >= baselineTime;
 }
 
 function formatRate(value: number): string {

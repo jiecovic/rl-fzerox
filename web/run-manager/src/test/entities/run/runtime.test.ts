@@ -61,6 +61,28 @@ describe("run runtime labels", () => {
     ).toBeNull();
   });
 
+  it("hides startup activity after a newer failure event", () => {
+    const run = runFixture({
+      status: "failed",
+      runtime: null,
+      recent_events: [
+        {
+          created_at: "2026-05-03T18:56:00+00:00",
+          kind: "failed",
+          message: "training failed: missing checkpoint",
+        },
+        {
+          created_at: "2026-05-03T18:55:20+00:00",
+          kind: "startup_resume",
+          message: "Loading latest checkpoint",
+        },
+      ],
+    });
+
+    expect(progressNote(run)).toBe("training failed: missing checkpoint");
+    expect(latestActiveStartupMessage(run)).toBeNull();
+  });
+
   it("derives lineage sim time from source checkpoint frames", () => {
     const runtime = runFixture().runtime;
     if (runtime === null) {
