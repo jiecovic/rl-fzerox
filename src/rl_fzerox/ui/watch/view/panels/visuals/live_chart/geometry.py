@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/view/panels/visuals/live_chart/geometry.py
+"""Cached point projection for dense Watch live charts.
+
+Live-series traces can contain many samples. This module converts raw series
+tuples into pygame plot points and buckets over-dense traces by screen pixel so
+rendering stays readable and cheap.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

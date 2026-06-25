@@ -1,12 +1,27 @@
 # src/rl_fzerox/ui/watch/view/panels/visuals/live_chart/plot.py
+"""Draw compact live-series chart blocks in the Watch side panel.
+
+This module owns pygame rendering for chart cards and plot lines. Pure element
+records, axis scaling, and legend layout live in sibling modules so the drawing
+flow stays focused.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from rl_fzerox.ui.watch.view.panels.rendering.text import _fit_text
-from rl_fzerox.ui.watch.view.panels.visuals.live_chart.geometry import (
-    _float_tuple_stats,
-    _plot_points,
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.axis import (
+    _format_axis_value,
+    _plot_value_range,
+)
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.elements import (
+    _PlotReferenceLine,
+    _PlotSeries,
+)
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.geometry import _plot_points
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.legend import (
+    _draw_plot_legend,
+    _plot_legend_height,
+    _plot_legend_rows,
 )
 from rl_fzerox.ui.watch.view.panels.visuals.live_chart.style import LIVE_CHART_STYLE
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
@@ -16,27 +31,6 @@ from rl_fzerox.ui.watch.view.screen.types import (
     PygameSurface,
     ViewerFonts,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class _PlotSeries:
-    y_values: tuple[float, ...]
-    color: tuple[int, int, int]
-    label: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class _PlotReferenceLine:
-    value: float
-    color: tuple[int, int, int]
-    label: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class _PlotLegendItem:
-    label: str
-    color: tuple[int, int, int]
-    width: int
 
 
 def _draw_chart_block(
@@ -250,24 +244,6 @@ def _draw_plot_series(
             pygame.draw.lines(screen, line.color, False, points, LIVE_CHART_STYLE.line_width)
 
 
-def _plot_value_range(
-    *,
-    series: tuple[_PlotSeries, ...],
-    reference_lines: tuple[_PlotReferenceLine, ...],
-) -> tuple[float, float]:
-    y_min = 0.0
-    y_max = 0.0
-    for line in series:
-        if line.y_values:
-            stats = _float_tuple_stats(line.y_values)
-            y_min = min(y_min, stats.minimum)
-            y_max = max(y_max, stats.maximum)
-    for line in reference_lines:
-        y_min = min(y_min, line.value)
-        y_max = max(y_max, line.value)
-    return y_min, y_max
-
-
 def _draw_reference_line(
     *,
     pygame: PygameModule,
@@ -330,116 +306,6 @@ def _draw_horizontal_dashed_line(
         x = dash_end + LIVE_CHART_STYLE.reference_line_gap
 
 
-def _draw_plot_legend(
-    *,
-    pygame: PygameModule,
-    screen: PygameSurface,
-    fonts: ViewerFonts,
-    rect: PygameRect,
-    rows: tuple[tuple[_PlotLegendItem, ...], ...],
-) -> None:
-    if not rows:
-        return
-
-    label_height = fonts.small.render("Hg", True, PALETTE.text_primary).get_height()
-    max_legend_width = max(1, rect.width - (2 * LIVE_CHART_STYLE.legend_margin))
-    content_width = max(
-        sum(item.width for item in row) + LIVE_CHART_STYLE.legend_item_gap * max(0, len(row) - 1)
-        for row in rows
-    )
-    legend_width = min(
-        max_legend_width,
-        content_width + (2 * LIVE_CHART_STYLE.legend_padding),
-    )
-    legend_height = (
-        (2 * LIVE_CHART_STYLE.legend_padding)
-        + len(rows) * label_height
-        + max(0, len(rows) - 1) * LIVE_CHART_STYLE.legend_row_gap
-    )
-    legend_rect = pygame.Rect(
-        rect.right - LIVE_CHART_STYLE.legend_margin - legend_width,
-        rect.y + LIVE_CHART_STYLE.legend_margin,
-        legend_width,
-        legend_height,
-    )
-    pygame.draw.rect(screen, LIVE_CHART_STYLE.block_fill, legend_rect, border_radius=5)
-    pygame.draw.rect(screen, PALETTE.panel_border, legend_rect, width=1, border_radius=5)
-
-    row_y = legend_rect.y + LIVE_CHART_STYLE.legend_padding
-    for row in rows:
-        item_x = legend_rect.x + LIVE_CHART_STYLE.legend_padding
-        for item in row:
-            line_y = row_y + label_height // 2
-            pygame.draw.line(
-                screen,
-                item.color,
-                (item_x, line_y),
-                (item_x + LIVE_CHART_STYLE.legend_swatch_width, line_y),
-                width=LIVE_CHART_STYLE.line_width,
-            )
-            label_surface = fonts.small.render(item.label, True, item.color)
-            label_x = (
-                item_x + LIVE_CHART_STYLE.legend_swatch_width + LIVE_CHART_STYLE.legend_swatch_gap
-            )
-            screen.blit(label_surface, (label_x, row_y))
-            item_x += item.width + LIVE_CHART_STYLE.legend_item_gap
-        row_y += label_height + LIVE_CHART_STYLE.legend_row_gap
-
-
-def _plot_legend_height(
-    *,
-    fonts: ViewerFonts,
-    rows: tuple[tuple[_PlotLegendItem, ...], ...],
-) -> int:
-    if not rows:
-        return 0
-    label_height = fonts.small.render("Hg", True, PALETTE.text_primary).get_height()
-    return (
-        (2 * LIVE_CHART_STYLE.legend_padding)
-        + len(rows) * label_height
-        + max(0, len(rows) - 1) * LIVE_CHART_STYLE.legend_row_gap
-    )
-
-
-def _plot_legend_rows(
-    *,
-    fonts: ViewerFonts,
-    rect_width: int,
-    series: tuple[_PlotSeries, ...],
-) -> tuple[tuple[_PlotLegendItem, ...], ...]:
-    content_width = max(
-        1,
-        rect_width - (2 * LIVE_CHART_STYLE.legend_margin) - (2 * LIVE_CHART_STYLE.legend_padding),
-    )
-    rows: list[list[_PlotLegendItem]] = [[]]
-    current_width = 0
-    for line in series:
-        if line.label is None:
-            continue
-        label_width = fonts.small.render(line.label, True, line.color).get_width()
-        item = _PlotLegendItem(
-            label=line.label,
-            color=line.color,
-            width=(
-                LIVE_CHART_STYLE.legend_swatch_width
-                + LIVE_CHART_STYLE.legend_swatch_gap
-                + label_width
-            ),
-        )
-        next_width = (
-            item.width
-            if current_width == 0
-            else current_width + LIVE_CHART_STYLE.legend_item_gap + item.width
-        )
-        if rows[-1] and next_width > content_width:
-            rows.append([])
-            current_width = 0
-            next_width = item.width
-        rows[-1].append(item)
-        current_width = next_width
-    return tuple(tuple(row) for row in rows if row)
-
-
 def _draw_y_axis_labels(
     *,
     pygame: PygameModule,
@@ -489,20 +355,3 @@ def _draw_y_axis_labels(
             (rect.x, tick_y),
             width=1,
         )
-
-
-def _format_axis_value(value: float) -> str:
-    abs_value = abs(value)
-    if abs_value < 1e-9:
-        return "0"
-    if abs_value < 0.001:
-        return f"{value:.1e}"
-    if abs_value >= 1000.0:
-        return f"{value / 1000.0:.1f}k"
-    if abs_value >= 100.0:
-        return f"{value:.0f}"
-    if abs_value >= 10.0:
-        return f"{value:.1f}"
-    if abs_value >= 1.0:
-        return f"{value:.2f}"
-    return f"{value:.3f}"

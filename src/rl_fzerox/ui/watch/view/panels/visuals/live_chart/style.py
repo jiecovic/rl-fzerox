@@ -1,4 +1,6 @@
 # src/rl_fzerox/ui/watch/view/panels/visuals/live_chart/style.py
+"""Shared dimensions and colors for Watch live chart cards."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

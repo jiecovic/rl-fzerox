@@ -1,15 +1,17 @@
 # src/rl_fzerox/ui/watch/view/panels/visuals/live.py
+"""Render the live-episode chart tab for Watch.
+
+This module arranges the six chart blocks shown while an episode is running.
+Chart primitives, summaries, and geometry live under `live_chart`.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.panels.core.format import _int_info
 from rl_fzerox.ui.watch.view.panels.rendering.text import _fit_text
-from rl_fzerox.ui.watch.view.panels.visuals.live_chart.geometry import _plot_points
-from rl_fzerox.ui.watch.view.panels.visuals.live_chart.plot import (
-    _draw_chart_block,
-    _plot_legend_rows,
-    _PlotSeries,
-)
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.elements import _PlotSeries
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.plot import _draw_chart_block
 from rl_fzerox.ui.watch.view.panels.visuals.live_chart.style import LIVE_CHART_STYLE
 from rl_fzerox.ui.watch.view.panels.visuals.live_chart.summaries import (
     _edge_ratio_summary,
@@ -31,15 +33,7 @@ from rl_fzerox.ui.watch.view.screen.types import (
     ViewerFonts,
 )
 
-__all__ = (
-    "LIVE_CHART_STYLE",
-    "_draw_live_tab",
-    "_ko_star_events_summary",
-    "_PlotSeries",
-    "_plot_legend_rows",
-    "_plot_points",
-    "_speed_summary",
-)
+__all__ = ("_draw_live_tab",)
 
 
 def _draw_live_tab(

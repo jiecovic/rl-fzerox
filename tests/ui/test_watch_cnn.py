@@ -18,15 +18,19 @@ from rl_fzerox.ui.watch.runtime.policy.cnn import (
     next_cnn_activation_normalization,
 )
 from rl_fzerox.ui.watch.view.panels.visuals.cnn import (
-    _layer_page_label,
-    _layer_pages,
     _mode_hint,
     _normalization_label,
-    _plan_layer_layout,
-    _separator_positions,
     _stats_summary,
-    _unused_tile_rects,
     _weak_channel_summary,
+)
+from rl_fzerox.ui.watch.view.panels.visuals.cnn_grid import (
+    _separator_positions,
+    _unused_tile_rects,
+)
+from rl_fzerox.ui.watch.view.panels.visuals.cnn_layout import (
+    _layer_page_label,
+    _layer_pages,
+    _plan_layer_layout,
 )
 from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT

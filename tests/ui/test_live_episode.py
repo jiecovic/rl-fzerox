@@ -6,14 +6,14 @@ from dataclasses import dataclass
 import pytest
 
 from rl_fzerox.ui.watch.live_series import LIVE_SERIES_LIMITS, EpisodeLiveSeriesTracker
-from rl_fzerox.ui.watch.view.panels.visuals.live import (
-    LIVE_CHART_STYLE,
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.elements import _PlotSeries
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.geometry import _plot_points
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.legend import _plot_legend_rows
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.style import LIVE_CHART_STYLE
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.summaries import (
     _height_above_ground_reference_lines,
     _height_above_ground_summary,
     _ko_star_events_summary,
-    _plot_legend_rows,
-    _plot_points,
-    _PlotSeries,
     _speed_summary,
 )
 from rl_fzerox.ui.watch.view.screen.types import ViewerFonts

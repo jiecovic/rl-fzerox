@@ -1,12 +1,12 @@
 # src/rl_fzerox/ui/watch/view/panels/visuals/live_chart/summaries.py
+"""Text summaries and reference-line data for the Watch live chart tab."""
+
 from __future__ import annotations
 
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot, KoStarRewardEvent
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.axis import _format_axis_value
+from rl_fzerox.ui.watch.view.panels.visuals.live_chart.elements import _PlotReferenceLine
 from rl_fzerox.ui.watch.view.panels.visuals.live_chart.geometry import _float_tuple_stats
-from rl_fzerox.ui.watch.view.panels.visuals.live_chart.plot import (
-    _format_axis_value,
-    _PlotReferenceLine,
-)
 from rl_fzerox.ui.watch.view.panels.visuals.live_chart.style import LIVE_CHART_STYLE
 
 
