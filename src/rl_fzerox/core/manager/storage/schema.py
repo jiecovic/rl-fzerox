@@ -150,31 +150,23 @@ def _assert_current_schema(
 ) -> None:
     inspector = inspect(engine)
     for table_name in CONFIG_OWNER_TABLES:
-        if table_name not in table_names:
-            raise RuntimeError(f"manager DB is not current: missing {table_name}")
-        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        _assert_table_present(table_names=table_names, table_name=table_name)
+        columns = _table_columns(inspector=inspector, table_name=table_name)
         if "config_json" in columns or "config_hash" in columns:
             raise RuntimeError(
                 "manager DB is not current: config JSON must be stored in config_snapshots only"
             )
-        if "config_snapshot_id" not in columns:
-            raise RuntimeError(
-                f"manager DB is not current: {table_name} is missing config_snapshot_id"
-            )
-    if "config_snapshots" not in table_names:
-        raise RuntimeError("manager DB is not current: missing config_snapshots")
-    if "save_games" not in table_names:
-        raise RuntimeError("manager DB is not current: missing save_games")
+        _assert_required_columns(
+            table_name=table_name,
+            columns=columns,
+            required_columns={"config_snapshot_id"},
+        )
+    _assert_table_present(table_names=table_names, table_name="config_snapshots")
+    _assert_table_present(table_names=table_names, table_name="save_games")
     _assert_save_game_columns(inspector=inspector)
-    for table_name in SAVE_GAME_CHILD_TABLES:
-        if table_name not in table_names:
-            raise RuntimeError(f"manager DB is not current: missing {table_name}")
-    for table_name in MANAGER_RUNTIME_TABLES:
-        if table_name not in table_names:
-            raise RuntimeError(f"manager DB is not current: missing {table_name}")
-    for table_name in EVALUATION_TABLES:
-        if table_name not in table_names:
-            raise RuntimeError(f"manager DB is not current: missing {table_name}")
+    _assert_tables_present(table_names=table_names, required_tables=SAVE_GAME_CHILD_TABLES)
+    _assert_tables_present(table_names=table_names, required_tables=MANAGER_RUNTIME_TABLES)
+    _assert_tables_present(table_names=table_names, required_tables=EVALUATION_TABLES)
     _assert_evaluation_columns(inspector=inspector)
     _assert_save_game_child_columns(inspector=inspector)
     _assert_run_foreign_keys(inspector=inspector, table_names=table_names)
@@ -186,85 +178,51 @@ def _assert_current_schema(
 
 
 def _assert_save_game_columns(*, inspector: Inspector) -> None:
-    columns = {column["name"] for column in inspector.get_columns("save_games")}
-    for column_name in _required_column_names(SaveGameModel):
-        if column_name not in columns:
-            raise RuntimeError(f"manager DB is not current: save_games is missing {column_name}")
+    _assert_model_columns(inspector=inspector, model=SaveGameModel)
 
 
 def _assert_evaluation_columns(*, inspector: Inspector) -> None:
     for model in (EvaluationModel, EvaluationPresetModel, EvaluationBaselineSuiteModel):
         table_name = model.__table__.name
-        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        columns = _table_columns(inspector=inspector, table_name=table_name)
         legacy_preset_columns = {"config_json", "source_artifact"}
         legacy_columns = legacy_preset_columns.intersection(columns)
         if table_name == "evaluation_presets" and legacy_columns:
-            joined_columns = ", ".join(sorted(legacy_columns))
-            raise RuntimeError(
-                "manager DB is not current: "
-                f"evaluation presets have legacy columns {joined_columns}"
+            _raise_legacy_columns_error(
+                subject="evaluation presets",
+                legacy_columns=legacy_columns,
+                verb="have",
             )
-        required_columns = {column.name for column in model.__table__.columns}
-        missing_columns = required_columns.difference(columns)
-        if missing_columns:
-            joined_columns = ", ".join(sorted(missing_columns))
-            raise RuntimeError(
-                f"manager DB is not current: {table_name} is missing {joined_columns}"
-            )
+        _assert_required_columns(
+            table_name=table_name,
+            columns=columns,
+            required_columns=_required_column_names(model),
+        )
 
 
 def _assert_save_game_child_columns(*, inspector: Inspector) -> None:
-    for table_name in SAVE_GAME_CHILD_TABLES:
-        columns = {column["name"] for column in inspector.get_columns(table_name)}
-        if "save_game_id" not in columns:
-            raise RuntimeError(f"manager DB is not current: {table_name} is missing save_game_id")
-    attempt_columns = {column["name"] for column in inspector.get_columns("save_game_attempts")}
-    setup_columns = {column["name"] for column in inspector.get_columns("save_game_course_setups")}
-    for column_name in _required_column_names(SaveGameCourseSetupModel):
-        if column_name not in setup_columns:
-            raise RuntimeError(
-                f"manager DB is not current: save_game_course_setups is missing {column_name}"
-            )
-    cup_setup_columns = {column["name"] for column in inspector.get_columns("save_game_cup_setups")}
-    for column_name in _required_column_names(SaveGameCupSetupModel):
-        if column_name not in cup_setup_columns:
-            raise RuntimeError(
-                f"manager DB is not current: save_game_cup_setups is missing {column_name}"
-            )
-    for column_name in _required_column_names(SaveGameAttemptModel):
-        if column_name not in attempt_columns:
-            raise RuntimeError(
-                f"manager DB is not current: save_game_attempts is missing {column_name}"
-            )
+    for model in (SaveGameCourseSetupModel, SaveGameCupSetupModel, SaveGameAttemptModel):
+        _assert_model_columns(inspector=inspector, model=model)
 
 
 def _assert_track_sampling_entry_columns(*, inspector: Inspector) -> None:
-    columns = {column["name"] for column in inspector.get_columns("run_track_sampling_entries")}
+    table_name = "run_track_sampling_entries"
+    columns = _table_columns(inspector=inspector, table_name=table_name)
     legacy_columns = columns.intersection(TRACK_SAMPLING_ENTRY_LEGACY_COLUMNS)
     if legacy_columns:
-        joined_columns = ", ".join(sorted(legacy_columns))
-        raise RuntimeError(
-            "manager DB is not current: "
-            f"run_track_sampling_entries has legacy columns {joined_columns}"
+        _raise_legacy_columns_error(
+            subject=table_name,
+            legacy_columns=legacy_columns,
         )
-    required_columns = {column.name for column in RunTrackSamplingEntryModel.__table__.columns}
-    missing_columns = required_columns.difference(columns)
-    if missing_columns:
-        joined_columns = ", ".join(sorted(missing_columns))
-        raise RuntimeError(
-            f"manager DB is not current: run_track_sampling_entries is missing {joined_columns}"
-        )
+    _assert_required_columns(
+        table_name=table_name,
+        columns=columns,
+        required_columns=_required_column_names(RunTrackSamplingEntryModel),
+    )
 
 
 def _assert_track_sampling_runtime_columns(*, inspector: Inspector) -> None:
-    columns = {column["name"] for column in inspector.get_columns("run_track_sampling_runtime")}
-    required_columns = {column.name for column in RunTrackSamplingRuntimeModel.__table__.columns}
-    missing_columns = required_columns.difference(columns)
-    if missing_columns:
-        joined_columns = ", ".join(sorted(missing_columns))
-        raise RuntimeError(
-            f"manager DB is not current: run_track_sampling_runtime is missing {joined_columns}"
-        )
+    _assert_model_columns(inspector=inspector, model=RunTrackSamplingRuntimeModel)
 
 
 def _required_column_names(model: type[DeclarativeBase]) -> set[str]:
@@ -272,41 +230,66 @@ def _required_column_names(model: type[DeclarativeBase]) -> set[str]:
 
 
 def _assert_track_sampling_artifact_columns(*, inspector: Inspector) -> None:
-    columns = {column["name"] for column in inspector.get_columns("run_track_sampling_artifacts")}
-    required_columns = {column.name for column in RunTrackSamplingArtifactModel.__table__.columns}
-    missing_columns = required_columns.difference(columns)
-    if missing_columns:
-        joined_columns = ", ".join(sorted(missing_columns))
-        raise RuntimeError(
-            f"manager DB is not current: run_track_sampling_artifacts is missing {joined_columns}"
-        )
+    _assert_model_columns(inspector=inspector, model=RunTrackSamplingArtifactModel)
 
 
 def _assert_alt_baseline_columns(*, inspector: Inspector) -> None:
-    columns = {column["name"] for column in inspector.get_columns("run_alt_baselines")}
-    required_columns = {column.name for column in RunAltBaselineModel.__table__.columns}
-    missing_columns = required_columns.difference(columns)
-    if missing_columns:
-        joined_columns = ", ".join(sorted(missing_columns))
-        raise RuntimeError(
-            f"manager DB is not current: run_alt_baselines is missing {joined_columns}"
-        )
+    _assert_model_columns(inspector=inspector, model=RunAltBaselineModel)
 
 
 def _assert_track_sampling_generated_slot_columns(*, inspector: Inspector) -> None:
-    columns = {
-        column["name"] for column in inspector.get_columns("run_track_sampling_generated_slots")
-    }
-    required_columns = {
-        column.name for column in RunTrackSamplingGeneratedSlotModel.__table__.columns
-    }
+    _assert_model_columns(inspector=inspector, model=RunTrackSamplingGeneratedSlotModel)
+
+
+def _assert_table_present(*, table_names: set[str], table_name: str) -> None:
+    if table_name not in table_names:
+        raise RuntimeError(f"manager DB is not current: missing {table_name}")
+
+
+def _assert_tables_present(
+    *,
+    table_names: set[str],
+    required_tables: tuple[str, ...],
+) -> None:
+    for table_name in required_tables:
+        _assert_table_present(table_names=table_names, table_name=table_name)
+
+
+def _table_columns(*, inspector: Inspector, table_name: str) -> set[str]:
+    return {str(column["name"]) for column in inspector.get_columns(table_name)}
+
+
+def _assert_model_columns(*, inspector: Inspector, model: type[DeclarativeBase]) -> None:
+    table_name = model.__table__.name
+    _assert_required_columns(
+        table_name=table_name,
+        columns=_table_columns(inspector=inspector, table_name=table_name),
+        required_columns=_required_column_names(model),
+    )
+
+
+def _assert_required_columns(
+    *,
+    table_name: str,
+    columns: set[str],
+    required_columns: set[str],
+) -> None:
     missing_columns = required_columns.difference(columns)
     if missing_columns:
         joined_columns = ", ".join(sorted(missing_columns))
-        raise RuntimeError(
-            "manager DB is not current: "
-            f"run_track_sampling_generated_slots is missing {joined_columns}"
-        )
+        raise RuntimeError(f"manager DB is not current: {table_name} is missing {joined_columns}")
+
+
+def _raise_legacy_columns_error(
+    *,
+    subject: str,
+    legacy_columns: set[str],
+    verb: str = "has",
+) -> None:
+    joined_columns = ", ".join(sorted(legacy_columns))
+    raise RuntimeError(
+        f"manager DB is not current: {subject} {verb} legacy columns {joined_columns}"
+    )
 
 
 def _assert_run_foreign_keys(
