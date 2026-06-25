@@ -23,10 +23,13 @@ def reset_gym_episode(
     """Reset one materialized Gym/watch episode and build its initial observation."""
 
     selected_track = reset_coordinator.select_episode_track(seed)
-    components.episode.begin_reset(active_track=selected_track)
     reset_result = reset_coordinator.reset_race(
         seed=seed,
         selected_track=selected_track,
+    )
+    components.episode.begin_reset(
+        active_track=reset_result.selected_track,
+        active_track_info=reset_result.selected_track_info,
     )
     info = reset_result.info
     telemetry = reset_result.telemetry

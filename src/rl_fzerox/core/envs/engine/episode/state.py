@@ -13,6 +13,7 @@ class EngineEpisodeState:
     """Mutable state that spans one active episode in the env engine."""
 
     active_track: SelectedTrack | None = None
+    active_track_info: dict[str, object] | None = None
     done: bool = False
     uses_custom_baseline: bool = False
     frame_count: int = 0
@@ -32,10 +33,18 @@ class EngineEpisodeState:
     last_info: dict[str, object] = field(default_factory=dict)
     last_telemetry: FZeroXTelemetry | None = None
 
-    def begin_reset(self, *, active_track: SelectedTrack | None) -> None:
+    def begin_reset(
+        self,
+        *,
+        active_track: SelectedTrack | None,
+        active_track_info: dict[str, object] | None = None,
+    ) -> None:
         """Reset episode-local mutable fields before a new initial observation."""
 
         self.active_track = active_track
+        if active_track_info is None and active_track is not None:
+            active_track_info = active_track.info()
+        self.active_track_info = None if active_track_info is None else dict(active_track_info)
         self.done = False
         self.frame_count = 0
         self.stalled_steps = 0

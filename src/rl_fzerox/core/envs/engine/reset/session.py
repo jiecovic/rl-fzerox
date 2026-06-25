@@ -38,6 +38,7 @@ from .tracks import (
 @dataclass(frozen=True, slots=True)
 class EngineResetResult:
     selected_track: SelectedTrack | None
+    selected_track_info: dict[str, object] | None
     info: dict[str, object]
     telemetry: FZeroXTelemetry | None
     uses_custom_baseline: bool
@@ -175,6 +176,7 @@ class EngineResetCoordinator:
         seed: int | None,
         selected_track: SelectedTrack | None,
     ) -> EngineResetResult:
+        selected_track_info = None if selected_track is None else selected_track.info()
         if selected_track is not None:
             load_track_baseline(
                 backend=self._backend,
@@ -188,8 +190,8 @@ class EngineResetCoordinator:
             sampled_track_baseline=selected_track is not None,
             selected_track=selected_track,
         )
-        if selected_track is not None:
-            info.update(selected_track.info())
+        if selected_track_info is not None:
+            info.update(selected_track_info)
         if self._locked_reset_course_id is not None:
             info["track_sampling_locked_course_id"] = self._locked_reset_course_id
 
@@ -206,6 +208,7 @@ class EngineResetCoordinator:
         info.update(backend_step_info(self._backend))
         return EngineResetResult(
             selected_track=selected_track,
+            selected_track_info=selected_track_info,
             info=info,
             telemetry=telemetry,
             uses_custom_baseline=uses_custom_baseline,

@@ -29,7 +29,6 @@ from ..controls import ActionMaskController, ControlStateTracker, sync_dynamic_a
 from ..controls.lean import lean_index_from_control, signed_lean
 from ..info import backend_step_info, telemetry_info
 from ..observation import EngineObservationBuilder
-from ..reset import SelectedTrack
 from .result import WatchEnvStep
 
 
@@ -44,7 +43,7 @@ class EnvStepRequest:
     spin_request: SpinRequest
     capture_display_frames: bool
     capture_audio: bool
-    active_track: SelectedTrack | None
+    active_track_info: dict[str, object] | None
     episode_frame_count: int
     episode_stalled_steps: int
     episode_progress_frontier_stalled_frames: int
@@ -245,8 +244,8 @@ class EngineStepAssembler:
 
     def _base_info(self, request: EnvStepRequest) -> dict[str, object]:
         info = backend_step_info(self.backend)
-        if request.active_track is not None:
-            info.update(request.active_track.info())
+        if request.active_track_info is not None:
+            info.update(request.active_track_info)
         return info
 
     def _step_action_context(

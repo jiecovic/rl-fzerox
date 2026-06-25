@@ -196,7 +196,7 @@ class PolicyDriveRuntime:
                 spin_request=spin_request,
                 capture_display_frames=True,
                 capture_audio=capture_audio,
-                active_track=None,
+                active_track_info=None,
                 episode_frame_count=self._episode.frame_count,
                 episode_stalled_steps=self._episode.stalled_steps,
                 episode_progress_frontier_stalled_frames=(

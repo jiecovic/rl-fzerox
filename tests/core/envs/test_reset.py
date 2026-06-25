@@ -8,7 +8,7 @@ from gymnasium.spaces import Box, Dict, MultiDiscrete
 
 from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
+from rl_fzerox.core.envs.engine.reset import SelectedTrack, TrackBaselineCache
 from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     ObservationConfig,
@@ -201,6 +201,47 @@ def test_step_info_keeps_sampled_track_metadata(tmp_path: Path) -> None:
     assert step_info["track_display_name"] == "Silence Time Attack - Blue Falcon Engine 50"
     assert step_info["track_course_index"] == 1
     assert step_info["track_non_agg_worst_time_ms"] == 63279
+
+
+def test_step_info_reuses_cached_sampled_track_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    info_calls = 0
+    original_info = SelectedTrack.info
+
+    def counting_info(self: SelectedTrack) -> dict[str, object]:
+        nonlocal info_calls
+        info_calls += 1
+        return original_info(self)
+
+    monkeypatch.setattr(SelectedTrack, "info", counting_info)
+    baseline_path = tmp_path / "silence.state"
+    baseline_path.write_bytes(b"state")
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        baseline_state_path=baseline_path,
+                        weight=1.0,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    env.reset(seed=123)
+    reset_info_calls = info_calls
+    _, _, _, _, step_info = env.step(env.action_space.sample())
+
+    assert reset_info_calls == 1
+    assert info_calls == reset_info_calls
+    assert step_info["track_id"] == "silence"
 
 
 def test_reset_can_disable_sampled_track_baseline_cache(tmp_path: Path) -> None:
