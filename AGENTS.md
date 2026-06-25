@@ -38,6 +38,8 @@ Examples:
 
 - Keep modules small and cohesive. Split files when doing so improves clarity,
   testability, or ownership.
+- Around 700 LOC, actively consider a cohesive split. A file size below about
+  500 LOC is a good target when the split stays natural.
 - When one subsystem needs several implementation files, prefer an owned
   package with a small facade over many loose sibling files.
 - Do not leave empty source directories behind after moves. Avoid one-file
