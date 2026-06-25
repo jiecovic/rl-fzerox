@@ -50,6 +50,9 @@ Examples:
   problem already present in the codebase.
 - Before adding behavior to a large runtime file, first look for a cohesive
   split that keeps side effects and state transitions easier to trace.
+- In Python, prefer absolute imports from project packages. Relative imports are
+  acceptable only for same-package local files, and should stay shallow
+  (`from .foo import ...`, not parent-package hops).
 - Add a single-line file path comment as the first line in every source file.
 
 ## Source of Truth
