@@ -39,6 +39,12 @@ Examples:
 - Keep public interfaces narrow and well-defined.
 - Do not introduce framework layers or indirection unless they solve a concrete
   problem already present in the codebase.
+- New helpers or files must pay for themselves immediately by reducing call
+  paths, concepts, duplication, or test burden.
+- Do not keep aliases, shims, fallback readers, or legacy paths unless they
+  protect a shipped public contract or an explicit migration.
+- Add config or env knobs only when existing defaults, UI, or schema cannot
+  represent the behavior cleanly.
 - In Python, prefer absolute imports from project packages. Relative imports are
   acceptable only for same-package local files, and should stay shallow
   (`from .foo import ...`, not parent-package hops).
@@ -90,6 +96,8 @@ Examples:
 - Keep hot loops allocation-light and data-oriented. Cache invariant lookups,
   avoid repeated schema/object construction, and keep logging out of per-frame
   paths unless explicitly sampled or gated.
+- Avoid repeated discovery or polling in runtime hot paths. Prepare stable
+  facts once and pass them forward.
 - Put emulator-hot, frame-processing, and large array work in Rust, NumPy, or
   narrow helper functions instead of Python object-heavy loops.
 - Prefer measuring the hot path before micro-optimizing. Preserve readability
@@ -168,6 +176,11 @@ Examples:
 - Add or update tests for behavior changes when feasible. If skipped, state why.
 - Run relevant lint, typecheck, and tests before finishing or committing
   meaningful changes. If a feasible check cannot be run, report that explicitly.
+- For reviews or verdicts, read the changed function or module plus relevant
+  callers, callees, sibling code, and tests. Do not judge from diff-only
+  context.
+- For dependency-backed behavior, inspect upstream docs, source, or types before
+  relying on API defaults, error behavior, or timing assumptions.
 
 Useful checks:
 
