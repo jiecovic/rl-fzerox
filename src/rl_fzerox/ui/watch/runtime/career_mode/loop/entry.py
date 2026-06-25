@@ -9,7 +9,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.debug import (
     observe_career_mode_debug_trace,
     open_career_mode_debug_trace,
 )
-from rl_fzerox.ui.watch.runtime.career_mode.loop.runner import _run_career_mode_loop_body
+from rl_fzerox.ui.watch.runtime.career_mode.loop.runner import run_career_mode_loop_body
 from rl_fzerox.ui.watch.runtime.career_mode.loop.signals import CareerModeWorkerQuit
 from rl_fzerox.ui.watch.runtime.career_mode.loop.state import (
     initial_career_mode_loop_state,
@@ -59,7 +59,7 @@ def run_loaded_career_mode_loop(
             frame_source=session.render,
             force=True,
         )
-        _run_career_mode_loop_body(
+        run_career_mode_loop_body(
             config=config,
             session=session,
             controller=controller,

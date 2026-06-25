@@ -87,7 +87,7 @@ from rl_fzerox.ui.watch.runtime.policy.visualization import (
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
 
 
-def _run_career_mode_loop_body(
+def run_career_mode_loop_body(
     *,
     config: WatchAppConfig,
     session: CareerModeRuntimeSession,
