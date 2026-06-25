@@ -76,6 +76,9 @@ def test_manager_training_bridge_adds_generated_x_cup_entries(
     config.tracks.include_x_cup = True
     config.tracks.x_cup_course_count = 2
     config.tracks.selected_course_ids = ()
+    config.vehicle.engine_mode = "random_range"
+    config.vehicle.engine_setting_min_raw_value = 30
+    config.vehicle.engine_setting_max_raw_value = 90
 
     train_config = build_managed_train_app_config(
         config,
@@ -94,6 +97,9 @@ def test_manager_training_bridge_adds_generated_x_cup_entries(
     assert all(entry.generated_course_hash is not None for entry in entries)
     assert {entry.generated_course_slot for entry in entries} == {0, 1}
     assert {entry.generated_course_generation for entry in entries} == {1}
+    assert {entry.engine_setting_min_raw_value for entry in entries} == {30}
+    assert {entry.engine_setting_max_raw_value for entry in entries} == {90}
+    assert {entry.source_engine_setting_raw_value for entry in entries} == {60}
 
 
 def test_manager_training_bridge_groups_generated_x_cup_difficulty_baselines(
