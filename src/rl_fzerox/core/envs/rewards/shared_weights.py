@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/rewards/shared_weights.py
+"""Protocol for reward weights consumed by shared helper modules.
+
+Some reward helpers operate on the common progress and event fields through this
+small, explicit profile dependency.
+"""
 from __future__ import annotations
 
 from typing import Protocol

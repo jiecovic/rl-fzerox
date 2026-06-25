@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/camera.py
+"""Reset-time camera synchronization.
+
+F-Zero X changes camera through controller input, so reset code uses this file
+to tap the game UI into the configured camera before an episode starts.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

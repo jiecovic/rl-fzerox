@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/gym_runtime/stepping.py
+"""Gym-runtime action validation and step orchestration.
+
+This file decodes policy actions, applies runtime control semantics, invokes
+engine step assembly, and persists episode state after each Gym step.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

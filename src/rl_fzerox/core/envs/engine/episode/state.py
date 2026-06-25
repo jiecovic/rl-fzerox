@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/engine/episode/state.py
+"""Mutable state carried across one active env episode.
+
+`EngineEpisodeState` is the handoff object between reset, stepping, controls,
+rewards, and observation assembly. It stores env-local facts only; persistent
+run-manager state lives outside the env package.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

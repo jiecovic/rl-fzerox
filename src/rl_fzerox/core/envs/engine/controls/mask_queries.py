@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/mask_queries.py
+"""Pure queries over action masks and decoded action branches.
+
+Runtime and UI code use this module to explain which selected branches violate
+the current mask while leaving controller and mask state untouched.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

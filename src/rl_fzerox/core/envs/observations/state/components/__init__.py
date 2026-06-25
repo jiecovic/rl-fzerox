@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/components/__init__.py
+"""State-vector component registry facade.
+
+Each component module owns one feature group, while this package exposes the
+small set of builders used by the state API. New components should register
+through the registry to keep vector assembly predictable.
+"""
 from __future__ import annotations
 
 from rl_fzerox.core.envs.observations.state.components.core import (

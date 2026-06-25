@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/gates.py
+"""Small immutable transforms for controller-state gating.
+
+Higher-level mask and semantics modules use these helpers to clear or preserve
+specific control branches while reusing `RaceControlState` replacement code.
+"""
 from __future__ import annotations
 
 from dataclasses import replace

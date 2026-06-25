@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/availability.py
+"""Dynamic control availability based on telemetry and runtime gates.
+
+The functions here update masks for boost, lean, air brake, and spin as the live
+race state changes during an episode.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState

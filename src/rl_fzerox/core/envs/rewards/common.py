@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/common.py
+"""Shared reward contracts and small cross-profile helpers.
+
+Reward profiles return `RewardStep` values and implement `RewardTracker`.
+Helpers in this file are intentionally generic enough to be reused across reward
+profiles.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

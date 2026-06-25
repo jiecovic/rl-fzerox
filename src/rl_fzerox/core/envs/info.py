@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/info.py
+"""Monitor/info-key defaults shared by envs, callbacks, and watch surfaces.
+
+The fields listed here are the stable episode-info surface expected by training
+logs, TensorBoard aggregation, evaluation, and UI inspection code.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

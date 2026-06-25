@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/tracks.py
+"""Facade for sampled-track reset helpers.
+
+The implementation lives in `track_sampling/`; this module keeps older reset
+call sites on a narrow, reset-owned import path.
+"""
 from __future__ import annotations
 
 from rl_fzerox.core.envs.engine.reset.track_sampling import (

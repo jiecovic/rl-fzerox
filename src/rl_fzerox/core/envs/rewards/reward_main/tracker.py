@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/reward_main/tracker.py
+"""Episode orchestration for the canonical `reward_main` profile.
+
+`RewardMainTracker` owns the mutable reward state across an episode: progress
+frontiers, previous telemetry, airborne/refill state, and debug summaries.
+Individual term formulas live in sibling modules.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/__init__.py
+"""Reward profile facade and config validation.
+
+The env runtime resolves reward configs through this module and receives a
+tracker class plus weight model. Concrete reward math stays inside profile
+packages such as `reward_main`.
+"""
 from dataclasses import fields
 from typing import Any
 

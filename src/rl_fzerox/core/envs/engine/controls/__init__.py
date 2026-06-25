@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/envs/engine/controls/__init__.py
-"""Control-state history, live availability, and action-mask helpers."""
+"""Control-state history, live availability, and action-mask helpers.
+
+This package is the env engine's control facade. It groups runtime masks,
+history trackers, pulse semantics, and temporary control gates used by both
+Gym training and policy-drive playback.
+"""
 
 from rl_fzerox.core.envs.engine.controls.availability import (
     apply_dynamic_control_gates,

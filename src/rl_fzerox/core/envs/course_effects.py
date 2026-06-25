@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/course_effects.py
+"""Helpers for interpreting course-effect bits from telemetry.
+
+Reward, observation, and watch code use these predicates as the shared place for
+raw surface-flag checks for refill, dirt, ice, and dash surfaces.
+"""
 from __future__ import annotations
 
 from enum import IntEnum

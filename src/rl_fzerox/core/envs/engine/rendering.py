@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/envs/engine/rendering.py
-"""Renderer resolution for emulator-backed env components."""
+"""Renderer resolution for emulator-backed env components.
+
+The env config may request a renderer by name while tests can inject a backend
+directly. This file centralizes that small runtime selection boundary.
+"""
 
 from __future__ import annotations
 

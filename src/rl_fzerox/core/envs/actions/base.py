@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/actions/base.py
+"""Base action adapter contracts shared by discrete and hybrid policies.
+
+Adapters decode raw policy outputs into requested controller state and branch
+metadata. Runtime control modules decide whether a requested control is
+currently legal.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

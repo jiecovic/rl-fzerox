@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/reward_main/step_terms.py
+"""Per-step reward terms keyed by the current telemetry snapshot.
+
+This module collects small, telemetry-local terms such as KO star changes,
+danger-speed shaping, and surface effects. Stateful terms stay in dedicated
+trackers or in the main reward tracker.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

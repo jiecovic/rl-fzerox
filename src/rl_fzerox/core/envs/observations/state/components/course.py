@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/observations/state/components/course.py
+"""State-vector features for selected course context.
+
+Course identity is reset/runtime context that complements live telemetry. This
+component turns that context into optional scalar or one-hot state features.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

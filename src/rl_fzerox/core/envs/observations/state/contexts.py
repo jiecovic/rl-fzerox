@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/contexts.py
+"""Context-derived state feature helpers.
+
+Some state features come from reset/runtime context rather than telemetry.
+This module converts selected course metadata into feature definitions and
+values while keeping the state API independent of reset internals.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry

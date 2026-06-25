@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/stepping/assembly.py
+"""Assembly of one native repeated-step result into env/watch outputs.
+
+This file bridges backend stepping, reward tracking, action-mask updates,
+observation building, and info projection for already-decoded env actions.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

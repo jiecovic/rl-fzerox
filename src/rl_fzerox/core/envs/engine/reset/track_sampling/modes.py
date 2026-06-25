@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/track_sampling/modes.py
+"""Sampling-mode algorithms for reset target entries.
+
+This module builds deterministic weighted cycles and per-env assignments used by
+equal, step-balanced, fixed-env, and deficit-budget sampling.
+"""
 from __future__ import annotations
 
 from collections.abc import Iterable

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/env.py
+"""Public Gymnasium environment wrapper.
+
+This file exposes `FZeroXEnv`, the stable object callers instantiate. Reset,
+step, observation, reward, and watch behavior are delegated to runtime and
+engine modules so this wrapper stays focused on the Gym API boundary.
+"""
 from __future__ import annotations
 
 from collections.abc import Sequence

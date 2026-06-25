@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/gym_runtime/reset.py
+"""Gym-runtime reset orchestration.
+
+This module connects reset target selection, backend reset, episode-state
+initialization, and initial observation construction for `FZeroXEnv`.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend

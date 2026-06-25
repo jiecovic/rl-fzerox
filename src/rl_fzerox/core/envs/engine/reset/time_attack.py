@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/time_attack.py
+"""Time-attack baseline retargeting.
+
+Time-attack baselines are exact course and vehicle states. This module patches
+only the engine setting when the selected target can safely reuse that baseline.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry

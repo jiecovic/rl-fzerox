@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/api.py
+"""Public API for state-vector specs and telemetry conversion.
+
+Callers use this module to ask which state features exist and to turn one
+telemetry snapshot plus action-history values into a normalized vector. It
+delegates feature ownership to component definitions.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

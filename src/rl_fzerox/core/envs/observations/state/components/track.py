@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/components/track.py
+"""State-vector features for progress and track-relative position.
+
+This component exposes spline progress, lap context, ground distance, and
+track-position signals from telemetry. Reward progress accounting lives in the
+reward modules.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

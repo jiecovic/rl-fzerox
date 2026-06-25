@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/components/machine.py
+"""State-vector features for machine orientation and dynamics.
+
+These features are direct telemetry-derived vehicle dynamics such as velocity,
+heading, drift, and angular motion. They are normalized here before being
+appended to the policy state vector.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

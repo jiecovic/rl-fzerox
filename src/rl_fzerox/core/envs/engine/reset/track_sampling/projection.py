@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/track_sampling/projection.py
+"""Projection from runtime config entries to selected reset targets.
+
+The selector uses this module to combine static track config, engine tuning
+choice, baseline variants, and generated-course metadata into `SelectedTrack`.
+"""
 from __future__ import annotations
 
 from rl_fzerox.core.engine_tuning import (

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/reward_main/controls.py
+"""Action-request and recovery-control reward terms.
+
+This module scores optional control-shaping knobs such as requested boosts,
+spins, and recovery behavior. It consumes decoded action context from the env
+runtime rather than inspecting raw policy actions.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary

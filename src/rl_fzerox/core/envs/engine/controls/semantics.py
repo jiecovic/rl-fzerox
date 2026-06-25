@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/semantics.py
-"""Shared semantic control filtering for policy and env stepping."""
+"""Shared semantic control filtering for policy and env stepping.
+
+These functions apply runtime control rules after action decoding and before
+emulator stepping, keeping Gym and policy-drive behavior aligned.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/components/control_history.py
+"""State-vector features derived from recent control history.
+
+This component exposes prior action values as normalized state features. The
+runtime records the history; this file only describes feature names and vector
+values for the configured history window.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

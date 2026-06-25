@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/components/vehicle.py
+"""State-vector features for health, speed, boost, and race timing.
+
+These features describe the current vehicle/race status that the policy may
+observe. Control history, course identity, and track geometry are handled by
+separate components.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

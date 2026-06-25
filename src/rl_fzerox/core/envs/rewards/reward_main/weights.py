@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/reward_main/weights.py
+"""Weight dataclass for the canonical `reward_main` profile.
+
+The fields here are the config-facing knobs used by progress, events, energy,
+control, and recovery terms. Keep defaults conservative because run-manager
+configs often inherit them implicitly.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

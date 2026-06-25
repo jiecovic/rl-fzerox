@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/episode_start.py
+"""Shared episode-start initialization after race reset has completed.
+
+This file prepares controller state, action masks, reward trackers, observation
+metadata, and the initial observation for Gym and watch runtimes.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

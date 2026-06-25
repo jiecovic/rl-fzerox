@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/telemetry.py
+"""Telemetry predicates with env-level semantics.
+
+These helpers wrap native emulator fields where reward or policy behavior needs
+a stricter interpretation than the immediate RAM flag alone.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry

@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/mask_config.py
+"""Typed containers for action-mask branch metadata.
+
+These small structures keep raw mask arrays connected to branch names and values
+so env, watch, and policy-drive code can inspect masks without guessing indices.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

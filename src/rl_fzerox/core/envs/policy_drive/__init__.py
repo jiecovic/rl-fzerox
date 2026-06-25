@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/envs/policy_drive/__init__.py
-"""Policy-drive runtime surface for live race control."""
+"""Policy-drive runtime facade for live race playback.
+
+Policy drive runs against an already-loaded race and reuses env action
+semantics. It is the watch/manual control counterpart to the Gym runtime.
+"""
 
 from rl_fzerox.core.envs.policy_drive.frame import (
     PolicyDriveFrame,

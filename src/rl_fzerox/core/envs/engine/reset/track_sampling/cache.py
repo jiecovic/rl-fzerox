@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/track_sampling/cache.py
+"""Per-worker baseline savestate cache for sampled tracks.
+
+Loading baseline bytes through this cache avoids repeated disk reads while
+keeping a bounded memory budget for long multi-course training runs.
+"""
 from __future__ import annotations
 
 from collections import OrderedDict

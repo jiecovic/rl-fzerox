@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/gp_race.py
+"""GP race baseline retargeting.
+
+GP race baselines are exact course and vehicle states. This module patches only
+the engine setting when the selected target can safely reuse that baseline.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry

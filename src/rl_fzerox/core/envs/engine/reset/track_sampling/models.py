@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/track_sampling/models.py
+"""Internal data models for sampled track reset selection.
+
+`SelectedTrack` carries the reset baseline plus the metadata emitted into env
+info, training stats, and engine-tuning contexts for one episode.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

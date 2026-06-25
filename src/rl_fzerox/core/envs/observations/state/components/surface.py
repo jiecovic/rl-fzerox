@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/state/components/surface.py
+"""State-vector features for course surface effects.
+
+Surface features expose whether the machine is on refill, dirt, ice, dash, jump,
+or related course effects. The raw effect decoding lives in course-effect
+helpers; this module only packages it for observation state.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

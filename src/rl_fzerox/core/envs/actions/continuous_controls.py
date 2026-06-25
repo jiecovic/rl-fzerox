@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/actions/continuous_controls.py
+"""Continuous control scaling and deterministic PWM helpers.
+
+The functions in this file translate normalized policy outputs into thrust,
+air-brake, and button-duty values that training and watch playback can replay
+deterministically.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/progress.py
+"""Episode-relative progress accounting shared by reward profiles.
+
+`EpisodeProgressState` tracks monotonic race-distance deltas from telemetry.
+Profile modules decide how to turn that progress into shaped reward and when
+to gate or bucket payouts.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary

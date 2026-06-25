@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/envs/policy_drive/frame.py
-"""Policy-drive frame data."""
+"""Policy-drive frame data.
+
+Watch/manual driving can request rendered frames and audio outside Gym training.
+These containers describe what one live policy-drive step produced.
+"""
 
 from __future__ import annotations
 

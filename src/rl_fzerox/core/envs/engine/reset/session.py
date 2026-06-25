@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/session.py
+"""Reset coordinator for track selection, baseline loading, and presentation sync.
+
+`EngineResetCoordinator` is the reset-side owner of sampled targets, queued
+deficit resets, engine tuning choices, cached baselines, and reset seeds.
+"""
 from __future__ import annotations
 
 import math

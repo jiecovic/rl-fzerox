@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/laps.py
+"""Lap-count helpers that normalize native RAM fields to HUD semantics.
+
+The raw lap counter can advance before the visible lap display does, so rewards
+and logs route completed-lap calculations through this file.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry

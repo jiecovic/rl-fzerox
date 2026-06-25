@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/reward_main/progress.py
+"""Gated progress-frontier reward for `reward_main`.
+
+Progress reward is paid from newly crossed spline buckets so each frontier
+bucket is rewarded once per episode. Speed and ground-effect multipliers are
+applied here before the tracker aggregates the step breakdown.
+"""
 from __future__ import annotations
 
 from collections.abc import Callable

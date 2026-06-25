@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/envs/actions/configured/hybrid.py
-"""Configured mixed continuous/discrete action adapter."""
+"""Configured mixed continuous/discrete action adapter.
+
+This adapter keeps steering and optional pitch as continuous policy outputs and
+uses discrete branches for buttons, lean, spin, and boost requests. The runtime
+still owns when those requests are legal.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/race.py
+"""Low-level race reset and selected-baseline retarget dispatch.
+
+This module talks directly to the backend reset/load APIs, then delegates
+mode-specific retargeting to GP race or time-attack helpers.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry

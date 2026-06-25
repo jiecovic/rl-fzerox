@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/observations/value.py
+"""Gym observation values and spaces for each observation mode.
+
+This file combines image buffers, optional state vectors, and Gym space
+metadata into the concrete values returned by env reset/step. Feature
+definition and telemetry extraction stay in the `state` package.
+"""
 from __future__ import annotations
 
 from collections.abc import Mapping

@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/envs/actions/configured/discrete.py
-"""Configured fully discrete action adapter."""
+"""Configured fully discrete action adapter.
+
+This adapter turns a MultiDiscrete policy action into one controller state plus
+optional spin/boost requests. It also builds the matching branch masks for the
+currently enabled control layout.
+"""
 
 from __future__ import annotations
 

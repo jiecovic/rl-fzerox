@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/envs/rewards/reward_main/recovery.py
+"""Outside-track recovery distance helpers.
+
+These functions reduce telemetry and repeated-step summaries into one recovery
+distance signal. The control reward module decides whether that movement should
+be rewarded for a given action context.
+"""
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary

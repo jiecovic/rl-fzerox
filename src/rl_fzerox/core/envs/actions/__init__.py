@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/actions/__init__.py
+"""Configured policy-action adapters and action-space exports.
+
+Imports from this package describe what a policy may request. Runtime modules
+still own masks, pulse semantics, and final controller state.
+"""
 from collections.abc import Callable
 
 from rl_fzerox.core.domain.actions import ActionAdapterName

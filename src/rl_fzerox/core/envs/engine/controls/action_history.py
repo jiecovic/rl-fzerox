@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/action_history.py
+"""Action-history buffer used for scalar observations and debug info.
+
+The history stores normalized control branch values after runtime semantics, so
+state observations reflect what the env actually applied.
+"""
 from __future__ import annotations
 
 from collections import deque

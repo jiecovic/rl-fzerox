@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/history.py
+"""Frame-local control-state tracker for runtime semantics.
+
+The tracker remembers applied and requested controls across steps so pulse,
+hold, action-history, and mask override behavior can be computed consistently.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

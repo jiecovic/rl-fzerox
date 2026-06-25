@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/envs/policy_drive/runtime.py
-"""Policy-drive runtime around shared emulator stepping components."""
+"""Policy-drive runtime around shared emulator stepping components.
+
+This runtime drives an already-loaded live race for watch/manual playback. It
+uses the same action semantics and step assembly as Gym runtime playback.
+"""
 
 from __future__ import annotations
 

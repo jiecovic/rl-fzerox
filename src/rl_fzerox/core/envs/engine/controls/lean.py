@@ -1,4 +1,9 @@
 # src/rl_fzerox/core/envs/engine/controls/lean.py
+"""Lean branch encoding, pulse timing, and mask helpers.
+
+Lean has discrete left/right/neutral states plus optional timer-assist behavior,
+so its conversion and hold logic lives outside the generic action adapter.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, replace

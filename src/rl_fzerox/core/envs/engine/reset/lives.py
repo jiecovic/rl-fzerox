@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/envs/engine/reset/lives.py
-"""Reset-time GP spare-machine randomization."""
+"""Reset-time GP spare-machine randomization.
+
+Training can randomize available GP lives after loading a baseline. This module
+keeps that game-RNG mutation separate from track selection and baseline loading.
+"""
 
 from __future__ import annotations
 

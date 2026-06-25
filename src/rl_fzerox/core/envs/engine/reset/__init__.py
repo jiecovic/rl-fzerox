@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/envs/engine/reset/__init__.py
-"""Race reset, camera synchronization, and sampled-track helpers."""
+"""Reset facade for race entry, camera sync, and sampled tracks.
+
+Callers should use this package boundary for reset orchestration primitives.
+Mode-specific mechanics live in sibling modules so GP race, time attack, and
+track sampling stay separate from the runtime entrypoint.
+"""
 
 from rl_fzerox.core.envs.engine.reset.camera import sync_camera_setting
 from rl_fzerox.core.envs.engine.reset.race import load_track_baseline, reset_race_state
