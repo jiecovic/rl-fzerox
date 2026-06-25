@@ -42,19 +42,11 @@ class _DummyModel:
         self.set_parameters_calls.append((path, exact_match, device))
 
 
-def _source_run_config(*, auxiliary_state_head_arch: tuple[int, ...] | None) -> SimpleNamespace:
-    return SimpleNamespace(
-        policy=SimpleNamespace(
-            auxiliary_state_enabled=auxiliary_state_head_arch is not None,
-            auxiliary_state_head_arch=auxiliary_state_head_arch or (),
-        )
-    )
-
-
 def _resume_train_config(
     tmp_path: Path,
     *,
     resume_mode: Literal["weights_only", "full_model"] = "weights_only",
+    source_auxiliary_state_head_arch: tuple[int, ...] | None = None,
 ) -> TrainConfig:
     return TrainConfig(
         algorithm="maskable_hybrid_action_ppo",
@@ -62,6 +54,8 @@ def _resume_train_config(
         resume_artifact="latest",
         resume_mode=resume_mode,
         resume_source_algorithm="maskable_hybrid_action_ppo",
+        resume_source_auxiliary_state_enabled=source_auxiliary_state_head_arch is not None,
+        resume_source_auxiliary_state_head_arch=source_auxiliary_state_head_arch or (),
         device="cpu",
     )
 
@@ -94,10 +88,6 @@ def test_weights_only_resume_relaxes_exact_match_when_aux_bank_presence_differs(
     model_path = tmp_path / "model.zip"
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: _source_run_config(auxiliary_state_head_arch=None),
-    )
-    monkeypatch.setattr(
         "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
         lambda run_dir, artifact: model_path,
     )
@@ -118,23 +108,12 @@ def test_non_managed_resume_allows_nonstructural_config_edits(
     model = _DummyModel(auxiliary_state_head_arch=None)
     model_path = tmp_path / "model.zip"
     train_config = _resume_train_config(tmp_path)
-    source_config = _train_app_config(
-        tmp_path, train_config=TrainConfig(algorithm=train_config.algorithm)
-    )
     current_config = _train_app_config(
         tmp_path,
         train_config=train_config,
         policy_config=PolicyConfig(activation="gelu"),
     )
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: source_config,
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_train_config",
-        lambda run_dir: source_config.train,
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
         lambda run_dir, artifact: model_path,
@@ -150,32 +129,22 @@ def test_non_managed_resume_allows_nonstructural_config_edits(
     assert model.set_parameters_calls == [(str(model_path), True, "cpu")]
 
 
-def test_non_managed_resume_rejects_structural_config_edits(
-    monkeypatch: pytest.MonkeyPatch,
+def test_resume_requires_explicit_auxiliary_state_metadata(
     tmp_path: Path,
 ) -> None:
     model = _DummyModel(auxiliary_state_head_arch=None)
-    train_config = _resume_train_config(tmp_path)
-    source_config = _train_app_config(
-        tmp_path, train_config=TrainConfig(algorithm=train_config.algorithm)
-    )
-    current_config = _train_app_config(
-        tmp_path,
-        train_config=train_config,
-        action_config=ActionConfig(pitch_buckets=7),
+    train_config = TrainConfig(
+        algorithm="maskable_hybrid_action_ppo",
+        resume_run_dir=tmp_path,
+        resume_artifact="latest",
+        resume_source_algorithm="maskable_hybrid_action_ppo",
     )
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: source_config,
-    )
-
-    with pytest.raises(RuntimeError, match="action layout"):
+    with pytest.raises(RuntimeError, match="Resume requires source checkpoint metadata"):
         maybe_resume_training_model(
             model=model,
             train_env=object(),
             train_config=train_config,
-            current_run_config=current_config,
         )
 
 
@@ -184,13 +153,9 @@ def test_weights_only_resume_keeps_exact_match_when_aux_bank_signature_matches(
     tmp_path: Path,
 ) -> None:
     model = _DummyModel(auxiliary_state_head_arch=(128,))
-    train_config = _resume_train_config(tmp_path)
+    train_config = _resume_train_config(tmp_path, source_auxiliary_state_head_arch=(128,))
     model_path = tmp_path / "model.zip"
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: _source_run_config(auxiliary_state_head_arch=(128,)),
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
         lambda run_dir, artifact: model_path,
@@ -223,10 +188,6 @@ def test_weights_only_resume_imports_source_action_bias_marker_before_reconcile(
         "spin_idle_logit": 0.0,
     }
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: _source_run_config(auxiliary_state_head_arch=None),
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
         lambda run_dir, artifact: model_path,
@@ -267,13 +228,9 @@ def test_weights_only_resume_relaxes_exact_match_when_aux_bank_arch_differs(
     tmp_path: Path,
 ) -> None:
     model = _DummyModel(auxiliary_state_head_arch=(64,))
-    train_config = _resume_train_config(tmp_path)
+    train_config = _resume_train_config(tmp_path, source_auxiliary_state_head_arch=(128,))
     model_path = tmp_path / "model.zip"
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: _source_run_config(auxiliary_state_head_arch=(128,)),
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
         lambda run_dir, artifact: model_path,
@@ -293,11 +250,10 @@ def test_full_model_resume_rejects_aux_bank_signature_mismatch(
     tmp_path: Path,
 ) -> None:
     model = _DummyModel(auxiliary_state_head_arch=(128,))
-    train_config = _resume_train_config(tmp_path, resume_mode="full_model")
-
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: _source_run_config(auxiliary_state_head_arch=(64,)),
+    train_config = _resume_train_config(
+        tmp_path,
+        resume_mode="full_model",
+        source_auxiliary_state_head_arch=(64,),
     )
 
     with pytest.raises(RuntimeError, match="Full-model resume requires the same auxiliary-state"):
@@ -335,14 +291,6 @@ def test_managed_resume_uses_injected_source_metadata_without_yaml_loaders(
         device="cpu",
     )
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_config",
-        lambda run_dir: pytest.fail(f"unexpected config YAML load: {run_dir}"),
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.training.session.model.preload.load_train_run_train_config",
-        lambda run_dir: pytest.fail(f"unexpected train YAML load: {run_dir}"),
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.training.session.model.preload.resolve_model_artifact_path",
         lambda run_dir, artifact: model_path,

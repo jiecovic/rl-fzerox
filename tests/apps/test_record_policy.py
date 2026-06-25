@@ -313,45 +313,45 @@ def test_resolve_ffmpeg_path_uses_bundled_fallback(monkeypatch: pytest.MonkeyPat
 
 
 def test_parse_args_records_deterministically_by_default() -> None:
-    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
+    args = parse_args(["--run-id", "run-a", "--out", "race.mp4"])
 
     assert args.deterministic is True
 
 
 def test_parse_args_can_record_stochastically() -> None:
-    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--no-deterministic"])
+    args = parse_args(["--run-id", "run-a", "--out", "race.mp4", "--no-deterministic"])
 
     assert args.deterministic is False
 
 
 def test_parse_args_uses_live_progress_by_default() -> None:
-    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
+    args = parse_args(["--run-id", "run-a", "--out", "race.mp4"])
 
     assert args.progress_interval == 2.0
 
 
 def test_parse_args_can_disable_live_progress() -> None:
-    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--progress-interval", "0"])
+    args = parse_args(["--run-id", "run-a", "--out", "race.mp4", "--progress-interval", "0"])
 
     assert args.progress_interval == 0.0
 
 
 def test_parse_args_defaults_to_stream_all_record_mode() -> None:
-    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
+    args = parse_args(["--run-id", "run-a", "--out", "race.mp4"])
 
     assert args.record_mode == "stream-all"
 
 
 def test_parse_args_accepts_probe_then_record_mode() -> None:
     args = parse_args(
-        ["--run-dir", "run-dir", "--out", "race.mp4", "--record-mode", "probe-then-record"]
+        ["--run-id", "run-a", "--out", "race.mp4", "--record-mode", "probe-then-record"]
     )
 
     assert args.record_mode == "probe-then-record"
 
 
 def test_parse_args_uses_lap_target_by_default() -> None:
-    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
+    args = parse_args(["--run-id", "run-a", "--out", "race.mp4"])
 
     assert args.target_laps == 3
     assert args.target_rank is None
@@ -360,8 +360,8 @@ def test_parse_args_uses_lap_target_by_default() -> None:
 def test_parse_args_accepts_max_episode_alias_and_reload_mode() -> None:
     args = parse_args(
         [
-            "--run-dir",
-            "run-dir",
+            "--run-id",
+            "run-a",
             "--out",
             "race.mp4",
             "--max-episodes",
@@ -379,7 +379,7 @@ def test_parse_args_accepts_max_episode_alias_and_reload_mode() -> None:
 
 
 def test_parse_args_accepts_recording_course_id() -> None:
-    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--course-id", "space_plant"])
+    args = parse_args(["--run-id", "run-a", "--out", "race.mp4", "--course-id", "space_plant"])
 
     assert args.course_id == "space_plant"
 

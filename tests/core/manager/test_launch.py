@@ -710,7 +710,6 @@ def test_active_watch_pid_clears_stale_viewer_lease(
             store=store,
             lease_id=lease_id,
             run_id=run.id,
-            run_dir=run.run_dir,
             artifact="latest",
         )
         is None
@@ -795,7 +794,7 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
         "rl_fzerox.apps.watch",
         "--manager-db-path",
         str(store.db_path),
-        "--managed-run-id",
+        "--run-id",
         run.id,
         "--artifact",
         "latest",

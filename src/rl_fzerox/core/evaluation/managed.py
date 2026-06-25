@@ -32,7 +32,6 @@ from rl_fzerox.core.training.runs import (
     RunPaths,
     ensure_run_dirs,
     explicit_run_paths,
-    load_train_run_config,
     materialize_train_run_config,
     save_train_run_config,
 )
@@ -146,7 +145,7 @@ def _materialize_evaluation_train_config(
     )
     suite = _evaluation_baseline_suite(evaluation)
     ensure_run_dirs(suite.run_paths)
-    materialized_config = _load_or_materialize_baseline_suite(
+    materialized_config = _materialize_baseline_suite(
         _suite_materializer_input(materializer_input, suite=suite),
         suite=suite,
     )
@@ -196,31 +195,16 @@ def _suite_materializer_input(
     )
 
 
-def _load_or_materialize_baseline_suite(
+def _materialize_baseline_suite(
     config: TrainAppConfig,
     *,
     suite: EvaluationBaselineSuite,
 ) -> TrainAppConfig:
-    if suite.manifest_path.is_file():
-        materialized_config = load_train_run_config(suite.run_paths.run_dir)
-        if _materialized_baselines_are_ready(materialized_config):
-            return materialized_config
-
+    # Evaluation suites reuse baseline files, not stale config snapshots. Always
+    # project from the SQLite-owned evaluation config and then sync the manifest mirror.
     materialized_config = materialize_train_run_config(config, run_paths=suite.run_paths)
     save_train_run_config(config=materialized_config, run_dir=suite.run_paths.run_dir)
     return materialized_config
-
-
-def _materialized_baselines_are_ready(config: TrainAppConfig) -> bool:
-    if config.env.track_sampling.enabled:
-        return all(
-            entry.baseline_state_path is not None
-            and entry.baseline_state_path.expanduser().is_file()
-            for entry in config.env.track_sampling.entries
-        )
-    if config.emulator.baseline_state_path is None:
-        return True
-    return config.emulator.baseline_state_path.expanduser().is_file()
 
 
 def _evaluation_materializer_input(config: TrainAppConfig, *, seed: int) -> TrainAppConfig:

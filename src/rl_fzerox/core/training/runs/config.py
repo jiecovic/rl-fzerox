@@ -6,12 +6,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 from omegaconf import OmegaConf
-from pydantic import ValidationError
+from omegaconf.errors import OmegaConfBaseException
 
 from rl_fzerox.core.runtime_spec.paths import project_root_dir, resolve_config_data_paths
 from rl_fzerox.core.runtime_spec.schema import (
     TrainAppConfig,
-    TrainConfig,
     WatchAppConfig,
 )
 from rl_fzerox.core.runtime_spec.track_registry import expand_track_registry_metadata
@@ -88,19 +87,21 @@ def materialize_train_run_config(
 
 
 def save_train_run_config(*, config: TrainAppConfig, run_dir: Path) -> Path:
-    """Persist one resolved train manifest next to a training run."""
+    """Sync the resolved train manifest mirror next to a training run."""
 
     config_path = run_dir / RUN_LAYOUT.config_filename
-    # SQLite owns the manager run spec and lifecycle. Once a run has materialized
-    # baselines, this manifest owns the run-local runtime identity used by
-    # in-place resume and watch so cache-key changes cannot drift old runs.
+    # Manager-owned flows must project runtime config from SQLite first, then
+    # call this function to update the manifest mirror. A stale manifest is
+    # replaced here; it is never a fallback source for managed run behavior.
     data = _train_config_snapshot_data(config)
+    if _saved_train_manifest_matches(config_path, data):
+        return config_path
     OmegaConf.save(config=OmegaConf.create(data), f=str(config_path))
     return config_path
 
 
 def load_train_run_config(run_dir: Path) -> TrainAppConfig:
-    """Load one previously saved resolved train manifest."""
+    """Load a train manifest mirror for explicit diagnostics or serialization tests."""
 
     config_path = resolve_train_run_config_path(run_dir)
     loaded = _load_train_config_mapping(config_path)
@@ -110,37 +111,6 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
     )
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)
-
-
-def load_train_run_config_for_watch(run_dir: Path) -> TrainAppConfig:
-    """Load a saved train manifest for watch and explain stale-manifest failures."""
-
-    try:
-        return load_train_run_config(run_dir)
-    except ValidationError as exc:
-        resolved_run_dir = run_dir.expanduser().resolve()
-        raise RuntimeError(
-            "Saved train manifest is not compatible with the current schema: "
-            f"{resolved_run_dir}. Restart the run with the current config schema."
-        ) from exc
-
-
-def load_train_run_train_config(run_dir: Path) -> TrainConfig:
-    """Load only the train section from a saved run manifest."""
-
-    config_path = resolve_train_run_config_path(run_dir)
-    loaded = _load_train_config_mapping(config_path)
-    train_data = loaded.get("train")
-    if not isinstance(train_data, dict):
-        raise ValueError(f"Train manifest is missing a train mapping: {config_path}")
-
-    train_section: dict[str, object] = {}
-    for key, value in train_data.items():
-        if not isinstance(key, str):
-            raise ValueError(f"Train manifest train keys must be strings: {config_path}")
-        train_section[key] = value
-    _resolve_train_config_paths({"train": train_section}, config_dir=config_path.parent)
-    return TrainConfig.model_validate(train_section)
 
 
 def _load_train_config_mapping(config_path: Path) -> dict[str, object]:
@@ -160,6 +130,15 @@ def _train_config_snapshot_data(config: TrainAppConfig) -> dict[str, object]:
     return {
         str(key): value for key, value in config.model_dump(mode="json", exclude_none=True).items()
     }
+
+
+def _saved_train_manifest_matches(config_path: Path, data: dict[str, object]) -> bool:
+    if not config_path.is_file():
+        return False
+    try:
+        return _load_train_config_mapping(config_path) == data
+    except (OSError, ValueError, OmegaConfBaseException):
+        return False
 
 
 def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: Path) -> None:

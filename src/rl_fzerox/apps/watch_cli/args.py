@@ -6,25 +6,18 @@ from collections.abc import Sequence
 from pathlib import Path
 
 
-def require_watch_locator(
-    *,
-    managed_run_id: str | None,
-    policy_run_dir: Path | None,
-) -> None:
-    """Reject ambiguous or missing watch sources before runtime config resolution."""
+def require_run_id(run_id: str | None) -> None:
+    """Reject missing watch sources before runtime config resolution."""
 
-    source_count = sum(value is not None for value in (policy_run_dir, managed_run_id))
-    if source_count > 1:
-        raise SystemExit("--run-dir and --managed-run-id are mutually exclusive")
-    if source_count == 0:
-        raise SystemExit("--run-dir or --managed-run-id is required")
+    if run_id is None:
+        raise SystemExit("--run-id is required")
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments for the watch app."""
 
     parser = argparse.ArgumentParser(
-        description="Watch the F-Zero X environment from a managed run or run directory.",
+        description="Watch the F-Zero X environment from a run-manager run.",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -33,20 +26,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Watch overrides. Use `-- key=value` to separate them from CLI flags.",
     )
     parser.add_argument(
-        "--run-dir",
-        dest="policy_run_dir",
-        type=Path,
-        default=None,
-        help=(
-            "Optional training run directory. The watch app loads its latest saved policy artifact."
-        ),
-    )
-    parser.add_argument(
         "--artifact",
         dest="policy_artifact",
         choices=("latest", "best", "final"),
         default=None,
-        help="Which saved policy artifact to load from the run directory.",
+        help="Which saved policy artifact to load from the managed run.",
     )
     parser.add_argument(
         "--manager-db-path",
@@ -56,10 +40,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional manager SQLite path for manager-owned watch sessions.",
     )
     parser.add_argument(
-        "--managed-run-id",
-        dest="managed_run_id",
+        "--run-id",
+        dest="run_id",
         default=None,
-        help="Optional run-manager run id to resolve watch config from SQLite.",
+        help="Run-manager run id to resolve from SQLite.",
     )
     parser.add_argument(
         "--viewer-lease-id",
@@ -68,14 +52,5 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help=argparse.SUPPRESS,
     )
     args = parser.parse_args(argv)
-    if (
-        args.policy_artifact is not None
-        and args.policy_run_dir is None
-        and args.managed_run_id is None
-    ):
-        raise SystemExit("--artifact requires --run-dir or --managed-run-id")
-    require_watch_locator(
-        managed_run_id=args.managed_run_id,
-        policy_run_dir=args.policy_run_dir,
-    )
+    require_run_id(args.run_id)
     return args

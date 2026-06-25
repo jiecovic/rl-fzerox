@@ -9,7 +9,9 @@ import pytest
 from rl_fzerox.core.engine_tuning import EngineTuningResetSampler
 from rl_fzerox.core.evaluation.engine_tuning import configure_evaluation_engine_tuning
 from rl_fzerox.core.evaluation.managed import (
+    EvaluationBaselineSuite,
     _evaluation_baseline_suite,
+    _materialize_baseline_suite,
     run_managed_evaluation,
 )
 from rl_fzerox.core.evaluation.models import (
@@ -22,6 +24,13 @@ from rl_fzerox.core.runtime_spec.schema import (
     AdaptiveEngineTuningConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
+    TrainAppConfig,
+)
+from rl_fzerox.core.training.runs import (
+    RunPaths,
+    ensure_run_dirs,
+    explicit_run_paths,
+    save_train_run_config,
 )
 
 
@@ -68,6 +77,52 @@ def test_baseline_suite_changes_with_preset_version(tmp_path: Path) -> None:
     )
 
     assert _suite_dir(different_version) != _suite_dir(base)
+
+
+def test_baseline_suite_uses_projected_config_instead_of_existing_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_paths = explicit_run_paths(tmp_path / "evaluations" / "_baseline_suites" / "suite-v1")
+    ensure_run_dirs(run_paths)
+    config = build_managed_train_app_config(
+        default_managed_run_config(),
+        run_id="eval-001",
+        run_dir=tmp_path / "evaluations" / "eval-001" / "runtime_projection",
+    )
+    config_path = save_train_run_config(config=config, run_dir=run_paths.run_dir)
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8")
+        + "\nremoved_top_level_field:\n  enabled: false\n",
+        encoding="utf-8",
+    )
+    rematerialized_config = config.model_copy(update={"seed": 456})
+    materialized_run_dirs: list[Path] = []
+
+    def fake_materialize_train_run_config(
+        input_config: TrainAppConfig,
+        *,
+        run_paths: RunPaths,
+    ) -> TrainAppConfig:
+        assert input_config == config
+        materialized_run_dirs.append(run_paths.run_dir)
+        return rematerialized_config
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.evaluation.managed.materialize_train_run_config",
+        fake_materialize_train_run_config,
+    )
+
+    loaded = _materialize_baseline_suite(
+        config,
+        suite=EvaluationBaselineSuite(run_paths=run_paths, manifest_path=config_path),
+    )
+
+    assert loaded == rematerialized_config
+    assert materialized_run_dirs == [run_paths.run_dir]
+    saved_manifest = config_path.read_text(encoding="utf-8")
+    assert "removed_top_level_field" not in saved_manifest
+    assert "seed: 456" in saved_manifest
 
 
 def test_evaluation_engine_tuning_uses_greedy_checkpoint_sampler(

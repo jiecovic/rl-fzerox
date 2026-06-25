@@ -145,16 +145,11 @@ def _load_saved_policy_algorithm(
 ) -> str:
     if explicit_algorithm is not None:
         return explicit_algorithm
-    if run_dir is None:
-        raise RuntimeError("Saved policy loading requires the source run directory")
-
-    config_path = run_dir / RUN_LAYOUT.config_filename
-    if not config_path.is_file():
-        raise RuntimeError(f"Saved policy run is missing {RUN_LAYOUT.config_filename}")
-
-    from rl_fzerox.core.training.runs import load_train_run_config
-
-    return load_train_run_config(run_dir).train.algorithm
+    _ = run_dir
+    raise RuntimeError(
+        "Saved policy loading requires explicit policy algorithm metadata. "
+        "train_manifest.yaml is a mirror and is not used as a config source."
+    )
 
 
 def _artifact_kind_from_policy_path(policy_path: Path) -> str:

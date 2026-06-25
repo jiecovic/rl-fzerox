@@ -9,11 +9,7 @@ from torch import nn
 
 from rl_fzerox.core.domain.policy import TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainAppConfig, TrainConfig
-from rl_fzerox.core.training.runs import (
-    load_train_run_config,
-    load_train_run_train_config,
-    resolve_model_artifact_path,
-)
+from rl_fzerox.core.training.runs import resolve_model_artifact_path
 from rl_fzerox.core.training.session.model.action_bias import (
     TrainingEnvActionDimensions,
     apply_weights_only_action_bias_delta,
@@ -23,9 +19,6 @@ from rl_fzerox.core.training.session.model.action_bias import (
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
     resolve_training_algorithm_class,
-)
-from rl_fzerox.core.training.session.model.compatibility import (
-    resume_compatibility_change_labels,
 )
 
 _ModelT = TypeVar("_ModelT")
@@ -56,18 +49,12 @@ def maybe_resume_training_model(
         return model
 
     resume_run_dir = train_config.resume_run_dir.resolve()
-    if current_run_config is not None and not train_config.resume_source_metadata_required:
-        _validate_non_managed_resume_compatibility(
-            source_config=load_train_run_config(resume_run_dir),
-            current_config=current_run_config,
-        )
+    _ = current_run_config
     source_auxiliary_state_signature = _source_auxiliary_state_signature(
         train_config=train_config,
-        resume_run_dir=resume_run_dir,
     )
     source_algorithm = _source_algorithm(
         train_config=train_config,
-        resume_run_dir=resume_run_dir,
     )
     current_algorithm = resolve_effective_training_algorithm(train_config=train_config)
     if source_algorithm != current_algorithm:
@@ -125,58 +112,34 @@ def maybe_resume_training_model(
     return model
 
 
-def _validate_non_managed_resume_compatibility(
-    *,
-    source_config: TrainAppConfig,
-    current_config: TrainAppConfig,
-) -> None:
-    changed = resume_compatibility_change_labels(source_config, current_config)
-    if not changed:
-        return
-    detail = ", ".join(changed)
-    raise RuntimeError(
-        "Resume checkpoint is incompatible with the current run config: "
-        f"{detail}. Change reward/training knobs only, use weights_only only for "
-        "compatible auxiliary-head changes, or start a fresh run."
-    )
-
-
 def _source_auxiliary_state_signature(
     *,
     train_config: TrainConfig,
-    resume_run_dir: Path,
 ) -> _AuxiliaryStateSignature:
-    """Resolve source aux-head shape from manager metadata or saved manifests."""
+    """Resolve source aux-head shape from explicit checkpoint metadata."""
 
     if train_config.resume_source_auxiliary_state_enabled is not None:
         if not train_config.resume_source_auxiliary_state_enabled:
             return None
         return tuple(int(value) for value in train_config.resume_source_auxiliary_state_head_arch)
-    _raise_if_managed_source_metadata_missing(train_config)
-    source_run_config = load_train_run_config(resume_run_dir)
-    return _auxiliary_state_signature_from_config(source_run_config.policy)
+    raise _missing_resume_metadata_error()
 
 
 def _source_algorithm(
     *,
     train_config: TrainConfig,
-    resume_run_dir: Path,
 ) -> TrainAlgorithmName:
     """Resolve source algorithm before choosing SB3 load/set-parameter behavior."""
 
     if train_config.resume_source_algorithm is not None:
         return train_config.resume_source_algorithm
-    _raise_if_managed_source_metadata_missing(train_config)
-    source_train_config = load_train_run_train_config(resume_run_dir)
-    return resolve_effective_training_algorithm(train_config=source_train_config)
+    raise _missing_resume_metadata_error()
 
 
-def _raise_if_managed_source_metadata_missing(train_config: TrainConfig) -> None:
-    if not train_config.resume_source_metadata_required:
-        return
-    raise RuntimeError(
-        "Managed resume requires source checkpoint metadata from the manager DB. "
-        "Saved YAML manifests are not used as a config source for managed runs."
+def _missing_resume_metadata_error() -> RuntimeError:
+    return RuntimeError(
+        "Resume requires source checkpoint metadata in TrainConfig. "
+        "train_manifest.yaml is a mirror and is not used as a config source."
     )
 
 
@@ -233,21 +196,6 @@ def _validate_full_model_resume_compatibility(
         "architecture as the source checkpoint. Use train.resume_mode=weights_only "
         "for aux-bank upgrades, downgrades, or trunk-width changes."
     )
-
-
-def _auxiliary_state_signature_from_config(
-    policy: object,
-) -> _AuxiliaryStateSignature:
-    auxiliary_state = getattr(policy, "auxiliary_state", None)
-    if auxiliary_state is None:
-        enabled = bool(getattr(policy, "auxiliary_state_enabled", False))
-        head_arch = tuple(getattr(policy, "auxiliary_state_head_arch", ()))
-    else:
-        enabled = bool(getattr(auxiliary_state, "enabled", False))
-        head_arch = tuple(getattr(auxiliary_state, "head_arch", ()))
-    if not enabled:
-        return None
-    return tuple(int(width) for width in head_arch)
 
 
 def _current_model_auxiliary_state_signature(model: object) -> _AuxiliaryStateSignature:

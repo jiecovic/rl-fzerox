@@ -17,53 +17,37 @@ from rl_fzerox.core.runtime_spec.watch_overrides import (
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
     continue_run_paths,
-    load_train_run_config_for_watch,
     materialize_train_run_config,
     materialize_watch_session_config,
+    save_train_run_config,
 )
 
 
 def resolve_watch_app_config(
     *,
-    policy_run_dir: Path | None,
+    run_id: str,
     policy_artifact: Literal["latest", "best", "final"] | None,
     manager_db_path: Path | None,
-    managed_run_id: str | None,
     session_name: str | None = None,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
-    """Resolve watch config from the canonical managed or saved-run surfaces."""
+    """Resolve watch config from the canonical SQLite-owned run surface."""
 
-    source_count = sum(value is not None for value in (policy_run_dir, managed_run_id))
-    if source_count > 1:
-        raise ValueError("--run-dir and --managed-run-id are mutually exclusive")
-    cli_run_dir = policy_run_dir.expanduser().resolve() if policy_run_dir is not None else None
     resolved_manager_db_path = (
         manager_db_path.expanduser().resolve()
         if manager_db_path is not None
         else default_manager_db_path().resolve()
     )
     cli_override_delta = watch_config_delta_from_dotlist(overrides) if overrides else {}
-    train_config: TrainAppConfig | None = None
-    lineage_frame_offset: int | None = None
     resolved_policy_artifact: Literal["latest", "best", "final"] = policy_artifact or "latest"
-    if policy_artifact is not None and cli_run_dir is None and managed_run_id is None:
-        raise ValueError("--artifact requires --run-dir or --managed-run-id")
-    if source_count == 0:
-        raise ValueError("--run-dir or --managed-run-id is required")
-    if managed_run_id is not None:
-        cli_run_dir, train_config, lineage_frame_offset = managed_watch_train_config(
-            db_path=resolved_manager_db_path,
-            run_id=managed_run_id,
-        )
-    elif cli_run_dir is not None:
-        train_config = load_train_run_config_for_watch(cli_run_dir)
-    else:
-        raise ValueError("watch config resolution requires a run directory")
+    run, train_config, lineage_frame_offset = managed_watch_train_config(
+        db_path=resolved_manager_db_path,
+        run_id=run_id,
+    )
 
     config = default_watch_config_from_train_run(
         train_config,
-        run_dir=cli_run_dir,
+        run_dir=run.run_dir,
         artifact=resolved_policy_artifact,
     )
     if lineage_frame_offset is not None:
@@ -75,38 +59,31 @@ def resolve_watch_app_config(
             }
         )
 
-    resolved_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
-    if policy_artifact is not None and resolved_run_dir is None:
-        raise ValueError("--artifact requires --run-dir or --managed-run-id")
-    if resolved_run_dir is not None:
-        resolved_train_config = train_config or load_train_run_config_for_watch(resolved_run_dir)
-        config = apply_train_run_to_watch_config(
-            config,
-            run_dir=resolved_run_dir,
-            train_config=resolved_train_config,
-        )
-        if cli_override_delta:
-            config = apply_watch_config_delta(config, cli_override_delta)
-        if policy_artifact is not None:
-            config = config.model_copy(
-                update={
-                    "watch": config.watch.model_copy(update={"policy_artifact": policy_artifact})
-                }
-            )
-    elif cli_override_delta:
+    config = apply_train_run_to_watch_config(
+        config,
+        run_dir=run.run_dir,
+        train_config=train_config,
+    )
+    if cli_override_delta:
         config = apply_watch_config_delta(config, cli_override_delta)
-
-    if managed_run_id is not None:
+    if policy_artifact is not None:
         config = config.model_copy(
             update={
                 "watch": config.watch.model_copy(
-                    update={
-                        "manager_db_path": resolved_manager_db_path,
-                        "managed_run_id": managed_run_id,
-                    }
+                    update={"policy_artifact": policy_artifact}
                 )
             }
         )
+    config = config.model_copy(
+        update={
+            "watch": config.watch.model_copy(
+                update={
+                    "manager_db_path": resolved_manager_db_path,
+                    "managed_run_id": run.id,
+                }
+            )
+        }
+    )
 
     return materialize_watch_session_config(
         config,
@@ -121,7 +98,7 @@ def default_watch_config_from_train_run(
     run_dir: Path,
     artifact: Literal["latest", "best", "final"],
 ) -> WatchAppConfig:
-    """Build one minimal watch config directly from a saved train run."""
+    """Build one minimal watch config from a projected runtime train config."""
 
     return WatchAppConfig(
         seed=train_config.seed,
@@ -142,7 +119,7 @@ def managed_watch_train_config(
     *,
     db_path: Path,
     run_id: str,
-) -> tuple[Path, TrainAppConfig, int | None]:
+) -> tuple[ManagedRun, TrainAppConfig, int | None]:
     """Resolve one manager-owned run into a materialized runtime training config."""
 
     store = ManagerStore(db_path)
@@ -150,32 +127,25 @@ def managed_watch_train_config(
     if run is None:
         raise ValueError(f"managed run not found: {run_id}")
     lineage_frame_offset = lineage_frame_offset_for_run(store, run)
-    try:
-        train_config = load_train_run_config_for_watch(run.run_dir)
-    except FileNotFoundError:
-        train_config = build_managed_train_app_config(
-            run.config,
-            run_id=run.id,
-            run_dir=run.run_dir,
-        )
-        train_config = restore_managed_runtime_track_sampling(
-            train_config,
-            store=store,
-            run_id=run.id,
-            include_artifacts=True,
-        )
-        train_config = materialize_train_run_config(
-            train_config,
-            run_paths=continue_run_paths(run.run_dir),
-        )
-    else:
-        train_config = restore_managed_runtime_track_sampling(
-            train_config,
-            store=store,
-            run_id=run.id,
-            include_artifacts=True,
-        )
-    return (run.run_dir, train_config, lineage_frame_offset)
+    train_config = build_managed_train_app_config(
+        run.config,
+        run_id=run.id,
+        run_dir=run.run_dir,
+    )
+    train_config = restore_managed_runtime_track_sampling(
+        train_config,
+        store=store,
+        run_id=run.id,
+        include_artifacts=True,
+    )
+    train_config = materialize_train_run_config(
+        train_config,
+        run_paths=continue_run_paths(run.run_dir),
+    )
+    # The manifest is a mirror of the SQLite-projected runtime config. Keep it
+    # synchronized for debugging/export, but never read it as a watch fallback.
+    save_train_run_config(config=train_config, run_dir=run.run_dir)
+    return (run, train_config, lineage_frame_offset)
 
 
 def lineage_frame_offset_for_run(store: ManagerStore, run: ManagedRun) -> int | None:

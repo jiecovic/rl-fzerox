@@ -8,14 +8,12 @@ from rl_fzerox.core.manager.projection.runtime import restore_managed_runtime_tr
 from rl_fzerox.core.manager.training import (
     apply_managed_resume_train_config,
     build_managed_fork_train_app_config,
-    build_managed_resume_train_app_config,
     build_managed_train_app_config,
 )
 from rl_fzerox.core.training.runs import (
     RUN_LAYOUT,
     RunPaths,
     continue_run_paths,
-    load_train_run_config,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimePersistence,
@@ -94,15 +92,13 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
 
 
 def _resume_train_config(*, run: ManagedRun):
-    try:
-        train_config = load_train_run_config(run.run_dir)
-    except FileNotFoundError:
-        return build_managed_resume_train_app_config(
-            run.config,
-            run_id=run.id,
-            run_dir=run.run_dir,
-            tensorboard_step_offset=run.lineage_step_offset,
-        )
+    # Resume config is projected from SQLite. train_manifest.yaml is only the
+    # synchronized mirror written after materialization, never a resume fallback.
+    train_config = build_managed_train_app_config(
+        run.config,
+        run_id=run.id,
+        run_dir=run.run_dir,
+    )
     return apply_managed_resume_train_config(
         train_config,
         run_dir=run.run_dir,

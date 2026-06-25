@@ -8,7 +8,7 @@ from pathlib import Path
 from rl_fzerox.apps.recording.progress import format_race_time_ms, format_recording_target
 from rl_fzerox.apps.recording.runner import record_policy_episode
 from rl_fzerox.apps.watch import resolve_watch_app_config
-from rl_fzerox.apps.watch_cli.args import require_watch_locator
+from rl_fzerox.apps.watch_cli.args import require_run_id
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
 
@@ -20,13 +20,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         allow_abbrev=False,
     )
     parser.add_argument(
-        "--run-dir",
-        dest="policy_run_dir",
-        type=Path,
-        default=None,
-        help="Training run directory containing saved policy artifacts.",
-    )
-    parser.add_argument(
         "--manager-db-path",
         dest="manager_db_path",
         type=Path,
@@ -34,17 +27,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional manager SQLite path for manager-owned watch sessions.",
     )
     parser.add_argument(
-        "--managed-run-id",
-        dest="managed_run_id",
+        "--run-id",
+        dest="run_id",
         default=None,
-        help="Optional run-manager run id to resolve the policy session from SQLite.",
+        help="Run-manager run id to resolve from SQLite.",
     )
     parser.add_argument(
         "--artifact",
         dest="policy_artifact",
         choices=("latest", "best", "final"),
         default=None,
-        help="Which saved policy artifact to load from the run directory.",
+        help="Which saved policy artifact to load from the managed run.",
     )
     parser.add_argument(
         "--out",
@@ -139,10 +132,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Watch overrides. Use `-- key=value` to separate them from CLI flags.",
     )
     args = parser.parse_args(argv)
-    require_watch_locator(
-        policy_run_dir=args.policy_run_dir,
-        managed_run_id=args.managed_run_id,
-    )
+    require_run_id(args.run_id)
     return args
 
 
@@ -152,10 +142,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     try:
         config = resolve_watch_app_config(
-            policy_run_dir=args.policy_run_dir,
+            run_id=args.run_id,
             policy_artifact=args.policy_artifact,
             manager_db_path=args.manager_db_path,
-            managed_run_id=args.managed_run_id,
             overrides=args.overrides,
         )
         config = with_deterministic_policy(config, deterministic=args.deterministic)

@@ -7,16 +7,7 @@ from rl_fzerox.apps.run_manager.worker.cli import _mark_worker_boot_failure
 from rl_fzerox.apps.run_manager.worker.config import _resolved_train_config
 from rl_fzerox.core.domain.courses import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
-from rl_fzerox.core.runtime_spec.schema import (
-    EmulatorConfig,
-    EnvConfig,
-    TrackSamplingConfig,
-    TrackSamplingEntryConfig,
-    TrainAppConfig,
-    TrainConfig,
-)
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
-from rl_fzerox.core.training.runs import save_train_run_config
 from tests.core.manager.manager_store_support import _track_sampling_artifact
 
 
@@ -102,7 +93,7 @@ def test_worker_resume_restores_x_cup_runtime_slots_from_db(tmp_path: Path) -> N
     assert entry.baseline_state_path is None
 
 
-def test_worker_resume_uses_saved_manifest_runtime_baselines(tmp_path: Path) -> None:
+def test_worker_resume_ignores_saved_manifest_runtime_baselines(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "runs.db")
     config = default_managed_run_config().model_copy(deep=True)
     config.tracks.race_mode = "gp_race"
@@ -116,49 +107,26 @@ def test_worker_resume_uses_saved_manifest_runtime_baselines(tmp_path: Path) -> 
         explicit_run_dir=tmp_path / "runs" / "runtime-manifest-resume",
         lineage_step_offset=123_456,
     )
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "fzerox.n64"
-    baseline_path = run.run_dir / "baselines" / "old-run-seeded-baseline.state"
-    core_path.touch()
-    rom_path.touch()
-    baseline_path.parent.mkdir(parents=True)
-    manifest_entry = TrackSamplingEntryConfig(
-        id="mute_city_gp_race_master_blue_falcon__variant_2",
-        course_id="mute_city",
-        runtime_course_key="mute_city",
-        course_name="Mute City",
-        course_index=0,
-        mode="gp_race",
-        gp_difficulty="master",
-        vehicle="blue_falcon",
-        baseline_state_path=baseline_path,
-        baseline_variant_index=1,
-        baseline_variant_count=8,
-        baseline_variant_seed=14_629_459_847_334_955_741,
-    )
-    save_train_run_config(
-        config=TrainAppConfig(
-            seed=7,
-            emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-            env=EnvConfig(
-                track_sampling=TrackSamplingConfig(
-                    enabled=True,
-                    entries=(manifest_entry,),
-                    baseline_variant_count=8,
-                )
-            ),
-            train=TrainConfig(output_root=tmp_path / "runs", run_name="runtime-manifest-resume"),
-        ),
-        run_dir=run.run_dir,
+    run.run_dir.mkdir(parents=True)
+    (run.run_dir / "train_manifest.yaml").write_text(
+        "seed: 999\n"
+        "env:\n"
+        "  track_sampling:\n"
+        "    enabled: true\n"
+        "    entries:\n"
+        "      - id: stale_manifest_entry\n"
+        "        course_id: silence\n",
+        encoding="utf-8",
     )
 
     train_config = _resolved_train_config(store=store, run=run, resume=True)
 
     assert len(train_config.env.track_sampling.entries) == 1
     entry = train_config.env.track_sampling.entries[0]
-    assert entry.id == manifest_entry.id
-    assert entry.baseline_state_path == baseline_path.resolve()
-    assert entry.baseline_variant_seed == manifest_entry.baseline_variant_seed
+    assert entry.id == "mute_city_gp_race_master_blue_falcon"
+    assert entry.course_id == "mute_city"
+    assert entry.baseline_state_path is None
+    assert train_config.env.track_sampling.baseline_variant_count == 8
     assert train_config.train.continue_run_dir == run.run_dir.resolve()
     assert train_config.train.resume_run_dir == run.run_dir.resolve()
     assert train_config.train.resume_mode == "full_model"

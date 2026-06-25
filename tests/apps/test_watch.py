@@ -12,18 +12,10 @@ from rl_fzerox.apps.watch import main, resolve_watch_app_config
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
-    EnvConfig,
-    PolicyConfig,
-    RewardConfig,
-    TrackSamplingConfig,
-    TrackSamplingEntryConfig,
-    TrainAppConfig,
-    TrainConfig,
     WatchAppConfig,
     WatchConfig,
 )
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
-from rl_fzerox.core.training.runs import save_train_run_config
 from rl_fzerox.ui.watch.app import run_viewer
 from rl_fzerox.ui.watch.runtime import WatchWorker
 from rl_fzerox.ui.watch.runtime.policy import (
@@ -38,16 +30,13 @@ class _FakeInferencePolicy:
         return 0, None
 
 
-def test_watch_rejects_artifact_without_run_dir() -> None:
-    with pytest.raises(SystemExit, match="--artifact requires --run-dir or --managed-run-id"):
+def test_watch_rejects_artifact_without_run_id() -> None:
+    with pytest.raises(SystemExit, match="--run-id is required"):
         main(["--artifact", "best"])
 
 
-def test_watch_rejects_missing_run_locator() -> None:
-    with pytest.raises(
-        SystemExit,
-        match="--run-dir or --managed-run-id is required",
-    ):
+def test_watch_rejects_missing_run_id() -> None:
+    with pytest.raises(SystemExit, match="--run-id is required"):
         main([])
 
 
@@ -56,39 +45,30 @@ def test_watch_clears_owned_viewer_lease_on_exit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
+    run = store.create_run(
+        run_id="run-a",
+        name="Run A",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    run.run_dir.mkdir(parents=True)
     lease_id = store.viewer_lease_id(
         kind="run_watch",
-        owner_id="run-a",
+        owner_id=run.id,
         qualifier="latest",
     )
     store.upsert_viewer_lease(
         lease_id=lease_id,
         kind="run_watch",
-        owner_id="run-a",
+        owner_id=run.id,
         pid=os.getpid(),
         qualifier="latest",
-    )
-    train_config = TrainAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-        ),
-        env=EnvConfig(),
-        policy=PolicyConfig(),
-        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
     captured_materialize_kwargs: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.load_train_run_config_for_watch",
-        lambda *_args, **_kwargs: train_config,
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
+        lambda config, *, run_paths: config,
     )
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
@@ -98,8 +78,8 @@ def test_watch_clears_owned_viewer_lease_on_exit(
 
     main(
         [
-            "--run-dir",
-            str(run_dir),
+            "--run-id",
+            run.id,
             "--manager-db-path",
             str(store.db_path),
             "--viewer-lease-id",
@@ -111,32 +91,24 @@ def test_watch_clears_owned_viewer_lease_on_exit(
     assert captured_materialize_kwargs["session_name"] == f"{lease_id}:{os.getpid()}"
 
 
-def test_watch_allows_run_dir_overrides_without_config(
+def test_watch_allows_run_id_overrides(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-    train_config = TrainAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-        ),
-        env=EnvConfig(),
-        policy=PolicyConfig(),
-        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="watch-overrides",
+        name="Watch overrides",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
     )
+    run.run_dir.mkdir(parents=True)
 
     captured: dict[str, WatchAppConfig] = {}
 
     monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.load_train_run_config_for_watch",
-        lambda *_args, **_kwargs: train_config,
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
+        lambda config, *, run_paths: config,
     )
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
@@ -149,8 +121,10 @@ def test_watch_allows_run_dir_overrides_without_config(
 
     main(
         [
-            "--run-dir",
-            str(run_dir),
+            "--run-id",
+            run.id,
+            "--manager-db-path",
+            str(store.db_path),
             "--",
             "watch.deterministic_policy=false",
             "watch.control_fps=30",
@@ -159,7 +133,8 @@ def test_watch_allows_run_dir_overrides_without_config(
     )
 
     config = captured["config"]
-    assert config.watch.policy_run_dir == run_dir.resolve()
+    assert config.watch.policy_run_dir == run.run_dir.resolve()
+    assert config.watch.managed_run_id == run.id
     assert config.watch.deterministic_policy is False
     assert config.watch.control_fps == 30.0
     assert config.watch.render_fps == 30.0
@@ -169,26 +144,18 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-    train_config = TrainAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-        ),
-        env=EnvConfig(),
-        policy=PolicyConfig(),
-        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="headless-watch",
+        name="Headless watch",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
     )
+    run.run_dir.mkdir(parents=True)
 
     monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.load_train_run_config_for_watch",
-        lambda *_args, **_kwargs: train_config,
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
+        lambda config, *, run_paths: config,
     )
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
@@ -196,30 +163,26 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     )
 
     config = resolve_watch_app_config(
-        policy_run_dir=run_dir,
+        run_id=run.id,
         policy_artifact="best",
-        manager_db_path=None,
-        managed_run_id=None,
+        manager_db_path=store.db_path,
         overrides=[],
     )
 
-    assert config.watch.policy_run_dir == run_dir.resolve()
+    assert config.watch.policy_run_dir == run.run_dir.resolve()
     assert config.watch.policy_artifact == "best"
-    assert config.emulator.core_path == core_path
-    assert config.train == train_config.train
-    assert config.policy == train_config.policy
+    assert config.watch.manager_db_path == store.db_path.resolve()
+    assert config.watch.managed_run_id == run.id
+    assert config.train is not None
+    assert config.policy is not None
 
 
-def test_resolve_watch_app_config_uses_managed_run_manifest_without_rematerializing(
+def test_resolve_watch_app_config_syncs_manifest_mirror_from_sqlite(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     db_path = tmp_path / "manager" / "runs.db"
     store = ManagerStore(db_path)
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
     run = store.create_run(
         run_id="manifest-watch",
         name="Manifest Watch",
@@ -227,43 +190,16 @@ def test_resolve_watch_app_config_uses_managed_run_manifest_without_rematerializ
         explicit_run_dir=tmp_path / "runs" / "manifest-watch",
     )
     run.run_dir.mkdir(parents=True)
-    manifest_entry = TrackSamplingEntryConfig(
-        id="manifest_mute_city",
-        course_id="mute_city",
-        course_name="Mute City",
-        course_index=0,
-        mode="gp_race",
-        gp_difficulty="master",
-        vehicle="blue_falcon",
-        baseline_state_path=run.run_dir / "baselines" / "manifest-baseline.state",
-        baseline_variant_index=1,
-        baseline_variant_count=8,
-        baseline_variant_seed=1234,
+    (run.run_dir / "train_manifest.yaml").write_text(
+        "removed_top_level_field: stale\n"
+        "env:\n"
+        "  action_repeat: 99\n",
+        encoding="utf-8",
     )
-    save_train_run_config(
-        config=TrainAppConfig(
-            seed=7,
-            emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-            env=EnvConfig(
-                action_repeat=5,
-                track_sampling=TrackSamplingConfig(
-                    enabled=True,
-                    entries=(manifest_entry,),
-                    baseline_variant_count=8,
-                ),
-            ),
-            policy=PolicyConfig(),
-            train=TrainConfig(output_root=tmp_path / "runs", run_name="manifest-watch"),
-        ),
-        run_dir=run.run_dir,
-    )
-
-    def fail_materialize_train_run_config(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("managed watch should use the saved manifest")
 
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
-        fail_materialize_train_run_config,
+        lambda config, *, run_paths: config,
     )
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
@@ -271,18 +207,19 @@ def test_resolve_watch_app_config_uses_managed_run_manifest_without_rematerializ
     )
 
     config = resolve_watch_app_config(
-        policy_run_dir=None,
+        run_id=run.id,
         policy_artifact="latest",
         manager_db_path=db_path,
-        managed_run_id=run.id,
         overrides=[],
     )
 
     assert config.watch.policy_run_dir == run.run_dir.resolve()
     assert config.watch.manager_db_path == db_path.resolve()
     assert config.watch.managed_run_id == run.id
-    assert config.env.action_repeat == 5
-    assert config.env.track_sampling.entries[0].id == "manifest_mute_city"
+    assert config.env.action_repeat == default_managed_run_config().action.action_repeat
+    manifest_text = (run.run_dir / "train_manifest.yaml").read_text(encoding="utf-8")
+    assert "removed_top_level_field" not in manifest_text
+    assert "action_repeat: 99" not in manifest_text
 
 
 def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
@@ -325,10 +262,9 @@ def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
     )
 
     config = resolve_watch_app_config(
-        policy_run_dir=None,
+        run_id=child.id,
         policy_artifact="latest",
         manager_db_path=db_path,
-        managed_run_id=child.id,
         overrides=[],
     )
 
@@ -336,115 +272,6 @@ def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
     assert config.watch.lineage_frame_offset == 2_000
     assert config.watch.manager_db_path == db_path.resolve()
     assert config.watch.managed_run_id == child.id
-
-
-def test_watch_allows_run_dir_without_config(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-
-    train_config = TrainAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-        ),
-        env=EnvConfig(action_repeat=2),
-        reward=RewardConfig(time_penalty_per_frame=-0.123),
-        policy=PolicyConfig(),
-        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
-    )
-
-    captured: dict[str, WatchAppConfig] = {}
-
-    monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.load_train_run_config_for_watch",
-        lambda *_args, **_kwargs: train_config,
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
-        lambda config, **_kwargs: config,
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.apps.watch.run_viewer",
-        lambda config, **_kwargs: captured.setdefault("config", config),
-    )
-
-    main(["--run-dir", str(run_dir)])
-
-    config = captured["config"]
-    assert config.seed == 7
-    assert config.emulator.core_path == core_path.resolve()
-    assert config.emulator.rom_path == rom_path.resolve()
-    assert config.env.action_repeat == 2
-    assert config.reward.time_penalty_per_frame == -0.123
-    assert config.train == train_config.train
-    assert config.policy == train_config.policy
-    assert config.watch.device == "cpu"
-    assert config.watch.policy_run_dir == run_dir.resolve()
-    assert config.watch.policy_artifact == "latest"
-
-
-def test_watch_cli_overrides_apply_after_run_manifest(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-
-    train_config = TrainAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-        ),
-        env=EnvConfig(action_repeat=3, camera_setting="regular"),
-        policy=PolicyConfig(),
-        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
-    )
-
-    captured: dict[str, WatchAppConfig] = {}
-    monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.load_train_run_config_for_watch",
-        lambda *_args, **_kwargs: train_config,
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
-        lambda config, **_kwargs: config,
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.apps.watch.run_viewer",
-        lambda config, **_kwargs: captured.setdefault("config", config),
-    )
-
-    main(
-        [
-            "--run-dir",
-            str(run_dir),
-            "--",
-            "env.camera_setting=close_behind",
-            "watch.control_fps=15",
-            "watch.render_fps=15",
-        ]
-    )
-
-    config = captured["config"]
-    assert config.seed == 7
-    assert config.env.action_repeat == 3
-    assert config.env.camera_setting == "close_behind"
-    assert config.watch.control_fps == 15.0
-    assert config.watch.render_fps == 15.0
-    assert config.watch.policy_run_dir == run_dir.resolve()
 
 
 def test_load_policy_runner_uses_configured_watch_device(monkeypatch: pytest.MonkeyPatch) -> None:

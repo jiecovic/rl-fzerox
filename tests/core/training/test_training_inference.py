@@ -10,7 +10,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 from gymnasium import spaces
-from omegaconf import OmegaConf
 from pytest import MonkeyPatch
 
 from fzerox_emulator.arrays import (
@@ -45,18 +44,6 @@ def _latest_model_path(run_dir: Path) -> Path:
     path = run_dir / RUN_LAYOUT.model_artifacts.latest
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
-
-
-def _configured_hybrid_action_config(
-    *,
-    continuous_axes: tuple[str, ...],
-    discrete_axes: tuple[str, ...] = (),
-) -> dict[str, object]:
-    return {
-        "adapter_name": "configured_hybrid",
-        "layout_continuous_axes": list(continuous_axes),
-        "layout_discrete_axes": list(discrete_axes),
-    }
 
 
 class _FakePolicy:
@@ -634,193 +621,25 @@ def test_policy_runner_exposes_loaded_checkpoint_path_and_time(tmp_path: Path) -
     assert runner.checkpoint_policy_mtime_utc == "2025-12-09T10:13:20Z"
 
 
-def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_manifest.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=(),
-                        discrete_axes=("steer", "gas", "boost", "lean"),
-                    )
-                },
-                "policy": {
-                    "recurrent": {
-                        "enabled": True,
-                    }
-                },
-                "train": {
-                    "algorithm": "maskable_hybrid_action_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    with pytest.raises(ValueError, match="requires a recurrent train.algorithm"):
+def test_load_saved_policy_algorithm_requires_explicit_metadata(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="requires explicit policy algorithm metadata"):
         _load_saved_policy_algorithm(tmp_path)
 
 
-def test_load_saved_policy_algorithm_recognizes_discrete_only_hybrid_recurrent_ppo(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_manifest.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=(),
-                        discrete_axes=("steer", "gas", "boost", "lean"),
-                    )
-                },
-                "policy": {
-                    "recurrent": {
-                        "enabled": True,
-                    }
-                },
-                "train": {
-                    "algorithm": "maskable_hybrid_recurrent_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
+def test_load_saved_policy_algorithm_uses_explicit_metadata(tmp_path: Path) -> None:
+    assert (
+        _load_saved_policy_algorithm(
+            tmp_path,
+            explicit_algorithm="maskable_hybrid_recurrent_ppo",
+        )
+        == "maskable_hybrid_recurrent_ppo"
     )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_recurrent_ppo"
-
-
-def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_manifest.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=("steer", "drive"),
-                        discrete_axes=("boost", "lean"),
-                    )
-                },
-                "policy": {},
-                "train": {
-                    "algorithm": "maskable_hybrid_action_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_action_ppo"
-
-
-def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_manifest.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=("steer", "drive"),
-                        discrete_axes=("boost", "lean"),
-                    )
-                },
-                "policy": {
-                    "recurrent": {
-                        "enabled": True,
-                    }
-                },
-                "train": {
-                    "algorithm": "maskable_hybrid_recurrent_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_recurrent_ppo"
 
 
 def test_load_saved_policy_uses_full_model_artifact_for_discrete_only_recurrent_runs(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_manifest.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=(),
-                        discrete_axes=("steer", "gas", "boost", "lean"),
-                    )
-                },
-                "policy": {
-                    "recurrent": {
-                        "enabled": True,
-                    }
-                },
-                "train": {
-                    "algorithm": "maskable_hybrid_recurrent_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
     policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
     model_path = _latest_model_path(tmp_path)
@@ -850,7 +669,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_discrete_only_recurrent_
 
     monkeypatch.setattr("sb3x.MaskableHybridRecurrentPPO.load", _fake_load)
 
-    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
+    loaded = _load_saved_policy(
+        policy_path,
+        run_dir=tmp_path,
+        device="cpu",
+        algorithm="maskable_hybrid_recurrent_ppo",
+    )
 
     assert isinstance(loaded, _FakeLoadedRecurrentModel)
     assert captured == {
@@ -863,34 +687,6 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_manifest.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=("steer", "drive"),
-                        discrete_axes=("boost", "lean"),
-                    )
-                },
-                "policy": {},
-                "train": {
-                    "algorithm": "maskable_hybrid_action_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
     policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
     model_path = _latest_model_path(tmp_path)
@@ -920,7 +716,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
 
     monkeypatch.setattr("sb3x.MaskableHybridActionPPO.load", _fake_load)
 
-    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
+    loaded = _load_saved_policy(
+        policy_path,
+        run_dir=tmp_path,
+        device="cpu",
+        algorithm="maskable_hybrid_action_ppo",
+    )
 
     assert isinstance(loaded, _FakeLoadedMaskableHybridModel)
     assert captured == {
@@ -933,38 +734,6 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_manifest.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=("steer", "drive"),
-                        discrete_axes=("boost", "lean"),
-                    )
-                },
-                "policy": {
-                    "recurrent": {
-                        "enabled": True,
-                    }
-                },
-                "train": {
-                    "algorithm": "maskable_hybrid_recurrent_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
     policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
     model_path = _latest_model_path(tmp_path)
@@ -994,7 +763,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
 
     monkeypatch.setattr("sb3x.MaskableHybridRecurrentPPO.load", _fake_load)
 
-    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
+    loaded = _load_saved_policy(
+        policy_path,
+        run_dir=tmp_path,
+        device="cpu",
+        algorithm="maskable_hybrid_recurrent_ppo",
+    )
 
     assert isinstance(loaded, _FakeLoadedMaskableHybridRecurrentModel)
     assert captured == {

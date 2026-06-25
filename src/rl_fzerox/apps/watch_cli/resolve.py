@@ -17,20 +17,18 @@ from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
 def resolve_watch_app_config(
     *,
-    policy_run_dir: Path | None,
+    run_id: str,
     policy_artifact: Literal["latest", "best", "final"] | None,
     manager_db_path: Path | None,
-    managed_run_id: str | None,
     session_name: str | None = None,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
     """Resolve watch config from CLI arguments."""
 
     return resolve_watch_app_config_from_core(
-        policy_run_dir=policy_run_dir,
+        run_id=run_id,
         policy_artifact=policy_artifact,
         manager_db_path=manager_db_path,
-        managed_run_id=managed_run_id,
         session_name=session_name,
         overrides=normalize_cli_overrides(overrides),
     )

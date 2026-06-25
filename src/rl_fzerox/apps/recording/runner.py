@@ -62,7 +62,7 @@ def record_policy_episode(
     if output_path.exists() and not overwrite:
         raise FileExistsError(f"Output already exists: {output_path}")
     if config.watch.policy_run_dir is None:
-        raise ValueError("--run-dir or watch.policy_run_dir is required for policy recording")
+        raise ValueError("watch.policy_run_dir is required for policy recording")
     if keep_failed and record_mode != "stream-all":
         raise ValueError("--keep-failed requires --record-mode stream-all")
     locked_course_id = (

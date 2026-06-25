@@ -19,10 +19,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     ) as lease_session:
         try:
             config = resolve_watch_app_config(
-                policy_run_dir=args.policy_run_dir,
+                run_id=args.run_id,
                 policy_artifact=args.policy_artifact,
                 manager_db_path=args.manager_db_path,
-                managed_run_id=args.managed_run_id,
                 session_name=_watch_session_name(args.viewer_lease_id),
                 overrides=args.overrides,
             )

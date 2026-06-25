@@ -16,7 +16,7 @@ def open_recording_session(
     fps: float | None,
 ) -> RecordingSession:
     if config.watch.policy_run_dir is None:
-        raise ValueError("--run-dir or watch.policy_run_dir is required for policy recording")
+        raise ValueError("watch.policy_run_dir is required for policy recording")
     seed_process(config.seed)
     emulator = Emulator(
         core_path=config.emulator.core_path,
@@ -34,6 +34,7 @@ def open_recording_session(
         config.watch.policy_run_dir,
         artifact=config.watch.policy_artifact,
         device=config.watch.device,
+        algorithm=config.watch.policy_algorithm,
     )
     output_fps = resolve_video_fps(native_fps=env.backend.native_fps, override=fps)
     return RecordingSession(env=env, policy_runner=policy_runner, output_fps=output_fps)

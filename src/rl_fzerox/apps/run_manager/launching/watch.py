@@ -51,7 +51,6 @@ def launch_watch_artifact(
             store=store,
             lease_id=lease_id,
             run_id=run.id,
-            run_dir=run.run_dir,
             artifact=artifact,
         )
         is not None
@@ -63,10 +62,9 @@ def launch_watch_artifact(
         deterministic_policy=deterministic_policy,
     )
     resolve_watch_app_config(
-        policy_run_dir=None,
+        run_id=run.id,
         policy_artifact="best" if artifact == "best" else "latest",
         manager_db_path=store.db_path,
-        managed_run_id=run.id,
         session_name=lease_id,
         overrides=overrides,
     )
@@ -77,7 +75,7 @@ def launch_watch_artifact(
         "rl_fzerox.apps.watch",
         "--manager-db-path",
         str(store.db_path),
-        "--managed-run-id",
+        "--run-id",
         run.id,
         "--artifact",
         artifact,
@@ -257,7 +255,6 @@ def active_watch_pid(
     store: ManagerStore,
     lease_id: str,
     run_id: str,
-    run_dir: Path,
     artifact: str,
 ) -> int | None:
     lease = store.get_viewer_lease(lease_id)
@@ -272,7 +269,6 @@ def active_watch_pid(
     if watch_process_matches(
         pid=lease.pid,
         run_id=run_id,
-        run_dir=run_dir,
         artifact=artifact,
     ):
         return lease.pid
@@ -280,7 +276,7 @@ def active_watch_pid(
     return None
 
 
-def watch_process_matches(*, pid: int, run_id: str, run_dir: Path, artifact: str) -> bool:
+def watch_process_matches(*, pid: int, run_id: str, artifact: str) -> bool:
     proc_dir = Path("/proc") / str(pid)
     if not proc_dir.is_dir():
         return False
@@ -292,5 +288,5 @@ def watch_process_matches(*, pid: int, run_id: str, run_dir: Path, artifact: str
     return (
         "rl_fzerox.apps.watch" in normalized
         and f"--artifact {artifact}" in normalized
-        and (f"--managed-run-id {run_id}" in normalized or f"--run-dir {run_dir}" in normalized)
+        and f"--run-id {run_id}" in normalized
     )
