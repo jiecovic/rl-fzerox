@@ -16,6 +16,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.state import (
     publish_initial_career_snapshot,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.recording import open_career_mode_recorder
+from rl_fzerox.ui.watch.runtime.career_mode.save_ram import CareerModeSaveBinding
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
 )
@@ -26,6 +27,7 @@ def run_loaded_career_mode_loop(
     config: WatchAppConfig,
     session: CareerModeRuntimeSession,
     controller: CareerModeController,
+    save_binding: CareerModeSaveBinding,
     command_queue: ProcessQueue,
     snapshot_queue: ProcessQueue,
 ) -> None:
@@ -61,6 +63,7 @@ def run_loaded_career_mode_loop(
             config=config,
             session=session,
             controller=controller,
+            save_binding=save_binding,
             command_queue=command_queue,
             snapshot_queue=snapshot_queue,
             state=state,

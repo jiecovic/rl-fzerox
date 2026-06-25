@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/setup/engine.py
+"""Engine-slider setup flow for the machine settings screen.
+
+The policy resolver supplies a per-course engine target; this helper emits
+bounded menu taps and confirms the RAM value before race entry.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable

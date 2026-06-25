@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/career_mode/execution/context.py
-"""Execution context for one save-game unlock attempt."""
+"""Execution context for one save-game unlock attempt.
+
+The manager store assembles this immutable payload before the watch runtime
+starts. Runtime code should consume the resolved values instead of re-querying
+partial save-game setup state.
+"""
 
 from __future__ import annotations
 

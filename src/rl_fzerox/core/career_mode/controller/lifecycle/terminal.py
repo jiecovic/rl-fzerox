@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/lifecycle/terminal.py
+"""Terminal race detection and metadata enrichment for Career Mode attempts.
+
+These helpers normalize terminal reasons from runtime info or telemetry and add
+the race metadata needed by save-progress and recording summaries.
+"""
+
 from __future__ import annotations
 
 from typing import Protocol

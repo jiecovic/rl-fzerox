@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/lifecycle/post_gp.py
+"""Post-GP ceremony tracking for delayed cup completion boundaries.
+
+The game can linger on cutscenes before credits or menus. This file annotates
+those frames so progress sync can wait for a stable end-of-attempt signal.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

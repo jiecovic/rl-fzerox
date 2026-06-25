@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/career_mode/policy/runtime.py
-"""Policy handoff models for Career Mode races."""
+"""Policy handoff models for Career Mode races.
+
+The watch runtime wraps a trained policy with the inference-safe train config
+and delegates race control to the shared policy-drive runtime.
+"""
 
 from __future__ import annotations
 

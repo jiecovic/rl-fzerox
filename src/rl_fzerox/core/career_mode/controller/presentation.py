@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/presentation.py
+"""Viewer/debug projections for the Career Mode controller state.
+
+The FSM keeps private mutable state; this module converts that state plus live
+runtime info into stable keys consumed by watch UI panels and debug traces.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

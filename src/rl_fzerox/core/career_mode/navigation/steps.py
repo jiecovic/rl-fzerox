@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/navigation/steps.py
+"""Semantic menu-step builders for Career Mode navigation.
+
+These helpers describe controller intent in terms of menu inputs and frame
+counts; emulator-specific button mapping happens outside this module.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.core.career_mode.navigation.types import (

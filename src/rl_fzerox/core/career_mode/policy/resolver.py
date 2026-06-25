@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/career_mode/policy/resolver.py
+"""Resolve configured policy artifacts for the active Career Mode course.
+
+Policy runners are loaded lazily on the first handoff to a matching course, then
+cached by run/artifact key. This keeps Career Mode startup independent of the
+size of the configured cup/course setup pool.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -54,7 +61,6 @@ class CareerPolicyResolver:
         self._device = device
         self._policy_cache: dict[tuple[str, str], _LoadedPolicy] = {}
         self._active_policy_key: tuple[str, str] | None = None
-        self._preload_policy_cache(self._course_setups)
 
     def update_context(
         self,
@@ -65,7 +71,6 @@ class CareerPolicyResolver:
         self._setup = setup
         self._course_setups = tuple(course_setups)
         self._active_policy_key = None
-        self._preload_policy_cache(self._course_setups)
 
     def resolve(
         self,
@@ -122,10 +127,6 @@ class CareerPolicyResolver:
         if policy_run is None:
             raise RuntimeError(f"Career Mode policy run not found: {run_id}")
         return policy_run
-
-    def _preload_policy_cache(self, course_setups: Sequence[ManagedSaveCourseSetup]) -> None:
-        for course_setup in course_setups:
-            self._load_policy(course_setup)
 
     def _load_policy(
         self,

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/setup/__init__.py
+"""Setup-flow facade for deterministic Career Mode menu navigation.
+
+The controller imports camera, engine, menu queue, and low-level menu-flow
+helpers through this package so the main FSM stays focused on lifecycle flow.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.core.career_mode.controller.setup.camera import CareerCameraSync

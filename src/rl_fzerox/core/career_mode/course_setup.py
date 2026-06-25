@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/career_mode/course_setup.py
-"""Course setup resolution for save-game unlock attempts."""
+"""Course setup resolution for save-game unlock attempts.
+
+Save-game targets are GP-cup oriented, while trained policies and engine values
+are selected per concrete course. This module resolves those rows without
+touching manager persistence.
+"""
 
 from __future__ import annotations
 

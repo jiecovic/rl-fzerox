@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/career_mode/navigation/types.py
+"""Shared Career Mode navigation enums and immutable timing values."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,7 +36,6 @@ class CareerPhase(StrEnum):
     ENTER_RACE = "enter_race"
     POLICY_RACE = "policy_race"
     CONTINUE_AFTER_RACE = "continue_after_race"
-    WAIT_FOR_GP_RACE = "wait_for_gp_race"
 
 
 class DifficultyPopupState(StrEnum):

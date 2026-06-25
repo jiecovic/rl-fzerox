@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/__init__.py
+"""Public controller facade for Career Mode watch/runtime orchestration.
+
+The concrete FSM lives in `fsm.py`; lifecycle/setup helpers remain private to
+the controller package unless runtime code needs a stable signal type.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.core.career_mode.controller.fsm import (
@@ -11,9 +17,6 @@ from rl_fzerox.core.career_mode.controller.lifecycle import (
     CareerRecordingSegmentClose,
     CareerRecordingSegmentStatus,
 )
-from rl_fzerox.core.career_mode.controller.setup import (
-    cup_selection_input as _cup_selection_input,
-)
 
 __all__ = [
     "CareerModeController",
@@ -22,5 +25,4 @@ __all__ = [
     "CareerRecordingSegmentStatus",
     "CareerRuntimeEmulator",
     "CareerRuntimeSession",
-    "_cup_selection_input",
 ]

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/lifecycle/recording.py
+"""Recording segment state for Career Mode cup attempts.
+
+The controller supplies the authoritative success/failure status; this module
+only remembers observed facts and exposes one explicit close signal.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

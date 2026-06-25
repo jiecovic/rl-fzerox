@@ -1,4 +1,8 @@
 # src/rl_fzerox/core/career_mode/execution/setup.py
+"""Adapters from watch config to concrete Career Mode race setup objects."""
+
+from __future__ import annotations
+
 from rl_fzerox.core.career_mode.execution.race import SaveRaceSetup
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig, WatchAppConfig
 

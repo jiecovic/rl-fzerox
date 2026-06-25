@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/career_mode/controller/lifecycle/__init__.py
+"""Lifecycle helper facade for controller-owned attempt side effects.
+
+The FSM emits explicit recording and emulator-reset signals from these helpers;
+runtime workers consume those signals instead of inferring lifecycle boundaries
+from database state or frontend sync details.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.core.career_mode.controller.lifecycle.events import (

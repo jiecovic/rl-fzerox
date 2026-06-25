@@ -8,12 +8,15 @@ from rl_fzerox.core.career_mode.controller import CareerModeController
 from rl_fzerox.core.career_mode.execution.attempt_timing import (
     career_attempt_menu_jitter_frames,
 )
-from rl_fzerox.core.career_mode.execution.save_file import load_save_ram
 from rl_fzerox.core.career_mode.navigation import RawMenuStep, in_gp_race
 from rl_fzerox.core.career_mode.policy import CareerModePolicyControl
 from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.runtime.career_mode.menu import menu_viewer_info
+from rl_fzerox.ui.watch.runtime.career_mode.save_ram import (
+    CareerModeSaveBinding,
+    load_career_mode_save_ram,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
 
@@ -49,8 +52,9 @@ def reset_emulator_for_next_attempt(
     config: WatchAppConfig,
     session: CareerModeRuntimeSession,
     controller: CareerModeController,
+    save_binding: CareerModeSaveBinding,
 ) -> tuple[dict[str, object], dict[str, object], FZeroXTelemetry | None]:
-    load_save_ram(config, session)
+    load_career_mode_save_ram(save_binding, session)
     session.emulator.reset()
     jitter_frames = apply_career_attempt_menu_jitter(
         config=config,

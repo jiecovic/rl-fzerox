@@ -1,4 +1,6 @@
 # tests/core/career_mode/test_attempt_timing.py
+"""Tests for deterministic Career Mode menu jitter."""
+
 from __future__ import annotations
 
 from rl_fzerox.core.career_mode.execution.attempt_timing import (

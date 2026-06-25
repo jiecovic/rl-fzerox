@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/lifecycle/post_race.py
+"""Post-race continuation state for result screens and next-course handoff.
+
+This helper owns button-pulse counters and fresh-race detection only. It does
+not decide save progress, attempt success, or recording status.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

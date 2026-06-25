@@ -1,4 +1,6 @@
 # tests/core/career_mode/test_policy_resolver.py
+"""Tests for loading and refreshing Career Mode policy artifacts."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,7 +15,7 @@ from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
-def test_career_policy_resolver_preloads_and_refreshes_cached_artifacts(
+def test_career_policy_resolver_lazy_loads_caches_and_refreshes_artifacts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -50,22 +52,52 @@ def test_career_policy_resolver_preloads_and_refreshes_cached_artifacts(
         device="cpu",
     )
 
-    assert loaded == [("run-a", "latest"), ("run-b", "best")]
-    loaded.clear()
+    assert loaded == []
 
     resolution = resolver.resolve({"course_index": 0})
 
-    assert loaded == []
+    assert loaded == [("run-a", "latest")]
     assert resolution is not None
     assert resolution.control.runner is runners[("run-a", "latest")]
+    assert resolution.activated_new_policy is True
     assert runners[("run-a", "latest")].refresh_count == 0
+    loaded.clear()
+
+    same_artifact_resolution = resolver.resolve({"course_index": 1})
+
+    assert loaded == []
+    assert same_artifact_resolution is not None
+    assert same_artifact_resolution.control.runner is runners[("run-a", "latest")]
+    assert same_artifact_resolution.activated_new_policy is False
+
+    other_artifact_resolution = resolver.resolve({"course_index": 2})
+
+    assert loaded == [("run-b", "best")]
+    assert other_artifact_resolution is not None
+    assert other_artifact_resolution.control.runner is runners[("run-b", "best")]
+    assert other_artifact_resolution.activated_new_policy is True
+    loaded.clear()
 
     refreshed_resolution = resolver.resolve({"course_index": 0}, refresh_artifact=True)
 
     assert loaded == []
     assert refreshed_resolution is not None
     assert refreshed_resolution.control.runner is runners[("run-a", "latest")]
+    assert refreshed_resolution.activated_new_policy is True
     assert runners[("run-a", "latest")].refresh_count == 1
+
+    resolver.update_context(
+        setup=_race_setup(),
+        course_setups=(_course_setup("run-a", course_id="mute_city", artifact="latest"),),
+    )
+
+    assert loaded == []
+    updated_context_resolution = resolver.resolve({"course_index": 0})
+
+    assert loaded == []
+    assert updated_context_resolution is not None
+    assert updated_context_resolution.control.runner is runners[("run-a", "latest")]
+    assert updated_context_resolution.activated_new_policy is True
 
 
 class _PolicyRunnerStub:

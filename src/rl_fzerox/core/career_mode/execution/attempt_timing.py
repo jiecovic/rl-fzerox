@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/execution/attempt_timing.py
+"""Deterministic menu jitter for repeated Career Mode save attempts.
+
+The jitter varies native game setup timing without patching game RAM, giving
+replays reproducible but less identical opponent/menu conditions.
+"""
+
 from __future__ import annotations
 
 import hashlib

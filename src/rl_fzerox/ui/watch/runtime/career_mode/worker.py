@@ -4,12 +4,6 @@ from __future__ import annotations
 from multiprocessing.queues import Queue as ProcessQueue
 
 from rl_fzerox.core.career_mode.controller import CareerModeController
-from rl_fzerox.core.career_mode.execution.save_file import (
-    load_save_ram,
-    persist_save_ram,
-    save_game_id_from_config,
-    store_from_config,
-)
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.runtime.career_mode.attempts import (
     RUNNER_CLOSE_REASONS,
@@ -18,6 +12,12 @@ from rl_fzerox.ui.watch.runtime.career_mode.attempts import (
 from rl_fzerox.ui.watch.runtime.career_mode.loop import run_loaded_career_mode_loop
 from rl_fzerox.ui.watch.runtime.career_mode.loop.runtime import (
     should_observe_policy_transition,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.save_ram import (
+    CareerModeSaveBinding,
+    career_mode_save_binding_from_config,
+    load_career_mode_save_ram,
+    persist_career_mode_save_ram,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.session import (
     CareerModeRuntimeSession,
@@ -55,7 +55,8 @@ def _run_career_mode_loop(
 ) -> None:
     session = open_career_mode_runtime_session(config)
     controller = CareerModeController.from_config(config)
-    load_save_ram(config, session)
+    save_binding = career_mode_save_binding_from_config(config)
+    load_career_mode_save_ram(save_binding, session)
 
     failure_reason = RUNNER_CLOSE_REASONS.closed
     try:
@@ -63,6 +64,7 @@ def _run_career_mode_loop(
             config=config,
             session=session,
             controller=controller,
+            save_binding=save_binding,
             command_queue=command_queue,
             snapshot_queue=snapshot_queue,
         )
@@ -70,29 +72,35 @@ def _run_career_mode_loop(
         failure_reason = RUNNER_CLOSE_REASONS.failed
         raise
     finally:
-        _close_career_mode(config, session, failure_reason=failure_reason)
+        _close_career_mode(
+            session,
+            save_binding,
+            failure_reason=failure_reason,
+        )
         session.close()
 
 
 def _close_career_mode(
-    config: WatchAppConfig,
     session: CareerModeRuntimeSession,
+    save_binding: CareerModeSaveBinding,
     *,
     failure_reason: str,
 ) -> None:
-    persist_save_ram(config, session)
-    store = store_from_config(config)
-    save_game_id = save_game_id_from_config(config)
-    fail_running_attempts(store, save_game_id=save_game_id, failure_reason=failure_reason)
+    persist_career_mode_save_ram(save_binding, session)
+    fail_running_attempts(
+        save_binding.store,
+        save_game_id=save_binding.save_game_id,
+        failure_reason=failure_reason,
+    )
 
 
 def _mark_runner_failed(config: WatchAppConfig) -> None:
-    store = store_from_config(config)
     save_game_id = config.watch.managed_save_game_id
     if save_game_id is not None:
+        save_binding = career_mode_save_binding_from_config(config)
         fail_running_attempts(
-            store,
-            save_game_id=save_game_id,
+            save_binding.store,
+            save_game_id=save_binding.save_game_id,
             failure_reason=RUNNER_CLOSE_REASONS.failed,
         )
 

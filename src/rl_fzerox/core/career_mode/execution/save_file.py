@@ -1,14 +1,17 @@
 # src/rl_fzerox/core/career_mode/execution/save_file.py
+"""Save-RAM load and persist helpers for Career Mode runs.
+
+This module stays below watch/runtime config binding. Callers pass an explicit
+save path or store/save-game id so managed SQLite state remains owned by the
+manager/runtime layer.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from rl_fzerox.core.manager.models import ManagedSaveGame
-from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
-
-if TYPE_CHECKING:
-    from rl_fzerox.core.manager import ManagerStore
 
 
 class SaveRamSession(Protocol):
@@ -26,14 +29,9 @@ class SaveRamGameStore(Protocol):
     def get_save_game(self, save_game_id: str) -> ManagedSaveGame | None: ...
 
 
-def load_save_ram(config: WatchAppConfig, session: SaveRamRuntimeSession) -> None:
-    save_path = save_path_from_config(config)
+def load_save_ram_from_path(save_path: Path, session: SaveRamRuntimeSession) -> None:
     if save_path.is_file():
         session.emulator.write_save_ram(save_path.read_bytes())
-
-
-def persist_save_ram(config: WatchAppConfig, session: SaveRamRuntimeSession) -> None:
-    persist_save_ram_to_path(save_path_from_config(config), session)
 
 
 def persist_save_ram_for_store(
@@ -41,10 +39,7 @@ def persist_save_ram_for_store(
     save_game_id: str,
     session: SaveRamRuntimeSession,
 ) -> None:
-    save_game = store.get_save_game(save_game_id)
-    if save_game is None:
-        raise RuntimeError("career mode save game disappeared")
-    persist_save_ram_to_path(save_game.save_path, session)
+    persist_save_ram_to_path(save_path_for_store(store, save_game_id), session)
 
 
 def persist_save_ram_to_path(save_path: Path, session: SaveRamRuntimeSession) -> None:
@@ -52,25 +47,8 @@ def persist_save_ram_to_path(save_path: Path, session: SaveRamRuntimeSession) ->
     save_path.write_bytes(session.emulator.read_save_ram())
 
 
-def save_path_from_config(config: WatchAppConfig) -> Path:
-    store = store_from_config(config)
-    save_game = store.get_save_game(save_game_id_from_config(config))
+def save_path_for_store(store: SaveRamGameStore, save_game_id: str) -> Path:
+    save_game = store.get_save_game(save_game_id)
     if save_game is None:
         raise RuntimeError("career mode save game disappeared")
     return save_game.save_path
-
-
-def store_from_config(config: WatchAppConfig) -> ManagerStore:
-    db_path = config.watch.manager_db_path
-    if db_path is None:
-        raise RuntimeError("career mode requires watch.manager_db_path")
-    from rl_fzerox.core.manager import ManagerStore
-
-    return ManagerStore(db_path)
-
-
-def save_game_id_from_config(config: WatchAppConfig) -> str:
-    save_game_id = config.watch.managed_save_game_id
-    if save_game_id is None:
-        raise RuntimeError("career mode requires watch.managed_save_game_id")
-    return save_game_id

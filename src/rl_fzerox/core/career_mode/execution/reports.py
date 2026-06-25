@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/career_mode/execution/reports.py
-"""Serializable reports for save-game unlock execution plans."""
+"""Serializable reports for save-game unlock execution plans.
+
+Reports are lightweight diagnostics for manager/UI surfaces. They mirror the
+resolved execution context and should not become a second source of truth.
+"""
 
 from __future__ import annotations
 

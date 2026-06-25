@@ -1,4 +1,5 @@
 # tests/core/career_mode/test_course_setup.py
+"""Tests for resolving policy/vehicle setup rows for Career Mode targets."""
 
 from __future__ import annotations
 

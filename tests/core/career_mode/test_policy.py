@@ -1,4 +1,6 @@
 # tests/core/career_mode/test_policy.py
+"""Tests for Career Mode policy runtime config adaptation."""
+
 from __future__ import annotations
 
 from pathlib import Path

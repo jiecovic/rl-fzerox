@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/career_mode/execution/race.py
-"""Race setup resolution for save-game unlock attempts."""
+"""Race setup resolution for save-game unlock attempts.
+
+This module validates that a save attempt has the policy, vehicle, course, and
+engine settings needed to enter one GP race/cup through the Career Mode menu.
+"""
 
 from __future__ import annotations
 

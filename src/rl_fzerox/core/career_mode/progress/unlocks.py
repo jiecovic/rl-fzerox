@@ -1,5 +1,10 @@
 # src/rl_fzerox/core/career_mode/progress/unlocks.py
-"""Rule-derived unlock path for portable save games."""
+"""Rule-derived unlock path for portable F-Zero X save games.
+
+The rules in this file describe fixed-cup GP clears and vehicle availability
+from inspected SRAM. They intentionally stay independent of live controller
+state and policy execution.
+"""
 
 from __future__ import annotations
 

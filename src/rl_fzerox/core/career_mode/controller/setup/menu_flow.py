@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/setup/menu_flow.py
+"""Pure menu-step matching helpers for the Career Mode setup route.
+
+These functions keep low-level step/screen rules out of the controller mixin and
+avoid side effects beyond choosing semantic menu inputs.
+"""
+
 from __future__ import annotations
 
 from rl_fzerox.core.career_mode.navigation import (

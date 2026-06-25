@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/career_mode/controller/setup/camera.py
+"""Camera synchronization before handing a GP race to a policy.
+
+Career Mode can reuse policies trained with a specific camera setting. This
+module owns the small runtime side effect that taps the camera control until
+telemetry confirms the expected view.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

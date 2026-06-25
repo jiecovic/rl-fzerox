@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/navigation/facts.py
+"""RAM-backed screen facts used by the Career Mode controller.
+
+The controller should make decisions from this normalized view instead of
+scattering raw runtime-info key parsing across lifecycle branches.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/setup/menu_queue.py
+"""Queued controller input pulses for deterministic menu navigation.
+
+The queue owns settle frames and retry limits for repeated START/ACCEPT pulses
+while the FSM waits for the game to expose the next expected screen.
+"""
+
 from __future__ import annotations
 
 from collections import deque

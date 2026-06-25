@@ -1,4 +1,10 @@
 # src/rl_fzerox/core/career_mode/controller/lifecycle/progress_sync.py
+"""Progress sync bridge for visible post-terminal GP screens.
+
+The controller calls this after a race terminal edge to persist save RAM and
+advance managed attempts only once a stable post-GP/menu boundary is visible.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

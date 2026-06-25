@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/career_mode/controller/fsm.py
+"""Live Career Mode controller and lifecycle side-effect boundary.
+
+This module keeps the high-level FSM, policy handoff, save-progress mutation,
+camera sync, and recording/emulator-reset signals in one traceable owner. Menu
+route details and post-race helpers live in sibling modules.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -194,96 +201,129 @@ class CareerModeController(CareerMenuRoutingMixin):
         if self._progress.attempt_id is None:
             return None
         if self._phase == CareerPhase.POLICY_RACE:
-            if facts.in_gp_race:
-                if facts.terminal_race_result:
-                    return self._continue_terminal_race_result_step()
-                return None
-            raise RuntimeError("Career Mode left a race before observing a game result")
-
+            return self._next_policy_race_step(facts)
         if self._phase == CareerPhase.CONTINUE_AFTER_RACE:
-            pending_step = self._menu_steps.peek()
-            if pending_step is not None and is_neutral_settle_step(pending_step):
-                step = self._menu_steps.pop()
-                self._phase = phase_from_step(step)
-                return step
-            if facts.is_gp_result_screen:
-                if facts.terminal_race_result:
-                    self._post_race.observe_terminal_result()
-                self._progress.observe_post_race_screen(info=info, setup=self._setup)
-                if self._post_race.continue_observed_result():
-                    return self._continue_after_race_pulse()
-                self._menu_steps.clear()
-                return raw_step(
-                    MenuInput.NEUTRAL,
-                    1,
-                    phase="continue_after_race:wait_for_terminal_result",
-                )
-            if facts.in_gp_race:
-                if facts.terminal_race_result:
-                    self._post_race.observe_terminal_result()
-                if (
-                    self._post_race.continuing_race_result
-                    and self._post_race.observed_terminal_race_result
-                ):
-                    if self._post_race.new_race_ready_for_policy(info):
-                        self._post_race.stop_result_continuation()
-                    else:
-                        return self._continue_after_race_pulse()
-                self._post_race.stop_result_continuation()
-                self._menu_steps.clear()
-                if not self._post_race.new_race_ready_for_policy(info):
-                    return raw_step(
-                        MenuInput.NEUTRAL,
-                        1,
-                        phase="continue_after_race:wait_for_fresh_race",
-                    )
-                if self._resolve_policy_control(info, refresh_artifact=True) is None:
-                    return self._wait_for_policy_resolution()
-                if camera_step := self._next_camera_sync_step(info):
-                    return camera_step
-                return self._enter_policy_race()
-            if facts.is_post_gp_screen:
-                self._menu_steps.clear()
-                return self._continue_post_gp_screen_step()
-            if facts.is_gp_next_course_screen:
-                self._menu_steps.clear()
-                return self._continue_next_course_step()
-            if self._menu_steps:
-                pending_step = self._menu_steps.peek()
-                if pending_step is None or not is_neutral_settle_step(pending_step):
-                    self._menu_steps.clear()
-                    return raw_step(
-                        MenuInput.NEUTRAL,
-                        1,
-                        phase="continue_after_race:wait_for_known_screen",
-                    )
-                step = self._menu_steps.pop()
-                self._phase = phase_from_step(step)
-                return step
-            return self._next_menu_step(info)
+            return self._next_continue_after_race_step(info=info, facts=facts)
         if facts.in_gp_race:
-            self._menu_steps.clear()
-            self._menu_steps.reset_advance_presses()
-            if facts.terminal_race_result:
-                return self._continue_terminal_race_result_step()
-            if (
-                self._post_race.awaiting_new_race_after_terminal
-                and not self._post_race.new_race_ready_for_policy(info)
-            ):
-                return raw_step(
-                    MenuInput.NEUTRAL,
-                    1,
-                    phase="enter_race:wait_for_fresh_race",
-                )
-            if self._resolve_policy_control(info, refresh_artifact=True) is None:
-                return self._wait_for_policy_resolution()
-            if camera_step := self._next_camera_sync_step(info):
-                return camera_step
-            return self._enter_policy_race()
+            return self._next_gp_race_entry_step(info=info, facts=facts)
         if self._menu_steps:
             if step := self._next_pending_menu_step(facts):
                 return step
         return self._next_menu_step(info)
+
+    def _next_policy_race_step(self, facts: MenuFacts) -> RawMenuStep | None:
+        if facts.in_gp_race:
+            if facts.terminal_race_result:
+                return self._continue_terminal_race_result_step()
+            return None
+        raise RuntimeError("Career Mode left a race before observing a game result")
+
+    def _next_continue_after_race_step(
+        self,
+        *,
+        info: dict[str, object],
+        facts: MenuFacts,
+    ) -> RawMenuStep | None:
+        if settle_step := self._pop_neutral_settle_step():
+            return settle_step
+        if facts.is_gp_result_screen:
+            return self._next_continue_after_race_result_step(info=info, facts=facts)
+        if facts.in_gp_race:
+            return self._next_continue_after_race_gp_race_step(info=info, facts=facts)
+        if facts.is_post_gp_screen:
+            self._menu_steps.clear()
+            return self._continue_post_gp_screen_step()
+        if facts.is_gp_next_course_screen:
+            self._menu_steps.clear()
+            return self._continue_next_course_step()
+        if self._menu_steps:
+            if settle_step := self._pop_neutral_settle_step():
+                return settle_step
+            self._menu_steps.clear()
+            return raw_step(
+                MenuInput.NEUTRAL,
+                1,
+                phase="continue_after_race:wait_for_known_screen",
+            )
+        return self._next_menu_step(info)
+
+    def _next_continue_after_race_result_step(
+        self,
+        *,
+        info: dict[str, object],
+        facts: MenuFacts,
+    ) -> RawMenuStep:
+        if facts.terminal_race_result:
+            self._post_race.observe_terminal_result()
+        self._progress.observe_post_race_screen(info=info, setup=self._setup)
+        if self._post_race.continue_observed_result():
+            return self._continue_after_race_pulse()
+        self._menu_steps.clear()
+        return raw_step(
+            MenuInput.NEUTRAL,
+            1,
+            phase="continue_after_race:wait_for_terminal_result",
+        )
+
+    def _next_continue_after_race_gp_race_step(
+        self,
+        *,
+        info: dict[str, object],
+        facts: MenuFacts,
+    ) -> RawMenuStep:
+        if facts.terminal_race_result:
+            self._post_race.observe_terminal_result()
+        if self._post_race.continuing_race_result and self._post_race.observed_terminal_race_result:
+            if self._post_race.new_race_ready_for_policy(info):
+                self._post_race.stop_result_continuation()
+            else:
+                return self._continue_after_race_pulse()
+        self._post_race.stop_result_continuation()
+        self._menu_steps.clear()
+        return self._next_gp_race_handoff_step(
+            info,
+            require_fresh_race=True,
+            wait_phase="continue_after_race:wait_for_fresh_race",
+        )
+
+    def _next_gp_race_entry_step(
+        self,
+        *,
+        info: dict[str, object],
+        facts: MenuFacts,
+    ) -> RawMenuStep:
+        self._menu_steps.clear()
+        self._menu_steps.reset_advance_presses()
+        if facts.terminal_race_result:
+            return self._continue_terminal_race_result_step()
+        return self._next_gp_race_handoff_step(
+            info,
+            require_fresh_race=self._post_race.awaiting_new_race_after_terminal,
+            wait_phase="enter_race:wait_for_fresh_race",
+        )
+
+    def _next_gp_race_handoff_step(
+        self,
+        info: dict[str, object],
+        *,
+        require_fresh_race: bool,
+        wait_phase: str,
+    ) -> RawMenuStep:
+        if require_fresh_race and not self._post_race.new_race_ready_for_policy(info):
+            return raw_step(MenuInput.NEUTRAL, 1, phase=wait_phase)
+        if self._resolve_policy_control(info, refresh_artifact=True) is None:
+            return self._wait_for_policy_resolution()
+        if camera_step := self._next_camera_sync_step(info):
+            return camera_step
+        return self._enter_policy_race()
+
+    def _pop_neutral_settle_step(self) -> RawMenuStep | None:
+        pending_step = self._menu_steps.peek()
+        if pending_step is None or not is_neutral_settle_step(pending_step):
+            return None
+        step = self._menu_steps.pop()
+        self._phase = phase_from_step(step)
+        return step
 
     def _enter_phase(self, phase: CareerPhase) -> None:
         if self._phase is not phase:
@@ -477,9 +517,6 @@ class CareerModeController(CareerMenuRoutingMixin):
         self._post_race.enter_continue_after_race()
         self._post_terminal_progress.reset()
         self._reset_camera_sync()
-
-    def _camera_ready(self, info: dict[str, object]) -> bool:
-        return self._camera.ready(info)
 
     def _next_camera_sync_step(
         self,

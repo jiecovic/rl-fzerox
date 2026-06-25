@@ -1,5 +1,9 @@
 # src/rl_fzerox/core/career_mode/navigation/__init__.py
-"""Menu state machines for Career Mode runner control."""
+"""Navigation facade for Career Mode menu and screen facts.
+
+The controller imports screen classifiers, immutable timing, and semantic menu
+steps here so low-level navigation rules stay grouped away from save progress.
+"""
 
 from __future__ import annotations
 

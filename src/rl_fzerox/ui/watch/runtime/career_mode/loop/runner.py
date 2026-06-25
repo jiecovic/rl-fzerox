@@ -6,7 +6,6 @@ from multiprocessing.queues import Queue as ProcessQueue
 
 from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.career_mode.controller import CareerModeController
-from rl_fzerox.core.career_mode.execution.save_file import persist_save_ram
 from rl_fzerox.core.career_mode.navigation import (
     MenuInput,
     RawMenuStep,
@@ -54,6 +53,10 @@ from rl_fzerox.ui.watch.runtime.career_mode.policy_step import (
     step_policy_or_manual,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.recording import FrameRecorder
+from rl_fzerox.ui.watch.runtime.career_mode.save_ram import (
+    CareerModeSaveBinding,
+    persist_career_mode_save_ram,
+)
 from rl_fzerox.ui.watch.runtime.career_mode.session import CareerModeRuntimeSession
 from rl_fzerox.ui.watch.runtime.career_mode.timing import active_policy_timing
 from rl_fzerox.ui.watch.runtime.ipc import drain_worker_commands
@@ -79,6 +82,7 @@ def _run_career_mode_loop_body(
     config: WatchAppConfig,
     session: CareerModeRuntimeSession,
     controller: CareerModeController,
+    save_binding: CareerModeSaveBinding,
     command_queue: ProcessQueue,
     snapshot_queue: ProcessQueue,
     state: CareerModeLoopState,
@@ -205,6 +209,7 @@ def _run_career_mode_loop_body(
             config=config,
             session=session,
             controller=controller,
+            save_binding=save_binding,
         )
         reset_info = dict(info)
         clear_policy_runtime_state()
@@ -383,7 +388,7 @@ def _run_career_mode_loop_body(
             if commands.quit_requested:
                 raise CareerModeWorkerQuit()
             if commands.save_requests:
-                persist_save_ram(config, session)
+                persist_career_mode_save_ram(save_binding, session)
             timing_update = apply_control_timing_command(
                 commands=commands,
                 session=session,

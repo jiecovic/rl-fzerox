@@ -1,4 +1,11 @@
 # src/rl_fzerox/core/career_mode/controller/setup/routing.py
+"""Menu-routing branch of the Career Mode controller FSM.
+
+This mixin maps observed menu screens to deterministic setup inputs. It mutates
+the controller's setup state but leaves attempt progress and recording lifecycle
+to the main FSM.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

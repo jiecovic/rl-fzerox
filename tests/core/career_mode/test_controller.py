@@ -1,4 +1,6 @@
 # tests/core/career_mode/test_controller.py
+"""Controller and lifecycle regression tests for Career Mode watch flow."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,12 +9,12 @@ from types import SimpleNamespace
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from rl_fzerox.core.career_mode.controller import (
     CareerModeController,
-    _cup_selection_input,
 )
 from rl_fzerox.core.career_mode.controller.lifecycle import (
     CareerRecordingSegmentTracker,
     post_terminal_progress_screen,
 )
+from rl_fzerox.core.career_mode.controller.setup.menu_flow import cup_selection_input
 from rl_fzerox.core.career_mode.execution.race import SaveRaceExecutionPlan, SaveRaceSetup
 from rl_fzerox.core.career_mode.navigation import (
     MENU_TIMING,
@@ -30,15 +32,15 @@ from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
 def test_cup_selection_moves_left_when_target_is_before_selected_cup() -> None:
-    assert _cup_selection_input(selected_cup_index=3, target_cup_index=0) is MenuInput.LEFT
+    assert cup_selection_input(selected_cup_index=3, target_cup_index=0) is MenuInput.LEFT
 
 
 def test_cup_selection_moves_right_when_target_is_after_selected_cup() -> None:
-    assert _cup_selection_input(selected_cup_index=0, target_cup_index=3) is MenuInput.RIGHT
+    assert cup_selection_input(selected_cup_index=0, target_cup_index=3) is MenuInput.RIGHT
 
 
 def test_cup_selection_moves_right_until_selected_cup_is_known() -> None:
-    assert _cup_selection_input(selected_cup_index=None, target_cup_index=0) is MenuInput.RIGHT
+    assert cup_selection_input(selected_cup_index=None, target_cup_index=0) is MenuInput.RIGHT
 
 
 def test_menu_facts_accept_game_mode_name_fallback() -> None:
@@ -76,7 +78,7 @@ def test_engine_adjust_steps_empty_when_target_already_selected() -> None:
 
 def test_policy_race_continues_terminal_gp_result_screen(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
-    controller._phase = CareerPhase.POLICY_RACE
+    _enter_policy_race(controller)
 
     step = controller.next_raw_step(
         info={"game_mode": "gp_race", "termination_reason": "finished"},
@@ -117,8 +119,8 @@ def test_stale_gp_race_terminal_is_not_post_terminal_progress_screen() -> None:
 
 def test_no_active_attempt_emits_no_menu_navigation(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
-    controller._progress._attempt_id = None
-    controller._phase = CareerPhase.WAIT_FOR_GP_RACE
+    _clear_active_attempt(controller)
+    _enter_phase(controller, CareerPhase.ENTER_RACE)
 
     step = controller.next_raw_step(
         info={"game_mode": "gp_race", "termination_reason": "finished"},
@@ -130,48 +132,28 @@ def test_no_active_attempt_emits_no_menu_navigation(tmp_path: Path) -> None:
 def test_checkpoint_refresh_is_armed_only_after_finished_attempt(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
     resolver = _PolicyResolverStub()
-    controller.__dict__["_policy_resolver"] = resolver
+    _replace_policy_resolver(controller, resolver)
 
-    assert (
-        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
-    )
+    _resolve_policy_handoff(controller)
     assert resolver.refresh_requests == [False]
 
-    controller._remember_finished_attempt(
-        SimpleNamespace(
-            finished_attempt_id="attempt-a",
-            finished_status="failed",
-            finished_failure_reason=None,
-        )
-    )
+    _mark_finished_attempt(controller, status="failed")
 
-    assert (
-        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
-    )
+    _resolve_policy_handoff(controller)
     assert resolver.refresh_requests == [False, True]
 
-    assert (
-        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
-    )
+    _resolve_policy_handoff(controller)
     assert resolver.refresh_requests == [False, True, False]
 
 
 def test_checkpoint_refresh_can_be_disabled_between_attempts(tmp_path: Path) -> None:
     controller = _controller(tmp_path, reload_policy_between_attempts=False)
     resolver = _PolicyResolverStub()
-    controller.__dict__["_policy_resolver"] = resolver
+    _replace_policy_resolver(controller, resolver)
 
-    controller._remember_finished_attempt(
-        SimpleNamespace(
-            finished_attempt_id="attempt-a",
-            finished_status="succeeded",
-            finished_failure_reason=None,
-        )
-    )
+    _mark_finished_attempt(controller, status="succeeded")
 
-    assert (
-        controller._resolve_policy_control({"course_index": 0}, refresh_artifact=True) == "control"
-    )
+    _resolve_policy_handoff(controller)
     assert resolver.refresh_requests == [False]
 
 
@@ -233,10 +215,11 @@ def test_recording_segment_close_is_not_downgraded_by_credit_reset() -> None:
 
 def test_recording_segment_close_survives_next_plan_application(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
-    controller.__dict__["_progress"] = _PostGpProgressStub(next_plan=True)
-    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._post_race.observed_terminal_race_result = True
-    controller._recording.observe_terminal_result({"termination_reason": "finished"})
+    _enter_post_terminal_flow(
+        controller,
+        progress=_PostGpProgressStub(next_plan=True),
+        recording_terminal=True,
+    )
 
     handled = controller.before_step(
         session=_ControllerSession(),
@@ -252,9 +235,7 @@ def test_recording_segment_close_survives_next_plan_application(tmp_path: Path) 
 def test_controller_does_not_sync_stale_gp_race_terminal_result(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
     progress = _PostGpProgressStub()
-    controller.__dict__["_progress"] = progress
-    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._post_race.observed_terminal_race_result = True
+    _enter_post_terminal_flow(controller, progress=progress)
 
     handled = controller.before_step(
         session=_ControllerSession(),
@@ -270,10 +251,11 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
     tmp_path: Path,
 ) -> None:
     controller = _controller(tmp_path)
-    controller.__dict__["_progress"] = _PostGpProgressStub()
-    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._post_race.observed_terminal_race_result = True
-    controller._post_race.continue_pulses = 1
+    _enter_post_terminal_flow(
+        controller,
+        progress=_PostGpProgressStub(),
+        continue_pulses=1,
+    )
 
     handled = controller.before_step(
         session=_ControllerSession(),
@@ -293,10 +275,7 @@ def test_controller_does_not_reset_or_close_recording_at_winning_ceremony_start(
 def test_controller_does_not_derive_final_rank_from_post_gp_position(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
     progress = _PostGpProgressStub()
-    controller.__dict__["_progress"] = progress
-    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._post_race.observed_terminal_race_result = True
-    controller._post_race.continue_pulses = 1
+    _enter_post_terminal_flow(controller, progress=progress, continue_pulses=1)
 
     handled = controller.before_step(
         session=_ControllerSession(),
@@ -317,10 +296,11 @@ def test_controller_keeps_recording_while_winning_ceremony_remains_visible(
     tmp_path: Path,
 ) -> None:
     controller = _controller(tmp_path)
-    controller.__dict__["_progress"] = _PostGpProgressStub()
-    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._post_race.observed_terminal_race_result = True
-    controller._post_race.continue_pulses = 1
+    _enter_post_terminal_flow(
+        controller,
+        progress=_PostGpProgressStub(),
+        continue_pulses=1,
+    )
 
     controller.before_step(
         session=_ControllerSession(),
@@ -351,10 +331,11 @@ def test_controller_closes_recording_when_winning_ceremony_exits_to_menu(
     tmp_path: Path,
 ) -> None:
     controller = _controller(tmp_path)
-    controller.__dict__["_progress"] = _PostGpProgressStub()
-    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._post_race.observed_terminal_race_result = True
-    controller._post_race.continue_pulses = 1
+    _enter_post_terminal_flow(
+        controller,
+        progress=_PostGpProgressStub(),
+        continue_pulses=1,
+    )
 
     controller.before_step(
         session=_ControllerSession(),
@@ -378,10 +359,11 @@ def test_controller_closes_recording_when_winning_ceremony_exits_to_menu(
 
 def test_controller_closes_recording_on_credits(tmp_path: Path) -> None:
     controller = _controller(tmp_path)
-    controller.__dict__["_progress"] = _PostGpProgressStub()
-    controller._phase = CareerPhase.CONTINUE_AFTER_RACE
-    controller._post_race.observed_terminal_race_result = True
-    controller._post_race.continue_pulses = 2
+    _enter_post_terminal_flow(
+        controller,
+        progress=_PostGpProgressStub(),
+        continue_pulses=2,
+    )
 
     handled = controller.before_step(
         session=_ControllerSession(),
@@ -482,6 +464,69 @@ class _ControllerEmulator:
 
 class _ControllerSession:
     emulator = _ControllerEmulator()
+
+
+def _enter_policy_race(controller: CareerModeController) -> None:
+    # Controller tests need to enter isolated FSM branches without replaying the
+    # full title/menu route. Keep those private-state fixtures centralized here.
+    controller._enter_policy_race()
+
+
+def _enter_phase(controller: CareerModeController, phase: CareerPhase) -> None:
+    controller._enter_phase(phase)
+
+
+def _replace_policy_resolver(
+    controller: CareerModeController,
+    resolver: _PolicyResolverStub,
+) -> None:
+    controller.__dict__["_policy_resolver"] = resolver
+
+
+def _replace_progress(
+    controller: CareerModeController,
+    progress: _PostGpProgressStub,
+) -> None:
+    controller.__dict__["_progress"] = progress
+
+
+def _clear_active_attempt(controller: CareerModeController) -> None:
+    controller._progress._attempt_id = None
+
+
+def _mark_finished_attempt(
+    controller: CareerModeController,
+    *,
+    status: str,
+) -> None:
+    controller._remember_finished_attempt(
+        SimpleNamespace(
+            finished_attempt_id="attempt-a",
+            finished_status=status,
+            finished_failure_reason=None,
+        )
+    )
+
+
+def _resolve_policy_handoff(controller: CareerModeController) -> None:
+    _enter_phase(controller, CareerPhase.ENTER_RACE)
+    step = controller.next_raw_step(info={"game_mode": "gp_race", "course_index": 0})
+    assert step is not None
+    assert step.phase == "policy_race:handoff"
+
+
+def _enter_post_terminal_flow(
+    controller: CareerModeController,
+    *,
+    progress: _PostGpProgressStub,
+    continue_pulses: int = 0,
+    recording_terminal: bool = False,
+) -> None:
+    _replace_progress(controller, progress)
+    controller._enter_continue_after_race()
+    controller._post_race.continue_pulses = continue_pulses
+    if recording_terminal:
+        controller._recording.observe_terminal_result({"termination_reason": "finished"})
 
 
 def _controller(
