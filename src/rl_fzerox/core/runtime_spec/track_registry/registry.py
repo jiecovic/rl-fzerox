@@ -8,6 +8,8 @@ models after references have been resolved.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -18,13 +20,32 @@ from rl_fzerox.core.runtime_spec.track_registry_types import REGISTRY
 from .common import registry_path
 
 
+@dataclass(frozen=True, slots=True)
+class TrackRegistryIndex:
+    """In-memory lookup table for one resolved track registry root."""
+
+    tracks_by_id: Mapping[str, dict[str, object]]
+
+    def track_by_id(self, raw_id: object) -> dict[str, object] | None:
+        if not isinstance(raw_id, str) or not raw_id:
+            return None
+        return self.tracks_by_id.get(raw_id)
+
+
+def track_registry_index(*, config_root: Path) -> TrackRegistryIndex:
+    tracks = iter_track_configs(config_root=config_root)
+    tracks_by_id: dict[str, dict[str, object]] = {}
+    for _, track in tracks:
+        track_id = track.get("id")
+        if isinstance(track_id, str) and track_id and track_id not in tracks_by_id:
+            tracks_by_id[track_id] = track
+    return TrackRegistryIndex(
+        tracks_by_id=tracks_by_id,
+    )
+
+
 def registry_track_by_id(raw_id: object, *, config_root: Path) -> dict[str, object] | None:
-    if not isinstance(raw_id, str) or not raw_id:
-        return None
-    for _, track in iter_track_configs(config_root=config_root):
-        if track.get("id") == raw_id:
-            return track
-    return None
+    return track_registry_index(config_root=config_root).track_by_id(raw_id)
 
 
 def iter_track_configs(*, config_root: Path) -> tuple[tuple[str, dict[str, object]], ...]:

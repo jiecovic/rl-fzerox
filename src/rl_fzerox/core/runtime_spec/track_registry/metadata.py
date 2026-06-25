@@ -18,7 +18,7 @@ from rl_fzerox.core.runtime_spec.vehicle_catalog import (
 )
 
 from .common import optional_str, safe_id
-from .registry import load_course_config, registry_track_by_id
+from .registry import TrackRegistryIndex, load_course_config, track_registry_index
 
 _TRACK_ENTRY_INHERITED_METADATA_KEYS = frozenset(
     {
@@ -45,8 +45,14 @@ def enrich_concrete_entries(section: dict[str, object], config_root: Path) -> No
     entries = section.get("entries")
     if not isinstance(entries, list | tuple):
         return
+    track_index = track_registry_index(config_root=config_root)
     section["entries"] = [
-        enrich_entry_with_registry_metadata(entry, config_root=config_root) for entry in entries
+        enrich_entry_with_registry_metadata(
+            entry,
+            config_root=config_root,
+            track_index=track_index,
+        )
+        for entry in entries
     ]
 
 
@@ -91,12 +97,15 @@ def enrich_entry_with_registry_metadata(
     raw_entry: object,
     *,
     config_root: Path,
+    track_index: TrackRegistryIndex | None = None,
 ) -> object:
     if not isinstance(raw_entry, dict):
         return raw_entry
     entry = {str(key): value for key, value in raw_entry.items() if isinstance(key, str)}
     enriched = enrich_track_with_registry_metadata(entry, config_root=config_root)
-    registry_entry = registry_track_by_id(enriched.get("id"), config_root=config_root)
+    if track_index is None:
+        track_index = track_registry_index(config_root=config_root)
+    registry_entry = track_index.track_by_id(enriched.get("id"))
     if registry_entry is not None:
         registry_entry = enrich_track_with_registry_metadata(
             registry_entry,
