@@ -32,6 +32,10 @@ from rl_fzerox.core.runtime_spec.schema.tracks.engine_tuning import (
 )
 from rl_fzerox.core.runtime_spec.schema.tracks.records import TrackRecordsConfig
 from rl_fzerox.core.runtime_spec.schema.tracks.x_cup import XCupRotationConfig
+from rl_fzerox.core.runtime_spec.track_sampling_identity import (
+    track_sampling_course_key,
+    track_sampling_reset_target_key,
+)
 
 
 class TrackSamplingEntryConfig(BaseModel):
@@ -39,19 +43,23 @@ class TrackSamplingEntryConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # Stable reset-target identity and human-facing course labels.
     id: str
     display_name: str | None = None
     course_ref: str | None = None
     course_id: str | None = None
     runtime_course_key: str | None = None
     course_name: str | None = None
+    # Materialized baseline and reset scheduler weight.
     baseline_state_path: Path | None = None
     weight: PositiveFloat = 1.0
+    # Race setup resolved from registry/manager config.
     course_index: NonNegativeInt | None = None
     mode: str | None = None
     gp_difficulty: RaceDifficultyName | None = None
     vehicle: str | None = None
     vehicle_name: str | None = None
+    # Source setup before generated-course or runtime restoration rewrites.
     source_vehicle: str | None = None
     engine_setting_raw_value: NonNegativeInt | None = None
     engine_setting_min_raw_value: NonNegativeInt | None = None
@@ -59,6 +67,7 @@ class TrackSamplingEntryConfig(BaseModel):
     source_course_index: NonNegativeInt | None = None
     source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
+    # Scheduler grouping for materialized baseline variants and alternate states.
     baseline_group_id: str | None = None
     baseline_group_weight: PositiveFloat | None = None
     baseline_variant_index: NonNegativeInt | None = None
@@ -67,6 +76,7 @@ class TrackSamplingEntryConfig(BaseModel):
     alt_baseline_id: str | None = None
     alt_baseline_label: str | None = None
     alt_baseline_source_entry_id: str | None = None
+    # Generated-course identity and rotation metadata, currently used by X-Cup.
     generated_course_kind: XCupGeneratedCourseKind | None = None
     generated_course_seed: NonNegativeInt | None = None
     generated_course_hash: str | None = None
@@ -74,8 +84,32 @@ class TrackSamplingEntryConfig(BaseModel):
     generated_course_generation: NonNegativeInt | None = None
     generated_course_segment_count: NonNegativeInt | None = None
     generated_course_length: PositiveFloat | None = None
+    # Logging and display metadata consumed by training/watch surfaces.
     log_per_course: bool = True
     records: TrackRecordsConfig | None = None
+
+    def course_key(self) -> str:
+        """Return the stable course/slot key used for stats and watch navigation."""
+
+        return track_sampling_course_key(
+            entry_id=self.id,
+            course_id=self.course_id,
+            runtime_course_key=self.runtime_course_key,
+            course_ref=self.course_ref,
+            course_index=self.course_index,
+        )
+
+    def reset_target_key(self) -> str:
+        """Return the reset-target key, including GP difficulty when applicable."""
+
+        return track_sampling_reset_target_key(
+            entry_id=self.id,
+            course_id=self.course_id,
+            runtime_course_key=self.runtime_course_key,
+            course_ref=self.course_ref,
+            course_index=self.course_index,
+            gp_difficulty=self.gp_difficulty,
+        )
 
     @model_validator(mode="after")
     def _validate_generated_course_fields(self) -> TrackSamplingEntryConfig:

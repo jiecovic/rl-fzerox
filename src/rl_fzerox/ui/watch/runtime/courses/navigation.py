@@ -9,10 +9,6 @@ from rl_fzerox.core.domain.race import (
     race_difficulty_names,
 )
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig
-from rl_fzerox.core.runtime_spec.track_sampling_identity import (
-    track_sampling_course_key,
-    track_sampling_reset_target_key,
-)
 from rl_fzerox.ui.watch.records import record_difficulty
 
 
@@ -210,24 +206,11 @@ def _first_target(
 
 
 def _entry_course_key(entry: TrackSamplingEntryConfig) -> str:
-    return track_sampling_course_key(
-        entry_id=entry.id,
-        course_id=entry.course_id,
-        runtime_course_key=entry.runtime_course_key,
-        course_ref=entry.course_ref,
-        course_index=entry.course_index,
-    )
+    return entry.course_key()
 
 
 def _entry_reset_target_key(entry: TrackSamplingEntryConfig) -> str:
-    return track_sampling_reset_target_key(
-        entry_id=entry.id,
-        course_id=entry.course_id,
-        runtime_course_key=entry.runtime_course_key,
-        course_ref=entry.course_ref,
-        course_index=entry.course_index,
-        gp_difficulty=entry.gp_difficulty,
-    )
+    return entry.reset_target_key()
 
 
 def _target_key_from_info(info: dict[str, object]) -> str | None:

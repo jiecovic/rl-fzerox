@@ -14,10 +14,6 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.runtime_spec.track_sampling_identity import (
-    track_sampling_course_key,
-    track_sampling_reset_target_key,
-)
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.records import record_difficulty
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
@@ -324,25 +320,12 @@ def _track_sampling_record(
     *,
     alt_baseline_count: int,
 ) -> dict[str, object]:
-    course_key = track_sampling_course_key(
-        entry_id=entry.id,
-        course_id=entry.course_id,
-        runtime_course_key=entry.runtime_course_key,
-        course_ref=entry.course_ref,
-        course_index=entry.course_index,
-    )
+    course_key = entry.course_key()
     info: dict[str, object] = {
         "track_entry_id": entry.id,
         "track_id": entry.id,
         "track_course_key": course_key,
-        "track_reset_target_key": track_sampling_reset_target_key(
-            entry_id=entry.id,
-            course_id=entry.course_id,
-            runtime_course_key=entry.runtime_course_key,
-            course_ref=entry.course_ref,
-            course_index=entry.course_index,
-            gp_difficulty=entry.gp_difficulty,
-        ),
+        "track_reset_target_key": entry.reset_target_key(),
         "track_baseline_state_path": str(entry.baseline_state_path),
         "track_sampling_weight": float(entry.weight),
         "track_alt_baseline_count": int(alt_baseline_count),
