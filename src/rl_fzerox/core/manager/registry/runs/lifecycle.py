@@ -140,18 +140,12 @@ def create_run(
 
 def get_run(store: ManagerStore, run_id: str) -> ManagedRun | None:
     store.initialize()
-    from rl_fzerox.core.manager.registry.runs.maintenance import reconcile_orphaned_runs
-
-    reconcile_orphaned_runs(store)
     with store._orm_session() as session:
         return get_managed_run(session, run_id)
 
 
 def list_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
     store.initialize()
-    from rl_fzerox.core.manager.registry.runs.maintenance import reconcile_orphaned_runs
-
-    reconcile_orphaned_runs(store)
     with store._orm_session() as session:
         return list_managed_runs(session)
 
@@ -162,9 +156,6 @@ def list_visible_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
 
 def list_visible_run_summaries(store: ManagerStore) -> tuple[ManagedRunSummary, ...]:
     store.initialize()
-    from rl_fzerox.core.manager.registry.runs.maintenance import reconcile_orphaned_runs
-
-    reconcile_orphaned_runs(store)
     with store._orm_session() as session:
         return list_visible_managed_run_summaries(session)
 

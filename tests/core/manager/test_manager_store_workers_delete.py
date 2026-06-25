@@ -241,6 +241,46 @@ def test_manager_store_reconciles_stale_dead_worker_lease(
     assert not _worker_exists(store, run.id)
 
 
+def test_manager_store_run_reads_do_not_reconcile_stale_worker_lease(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Read Only Lease Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    started_at = "2026-05-03T12:00:00+00:00"
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=started_at,
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+    assert store.register_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        pid=12345,
+        launched_at=started_at,
+    )
+    stale_heartbeat = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="seconds")
+    _set_worker_heartbeat(store, run_id=run.id, heartbeat_at=stale_heartbeat)
+    monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: False)
+
+    fetched = store.get_run(run.id)
+    summaries = store.list_visible_run_summaries()
+
+    assert fetched is not None
+    assert fetched.status == "running"
+    assert tuple(summary.id for summary in summaries) == (run.id,)
+    assert summaries[0].status == "running"
+    assert _worker_exists(store, run.id)
+
+
 def test_manager_store_keeps_fresh_worker_lease_when_pid_is_not_visible(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

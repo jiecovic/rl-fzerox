@@ -23,6 +23,9 @@ from rl_fzerox.core.manager.errors import ManagerNameConflictError
 
 
 def runs_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
+    # Run snapshots are the UI polling boundary that advances stale worker
+    # leases. Core registry read helpers stay read-only.
+    store.reconcile_orphaned_runs()
     visible_runs = store.list_visible_run_summaries()
     recent_events = store.list_recent_run_events(
         tuple(run.id for run in visible_runs),
