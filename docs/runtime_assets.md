@@ -14,6 +14,3 @@ ROM path in the run manager config before launching a run.
 
 Use the US F-Zero X ROM. RAM offsets and telemetry are maintained for that
 version.
-
-Do not commit ROMs, emulator cores, save states, checkpoints, or generated run
-files.

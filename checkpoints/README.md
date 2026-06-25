@@ -12,5 +12,4 @@ local/cache/baseline_materializer/
 ```
 
 Training materializes run-local reset states and stores policy artifacts under
-the specific run directory. Do not commit ROMs, generated save states, or model
-artifacts unless there is an explicit reason to publish a curated checkpoint.
+the specific run directory.
