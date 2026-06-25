@@ -17,7 +17,6 @@ from rl_fzerox.core.career_mode.navigation import (
     MenuInput,
     RawMenuStep,
     course_id_from_info,
-    in_gp_race,
 )
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
@@ -53,6 +52,11 @@ from rl_fzerox.ui.watch.runtime.career_mode.loop.snapshot import (
 from rl_fzerox.ui.watch.runtime.career_mode.loop.state import (
     CareerModeLoopState,
     TimedRecordingNotice,
+)
+from rl_fzerox.ui.watch.runtime.career_mode.loop.terminal import (
+    ObservedPolicyTerminal,
+    observe_policy_race_terminal,
+    observe_policy_start_terminal,
 )
 from rl_fzerox.ui.watch.runtime.career_mode.menu import (
     menu_viewer_info,
@@ -335,6 +339,23 @@ def run_career_mode_loop_body(
         tracer.state("begin_policy_race", info=info, force=True)
         publish_snapshot(policy_visible=True)
 
+    def apply_observed_terminal(terminal: ObservedPolicyTerminal) -> bool:
+        tracer.state(
+            "terminal_handled",
+            info=info,
+            event=terminal.event,
+            force=True,
+        )
+        tracer.lifecycle(terminal.lifecycle, info=info, trace_info=terminal.viewer_info)
+        if terminal.lifecycle.reset_requested:
+            reset_for_next_attempt_snapshot()
+            return True
+        refresh_after_terminal_episode(increment_episode=terminal.increment_episode)
+        if not terminal.lifecycle.has_active_attempt:
+            step_idle_after_runner_complete()
+            return True
+        return False
+
     try:
         while True:
             previous_cnn_visualization_enabled = cnn_visualization_enabled
@@ -491,37 +512,15 @@ def run_career_mode_loop_body(
                 active_policy_started=policy_runtime.started,
                 info=info,
             ):
-                terminal_handled = controller.observe_step(
+                terminal = observe_policy_start_terminal(
+                    controller=controller,
                     session=session,
+                    frame_recorder=frame_recorder,
                     info=info,
+                    active_policy_control=policy_runtime.policy_control,
                 )
-                if not terminal_handled and not in_gp_race(info):
-                    raise RuntimeError("Career Mode left a race before observing a game result")
-                if terminal_handled:
-                    tracer.state(
-                        "terminal_handled",
-                        info=info,
-                        event="policy_start_terminal",
-                        force=True,
-                    )
-                    terminal_info = controller.viewer_info(
-                        info=info,
-                        active_policy_control=policy_runtime.policy_control,
-                    )
-                    lifecycle = handle_controller_lifecycle(
-                        controller=controller,
-                        frame_recorder=frame_recorder,
-                        info=terminal_info,
-                        record_event=True,
-                    )
-                    tracer.lifecycle(lifecycle, info=info, trace_info=terminal_info)
-                    if lifecycle.reset_requested:
-                        reset_for_next_attempt_snapshot()
-                        continue
-                    refresh_after_terminal_episode(increment_episode=False)
-                    if not lifecycle.has_active_attempt:
-                        step_idle_after_runner_complete()
-                        continue
+                if terminal is not None and apply_observed_terminal(terminal):
+                    continue
             if not controller.has_active_attempt():
                 step_idle_after_runner_complete()
                 continue
@@ -617,35 +616,15 @@ def run_career_mode_loop_body(
                 current_telemetry = policy_step.telemetry
                 last_live_series_publish_time = policy_step.last_live_series_publish_time
                 tracer.state("policy_step", info=info)
-                terminal_handled = controller.observe_step(
+                terminal = observe_policy_race_terminal(
+                    controller=controller,
                     session=session,
+                    frame_recorder=frame_recorder,
                     info=info,
+                    active_policy_control=policy_runtime.policy_control,
                 )
-                if terminal_handled and not controller.policy_owns_control():
-                    tracer.state(
-                        "terminal_handled",
-                        info=info,
-                        event="race_terminal",
-                        force=True,
-                    )
-                    terminal_info = controller.viewer_info(
-                        info=info,
-                        active_policy_control=policy_runtime.policy_control,
-                    )
-                    lifecycle = handle_controller_lifecycle(
-                        controller=controller,
-                        frame_recorder=frame_recorder,
-                        info=terminal_info,
-                        record_event=True,
-                    )
-                    tracer.lifecycle(lifecycle, info=info, trace_info=terminal_info)
-                    if lifecycle.reset_requested:
-                        reset_for_next_attempt_snapshot()
-                        continue
-                    refresh_after_terminal_episode(increment_episode=True)
-                    if not lifecycle.has_active_attempt:
-                        step_idle_after_runner_complete()
-                        continue
+                if terminal is not None and apply_observed_terminal(terminal):
+                    continue
 
             if current_step_seconds is not None:
                 now = time.perf_counter()
