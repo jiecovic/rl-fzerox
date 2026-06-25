@@ -1,8 +1,6 @@
 ## Commit Messages
 
-Use Conventional Commits with a scope:
-
-`<type>(<scope>): <summary>`
+Use Conventional Commits with a scope: `<type>(<scope>): <summary>`.
 
 Allowed types:
 
@@ -18,14 +16,8 @@ Allowed types:
 - `style`
 - `revert`
 
-Rules:
-
-- Use present tense, imperative mood.
-- Keep the summary lowercase and concise, target 72 characters or less.
-- Do not end the summary with a period.
-- Keep each commit focused on one logical change.
-- Add a body when the reason is not obvious from the diff.
-- Use footers for breaking changes or issue metadata when needed.
+Rules: present tense, imperative mood, lowercase summary, no trailing period,
+focused logical change. Add body/footer only when useful.
 
 Examples:
 
@@ -36,12 +28,9 @@ Examples:
 
 ## Architecture Boundaries
 
-- Keep modules small and cohesive. Split files when doing so improves clarity,
-  testability, or ownership.
-- Around 700 LOC, actively consider a cohesive split. A file size below about
-  500 LOC is a good target when the split stays natural.
-- When one subsystem needs several implementation files, prefer an owned
-  package with a small facade over many loose sibling files.
+- Keep modules small and cohesive. Around 700 LOC, actively consider a split;
+  below about 500 LOC is a good target when the split stays natural.
+- Prefer owned packages with small facades over many loose sibling files.
 - Do not leave empty source directories behind after moves. Avoid one-file
   packages unless they are deliberate public facades or near-term grouping
   points.
@@ -50,8 +39,6 @@ Examples:
 - Keep public interfaces narrow and well-defined.
 - Do not introduce framework layers or indirection unless they solve a concrete
   problem already present in the codebase.
-- Before adding behavior to a large runtime file, first look for a cohesive
-  split that keeps side effects and state transitions easier to trace.
 - In Python, prefer absolute imports from project packages. Relative imports are
   acceptable only for same-package local files, and should stay shallow
   (`from .foo import ...`, not parent-package hops).
@@ -87,10 +74,8 @@ Examples:
 - Prefer explicit, maintainable designs over clever or over-abstracted code.
 - Use clear names, straightforward control flow, and predictable data flow.
 - Document intent behind non-obvious behavior, invariants, and tradeoffs.
-- Keep comments useful for the next maintainer; do not restate obvious code.
 - Avoid speculative abstractions, premature generalization, and copied patterns
   without a clear reason.
-- Prefer composition over inheritance when either would work.
 - Group related literal values in proper data structures when that clarifies
   RAM offsets, protocol ids, wire values, enum constants, or config tables.
 - Do not leave dead code, commented-out code, placeholder hooks, or vague TODOs.
@@ -99,11 +84,9 @@ Examples:
 
 ## Interfaces and Performance
 
-- Prefer composition and small capability interfaces over deep inheritance.
-- In Rust, use traits for project-owned behavior boundaries when they reduce
-  concrete coupling without hiding simple data flow.
-- In Python, use `Protocol` for small project-owned structural interfaces. Avoid
-  broad protocol layers around third-party dynamic libraries.
+- Prefer composition and small capability interfaces over deep inheritance. Use
+  Rust traits or Python `Protocol` for project-owned behavior boundaries when
+  they reduce coupling without hiding simple data flow.
 - Keep hot loops allocation-light and data-oriented. Cache invariant lookups,
   avoid repeated schema/object construction, and keep logging out of per-frame
   paths unless explicitly sampled or gated.
@@ -120,8 +103,6 @@ Examples:
 - Keep static typing pragmatic at third-party dynamic boundaries. Avoid large
   local `Protocol` layers just to compensate for weak typing in pygame,
   Stable-Baselines3, Gymnasium, or native extension modules.
-- Prefer small typed wrappers, narrow helper functions, or project-owned type
-  aliases when they improve maintainability.
 - Use centralized aliases in `fzerox_emulator.arrays` for project-owned NumPy
   concepts such as RGB frames, observations, masks, and action vectors.
 - Do not leave raw `np.ndarray` or direct `NDArray[...]` types on new
@@ -153,9 +134,6 @@ Examples:
 
 - Keep README-level docs and developer guidance in sync with architectural
   changes.
-- Add brief docstrings or comments where they materially reduce reader effort.
-- For complex subsystems, document core concepts, data flow, and extension
-  points close to the code.
 - Keep user docs short and practical. Start with what the user wants to do, then
   list the necessary commands, settings, or UI steps.
 - Do not try to fully document every subsystem in one pass. Establish the
@@ -166,15 +144,10 @@ Examples:
   target", "materialization", "runtime projection", "backend", or "source of
   truth".
 - Prefer tables, short rules, and examples over long narrative sections.
-  Equations and schema fields belong only where they clarify a decision the
-  reader must make.
-- Avoid negative framing in final docs. Define what a concept is before
-  mentioning what it is not.
-- Do not carry conversational corrections, review back-and-forth, or planning
-  residue into documentation prose.
+- Avoid negative framing and conversational residue in final docs. Define what a
+  concept is before mentioning what it is not.
 - Use short `Note:` or `Non-goals:` sections only when an exclusion materially
   helps users understand an API boundary or workflow.
-- Keep documentation standalone, neutral, and implementation-focused.
 
 ## Runtime Assets
 
@@ -193,11 +166,8 @@ Examples:
 - Python recipes use the active interpreter by default. Override with
   `PYTHON=/path/to/python just <task>` when needed.
 - Add or update tests for behavior changes when feasible. If skipped, state why.
-- Run relevant lint, typecheck, and tests before finishing meaningful changes.
-- Do not mark work complete if reasonable verification was feasible but not run.
-- Do not commit larger changes or refactors without first running the relevant
-  quality tools for the touched surface.
-- If a check cannot be run, report that explicitly.
+- Run relevant lint, typecheck, and tests before finishing or committing
+  meaningful changes. If a feasible check cannot be run, report that explicitly.
 
 Useful checks:
 
