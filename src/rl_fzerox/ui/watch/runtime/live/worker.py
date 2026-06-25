@@ -14,8 +14,6 @@ from typing import TYPE_CHECKING
 
 from fzerox_emulator import RaceControlState, SpinRequest
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.engine.controls import action_mask_violations
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.live_series import (
     LIVE_SERIES_PUBLISH_POLICY,
@@ -46,6 +44,10 @@ from rl_fzerox.ui.watch.runtime.live.reset import _sync_next_watch_reset_after_e
 from rl_fzerox.ui.watch.runtime.live.session import (
     open_watch_runtime_session,
 )
+from rl_fzerox.ui.watch.runtime.live.step import (
+    LiveStepRequest,
+    step_policy_or_manual,
+)
 from rl_fzerox.ui.watch.runtime.live.track_sampling import LiveTrackSamplingState
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
@@ -71,11 +73,6 @@ from rl_fzerox.ui.watch.runtime.policy.visualization import (
 )
 from rl_fzerox.ui.watch.runtime.snapshots.build import (
     _build_snapshot,
-    _next_boost_lamp_level,
-    _publish_step_snapshots,
-    _StepSnapshotDisplay,
-    _StepSnapshotFrameState,
-    _StepSnapshotPublishRequest,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry, _telemetry_to_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
@@ -412,183 +409,65 @@ def _run_simulation_loop(
                         time.sleep(min(wait_seconds, 0.005))
                         continue
 
-                single_frame_manual = commands.paused and commands.step_requests > 0
-                previous_observation = observation
-                previous_info = dict(info)
-                previous_episode_reward = episode_reward
-                previous_telemetry = _read_live_telemetry(emulator)
-                previous_control_state = current_control_state
-                previous_gas_level = current_gas_level
-                previous_policy_action = committed_policy_action
-                previous_action_mask_branches = committed_action_mask_branches
-                previous_auxiliary_predictions = current_auxiliary_predictions
-                previous_auxiliary_targets = current_auxiliary_targets
-                decision_action_mask = env.action_mask_snapshot()
-                if manual_control_enabled:
-                    if single_frame_manual:
-                        observation, reward, terminated, truncated, info = env.step_frame(
-                            current_control_state,
-                            spin_request=manual_spin_request,
-                        )
-                        display_frames = (env.render(),)
-                        display_controller_masks = (current_control_state.control_mask,)
-                    else:
-                        watch_step = env.step_control_watch(
-                            current_control_state,
-                            spin_request=manual_spin_request,
-                        )
-                        observation, reward, terminated, truncated, info = watch_step.gym_result()
-                        display_frames = watch_step.display_frames
-                        display_controller_masks = watch_step.display_controller_masks
-                    current_policy_action = None
-                    current_control_state = env.last_requested_control_state
-                    current_gas_level = env.last_gas_level
-                    committed_policy_action = None
-                    cnn_activations = None
-                else:
-                    assert policy_runner is not None
-                    policy_runner.refresh_if_due(interval_seconds=10.0)
-                    decision_action_mask = env.action_mask_snapshot()
-                    policy_action_mask = (
-                        decision_action_mask if policy_runner.supports_action_masks else None
-                    )
-                    action = policy_runner.predict(
-                        observation,
-                        deterministic=deterministic_policy,
-                        action_masks=(
-                            policy_action_mask.flat if policy_action_mask is not None else None
-                        ),
-                        refresh=False,
-                    )
-                    if policy_action_mask is not None:
-                        violations = action_mask_violations(policy_action_mask.branches, action)
-                        if violations:
-                            details = ", ".join(violations)
-                            raise RuntimeError(f"Policy selected masked action values: {details}")
-                    current_policy_action = action
-                    cnn_activations = cnn_sampler.capture(
-                        enabled=commands.cnn_visualization_enabled,
-                        policy_runner=policy_runner,
-                        observation=observation,
-                        normalization=commands.cnn_normalization,
-                    )
-                    watch_step = env.step_watch(action)
-                    raw_observation, reward, terminated, truncated, raw_info = (
-                        watch_step.gym_result()
-                    )
-                    display_frames = watch_step.display_frames
-                    display_controller_masks = watch_step.display_controller_masks
-                    current_control_state = env.last_requested_control_state
-                    current_gas_level = env.last_gas_level
-                if manual_control_enabled:
-                    raw_observation = observation
-                    raw_info = info
-                observation, info = apply_watch_state_feature_zeroing(
-                    raw_observation,
-                    raw_info,
-                    watch_zeroed_features=watch_zeroed_state_features,
-                )
-                final_action_mask_branches = env.action_mask_branches()
-                live_telemetry = _read_live_telemetry(emulator)
-                final_auxiliary_predictions = _current_auxiliary_predictions(
-                    policy_runner=policy_runner,
-                    enabled=auxiliary_visualization_enabled,
-                    observation=observation,
-                    target_names=auxiliary_target_names,
-                )
-                final_auxiliary_targets = _current_auxiliary_targets(
-                    telemetry=live_telemetry,
-                    enabled=auxiliary_visualization_enabled,
-                    target_names=auxiliary_target_names,
-                )
-                boost_lamp_level = _next_boost_lamp_level(
-                    previous=boost_lamp_level,
-                    control_state=current_control_state,
-                    boost_active=telemetry_boost_active(live_telemetry),
-                    action_repeat=config.env.action_repeat,
-                )
-                control_rate.tick()
-                episode_reward += reward
-                live_series.observe_decision(
-                    episode=episode,
-                    info=info,
-                    episode_reward=episode_reward,
-                    telemetry_data=_telemetry_to_data(live_telemetry),
-                    action_repeat=config.env.action_repeat,
-                )
-                track_record_book = track_record_book.update(
-                    info,
-                    live_telemetry,
-                    episode_done=terminated or truncated,
-                )
-                live_episode_series = None
-                if live_visualization_enabled:
-                    current_time = time.perf_counter()
-                    if (
-                        current_time - last_live_series_publish_time
-                        >= LIVE_SERIES_PUBLISH_POLICY.interval_seconds
-                    ):
-                        live_episode_series = live_series.snapshot()
-                        last_live_series_publish_time = current_time
-                _publish_step_snapshots(
-                    _StepSnapshotPublishRequest(
+                step_result = step_policy_or_manual(
+                    LiveStepRequest(
                         config=config,
                         env=env,
                         emulator=emulator,
                         snapshot_queue=snapshot_queue,
-                        display=_StepSnapshotDisplay(
-                            display_frames=display_frames,
-                            display_controller_masks=display_controller_masks,
-                        ),
-                        previous=_StepSnapshotFrameState(
-                            observation=previous_observation,
-                            info=save_notice.apply(previous_info, now=time.perf_counter()),
-                            episode_reward=previous_episode_reward,
-                            telemetry=previous_telemetry,
-                            control_state=previous_control_state,
-                            gas_level=previous_gas_level,
-                            action_mask_branches=previous_action_mask_branches,
-                            policy_action=previous_policy_action,
-                            auxiliary_predictions=previous_auxiliary_predictions,
-                            auxiliary_targets=previous_auxiliary_targets,
-                        ),
-                        final=_StepSnapshotFrameState(
-                            observation=observation,
-                            info=save_notice.apply(info, now=time.perf_counter()),
-                            episode_reward=episode_reward,
-                            telemetry=live_telemetry,
-                            control_state=current_control_state,
-                            gas_level=current_gas_level,
-                            action_mask_branches=final_action_mask_branches,
-                            policy_action=current_policy_action,
-                            auxiliary_predictions=final_auxiliary_predictions,
-                            auxiliary_targets=final_auxiliary_targets,
-                        ),
+                        policy_runner=policy_runner,
+                        observation=observation,
+                        info=info,
                         reset_info=reset_info,
                         episode=episode,
-                        control_fps=control_rate.rate_hz(),
+                        episode_reward=episode_reward,
+                        control_rate=control_rate,
                         target_control_fps=target_control_fps,
                         target_control_seconds=target_control_seconds,
-                        boost_lamp_level=boost_lamp_level,
-                        policy_runner=policy_runner,
                         deterministic_policy=deterministic_policy,
                         manual_control_enabled=manual_control_enabled,
-                        policy_reload_error=policy_reload_error,
-                        cnn_activations=cnn_activations,
-                        # The full track-sampling config can be hundreds of KB when
-                        # race-start variants are enabled. Initial/reset snapshots
-                        # carry it for UI metadata; repeated display-frame snapshots
-                        # omit it so Watch does not pickle it every frame.
-                        active_track_sampling=None,
+                        single_frame_manual=commands.paused and commands.step_requests > 0,
+                        current_control_state=current_control_state,
+                        current_gas_level=current_gas_level,
+                        spin_request=manual_spin_request,
+                        boost_lamp_level=boost_lamp_level,
+                        committed_policy_action=committed_policy_action,
+                        committed_action_mask_branches=committed_action_mask_branches,
+                        current_auxiliary_predictions=current_auxiliary_predictions,
+                        current_auxiliary_targets=current_auxiliary_targets,
+                        cnn_visualization_enabled=cnn_visualization_enabled,
+                        cnn_normalization=cnn_normalization,
+                        cnn_sampler=cnn_sampler,
+                        auxiliary_visualization_enabled=auxiliary_visualization_enabled,
+                        auxiliary_target_names=auxiliary_target_names,
+                        watch_zeroed_state_features=watch_zeroed_state_features,
+                        live_visualization_enabled=live_visualization_enabled,
+                        live_series=live_series,
+                        last_live_series_publish_time=last_live_series_publish_time,
                         track_record_book=track_record_book,
-                        live_episode_series=live_episode_series,
+                        save_notice=save_notice,
+                        policy_reload_error=policy_reload_error,
                     )
                 )
-                committed_policy_action = current_policy_action
-                committed_action_mask_branches = final_action_mask_branches
-                current_telemetry = live_telemetry
-                current_auxiliary_predictions = final_auxiliary_predictions
-                current_auxiliary_targets = final_auxiliary_targets
+                raw_observation = step_result.raw_observation
+                raw_info = step_result.raw_info
+                observation = step_result.observation
+                info = step_result.info
+                terminated = step_result.terminated
+                truncated = step_result.truncated
+                episode_reward = step_result.episode_reward
+                current_control_state = step_result.control_state
+                current_gas_level = step_result.gas_level
+                boost_lamp_level = step_result.boost_lamp_level
+                current_policy_action = step_result.policy_action
+                committed_policy_action = step_result.policy_action
+                cnn_activations = step_result.cnn_activations
+                committed_action_mask_branches = step_result.committed_action_mask_branches
+                track_record_book = step_result.track_record_book
+                current_telemetry = step_result.telemetry
+                current_auxiliary_predictions = step_result.auxiliary_predictions
+                current_auxiliary_targets = step_result.auxiliary_targets
+                last_live_series_publish_time = step_result.last_live_series_publish_time
                 if target_control_seconds is not None:
                     now = time.perf_counter()
                     next_step_time = max(next_step_time + target_control_seconds, now)
