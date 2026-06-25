@@ -17,9 +17,6 @@ from rl_fzerox.core.domain.policy import (
     validate_cnn_layer_geometry,
 )
 from rl_fzerox.core.policy.auxiliary_state.names import AuxiliaryStateTargetName
-from rl_fzerox.core.policy.auxiliary_state.targets import (
-    auxiliary_state_target_supports_grounded_only,
-)
 
 
 def normalize_policy_cnn_layer_kind(value: object) -> CnnLayerKind:
@@ -66,7 +63,16 @@ def validate_policy_auxiliary_grounded_only(
     name: AuxiliaryStateTargetName,
     grounded_only: bool,
 ) -> None:
-    if grounded_only and not auxiliary_state_target_supports_grounded_only(name):
+    if not grounded_only:
+        return
+    # `targets.py` owns vectorization and imports native telemetry types. Keep
+    # schema imports native-free for config/manifest helpers that only need the
+    # Pydantic model definitions.
+    from rl_fzerox.core.policy.auxiliary_state.targets import (
+        auxiliary_state_target_supports_grounded_only,
+    )
+
+    if not auxiliary_state_target_supports_grounded_only(name):
         raise ValueError("grounded_only is not supported for this auxiliary-state target")
 
 
