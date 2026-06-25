@@ -3,6 +3,7 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/app/App";
+import type { ManagerData } from "@/app/managerData";
 import { ApiSchemaMismatchError } from "@/shared/api/client";
 import {
   configMetadataFixture,
@@ -38,6 +39,29 @@ const stopRunMock = vi.fn();
 const subscribeRunLiveUpdatesMock = vi.fn();
 const subscribeRunTrackSamplingUpdatesMock = vi.fn();
 const watchRunMock = vi.fn();
+
+function managerDataFixture(overrides: Partial<ManagerData> = {}): ManagerData {
+  return {
+    drafts: [draftFixture()],
+    evaluationBaselineSuites: [],
+    evaluationError: null,
+    evaluations: [],
+    evaluationPresets: [],
+    metadata: configMetadataFixture,
+    runs: [],
+    saveGames: [],
+    templates: [
+      {
+        config: managedRunConfigFixture,
+        created_at: "2026-05-01T16:11:28+00:00",
+        id: "template-001",
+        name: "default",
+        updated_at: "2026-05-01T16:11:28+00:00",
+      },
+    ],
+    ...overrides,
+  };
+}
 
 vi.mock("@/app/managerData", () => ({
   loadManagerData: () => loadManagerDataMock(),
@@ -95,13 +119,7 @@ vi.mock("@/shared/api/client", async () => {
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    loadManagerDataMock.mockResolvedValue({
-      drafts: [draftFixture()],
-      metadata: configMetadataFixture,
-      runs: [],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValue(managerDataFixture());
     createDraftWithSourceMock.mockImplementation(
       async (
         name: string,
@@ -170,7 +188,7 @@ describe("App", () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Drafts" }));
-    await user.click(screen.getByRole("button", { name: /50,000,000 steps/i }));
+    await user.click(screen.getByRole("row", { name: /ppo_allcups_recurrent.*50,000,000/i }));
 
     expect(await screen.findByRole("textbox", { name: "Run name" })).toHaveValue(
       "ppo_allcups_recurrent",
@@ -194,13 +212,12 @@ describe("App", () => {
 
   it("opens a fork as a draft editor instead of launching immediately", async () => {
     const user = userEvent.setup();
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      }),
+    );
 
     render(<App />);
 
@@ -226,13 +243,12 @@ describe("App", () => {
 
   it("saves and launches an unsaved fork using its in-memory fork source", async () => {
     const user = userEvent.setup();
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      }),
+    );
 
     render(<App />);
 
@@ -269,19 +285,18 @@ describe("App", () => {
 
   it("asks whether to copy alt baselines when opening a fork draft", async () => {
     const user = userEvent.setup();
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [
-        runFixture({
-          active_alt_baseline_count: 2,
-          id: "run-001",
-          name: "ppo_test_1",
-        }),
-      ],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [
+          runFixture({
+            active_alt_baseline_count: 2,
+            id: "run-001",
+            name: "ppo_test_1",
+          }),
+        ],
+      }),
+    );
 
     render(<App />);
 
@@ -315,13 +330,12 @@ describe("App", () => {
 
   it("launches an unsaved fork with edited PPO clip range", async () => {
     const user = userEvent.setup();
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      }),
+    );
 
     render(<App />);
 
@@ -371,13 +385,12 @@ describe("App", () => {
         ],
       },
     };
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [runFixture({ id: "run-001", name: "ppo_test_1", config: sourceConfig })],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [runFixture({ id: "run-001", name: "ppo_test_1", config: sourceConfig })],
+      }),
+    );
 
     render(<App />);
 
@@ -408,13 +421,12 @@ describe("App", () => {
 
   it("launches a saved draft with the edited PPO clip range", async () => {
     const user = userEvent.setup();
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [],
+      }),
+    );
 
     render(<App />);
 
@@ -448,13 +460,12 @@ describe("App", () => {
 
   it("creates a normal editable draft from a run without fork lineage", async () => {
     const user = userEvent.setup();
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      }),
+    );
 
     render(<App />);
 
@@ -480,7 +491,7 @@ describe("App", () => {
       "ppo_test_1 draft",
     );
     await user.click(within(workspaceTabs).getByRole("button", { name: "Drafts" }));
-    expect(screen.getByRole("button", { name: /^ppo_test_1 draft/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Draft · ppo_test_1 draft" })).toBeInTheDocument();
   });
 
   it("shows API contract details for backend schema mismatch", async () => {
@@ -537,13 +548,12 @@ describe("App", () => {
         fps: null,
       },
     });
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [parentRun, childRun],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [parentRun, childRun],
+      }),
+    );
 
     render(<App />);
 
@@ -580,13 +590,12 @@ describe("App", () => {
   it("shows watch launch failures in run feedback", async () => {
     const user = userEvent.setup();
     const run = runFixture({ id: "run-001", name: "ppo_test_1" });
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [run],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [run],
+      }),
+    );
     watchRunMock.mockRejectedValueOnce(
       new Error(
         "Saved train manifest is not compatible with the current schema: /tmp/run. Restart the run with the current config schema.",
@@ -625,13 +634,12 @@ describe("App", () => {
   it("persists watch launch settings locally", async () => {
     const user = userEvent.setup();
     const run = runFixture({ id: "run-001", name: "ppo_test_1" });
-    loadManagerDataMock.mockResolvedValue({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [run],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValue(
+      managerDataFixture({
+        drafts: [],
+        runs: [run],
+      }),
+    );
 
     render(<App />);
 
@@ -682,13 +690,12 @@ describe("App", () => {
   it("shows newly observed watch process failure events globally", async () => {
     const user = userEvent.setup();
     const run = runFixture({ id: "run-001", name: "ppo_test_1" });
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [run],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [run],
+      }),
+    );
 
     render(<App />);
 
@@ -741,13 +748,12 @@ describe("App", () => {
         },
       ],
     });
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [run],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [run],
+      }),
+    );
 
     render(<App />);
 
@@ -798,13 +804,12 @@ describe("App", () => {
       started_at: "2026-05-03T10:00:00+00:00",
       stopped_at: "2026-05-03T11:00:00+00:00",
     });
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [parentRun, staleStartedRun],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [parentRun, staleStartedRun],
+      }),
+    );
 
     render(<App />);
 
@@ -839,13 +844,12 @@ describe("App", () => {
       source_num_timesteps: 20_304_180,
       runtime: null,
     });
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [failedForkRun],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [failedForkRun],
+      }),
+    );
 
     render(<App />);
 
@@ -878,13 +882,12 @@ describe("App", () => {
         },
       ],
     });
-    loadManagerDataMock.mockResolvedValueOnce({
-      drafts: [],
-      metadata: configMetadataFixture,
-      runs: [failedRun],
-      saveGames: [],
-      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
-    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        drafts: [],
+        runs: [failedRun],
+      }),
+    );
 
     render(<App />);
 
