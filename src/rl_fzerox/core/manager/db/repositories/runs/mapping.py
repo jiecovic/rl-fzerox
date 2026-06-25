@@ -3,13 +3,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from rl_fzerox.core.domain.engine import ENGINE_SLIDER
 from rl_fzerox.core.manager.db.models.metadata import LineageGroupModel
 from rl_fzerox.core.manager.db.models.runs import RunModel
 from rl_fzerox.core.manager.db.models.runtime import (
@@ -28,6 +26,7 @@ from rl_fzerox.core.manager.registry.common import (
     run_command,
     run_status,
 )
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.serialization import load_config_json
 
 
@@ -85,13 +84,14 @@ def managed_run_summary_from_model(session: Session, run: RunModel) -> ManagedRu
     runtime = session.get(RunRuntimeModel, run.id)
     worker = session.get(RunWorkerModel, run.id)
     pending_command = session.get(RunCommandModel, run.id)
+    config = load_config_json(run.config_snapshot.config_json)
     return ManagedRunSummary(
         id=run.id,
         name=run.name,
         status=run_status(run.status),
         config_hash=run.config_snapshot.config_hash,
-        action_repeat=_action_repeat_from_config_json(run.config_snapshot.config_json),
-        vehicle_setup=_vehicle_summary_from_config_json(run.config_snapshot.config_json),
+        action_repeat=config.action.action_repeat,
+        vehicle_setup=_vehicle_summary_from_config(config),
         lineage_id=lineage_id,
         lineage_groups=lineage_groups,
         lineage_step_offset=run.lineage_step_offset,
@@ -124,51 +124,15 @@ def _managed_runtime_from_model(runtime: RunRuntimeModel) -> ManagedRunRuntime:
     )
 
 
-def _action_repeat_from_config_json(config_json: str) -> int:
-    try:
-        loaded = json.loads(config_json)
-    except json.JSONDecodeError:
-        return 1
-    if not isinstance(loaded, dict):
-        return 1
-    action = loaded.get("action")
-    if not isinstance(action, dict):
-        return 1
-    action_repeat = action.get("action_repeat")
-    if not isinstance(action_repeat, int | float):
-        return 1
-    return max(1, int(action_repeat))
-
-
-def _vehicle_summary_from_config_json(config_json: str) -> ManagedRunVehicleSummary:
-    try:
-        loaded = json.loads(config_json)
-    except json.JSONDecodeError:
-        loaded = {}
-    vehicle = loaded.get("vehicle") if isinstance(loaded, dict) else None
-    if not isinstance(vehicle, dict):
-        vehicle = {}
-    selected_vehicle_ids = vehicle.get("selected_vehicle_ids")
-    if isinstance(selected_vehicle_ids, list):
-        vehicle_ids = tuple(value for value in selected_vehicle_ids if isinstance(value, str))
-    else:
-        vehicle_ids = ()
+def _vehicle_summary_from_config(config: ManagedRunConfig) -> ManagedRunVehicleSummary:
+    vehicle = config.vehicle
     return ManagedRunVehicleSummary(
-        selection_mode=_string_value(vehicle.get("selection_mode"), fallback="fixed"),
-        selected_vehicle_ids=vehicle_ids or ("blue_falcon",),
-        engine_mode=_string_value(vehicle.get("engine_mode"), fallback="fixed"),
-        engine_setting_raw_value=_bounded_int(
-            vehicle.get("engine_setting_raw_value"),
-            fallback=50,
-        ),
-        engine_setting_min_raw_value=_bounded_int(
-            vehicle.get("engine_setting_min_raw_value"),
-            fallback=20,
-        ),
-        engine_setting_max_raw_value=_bounded_int(
-            vehicle.get("engine_setting_max_raw_value"),
-            fallback=80,
-        ),
+        selection_mode=vehicle.selection_mode,
+        selected_vehicle_ids=vehicle.selected_vehicle_ids,
+        engine_mode=vehicle.engine_mode,
+        engine_setting_raw_value=vehicle.engine_setting_raw_value,
+        engine_setting_min_raw_value=vehicle.engine_setting_min_raw_value,
+        engine_setting_max_raw_value=vehicle.engine_setting_max_raw_value,
     )
 
 
@@ -176,13 +140,3 @@ def _required_lineage_id(run: RunModel) -> str:
     if run.lineage_id:
         return run.lineage_id
     raise RuntimeError(f"manager DB is not current: run {run.id} is missing lineage_id")
-
-
-def _string_value(value: object, *, fallback: str) -> str:
-    return value if isinstance(value, str) and value else fallback
-
-
-def _bounded_int(value: object, *, fallback: int) -> int:
-    if not isinstance(value, int | float):
-        return fallback
-    return max(ENGINE_SLIDER.min_step, min(ENGINE_SLIDER.max_step, int(value)))

@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+import pytest
+from pydantic import ValidationError
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
@@ -14,6 +16,8 @@ from rl_fzerox.core.manager import (
     default_managed_run_config,
     new_managed_run_id,
 )
+from rl_fzerox.core.manager.db import manager_session
+from rl_fzerox.core.manager.db.models import RunModel
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingAltBaseline,
@@ -123,6 +127,23 @@ def test_manager_store_hides_archived_runs_from_visible_views(tmp_path: Path) ->
     assert sum(group.run_count for group in groups) == 1
     assert active_dir / "tensorboard" in tensorboard_targets
     assert archived_dir / "tensorboard" not in tensorboard_targets
+
+
+def test_manager_store_run_summaries_validate_config_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Visible Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "managed_runs",
+    )
+    store.update_run_status(run_id=run.id, status="stopped", message="run stopped")
+    with manager_session(store.db_path) as session:
+        run_model = session.get(RunModel, run.id)
+        assert run_model is not None
+        run_model.config_snapshot.config_json = '{"action":{"action_repeat":0}}'
+
+    with pytest.raises(ValidationError, match="action_repeat"):
+        store.list_visible_run_summaries()
 
 
 def test_manager_store_persists_runtime_snapshots_and_metric_history(tmp_path: Path) -> None:

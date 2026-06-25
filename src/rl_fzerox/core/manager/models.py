@@ -188,7 +188,7 @@ class ManagedRunVehicleSummary:
 
 @dataclass(frozen=True, slots=True)
 class ManagedRunSummary:
-    """Lightweight run-list record that avoids deserializing full configs."""
+    """Run-list record that omits the full config from API payloads."""
 
     id: str
     name: str
