@@ -16,9 +16,6 @@ from pydantic import (
 from rl_fzerox.core.domain.policy import (
     CnnActivationName,
     CnnLayerKind,
-    is_activation_cnn_layer,
-    normalize_cnn_layer_kind,
-    validate_cnn_layer_geometry,
 )
 from rl_fzerox.core.manager.run_spec.common import (
     ActivationName,
@@ -26,8 +23,13 @@ from rl_fzerox.core.manager.run_spec.common import (
     FeatureDim,
 )
 from rl_fzerox.core.policy.auxiliary_state.names import AuxiliaryStateTargetName
-from rl_fzerox.core.policy.auxiliary_state.targets import (
-    auxiliary_state_target_supports_grounded_only,
+from rl_fzerox.core.policy.schema_validation import (
+    default_policy_cnn_layer_activation,
+    normalize_policy_cnn_layer_kind,
+    validate_policy_auxiliary_grounded_only,
+    validate_policy_auxiliary_losses,
+    validate_policy_cnn_layer_geometry,
+    validate_policy_custom_conv_layers_present,
 )
 
 
@@ -42,8 +44,10 @@ class ManagedPolicyAuxiliaryStateLossConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_grounded_only(self) -> ManagedPolicyAuxiliaryStateLossConfig:
-        if self.grounded_only and not auxiliary_state_target_supports_grounded_only(self.name):
-            raise ValueError("grounded_only is not supported for this auxiliary-state target")
+        validate_policy_auxiliary_grounded_only(
+            name=self.name,
+            grounded_only=self.grounded_only,
+        )
         return self
 
 
@@ -66,11 +70,11 @@ class ManagedPolicyConfig(BaseModel):
         @field_validator("kind", mode="before")
         @classmethod
         def _normalize_kind(cls, value: object) -> CnnLayerKind:
-            return normalize_cnn_layer_kind(value)
+            return normalize_policy_cnn_layer_kind(value)
 
         @model_validator(mode="after")
         def _validate_layer_geometry(self) -> ManagedPolicyConfig.CustomConvLayer:
-            validate_cnn_layer_geometry(
+            validate_policy_cnn_layer_geometry(
                 kind=self.kind,
                 kernel_size=int(self.kernel_size),
                 stride=int(self.stride),
@@ -80,8 +84,10 @@ class ManagedPolicyConfig(BaseModel):
 
         @model_validator(mode="after")
         def _validate_activation_name(self) -> ManagedPolicyConfig.CustomConvLayer:
-            if is_activation_cnn_layer(self.kind) and self.activation is None:
-                self.activation = "relu"
+            self.activation = default_policy_cnn_layer_activation(
+                kind=self.kind,
+                activation=self.activation,
+            )
             return self
 
     conv_profile: ConvProfile = "nature"
@@ -113,16 +119,20 @@ class ManagedPolicyConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_custom_conv_layers(self) -> ManagedPolicyConfig:
-        if self.conv_profile == "custom" and not self.custom_conv_layers:
-            raise ValueError("policy.custom_conv_layers must not be empty for conv_profile=custom")
-        loss_names = [loss.name for loss in self.auxiliary_state_losses]
-        if len(set(loss_names)) != len(loss_names):
-            raise ValueError("policy.auxiliary_state_losses must not contain duplicates")
-        if self.auxiliary_state_losses and not self.auxiliary_state_enabled:
-            raise ValueError(
+        validate_policy_custom_conv_layers_present(
+            conv_profile=self.conv_profile,
+            has_custom_layers=bool(self.custom_conv_layers),
+            message="policy.custom_conv_layers must not be empty for conv_profile=custom",
+        )
+        validate_policy_auxiliary_losses(
+            loss_names=tuple(loss.name for loss in self.auxiliary_state_losses),
+            enabled=self.auxiliary_state_enabled,
+            duplicate_message="policy.auxiliary_state_losses must not contain duplicates",
+            disabled_message=(
                 "policy.auxiliary_state_enabled must be true when "
                 "auxiliary_state_losses are configured"
-            )
+            ),
+        )
         return self
 
 

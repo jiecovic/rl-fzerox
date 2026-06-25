@@ -8,14 +8,16 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator,
 from rl_fzerox.core.domain.policy import (
     CnnActivationName,
     CnnLayerKind,
-    is_activation_cnn_layer,
-    normalize_cnn_layer_kind,
-    validate_cnn_layer_geometry,
 )
 from rl_fzerox.core.policy.activations import ActivationName
 from rl_fzerox.core.policy.auxiliary_state.names import AuxiliaryStateTargetName
-from rl_fzerox.core.policy.auxiliary_state.targets import (
-    auxiliary_state_target_supports_grounded_only,
+from rl_fzerox.core.policy.schema_validation import (
+    default_policy_cnn_layer_activation,
+    normalize_policy_cnn_layer_kind,
+    validate_policy_auxiliary_grounded_only,
+    validate_policy_auxiliary_losses,
+    validate_policy_cnn_layer_geometry,
+    validate_policy_custom_conv_layers_present,
 )
 
 
@@ -47,11 +49,11 @@ class ExtractorConfig(BaseModel):
         @field_validator("kind", mode="before")
         @classmethod
         def _normalize_kind(cls, value: object) -> CnnLayerKind:
-            return normalize_cnn_layer_kind(value)
+            return normalize_policy_cnn_layer_kind(value)
 
         @model_validator(mode="after")
         def _validate_layer_geometry(self) -> ExtractorConfig.CustomConvLayer:
-            validate_cnn_layer_geometry(
+            validate_policy_cnn_layer_geometry(
                 kind=self.kind,
                 kernel_size=int(self.kernel_size),
                 stride=int(self.stride),
@@ -61,8 +63,10 @@ class ExtractorConfig(BaseModel):
 
         @model_validator(mode="after")
         def _validate_activation_name(self) -> ExtractorConfig.CustomConvLayer:
-            if is_activation_cnn_layer(self.kind) and self.activation is None:
-                self.activation = "relu"
+            self.activation = default_policy_cnn_layer_activation(
+                kind=self.kind,
+                activation=self.activation,
+            )
             return self
 
     conv_profile: Literal[
@@ -84,8 +88,11 @@ class ExtractorConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_custom_conv_layers(self) -> ExtractorConfig:
-        if self.conv_profile == "custom" and not self.custom_conv_layers:
-            raise ValueError("policy.extractor.custom_conv_layers must not be empty")
+        validate_policy_custom_conv_layers_present(
+            conv_profile=self.conv_profile,
+            has_custom_layers=bool(self.custom_conv_layers),
+            message="policy.extractor.custom_conv_layers must not be empty",
+        )
         return self
 
     def resolved_state_net_arch(self) -> tuple[int, ...]:
@@ -129,8 +136,10 @@ class PolicyAuxiliaryStateLossConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_grounded_only(self) -> PolicyAuxiliaryStateLossConfig:
-        if self.grounded_only and not auxiliary_state_target_supports_grounded_only(self.name):
-            raise ValueError("grounded_only is not supported for this auxiliary-state target")
+        validate_policy_auxiliary_grounded_only(
+            name=self.name,
+            grounded_only=self.grounded_only,
+        )
         return self
 
 
@@ -145,13 +154,14 @@ class PolicyAuxiliaryStateConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_losses(self) -> PolicyAuxiliaryStateConfig:
-        loss_names = [loss.name for loss in self.losses]
-        if len(set(loss_names)) != len(loss_names):
-            raise ValueError("policy.auxiliary_state.losses must not contain duplicates")
-        if self.losses and not self.enabled:
-            raise ValueError(
+        validate_policy_auxiliary_losses(
+            loss_names=tuple(loss.name for loss in self.losses),
+            enabled=self.enabled,
+            duplicate_message="policy.auxiliary_state.losses must not contain duplicates",
+            disabled_message=(
                 "policy.auxiliary_state.enabled must be true when losses are configured"
-            )
+            ),
+        )
         return self
 
 
