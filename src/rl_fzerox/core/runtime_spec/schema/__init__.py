@@ -28,12 +28,8 @@ from rl_fzerox.core.runtime_spec.schema.common import (
     TrackSamplingMode,
     WatchFpsSetting,
 )
-from rl_fzerox.core.runtime_spec.schema.env import (
-    EmulatorConfig,
-    EnvConfig,
-    RewardConfig,
-    RewardCourseOverrideConfig,
-)
+from rl_fzerox.core.runtime_spec.schema.emulator import EmulatorConfig
+from rl_fzerox.core.runtime_spec.schema.env import EnvConfig
 from rl_fzerox.core.runtime_spec.schema.observations import (
     CustomResolutionChoice,
     ObservationConfig,
@@ -52,6 +48,10 @@ from rl_fzerox.core.runtime_spec.schema.policy import (
     PolicyAuxiliaryStateLossConfig,
     PolicyConfig,
     PolicyRecurrentConfig,
+)
+from rl_fzerox.core.runtime_spec.schema.rewards import (
+    RewardConfig,
+    RewardCourseOverrideConfig,
 )
 from rl_fzerox.core.runtime_spec.schema.tracks import (
     AdaptiveEngineTuningConfig,

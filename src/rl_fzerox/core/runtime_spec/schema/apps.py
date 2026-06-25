@@ -22,8 +22,10 @@ from pydantic import (
 
 from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema.common import WatchFpsSetting
-from rl_fzerox.core.runtime_spec.schema.env import EmulatorConfig, EnvConfig, RewardConfig
+from rl_fzerox.core.runtime_spec.schema.emulator import EmulatorConfig
+from rl_fzerox.core.runtime_spec.schema.env import EnvConfig
 from rl_fzerox.core.runtime_spec.schema.policy import PolicyConfig
+from rl_fzerox.core.runtime_spec.schema.rewards import RewardConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackConfig
 from rl_fzerox.core.runtime_spec.schema.training import TrainConfig
 
