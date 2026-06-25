@@ -245,7 +245,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             self._fusion_mlp: nn.Module = nn.Identity()
         else:
             # The fusion layer lets image and scalar-state features interact
-            # before the recurrent core, while keeping the legacy concat path.
+            # before the recurrent core when a fusion width is configured.
             self._fusion_mlp = nn.Sequential(
                 nn.Linear(combined_features_dim, resolved_fusion_features_dim),
                 resolve_policy_activation_fn(fusion_activation)(),
