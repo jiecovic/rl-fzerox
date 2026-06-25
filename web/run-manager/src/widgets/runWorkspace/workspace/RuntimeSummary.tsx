@@ -81,6 +81,7 @@ export function RunRuntimeSummary({
   const progressFraction = runtime?.progress_fraction ?? 0;
   const hasLineageTotals = showsLineageTotals(run);
   const watchRendererOptions = rendererNames(metadata, actions.selectedWatchRenderer);
+  const progressNoteText = progressNote(run);
   const activeStartupMessage = latestActiveStartupMessage(run);
 
   return (
@@ -105,7 +106,7 @@ export function RunRuntimeSummary({
             run.status === "failed" ? "text-app-danger" : undefined,
           )}
         >
-          {progressNote(run)}
+          {progressNoteText}
         </div>
         {activeStartupMessage !== null ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-app-muted">

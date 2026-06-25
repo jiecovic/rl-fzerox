@@ -21,18 +21,12 @@ export function progressNote(run: ManagedRunDetail): string {
   const target = run.config.train.total_timesteps.toLocaleString();
   if (runtime === null) {
     const failureMessage = latestFailureMessage(run);
-    const startupMessage = latestStartupMessage(run);
     if (run.status === "failed") {
       return (
-        failureMessage ??
-        startupMessage ??
-        `Run failed before the first callback flush. Target was ${target} steps.`
+        failureMessage ?? `Run failed before the first callback flush. Target was ${target} steps.`
       );
     }
-    return (
-      startupMessage ??
-      `Target ${target} steps. Runtime metrics appear after the first callback flush.`
-    );
+    return `Target ${target} steps. Runtime metrics appear after the first callback flush.`;
   }
   if (run.lineage_step_offset <= 0) {
     return `${runtime.num_timesteps.toLocaleString()} / ${runtime.total_timesteps.toLocaleString()} steps`;
@@ -121,14 +115,6 @@ export function lineageStepsLabel(run: ManagedRun): string {
     return run.source_num_timesteps.toLocaleString();
   }
   return "n/a";
-}
-
-export function latestStartupMessage(run: ManagedRun): string | null {
-  const startupEvent = latestStartupEvent(run);
-  if (startupEvent === null) {
-    return null;
-  }
-  return startupEvent.message;
 }
 
 export function latestActiveStartupMessage(run: ManagedRun): string | null {

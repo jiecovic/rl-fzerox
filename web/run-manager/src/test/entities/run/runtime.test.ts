@@ -1,9 +1,29 @@
 // web/run-manager/src/test/entities/run/runtime.test.ts
 import { describe, expect, it } from "vitest";
-import { latestActiveStartupMessage } from "@/entities/run/model/runtime";
+import { latestActiveStartupMessage, progressNote } from "@/entities/run/model/runtime";
 import { runFixture } from "@/test/fixtures";
 
 describe("run runtime labels", () => {
+  it("keeps setup activity separate from pre-runtime progress text", () => {
+    const run = runFixture({
+      runtime: null,
+      recent_events: [
+        {
+          created_at: "2026-05-03T18:55:20+00:00",
+          kind: "startup_materialize",
+          message:
+            "Resolving track sampling baselines: 13/384 complete " +
+            "(existing 0, cache 0, generated 13); next Mute City",
+        },
+      ],
+    });
+
+    expect(progressNote(run)).toBe(
+      "Target 50,000,000 steps. Runtime metrics appear after the first callback flush.",
+    );
+    expect(latestActiveStartupMessage(run)).toMatch(/Resolving track sampling baselines/);
+  });
+
   it("keeps startup activity only while it is newer than runtime metrics", () => {
     const runtime = runFixture().runtime;
     if (runtime === null) {
