@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/recording/recorder.py
+"""Career Mode native-frame recording and segment lifecycle.
+
+The controller emits explicit recording close events; this module consumes
+those events, writes live/segment video streams, and delegates summary/remux
+finalization without inferring attempt lifecycle from manager state.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping

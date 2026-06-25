@@ -1,4 +1,10 @@
 # tests/ui/test_career_mode_recording.py
+"""Career Mode recording regression tests.
+
+This file covers native-frame recording, input HUD rendering, segment
+lifecycle, summary payloads, path naming, and MP4 finalization behavior.
+"""
+
 from __future__ import annotations
 
 import json
@@ -16,7 +22,7 @@ from rl_fzerox.ui.watch.runtime.career_mode.recording import (
     career_session_summary_path,
     write_segment_summary_files,
 )
-from rl_fzerox.ui.watch.runtime.career_mode.recording_hud import input_hud_frame
+from rl_fzerox.ui.watch.runtime.career_mode.recording.hud import input_hud_frame
 
 
 class _FakeWriter:

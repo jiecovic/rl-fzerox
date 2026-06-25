@@ -1,4 +1,10 @@
 # src/rl_fzerox/ui/watch/view/screen/frame.py
+"""Pygame window sizing, fonts, and full-frame Watch drawing.
+
+`screen.render` builds the view model; this module turns that data into pygame
+surfaces, left-column overlays, side-panel rendering, and clickable hitboxes.
+"""
+
 from __future__ import annotations
 
 import math

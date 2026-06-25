@@ -1,4 +1,10 @@
 # src/rl_fzerox/ui/watch/view/panels/visuals/viz.py
+"""Convert controls, policy actions, and masks into Watch cockpit visuals.
+
+The functions here derive UI-ready `ControlViz` and flag data. Actual cockpit
+widget drawing lives under `view/components/cockpit`.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

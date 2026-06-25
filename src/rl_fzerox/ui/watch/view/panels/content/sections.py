@@ -1,4 +1,10 @@
 # src/rl_fzerox/ui/watch/view/panels/content/sections.py
+"""Compose side-panel content sections for the Watch UI.
+
+This module assembles the high-level panel columns from smaller section
+builders. Rendering and text fitting stay under `view/panels/rendering`.
+"""
+
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, RaceControlState

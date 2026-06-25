@@ -1,4 +1,10 @@
 # src/rl_fzerox/ui/watch/view/panels/visuals/cnn.py
+"""Render CNN activation pages inside the Watch side panel.
+
+The runtime captures activation snapshots; this module plans layer/stat layouts
+and draws them with pygame, including layer tabs and unused-tile overlays.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

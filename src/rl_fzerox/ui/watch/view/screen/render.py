@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/view/screen/render.py
+"""Assemble watch-frame view data from config and worker snapshots.
+
+This file enriches snapshot info with viewer-only metadata, resolves telemetry
+payloads, and builds `FrameRenderData`. Pygame drawing details live in
+`screen.frame` and lower-level component modules.
+"""
+
 from __future__ import annotations
 
 import math

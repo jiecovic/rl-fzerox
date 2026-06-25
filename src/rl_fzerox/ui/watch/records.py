@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/records.py
+"""Watch-local per-track record and attempt-stat tracking.
+
+Runtime workers update `TrackRecordBook` from episode info and live telemetry.
+The module also owns record identity, including generated X-Cup keys and legacy
+lookup keys used by older watch snapshots.
+"""
+
 from __future__ import annotations
 
 import math

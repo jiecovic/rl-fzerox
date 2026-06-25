@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/live_series.py
+"""Rolling live-series metrics for the watch charts.
+
+Workers feed this tracker once per policy/manual decision. The view layer reads
+snapshots only; it does not infer episode progress or event series from raw
+telemetry.
+"""
+
 from __future__ import annotations
 
 from collections import deque

@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/runtime/snapshots/build.py
+"""Build and publish watch snapshots across the worker/viewer process boundary.
+
+Workers call these helpers after emulator steps. The module keeps frame
+fallbacks, action-hold interpolation, policy metadata, telemetry conversion,
+and optional recording frame info in one snapshot boundary.
+"""
+
 from __future__ import annotations
 
 import time

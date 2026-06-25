@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/input.py
+"""Normalize pygame keyboard and mouse events into watch worker commands.
+
+The viewer loop consumes only `ViewerInput`; this file is the boundary where
+pygame-specific key constants, click hitboxes, held-key repeat, and manual
+controller state are translated into that stable shape.
+"""
+
 from __future__ import annotations
 
 import time

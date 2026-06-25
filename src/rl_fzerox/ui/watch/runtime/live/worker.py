@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/runtime/live/worker.py
+"""Live watch worker process for normal policy/manual rollouts.
+
+The worker owns emulator stepping, command draining, timing, track-sampling
+refresh, policy reload checks, and snapshot publication. Domain state remains
+in the env/session; pygame rendering stays in the viewer process.
+"""
+
 from __future__ import annotations
 
 import time

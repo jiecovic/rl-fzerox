@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/loop/runner.py
+"""Career Mode watch-loop body.
+
+This worker-side loop coordinates process commands, menu stepping, policy
+handoff, snapshot publication, recording notices, and timing. The core Career
+Mode controller remains the owner of FSM and attempt lifecycle decisions.
+"""
+
 from __future__ import annotations
 
 import time

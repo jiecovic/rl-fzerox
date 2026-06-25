@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/runtime/ipc/queues.py
+"""Multiprocessing queues, worker startup, and command coalescing for Watch.
+
+This module owns process lifecycle and the IPC contract between the pygame
+viewer and worker processes. Runtime workers consume `WorkerCommandBatch`
+instead of raw viewer events.
+"""
+
 from __future__ import annotations
 
 import multiprocessing as mp

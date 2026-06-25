@@ -1,4 +1,10 @@
 # src/rl_fzerox/ui/watch/recording.py
+"""Optional full-window recording for the pygame watch viewer.
+
+This module records rendered viewer surfaces. Career Mode game-frame recording
+is intentionally separate under `runtime/career_mode/recording`.
+"""
+
 from __future__ import annotations
 
 import numpy as np

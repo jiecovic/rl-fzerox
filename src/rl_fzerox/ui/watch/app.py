@@ -1,4 +1,12 @@
 # src/rl_fzerox/ui/watch/app.py
+"""Top-level pygame watch viewer loop.
+
+This module owns the UI process event loop: input polling, worker command
+delivery, snapshot draining, window resizing, frame rendering, and optional
+viewer-side recording. Emulator stepping and policy inference stay in worker
+processes under `runtime`.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable

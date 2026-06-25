@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/runtime/live/session.py
+"""Runtime session construction for the live watch worker.
+
+This file opens the emulator env, optional policy runner, engine-tuning cache,
+and watch-specific state-feature masking inputs. The worker loop consumes the
+session; it should not duplicate setup or artifact-resolution rules.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

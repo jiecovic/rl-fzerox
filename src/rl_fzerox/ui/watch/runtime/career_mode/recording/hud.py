@@ -1,4 +1,11 @@
 # src/rl_fzerox/ui/watch/runtime/career_mode/recording/hud.py
+"""Tiny input HUD renderer for Career Mode game-frame recordings.
+
+The recorder calls this module after the worker has attached controller input
+fields to frame info. It draws directly onto RGB frame copies and stays
+independent from pygame viewer widgets.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
