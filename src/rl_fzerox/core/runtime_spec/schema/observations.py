@@ -41,6 +41,14 @@ from rl_fzerox.core.runtime_spec.schema.common import (
 
 type ObservationResolutionMode = Literal["preset", "custom", "source_crop"]
 
+_STATE_COMPONENT_SETTING_FIELDS = (
+    "encoding",
+    "progress_source",
+    "length",
+    "controls",
+    "included_features",
+)
+
 
 class PresetResolutionChoice(BaseModel):
     """Preset-backed observation resolution."""
@@ -126,50 +134,10 @@ class ObservationStateComponentConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_component_settings(self) -> ObservationStateComponentConfig:
-        configured_fields = {
-            name
-            for name in (
-                "encoding",
-                "progress_source",
-                "length",
-                "controls",
-                "included_features",
-            )
-            if getattr(self, name) is not None
-        }
-        invalid_fields = configured_fields - self._allowed_fields()
-        if invalid_fields:
-            joined = ", ".join(sorted(invalid_fields))
-            raise ValueError(f"{self.name} does not accept setting(s): {joined}")
-
-        if self.controls is not None:
-            if len(set(self.controls)) != len(self.controls):
-                raise ValueError("control_history.controls must not contain duplicates")
-            normalized = {"gas" if control == "thrust" else control for control in self.controls}
-            if len(normalized) != len(self.controls):
-                raise ValueError("control_history.controls cannot contain both gas and thrust")
-        if self.included_features is not None:
-            if len(set(self.included_features)) != len(self.included_features):
-                raise ValueError("state component included_features must not contain duplicates")
-            supported = set(_supported_state_feature_names(self))
-            unsupported = sorted(set(self.included_features) - supported)
-            if unsupported:
-                joined = ", ".join(unsupported)
-                raise ValueError(f"{self.name} does not support included feature(s): {joined}")
+        _validate_allowed_state_component_settings(self)
+        _validate_control_history_controls(self.controls)
+        _validate_included_state_features(self)
         return self
-
-    def _allowed_fields(self) -> frozenset[str]:
-        match self.name:
-            case "course_context":
-                return frozenset({"encoding", "included_features"})
-            case "control_history":
-                return frozenset({"length", "controls", "included_features"})
-            case "track_position":
-                return frozenset({"progress_source", "included_features"})
-            case "vehicle_state" | "machine_context" | "surface_state":
-                return frozenset({"included_features"})
-            case _:
-                raise ValueError(f"Unsupported state component: {self.name!r}")
 
     def data(self) -> ObservationStateComponentSettings:
         """Return the compact ordered form consumed by env code."""
@@ -286,6 +254,56 @@ def _supported_state_feature_names(component: ObservationStateComponentConfig) -
             if feature.name not in feature_names:
                 feature_names.append(feature.name)
     return tuple(feature_names)
+
+
+def _validate_allowed_state_component_settings(component: ObservationStateComponentConfig) -> None:
+    configured_fields = {
+        name for name in _STATE_COMPONENT_SETTING_FIELDS if getattr(component, name) is not None
+    }
+    invalid_fields = configured_fields - _allowed_state_component_fields(component.name)
+    if invalid_fields:
+        joined = ", ".join(sorted(invalid_fields))
+        raise ValueError(f"{component.name} does not accept setting(s): {joined}")
+
+
+def _allowed_state_component_fields(
+    name: ObservationStateComponentName,
+) -> frozenset[str]:
+    match name:
+        case "course_context":
+            return frozenset({"encoding", "included_features"})
+        case "control_history":
+            return frozenset({"length", "controls", "included_features"})
+        case "track_position":
+            return frozenset({"progress_source", "included_features"})
+        case "vehicle_state" | "machine_context" | "surface_state":
+            return frozenset({"included_features"})
+        case _:
+            raise ValueError(f"Unsupported state component: {name!r}")
+
+
+def _validate_control_history_controls(
+    controls: tuple[ActionHistoryControlName, ...] | None,
+) -> None:
+    if controls is None:
+        return
+    if len(set(controls)) != len(controls):
+        raise ValueError("control_history.controls must not contain duplicates")
+    normalized = {"gas" if control == "thrust" else control for control in controls}
+    if len(normalized) != len(controls):
+        raise ValueError("control_history.controls cannot contain both gas and thrust")
+
+
+def _validate_included_state_features(component: ObservationStateComponentConfig) -> None:
+    if component.included_features is None:
+        return
+    if len(set(component.included_features)) != len(component.included_features):
+        raise ValueError("state component included_features must not contain duplicates")
+    supported = set(_supported_state_feature_names(component))
+    unsupported = sorted(set(component.included_features) - supported)
+    if unsupported:
+        joined = ", ".join(unsupported)
+        raise ValueError(f"{component.name} does not support included feature(s): {joined}")
 
 
 def _component_settings(
