@@ -3,11 +3,16 @@ import * as Dialog from "@radix-ui/react-dialog";
 
 import { Button } from "@/shared/ui/Button";
 
+type ConfirmButtonTone = "danger" | "default";
+type ConfirmButtonVariant = "accentSoft" | "primary" | "secondary";
+
 interface ConfirmDialogProps {
   busy?: boolean;
   busyLabel?: string;
   cancelLabel?: string;
   confirmLabel: string;
+  confirmTone?: ConfirmButtonTone;
+  confirmVariant?: ConfirmButtonVariant;
   description: string;
   error?: string | null;
   open: boolean;
@@ -21,6 +26,8 @@ export function ConfirmDialog({
   busyLabel = "Deleting...",
   cancelLabel = "Cancel",
   confirmLabel,
+  confirmTone = "danger",
+  confirmVariant = "secondary",
   description,
   error = null,
   open,
@@ -65,7 +72,7 @@ export function ConfirmDialog({
             <Button disabled={busy} onClick={onClose}>
               {cancelLabel}
             </Button>
-            <Button tone="danger" disabled={busy} onClick={onConfirm}>
+            <Button disabled={busy} tone={confirmTone} variant={confirmVariant} onClick={onConfirm}>
               {busy ? busyLabel : confirmLabel}
             </Button>
           </div>

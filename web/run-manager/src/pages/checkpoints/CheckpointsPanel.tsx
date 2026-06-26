@@ -9,7 +9,7 @@ import type {
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { formatInteger } from "@/shared/ui/format";
-import { ImportIcon, TrashIcon } from "@/shared/ui/icons";
+import { ExportIcon, TrashIcon } from "@/shared/ui/icons";
 import {
   ListActionsCell,
   ListActionsHeaderCell,
@@ -42,6 +42,7 @@ export function CheckpointsPanel({
   const [deleteRequested, setDeleteRequested] = useState<PublishedCheckpoint | null>(null);
   const [deleteSelectedRequested, setDeleteSelectedRequested] = useState(false);
   const [deletingCheckpointId, setDeletingCheckpointId] = useState<string | null>(null);
+  const [installRequested, setInstallRequested] = useState<CheckpointCatalogEntry | null>(null);
   const [installingKey, setInstallingKey] = useState<string | null>(null);
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
   const [selectedCheckpointIds, setSelectedCheckpointIds] = useState<ReadonlySet<string>>(
@@ -79,14 +80,16 @@ export function CheckpointsPanel({
     });
   }, [installedCheckpointIds]);
 
-  async function installEntry(entry: CheckpointCatalogEntry) {
+  async function installEntry(entry: CheckpointCatalogEntry): Promise<boolean> {
     const key = checkpointEntryKey(entry);
     setInstallingKey(key);
     onGlobalError(null);
     try {
       await onInstallCheckpoint(entry.id, entry.version);
+      return true;
     } catch (caught) {
       onGlobalError(caught instanceof Error ? caught.message : "checkpoint install failed");
+      return false;
     } finally {
       setInstallingKey(null);
     }
@@ -135,6 +138,15 @@ export function CheckpointsPanel({
       onGlobalError(caught instanceof Error ? caught.message : "checkpoint delete failed");
     } finally {
       setIsDeletingSelected(false);
+    }
+  }
+
+  async function confirmCheckpointInstall() {
+    if (installRequested === null) {
+      return;
+    }
+    if (await installEntry(installRequested)) {
+      setInstallRequested(null);
     }
   }
 
@@ -221,7 +233,7 @@ export function CheckpointsPanel({
                     selectedCheckpointIds.has(entry.installed_checkpoint_id)
                   }
                   onDelete={(checkpoint) => setDeleteRequested(checkpoint)}
-                  onInstall={() => void installEntry(entry)}
+                  onInstall={() => setInstallRequested(entry)}
                   onOpen={onOpenCheckpoint}
                   onToggleSelection={toggleCheckpointSelection}
                 />
@@ -230,6 +242,22 @@ export function CheckpointsPanel({
           </ListTable>
         )}
       </Panel>
+      <ConfirmDialog
+        busy={installRequested !== null && installingKey === checkpointEntryKey(installRequested)}
+        busyLabel="Downloading..."
+        confirmLabel="Download"
+        confirmTone="default"
+        confirmVariant="primary"
+        description={
+          installRequested === null
+            ? ""
+            : `Download and install ${installRequested.name}? The checkpoint will be stored under local/manager/checkpoints and can then be opened, forked, watched, or evaluated.`
+        }
+        open={installRequested !== null}
+        title="Download checkpoint"
+        onClose={() => setInstallRequested(null)}
+        onConfirm={() => void confirmCheckpointInstall()}
+      />
       <ConfirmDialog
         busy={deletingCheckpointId !== null}
         confirmLabel="Delete checkpoint"
@@ -280,16 +308,15 @@ function CheckpointCatalogRow({
   onToggleSelection: (checkpointId: string, selected: boolean) => void;
 }) {
   const checkpoint = entry.manifest.checkpoint;
+  const openRow =
+    installedCheckpoint === null
+      ? onInstall
+      : installedCheckpoint.run === null
+        ? undefined
+        : () => onOpen(installedCheckpoint);
 
   return (
-    <ListRow
-      selected={selected}
-      onOpen={
-        installedCheckpoint === null || installedCheckpoint.run === null
-          ? undefined
-          : () => onOpen(installedCheckpoint)
-      }
-    >
+    <ListRow selected={selected} onOpen={openRow}>
       <ListSelectionCell
         aria-label={`Select checkpoint: ${entry.name}`}
         checked={selected}
@@ -326,13 +353,13 @@ function CheckpointCatalogRow({
       </td>
       <ListActionsCell>
         <TooltipIconButton
-          aria-label={`Install checkpoint: ${entry.name}`}
+          aria-label={`Download checkpoint: ${entry.name}`}
           disabled={installedCheckpoint !== null || installing}
           size="compact"
-          tooltip={installedCheckpoint !== null ? "Installed" : "Install checkpoint"}
+          tooltip={installedCheckpoint !== null ? "Installed" : "Download checkpoint"}
           onClick={onInstall}
         >
-          <ImportIcon />
+          <ExportIcon />
         </TooltipIconButton>
         <TooltipIconButton
           aria-label={`Delete checkpoint: ${entry.name}`}
