@@ -1,0 +1,81 @@
+{
+  "entries": [
+    {
+      "bundle": {
+        "filename": "rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip",
+        "sha256": "16932e04047f3e78da225efe18fa27fb5c672ea95da48c253f2a9e9715398bd6",
+        "size_bytes": 33569307,
+        "url": "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip"
+      },
+      "id": "blue-falcon-fine-tuned",
+      "manifest": {
+        "checkpoint": {
+          "created_at": "2026-06-26T10:26:03+00:00",
+          "id": "blue-falcon-fine-tuned",
+          "lineage_num_timesteps": 1979774040,
+          "local_num_timesteps": 68288256,
+          "name": "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+          "source_artifact": "best",
+          "source_run_id": "20260624-120927-f6fa7b32",
+          "source_run_name": "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+          "version": "v1"
+        },
+        "compatibility": {
+          "action_space_sha256": "575ee0a68d1769938ccec8bfdecc8d8749da0c758d78eafddad1734a988be904",
+          "app_version": null,
+          "config_schema_version": 1,
+          "observation_space_sha256": "e023c2cea9f85813edfa25f9a526841c09a71ddd3925e5edf6fcca70424fc911",
+          "policy_architecture": null,
+          "policy_signature_sha256": "cbfa6cce924a8b17004c59c210664ba951562c8380cce81ce178897fe1f533fb",
+          "train_config_sha256": "bc890dbc2339113804de1d3a7397b189864b290209f57247e32bbded3547c022",
+          "training_algorithm": "maskable_hybrid_recurrent_ppo"
+        },
+        "exported_at": "2026-06-26T12:15:44+00:00",
+        "files": [
+          {
+            "path": "checkpoint/policy.zip",
+            "role": "policy",
+            "sha256": "3f6363c85dc421f630222b21c7a86b5f01df1fef849b6c8fd4437b6800832981",
+            "size_bytes": 9169014
+          },
+          {
+            "path": "checkpoint/model.zip",
+            "role": "model",
+            "sha256": "db81b197f5f291d2260dfe51055d782bc5d2c02df09369f04bb80eab97b9f38f",
+            "size_bytes": 28268751
+          },
+          {
+            "path": "checkpoint/policy.metadata.json",
+            "role": "checkpoint_metadata",
+            "sha256": "114fdeb072f6fa97fc710d0d68e3b48977c369119b8ce1e2436c24876d755fe2",
+            "size_bytes": 71
+          },
+          {
+            "path": "config/train_config.json",
+            "role": "train_config",
+            "sha256": "bc890dbc2339113804de1d3a7397b189864b290209f57247e32bbded3547c022",
+            "size_bytes": 10238
+          },
+          {
+            "path": "metrics/evaluation.json",
+            "role": "evaluation_metrics",
+            "sha256": "918d42d7be2ce43bc2cc18ecdee4aafcb8de367bd27af358acdc48f1f9b63f91",
+            "size_bytes": 363737
+          },
+          {
+            "path": "engine_tuning/state.json",
+            "role": "engine_tuning_state",
+            "sha256": "9849be59afaf71ba63b47dc591d4f4ec5a9a80edef26af0a6d68b6eb5d97d297",
+            "size_bytes": 361173
+          }
+        ],
+        "format_name": "rl-fzerox-checkpoint-bundle",
+        "schema_version": 1
+      },
+      "version": "v1"
+    }
+  ],
+  "format_name": "rl-fzerox-checkpoint-catalog",
+  "schema_version": 1,
+  "updated_at": "2026-06-26T12:15:44+00:00"
+}
