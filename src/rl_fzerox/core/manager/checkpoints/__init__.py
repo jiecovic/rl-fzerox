@@ -13,6 +13,12 @@ from rl_fzerox.core.manager.checkpoints.manifest import (
     parse_checkpoint_bundle_manifest_json,
     serialize_checkpoint_bundle_manifest_json,
 )
+from rl_fzerox.core.manager.checkpoints.package import (
+    CheckpointBundlePackageError,
+    CheckpointBundlePackageResult,
+    default_checkpoint_bundle_path,
+    package_checkpoint_bundle,
+)
 
 __all__ = [
     "CHECKPOINT_BUNDLE_LAYOUT",
@@ -22,7 +28,11 @@ __all__ = [
     "CheckpointBundleFileRole",
     "CheckpointBundleManifest",
     "CheckpointBundleManifestError",
+    "CheckpointBundlePackageError",
+    "CheckpointBundlePackageResult",
     "CheckpointBundleSourceArtifact",
+    "default_checkpoint_bundle_path",
+    "package_checkpoint_bundle",
     "parse_checkpoint_bundle_manifest_json",
     "serialize_checkpoint_bundle_manifest_json",
 ]

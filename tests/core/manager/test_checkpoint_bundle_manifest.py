@@ -83,12 +83,24 @@ def test_checkpoint_bundle_manifest_rejects_duplicate_paths() -> None:
 
 def test_checkpoint_bundle_manifest_rejects_missing_policy() -> None:
     with pytest.raises(ValueError, match="missing required file roles"):
-        _manifest(files=(_file("train_config", "config/train_config.json"),))
+        _manifest(
+            files=(
+                _file("model", "checkpoint/model.zip"),
+                _file("checkpoint_metadata", "checkpoint/policy.metadata.json"),
+                _file("train_config", "config/train_config.json"),
+            )
+        )
 
 
 def test_checkpoint_bundle_manifest_rejects_missing_train_config() -> None:
     with pytest.raises(ValueError, match="missing required file roles"):
-        _manifest(files=(_file("policy", "checkpoint/policy.zip"),))
+        _manifest(
+            files=(
+                _file("policy", "checkpoint/policy.zip"),
+                _file("model", "checkpoint/model.zip"),
+                _file("checkpoint_metadata", "checkpoint/policy.metadata.json"),
+            )
+        )
 
 
 def test_checkpoint_bundle_manifest_rejects_duplicate_singleton_role() -> None:
@@ -97,6 +109,8 @@ def test_checkpoint_bundle_manifest_rejects_duplicate_singleton_role() -> None:
             files=(
                 _file("policy", "checkpoint/policy.zip"),
                 _file("policy", "checkpoint/policy-copy.zip"),
+                _file("model", "checkpoint/model.zip"),
+                _file("checkpoint_metadata", "checkpoint/policy.metadata.json"),
                 _file("train_config", "config/train_config.json"),
             )
         )
@@ -107,6 +121,8 @@ def test_checkpoint_bundle_manifest_rejects_role_in_wrong_directory() -> None:
         _manifest(
             files=(
                 _file("policy", "config/policy.zip"),
+                _file("model", "checkpoint/model.zip"),
+                _file("checkpoint_metadata", "checkpoint/policy.metadata.json"),
                 _file("train_config", "config/train_config.json"),
             )
         )
@@ -144,6 +160,8 @@ def _manifest(
         files=files
         or (
             _file("policy", "checkpoint/policy.zip", sha256=policy_hash),
+            _file("model", "checkpoint/model.zip"),
+            _file("checkpoint_metadata", "checkpoint/policy.metadata.json"),
             _file("train_config", "config/train_config.json"),
         ),
     )

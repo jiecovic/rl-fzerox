@@ -41,6 +41,7 @@ CheckpointBundleFileRole = Literal[
     "train_config",
     "evaluation_metrics",
     "engine_tuning_state",
+    "engine_tuning_model",
 ]
 
 CheckpointBundleSourceArtifact = Literal["latest", "best", "final"]
@@ -80,8 +81,11 @@ _ROLE_ROOTS: dict[CheckpointBundleFileRole, str] = {
     "train_config": "config",
     "evaluation_metrics": "metrics",
     "engine_tuning_state": "engine_tuning",
+    "engine_tuning_model": "engine_tuning",
 }
-_REQUIRED_ROLES = frozenset[CheckpointBundleFileRole]({"policy", "train_config"})
+_REQUIRED_ROLES = frozenset[CheckpointBundleFileRole](
+    {"policy", "model", "checkpoint_metadata", "train_config"}
+)
 _SINGLETON_ROLES = frozenset[CheckpointBundleFileRole](
     {
         "policy",
@@ -90,6 +94,7 @@ _SINGLETON_ROLES = frozenset[CheckpointBundleFileRole](
         "train_config",
         "evaluation_metrics",
         "engine_tuning_state",
+        "engine_tuning_model",
     }
 )
 
@@ -154,6 +159,7 @@ class CheckpointBundleCompatibility(CheckpointBundleModel):
     train_config_sha256: str | None = None
     observation_space_sha256: str | None = None
     action_space_sha256: str | None = None
+    policy_signature_sha256: str | None = None
 
     @field_validator("app_version", "training_algorithm", "policy_architecture")
     @classmethod
@@ -162,7 +168,12 @@ class CheckpointBundleCompatibility(CheckpointBundleModel):
             return None
         return _validate_non_empty_text(value)
 
-    @field_validator("train_config_sha256", "observation_space_sha256", "action_space_sha256")
+    @field_validator(
+        "train_config_sha256",
+        "observation_space_sha256",
+        "action_space_sha256",
+        "policy_signature_sha256",
+    )
     @classmethod
     def validate_optional_sha256(cls, value: str | None) -> str | None:
         if value is None:
