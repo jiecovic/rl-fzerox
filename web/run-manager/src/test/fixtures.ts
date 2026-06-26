@@ -1,5 +1,6 @@
 // web/run-manager/src/test/fixtures.ts
 import type {
+  CheckpointCatalogResponse,
   ConfigMetadata,
   ManagedDraft,
   ManagedRunConfig,
@@ -30,6 +31,51 @@ const generated: GeneratedFixtures = {
 export const managedRunConfigFixture: ManagedRunConfig = generated.managed_run_config;
 export const configMetadataFixture: ConfigMetadata = generated.config_metadata;
 export const policyPreviewFixture: PolicyArchitecturePreview = generated.policy_preview;
+
+export function checkpointCatalogFixture(
+  overrides: Partial<CheckpointCatalogResponse> = {},
+): CheckpointCatalogResponse {
+  return {
+    catalog: {
+      format_name: "rl-fzerox-checkpoint-catalog",
+      schema_version: 1,
+      updated_at: "2026-06-26T12:15:44+00:00",
+    },
+    entries: [
+      {
+        id: "blue-falcon-fine-tuned",
+        version: "v1",
+        name: "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+        bundle: {
+          filename: "rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip",
+          sha256: "a".repeat(64),
+          size_bytes: 33_569_307,
+          url: "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/bundle.zip",
+        },
+        installed_checkpoint_id: null,
+        manifest: {
+          checkpoint: {
+            id: "blue-falcon-fine-tuned",
+            name: "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+            version: "v1",
+            source_artifact: "best",
+            local_num_timesteps: 68_288_256,
+            lineage_num_timesteps: 1_979_774_040,
+          },
+          compatibility: {
+            training_algorithm: "maskable_hybrid_recurrent_ppo",
+          },
+          exported_at: "2026-06-26T12:15:44+00:00",
+          files: [],
+          format_name: "rl-fzerox-checkpoint-bundle",
+          schema_version: 1,
+        },
+      },
+    ],
+    installed_checkpoints: [],
+    ...overrides,
+  };
+}
 
 export function draftFixture(overrides: Partial<ManagedDraft> = {}): ManagedDraft {
   return {

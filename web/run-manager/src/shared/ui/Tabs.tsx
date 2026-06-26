@@ -7,6 +7,7 @@ import {
   CloseIcon,
   DraftTabIcon,
   EvaluationTabIcon,
+  ImportIcon,
   RunTabIcon,
 } from "@/shared/ui/icons";
 
@@ -15,7 +16,7 @@ export interface TabItem<T extends string> {
   id: T;
   label: string;
   closable?: boolean;
-  icon?: "career" | "charts" | "draft" | "evaluation" | "run";
+  icon?: "career" | "charts" | "checkpoint" | "draft" | "evaluation" | "run";
   shortLabel?: string;
   tone?: "draft" | "run";
 }
@@ -82,6 +83,8 @@ function TabIcon({ icon }: { icon: TabItem<string>["icon"] }) {
       return <CareerTabIcon />;
     case "charts":
       return <ChartIcon />;
+    case "checkpoint":
+      return <ImportIcon />;
     case "draft":
       return <DraftTabIcon />;
     case "evaluation":

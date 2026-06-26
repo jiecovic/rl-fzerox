@@ -1,5 +1,6 @@
 // web/run-manager/src/app/managerData.ts
 import {
+  fetchCheckpointCatalog,
   fetchConfigMetadata,
   fetchDrafts,
   fetchEvaluationData as fetchEvaluationPayload,
@@ -8,6 +9,7 @@ import {
   fetchTemplates,
 } from "@/shared/api/client";
 import type {
+  CheckpointCatalogResponse,
   ConfigMetadata,
   EvaluationBaselineSuite,
   ManagedDraft,
@@ -19,6 +21,8 @@ import type {
 } from "@/shared/api/contract";
 
 export interface ManagerData {
+  checkpointCatalog: CheckpointCatalogResponse | null;
+  checkpointCatalogError: string | null;
   drafts: ManagedDraft[];
   evaluationBaselineSuites: EvaluationBaselineSuite[];
   evaluationError: string | null;
@@ -31,15 +35,19 @@ export interface ManagerData {
 }
 
 export async function loadManagerData(): Promise<ManagerData> {
-  const [templates, drafts, runs, saveGames, evaluationData, metadata] = await Promise.all([
-    fetchTemplates(),
-    fetchDrafts(),
-    fetchRuns(),
-    fetchSaveGames(),
-    fetchEvaluationData(),
-    fetchConfigMetadata(),
-  ]);
+  const [templates, drafts, runs, saveGames, evaluationData, checkpointCatalogData, metadata] =
+    await Promise.all([
+      fetchTemplates(),
+      fetchDrafts(),
+      fetchRuns(),
+      fetchSaveGames(),
+      fetchEvaluationData(),
+      fetchCheckpointCatalogData(),
+      fetchConfigMetadata(),
+    ]);
   return {
+    checkpointCatalog: checkpointCatalogData.catalog,
+    checkpointCatalogError: checkpointCatalogData.error,
     drafts,
     evaluationBaselineSuites: evaluationData.baselineSuites,
     evaluationError: evaluationData.error,
@@ -50,6 +58,18 @@ export async function loadManagerData(): Promise<ManagerData> {
     saveGames,
     templates,
   };
+}
+
+async function fetchCheckpointCatalogData(): Promise<{
+  catalog: CheckpointCatalogResponse | null;
+  error: string | null;
+}> {
+  try {
+    return { catalog: await fetchCheckpointCatalog(), error: null };
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "failed to load checkpoint catalog";
+    return { catalog: null, error: message };
+  }
 }
 
 async function fetchEvaluationData(): Promise<{

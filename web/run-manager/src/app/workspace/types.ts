@@ -10,6 +10,7 @@ import type {
 } from "@/shared/api/contract";
 
 export type WorkspaceTabId =
+  | "checkpoints"
   | "drafts"
   | "evaluations"
   | "runs"
@@ -22,7 +23,7 @@ export type WorkspaceTabId =
 
 export type PrimaryWorkspaceTabId = Extract<
   WorkspaceTabId,
-  "drafts" | "evaluations" | "runs" | "charts" | "save-games"
+  "checkpoints" | "drafts" | "evaluations" | "runs" | "charts" | "save-games"
 >;
 
 export interface ForkSource {
@@ -89,7 +90,7 @@ export interface WorkspaceTab {
   activity?: "running";
   closable?: boolean;
   id: WorkspaceTabId;
-  icon?: "career" | "charts" | "draft" | "evaluation" | "run";
+  icon?: "career" | "charts" | "checkpoint" | "draft" | "evaluation" | "run";
   label: string;
   shortLabel?: string;
   tone?: "draft" | "run";

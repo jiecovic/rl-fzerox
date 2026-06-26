@@ -99,6 +99,8 @@ export function App() {
 
             <WorkspaceBody
               actions={actions}
+              checkpointCatalog={managerData.checkpointCatalog}
+              checkpointCatalogError={managerData.checkpointCatalogError}
               defaultConfig={managerData.defaultConfig}
               drafts={managerData.drafts}
               error={workspaceError}

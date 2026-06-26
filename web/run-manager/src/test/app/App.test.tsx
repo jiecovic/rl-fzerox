@@ -6,6 +6,7 @@ import { App } from "@/app/App";
 import type { ManagerData } from "@/app/managerData";
 import { ApiSchemaMismatchError } from "@/shared/api/client";
 import {
+  checkpointCatalogFixture,
   configMetadataFixture,
   draftFixture,
   managedRunConfigFixture,
@@ -42,6 +43,8 @@ const watchRunMock = vi.fn();
 
 function managerDataFixture(overrides: Partial<ManagerData> = {}): ManagerData {
   return {
+    checkpointCatalog: checkpointCatalogFixture(),
+    checkpointCatalogError: null,
     drafts: [draftFixture()],
     evaluationBaselineSuites: [],
     evaluationError: null,

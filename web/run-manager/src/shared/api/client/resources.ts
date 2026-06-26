@@ -1,5 +1,9 @@
 // web/run-manager/src/shared/api/client/resources.ts
 export {
+  fetchCheckpointCatalog,
+  installCatalogCheckpoint,
+} from "@/shared/api/client/resources/checkpoints";
+export {
   createDraft,
   createDraftWithSource,
   deleteDraft,

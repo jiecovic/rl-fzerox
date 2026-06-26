@@ -39,6 +39,7 @@ export function saveGameSessionId(seed: string): `save-game:${string}` {
 export const primaryWorkspaceTabs = [
   { id: "drafts", icon: "draft", label: "Drafts" },
   { id: "runs", icon: "run", label: "Runs" },
+  { id: "checkpoints", icon: "checkpoint", label: "Checkpoints", shortLabel: "Ckpt" },
   { id: "charts", icon: "charts", label: "Charts" },
   { id: "evaluations", icon: "evaluation", label: "Evaluations", shortLabel: "Eval" },
   { id: "save-games", icon: "career", label: "Career Mode", shortLabel: "Career" },
@@ -48,6 +49,7 @@ export function activePrimaryWorkspaceTabId(id: WorkspaceTabId): PrimaryWorkspac
   switch (id) {
     case "drafts":
     case "runs":
+    case "checkpoints":
     case "charts":
     case "evaluations":
     case "save-games":

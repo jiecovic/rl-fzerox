@@ -20,6 +20,7 @@ import {
   fetchSaveGames,
 } from "@/shared/api/client";
 import type {
+  CheckpointCatalogResponse,
   ConfigMetadata,
   EvaluationBaselineSuite,
   ManagedDraft,
@@ -37,6 +38,10 @@ interface ReloadManagerDataOptions {
 
 export function useManagerData() {
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
+  const [checkpointCatalog, setCheckpointCatalog] = useState<CheckpointCatalogResponse | null>(
+    null,
+  );
+  const [checkpointCatalogError, setCheckpointCatalogError] = useState<string | null>(null);
   const [evaluationBaselineSuites, setEvaluationBaselineSuites] = useState<
     EvaluationBaselineSuite[]
   >([]);
@@ -62,6 +67,7 @@ export function useManagerData() {
     );
   }, []);
   const clearError = useCallback(() => setError(null), []);
+  const clearCheckpointCatalogError = useCallback(() => setCheckpointCatalogError(null), []);
   const clearEvaluationError = useCallback(() => setEvaluationError(null), []);
 
   const loadRunDetail = useCallback(async (runId: string) => {
@@ -101,6 +107,8 @@ export function useManagerData() {
       for (const run of runDetails) {
         rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
       }
+      setCheckpointCatalog(managerData.checkpointCatalog);
+      setCheckpointCatalogError(managerData.checkpointCatalogError);
       setDrafts(managerData.drafts);
       setEvaluationBaselineSuites(managerData.evaluationBaselineSuites);
       setEvaluationError(managerData.evaluationError);
@@ -204,7 +212,10 @@ export function useManagerData() {
 
   return {
     clearError,
+    clearCheckpointCatalogError,
     clearEvaluationError,
+    checkpointCatalog,
+    checkpointCatalogError,
     defaultConfig,
     drafts,
     error,

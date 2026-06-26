@@ -23,6 +23,7 @@ import {
   exportRunBundle,
   fetchRunEngineTuningState,
   importRunBundle,
+  installCatalogCheckpoint,
   launchRun,
   openRunDirectory,
   renameRun,
@@ -128,6 +129,7 @@ export interface WorkspaceActions {
   }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   exportManagedRun: (run: ManagedRun) => Promise<void>;
   importManagedRunBundle: (file: File) => Promise<void>;
+  installManagedCatalogCheckpoint: (checkpointId: string, version: string) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
   removeManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<void>;
   removeLineage: (lineageId: string) => Promise<void>;
@@ -385,6 +387,11 @@ export function useWorkspaceActions({
     await reloadManagerData();
   }
 
+  async function installManagedCatalogCheckpoint(checkpointId: string, version: string) {
+    await installCatalogCheckpoint(checkpointId, version);
+    await reloadManagerData({ showLoading: false });
+  }
+
   async function watchManagedRun(
     runId: string,
     artifact: "latest" | "best",
@@ -443,6 +450,7 @@ export function useWorkspaceActions({
     openManagedRunDirectory,
     exportManagedRun,
     importManagedRunBundle,
+    installManagedCatalogCheckpoint,
     removeDraft,
     removeLineage,
     removeRun,

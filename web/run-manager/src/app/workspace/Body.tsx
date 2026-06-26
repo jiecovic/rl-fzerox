@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import type { WorkspaceActions } from "@/app/workspace/actions";
 import { configuratorBaseConfigForDraftEditor } from "@/app/workspace/model";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
+import { CheckpointsPanel } from "@/pages/checkpoints/CheckpointsPanel";
 import { DraftsPanel } from "@/pages/drafts/DraftsPanel";
 import { EvaluationsPanel } from "@/pages/evaluations/EvaluationsPanel";
 import { RunsPanel } from "@/pages/runs/RunsPanel";
 import { SaveGamesPanel } from "@/pages/saveGames/SaveGamesPanel";
 import type {
+  CheckpointCatalogResponse,
   ConfigMetadata,
   EvaluationBaselineSuite,
   ManagedDraft,
@@ -31,6 +33,8 @@ interface WorkspaceBodyProps {
   actions: WorkspaceActions;
   defaultConfig: ManagedRunConfig | null;
   drafts: ManagedDraft[];
+  checkpointCatalog: CheckpointCatalogResponse | null;
+  checkpointCatalogError: string | null;
   error: string | null;
   evaluationBaselineSuites: EvaluationBaselineSuite[];
   evaluationError: string | null;
@@ -51,6 +55,8 @@ export function WorkspaceBody({
   actions,
   defaultConfig,
   drafts,
+  checkpointCatalog,
+  checkpointCatalogError,
   error,
   evaluationBaselineSuites,
   evaluationError,
@@ -140,6 +146,14 @@ export function WorkspaceBody({
           onResumeRun={(run) => actions.resumeManagedRun(run.id)}
           onStopRun={(run) => actions.stopManagedRun(run.id)}
           onUpdateLineageGroups={actions.updateManagedLineageGroups}
+        />
+      ) : null}
+      {!isLoading && sessions.activeTabId === "checkpoints" ? (
+        <CheckpointsPanel
+          catalog={checkpointCatalog}
+          error={checkpointCatalogError}
+          onGlobalError={actions.setGlobalError}
+          onInstallCheckpoint={actions.installManagedCatalogCheckpoint}
         />
       ) : null}
       {!isLoading && sessions.activeTabId === "charts" ? (
