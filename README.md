@@ -47,16 +47,17 @@ uv python install 3.12
 uv venv --python 3.12 .venv
 source .venv/bin/activate
 python --version
-python -m pip install -U pip
-python -m pip install -e ".[dev,watch,train]"
-python -m pip install "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.git"
+uv pip install -U pip
+uv pip install -e ".[dev,watch,train]"
+uv pip install "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.git"
 
 just native
 just run-manager-install
 ```
 
 If your active interpreter is already Python 3.12, `python -m venv .venv` also
-works. Check `python --version` before installing dependencies.
+works. Check `python --version` before installing dependencies, then use
+`python -m pip install ...` for the install commands above.
 
 `just run-manager-install` installs the local React frontend dependencies used
 by `just fzerox`.
