@@ -18,6 +18,7 @@ from rl_fzerox.apps.run_manager.launching.watch import (
     raise_if_watch_exited_early,
     watch_failure_detail,
 )
+from rl_fzerox.apps.run_manager.worker.config import _resolved_train_config
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.engine_tuning import (
     ENGINE_TUNING_STATE_VERSION,
@@ -39,6 +40,7 @@ from rl_fzerox.core.training.session.artifacts import (
     engine_tuning_model_path,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingAltBaseline
+from tests.core.manager.test_manager_store_checkpoints import _manifest, _payloads, _write_bundle
 
 
 class _RecordingLauncher(ManagerRunLauncher):
@@ -216,6 +218,46 @@ def test_fork_copies_active_alt_baselines(tmp_path: Path) -> None:
     assert child_baseline.label == "chicane approach"
     assert child_baseline.state_path.parent == child.run_dir / RUN_LAYOUT.baselines_dirname / "alt"
     assert child_baseline.state_path.read_bytes() == b"alt-state"
+
+
+def test_fork_published_checkpoint_creates_snapshot_only_child_run(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    payloads = _payloads()
+    bundle_path = tmp_path / "blue-falcon.zip"
+    _write_bundle(bundle_path, manifest=_manifest(payloads), payloads=payloads)
+    checkpoint = store.import_published_checkpoint_bundle(bundle_path=bundle_path)
+    launcher = _RecordingLauncher(store)
+    child_config = checkpoint.config.model_copy(deep=True)
+    child_config.policy.auxiliary_state_enabled = True
+
+    child = launcher.fork_checkpoint(
+        checkpoint_id=checkpoint.id,
+        name="Fine Tune",
+        config=child_config,
+    )
+
+    assert launcher.spawn_calls == [(child.id, False)]
+    assert child.parent_run_id is None
+    assert child.source_run_id is None
+    assert child.source_artifact == "best"
+    assert child.source_snapshot_dir is not None
+    assert child.source_num_timesteps == checkpoint.local_num_timesteps
+    assert child.lineage_step_offset == checkpoint.lineage_num_timesteps
+    assert child.lineage_id == child.id
+    assert (child.source_snapshot_dir / RUN_LAYOUT.policy_artifacts.best).read_bytes() == b"policy"
+    assert (child.source_snapshot_dir / RUN_LAYOUT.model_artifacts.best).read_bytes() == b"model"
+    assert (child.source_snapshot_dir / RUN_LAYOUT.config_filename).is_file()
+    assert (child.source_snapshot_dir / "fork_source.metadata.json").is_file()
+
+    train_config = _resolved_train_config(store=store, run=child, resume=False)
+
+    assert train_config.train.resume_run_dir == child.source_snapshot_dir
+    assert train_config.train.resume_artifact == "best"
+    assert train_config.policy.auxiliary_state.enabled is True
+    assert train_config.train.resume_source_auxiliary_state_enabled is False
+    assert train_config.train.tensorboard_step_offset == checkpoint.lineage_num_timesteps
 
 
 def test_fork_without_explicit_config_resets_action_bias_deltas(tmp_path: Path) -> None:

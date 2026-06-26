@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rl_fzerox.core.domain.policy import TrainAlgorithmName
 from rl_fzerox.core.manager.projection.assembly import (
     effective_train_algorithm,
     train_config_payload,
@@ -106,6 +107,33 @@ def build_managed_fork_train_app_config(
 ) -> TrainAppConfig:
     """Project one manager config into a child run warm-started from another run."""
 
+    return build_managed_fork_train_app_config_from_metadata(
+        config,
+        run_id=run_id,
+        run_dir=run_dir,
+        source_run_dir=source_run_dir,
+        source_artifact=source_artifact,
+        source_algorithm=effective_train_algorithm(source_config),
+        source_auxiliary_state_enabled=source_config.policy.auxiliary_state_enabled,
+        source_auxiliary_state_head_arch=source_config.policy.auxiliary_state_head_arch,
+        tensorboard_step_offset=tensorboard_step_offset,
+    )
+
+
+def build_managed_fork_train_app_config_from_metadata(
+    config: ManagedRunConfig,
+    *,
+    run_id: str,
+    run_dir: Path,
+    source_run_dir: Path,
+    source_artifact: str,
+    source_algorithm: TrainAlgorithmName,
+    source_auxiliary_state_enabled: bool,
+    source_auxiliary_state_head_arch: tuple[int, ...],
+    tensorboard_step_offset: int = 0,
+) -> TrainAppConfig:
+    """Project a warm-start config when the source run is a pinned snapshot only."""
+
     train_config = build_managed_train_app_config(
         config,
         run_id=run_id,
@@ -117,10 +145,10 @@ def build_managed_fork_train_app_config(
         "resume_mode": "weights_only",
         "resume_source_metadata_required": True,
         "tensorboard_step_offset": tensorboard_step_offset,
+        "resume_source_algorithm": source_algorithm,
+        "resume_source_auxiliary_state_enabled": source_auxiliary_state_enabled,
+        "resume_source_auxiliary_state_head_arch": source_auxiliary_state_head_arch,
     }
-    resume_updates.update(
-        _managed_resume_source_metadata(source_config),
-    )
     return train_config.model_copy(
         update={
             "train": train_config.train.model_copy(
@@ -128,11 +156,3 @@ def build_managed_fork_train_app_config(
             )
         }
     )
-
-
-def _managed_resume_source_metadata(config: ManagedRunConfig) -> dict[str, object]:
-    return {
-        "resume_source_algorithm": effective_train_algorithm(config),
-        "resume_source_auxiliary_state_enabled": config.policy.auxiliary_state_enabled,
-        "resume_source_auxiliary_state_head_arch": config.policy.auxiliary_state_head_arch,
-    }

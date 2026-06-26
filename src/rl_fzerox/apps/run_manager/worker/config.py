@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from rl_fzerox.apps.run_manager.worker.clock import now_iso
 from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager.artifacts.fork_source import load_fork_source_metadata
 from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.manager.projection.runtime import restore_managed_runtime_track_sampling
 from rl_fzerox.core.manager.training import (
     apply_managed_resume_train_config,
     build_managed_fork_train_app_config,
+    build_managed_fork_train_app_config_from_metadata,
     build_managed_train_app_config,
 )
 from rl_fzerox.core.training.runs import (
@@ -55,20 +57,35 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
             store=store,
             run_id=run.id,
             include_artifacts=True,
-        )
+    )
     if run.source_snapshot_dir is not None and run.source_artifact is not None:
-        if run.source_run_id is None:
-            raise RuntimeError("managed fork source metadata is missing; recreate the fork draft")
-        source_run = store.get_run(run.source_run_id)
-        if source_run is None:
-            raise RuntimeError(f"source run not found for forked run: {run.source_run_id}")
-        return build_managed_fork_train_app_config(
+        if run.source_run_id is not None:
+            source_run = store.get_run(run.source_run_id)
+            if source_run is None:
+                raise RuntimeError(f"source run not found for forked run: {run.source_run_id}")
+            return build_managed_fork_train_app_config(
+                run.config,
+                run_id=run.id,
+                run_dir=run.run_dir,
+                source_run_dir=run.source_snapshot_dir,
+                source_artifact=run.source_artifact,
+                source_config=source_run.config,
+                tensorboard_step_offset=run.lineage_step_offset,
+            )
+        source_metadata = load_fork_source_metadata(source_dir=run.source_snapshot_dir)
+        return build_managed_fork_train_app_config_from_metadata(
             run.config,
             run_id=run.id,
             run_dir=run.run_dir,
             source_run_dir=run.source_snapshot_dir,
             source_artifact=run.source_artifact,
-            source_config=source_run.config,
+            source_algorithm=source_metadata.source_algorithm,
+            source_auxiliary_state_enabled=(
+                source_metadata.source_auxiliary_state_enabled
+            ),
+            source_auxiliary_state_head_arch=(
+                source_metadata.source_auxiliary_state_head_arch
+            ),
             tensorboard_step_offset=run.lineage_step_offset,
         )
     if run.source_run_id is not None and run.source_artifact is not None:

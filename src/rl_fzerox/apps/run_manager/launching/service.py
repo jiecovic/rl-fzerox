@@ -6,6 +6,7 @@ from typing import Literal
 
 from rl_fzerox.apps.run_manager.launching.engine_tuning_source import EngineTuningSourceAction
 from rl_fzerox.apps.run_manager.launching.run_lifecycle import (
+    fork_published_checkpoint,
     fork_run,
     launch_run,
     request_run_control,
@@ -78,6 +79,23 @@ class ManagerRunLauncher:
             source_snapshot_dir=source_snapshot_dir,
             source_num_timesteps=source_num_timesteps,
             copy_alt_baselines=copy_alt_baselines,
+            engine_tuning_source_action=engine_tuning_source_action,
+            spawn_worker=self._spawn_worker_for_lifecycle,
+        )
+
+    def fork_checkpoint(
+        self,
+        *,
+        checkpoint_id: str,
+        name: str | None = None,
+        config: ManagedRunConfig | None = None,
+        engine_tuning_source_action: EngineTuningSourceAction = "convert",
+    ) -> ManagedRun:
+        return fork_published_checkpoint(
+            self._store,
+            checkpoint_id=checkpoint_id,
+            name=name,
+            config=config,
             engine_tuning_source_action=engine_tuning_source_action,
             spawn_worker=self._spawn_worker_for_lifecycle,
         )

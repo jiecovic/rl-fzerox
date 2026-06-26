@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.policy import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.manager.artifacts.paths import manager_runs_root
 from rl_fzerox.core.manager.projection.actions import (
     build_action_data,
@@ -220,7 +220,7 @@ def _actor_regularization_data(config: ManagedRunConfig) -> dict[str, float]:
     }
 
 
-def effective_train_algorithm(config: ManagedRunConfig) -> str:
+def effective_train_algorithm(config: ManagedRunConfig) -> TrainAlgorithmName:
     return (
         TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo
         if config.policy.recurrent_enabled
