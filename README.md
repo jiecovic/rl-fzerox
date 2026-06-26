@@ -69,7 +69,13 @@ python -m pip install -U pip
 
 Then install the project:
 
+For NVIDIA CUDA training, install a CUDA-enabled PyTorch wheel first. Use the
+official PyTorch selector for the exact command for your driver/platform:
+<https://pytorch.org/get-started/locally/>.
+
 ```bash
+# Optional, for CUDA users: run the PyTorch CUDA install command here first.
+
 python -m pip install -e ".[dev,watch,train]"
 python -m pip install "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.git"
 just native
@@ -78,6 +84,12 @@ just run-manager-install
 
 `just run-manager-install` installs the local React frontend dependencies used
 by `just fzerox`.
+
+After installing PyTorch, verify CUDA from inside the virtual environment:
+
+```bash
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
+```
 
 `local/` is the ignored machine-local workspace. After clone, it contains empty
 folders for required runtime assets. Example paths used by the default app
