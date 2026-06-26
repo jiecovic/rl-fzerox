@@ -2,9 +2,20 @@
 import { fileURLToPath, URL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { createLogger } from "vite";
 import { defineConfig } from "vitest/config";
 
+const logger = createLogger();
+const defaultError = logger.error;
+logger.error = (message, options) => {
+  if (isExpectedWebSocketProxyReset(message)) {
+    return;
+  }
+  defaultError(message, options);
+};
+
 export default defineConfig({
+  customLogger: logger,
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -30,3 +41,10 @@ export default defineConfig({
     setupFiles: "./src/test/setup.ts",
   },
 });
+
+function isExpectedWebSocketProxyReset(message: string) {
+  return (
+    (message.includes("ws proxy error:") || message.includes("ws proxy socket error:")) &&
+    (message.includes("ECONNRESET") || message.includes("EPIPE"))
+  );
+}
