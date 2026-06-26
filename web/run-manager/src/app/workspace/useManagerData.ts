@@ -6,6 +6,8 @@ import { useRunLiveSync } from "@/app/workspace/liveSync";
 import {
   compareSaveGames,
   runSummaryFromDetail,
+  updateCheckpointCatalogRuns,
+  upsertRun,
   upsertSaveGameStatus,
 } from "@/app/workspace/model";
 import {
@@ -62,38 +64,45 @@ export function useManagerData() {
 
   const upsertRunDetail = useCallback((run: ManagedRunDetail) => {
     rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
+    const summary = runSummaryFromDetail(run);
     setRunDetailsById((current) =>
       trimRunDetailCache({ ...current, [run.id]: run }, null, runDetailAccessOrderRef.current),
+    );
+    setRuns((current) =>
+      current.some((candidate) => candidate.id === run.id) ? upsertRun(current, summary) : current,
+    );
+    setCheckpointCatalog((current) =>
+      updateCheckpointCatalogRuns(current, new Map([[run.id, summary]])),
     );
   }, []);
   const clearError = useCallback(() => setError(null), []);
   const clearCheckpointCatalogError = useCallback(() => setCheckpointCatalogError(null), []);
   const clearEvaluationError = useCallback(() => setEvaluationError(null), []);
 
-  const loadRunDetail = useCallback(async (runId: string) => {
-    const cached = runDetailsRef.current[runId];
-    if (cached !== undefined) {
-      rememberRunDetailAccess(runDetailAccessOrderRef.current, runId);
-      return cached;
-    }
-    const inflight = runDetailRequestsRef.current.get(runId);
-    if (inflight !== undefined) {
-      return inflight;
-    }
-    const request = fetchRun(runId)
-      .then((run) => {
-        rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
-        setRunDetailsById((current) =>
-          trimRunDetailCache({ ...current, [run.id]: run }, null, runDetailAccessOrderRef.current),
-        );
-        return run;
-      })
-      .finally(() => {
-        runDetailRequestsRef.current.delete(runId);
-      });
-    runDetailRequestsRef.current.set(runId, request);
-    return request;
-  }, []);
+  const loadRunDetail = useCallback(
+    async (runId: string) => {
+      const cached = runDetailsRef.current[runId];
+      if (cached !== undefined) {
+        rememberRunDetailAccess(runDetailAccessOrderRef.current, runId);
+        return cached;
+      }
+      const inflight = runDetailRequestsRef.current.get(runId);
+      if (inflight !== undefined) {
+        return inflight;
+      }
+      const request = fetchRun(runId)
+        .then((run) => {
+          upsertRunDetail(run);
+          return run;
+        })
+        .finally(() => {
+          runDetailRequestsRef.current.delete(runId);
+        });
+      runDetailRequestsRef.current.set(runId, request);
+      return request;
+    },
+    [upsertRunDetail],
+  );
 
   const reloadManagerData = useCallback(async (options: ReloadManagerDataOptions = {}) => {
     const showLoading = options.showLoading ?? true;
@@ -206,6 +215,7 @@ export function useManagerData() {
   useRunLiveSync({
     runDetailAccessOrderRef,
     setError,
+    setCheckpointCatalog,
     setRunDetailsById,
     setRuns,
   });

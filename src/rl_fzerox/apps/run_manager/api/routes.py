@@ -44,7 +44,7 @@ def create_manager_api_app(
     launcher = run_launcher or ManagerRunLauncher(store)
     _register_exception_handlers(app)
     live_broadcaster = LiveSnapshotBroadcaster(
-        lambda: _run_sync(handlers.runs_payload, store),
+        lambda: _run_sync(handlers.runs_live_payload, store),
         message_types=LiveMessageTypes(snapshot="runs_snapshot", error="runs_error"),
         error_log_message="failed to poll live run snapshot",
     )

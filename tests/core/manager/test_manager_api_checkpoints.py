@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import rl_fzerox.apps.run_manager.api.handlers.checkpoints as manager_api_checkpoints
+from rl_fzerox.apps.run_manager.api.handlers.runs import runs_live_payload, runs_payload
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.checkpoints import (
     CheckpointCatalog,
@@ -108,6 +109,46 @@ async def test_manager_api_catalog_includes_installed_checkpoint_run(
     assert checkpoint["run_id"] == "checkpoint-blue-falcon-fine-tuned-v1"
     assert checkpoint["run"]["id"] == checkpoint["run_id"]
     assert checkpoint["run"]["status"] == "archived"
+
+
+async def test_manager_live_runs_include_installed_checkpoint_events(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle_path, catalog_path = _write_catalog_bundle(tmp_path)
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "default_checkpoint_catalog_path",
+        lambda: catalog_path,
+    )
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "_download_catalog_bundle",
+        lambda entry, *, download_dir: bundle_path,
+    )
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    client = _client(tmp_path, store=store)
+    install_response = await client.post(
+        "/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install"
+    )
+    assert install_response.status_code == 200
+    checkpoint_run_id = "checkpoint-blue-falcon-fine-tuned-v1"
+    store.append_run_event(
+        run_id=checkpoint_run_id,
+        kind="startup_watch_materialize",
+        message="Resolving track sampling baselines: 41/240 complete",
+    )
+
+    assert runs_payload(store)["runs"] == []
+    live_payload = runs_live_payload(store)
+
+    assert [run["id"] for run in live_payload["runs"]] == [checkpoint_run_id]
+    recent_events = live_payload["runs"][0]["recent_events"]
+    assert isinstance(recent_events, list)
+    assert isinstance(recent_events[0], dict)
+    message = recent_events[0]["message"]
+    assert isinstance(message, str)
+    assert message.startswith("Resolving track sampling baselines")
 
 
 async def test_manager_api_does_not_expose_checkpoint_fork_route(tmp_path: Path) -> None:

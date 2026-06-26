@@ -18,7 +18,7 @@ from rl_fzerox.apps.run_manager.api.handlers.common import (
 )
 from rl_fzerox.apps.run_manager.api.payloads.runs import run_summary_payload
 from rl_fzerox.apps.run_manager.desktop import open_directory
-from rl_fzerox.core.manager import ManagerStore
+from rl_fzerox.core.manager import ManagedRunSummary, ManagerStore
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 
 
@@ -26,12 +26,30 @@ def runs_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
     # Run snapshots are the UI polling boundary that advances stale worker
     # leases. Core registry read helpers stay read-only.
     store.reconcile_orphaned_runs()
-    visible_runs = store.list_visible_run_summaries()
+    return _runs_payload(store, store.list_visible_run_summaries())
+
+
+def runs_live_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
+    """Return live run summaries including installed checkpoint run snapshots."""
+
+    store.reconcile_orphaned_runs()
+    runs_by_id = {run.id: run for run in store.list_visible_run_summaries()}
+    for checkpoint in store.list_published_checkpoints():
+        snapshot_run = store.get_run_summary(checkpoint.run_id)
+        if snapshot_run is not None:
+            runs_by_id.setdefault(snapshot_run.id, snapshot_run)
+    return _runs_payload(store, tuple(runs_by_id.values()))
+
+
+def _runs_payload(
+    store: ManagerStore,
+    runs: tuple[ManagedRunSummary, ...],
+) -> dict[str, list[dict[str, object]]]:
     recent_events = store.list_recent_run_events(
-        tuple(run.id for run in visible_runs),
+        tuple(run.id for run in runs),
         limit_per_run=6,
     )
-    alt_baseline_counts = {run.id: active_alt_baseline_count(store, run.id) for run in visible_runs}
+    alt_baseline_counts = {run.id: active_alt_baseline_count(store, run.id) for run in runs}
     return {
         "runs": [
             run_summary_payload(
@@ -39,7 +57,7 @@ def runs_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
                 recent_events=recent_events.get(item.id, ()),
                 active_alt_baseline_count=alt_baseline_counts.get(item.id, 0),
             )
-            for item in visible_runs
+            for item in runs
         ]
     }
 

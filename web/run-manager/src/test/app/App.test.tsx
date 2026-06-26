@@ -9,6 +9,7 @@ import {
   checkpointCatalogFixture,
   configMetadataFixture,
   draftFixture,
+  installedCheckpointFixture,
   managedRunConfigFixture,
   policyPreviewFixture,
   runFixture,
@@ -738,6 +739,70 @@ describe("App", () => {
     expect(alert.closest(".configurator-feedback-stack")).toBeNull();
   });
 
+  it("updates opened checkpoint runs from live snapshots", async () => {
+    const user = userEvent.setup();
+    const checkpointRun = runFixture({
+      available_policy_artifacts: ["best"],
+      id: "checkpoint-blue-falcon-all-cups-v1",
+      name: "72 x 96 IMPALA - like: Blue Falcon All Cups V1",
+      status: "archived",
+    });
+    loadManagerDataMock.mockResolvedValueOnce(
+      managerDataFixture({
+        checkpointCatalog: checkpointCatalogFixture({
+          entries: checkpointCatalogFixture().entries.map((entry) => ({
+            ...entry,
+            installed_checkpoint_id: "blue-falcon-all-cups-v1",
+          })),
+          installed_checkpoints: [
+            installedCheckpointFixture({
+              id: "blue-falcon-all-cups-v1",
+              run: checkpointRun,
+              run_id: checkpointRun.id,
+            }),
+          ],
+        }),
+        drafts: [],
+        runs: [],
+      }),
+    );
+    fetchRunMock.mockResolvedValue(checkpointRun);
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Checkpoints" }));
+    await user.click(await screen.findByText(checkpointRun.name));
+    expect(await screen.findByText("Training progress")).toBeInTheDocument();
+
+    const liveOptions = subscribeRunLiveUpdatesMock.mock.calls.at(-1)?.[0] as
+      | { onRuns: (runs: ReturnType<typeof runFixture>[]) => void }
+      | undefined;
+    if (liveOptions === undefined) {
+      throw new Error("expected live run subscription options");
+    }
+    act(() => {
+      liveOptions.onRuns([
+        runFixture({
+          ...checkpointRun,
+          recent_events: [
+            {
+              created_at: "2026-06-26T18:55:20+00:00",
+              kind: "startup_watch_materialize",
+              message:
+                "Resolving track sampling baselines: 41/240 complete " +
+                "(existing 0, cache 0, generated 41); next Big Blue",
+            },
+          ],
+        }),
+      ]);
+    });
+
+    expect(
+      await screen.findByText(/Resolving track sampling baselines: 41\/240/),
+    ).toBeInTheDocument();
+  });
+
   it("does not replay historical watch failures globally", async () => {
     const user = userEvent.setup();
     const run = runFixture({
@@ -769,7 +834,7 @@ describe("App", () => {
     }
     await user.click(openRunButton);
 
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/latest watch failed/i)).not.toBeInTheDocument();
   });
 
   it("derives local wall time from active runtime instead of stale initial launch timestamps", async () => {

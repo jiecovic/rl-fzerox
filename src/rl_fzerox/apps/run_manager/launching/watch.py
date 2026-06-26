@@ -1,6 +1,7 @@
 # src/rl_fzerox/apps/run_manager/launching/watch.py
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import threading
@@ -12,7 +13,7 @@ from typing import Literal, Protocol
 from rl_fzerox.apps.run_manager.launching.processes import fresh_process_log
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.watch import resolve_watch_app_config
-from rl_fzerox.core.manager.registry.viewers import viewer_lease_is_fresh
+from rl_fzerox.core.manager.registry.viewers import VIEWER_LEASE_POLICY, viewer_lease_is_fresh
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.training.runs import resolve_model_artifact_path
@@ -20,6 +21,7 @@ from rl_fzerox.core.training.runs import resolve_model_artifact_path
 WatchLaunchStatus = Literal["started", "already_running"]
 type WatchRenderer = RendererName
 WATCH_STARTUP_TIMEOUT_SECONDS = 2.0
+_WATCH_LAUNCH_LOCK = threading.Lock()
 
 
 class _WatchProcess(Protocol):
@@ -48,6 +50,7 @@ def launch_watch_artifact(
         owner_id=run.id,
         qualifier=artifact,
     )
+    startup_lease = _WatchStartupLease(store=store, run_id=run.id, artifact=artifact)
     if (
         active_watch_pid(
             store=store,
@@ -56,74 +59,156 @@ def launch_watch_artifact(
             artifact=artifact,
         )
         is not None
+        or startup_lease.is_active()
     ):
         return "already_running"
-    validate_watch_device(device)
-    overrides = watch_config_overrides(
-        device=device,
-        renderer=renderer,
-        deterministic_policy=deterministic_policy,
-    )
-    resolve_watch_app_config(
-        run_id=run.id,
-        policy_artifact="best" if artifact == "best" else "latest",
-        manager_db_path=store.db_path,
-        session_name=lease_id,
-        overrides=overrides,
-        startup_reporter=watch_startup_reporter(store=store, run_id=run.id),
-    )
-    log_path = manager_watch_log_path(run.id, artifact=artifact)
-    command = [
-        sys.executable,
-        "-m",
-        "rl_fzerox.apps.watch",
-        "--manager-db-path",
-        str(store.db_path),
-        "--run-id",
-        run.id,
-        "--artifact",
-        artifact,
-        "--viewer-lease-id",
-        lease_id,
-        "--",
-        *overrides,
-    ]
-    cwd = project_root_dir()
-    with fresh_process_log(log_path, command=command, cwd=cwd) as log_handle:
-        process = subprocess.Popen(
-            command,
-            cwd=cwd,
-            stdin=subprocess.DEVNULL,
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-    store.upsert_viewer_lease(
-        lease_id=lease_id,
-        kind="run_watch",
-        owner_id=run.id,
-        pid=process.pid,
-        qualifier=artifact,
-    )
+    if not startup_lease.acquire():
+        return "already_running"
+    startup_lease.start_heartbeat()
     try:
-        raise_if_watch_exited_early(process=process, log_path=log_path)
-    except RuntimeError as error:
-        store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
-        store.append_run_event(
-            run_id=run.id,
-            kind="watch_failed",
-            message=f"{artifact} watch failed: {error}",
+        validate_watch_device(device)
+        overrides = watch_config_overrides(
+            device=device,
+            renderer=renderer,
+            deterministic_policy=deterministic_policy,
         )
-        raise
-    reap_watch_when_done(
-        db_path=store.db_path,
-        process=process,
-        lease_id=lease_id,
-        run_id=run.id,
-        artifact=artifact,
-        log_path=log_path,
-    )
-    return "started"
+        resolve_watch_app_config(
+            run_id=run.id,
+            policy_artifact="best" if artifact == "best" else "latest",
+            manager_db_path=store.db_path,
+            session_name=lease_id,
+            overrides=overrides,
+            startup_reporter=watch_startup_reporter(store=store, run_id=run.id),
+        )
+        log_path = manager_watch_log_path(run.id, artifact=artifact)
+        command = [
+            sys.executable,
+            "-m",
+            "rl_fzerox.apps.watch",
+            "--manager-db-path",
+            str(store.db_path),
+            "--run-id",
+            run.id,
+            "--artifact",
+            artifact,
+            "--viewer-lease-id",
+            lease_id,
+            "--",
+            *overrides,
+        ]
+        cwd = project_root_dir()
+        with fresh_process_log(log_path, command=command, cwd=cwd) as log_handle:
+            process = subprocess.Popen(
+                command,
+                cwd=cwd,
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        store.upsert_viewer_lease(
+            lease_id=lease_id,
+            kind="run_watch",
+            owner_id=run.id,
+            pid=process.pid,
+            qualifier=artifact,
+        )
+        startup_lease.clear()
+        try:
+            raise_if_watch_exited_early(process=process, log_path=log_path)
+        except RuntimeError as error:
+            store.clear_viewer_lease(lease_id=lease_id, pid=process.pid)
+            store.append_run_event(
+                run_id=run.id,
+                kind="watch_failed",
+                message=f"{artifact} watch failed: {error}",
+            )
+            raise
+        reap_watch_when_done(
+            db_path=store.db_path,
+            process=process,
+            lease_id=lease_id,
+            run_id=run.id,
+            artifact=artifact,
+            log_path=log_path,
+        )
+        return "started"
+    finally:
+        startup_lease.stop_heartbeat()
+        startup_lease.clear()
+
+
+class _WatchStartupLease:
+    """Guard the materialization phase before a visible watch process exists."""
+
+    def __init__(self, *, store: ManagerStore, run_id: str, artifact: str) -> None:
+        self._store = store
+        self._run_id = run_id
+        self._artifact = artifact
+        self._qualifier = f"{artifact}:launch"
+        self._lease_id = store.viewer_lease_id(
+            kind="run_watch",
+            owner_id=run_id,
+            qualifier=self._qualifier,
+        )
+        self._pid = os.getpid()
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def is_active(self) -> bool:
+        lease = self._store.get_viewer_lease(self._lease_id)
+        if lease is None:
+            return False
+        if (
+            lease.kind != "run_watch"
+            or lease.owner_id != self._run_id
+            or lease.qualifier != self._qualifier
+        ):
+            self._store.clear_viewer_lease(lease_id=self._lease_id)
+            return False
+        if not viewer_lease_is_fresh(lease):
+            self._store.clear_viewer_lease(lease_id=self._lease_id, pid=lease.pid)
+            return False
+        return True
+
+    def acquire(self) -> bool:
+        with _WATCH_LAUNCH_LOCK:
+            if self.is_active():
+                return False
+            self._store.upsert_viewer_lease(
+                lease_id=self._lease_id,
+                kind="run_watch",
+                owner_id=self._run_id,
+                pid=self._pid,
+                qualifier=self._qualifier,
+            )
+        return True
+
+    def start_heartbeat(self) -> None:
+        self._thread = threading.Thread(
+            target=self._heartbeat_loop,
+            name=f"run-manager-watch-launch-{self._run_id}-{self._artifact}",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def stop_heartbeat(self) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=VIEWER_LEASE_POLICY.heartbeat_interval.total_seconds() + 1.0)
+
+    def clear(self) -> None:
+        self._store.clear_viewer_lease(lease_id=self._lease_id, pid=self._pid)
+
+    def _heartbeat_loop(self) -> None:
+        interval = VIEWER_LEASE_POLICY.heartbeat_interval.total_seconds()
+        while not self._stop_event.wait(interval):
+            if not self._store.heartbeat_viewer_lease(
+                lease_id=self._lease_id,
+                pid=self._pid,
+                heartbeat_at=self._store.utc_now(),
+            ):
+                return
 
 
 def watch_config_overrides(

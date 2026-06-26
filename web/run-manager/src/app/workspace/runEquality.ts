@@ -13,7 +13,7 @@ export function sameRunPayload(left: readonly ManagedRun[], right: readonly Mana
   return true;
 }
 
-function sameRunSummary(left: ManagedRun, right: ManagedRun) {
+export function sameRunSummary(left: ManagedRun, right: ManagedRun) {
   if (
     left.id !== right.id ||
     left.name !== right.name ||

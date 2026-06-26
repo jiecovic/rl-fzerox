@@ -1,4 +1,6 @@
 // web/run-manager/src/app/workspace/model.ts
+
+import { sameRunSummary } from "@/app/workspace/runEquality";
 import type {
   DraftEditorSession,
   EvaluationSession,
@@ -11,6 +13,7 @@ import type {
 } from "@/app/workspace/types";
 import { isPinnedRun } from "@/entities/run/model/runtime";
 import type {
+  CheckpointCatalogResponse,
   ManagedDraft,
   ManagedEvaluation,
   ManagedRun,
@@ -240,6 +243,29 @@ export function runSummaryFromDetail(run: ManagedRunDetail): ManagedRun {
   const { config: _config, ...summary } = run;
   void _config;
   return summary;
+}
+
+export function updateCheckpointCatalogRuns(
+  catalog: CheckpointCatalogResponse | null,
+  runsById: ReadonlyMap<string, ManagedRun>,
+): CheckpointCatalogResponse | null {
+  if (catalog === null) {
+    return null;
+  }
+  let changed = false;
+  const installed_checkpoints = catalog.installed_checkpoints.map((checkpoint) => {
+    const run = runsById.get(checkpoint.run_id);
+    if (
+      run === undefined ||
+      checkpoint.run === run ||
+      (checkpoint.run !== null && sameRunSummary(checkpoint.run, run))
+    ) {
+      return checkpoint;
+    }
+    changed = true;
+    return { ...checkpoint, run };
+  });
+  return changed ? { ...catalog, installed_checkpoints } : catalog;
 }
 
 export function compareRuns(left: ManagedRun, right: ManagedRun) {

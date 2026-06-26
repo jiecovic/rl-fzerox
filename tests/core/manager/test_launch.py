@@ -707,13 +707,68 @@ def test_watch_artifact_skips_duplicate_window(
         ),
     )
 
-    launcher.watch_artifact(
+    status = launcher.watch_artifact(
         run_id=run.id,
         artifact="latest",
         device="cuda",
         renderer=None,
         deterministic_policy=True,
     )
+
+    assert status == "already_running"
+
+
+def test_watch_artifact_skips_duplicate_materialization_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="watch-run",
+        name="Watch Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "watch-run",
+    )
+    launcher = ManagerRunLauncher(store)
+    launch_lease_id = store.viewer_lease_id(
+        kind="run_watch",
+        owner_id=run.id,
+        qualifier="latest:launch",
+    )
+    store.upsert_viewer_lease(
+        lease_id=launch_lease_id,
+        kind="run_watch",
+        owner_id=run.id,
+        pid=os.getpid(),
+        qualifier="latest:launch",
+    )
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.watch.resolve_model_artifact_path",
+        lambda *_args, **_kwargs: run.run_dir / RUN_LAYOUT.model_artifacts.latest,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.watch.resolve_watch_app_config",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("duplicate watch should not resolve config")
+        ),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.watch.subprocess.Popen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("duplicate watch should not spawn a process")
+        ),
+    )
+
+    status = launcher.watch_artifact(
+        run_id=run.id,
+        artifact="latest",
+        device="cuda",
+        renderer=None,
+        deterministic_policy=True,
+    )
+
+    assert status == "already_running"
 
 
 def test_active_watch_pid_clears_stale_viewer_lease(

@@ -342,7 +342,37 @@ function mergeRunDetail(summary: ManagedRun, detail: ManagedRunDetail): ManagedR
     ...detail,
     ...summary,
     config: detail.config,
+    recent_events: fresherRecentEvents(summary.recent_events, detail.recent_events),
+    runtime: fresherRuntime(summary.runtime, detail.runtime),
   };
+}
+
+function fresherRuntime(
+  summaryRuntime: ManagedRun["runtime"],
+  detailRuntime: ManagedRunDetail["runtime"],
+): ManagedRun["runtime"] {
+  if (summaryRuntime === null || detailRuntime === null) {
+    return detailRuntime ?? summaryRuntime;
+  }
+  return Date.parse(detailRuntime.updated_at) > Date.parse(summaryRuntime.updated_at)
+    ? detailRuntime
+    : summaryRuntime;
+}
+
+function fresherRecentEvents(
+  summaryEvents: ManagedRun["recent_events"],
+  detailEvents: ManagedRunDetail["recent_events"],
+): ManagedRun["recent_events"] {
+  return latestEventTime(detailEvents) > latestEventTime(summaryEvents)
+    ? detailEvents
+    : summaryEvents;
+}
+
+function latestEventTime(events: ManagedRun["recent_events"]): number {
+  return events.reduce((latest, event) => {
+    const timestamp = Date.parse(event.created_at);
+    return Number.isNaN(timestamp) ? latest : Math.max(latest, timestamp);
+  }, -Infinity);
 }
 
 function mergeWorkspaceRuns(visibleRuns: ManagedRun[], checkpointRuns: ManagedRun[]) {
