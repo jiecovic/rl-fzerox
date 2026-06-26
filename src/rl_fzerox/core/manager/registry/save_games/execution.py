@@ -18,7 +18,6 @@ from rl_fzerox.core.career_mode.progress.unlocks import (
     build_unlock_progress,
     default_unlock_targets,
 )
-from rl_fzerox.core.manager.db.repositories import runs as run_repository
 from rl_fzerox.core.manager.db.repositories import save_games as save_game_repository
 from rl_fzerox.core.manager.models import (
     ManagedSaveAttempt,
@@ -27,7 +26,7 @@ from rl_fzerox.core.manager.models import (
     ManagedSaveUnlockProgress,
     ManagedSaveUnlockTarget,
 )
-from rl_fzerox.core.training.runs import resolve_policy_artifact_path
+from rl_fzerox.core.manager.policy_sources import resolve_policy_source
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -99,11 +98,15 @@ def get_save_attempt_execution_context(
         )
         if course_setup is None:
             raise ValueError("save attempt is missing a resolved course setup")
-        if not save_game_repository.run_exists(session, course_setup.policy_run_id):
-            raise KeyError("policy run not found")
-        policy_run = run_repository.get_managed_run(session, course_setup.policy_run_id)
-        if policy_run is None:
-            raise KeyError("policy run not found")
+        policy_source = resolve_policy_source(
+            session,
+            kind=course_setup.policy_source_kind,
+            source_id=course_setup.policy_source_id,
+            artifact=course_setup.policy_artifact,
+            require_policy_artifact=True,
+        )
+        if policy_source.policy_path is None:
+            raise FileNotFoundError("policy checkpoint is missing")
         return SaveAttemptExecutionContext(
             save_game=save_game,
             attempt=attempt,
@@ -111,12 +114,9 @@ def get_save_attempt_execution_context(
             course_setup_target=course_setup_target,
             course_setup=course_setup,
             cup_setup=cup_setup,
-            policy_run=policy_run,
+            policy_source=policy_source,
             policy_artifact=course_setup.policy_artifact,
-            policy_path=resolve_policy_artifact_path(
-                policy_run.run_dir,
-                artifact=course_setup.policy_artifact,
-            ),
+            policy_path=policy_source.policy_path,
         )
 
 
@@ -156,7 +156,7 @@ def validate_policy_attempt_setup(
     course_setup = resolve_course_setup(course_setups, course_setup_target)
     if course_setup is None:
         raise ValueError(f"{error_subject} has no matching course setup")
-    _validate_required_course_setup_runs(
+    _validate_required_course_setup_sources(
         session,
         course_setups=course_setups,
         targets=resolved_targets,
@@ -221,7 +221,7 @@ def _target_for_attempt(attempt: ManagedSaveAttempt) -> UnlockRuleTarget:
     raise ValueError("save attempt target is not part of the unlock path")
 
 
-def _validate_required_course_setup_runs(
+def _validate_required_course_setup_sources(
     session: Session,
     *,
     course_setups: tuple[ManagedSaveCourseSetup, ...],
@@ -231,8 +231,12 @@ def _validate_required_course_setup_runs(
         course_setup = resolve_course_setup(course_setups, target)
         if course_setup is None:
             raise ValueError(f"save attempt has no matching course setup for {target.course_id}")
-        if not save_game_repository.run_exists(session, course_setup.policy_run_id):
-            raise KeyError("policy run not found")
+        resolve_policy_source(
+            session,
+            kind=course_setup.policy_source_kind,
+            source_id=course_setup.policy_source_id,
+            artifact=course_setup.policy_artifact,
+        )
 
 
 def _course_setup_target_label(target: CourseSetupTarget) -> str:

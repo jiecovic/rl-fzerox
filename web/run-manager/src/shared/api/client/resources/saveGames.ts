@@ -163,7 +163,8 @@ export async function upsertSaveCourseSetup({
   difficulty,
   engineSettingRawValue,
   policyArtifact,
-  policyRunId,
+  policySourceId,
+  policySourceKind,
   saveGameId,
 }: {
   courseId?: string | null;
@@ -171,7 +172,8 @@ export async function upsertSaveCourseSetup({
   difficulty?: string | null;
   engineSettingRawValue: number;
   policyArtifact: SavePolicyArtifact;
-  policyRunId: string;
+  policySourceId: string;
+  policySourceKind: "run" | "evaluation";
   saveGameId: string;
 }): Promise<ManagedSaveGame> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/course-setups`, {
@@ -181,7 +183,8 @@ export async function upsertSaveCourseSetup({
       difficulty: difficulty ?? null,
       cup_id: cupId ?? null,
       course_id: courseId ?? null,
-      policy_run_id: policyRunId,
+      policy_source_kind: policySourceKind,
+      policy_source_id: policySourceId,
       policy_artifact: policyArtifact,
       engine_setting_raw_value: engineSettingRawValue,
     }),

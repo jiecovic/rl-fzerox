@@ -1261,6 +1261,7 @@ def _configure_gp_cup(
             save_game_id=save_game_id,
             cup_id=cup_id,
             course_id=course.id,
-            policy_run_id=run_id,
+            policy_source_kind="run",
+            policy_source_id=run_id,
             policy_artifact="best",
         )

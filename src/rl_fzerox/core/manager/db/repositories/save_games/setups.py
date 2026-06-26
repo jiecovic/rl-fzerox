@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,7 +14,12 @@ from rl_fzerox.core.manager.db.repositories.save_games.mapping import (
     course_setup_from_model,
     cup_setup_from_model,
 )
-from rl_fzerox.core.manager.models import ManagedSaveCourseSetup, ManagedSaveCupSetup
+from rl_fzerox.core.manager.models import (
+    ManagedSaveCourseSetup,
+    ManagedSaveCupSetup,
+    PolicySourceArtifact,
+    PolicySourceKind,
+)
 
 
 def list_course_setups(
@@ -41,8 +44,9 @@ def upsert_course_setup(
     *,
     setup_id: str,
     save_game_id: str,
-    policy_run_id: str,
-    policy_artifact: Literal["latest", "best"],
+    policy_source_kind: PolicySourceKind,
+    policy_source_id: str,
+    policy_artifact: PolicySourceArtifact,
     engine_setting_raw_value: int,
     created_at: str,
     updated_at: str,
@@ -73,7 +77,8 @@ def upsert_course_setup(
             difficulty=difficulty,
             cup_id=cup_id,
             course_id=course_id,
-            policy_run_id=policy_run_id,
+            policy_source_kind=policy_source_kind,
+            policy_source_id=policy_source_id,
             policy_artifact=policy_artifact,
             engine_setting_raw_value=engine_setting_raw_value,
             created_at=created_at,
@@ -81,7 +86,8 @@ def upsert_course_setup(
         )
         session.add(row)
     else:
-        row.policy_run_id = policy_run_id
+        row.policy_source_kind = policy_source_kind
+        row.policy_source_id = policy_source_id
         row.policy_artifact = policy_artifact
         row.engine_setting_raw_value = engine_setting_raw_value
         row.updated_at = updated_at

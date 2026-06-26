@@ -40,9 +40,11 @@ class SaveRaceExecutionPlan:
     """Resolved inputs for launching one policy-backed GP race attempt."""
 
     attempt_id: str
-    policy_run_id: str
-    policy_run_dir: Path
-    policy_artifact: Literal["latest", "best"]
+    policy_source_kind: Literal["run", "evaluation"]
+    policy_source_id: str
+    policy_source_name: str
+    policy_source_dir: Path
+    policy_artifact: Literal["latest", "best", "final"]
     policy_algorithm: str
     policy_path: Path
     race_setup: SaveRaceSetup
@@ -63,10 +65,12 @@ def build_save_race_execution_plan(
     route = machine_select_route_for_slot(vehicle.machine_select_slot)
     return SaveRaceExecutionPlan(
         attempt_id=context.attempt.id,
-        policy_run_id=context.policy_run.id,
-        policy_run_dir=context.policy_run.run_dir,
+        policy_source_kind=context.policy_source.kind,
+        policy_source_id=context.policy_source.id,
+        policy_source_name=context.policy_source.name,
+        policy_source_dir=context.policy_source.source_dir,
         policy_artifact=context.policy_artifact,
-        policy_algorithm=effective_train_algorithm(context.policy_run.config),
+        policy_algorithm=effective_train_algorithm(context.policy_source.config),
         policy_path=context.policy_path,
         race_setup=SaveRaceSetup(
             difficulty=context.course_setup_target.difficulty,

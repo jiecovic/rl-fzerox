@@ -2,8 +2,8 @@
 """Resolve configured policy artifacts for the active Career Mode course.
 
 Policy runners are loaded lazily on the first handoff to a matching course, then
-cached by run/artifact key. This keeps Career Mode startup independent of the
-size of the configured cup/course setup pool.
+cached by policy-source/artifact key. This keeps Career Mode startup independent
+of the size of the configured cup/course setup pool.
 """
 
 from __future__ import annotations
@@ -19,16 +19,28 @@ from rl_fzerox.core.career_mode.course_setup import (
 from rl_fzerox.core.career_mode.navigation import course_id_from_info
 from rl_fzerox.core.career_mode.policy.runtime import CareerModePolicyControl
 from rl_fzerox.core.domain.race import CameraSettingName
-from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
+from rl_fzerox.core.manager.models import (
+    ManagedPolicySource,
+    ManagedSaveCourseSetup,
+    PolicySourceArtifact,
+    PolicySourceKind,
+)
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 from rl_fzerox.core.training.inference import PolicyRunner, load_policy_runner
 
 
-class CareerPolicyRunStore(Protocol):
+class CareerPolicySourceStore(Protocol):
     """Store surface needed to resolve trained policy artifacts for a course."""
 
-    def get_run(self, run_id: str) -> ManagedRun | None: ...
+    def resolve_policy_source(
+        self,
+        *,
+        policy_source_kind: PolicySourceKind,
+        policy_source_id: str,
+        policy_artifact: PolicySourceArtifact,
+        require_policy_artifact: bool = False,
+    ) -> ManagedPolicySource: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +52,7 @@ class CareerPolicyResolution:
 
 @dataclass(frozen=True, slots=True)
 class _LoadedPolicy:
-    run: ManagedRun
+    source: ManagedPolicySource
     runner: PolicyRunner
 
 
@@ -50,7 +62,7 @@ class CareerPolicyResolver:
     def __init__(
         self,
         *,
-        store: CareerPolicyRunStore,
+        store: CareerPolicySourceStore,
         setup: CareerModeRaceSetupConfig,
         course_setups: Sequence[ManagedSaveCourseSetup],
         device: str,
@@ -59,8 +71,8 @@ class CareerPolicyResolver:
         self._setup = setup
         self._course_setups = tuple(course_setups)
         self._device = device
-        self._policy_cache: dict[tuple[str, str], _LoadedPolicy] = {}
-        self._active_policy_key: tuple[str, str] | None = None
+        self._policy_cache: dict[tuple[str, str, str], _LoadedPolicy] = {}
+        self._active_policy_key: tuple[str, str, str] | None = None
 
     def update_context(
         self,
@@ -82,7 +94,11 @@ class CareerPolicyResolver:
         if course_setup is None:
             return None
 
-        key = (course_setup.policy_run_id, course_setup.policy_artifact)
+        key = (
+            course_setup.policy_source_kind,
+            course_setup.policy_source_id,
+            course_setup.policy_artifact,
+        )
         loaded_policy = self._load_policy(
             course_setup,
             refresh_artifact=refresh_artifact,
@@ -94,11 +110,11 @@ class CareerPolicyResolver:
         return CareerPolicyResolution(
             control=CareerModePolicyControl(
                 course_setup=course_setup,
-                policy_run=loaded_policy.run,
+                policy_source=loaded_policy.source,
                 runner=loaded_policy.runner,
             ),
             camera_setting=validated_camera_setting(
-                loaded_policy.run.config.environment.camera_setting
+                loaded_policy.source.config.environment.camera_setting
             ),
             activated_new_policy=activated_new_policy,
         )
@@ -122,33 +138,36 @@ class CareerPolicyResolver:
             raise RuntimeError(f"no Career Mode course setup matches {course_id!r}")
         return course_setup
 
-    def _required_policy_run(self, run_id: str) -> ManagedRun:
-        policy_run = self._store.get_run(run_id)
-        if policy_run is None:
-            raise RuntimeError(f"Career Mode policy run not found: {run_id}")
-        return policy_run
-
     def _load_policy(
         self,
         course_setup: ManagedSaveCourseSetup,
         *,
         refresh_artifact: bool = False,
     ) -> _LoadedPolicy:
-        key = (course_setup.policy_run_id, course_setup.policy_artifact)
+        key = (
+            course_setup.policy_source_kind,
+            course_setup.policy_source_id,
+            course_setup.policy_artifact,
+        )
         loaded_policy = self._policy_cache.get(key)
         if loaded_policy is not None:
             if refresh_artifact:
                 loaded_policy.runner.refresh()
             return loaded_policy
 
-        policy_run = self._required_policy_run(course_setup.policy_run_id)
+        policy_source = self._store.resolve_policy_source(
+            policy_source_kind=course_setup.policy_source_kind,
+            policy_source_id=course_setup.policy_source_id,
+            policy_artifact=course_setup.policy_artifact,
+            require_policy_artifact=True,
+        )
         runner = load_policy_runner(
-            policy_run.run_dir,
+            policy_source.source_dir,
             artifact=course_setup.policy_artifact,
             device=self._device,
-            algorithm=effective_train_algorithm(policy_run.config),
+            algorithm=effective_train_algorithm(policy_source.config),
         )
-        loaded_policy = _LoadedPolicy(run=policy_run, runner=runner)
+        loaded_policy = _LoadedPolicy(source=policy_source, runner=runner)
         self._policy_cache[key] = loaded_policy
         return loaded_policy
 

@@ -17,7 +17,7 @@ from rl_fzerox.core.envs.observations import (
     state_feature_names,
 )
 from rl_fzerox.core.manager import default_managed_run_config
-from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
+from rl_fzerox.core.manager.models import ManagedPolicySource, ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     EmulatorConfig,
@@ -171,7 +171,8 @@ def test_career_session_inherits_policy_dropout_one_zeroed_features(tmp_path: Pa
         course_setup=ManagedSaveCourseSetup(
             id="course-setup",
             save_game_id="save",
-            policy_run_id=run.id,
+            policy_source_kind="run",
+            policy_source_id=run.id,
             policy_artifact="latest",
             engine_setting_raw_value=50,
             difficulty="novice",
@@ -180,7 +181,19 @@ def test_career_session_inherits_policy_dropout_one_zeroed_features(tmp_path: Pa
             created_at="2026-01-01T00:00:00Z",
             updated_at="2026-01-01T00:00:00Z",
         ),
-        policy_run=run,
+        policy_source=ManagedPolicySource(
+            kind="run",
+            id=run.id,
+            name=run.name,
+            artifact="latest",
+            config=run.config,
+            source_dir=run.run_dir,
+            mutable=True,
+            created_at=run.created_at,
+            updated_at=run.created_at,
+            source_run_id=run.id,
+            source_run_name=run.name,
+        ),
         runner=PolicyRunner(
             LoadedPolicy(run_dir=run.run_dir, policy_path=policy_path, artifact="latest"),
             policy=PolicyStub(),

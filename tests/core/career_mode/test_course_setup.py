@@ -38,7 +38,7 @@ def test_resolve_course_setup_prefers_specific_difficulty_over_generic_row() -> 
     )
 
     assert resolved is not None
-    assert resolved.policy_run_id == "run-expert"
+    assert resolved.policy_source_id == "run-expert"
 
 
 def test_resolve_course_setup_prefers_cup_specific_over_course_only_row() -> None:
@@ -53,7 +53,7 @@ def test_resolve_course_setup_prefers_cup_specific_over_course_only_row() -> Non
     )
 
     assert resolved is not None
-    assert resolved.policy_run_id == "run-jack"
+    assert resolved.policy_source_id == "run-jack"
 
 
 def test_resolve_course_setup_does_not_use_course_rows_for_cup_target() -> None:
@@ -156,7 +156,7 @@ def test_resolve_course_setup_treats_missing_difficulty_and_cup_as_wildcards() -
     )
 
     assert resolved is not None
-    assert resolved.policy_run_id == "run-joker-rainbow"
+    assert resolved.policy_source_id == "run-joker-rainbow"
 
 
 def test_resolve_course_setup_rejects_non_matching_filters() -> None:
@@ -197,7 +197,7 @@ def test_resolve_course_setup_uses_newer_duplicate_for_same_target() -> None:
     )
 
     assert resolved is not None
-    assert resolved.policy_run_id == "run-new"
+    assert resolved.policy_source_id == "run-new"
 
 
 def test_resolve_course_setup_returns_none_without_course_target() -> None:
@@ -230,7 +230,7 @@ def test_resolve_cup_setup_prefers_specific_difficulty_over_generic_row() -> Non
 
 
 def _course_setup(
-    policy_run_id: str,
+    policy_source_id: str,
     *,
     setup_id: str | None = None,
     policy_artifact: Literal["latest", "best"] = "latest",
@@ -241,9 +241,10 @@ def _course_setup(
     updated_at: str = "2026-01-01T00:00:00Z",
 ) -> ManagedSaveCourseSetup:
     return ManagedSaveCourseSetup(
-        id=setup_id or f"course-{policy_run_id}",
+        id=setup_id or f"course-{policy_source_id}",
         save_game_id="save",
-        policy_run_id=policy_run_id,
+        policy_source_kind="run",
+        policy_source_id=policy_source_id,
         policy_artifact=policy_artifact,
         engine_setting_raw_value=engine,
         difficulty=difficulty,

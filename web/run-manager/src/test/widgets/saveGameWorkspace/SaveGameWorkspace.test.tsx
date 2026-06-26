@@ -4,8 +4,13 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { SaveGameSession } from "@/app/workspace/types";
-import type { ManagedSaveGame } from "@/shared/api/contract";
-import { configMetadataFixture, runFixture, saveGameFixture } from "@/test/fixtures";
+import type { ManagedEvaluation, ManagedSaveGame } from "@/shared/api/contract";
+import {
+  configMetadataFixture,
+  managedRunConfigFixture,
+  runFixture,
+  saveGameFixture,
+} from "@/test/fixtures";
 import { cleanup, render, screen } from "@/test/render";
 import { SaveGameWorkspace } from "@/widgets/saveGameWorkspace/SaveGameWorkspace";
 
@@ -123,7 +128,7 @@ describe("SaveGameWorkspace", () => {
       onUpsertCupSetup,
     });
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), run.id);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), `run:${run.id}`);
     expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
@@ -138,7 +143,8 @@ describe("SaveGameWorkspace", () => {
       difficulty: null,
       engineSettingRawValue: 64,
       policyArtifact: "best",
-      policyRunId: "run-policy",
+      policySourceId: "run-policy",
+      policySourceKind: "run",
       saveGameId: "save-001",
     });
     expect(onUpsertCupSetup).not.toHaveBeenCalled();
@@ -193,7 +199,7 @@ describe("SaveGameWorkspace", () => {
       onUpsertCourseSetup,
     });
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), run.id);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), `run:${run.id}`);
     await user.click(screen.getByRole("button", { name: "Import learned engines" }));
 
     expect(onImportEngineTuning).toHaveBeenCalledWith({
@@ -228,6 +234,38 @@ describe("SaveGameWorkspace", () => {
     expect(screen.getByRole("button", { name: "Save 2 changes" })).toBeEnabled();
   });
 
+  it("saves evaluation snapshots as policy sources", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture();
+    const evaluation = evaluationFixture({
+      id: "eval-policy",
+      name: "blue falcon eval",
+      status: "completed",
+    });
+    const onUpsertCourseSetup = vi.fn().mockResolvedValue(saveGame);
+
+    renderSaveGameWorkspace({
+      evaluations: [evaluation],
+      saveGame,
+      onUpsertCourseSetup,
+    });
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Policy" }),
+      "evaluation:eval-policy",
+    );
+    await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
+    await user.click(screen.getByRole("button", { name: "Save 24 changes" }));
+
+    expect(onUpsertCourseSetup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyArtifact: "best",
+        policySourceId: "eval-policy",
+        policySourceKind: "evaluation",
+      }),
+    );
+  });
+
   it("counts one dirty change for one course engine override", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
@@ -260,7 +298,8 @@ describe("SaveGameWorkspace", () => {
       difficulty: null,
       engineSettingRawValue: 40,
       policyArtifact: "best",
-      policyRunId: "run-policy",
+      policySourceId: "run-policy",
+      policySourceKind: "run",
       saveGameId: "save-001",
     });
   });
@@ -701,8 +740,10 @@ function renderSaveGameWorkspace({
   onUpsertCupSetup = vi.fn(),
   onStartCareerMode = vi.fn(),
   runs = [],
+  evaluations = [],
   saveGame,
 }: {
+  evaluations?: Parameters<typeof SaveGameWorkspace>[0]["evaluations"];
   onImportEngineTuning?: Parameters<typeof SaveGameWorkspace>[0]["onImportEngineTuning"];
   onOpenSaveGameDirectory?: (saveGameId: string) => Promise<void>;
   onRefreshStatus?: Parameters<typeof SaveGameWorkspace>[0]["onRefreshStatus"];
@@ -723,6 +764,7 @@ function renderSaveGameWorkspace({
       onStartCareerMode={onStartCareerMode}
       onUpsertCourseSetup={onUpsertCourseSetup}
       onUpsertCupSetup={onUpsertCupSetup}
+      evaluations={evaluations}
       runs={runs}
       saveGame={saveGame}
     />,
@@ -750,11 +792,74 @@ function courseSetupFixture(
     cup_id: "jack",
     difficulty: null,
     policy_artifact: "best" as const,
-    policy_run_id: "run-policy",
+    policy_source_id: "run-policy",
+    policy_source_kind: "run",
     save_game_id: "save-001",
     engine_setting_raw_value: 50,
     created_at: "2026-06-02T10:30:00+00:00",
     updated_at: "2026-06-02T10:30:00+00:00",
+    ...overrides,
+  };
+}
+
+function evaluationFixture(overrides: Partial<ManagedEvaluation> = {}): ManagedEvaluation {
+  return {
+    id: "eval-001",
+    name: "evaluation snapshot",
+    status: "completed",
+    evaluation_dir: "/tmp/evaluations/eval-001",
+    source_run_id: "run-policy",
+    source_artifact: "best",
+    preset_id: "preset-001",
+    preset_version: 1,
+    policy_mode: "deterministic",
+    seed: 123,
+    target: {
+      mode: "gp_course",
+      course_ids: [],
+      cup_ids: ["jack"],
+      difficulties: ["master"],
+      vehicle_ids: ["blue_falcon"],
+      repeats_per_target: 10,
+      baseline_variant_count: 10,
+    },
+    config: managedRunConfigFixture,
+    checkpoint: {
+      source_run_id: "run-policy",
+      source_run_name: "fast policy",
+      artifact: "best",
+      source_policy_path: "/tmp/runs/run-policy/best/policy.zip",
+      copied_policy_path: "/tmp/evaluations/eval-001/checkpoint_snapshot/policy.zip",
+      source_model_path: null,
+      copied_model_path: null,
+      local_num_timesteps: 10,
+      lineage_num_timesteps: 10,
+      source_mtime_ns: "1",
+    },
+    progress: {
+      completed_attempts: 24,
+      total_attempts: 24,
+      result_status: "completed",
+    },
+    result_summary: null,
+    baseline_suite: {
+      id: "suite-001",
+      preset_id: "preset-001",
+      preset_version: 1,
+      status: "ready",
+      suite_dir: "/tmp/evaluation-baselines/suite-001",
+      manifest_path: null,
+      error_message: null,
+      created_at: "2026-06-02T10:30:00+00:00",
+      updated_at: "2026-06-02T10:30:00+00:00",
+      materialized_at: "2026-06-02T10:30:00+00:00",
+    },
+    created_at: "2026-06-02T10:30:00+00:00",
+    updated_at: "2026-06-02T10:30:00+00:00",
+    started_at: "2026-06-02T10:30:00+00:00",
+    finished_at: "2026-06-02T10:40:00+00:00",
+    result_json_path: "/tmp/evaluations/eval-001/result.json",
+    error_message: null,
     ...overrides,
   };
 }
@@ -808,6 +913,7 @@ function StatefulNewSaveGameWorkspace({
   return (
     <SaveGameWorkspace
       metadata={configMetadataFixture}
+      evaluations={[]}
       runs={[]}
       saveGame={null}
       session={session}
@@ -839,6 +945,7 @@ function StatefulExistingSaveGameWorkspace({
   onStartCareerMode,
   onUpsertCourseSetup,
   onUpsertCupSetup,
+  evaluations,
   runs,
   saveGame,
 }: {
@@ -849,6 +956,7 @@ function StatefulExistingSaveGameWorkspace({
   onStartCareerMode: Parameters<typeof SaveGameWorkspace>[0]["onStartCareerMode"];
   onUpsertCourseSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCourseSetup"];
   onUpsertCupSetup: Parameters<typeof SaveGameWorkspace>[0]["onUpsertCupSetup"];
+  evaluations: Parameters<typeof SaveGameWorkspace>[0]["evaluations"];
   runs: Parameters<typeof SaveGameWorkspace>[0]["runs"];
   saveGame: ManagedSaveGame;
 }) {
@@ -856,6 +964,7 @@ function StatefulExistingSaveGameWorkspace({
   return (
     <SaveGameWorkspace
       metadata={configMetadataFixture}
+      evaluations={evaluations}
       runs={runs}
       saveGame={saveGame}
       session={session}

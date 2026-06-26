@@ -22,6 +22,8 @@ WatchDevice = Literal["cpu", "cuda"]
 type WatchRenderer = RendererName
 PolicyPlaybackMode = Literal["deterministic", "stochastic"]
 EngineTuningSourceAction = Literal["convert", "discard"]
+PolicySourceKind = Literal["run", "evaluation"]
+PolicySourceArtifact = Literal["latest", "best", "final"]
 
 
 class EvaluationTargetRequest(BaseModel):
@@ -187,8 +189,9 @@ class UpsertSaveCourseSetupRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    policy_run_id: str
-    policy_artifact: Literal["latest", "best"] = "best"
+    policy_source_kind: PolicySourceKind = "run"
+    policy_source_id: str
+    policy_artifact: PolicySourceArtifact = "best"
     engine_setting_raw_value: int = Field(
         default=engine_percent_to_slider_step(50),
         ge=ENGINE_SLIDER.min_step,
@@ -227,7 +230,7 @@ class ImportSaveEngineTuningRequest(BaseModel):
 
     course_setups: tuple[ImportSaveEngineTuningCourseSetupRequest, ...] = ()
     policy_run_id: str
-    policy_artifact: Literal["latest", "best"] = "latest"
+    policy_artifact: PolicySourceArtifact = "latest"
 
 
 class UpdateDraftRequest(BaseModel):

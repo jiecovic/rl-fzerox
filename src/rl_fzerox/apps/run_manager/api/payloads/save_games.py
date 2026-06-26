@@ -1,7 +1,6 @@
 # src/rl_fzerox/apps/run_manager/api/payloads/save_games.py
 from __future__ import annotations
 
-from rl_fzerox.apps.run_manager.api.payloads.runs import run_summary_payload
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager import (
     ManagedSaveAttempt,
@@ -22,7 +21,8 @@ def save_course_setup_payload(
         "difficulty": assignment.difficulty,
         "cup_id": assignment.cup_id,
         "course_id": assignment.course_id,
-        "policy_run_id": assignment.policy_run_id,
+        "policy_source_kind": assignment.policy_source_kind,
+        "policy_source_id": assignment.policy_source_id,
         "policy_artifact": assignment.policy_artifact,
         "engine_setting_raw_value": assignment.engine_setting_raw_value,
         "created_at": assignment.created_at,
@@ -97,7 +97,14 @@ def save_attempt_execution_context_payload(
         },
         "course_setup": save_course_setup_payload(context.course_setup),
         "cup_setup": save_cup_setup_payload(context.cup_setup),
-        "policy_run": run_summary_payload(context.policy_run),
+        "policy_source": {
+            "kind": context.policy_source.kind,
+            "id": context.policy_source.id,
+            "name": context.policy_source.name,
+            "mutable": context.policy_source.mutable,
+            "source_run_id": context.policy_source.source_run_id,
+            "source_run_name": context.policy_source.source_run_name,
+        },
         "policy_artifact": context.policy_artifact,
         "policy_path": str(context.policy_path),
     }

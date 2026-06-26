@@ -9,14 +9,18 @@ from typing import Literal
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.domain.engine import engine_percent_to_slider_step
 from rl_fzerox.core.manager.models import (
+    ManagedPolicySource,
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
     ManagedSaveCupSetup,
     ManagedSaveGame,
     ManagedSaveUnlockProgress,
+    PolicySourceArtifact,
+    PolicySourceKind,
     SaveAttemptStatus,
     SaveGameStatus,
 )
+from rl_fzerox.core.manager.policy_sources import resolve_policy_source
 from rl_fzerox.core.manager.registry import save_games as save_game_registry
 from rl_fzerox.core.manager.store_api.common import manager_store as _manager_store
 
@@ -217,8 +221,9 @@ class SaveGameStoreMixin:
         self,
         *,
         save_game_id: str,
-        policy_run_id: str,
-        policy_artifact: Literal["latest", "best"],
+        policy_source_kind: PolicySourceKind,
+        policy_source_id: str,
+        policy_artifact: PolicySourceArtifact,
         engine_setting_raw_value: int = engine_percent_to_slider_step(50),
         difficulty: str | None = None,
         cup_id: str | None = None,
@@ -227,13 +232,33 @@ class SaveGameStoreMixin:
         return save_game_registry.upsert_course_setup(
             _manager_store(self),
             save_game_id=save_game_id,
-            policy_run_id=policy_run_id,
+            policy_source_kind=policy_source_kind,
+            policy_source_id=policy_source_id,
             policy_artifact=policy_artifact,
             engine_setting_raw_value=engine_setting_raw_value,
             difficulty=difficulty,
             cup_id=cup_id,
             course_id=course_id,
         )
+
+    def resolve_policy_source(
+        self,
+        *,
+        policy_source_kind: PolicySourceKind,
+        policy_source_id: str,
+        policy_artifact: PolicySourceArtifact,
+        require_policy_artifact: bool = False,
+    ) -> ManagedPolicySource:
+        store = _manager_store(self)
+        store.initialize()
+        with store._orm_session() as session:
+            return resolve_policy_source(
+                session,
+                kind=policy_source_kind,
+                source_id=policy_source_id,
+                artifact=policy_artifact,
+                require_policy_artifact=require_policy_artifact,
+            )
 
     def upsert_save_cup_setup(
         self,

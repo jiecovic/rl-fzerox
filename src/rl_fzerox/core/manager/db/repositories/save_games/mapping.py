@@ -18,11 +18,12 @@ from rl_fzerox.core.manager.models import (
     ManagedSaveCourseSetup,
     ManagedSaveCupSetup,
     ManagedSaveGame,
+    PolicySourceArtifact,
+    PolicySourceKind,
 )
 from rl_fzerox.core.manager.registry.common import (
     optional_float,
     optional_int,
-    optional_source_artifact,
     save_attempt_status,
     save_game_status,
 )
@@ -67,7 +68,8 @@ def course_setup_from_model(
     return ManagedSaveCourseSetup(
         id=row.id,
         save_game_id=row.save_game_id,
-        policy_run_id=row.policy_run_id,
+        policy_source_kind=_required_policy_source_kind(row.policy_source_kind),
+        policy_source_id=row.policy_source_id,
         policy_artifact=_required_policy_artifact(row.policy_artifact),
         engine_setting_raw_value=engine_percent_to_slider_step(50)
         if engine_setting_raw_value is None
@@ -115,11 +117,24 @@ def save_attempt_from_model(row: SaveGameAttemptModel) -> ManagedSaveAttempt:
     )
 
 
-def _required_policy_artifact(value: object) -> Literal["latest", "best"]:
-    artifact = optional_source_artifact(value)
-    if artifact is None:
-        raise ValueError("course setup is missing policy artifact")
-    return artifact
+def _required_policy_source_kind(value: object) -> PolicySourceKind:
+    match str(value):
+        case "run":
+            return "run"
+        case "evaluation":
+            return "evaluation"
+    raise ValueError(f"course setup has invalid policy source kind: {value!r}")
+
+
+def _required_policy_artifact(value: object) -> PolicySourceArtifact:
+    match str(value):
+        case "latest":
+            return "latest"
+        case "best":
+            return "best"
+        case "final":
+            return "final"
+    raise ValueError(f"course setup has invalid policy artifact: {value!r}")
 
 
 def _required_runner_device(value: object) -> Literal["cpu", "cuda"]:

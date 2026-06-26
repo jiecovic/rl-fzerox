@@ -49,8 +49,9 @@ def test_career_recorder_summary_captures_terminal_events_between_frames(
                 str(tmp_path / "runs" / "run-a" / "checkpoints" / "latest" / "policy.zip")
             ),
             "career_mode_policy_course_id": "mute_city",
-            "career_mode_policy_run_id": "run-a",
-            "career_mode_policy_run_name": "Run A",
+            "career_mode_policy_source_id": "run-a",
+            "career_mode_policy_source_kind": "run",
+            "career_mode_policy_source_name": "Run A",
         },
     )
     recorder.record_event(
@@ -109,8 +110,9 @@ def test_career_recorder_summary_captures_terminal_events_between_frames(
             "mtime_utc": "2025-12-10T12:00:00Z",
             "num_timesteps": 14_820_470,
             "path": str(tmp_path / "runs" / "run-a" / "checkpoints" / "latest" / "policy.zip"),
-            "run_id": "run-a",
-            "run_name": "Run A",
+            "source_id": "run-a",
+            "source_kind": "run",
+            "source_name": "Run A",
         }
     ]
     assert summary["courses"] == [

@@ -4,9 +4,16 @@ import { SingleSlider } from "@/entities/runConfig/ui/sections/vehicle/engineSet
 import type {
   PolicyArtifactDraft,
   PolicySelectionDraft,
+  PolicySourceOption,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
-import { preferredVehicleSetup } from "@/features/saveGameCourseSetup/model/courseSetup";
-import type { ConfigMetadata, ManagedRun, SavePolicyArtifact } from "@/shared/api/contract";
+import {
+  policySelectionDraftForSource,
+  policySourceKey,
+  policySourceOptionKey,
+  preferredVehicleSetup,
+  selectedPolicySource,
+} from "@/features/saveGameCourseSetup/model/courseSetup";
+import type { ConfigMetadata, SavePolicyArtifact } from "@/shared/api/contract";
 import {
   ENGINE_SLIDER,
   enginePercentToSliderStep,
@@ -15,18 +22,18 @@ import {
 import { FieldSelect, FieldShell } from "@/shared/ui/Field";
 
 export function PolicySelectionSelect({
-  assignableRuns,
   disabled,
   draft,
   label,
   onDraftChange,
+  policySources,
   visibleLabel,
 }: {
-  assignableRuns: readonly ManagedRun[];
   disabled: boolean;
   draft: PolicySelectionDraft;
   label: string;
   onDraftChange: (draft: PolicySelectionDraft) => void;
+  policySources: readonly PolicySourceOption[];
   visibleLabel?: string;
 }) {
   return (
@@ -34,19 +41,22 @@ export function PolicySelectionSelect({
       <span>{visibleLabel ?? label}</span>
       <FieldSelect
         aria-label={label}
-        disabled={disabled || assignableRuns.length === 0}
-        value={draft.policyRunId}
-        onChange={(event) =>
-          onDraftChange({
-            ...draft,
-            policyRunId: event.currentTarget.value,
-          })
-        }
+        disabled={disabled || policySources.length === 0}
+        value={policySourceKey(draft)}
+        onChange={(event) => {
+          const selectedKey = event.currentTarget.value;
+          const source =
+            policySources.find((candidate) => policySourceOptionKey(candidate) === selectedKey) ??
+            null;
+          if (source !== null) {
+            onDraftChange(policySelectionDraftForSource(draft, source));
+          }
+        }}
       >
         <option disabled value="">
           Select policy
         </option>
-        <PolicyRunOptions assignableRuns={assignableRuns} />
+        <PolicySourceOptions policySources={policySources} />
       </FieldSelect>
     </FieldShell>
   );
@@ -57,20 +67,24 @@ export function PolicyArtifactSelect<TDraft extends PolicySelectionDraft>({
   draft,
   label,
   onDraftChange,
+  policySources,
   visibleLabel,
 }: {
   disabled: boolean;
   draft: TDraft;
   label: string;
   onDraftChange: (draft: TDraft) => void;
+  policySources: readonly PolicySourceOption[];
   visibleLabel?: string;
 }) {
+  const source = selectedPolicySource(policySources, draft);
+  const fixedArtifact = source?.kind === "evaluation";
   return (
     <FieldShell>
       <span>{visibleLabel ?? label}</span>
       <FieldSelect
         aria-label={label}
-        disabled={disabled || draft.policyRunId === ""}
+        disabled={disabled || draft.policySourceId === "" || fixedArtifact}
         value={draft.policyArtifact}
         onChange={(event) => {
           onDraftChange({
@@ -81,29 +95,30 @@ export function PolicyArtifactSelect<TDraft extends PolicySelectionDraft>({
       >
         <option value="best">best</option>
         <option value="latest">latest</option>
+        <option value="final">final</option>
       </FieldSelect>
     </FieldShell>
   );
 }
 
 export function PolicyDraftSelect({
-  assignableRuns,
   disabled,
   draft,
   label,
   lockedVehicleId,
   metadata,
   onDraftChange,
+  policySources,
   unlockedVehicleIds,
   visibleLabel,
 }: {
-  assignableRuns: readonly ManagedRun[];
   disabled: boolean;
   draft: PolicyArtifactDraft;
   label: string;
   lockedVehicleId?: string;
   metadata: ConfigMetadata;
   onDraftChange: (draft: PolicyArtifactDraft) => void;
+  policySources: readonly PolicySourceOption[];
   unlockedVehicleIds: readonly string[];
   visibleLabel?: string;
 }) {
@@ -112,21 +127,27 @@ export function PolicyDraftSelect({
       <span>{visibleLabel ?? label}</span>
       <FieldSelect
         aria-label={label}
-        disabled={disabled || assignableRuns.length === 0}
-        value={draft.policyRunId}
+        disabled={disabled || policySources.length === 0}
+        value={policySourceKey(draft)}
         onChange={(event) => {
-          const policyRunId = event.currentTarget.value;
-          const selectedRun = assignableRuns.find((run) => run.id === policyRunId) ?? null;
+          const selectedKey = event.currentTarget.value;
+          const source =
+            policySources.find((candidate) => policySourceOptionKey(candidate) === selectedKey) ??
+            null;
+          if (source === null) {
+            return;
+          }
           const preferredSetup = preferredVehicleSetup({
             currentDraft: draft,
             metadata,
-            run: selectedRun,
+            source,
             unlockedVehicleIds,
           });
+          const policySelection = policySelectionDraftForSource(draft, source);
           onDraftChange({
             ...draft,
             ...preferredSetup,
-            policyRunId,
+            ...policySelection,
             vehicleId: lockedVehicleId ?? preferredSetup.vehicleId,
           });
         }}
@@ -134,22 +155,22 @@ export function PolicyDraftSelect({
         <option disabled value="">
           Select policy
         </option>
-        <PolicyRunOptions assignableRuns={assignableRuns} />
+        <PolicySourceOptions policySources={policySources} />
       </FieldSelect>
     </FieldShell>
   );
 }
 
-const PolicyRunOptions = memo(function PolicyRunOptions({
-  assignableRuns,
+const PolicySourceOptions = memo(function PolicySourceOptions({
+  policySources,
 }: {
-  assignableRuns: readonly ManagedRun[];
+  policySources: readonly PolicySourceOption[];
 }) {
   return (
     <>
-      {assignableRuns.map((run) => (
-        <option key={run.id} value={run.id}>
-          {run.name}
+      {policySources.map((source) => (
+        <option key={policySourceOptionKey(source)} value={policySourceOptionKey(source)}>
+          {source.label}
         </option>
       ))}
     </>

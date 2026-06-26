@@ -38,7 +38,7 @@ class CareerModeRuntimeSession:
     watch_zeroed_state_features: frozenset[str]
     auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...]
     _policy_race: CareerPolicyRaceDriver | None = field(init=False, repr=False)
-    _active_policy_key: tuple[str, str] | None = field(init=False, repr=False)
+    _active_policy_key: tuple[str, str, str] | None = field(init=False, repr=False)
     _active_policy_control: CareerModePolicyControl | None = field(
         init=False,
         repr=False,
@@ -46,7 +46,7 @@ class CareerModeRuntimeSession:
 
     def __post_init__(self) -> None:
         self._policy_race: CareerPolicyRaceDriver | None = None
-        self._active_policy_key: tuple[str, str] | None = None
+        self._active_policy_key: tuple[str, str, str] | None = None
         self._active_policy_control: CareerModePolicyControl | None = None
 
     def close(self) -> None:
@@ -137,7 +137,7 @@ class CareerModeRuntimeSession:
                 "train": train_config.train,
                 "watch": base_config.watch.model_copy(
                     update={
-                        "policy_run_dir": policy_control.policy_run.run_dir,
+                        "policy_run_dir": policy_control.policy_source.source_dir,
                         "policy_artifact": policy_control.course_setup.policy_artifact,
                         "policy_algorithm": train_config.train.algorithm,
                     }

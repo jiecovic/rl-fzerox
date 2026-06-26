@@ -187,6 +187,7 @@ export function WorkspaceBody({
       ) : null}
       {!isLoading && activeSaveGameSession !== null ? (
         <SaveGameWorkspace
+          evaluations={evaluations}
           metadata={metadata}
           runs={runs}
           saveGame={

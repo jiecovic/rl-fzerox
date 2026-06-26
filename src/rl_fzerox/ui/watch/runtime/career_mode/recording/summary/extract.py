@@ -279,8 +279,9 @@ def _policy_checkpoint_summary(info: Mapping[str, object]) -> dict[str, object] 
         return None
     summary: dict[str, object] = {"path": path}
     for key, output_key in (
-        ("career_mode_policy_run_id", "run_id"),
-        ("career_mode_policy_run_name", "run_name"),
+        ("career_mode_policy_source_id", "source_id"),
+        ("career_mode_policy_source_kind", "source_kind"),
+        ("career_mode_policy_source_name", "source_name"),
         ("career_mode_policy_artifact", "artifact"),
         ("career_mode_policy_course_id", "course_id"),
         ("career_mode_policy_checkpoint_num_timesteps", "num_timesteps"),
@@ -301,6 +302,8 @@ def _policy_checkpoint_signature(checkpoint: Mapping[str, object]) -> tuple[obje
         checkpoint.get(key)
         for key in (
             "run_id",
+            "source_id",
+            "source_kind",
             "artifact",
             "course_id",
             "path",
@@ -330,8 +333,9 @@ _SUMMARY_INFO_FIELDS = (
     "career_mode_policy_checkpoint_stage",
     "career_mode_policy_checkpoint_stage_index",
     "career_mode_policy_course_id",
-    "career_mode_policy_run_id",
-    "career_mode_policy_run_name",
+    "career_mode_policy_source_id",
+    "career_mode_policy_source_kind",
+    "career_mode_policy_source_name",
     "game_mode",
     "game_mode_name",
     "gp_final_rank",

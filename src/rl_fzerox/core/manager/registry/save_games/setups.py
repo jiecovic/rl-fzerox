@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from rl_fzerox.core.career_mode.progress.unlocks import build_unlock_progress
 from rl_fzerox.core.domain.engine import (
@@ -11,7 +11,13 @@ from rl_fzerox.core.domain.engine import (
     validate_engine_slider_step,
 )
 from rl_fzerox.core.manager.db.repositories import save_games as save_game_repository
-from rl_fzerox.core.manager.models import ManagedSaveCourseSetup, ManagedSaveCupSetup
+from rl_fzerox.core.manager.models import (
+    ManagedSaveCourseSetup,
+    ManagedSaveCupSetup,
+    PolicySourceArtifact,
+    PolicySourceKind,
+)
+from rl_fzerox.core.manager.policy_sources import resolve_policy_source
 from rl_fzerox.core.manager.registry.common import new_record_id, utc_now
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 
@@ -45,8 +51,9 @@ def upsert_course_setup(
     store: ManagerStore,
     *,
     save_game_id: str,
-    policy_run_id: str,
-    policy_artifact: Literal["latest", "best"],
+    policy_source_kind: PolicySourceKind,
+    policy_source_id: str,
+    policy_artifact: PolicySourceArtifact,
     engine_setting_raw_value: int = engine_percent_to_slider_step(50),
     difficulty: str | None = None,
     cup_id: str | None = None,
@@ -62,13 +69,18 @@ def upsert_course_setup(
         save_game = save_game_repository.get_save_game(session, save_game_id)
         if save_game is None:
             raise KeyError("save game not found")
-        if not save_game_repository.run_exists(session, policy_run_id):
-            raise KeyError("policy run not found")
+        resolve_policy_source(
+            session,
+            kind=policy_source_kind,
+            source_id=policy_source_id,
+            artifact=policy_artifact,
+        )
         course_setup = save_game_repository.upsert_course_setup(
             session,
             setup_id=new_record_id(f"{save_game_id} setup"),
             save_game_id=save_game_id,
-            policy_run_id=policy_run_id,
+            policy_source_kind=policy_source_kind,
+            policy_source_id=policy_source_id,
             policy_artifact=policy_artifact,
             engine_setting_raw_value=engine_setting_raw_value,
             created_at=now,

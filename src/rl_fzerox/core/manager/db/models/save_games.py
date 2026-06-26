@@ -58,7 +58,8 @@ class SaveGameCourseSetupModel(ManagerBase):
     difficulty: Mapped[str | None]
     cup_id: Mapped[str | None]
     course_id: Mapped[str | None]
-    policy_run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
+    policy_source_kind: Mapped[str] = mapped_column(String, default="run")
+    policy_source_id: Mapped[str] = mapped_column(String)
     policy_artifact: Mapped[str]
     engine_setting_raw_value: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[str]

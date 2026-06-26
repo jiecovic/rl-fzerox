@@ -10,7 +10,7 @@ from rl_fzerox.core.career_mode.course_setup import CourseSetupTarget
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.models import (
-    ManagedRun,
+    ManagedPolicySource,
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
     ManagedSaveCupSetup,
@@ -407,7 +407,8 @@ def _execution_context(
     course_setup = ManagedSaveCourseSetup(
         id="course-setup-1",
         save_game_id=save_game.id,
-        policy_run_id=run_id,
+        policy_source_kind="run",
+        policy_source_id=run_id,
         policy_artifact="latest",
         engine_setting_raw_value=50,
         created_at="2026-01-01T00:00:00Z",
@@ -425,15 +426,19 @@ def _execution_context(
         updated_at="2026-01-01T00:00:00Z",
         difficulty=difficulty,
     )
-    policy_run = ManagedRun(
+    policy_source = ManagedPolicySource(
+        kind="run",
         id=run_id,
         name="Run",
-        status="finished",
+        artifact="latest",
         config=default_managed_run_config(),
-        config_hash="hash",
-        run_dir=tmp_path / "run-1",
+        source_dir=tmp_path / "run-1",
+        mutable=True,
         created_at="2026-01-01T00:00:00Z",
-        lineage_id="lineage-1",
+        updated_at="2026-01-01T00:00:00Z",
+        policy_path=tmp_path / "run-1" / "latest.zip",
+        source_run_id=run_id,
+        source_run_name="Run",
     )
     return SaveAttemptExecutionContext(
         save_game=save_game,
@@ -442,7 +447,7 @@ def _execution_context(
         course_setup_target=course_setup_target,
         course_setup=course_setup,
         cup_setup=cup_setup,
-        policy_run=policy_run,
+        policy_source=policy_source,
         policy_artifact="latest",
-        policy_path=policy_run.run_dir / "latest.zip",
+        policy_path=policy_source.policy_path or tmp_path / "run-1" / "latest.zip",
     )

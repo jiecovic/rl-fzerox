@@ -9,7 +9,6 @@ from typing import Literal
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from rl_fzerox.core.manager.db.models.runs import RunModel
 from rl_fzerox.core.manager.db.models.save_games import (
     SaveGameAttemptModel,
     SaveGameCourseSetupModel,
@@ -33,12 +32,6 @@ def assert_save_game_name_available(
     existing_id = session.scalar(statement.limit(1))
     if existing_id is not None and existing_id != exclude_id:
         raise ManagerNameConflictError(kind="save game", name=name)
-
-
-def run_exists(session: Session, run_id: str) -> bool:
-    """Return whether a policy run exists."""
-
-    return session.get(RunModel, run_id) is not None
 
 
 def insert_save_game(session: Session, save_game: ManagedSaveGame) -> None:

@@ -23,7 +23,9 @@ export const saveUnlockTargetStatusSchema = z.enum([
 
 export const saveAttemptStatusSchema = z.enum(["running", "succeeded", "failed"]);
 
-export const savePolicyArtifactSchema = z.enum(["latest", "best"]);
+export const savePolicySourceKindSchema = z.enum(["run", "evaluation"]);
+
+export const savePolicyArtifactSchema = z.enum(["latest", "best", "final"]);
 
 export const policyPlaybackModeSchema = z.enum(["deterministic", "stochastic"]);
 
@@ -33,7 +35,8 @@ export const managedSaveCourseSetupSchema = z.object({
   difficulty: z.string().nullable(),
   cup_id: z.string().nullable(),
   course_id: z.string().nullable(),
-  policy_run_id: z.string(),
+  policy_source_kind: savePolicySourceKindSchema,
+  policy_source_id: z.string(),
   policy_artifact: savePolicyArtifactSchema,
   engine_setting_raw_value: z.number().int().min(ENGINE_SLIDER.minStep).max(ENGINE_SLIDER.maxStep),
   created_at: z.string(),
@@ -185,6 +188,7 @@ export type SaveEngineTuningCourseSetupRecommendation = z.infer<
 >;
 export type SaveAttemptStatus = z.infer<typeof saveAttemptStatusSchema>;
 export type SavePolicyArtifact = z.infer<typeof savePolicyArtifactSchema>;
+export type SavePolicySourceKind = z.infer<typeof savePolicySourceKindSchema>;
 export type SaveUnlockTargetStatus = z.infer<typeof saveUnlockTargetStatusSchema>;
 
 export interface CareerModeRunnerLaunchRequest {

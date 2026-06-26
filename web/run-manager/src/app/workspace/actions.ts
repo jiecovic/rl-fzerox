@@ -50,6 +50,7 @@ import type {
   SaveEngineTuningCourseSetupRecommendation,
   SaveGameRunnerSettingsUpdateRequest,
   SavePolicyArtifact,
+  SavePolicySourceKind,
   StartEvaluationRequest,
   WatchDevice,
   WatchRenderer,
@@ -100,7 +101,8 @@ export interface WorkspaceActions {
   upsertManagedSaveCourseSetup: (request: {
     engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
     courseId?: string | null;
     cupId?: string | null;

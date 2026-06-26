@@ -24,8 +24,9 @@ def career_mode_sections(info: dict[str, object]) -> list[PanelSection]:
     completed_targets = _int_info(info, "career_mode_completed_targets")
     total_targets = _int_info(info, "career_mode_total_targets")
     inspection_status = _non_empty_text(info.get("career_mode_inspection_status"))
-    policy_run_name = _non_empty_text(info.get("career_mode_policy_run_name"))
-    policy_run_id = _non_empty_text(info.get("career_mode_policy_run_id"))
+    policy_source_name = _non_empty_text(info.get("career_mode_policy_source_name"))
+    policy_source_id = _non_empty_text(info.get("career_mode_policy_source_id"))
+    policy_source_kind = _non_empty_text(info.get("career_mode_policy_source_kind"))
     policy_artifact = _non_empty_text(info.get("career_mode_policy_artifact"))
     policy_course_id = _non_empty_text(info.get("career_mode_policy_course_id"))
     policy_active = info.get("career_mode_policy_active") is True
@@ -98,10 +99,15 @@ def career_mode_sections(info: dict[str, object]) -> list[PanelSection]:
         ),
         _panel_line(
             "Policy",
-            policy_run_name or "-",
-            PALETTE.text_primary if policy_run_name else PALETTE.text_muted,
+            policy_source_name or "-",
+            PALETTE.text_primary if policy_source_name else PALETTE.text_muted,
             wrap=True,
             min_value_lines=2,
+        ),
+        _panel_line(
+            "Source",
+            _format_mode_name(policy_source_kind) if policy_source_kind else "-",
+            PALETTE.text_primary if policy_source_kind else PALETTE.text_muted,
         ),
         _panel_line(
             "Artifact",
@@ -121,9 +127,9 @@ def career_mode_sections(info: dict[str, object]) -> list[PanelSection]:
             min_value_lines=2,
         ),
         _panel_line(
-            "Policy run id",
-            policy_run_id or "-",
-            PALETTE.text_primary if policy_run_id else PALETTE.text_muted,
+            "Policy source id",
+            policy_source_id or "-",
+            PALETTE.text_primary if policy_source_id else PALETTE.text_muted,
             wrap=True,
             min_value_lines=2,
         ),

@@ -575,8 +575,10 @@ def _execution_plan() -> SaveRaceExecutionPlan:
     race_setup = _race_setup()
     return SaveRaceExecutionPlan(
         attempt_id="attempt-2",
-        policy_run_id="run-1",
-        policy_run_dir=Path("runs/run-1"),
+        policy_source_kind="run",
+        policy_source_id="run-1",
+        policy_source_name="Run 1",
+        policy_source_dir=Path("runs/run-1"),
         policy_artifact="best",
         policy_algorithm="ppo",
         policy_path=Path("runs/run-1/checkpoints/best/policy.zip"),

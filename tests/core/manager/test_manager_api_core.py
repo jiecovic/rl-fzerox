@@ -289,7 +289,8 @@ async def test_manager_api_upserts_save_course_setup(tmp_path: Path) -> None:
             "cup_id": "jack",
             "course_id": "mute_city",
             "policy_artifact": "best",
-            "policy_run_id": run.id,
+            "policy_source_kind": "run",
+            "policy_source_id": run.id,
             "engine_setting_raw_value": 60,
         },
     )
@@ -301,7 +302,8 @@ async def test_manager_api_upserts_save_course_setup(tmp_path: Path) -> None:
     assert assignments[0]["save_game_id"] == save_game_id
     assert assignments[0]["cup_id"] == "jack"
     assert assignments[0]["course_id"] == "mute_city"
-    assert assignments[0]["policy_run_id"] == "policy-run"
+    assert assignments[0]["policy_source_kind"] == "run"
+    assert assignments[0]["policy_source_id"] == "policy-run"
     assert assignments[0]["policy_artifact"] == "best"
     assert assignments[0]["engine_setting_raw_value"] == 60
 
@@ -475,7 +477,8 @@ async def test_manager_api_returns_save_attempt_execution_context(tmp_path: Path
         "cup_id": "jack",
         "course_id": None,
     }
-    assert context["policy_run"]["id"] == "policy-run"
+    assert context["policy_source"]["kind"] == "run"
+    assert context["policy_source"]["id"] == "policy-run"
     assert context["policy_artifact"] == "best"
     assert context["policy_path"] == str(policy_path.resolve())
 
@@ -484,7 +487,8 @@ async def test_manager_api_returns_save_attempt_execution_context(tmp_path: Path
     assert plan_response.status_code == 200
     plan = plan_response.json()["execution_plan"]
     assert plan["attempt"]["id"] == attempt["id"]
-    assert plan["policy"]["run_id"] == "policy-run"
+    assert plan["policy"]["source_kind"] == "run"
+    assert plan["policy"]["source_id"] == "policy-run"
     assert plan["policy"]["artifact"] == "best"
     assert plan["policy"]["path"] == str(policy_path.resolve())
     assert plan["race_setup"]["difficulty"] == "novice"
@@ -516,7 +520,8 @@ async def _configure_api_gp_cup(
                 "cup_id": cup_id,
                 "course_id": course.id,
                 "policy_artifact": "best",
-                "policy_run_id": run_id,
+                "policy_source_kind": "run",
+                "policy_source_id": run_id,
             },
         )
         assert response.status_code == 200

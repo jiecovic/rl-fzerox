@@ -14,7 +14,7 @@ from typing import Literal
 
 from rl_fzerox.core.career_mode.course_setup import CourseSetupTarget
 from rl_fzerox.core.manager.models import (
-    ManagedRun,
+    ManagedPolicySource,
     ManagedSaveAttempt,
     ManagedSaveCourseSetup,
     ManagedSaveCupSetup,
@@ -33,6 +33,6 @@ class SaveAttemptExecutionContext:
     course_setup_target: CourseSetupTarget
     course_setup: ManagedSaveCourseSetup
     cup_setup: ManagedSaveCupSetup
-    policy_run: ManagedRun
-    policy_artifact: Literal["latest", "best"]
+    policy_source: ManagedPolicySource
+    policy_artifact: Literal["latest", "best", "final"]
     policy_path: Path

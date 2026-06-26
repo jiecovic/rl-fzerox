@@ -11,7 +11,7 @@ from rl_fzerox.core.career_mode.policy.runtime import _policy_train_config
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.manager import ManagedRunConfig, default_managed_run_config
-from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
+from rl_fzerox.core.manager.models import ManagedPolicySource, ManagedRun, ManagedSaveCourseSetup
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 
 
@@ -99,7 +99,8 @@ def _policy_control(run: ManagedRun) -> CareerModePolicyControl:
         course_setup=ManagedSaveCourseSetup(
             id="course-setup",
             save_game_id="save",
-            policy_run_id=run.id,
+            policy_source_kind="run",
+            policy_source_id=run.id,
             policy_artifact="latest",
             engine_setting_raw_value=50,
             difficulty="novice",
@@ -108,6 +109,18 @@ def _policy_control(run: ManagedRun) -> CareerModePolicyControl:
             created_at="2026-01-01T00:00:00Z",
             updated_at="2026-01-01T00:00:00Z",
         ),
-        policy_run=run,
+        policy_source=ManagedPolicySource(
+            kind="run",
+            id=run.id,
+            name=run.name,
+            artifact="latest",
+            config=run.config,
+            source_dir=run.run_dir,
+            mutable=True,
+            created_at=run.created_at,
+            updated_at=run.created_at,
+            source_run_id=run.id,
+            source_run_name=run.name,
+        ),
         runner=runner,
     )

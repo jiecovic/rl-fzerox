@@ -69,7 +69,8 @@ def delete_run(store: ManagerStore, run_id: str) -> bool:
         if (
             session.scalar(
                 select(SaveGameCourseSetupModel.id)
-                .where(SaveGameCourseSetupModel.policy_run_id == run_id)
+                .where(SaveGameCourseSetupModel.policy_source_kind == "run")
+                .where(SaveGameCourseSetupModel.policy_source_id == run_id)
                 .limit(1)
             )
             is not None

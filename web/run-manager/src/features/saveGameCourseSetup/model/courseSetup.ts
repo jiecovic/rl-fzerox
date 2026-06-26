@@ -1,11 +1,13 @@
 // web/run-manager/src/features/saveGameCourseSetup/model/courseSetup.ts
 import type {
   ConfigMetadata,
+  ManagedEvaluation,
   ManagedRun,
   ManagedSaveCourseSetup,
   ManagedSaveCupSetup,
   ManagedSaveUnlockTarget,
   SavePolicyArtifact,
+  SavePolicySourceKind,
 } from "@/shared/api/contract";
 import { enginePercentToSliderStep } from "@/shared/domain/engineBuckets";
 
@@ -30,22 +32,37 @@ export type CupSetupValues = {
 export type PolicyArtifactDraft = {
   engineSettingRawValue: number;
   policyArtifact: SavePolicyArtifact;
-  policyRunId: string;
+  policySourceId: string;
+  policySourceKind: SavePolicySourceKind;
   vehicleId: string;
 };
 
-export type PolicySelectionDraft = Pick<PolicyArtifactDraft, "policyArtifact" | "policyRunId">;
+export type PolicySelectionDraft = Pick<
+  PolicyArtifactDraft,
+  "policyArtifact" | "policySourceId" | "policySourceKind"
+>;
 export type CourseSetupDraft = CourseSetupValues & PolicyArtifactDraft;
 export type CourseSetupDraftMap = Record<string, CourseSetupDraft>;
 export type CupSetupDraft = CupSetupValues & Pick<PolicyArtifactDraft, "vehicleId">;
 export type CupSetupDraftMap = Record<string, CupSetupDraft>;
+export type PolicySourceVehicleSetup = ManagedRun["vehicle_setup"];
+
+export interface PolicySourceOption {
+  artifact: SavePolicyArtifact;
+  id: string;
+  kind: SavePolicySourceKind;
+  label: string;
+  canImportEngineTuning: boolean;
+  vehicleSetup: PolicySourceVehicleSetup;
+}
 
 export const NEUTRAL_ENGINE_SETTING_RAW_VALUE = enginePercentToSliderStep(50);
 
 export const EMPTY_COURSE_SETUP_DRAFT: PolicyArtifactDraft = {
   engineSettingRawValue: NEUTRAL_ENGINE_SETTING_RAW_VALUE,
   policyArtifact: "best",
-  policyRunId: "",
+  policySourceId: "",
+  policySourceKind: "run",
   vehicleId: "blue_falcon",
 };
 
@@ -94,7 +111,8 @@ export function courseSetupDraftsFromSavedSetups(
       ...values,
       engineSettingRawValue: setup.engine_setting_raw_value,
       policyArtifact: setup.policy_artifact,
-      policyRunId: setup.policy_run_id,
+      policySourceId: setup.policy_source_id,
+      policySourceKind: setup.policy_source_kind,
       vehicleId: EMPTY_COURSE_SETUP_DRAFT.vehicleId,
     };
   }
@@ -139,7 +157,8 @@ export function sharedPolicySelectionDraft(
   return drafts.every((draft) => policySelectionDraftsEqual(draft, firstDraft))
     ? {
         policyArtifact: firstDraft.policyArtifact,
-        policyRunId: firstDraft.policyRunId,
+        policySourceId: firstDraft.policySourceId,
+        policySourceKind: firstDraft.policySourceKind,
       }
     : null;
 }
@@ -158,9 +177,10 @@ export function dirtyCourseSetupDrafts(
   return Object.values(current).filter((draft) => {
     const savedDraft = saved[courseSetupKey(draft)] ?? null;
     return (
-      draft.policyRunId !== "" &&
+      draft.policySourceId !== "" &&
       (savedDraft === null ||
-        savedDraft.policyRunId !== draft.policyRunId ||
+        savedDraft.policySourceKind !== draft.policySourceKind ||
+        savedDraft.policySourceId !== draft.policySourceId ||
         savedDraft.policyArtifact !== draft.policyArtifact ||
         savedDraft.engineSettingRawValue !== draft.engineSettingRawValue)
     );
@@ -204,32 +224,105 @@ export function dirtyCupSetupDrafts(
 export function preferredVehicleSetup({
   currentDraft,
   metadata,
-  run,
+  source,
   unlockedVehicleIds,
 }: {
   currentDraft: PolicyArtifactDraft;
   metadata: ConfigMetadata;
-  run: ManagedRun | null;
+  source: PolicySourceOption | null;
   unlockedVehicleIds: readonly string[];
 }): Pick<PolicyArtifactDraft, "engineSettingRawValue" | "vehicleId"> {
   const unlockedVehicleSet = new Set(unlockedVehicleIds);
   const fallbackVehicleId = unlockedVehicleSet.has("blue_falcon")
     ? "blue_falcon"
     : (unlockedVehicleIds[0] ?? metadata.vehicles[0]?.id ?? currentDraft.vehicleId);
-  if (run === null) {
+  if (source === null) {
     return {
       engineSettingRawValue: currentDraft.engineSettingRawValue,
       vehicleId: currentDraft.vehicleId,
     };
   }
-  const trainedVehicleId = run.vehicle_setup.selected_vehicle_ids[0] ?? null;
+  const trainedVehicleId = source.vehicleSetup.selected_vehicle_ids[0] ?? null;
   const vehicleId =
     trainedVehicleId !== null && unlockedVehicleSet.has(trainedVehicleId)
       ? trainedVehicleId
       : fallbackVehicleId;
   return {
-    engineSettingRawValue: preferredEngineSetting(run),
+    engineSettingRawValue: preferredEngineSetting(source.vehicleSetup),
     vehicleId,
+  };
+}
+
+export function policySourceOptions({
+  evaluations,
+  runs,
+}: {
+  evaluations: readonly ManagedEvaluation[];
+  runs: readonly ManagedRun[];
+}): PolicySourceOption[] {
+  return [
+    ...runs
+      .filter((run) => run.status !== "created" && run.status !== "archived")
+      .map(
+        (run): PolicySourceOption => ({
+          artifact: "best",
+          id: run.id,
+          kind: "run",
+          label: run.name,
+          canImportEngineTuning: run.vehicle_setup.engine_mode === "adaptive_tuner",
+          vehicleSetup: run.vehicle_setup,
+        }),
+      ),
+    ...evaluations
+      .filter((evaluation) => evaluation.status === "completed")
+      .map(
+        (evaluation): PolicySourceOption => ({
+          artifact: evaluation.checkpoint.artifact,
+          id: evaluation.id,
+          kind: "evaluation",
+          label: `${evaluation.name} · evaluation snapshot`,
+          canImportEngineTuning: false,
+          vehicleSetup: {
+            selection_mode: evaluation.config.vehicle.selection_mode,
+            selected_vehicle_ids: evaluation.config.vehicle.selected_vehicle_ids,
+            engine_mode: evaluation.config.vehicle.engine_mode,
+            engine_setting_raw_value: evaluation.config.vehicle.engine_setting_raw_value,
+            engine_setting_min_raw_value: evaluation.config.vehicle.engine_setting_min_raw_value,
+            engine_setting_max_raw_value: evaluation.config.vehicle.engine_setting_max_raw_value,
+          },
+        }),
+      ),
+  ];
+}
+
+export function policySourceKey(draft: PolicySelectionDraft): string {
+  return draft.policySourceId === "" ? "" : `${draft.policySourceKind}:${draft.policySourceId}`;
+}
+
+export function policySourceOptionKey(source: PolicySourceOption): string {
+  return `${source.kind}:${source.id}`;
+}
+
+export function selectedPolicySource(
+  policySources: readonly PolicySourceOption[],
+  draft: PolicySelectionDraft,
+): PolicySourceOption | null {
+  return (
+    policySources.find(
+      (source) => source.kind === draft.policySourceKind && source.id === draft.policySourceId,
+    ) ?? null
+  );
+}
+
+export function policySelectionDraftForSource(
+  draft: PolicySelectionDraft,
+  source: PolicySourceOption,
+): PolicySelectionDraft {
+  return {
+    ...draft,
+    policyArtifact: source.kind === "evaluation" ? source.artifact : draft.policyArtifact,
+    policySourceId: source.id,
+    policySourceKind: source.kind,
   };
 }
 
@@ -275,11 +368,14 @@ function policySelectionDraftsEqual(
   left: PolicySelectionDraft,
   right: PolicySelectionDraft,
 ): boolean {
-  return left.policyRunId === right.policyRunId && left.policyArtifact === right.policyArtifact;
+  return (
+    left.policySourceKind === right.policySourceKind &&
+    left.policySourceId === right.policySourceId &&
+    left.policyArtifact === right.policyArtifact
+  );
 }
 
-function preferredEngineSetting(run: ManagedRun): number {
-  const vehicle = run.vehicle_setup;
+function preferredEngineSetting(vehicle: PolicySourceVehicleSetup): number {
   if (vehicle.engine_mode === "fixed") {
     return vehicle.engine_setting_raw_value;
   }

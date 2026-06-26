@@ -13,6 +13,7 @@ import type {
   SaveEngineTuningCourseSetupRecommendation,
   SaveGameRunnerSettingsUpdateRequest,
   SavePolicyArtifact,
+  SavePolicySourceKind,
 } from "@/shared/api/contract";
 import {
   launchableTargetStatus,
@@ -23,7 +24,8 @@ import {
 export interface SaveCourseSetupRequest {
   engineSettingRawValue: number;
   policyArtifact: SavePolicyArtifact;
-  policyRunId: string;
+  policySourceId: string;
+  policySourceKind: SavePolicySourceKind;
   saveGameId: string;
   courseId?: string | null;
   cupId?: string | null;

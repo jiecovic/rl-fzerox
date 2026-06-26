@@ -10,7 +10,7 @@ from __future__ import annotations
 from rl_fzerox.core.career_mode.policy.resolver import (
     CareerPolicyResolution,
     CareerPolicyResolver,
-    CareerPolicyRunStore,
+    CareerPolicySourceStore,
 )
 from rl_fzerox.core.career_mode.policy.runtime import (
     CareerModePolicyControl,
@@ -22,5 +22,5 @@ __all__ = [
     "CareerPolicyRaceDriver",
     "CareerPolicyResolution",
     "CareerPolicyResolver",
-    "CareerPolicyRunStore",
+    "CareerPolicySourceStore",
 ]

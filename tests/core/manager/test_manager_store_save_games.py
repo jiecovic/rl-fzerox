@@ -20,6 +20,8 @@ from rl_fzerox.core.manager.db.models import (
     SaveGameModel,
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
+from rl_fzerox.core.training.runs import RUN_LAYOUT
+from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
 from tests.core.manager.manager_store_support import (
     _logical_sra,
     _write_policy_artifact,
@@ -139,7 +141,8 @@ def test_manager_store_deletes_save_game_with_owned_rows_and_files(tmp_path: Pat
         save_game_id=save_game.id,
         cup_id="jack",
         course_id="mute_city",
-        policy_run_id=run.id,
+        policy_source_kind="run",
+        policy_source_id=run.id,
         policy_artifact="best",
     )
     cup_setup = store.upsert_save_cup_setup(
@@ -197,14 +200,16 @@ def test_manager_store_upserts_save_course_setups(tmp_path: Path) -> None:
         save_game_id=save_game.id,
         cup_id="jack",
         course_id="mute_city",
-        policy_run_id=run.id,
+        policy_source_kind="run",
+        policy_source_id=run.id,
         policy_artifact="best",
     )
     updated = store.upsert_save_course_setup(
         save_game_id=save_game.id,
         cup_id="jack",
         course_id="mute_city",
-        policy_run_id=run.id,
+        policy_source_kind="run",
+        policy_source_id=run.id,
         policy_artifact="latest",
         engine_setting_raw_value=60,
     )
@@ -213,7 +218,8 @@ def test_manager_store_upserts_save_course_setups(tmp_path: Path) -> None:
     assert len(assignments) == 1
     assert created.id == updated.id
     assert assignments[0].save_game_id == save_game.id
-    assert assignments[0].policy_run_id == "policy-run"
+    assert assignments[0].policy_source_kind == "run"
+    assert assignments[0].policy_source_id == "policy-run"
     assert assignments[0].policy_artifact == "latest"
     assert assignments[0].cup_id == "jack"
     assert assignments[0].course_id == "mute_city"
@@ -416,8 +422,61 @@ def test_manager_store_resolves_save_attempt_execution_context(tmp_path: Path) -
     assert context.target.difficulty == "novice"
     assert context.target.cup_id == "jack"
     assert context.cup_setup.vehicle_id == "blue_falcon"
-    assert context.policy_run.id == run.id
+    assert context.policy_source.kind == "run"
+    assert context.policy_source.id == run.id
     assert context.policy_path == policy_path.resolve()
+
+
+def test_manager_store_resolves_evaluation_source_execution_context(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Evaluated Policy",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    _write_evaluation_source_checkpoint(run.run_dir, "best")
+    evaluation = store.create_evaluation(
+        name="Career Evaluation Snapshot",
+        source_run_id=run.id,
+        source_artifact="best",
+        policy_mode="deterministic",
+        preset_id="gp_course_master_all_courses",
+        evaluations_root=tmp_path / "evaluations",
+    )
+    store.mark_evaluation_running(evaluation.id)
+    evaluation = store.mark_evaluation_completed(evaluation.id)
+    save_game = store.create_save_game(
+        name="Evaluation Source Save",
+        save_games_root=tmp_path / "save-games",
+    )
+    save_game.save_path.write_bytes(_logical_sra({}))
+    store.upsert_save_cup_setup(
+        save_game_id=save_game.id,
+        cup_id="jack",
+        vehicle_id="blue_falcon",
+    )
+    for course in sorted(BUILT_IN_COURSES, key=lambda item: item.course_index):
+        if course.cup != "jack":
+            continue
+        store.upsert_save_course_setup(
+            save_game_id=save_game.id,
+            cup_id="jack",
+            course_id=course.id,
+            policy_source_kind="evaluation",
+            policy_source_id=evaluation.id,
+            policy_artifact=evaluation.checkpoint.artifact,
+        )
+
+    attempt = store.start_next_save_attempt(save_game.id)
+    context = store.get_save_attempt_execution_context(attempt.id)
+
+    assert context is not None
+    assert context.policy_source.kind == "evaluation"
+    assert context.policy_source.id == evaluation.id
+    assert context.policy_source.mutable is False
+    assert context.policy_source.source_run_id == run.id
+    assert context.policy_path == Path(evaluation.checkpoint.copied_policy_path).resolve()
+    assert context.policy_source.source_dir == evaluation.evaluation_dir / "checkpoint_snapshot"
 
 
 def _configure_gp_cup(
@@ -441,6 +500,24 @@ def _configure_gp_cup(
             save_game_id=save_game_id,
             cup_id=cup_id,
             course_id=course.id,
-            policy_run_id=run_id,
+            policy_source_kind="run",
+            policy_source_id=run_id,
             policy_artifact="best",
         )
+
+
+def _write_evaluation_source_checkpoint(
+    run_dir: Path,
+    artifact: Literal["latest", "best"],
+) -> Path:
+    checkpoint_dir = run_dir / RUN_LAYOUT.checkpoints_dirname / artifact
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    model_path = checkpoint_dir / "model.zip"
+    policy_path = checkpoint_dir / "policy.zip"
+    model_path.write_bytes(b"fake model checkpoint")
+    policy_path.write_bytes(b"fake policy checkpoint")
+    policy_artifact_metadata_path(policy_path).write_text(
+        '{"num_timesteps": 123, "lineage_num_timesteps": 123}\n',
+        encoding="utf-8",
+    )
+    return policy_path

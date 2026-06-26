@@ -14,6 +14,7 @@ import type {
   CupView,
   PolicyArtifactDraft,
   PolicySelectionDraft,
+  PolicySourceOption,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   countDirtyCourseSetups,
@@ -29,6 +30,7 @@ import {
   dirtyCupSetupDrafts,
   EMPTY_COURSE_SETUP_DRAFT,
   resetCourseEngineDrafts,
+  selectedPolicySource,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
 import {
   CourseSetupPanel,
@@ -37,17 +39,16 @@ import {
 } from "@/features/saveGameCourseSetup/ui/CourseSetupPanels";
 import type {
   ConfigMetadata,
-  ManagedRun,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
   SaveEngineTuningCourseSetupRecommendation,
   SavePolicyArtifact,
+  SavePolicySourceKind,
 } from "@/shared/api/contract";
 import { ToggleSwitch } from "@/shared/ui/configFields";
 import { FieldInput, FieldShell } from "@/shared/ui/Field";
 
 interface UnlockPathPanelProps {
-  assignableRuns: readonly ManagedRun[];
   metadata: ConfigMetadata;
   onUpsertCourseSetup: (request: {
     courseId?: string | null;
@@ -55,7 +56,8 @@ interface UnlockPathPanelProps {
     difficulty?: string | null;
     engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
   }) => Promise<ManagedSaveGame>;
   onImportEngineTuning: (request: {
@@ -82,6 +84,7 @@ interface UnlockPathPanelProps {
   onStartTarget: (target: ManagedSaveUnlockTarget) => void;
   onTargetClearGoalTextChange: (targetClearGoalText: string) => void;
   perfectRun: boolean;
+  policySources: readonly PolicySourceOption[];
   keepFailedPerfectRunVideos: boolean;
   recordingEnabled: boolean;
   reloadPolicyBetweenAttempts: boolean;
@@ -95,7 +98,6 @@ interface UnlockPathPanelProps {
 const EMPTY_STRING_ARRAY: readonly string[] = [];
 
 export const UnlockPathPanel = memo(function UnlockPathPanel({
-  assignableRuns,
   metadata,
   onCourseSetupDirtyChange,
   onKeepFailedPerfectRunVideosChange,
@@ -107,6 +109,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
   onUpsertCourseSetup,
   onUpsertCupSetup,
   perfectRun,
+  policySources,
   keepFailedPerfectRunVideos,
   recordingEnabled,
   reloadPolicyBetweenAttempts,
@@ -178,7 +181,8 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
           ...values,
           engineSettingRawValue: draft.engineSettingRawValue,
           policyArtifact: draft.policyArtifact,
-          policyRunId: draft.policyRunId,
+          policySourceId: draft.policySourceId,
+          policySourceKind: draft.policySourceKind,
           vehicleId: draft.vehicleId,
         },
       }));
@@ -198,7 +202,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
 
   const applyCourseSetupDrafts = useCallback(
     (setups: readonly CourseSetupValues[], draft: PolicySelectionDraft) => {
-      if (draft.policyRunId === "") {
+      if (draft.policySourceId === "") {
         return;
       }
       setCourseSetupDrafts((current) => {
@@ -212,7 +216,8 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
             ...setup,
             engineSettingRawValue: currentDraft.engineSettingRawValue,
             policyArtifact: draft.policyArtifact,
-            policyRunId: draft.policyRunId,
+            policySourceId: draft.policySourceId,
+            policySourceKind: draft.policySourceKind,
             vehicleId: currentDraft.vehicleId,
           };
         }
@@ -228,7 +233,8 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
 
   const importEngineTuningForDraft = useCallback(
     async (draft: PolicySelectionDraft, scope?: CourseSetupSaveScope) => {
-      if (draft.policyRunId === "") {
+      const selectedSource = selectedPolicySource(policySources, draft);
+      if (selectedSource?.canImportEngineTuning !== true) {
         return;
       }
       const requestedSetups = courseSetupRecommendationRequests({
@@ -255,7 +261,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
       const recommendations = await onImportEngineTuning({
         courseSetups,
         policyArtifact: draft.policyArtifact,
-        policyRunId: draft.policyRunId,
+        policyRunId: draft.policySourceId,
         saveGameId: saveGame.id,
       });
       setCourseSetupDrafts((current) =>
@@ -266,7 +272,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
         }),
       );
     },
-    [courseSetupDrafts, cupSetupDrafts, cups, onImportEngineTuning, saveGame.id],
+    [courseSetupDrafts, cupSetupDrafts, cups, onImportEngineTuning, policySources, saveGame.id],
   );
 
   const saveCourseSetups = useCallback(
@@ -290,7 +296,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
       setSavingSetups(true);
       try {
         for (const draft of dirtyCourseDrafts) {
-          if (draft.policyRunId === "") {
+          if (draft.policySourceId === "") {
             continue;
           }
           await onUpsertCourseSetup({
@@ -299,7 +305,8 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
             difficulty: draft.difficulty ?? null,
             engineSettingRawValue: draft.engineSettingRawValue,
             policyArtifact: draft.policyArtifact,
-            policyRunId: draft.policyRunId,
+            policySourceId: draft.policySourceId,
+            policySourceKind: draft.policySourceKind,
             saveGameId: saveGame.id,
           });
         }
@@ -362,14 +369,13 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
         onStartTarget={onStartTarget}
       />
       <GlobalPolicyPanel
-        assignableRuns={assignableRuns}
         cups={cups}
+        policySources={policySources}
         updating={updating || savingCourseSetups}
         onImportEngineTuning={importEngineTuningForDraft}
         onApplySetups={applyCourseSetupDrafts}
       />
       <CourseSetupPanel
-        assignableRuns={assignableRuns}
         cups={cups}
         defaultExpandedCupId={saveGame.unlock_progress?.next_target?.cup_id ?? null}
         dirtySetupCount={dirtySetupCount}
@@ -384,6 +390,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
         onCourseSetupDraftChange={updateCourseSetupDraft}
         onCupSetupDraftChange={updateCupSetupDraft}
         onImportEngineTuning={importEngineTuningForDraft}
+        policySources={policySources}
         onResetEngineSetups={resetEngineSetups}
         onSaveSetups={triggerSaveCourseSetups}
       />
@@ -641,7 +648,8 @@ function applyEngineRecommendationsToDrafts({
       ...values,
       engineSettingRawValue: recommendation.engine_setting_raw_value,
       policyArtifact: draft.policyArtifact,
-      policyRunId: draft.policyRunId,
+      policySourceId: draft.policySourceId,
+      policySourceKind: draft.policySourceKind,
       vehicleId: recommendation.vehicle_id,
     };
   }

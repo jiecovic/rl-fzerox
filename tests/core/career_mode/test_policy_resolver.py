@@ -11,7 +11,13 @@ import pytest
 from rl_fzerox.core.career_mode.policy import CareerPolicyResolver
 from rl_fzerox.core.career_mode.policy import resolver as resolver_module
 from rl_fzerox.core.manager import default_managed_run_config
-from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
+from rl_fzerox.core.manager.models import (
+    ManagedPolicySource,
+    ManagedRun,
+    ManagedSaveCourseSetup,
+    PolicySourceArtifact,
+    PolicySourceKind,
+)
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
 
 
@@ -42,7 +48,7 @@ def test_career_policy_resolver_lazy_loads_caches_and_refreshes_artifacts(
     monkeypatch.setattr(resolver_module, "load_policy_runner", fake_load_policy_runner)
 
     resolver = CareerPolicyResolver(
-        store=_PolicyRunStore(runs),
+        store=_PolicySourceStore(runs),
         setup=_race_setup(),
         course_setups=(
             _course_setup("run-a", course_id="mute_city", artifact="latest"),
@@ -108,12 +114,34 @@ class _PolicyRunnerStub:
         self.refresh_count += 1
 
 
-class _PolicyRunStore:
+class _PolicySourceStore:
     def __init__(self, runs: dict[str, ManagedRun]) -> None:
         self._runs = runs
 
-    def get_run(self, run_id: str) -> ManagedRun | None:
-        return self._runs.get(run_id)
+    def resolve_policy_source(
+        self,
+        *,
+        policy_source_kind: PolicySourceKind,
+        policy_source_id: str,
+        policy_artifact: PolicySourceArtifact,
+        require_policy_artifact: bool = False,
+    ) -> ManagedPolicySource:
+        assert policy_source_kind == "run"
+        assert require_policy_artifact is True
+        run = self._runs[policy_source_id]
+        return ManagedPolicySource(
+            kind="run",
+            id=run.id,
+            name=run.name,
+            artifact=policy_artifact,
+            config=run.config,
+            source_dir=run.run_dir,
+            mutable=True,
+            created_at=run.created_at,
+            updated_at=run.created_at,
+            source_run_id=run.id,
+            source_run_name=run.name,
+        )
 
 
 def _managed_run(run_id: str, tmp_path: Path) -> ManagedRun:
@@ -153,7 +181,8 @@ def _course_setup(
     return ManagedSaveCourseSetup(
         id=f"{run_id}-{course_id}-{artifact}",
         save_game_id="save",
-        policy_run_id=run_id,
+        policy_source_kind="run",
+        policy_source_id=run_id,
         policy_artifact=artifact,
         engine_setting_raw_value=50,
         difficulty="novice",

@@ -30,6 +30,8 @@ ManagedEvaluationStatus = Literal[
     "cancelled",
 ]
 EvaluationBaselineSuiteStatus = Literal["not_created", "ready", "failed"]
+PolicySourceKind = Literal["run", "evaluation"]
+PolicySourceArtifact = Literal["latest", "best", "final"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +177,26 @@ class ManagedRun:
 
 
 @dataclass(frozen=True, slots=True)
+class ManagedPolicySource:
+    """One policy checkpoint source assignable to save-game course setups."""
+
+    kind: PolicySourceKind
+    id: str
+    name: str
+    artifact: PolicySourceArtifact
+    config: ManagedRunConfig
+    source_dir: Path
+    mutable: bool
+    created_at: str
+    updated_at: str
+    policy_path: Path | None = None
+    source_run_id: str | None = None
+    source_run_name: str | None = None
+    local_num_timesteps: int | None = None
+    lineage_num_timesteps: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ManagedRunVehicleSummary:
     """Vehicle settings needed when assigning a trained policy to a save game."""
 
@@ -309,8 +331,9 @@ class ManagedSaveCourseSetup:
 
     id: str
     save_game_id: str
-    policy_run_id: str
-    policy_artifact: Literal["latest", "best"]
+    policy_source_kind: PolicySourceKind
+    policy_source_id: str
+    policy_artifact: PolicySourceArtifact
     engine_setting_raw_value: int
     created_at: str
     updated_at: str

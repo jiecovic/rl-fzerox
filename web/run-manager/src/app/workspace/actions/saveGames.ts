@@ -20,6 +20,7 @@ import type {
   SaveEngineTuningCourseSetupRecommendation,
   SaveGameRunnerSettingsUpdateRequest,
   SavePolicyArtifact,
+  SavePolicySourceKind,
 } from "@/shared/api/contract";
 
 interface WorkspaceSaveGameActionsOptions {
@@ -53,7 +54,8 @@ export interface WorkspaceSaveGameActions {
   upsertManagedSaveCourseSetup: (request: {
     engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
     courseId?: string | null;
     cupId?: string | null;
@@ -86,7 +88,8 @@ export function workspaceSaveGameActions({
   async function upsertManagedSaveCourseSetup(request: {
     engineSettingRawValue: number;
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
     courseId?: string | null;
     cupId?: string | null;

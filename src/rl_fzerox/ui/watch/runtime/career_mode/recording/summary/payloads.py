@@ -199,7 +199,7 @@ def _policy_checkpoint_markdown_lines(payload: Mapping[str, object]) -> list[str
             "| "
             + " | ".join(
                 (
-                    _summary_text(checkpoint.get("run_name") or checkpoint.get("run_id")),
+                    _summary_text(checkpoint.get("source_name") or checkpoint.get("source_id")),
                     _summary_text(checkpoint.get("artifact")),
                     _summary_text(checkpoint.get("course_id")),
                     _summary_text(checkpoint.get("num_timesteps")),

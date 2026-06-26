@@ -13,6 +13,7 @@ import { useSaveGameRunnerRefresh } from "@/features/careerRunner/model/useSaveG
 import { RunnerControlPanel } from "@/features/careerRunner/ui/RunnerControlPanel";
 import { CreateSaveGameForm } from "@/features/createSaveGame/ui/CreateSaveGameForm";
 import {
+  policySourceOptions,
   resolveSavedCourseSetup,
   resolveSavedCupSetup,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
@@ -20,6 +21,7 @@ import { UnlockPathPanel } from "@/features/saveGameCourseSetup/ui/UnlockPathPan
 import type {
   CareerModeRunnerLaunchRequest,
   ConfigMetadata,
+  ManagedEvaluation,
   ManagedRun,
   ManagedSaveGame,
   ManagedSaveUnlockTarget,
@@ -67,6 +69,7 @@ interface SaveGameWorkspaceProps {
   onStartCareerMode: (
     request: CareerModeRunnerLaunchRequest,
   ) => Promise<"started" | "already_running">;
+  evaluations: ManagedEvaluation[];
   runs: ManagedRun[];
   saveGame: ManagedSaveGame | null;
   session: SaveGameSession;
@@ -85,6 +88,7 @@ export function SaveGameWorkspace({
   onUpsertCourseSetup,
   onUpsertCupSetup,
   onStartCareerMode,
+  evaluations,
   runs,
   saveGame,
   session,
@@ -129,7 +133,7 @@ export function SaveGameWorkspace({
     saveGame,
     session,
   });
-  const assignableRuns = useStableAssignableRuns(runs);
+  const policySources = useStablePolicySources(policySourceOptions({ evaluations, runs }));
 
   const saveGameCourseSetups = saveGame?.course_setups ?? EMPTY_COURSE_SETUPS;
   const saveGameCupSetups = saveGame?.cup_setups ?? EMPTY_CUP_SETUPS;
@@ -350,7 +354,7 @@ export function SaveGameWorkspace({
           onCopySaveId={() => void copyDetail(saveGame.id, "id")}
         />
         <UnlockPathPanel
-          assignableRuns={assignableRuns}
+          policySources={policySources}
           keepFailedPerfectRunVideos={session.keepFailedPerfectRunVideos}
           metadata={metadata}
           perfectRun={session.perfectRun}
@@ -382,16 +386,21 @@ export function SaveGameWorkspace({
   );
 }
 
-function useStableAssignableRuns(runs: readonly ManagedRun[]): readonly ManagedRun[] {
-  const stableAssignableRuns = useRef<{ key: string; runs: readonly ManagedRun[] } | null>(null);
-  const key = useMemo(() => assignableRunsKey(runs), [runs]);
-  if (stableAssignableRuns.current?.key !== key) {
-    stableAssignableRuns.current = {
+type PolicySourceOptions = ReturnType<typeof policySourceOptions>;
+
+function useStablePolicySources(policySources: PolicySourceOptions): PolicySourceOptions {
+  const stablePolicySources = useRef<{
+    key: string;
+    policySources: PolicySourceOptions;
+  } | null>(null);
+  const key = useMemo(() => policySourcesKey(policySources), [policySources]);
+  if (stablePolicySources.current?.key !== key) {
+    stablePolicySources.current = {
       key,
-      runs: runs.filter((run) => run.status !== "created" && run.status !== "archived"),
+      policySources,
     };
   }
-  return stableAssignableRuns.current.runs;
+  return stablePolicySources.current.policySources;
 }
 
 const EMPTY_BUILT_IN_COURSES: ConfigMetadata["built_in_courses"] = [];
@@ -431,19 +440,20 @@ function unlockTargetsKey(targets: readonly ManagedSaveUnlockTarget[]): string {
     .join("\u001e");
 }
 
-function assignableRunsKey(runs: readonly ManagedRun[]): string {
-  return runs
-    .filter((run) => run.status !== "created" && run.status !== "archived")
-    .map((run) =>
+function policySourcesKey(policySources: PolicySourceOptions): string {
+  return policySources
+    .map((source) =>
       [
-        run.id,
-        run.name,
-        run.status,
-        run.vehicle_setup.engine_mode,
-        run.vehicle_setup.engine_setting_raw_value,
-        run.vehicle_setup.engine_setting_min_raw_value,
-        run.vehicle_setup.engine_setting_max_raw_value,
-        run.vehicle_setup.selected_vehicle_ids.join(","),
+        source.kind,
+        source.id,
+        source.label,
+        source.artifact,
+        source.canImportEngineTuning ? "1" : "0",
+        source.vehicleSetup.engine_mode,
+        source.vehicleSetup.engine_setting_raw_value,
+        source.vehicleSetup.engine_setting_min_raw_value,
+        source.vehicleSetup.engine_setting_max_raw_value,
+        source.vehicleSetup.selected_vehicle_ids.join(","),
       ].join("\u001f"),
     )
     .join("\u001e");

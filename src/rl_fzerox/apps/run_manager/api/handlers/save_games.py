@@ -127,7 +127,8 @@ def upsert_save_course_setup_payload(
             difficulty=request.difficulty,
             cup_id=request.cup_id,
             course_id=request.course_id,
-            policy_run_id=request.policy_run_id,
+            policy_source_kind=request.policy_source_kind,
+            policy_source_id=request.policy_source_id,
             policy_artifact=request.policy_artifact,
             engine_setting_raw_value=request.engine_setting_raw_value,
         )
@@ -238,7 +239,7 @@ def _adaptive_engine_config(run: ManagedRun) -> AdaptiveEngineTuningConfig:
 def _resolve_engine_tuning_policy_artifact(
     run: ManagedRun,
     *,
-    artifact: Literal["latest", "best"],
+    artifact: Literal["latest", "best", "final"],
 ) -> Path:
     try:
         return resolve_policy_artifact_path(run.run_dir, artifact=artifact)

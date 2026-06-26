@@ -21,7 +21,7 @@ from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 
 if TYPE_CHECKING:
     from fzerox_emulator import Emulator
-    from rl_fzerox.core.manager.models import ManagedRun, ManagedSaveCourseSetup
+    from rl_fzerox.core.manager.models import ManagedPolicySource, ManagedSaveCourseSetup
     from rl_fzerox.core.training.inference import PolicyRunner
 
 
@@ -30,13 +30,14 @@ class CareerModePolicyControl:
     """Loaded trained policy selected for the current Career Mode race."""
 
     course_setup: ManagedSaveCourseSetup
-    policy_run: ManagedRun
+    policy_source: ManagedPolicySource
     runner: PolicyRunner
 
     @property
-    def key(self) -> tuple[str, str]:
+    def key(self) -> tuple[str, str, str]:
         return (
-            self.course_setup.policy_run_id,
+            self.course_setup.policy_source_kind,
+            self.course_setup.policy_source_id,
             self.course_setup.policy_artifact,
         )
 
@@ -58,7 +59,7 @@ class CareerPolicyRaceDriver:
         )
 
     @property
-    def key(self) -> tuple[str, str]:
+    def key(self) -> tuple[str, str, str]:
         return self.policy_control.key
 
     @property
@@ -111,8 +112,8 @@ class CareerPolicyRaceDriver:
 
 def _policy_train_config(policy_control: CareerModePolicyControl) -> TrainAppConfig:
     train_config = build_managed_train_app_config(
-        policy_control.policy_run.config,
-        run_id=policy_control.policy_run.id,
-        run_dir=policy_control.policy_run.run_dir,
+        policy_control.policy_source.config,
+        run_id=policy_control.policy_source.id,
+        run_dir=policy_control.policy_source.source_dir,
     )
     return inference_train_app_config(train_config)

@@ -17,14 +17,16 @@ describe("resetCourseEngineDrafts", () => {
         ...muteCity,
         engineSettingRawValue: 83,
         policyArtifact: "latest",
-        policyRunId: "run-a",
+        policySourceId: "run-a",
+        policySourceKind: "run",
         vehicleId: "blue_falcon",
       },
       [courseSetupKey(silence)]: {
         ...silence,
         engineSettingRawValue: 12,
         policyArtifact: "best",
-        policyRunId: "run-b",
+        policySourceId: "run-b",
+        policySourceKind: "run",
         vehicleId: "wild_goose",
       },
     };
@@ -35,7 +37,8 @@ describe("resetCourseEngineDrafts", () => {
       ...muteCity,
       engineSettingRawValue: 64,
       policyArtifact: "latest",
-      policyRunId: "run-a",
+      policySourceId: "run-a",
+      policySourceKind: "run",
       vehicleId: "blue_falcon",
     });
     expect(next[courseSetupKey(silence)]).toBe(current[courseSetupKey(silence)]);
@@ -50,7 +53,8 @@ describe("resetCourseEngineDrafts", () => {
       ...portTown,
       engineSettingRawValue: 64,
       policyArtifact: "best",
-      policyRunId: "",
+      policySourceId: "",
+      policySourceKind: "run",
       vehicleId: "blue_falcon",
     });
   });
@@ -66,7 +70,8 @@ describe("sharedPolicySelectionDraft", () => {
             cupId: "jack",
             engineSettingRawValue: 80,
             policyArtifact: "latest",
-            policyRunId: "run-a",
+            policySourceId: "run-a",
+            policySourceKind: "run",
             vehicleId: "blue_falcon",
           },
           {
@@ -74,7 +79,8 @@ describe("sharedPolicySelectionDraft", () => {
             cupId: "jack",
             engineSettingRawValue: 103,
             policyArtifact: "latest",
-            policyRunId: "run-a",
+            policySourceId: "run-a",
+            policySourceKind: "run",
             vehicleId: "blue_falcon",
           },
         ],
@@ -82,7 +88,8 @@ describe("sharedPolicySelectionDraft", () => {
       ),
     ).toEqual({
       policyArtifact: "latest",
-      policyRunId: "run-a",
+      policySourceId: "run-a",
+      policySourceKind: "run",
     });
   });
 
@@ -95,7 +102,8 @@ describe("sharedPolicySelectionDraft", () => {
             cupId: "jack",
             engineSettingRawValue: 80,
             policyArtifact: "latest",
-            policyRunId: "run-a",
+            policySourceId: "run-a",
+            policySourceKind: "run",
             vehicleId: "blue_falcon",
           },
           {
@@ -103,7 +111,8 @@ describe("sharedPolicySelectionDraft", () => {
             cupId: "jack",
             engineSettingRawValue: 80,
             policyArtifact: "latest",
-            policyRunId: "run-b",
+            policySourceId: "run-b",
+            policySourceKind: "run",
             vehicleId: "blue_falcon",
           },
         ],

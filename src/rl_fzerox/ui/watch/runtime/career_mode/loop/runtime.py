@@ -123,9 +123,9 @@ def active_policy_intro_target_timer(
     if active_policy_control is None:
         return None
     return build_managed_train_app_config(
-        active_policy_control.policy_run.config,
-        run_id=active_policy_control.policy_run.id,
-        run_dir=active_policy_control.policy_run.run_dir,
+        active_policy_control.policy_source.config,
+        run_id=active_policy_control.policy_source.id,
+        run_dir=active_policy_control.policy_source.source_dir,
     ).env.race_intro_target_timer
 
 

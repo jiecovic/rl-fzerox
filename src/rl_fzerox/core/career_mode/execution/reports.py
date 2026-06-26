@@ -30,8 +30,10 @@ def save_race_execution_plan_report(
             "artifact": plan.policy_artifact,
             "algorithm": plan.policy_algorithm,
             "path": str(plan.policy_path),
-            "run_dir": str(plan.policy_run_dir),
-            "run_id": plan.policy_run_id,
+            "source_dir": str(plan.policy_source_dir),
+            "source_id": plan.policy_source_id,
+            "source_kind": plan.policy_source_kind,
+            "source_name": plan.policy_source_name,
         },
         "race_setup": asdict(plan.race_setup),
         "save_game": {

@@ -11,7 +11,7 @@ from rl_fzerox.core.career_mode.execution.race import (
     build_save_race_execution_plan,
 )
 from rl_fzerox.core.manager import ManagerStore
-from rl_fzerox.core.manager.models import ManagedRun
+from rl_fzerox.core.manager.models import ManagedPolicySource
 from rl_fzerox.core.manager.projection.assembly import emulator_data
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.schema import (
@@ -55,7 +55,7 @@ def resolve_career_mode_config(
         save_game_id=context.save_game.id,
         save_path=context.save_game.save_path,
         attempt_id=context.attempt.id,
-        emulator=EmulatorConfig.model_validate(emulator_data(context.policy_run.config)),
+        emulator=EmulatorConfig.model_validate(emulator_data(context.policy_source.config)),
         attempt_seed=attempt_seed,
         deterministic_policy=deterministic_policy,
         single_target=single_target,
@@ -65,10 +65,10 @@ def resolve_career_mode_config(
         race_setup=career_mode_race_setup_config(plan.race_setup),
         label=context.target.label,
         policy_observation_layout_shape_hint=career_policy_observation_layout_shape_hint(
-            _assigned_policy_run_configs(
+            _assigned_policy_source_configs(
                 store,
                 save_game_id=context.save_game.id,
-                fallback_run=context.policy_run,
+                fallback_source=context.policy_source,
             )
         ),
     )
@@ -145,22 +145,30 @@ def career_policy_observation_layout_shape_hint(
     return max_preview_height, tile_width, 3 * max_frame_count
 
 
-def _assigned_policy_run_configs(
+def _assigned_policy_source_configs(
     store: ManagerStore,
     *,
     save_game_id: str,
-    fallback_run: ManagedRun,
+    fallback_source: ManagedPolicySource,
 ) -> tuple[ManagedRunConfig, ...]:
-    policy_configs: list[ManagedRunConfig] = [fallback_run.config]
-    seen_run_ids = {fallback_run.id}
+    policy_configs: list[ManagedRunConfig] = [fallback_source.config]
+    seen_source_keys = {
+        (fallback_source.kind, fallback_source.id, fallback_source.artifact),
+    }
     for setup in store.list_save_course_setups(save_game_id):
-        if setup.policy_run_id in seen_run_ids:
+        key = (setup.policy_source_kind, setup.policy_source_id, setup.policy_artifact)
+        if key in seen_source_keys:
             continue
-        policy_run = store.get_run(setup.policy_run_id)
-        if policy_run is None:
+        try:
+            policy_source = store.resolve_policy_source(
+                policy_source_kind=setup.policy_source_kind,
+                policy_source_id=setup.policy_source_id,
+                policy_artifact=setup.policy_artifact,
+            )
+        except (KeyError, ValueError):
             continue
-        seen_run_ids.add(policy_run.id)
-        policy_configs.append(policy_run.config)
+        seen_source_keys.add(key)
+        policy_configs.append(policy_source.config)
     return tuple(policy_configs)
 
 
