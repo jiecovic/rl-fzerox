@@ -76,9 +76,9 @@ def test_official_checkpoint_catalog_file_parses() -> None:
 
     assert len(catalog.entries) == 1
     entry = catalog.entries[0]
-    assert entry.id == "blue-falcon-fine-tuned"
+    assert entry.id == "blue-falcon-all-cups"
     assert entry.version == "v1"
-    assert entry.bundle.filename == "rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip"
+    assert entry.bundle.filename == "rl-fzerox-checkpoint-blue-falcon-all-cups-v1.zip"
     assert entry.manifest.checkpoint.lineage_num_timesteps == 1_979_774_040
 
 

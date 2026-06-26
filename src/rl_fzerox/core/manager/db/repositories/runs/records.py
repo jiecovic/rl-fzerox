@@ -76,6 +76,13 @@ def get_managed_run(session: Session, run_id: str) -> ManagedRun | None:
     return None if run is None else managed_run_from_model(session, run)
 
 
+def get_managed_run_summary(session: Session, run_id: str) -> ManagedRunSummary | None:
+    """Return one lightweight run summary by id."""
+
+    run = session.get(RunModel, run_id)
+    return None if run is None else managed_run_summary_from_model(session, run)
+
+
 def list_managed_runs(session: Session) -> tuple[ManagedRun, ...]:
     """Return all managed runs in manager display order."""
 

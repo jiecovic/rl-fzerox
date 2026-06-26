@@ -17,6 +17,7 @@ from rl_fzerox.core.manager.models import (
     ManagedRunDraft,
     ManagedRunTemplate,
     ManagedViewerLease,
+    PolicySourceKind,
     ViewerLeaseKind,
 )
 from rl_fzerox.core.manager.registry import drafts as draft_registry
@@ -125,6 +126,8 @@ class ManagerStore(
         *,
         name: str,
         config: ManagedRunConfig,
+        source_policy_kind: PolicySourceKind | None = None,
+        source_policy_id: str | None = None,
         source_run_id: str | None = None,
         source_artifact: Literal["latest", "best"] | None = None,
     ) -> ManagedRunDraft:
@@ -132,6 +135,8 @@ class ManagerStore(
             self,
             name=name,
             config=config,
+            source_policy_kind=source_policy_kind,
+            source_policy_id=source_policy_id,
             source_run_id=source_run_id,
             source_artifact=source_artifact,
         )
@@ -151,6 +156,8 @@ class ManagerStore(
         draft_id: str,
         name: str,
         config: ManagedRunConfig,
+        source_policy_kind: PolicySourceKind | None = None,
+        source_policy_id: str | None = None,
         source_run_id: str | None = None,
         source_artifact: Literal["latest", "best"] | None = None,
     ) -> ManagedRunDraft | None:
@@ -159,6 +166,8 @@ class ManagerStore(
             draft_id=draft_id,
             name=name,
             config=config,
+            source_policy_kind=source_policy_kind,
+            source_policy_id=source_policy_id,
             source_run_id=source_run_id,
             source_artifact=source_artifact,
         )

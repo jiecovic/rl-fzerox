@@ -17,6 +17,7 @@ import {
   clearRunAltBaselines,
   clearRunCourseAltBaselines,
   createDraftWithSource,
+  deleteCheckpoint,
   deleteDraft,
   deleteLineage,
   deleteRun,
@@ -48,6 +49,7 @@ import type {
   ManagedRunDetail,
   ManagedSaveGame,
   PolicyPlaybackMode,
+  PublishedCheckpoint,
   SaveEngineTuningCourseSetupRecommendation,
   SaveGameRunnerSettingsUpdateRequest,
   SavePolicyArtifact,
@@ -130,6 +132,7 @@ export interface WorkspaceActions {
   exportManagedRun: (run: ManagedRun) => Promise<void>;
   importManagedRunBundle: (file: File) => Promise<void>;
   installManagedCatalogCheckpoint: (checkpointId: string, version: string) => Promise<void>;
+  removeManagedCheckpoint: (checkpoint: PublishedCheckpoint) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
   removeManagedEvaluation: (evaluation: ManagedEvaluation) => Promise<void>;
   removeLineage: (lineageId: string) => Promise<void>;
@@ -316,10 +319,9 @@ export function useWorkspaceActions({
       loadRunDetail(runId),
       fetchRunEngineTuningState(runId, artifact),
     ]);
-    const initialDraftName =
-      sourceRun === null
-        ? nextAvailableDraftName("fork", allKnownNames())
-        : nextForkDraftName(sourceRun, runs, allKnownNames());
+    const sourceSummary = sourceRun ?? runSummaryFromDetail(sourceDetail);
+    const sourceRuns = sourceRun === null ? upsertRun(runs, sourceSummary) : runs;
+    const initialDraftName = nextForkDraftName(sourceSummary, sourceRuns, allKnownNames());
     const initialConfig = forkInitialConfig(sourceDetail.config);
     sessions.createForkDraft({
       artifact,
@@ -392,6 +394,16 @@ export function useWorkspaceActions({
     await reloadManagerData({ showLoading: false });
   }
 
+  async function removeManagedCheckpoint(checkpoint: PublishedCheckpoint) {
+    await deleteCheckpoint(checkpoint.id);
+    if (checkpoint.run !== null) {
+      sessions.closeRunTabsForRun(checkpoint.run.id);
+      sessions.closeEditorsForSourceRuns([checkpoint.run.id]);
+      sessions.setChartsFocusRunId((current) => (current === checkpoint.run?.id ? null : current));
+    }
+    await reloadManagerData({ showLoading: false });
+  }
+
   async function watchManagedRun(
     runId: string,
     artifact: "latest" | "best",
@@ -451,6 +463,7 @@ export function useWorkspaceActions({
     exportManagedRun,
     importManagedRunBundle,
     installManagedCatalogCheckpoint,
+    removeManagedCheckpoint,
     removeDraft,
     removeLineage,
     removeRun,

@@ -52,6 +52,7 @@ import type {
 import { randomAttemptSeedText } from "@/features/careerRunner/model/runnerSeed";
 
 export function useWorkspaceSessions({
+  checkpointRunIds,
   drafts,
   evaluations,
   runs,
@@ -92,10 +93,15 @@ export function useWorkspaceSessions({
         : null,
     [activeTabId, saveGameSessions],
   );
-  const activePrimaryTabId = activePrimaryWorkspaceTabId(activeTabId);
+  const checkpointRunIdSet = useMemo(() => new Set(checkpointRunIds), [checkpointRunIds]);
+  const activePrimaryTabId =
+    activeRunTab !== null && checkpointRunIdSet.has(activeRunTab.runId)
+      ? "checkpoints"
+      : activePrimaryWorkspaceTabId(activeTabId);
   const sessionTabs = useMemo(
     () =>
       buildWorkspaceSessionTabs(
+        checkpointRunIdSet,
         draftEditors,
         evaluationSessions,
         evaluations,
@@ -103,7 +109,15 @@ export function useWorkspaceSessions({
         runs,
         saveGameSessions,
       ),
-    [draftEditors, evaluationSessions, evaluations, runTabs, runs, saveGameSessions],
+    [
+      checkpointRunIdSet,
+      draftEditors,
+      evaluationSessions,
+      evaluations,
+      runTabs,
+      runs,
+      saveGameSessions,
+    ],
   );
 
   function openDraft(draft: UseWorkspaceSessionsOptions["drafts"][number]) {

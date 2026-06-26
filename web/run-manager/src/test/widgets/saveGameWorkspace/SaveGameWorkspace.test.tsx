@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SaveGameSession } from "@/app/workspace/types";
 import type { ManagedEvaluation, ManagedSaveGame } from "@/shared/api/contract";
 import {
+  checkpointCatalogFixture,
   configMetadataFixture,
   managedRunConfigFixture,
   runFixture,
@@ -956,6 +957,7 @@ function StatefulNewSaveGameWorkspace({
   const [session, setSession] = useState(newSaveGameSession());
   return (
     <SaveGameWorkspace
+      checkpointCatalog={checkpointCatalogFixture()}
       metadata={configMetadataFixture}
       evaluations={[]}
       runs={[]}
@@ -1007,6 +1009,7 @@ function StatefulExistingSaveGameWorkspace({
   const [session, setSession] = useState(existingSaveGameSession(saveGame.id));
   return (
     <SaveGameWorkspace
+      checkpointCatalog={checkpointCatalogFixture()}
       metadata={configMetadataFixture}
       evaluations={evaluations}
       runs={runs}

@@ -19,14 +19,12 @@ from rl_fzerox.apps.run_manager.launching.worker import (
 )
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig, ManagerStore, new_managed_run_id
 from rl_fzerox.core.manager.artifacts.fork_source import (
-    ForkSourceMetadata,
     clone_fork_source,
     is_complete_fork_source,
     link_or_copy_file,
+    load_fork_source_metadata,
     run_fork_source_dir,
     snapshot_fork_source,
-    snapshot_fork_source_from_paths,
-    write_fork_source_metadata,
 )
 from rl_fzerox.core.manager.artifacts.paths import predicted_managed_run_dir
 from rl_fzerox.core.manager.models import RunCommand
@@ -34,6 +32,7 @@ from rl_fzerox.core.manager.run_spec import reset_fork_action_bias_deltas
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,
     build_managed_fork_train_app_config,
+    build_managed_fork_train_app_config_from_metadata,
     build_managed_train_app_config,
 )
 from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path
@@ -184,86 +183,67 @@ def fork_run(
     return launched
 
 
-def fork_published_checkpoint(
+def launch_pinned_fork_source(
     store: ManagerStore,
     *,
-    checkpoint_id: str,
-    name: str | None = None,
-    config: ManagedRunConfig | None = None,
+    name: str,
+    config: ManagedRunConfig,
+    source_snapshot_dir: Path,
+    source_artifact: Literal["latest", "best"],
+    source_num_timesteps: int,
+    exclude_draft_id: str | None = None,
     engine_tuning_source_action: EngineTuningSourceAction = "convert",
     spawn_worker: WorkerSpawner = spawn_manager_worker,
 ) -> ManagedRun:
-    """Launch one fresh run warm-started from an imported checkpoint record."""
+    """Launch one run from a draft-owned immutable fork-source snapshot."""
 
-    checkpoint = store.get_published_checkpoint(checkpoint_id)
-    if checkpoint is None:
-        raise ValueError(f"published checkpoint not found: {checkpoint_id}")
-    artifact = _forkable_checkpoint_artifact(checkpoint.source_artifact)
-    normalized_name = (name or default_fork_name(checkpoint.name, artifact)).strip()
+    normalized_name = name.strip()
     if not normalized_name:
         raise ValueError("run name is required")
 
-    child_config = (
-        config if config is not None else reset_fork_action_bias_deltas(checkpoint.config)
-    )
-    assert_managed_fork_compatible(checkpoint.config, child_config)
+    source_metadata = load_fork_source_metadata(source_dir=source_snapshot_dir)
     child_run_id = new_managed_run_id(normalized_name)
     child_run_dir = predicted_managed_run_dir(child_run_id, lineage_id=child_run_id)
     child_source_snapshot_dir = run_fork_source_dir(run_dir=child_run_dir)
-    source_num_timesteps = snapshot_fork_source_from_paths(
-        policy_path=checkpoint.policy_path,
-        model_path=checkpoint.model_path,
-        artifact=artifact,
+    clone_fork_source(
+        source_dir=source_snapshot_dir,
         destination_dir=child_source_snapshot_dir,
-        source_num_timesteps=checkpoint.local_num_timesteps,
-        engine_tuning_state_path=checkpoint.engine_tuning_state_path,
-        engine_tuning_model_path=checkpoint.engine_tuning_model_path,
-    )
-    source_train_config = build_managed_train_app_config(
-        checkpoint.config,
-        run_id=checkpoint.id,
-        run_dir=child_source_snapshot_dir,
-    )
-    write_fork_source_metadata(
-        source_dir=child_source_snapshot_dir,
-        metadata=ForkSourceMetadata(
-            source_algorithm=source_train_config.train.algorithm,
-            source_auxiliary_state_enabled=checkpoint.config.policy.auxiliary_state_enabled,
-            source_auxiliary_state_head_arch=(
-                checkpoint.config.policy.auxiliary_state_head_arch
-            ),
-        ),
-    )
-    persist_launch_manifest(
-        run_dir=child_source_snapshot_dir,
-        train_config=source_train_config,
     )
     prepare_engine_tuning_fork_source(
-        config=child_config,
+        config=config,
         source_dir=child_source_snapshot_dir,
-        artifact=artifact,
+        artifact=source_artifact,
         action=engine_tuning_source_action,
     )
-    child_lineage_step_offset = checkpoint.lineage_num_timesteps or source_num_timesteps
-    train_config = build_managed_fork_train_app_config(
-        child_config,
+    child_lineage_step_offset = (
+        source_metadata.source_lineage_num_timesteps or source_num_timesteps
+    )
+    train_config = build_managed_fork_train_app_config_from_metadata(
+        config,
         run_id=child_run_id,
         run_dir=child_run_dir,
         source_run_dir=child_source_snapshot_dir,
-        source_artifact=artifact,
-        source_config=checkpoint.config,
+        source_artifact=source_artifact,
+        source_algorithm=source_metadata.source_algorithm,
+        source_auxiliary_state_enabled=(
+            source_metadata.source_auxiliary_state_enabled
+        ),
+        source_auxiliary_state_head_arch=(
+            source_metadata.source_auxiliary_state_head_arch
+        ),
         tensorboard_step_offset=child_lineage_step_offset,
     )
     child_run = store.create_run(
         run_id=child_run_id,
         name=normalized_name,
-        config=child_config,
+        config=config,
         explicit_run_dir=child_run_dir,
         lineage_id=child_run_id,
         lineage_step_offset=child_lineage_step_offset,
-        source_artifact=artifact,
+        source_artifact=source_artifact,
         source_snapshot_dir=child_source_snapshot_dir,
         source_num_timesteps=source_num_timesteps,
+        exclude_draft_id=exclude_draft_id,
     )
     persist_launch_manifest(run_dir=child_run.run_dir, train_config=train_config)
     spawn_worker(store=store, run_id=child_run.id, resume=False)
@@ -273,23 +253,14 @@ def fork_published_checkpoint(
         started_at=utc_now(),
         stopped_at=None,
         message=(
-            f"forked from published checkpoint {checkpoint.name} "
-            f"({artifact} @ {source_num_timesteps:,} steps); "
+            f"forked from pinned checkpoint source "
+            f"({source_artifact} @ {source_num_timesteps:,} steps); "
             f"log: {manager_worker_log_path(child_run.id)}"
         ),
     )
     if launched is None:
         raise RuntimeError(f"managed child run disappeared during launch: {child_run.id}")
     return launched
-
-
-def _forkable_checkpoint_artifact(artifact: str) -> Literal["latest", "best"]:
-    match artifact:
-        case "latest":
-            return "latest"
-        case "best":
-            return "best"
-    raise ValueError(f"unsupported fork artifact for published checkpoint: {artifact!r}")
 
 
 def _copy_alt_baselines_to_fork(

@@ -51,7 +51,9 @@ export function Tabs<T extends string>({
             <span className={tabContentClass(variant)}>
               <TabIcon icon={item.icon} />
               <TabActivity activity={item.activity} />
-              <span>{variant === "sidebar" ? (item.shortLabel ?? item.label) : item.label}</span>
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                {variant === "sidebar" ? (item.shortLabel ?? item.label) : item.label}
+              </span>
             </span>
           </button>
           {item.closable === true && onClose !== undefined ? (
@@ -74,7 +76,10 @@ function tabsNavClass(variant: TabsProps<string>["variant"]) {
   if (variant === "sidebar") {
     return "flex flex-col gap-1";
   }
-  return cn("flex items-end gap-0", variant === "workspace" ? "mt-2.5" : "mb-[-1px]");
+  return cn(
+    "flex min-w-0 items-end gap-0 overflow-hidden",
+    variant === "workspace" ? "mt-2.5" : "mb-[-1px]",
+  );
 }
 
 function TabIcon({ icon }: { icon: TabItem<string>["icon"] }) {
@@ -115,14 +120,14 @@ function tabContentClass(variant: TabsProps<string>["variant"]) {
   if (variant === "sidebar") {
     return "inline-flex min-w-0 items-center gap-2";
   }
-  return "inline-flex items-center gap-2";
+  return "inline-flex min-w-0 items-center gap-2";
 }
 
 function tabButtonClass(variant: TabsProps<string>["variant"]) {
   if (variant === "sidebar") {
     return "min-h-[44px] w-full border-0 bg-transparent px-3 text-left text-[13px] text-app-muted group-hover:text-app-text group-[.is-active]:text-app-text";
   }
-  return "min-h-[42px] border-0 bg-transparent px-4 text-[13px] text-app-muted group-hover:text-app-text group-[.is-active]:text-app-text";
+  return "min-h-[42px] min-w-0 border-0 bg-transparent px-4 text-[13px] text-app-muted group-hover:text-app-text group-[.is-active]:text-app-text";
 }
 
 function tabCloseButtonClass(variant: TabsProps<string>["variant"]) {
@@ -146,7 +151,7 @@ function tabShellClass<T extends string>(
     );
   }
   return cn(
-    "group mb-[-1px] inline-flex overflow-hidden border border-b-0 border-app-border bg-app-surface-muted hover:border-app-border-strong hover:bg-[color-mix(in_srgb,var(--accent)_9%,var(--surface-muted))]",
+    "group mb-[-1px] inline-flex min-w-0 max-w-full overflow-hidden border border-b-0 border-app-border bg-app-surface-muted hover:border-app-border-strong hover:bg-[color-mix(in_srgb,var(--accent)_9%,var(--surface-muted))]",
     active
       ? "is-active border-app-border-strong border-t-app-accent bg-app-surface shadow-[inset_0_2px_0_var(--accent)]"
       : undefined,

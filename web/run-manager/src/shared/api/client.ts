@@ -31,6 +31,7 @@ export {
   createEvaluation,
   createEvaluationPreset,
   createSaveGame,
+  deleteCheckpoint,
   deleteDraft,
   deleteEvaluation,
   deleteEvaluationPreset,

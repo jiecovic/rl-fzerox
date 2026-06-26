@@ -19,6 +19,7 @@ from rl_fzerox.core.manager.checkpoints import (
 )
 from rl_fzerox.core.manager.db.models.configs import ConfigSnapshotModel
 from rl_fzerox.core.manager.storage.serialization import config_json
+from rl_fzerox.core.training.runs import RUN_LAYOUT
 
 
 def test_manager_store_imports_published_checkpoint_bundle(tmp_path: Path) -> None:
@@ -39,13 +40,17 @@ def test_manager_store_imports_published_checkpoint_bundle(tmp_path: Path) -> No
         checkpoint.import_dir
         == tmp_path / "manager" / "checkpoints" / ("blue-falcon-fine-tuned") / "v1"
     )
-    assert checkpoint.policy_path == checkpoint.import_dir / "checkpoint" / "policy.zip"
-    assert checkpoint.model_path == checkpoint.import_dir / "checkpoint" / "model.zip"
+    assert checkpoint.run_id == "checkpoint-blue-falcon-fine-tuned-v1"
+    assert checkpoint.policy_path == checkpoint.import_dir / RUN_LAYOUT.policy_artifacts.best
+    assert checkpoint.model_path == checkpoint.import_dir / RUN_LAYOUT.model_artifacts.best
     assert checkpoint.evaluation_metrics_path == checkpoint.import_dir / "metrics" / (
         "evaluation.json"
     )
-    assert checkpoint.engine_tuning_state_path == checkpoint.import_dir / "engine_tuning" / (
-        "state.json"
+    assert (
+        checkpoint.engine_tuning_state_path
+        == checkpoint.import_dir
+        / Path(RUN_LAYOUT.policy_artifacts.best).parent
+        / "engine_tuning_state.json"
     )
     assert checkpoint.source_bundle_path == bundle_path.resolve()
     assert checkpoint.source_bundle_sha256 == _sha256_file(bundle_path)
@@ -60,6 +65,13 @@ def test_manager_store_imports_published_checkpoint_bundle(tmp_path: Path) -> No
 
     assert store.get_published_checkpoint(checkpoint.id) == checkpoint
     assert store.list_published_checkpoints() == (checkpoint,)
+    run = store.get_run(checkpoint.run_id)
+    assert run is not None
+    assert run.status == "archived"
+    assert run.run_dir == checkpoint.import_dir
+    assert run.lineage_id == checkpoint.id
+    assert run.lineage_step_offset == 1_911_485_784
+    assert run.source_num_timesteps == checkpoint.local_num_timesteps
 
 
 def test_manager_store_published_checkpoint_has_import_config_snapshot(
@@ -155,7 +167,9 @@ def _payloads() -> dict[str, bytes]:
     return {
         "checkpoint/policy.zip": b"policy",
         "checkpoint/model.zip": b"model",
-        "checkpoint/policy.metadata.json": b'{"num_timesteps": 123}\n',
+        "checkpoint/policy.metadata.json": (
+            b'{"num_timesteps": 68288256, "lineage_num_timesteps": 1979774040}\n'
+        ),
         "config/train_config.json": config_json(default_managed_run_config()).encode("utf-8"),
         "engine_tuning/state.json": b"{}\n",
         "metrics/evaluation.json": b'{"finish_rate": 0.875}\n',

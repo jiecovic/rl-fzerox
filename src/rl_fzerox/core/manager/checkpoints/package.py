@@ -184,8 +184,8 @@ def package_evaluation_checkpoint_bundle(
     evaluation = store.get_evaluation(evaluation_id)
     if evaluation is None:
         raise CheckpointBundlePackageError(f"evaluation {evaluation_id!r} does not exist")
-    if evaluation.status != "completed":
-        raise CheckpointBundlePackageError("refusing to package an incomplete evaluation")
+    if evaluation.status == "running":
+        raise CheckpointBundlePackageError("refusing to package a running evaluation")
 
     normalized_version = _non_empty_text(version, field_name="version")
     artifact = evaluation.checkpoint.artifact
@@ -505,9 +505,9 @@ def _evaluation_model_path(evaluation: ManagedEvaluation) -> Path:
     return Path(evaluation.checkpoint.copied_model_path).expanduser().resolve()
 
 
-def _evaluation_metrics_path(evaluation: ManagedEvaluation) -> Path:
-    if evaluation.result_json_path is None:
-        raise CheckpointBundlePackageError("evaluation has no result summary path")
+def _evaluation_metrics_path(evaluation: ManagedEvaluation) -> Path | None:
+    if evaluation.status != "completed" or evaluation.result_json_path is None:
+        return None
     return evaluation.result_json_path.expanduser().resolve()
 
 

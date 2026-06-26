@@ -70,6 +70,8 @@ def launch_run_payload(
             name=name,
             config=request.config,
             draft_id=request.draft_id,
+            source_policy_kind=request.source_policy_kind,
+            source_policy_id=request.source_policy_id,
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
             copy_alt_baselines=request.copy_alt_baselines,

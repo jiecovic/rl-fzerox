@@ -220,7 +220,7 @@ def test_fork_copies_active_alt_baselines(tmp_path: Path) -> None:
     assert child_baseline.state_path.read_bytes() == b"alt-state"
 
 
-def test_fork_published_checkpoint_creates_snapshot_only_child_run(
+def test_fork_published_checkpoint_run_snapshot_creates_child_run(
     tmp_path: Path,
 ) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
@@ -232,24 +232,24 @@ def test_fork_published_checkpoint_creates_snapshot_only_child_run(
     child_config = checkpoint.config.model_copy(deep=True)
     child_config.policy.auxiliary_state_enabled = True
 
-    child = launcher.fork_checkpoint(
-        checkpoint_id=checkpoint.id,
+    child = launcher.fork(
+        run_id=checkpoint.run_id,
+        artifact="best",
         name="Fine Tune",
         config=child_config,
     )
 
     assert launcher.spawn_calls == [(child.id, False)]
-    assert child.parent_run_id is None
-    assert child.source_run_id is None
+    assert child.parent_run_id == checkpoint.run_id
+    assert child.source_run_id == checkpoint.run_id
     assert child.source_artifact == "best"
     assert child.source_snapshot_dir is not None
     assert child.source_num_timesteps == checkpoint.local_num_timesteps
     assert child.lineage_step_offset == checkpoint.lineage_num_timesteps
-    assert child.lineage_id == child.id
+    assert child.lineage_id == checkpoint.id
     assert (child.source_snapshot_dir / RUN_LAYOUT.policy_artifacts.best).read_bytes() == b"policy"
     assert (child.source_snapshot_dir / RUN_LAYOUT.model_artifacts.best).read_bytes() == b"model"
     assert (child.source_snapshot_dir / RUN_LAYOUT.config_filename).is_file()
-    assert (child.source_snapshot_dir / "fork_source.metadata.json").is_file()
 
     train_config = _resolved_train_config(store=store, run=child, resume=False)
 

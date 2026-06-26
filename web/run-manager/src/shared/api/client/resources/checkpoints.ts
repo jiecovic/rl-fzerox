@@ -3,6 +3,7 @@ import { getJson, parseApiPayload, parseJson } from "@/shared/api/client/http";
 import {
   type CheckpointCatalogResponse,
   checkpointCatalogResponseSchema,
+  deleteCheckpointResponseSchema,
   type InstallCheckpointResponse,
   installCheckpointResponseSchema,
 } from "@/shared/api/contract";
@@ -28,4 +29,12 @@ export async function installCatalogCheckpoint(
     },
   );
   return parseApiPayload(installCheckpointResponseSchema, await parseJson(response));
+}
+
+export async function deleteCheckpoint(checkpointId: string): Promise<boolean> {
+  const response = await fetch(`/api/checkpoints/${encodeURIComponent(checkpointId)}`, {
+    method: "DELETE",
+  });
+  const payload = parseApiPayload(deleteCheckpointResponseSchema, await parseJson(response));
+  return payload.deleted;
 }

@@ -110,7 +110,7 @@ export function EvaluationWorkspace({
     <Panel>
       <PanelHeader
         title={
-          <span className="inline-flex min-w-0 items-center gap-2">
+          <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
               {evaluation.name}
             </span>

@@ -179,15 +179,17 @@ export function RunWorkspace({
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
               {run.name}
             </span>
-            <TooltipIconButton
-              aria-label="Rename run"
-              disabled={actions.isRenaming}
-              size="small"
-              tooltip="Rename"
-              onClick={() => setRenameDialogOpen(true)}
-            >
-              <RenameIcon />
-            </TooltipIconButton>
+            {run.status !== "archived" ? (
+              <TooltipIconButton
+                aria-label="Rename run"
+                disabled={actions.isRenaming}
+                size="small"
+                tooltip="Rename"
+                onClick={() => setRenameDialogOpen(true)}
+              >
+                <RenameIcon />
+              </TooltipIconButton>
+            ) : null}
           </span>
         }
         subtitle={runWorkspaceSubtitle(run)}
@@ -225,7 +227,7 @@ export function RunWorkspace({
         onShowCharts={onShowCharts}
         run={run}
         engineTuningExpanded={engineTuningExpanded}
-        canResetEngineTuning={run.status !== "running"}
+        canResetEngineTuning={run.status !== "running" && run.status !== "archived"}
         engineTuningState={engineTuningState}
         isResettingEngineTuning={isResettingEngineTuning}
         trackSamplingState={trackSamplingState}

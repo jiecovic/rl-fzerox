@@ -298,6 +298,7 @@ export function configuratorBaseConfigForDraftEditor(
 }
 
 export function buildWorkspaceSessionTabs(
+  checkpointRunIds: ReadonlySet<string>,
   draftEditors: readonly DraftEditorSession[],
   evaluationSessions: readonly EvaluationSession[],
   evaluations: readonly ManagedEvaluation[],
@@ -308,10 +309,11 @@ export function buildWorkspaceSessionTabs(
   return [
     ...runTabs.map((session) => {
       const run = runs.find((candidate) => candidate.id === session.runId);
+      const isCheckpointRun = checkpointRunIds.has(session.runId);
       return {
         id: session.sessionId,
-        icon: "run" as const,
-        label: `Run · ${run?.name ?? session.title}`,
+        icon: isCheckpointRun ? ("checkpoint" as const) : ("run" as const),
+        label: `${isCheckpointRun ? "Checkpoint" : "Run"} · ${run?.name ?? session.title}`,
         activity: run?.status === "running" ? ("running" as const) : undefined,
         closable: true,
         tone: "run" as const,

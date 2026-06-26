@@ -5,6 +5,7 @@ import {
   draftsResponseSchema,
   type ManagedDraft,
   type ManagedRunConfig,
+  type SavePolicySourceKind,
 } from "@/shared/api/contract";
 
 export async function fetchDrafts(): Promise<ManagedDraft[]> {
@@ -21,6 +22,8 @@ export async function createDraftWithSource(
   config: ManagedRunConfig,
   sourceRunId: string | null,
   sourceArtifact: "latest" | "best" | null,
+  sourcePolicyKind: SavePolicySourceKind | null = sourceRunId === null ? null : "run",
+  sourcePolicyId: string | null = sourceRunId,
 ): Promise<ManagedDraft> {
   const response = await fetch("/api/drafts", {
     method: "POST",
@@ -28,6 +31,8 @@ export async function createDraftWithSource(
     body: JSON.stringify({
       name,
       config,
+      source_policy_kind: sourcePolicyKind,
+      source_policy_id: sourcePolicyId,
       source_run_id: sourceRunId,
       source_artifact: sourceArtifact,
     }),
@@ -50,6 +55,8 @@ export async function updateDraftWithSource(
   config: ManagedRunConfig,
   sourceRunId: string | null,
   sourceArtifact: "latest" | "best" | null,
+  sourcePolicyKind: SavePolicySourceKind | null = sourceRunId === null ? null : "run",
+  sourcePolicyId: string | null = sourceRunId,
 ): Promise<ManagedDraft> {
   const response = await fetch(`/api/drafts/${encodeURIComponent(id)}`, {
     method: "PUT",
@@ -57,6 +64,8 @@ export async function updateDraftWithSource(
     body: JSON.stringify({
       name,
       config,
+      source_policy_kind: sourcePolicyKind,
+      source_policy_id: sourcePolicyId,
       source_run_id: sourceRunId,
       source_artifact: sourceArtifact,
     }),

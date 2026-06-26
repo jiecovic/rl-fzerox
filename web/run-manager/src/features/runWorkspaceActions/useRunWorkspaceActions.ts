@@ -353,6 +353,7 @@ export function useRunWorkspaceActions({
   const pendingCommand = run.pending_command;
   const normalizedRunName = runName.trim();
   const canRename =
+    run.status !== "archived" &&
     normalizedRunName.length > 0 &&
     normalizedRunName !== run.name &&
     !isRenaming &&

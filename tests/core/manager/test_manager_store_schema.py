@@ -334,6 +334,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "checkpoint_id",
         "version",
         "name",
+        "run_id",
         "config_snapshot_id",
         "import_dir",
         "manifest_json",

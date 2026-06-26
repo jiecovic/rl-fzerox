@@ -21,6 +21,7 @@ from rl_fzerox.core.manager.registry.runs.commands import (
 from rl_fzerox.core.manager.registry.runs.lifecycle import (
     create_run,
     get_run,
+    get_run_summary,
     list_recent_run_events,
     list_runs,
     list_visible_run_summaries,
@@ -69,6 +70,7 @@ __all__ = [
     "get_run",
     "get_run_alt_baselines",
     "get_run_generated_x_cup_slots",
+    "get_run_summary",
     "get_run_track_sampling_artifacts",
     "get_run_track_sampling_state",
     "heartbeat_run_worker",

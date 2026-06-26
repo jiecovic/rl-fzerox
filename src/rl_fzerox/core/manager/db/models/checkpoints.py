@@ -27,6 +27,7 @@ class PublishedCheckpointModel(ManagerBase):
     checkpoint_id: Mapped[str]
     version: Mapped[str]
     name: Mapped[str]
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), unique=True)
     config_snapshot_id: Mapped[str] = mapped_column(ForeignKey("config_snapshots.id"))
     import_dir: Mapped[str] = mapped_column(unique=True)
     manifest_json: Mapped[str] = mapped_column(Text)

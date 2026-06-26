@@ -6,8 +6,8 @@ from typing import Literal
 
 from rl_fzerox.apps.run_manager.launching.engine_tuning_source import EngineTuningSourceAction
 from rl_fzerox.apps.run_manager.launching.run_lifecycle import (
-    fork_published_checkpoint,
     fork_run,
+    launch_pinned_fork_source,
     launch_run,
     request_run_control,
     resume_run,
@@ -16,6 +16,7 @@ from rl_fzerox.apps.run_manager.launching.save_games import launch_career_mode_r
 from rl_fzerox.apps.run_manager.launching.watch import WatchLaunchStatus, launch_watch_artifact
 from rl_fzerox.apps.run_manager.launching.worker import spawn_manager_worker
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig, ManagerStore
+from rl_fzerox.core.manager.models import PolicySourceKind
 
 
 class ManagerRunLauncher:
@@ -30,6 +31,8 @@ class ManagerRunLauncher:
         name: str,
         config: ManagedRunConfig,
         draft_id: str | None = None,
+        source_policy_kind: PolicySourceKind | None = None,
+        source_policy_id: str | None = None,
         source_run_id: str | None = None,
         source_artifact: Literal["latest", "best"] | None = None,
         copy_alt_baselines: bool = True,
@@ -38,6 +41,20 @@ class ManagerRunLauncher:
         normalized_name = name.strip()
         if not normalized_name:
             raise ValueError("run name is required")
+        if draft_id is not None:
+            draft_run = self._launch_draft_source(
+                name=normalized_name,
+                config=config,
+                draft_id=draft_id,
+                source_run_id=source_run_id,
+                source_artifact=source_artifact,
+                copy_alt_baselines=copy_alt_baselines,
+                engine_tuning_source_action=engine_tuning_source_action,
+            )
+            if draft_run is not None:
+                return draft_run
+        if source_policy_kind == "checkpoint":
+            raise ValueError("checkpoint training forks must use the linked run snapshot")
         if source_run_id is not None and source_artifact is not None:
             return self._launch_fork_source(
                 name=normalized_name,
@@ -79,23 +96,6 @@ class ManagerRunLauncher:
             source_snapshot_dir=source_snapshot_dir,
             source_num_timesteps=source_num_timesteps,
             copy_alt_baselines=copy_alt_baselines,
-            engine_tuning_source_action=engine_tuning_source_action,
-            spawn_worker=self._spawn_worker_for_lifecycle,
-        )
-
-    def fork_checkpoint(
-        self,
-        *,
-        checkpoint_id: str,
-        name: str | None = None,
-        config: ManagedRunConfig | None = None,
-        engine_tuning_source_action: EngineTuningSourceAction = "convert",
-    ) -> ManagedRun:
-        return fork_published_checkpoint(
-            self._store,
-            checkpoint_id=checkpoint_id,
-            name=name,
-            config=config,
             engine_tuning_source_action=engine_tuning_source_action,
             spawn_worker=self._spawn_worker_for_lifecycle,
         )
@@ -231,4 +231,50 @@ class ManagerRunLauncher:
             source_num_timesteps=draft.source_num_timesteps,
             copy_alt_baselines=copy_alt_baselines,
             engine_tuning_source_action=engine_tuning_source_action,
+        )
+
+    def _launch_draft_source(
+        self,
+        *,
+        name: str,
+        config: ManagedRunConfig,
+        draft_id: str,
+        source_run_id: str | None,
+        source_artifact: Literal["latest", "best"] | None,
+        copy_alt_baselines: bool,
+        engine_tuning_source_action: EngineTuningSourceAction,
+    ) -> ManagedRun | None:
+        draft = self._store.get_draft(draft_id)
+        if draft is None:
+            raise ValueError(f"draft not found: {draft_id}")
+        if draft.source_artifact is None:
+            return None
+        artifact = source_artifact or draft.source_artifact
+        if artifact != draft.source_artifact:
+            raise ValueError("fork draft artifact no longer matches the requested source")
+        if draft.source_snapshot_dir is None or draft.source_num_timesteps is None:
+            return None
+        if draft.source_run_id is not None:
+            requested_run_id = source_run_id or draft.source_run_id
+            if requested_run_id != draft.source_run_id:
+                raise ValueError("fork draft source no longer matches the requested source run")
+            return self._launch_fork_source(
+                name=name,
+                config=config,
+                draft_id=draft_id,
+                source_run_id=draft.source_run_id,
+                source_artifact=artifact,
+                copy_alt_baselines=copy_alt_baselines,
+                engine_tuning_source_action=engine_tuning_source_action,
+            )
+        return launch_pinned_fork_source(
+            self._store,
+            name=name,
+            config=config,
+            source_snapshot_dir=draft.source_snapshot_dir,
+            source_artifact=artifact,
+            source_num_timesteps=draft.source_num_timesteps,
+            exclude_draft_id=draft_id,
+            engine_tuning_source_action=engine_tuning_source_action,
+            spawn_worker=self._spawn_worker_for_lifecycle,
         )

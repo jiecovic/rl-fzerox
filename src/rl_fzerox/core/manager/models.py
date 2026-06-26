@@ -162,6 +162,7 @@ class ManagedPublishedCheckpoint:
     name: str
     config: ManagedRunConfig
     config_hash: str
+    run_id: str
     import_dir: Path
     manifest_json: str
     source_bundle_path: Path | None

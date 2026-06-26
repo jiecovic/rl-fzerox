@@ -57,6 +57,10 @@ Examples:
 - `train_manifest.yaml` is only a mirror of the managed run spec. Do not use it
   as a fallback or source for managed behavior; write or verify it after reading
   from SQLite.
+- Published checkpoints are catalog/install records that point at read-only
+  archived run snapshots. Once installed, watch, fork, evaluation, save-game
+  policy selection, and workspace views should use the linked run id instead of
+  checkpoint-specific launch or workspace paths.
 - If a touched area has mixed ownership, multiple sources of truth, legacy
   compatibility paths, or other structural debt, call that out before extending
   it. Prefer fixing the boundary over adding behavior on top of it.

@@ -22,10 +22,6 @@ def create_drafts_router(store: ManagerStore) -> APIRouter:
     @router.post("/api/drafts", status_code=201)
     async def create_draft(request: CreateDraftRequest) -> dict[str, dict[str, object]]:
         name = required_name(request.name, subject="draft")
-        handlers.validate_source_fields(
-            source_run_id=request.source_run_id,
-            source_artifact=request.source_artifact,
-        )
         return await run_sync(handlers.create_draft_payload, store, request, name)
 
     @router.put("/api/drafts/{draft_id}")
@@ -34,10 +30,6 @@ def create_drafts_router(store: ManagerStore) -> APIRouter:
         request: UpdateDraftRequest,
     ) -> dict[str, dict[str, object]]:
         name = required_name(request.name, subject="draft")
-        handlers.validate_source_fields(
-            source_run_id=request.source_run_id,
-            source_artifact=request.source_artifact,
-        )
         return await run_sync(handlers.update_draft_payload, store, draft_id, request, name)
 
     @router.delete("/api/drafts/{draft_id}")

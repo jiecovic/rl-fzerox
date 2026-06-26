@@ -159,6 +159,8 @@ def _evaluation_checkpoint_source(policy_source: ManagedPolicySource) -> Evaluat
         lineage_step_offset=policy_source.lineage_step_offset,
         policy_path=policy_source.policy_path,
         model_path=policy_source.model_path,
+        engine_tuning_state_path=policy_source.engine_tuning_state_path,
+        engine_tuning_model_path=policy_source.engine_tuning_model_path,
         local_num_timesteps=policy_source.local_num_timesteps,
         lineage_num_timesteps=policy_source.lineage_num_timesteps,
     )

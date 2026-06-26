@@ -12,6 +12,7 @@ import {
   type PolicyPlaybackMode,
   runResponseSchema,
   runsResponseSchema,
+  type SavePolicySourceKind,
   updateLineageGroupsResponseSchema,
   type WatchRenderer,
   watchRunResponseSchema,
@@ -38,6 +39,8 @@ export async function launchRun(
   sourceArtifact: "latest" | "best" | null = null,
   copyAltBaselines = true,
   engineTuningSourceAction?: EngineTuningSourceAction,
+  sourcePolicyKind: SavePolicySourceKind | null = sourceRunId === null ? null : "run",
+  sourcePolicyId: string | null = sourceRunId,
 ): Promise<ManagedRunDetail> {
   const response = await fetch("/api/runs", {
     method: "POST",
@@ -46,6 +49,8 @@ export async function launchRun(
       name,
       config,
       draft_id: draftId,
+      source_policy_kind: sourcePolicyKind,
+      source_policy_id: sourcePolicyId,
       source_run_id: sourceRunId,
       source_artifact: sourceArtifact,
       copy_alt_baselines: copyAltBaselines,

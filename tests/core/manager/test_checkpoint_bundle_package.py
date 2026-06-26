@@ -133,6 +133,54 @@ def test_package_evaluation_checkpoint_bundle_writes_metrics_payload(tmp_path: P
     }
 
 
+def test_package_created_evaluation_checkpoint_bundle_omits_metrics_payload(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = _create_run_with_checkpoint(store, tmp_path, artifact="best")
+    evaluation = store.create_evaluation(
+        name="Blue Falcon Pending Eval",
+        source_run_id=run.id,
+        source_artifact="best",
+        policy_mode="deterministic",
+        preset_id="time_attack_all_courses",
+        evaluations_root=tmp_path / "evaluations",
+    )
+    bundle_path = tmp_path / "pending-evaluation-bundle.zip"
+
+    result = package_evaluation_checkpoint_bundle(
+        store=store,
+        evaluation_id=evaluation.id,
+        version="v1",
+        checkpoint_id="blue-falcon-pending-v1",
+        output_path=bundle_path,
+    )
+
+    assert result.bundle_path == bundle_path
+    with zipfile.ZipFile(bundle_path) as archive:
+        assert sorted(archive.namelist()) == [
+            "checkpoint/model.zip",
+            "checkpoint/policy.metadata.json",
+            "checkpoint/policy.zip",
+            "config/train_config.json",
+            "engine_tuning/state.json",
+            "manifest.json",
+        ]
+        manifest = parse_checkpoint_bundle_manifest_json(
+            archive.read(CHECKPOINT_BUNDLE_LAYOUT.manifest_path).decode("utf-8")
+        )
+
+    assert manifest.checkpoint.id == "blue-falcon-pending-v1"
+    assert manifest.checkpoint.created_at == evaluation.created_at
+    assert {file.role for file in manifest.files} == {
+        "policy",
+        "model",
+        "checkpoint_metadata",
+        "train_config",
+        "engine_tuning_state",
+    }
+
+
 def test_package_checkpoint_bundle_requires_exact_artifact(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = _create_run_with_checkpoint(store, tmp_path, artifact="best")

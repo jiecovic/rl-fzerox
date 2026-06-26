@@ -10,7 +10,11 @@ from fastapi import FastAPI
 from httpx._types import RequestFiles
 
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
-from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
+from rl_fzerox.apps.run_manager.api.contracts import (
+    EngineTuningSourceAction,
+    PolicySourceKind,
+    WatchRenderer,
+)
 from rl_fzerox.core.manager import (
     ManagedRun,
     ManagedRunConfig,
@@ -29,15 +33,19 @@ class _LauncherStub:
         name: str,
         config: ManagedRunConfig,
         draft_id: str | None,
+        source_policy_kind: PolicySourceKind | None,
+        source_policy_id: str | None,
         source_run_id: str | None,
         source_artifact: Literal["latest", "best"] | None,
         copy_alt_baselines: bool,
-        engine_tuning_source_action: Literal["convert", "discard"],
+        engine_tuning_source_action: EngineTuningSourceAction,
     ) -> ManagedRun:
         del (
             name,
             config,
             draft_id,
+            source_policy_kind,
+            source_policy_id,
             source_run_id,
             source_artifact,
             copy_alt_baselines,

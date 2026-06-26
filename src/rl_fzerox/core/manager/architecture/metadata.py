@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
 from rl_fzerox.core.domain.observations import (
@@ -20,12 +21,14 @@ from rl_fzerox.core.manager.architecture.models import (
     ObservationResolutionBounds,
     ObservationSourceGeometryInfo,
     RunManagerConfigMetadata,
+    RuntimeAssetInfo,
     SelectOption,
     StateComponentInfo,
     StateFeatureInfo,
     TrackCupInfo,
     VehicleInfo,
 )
+from rl_fzerox.core.manager.projection.assembly import default_core_path, default_rom_path
 from rl_fzerox.core.manager.run_spec import (
     ManagedStateComponentConfig,
     default_state_components,
@@ -34,13 +37,18 @@ from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_name_for_feature,
     auxiliary_state_target_supports_grounded_only,
 )
+from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.runtime_spec.vehicle_catalog import CATALOG, vehicle_menu_row_and_column
 
 
-def run_manager_config_metadata() -> RunManagerConfigMetadata:
+def run_manager_config_metadata(
+    *,
+    runtime_assets: tuple[RuntimeAssetInfo, ...] | None = None,
+) -> RunManagerConfigMetadata:
     """Return stable manager options derived from backend-supported config values."""
 
     return RunManagerConfigMetadata(
+        runtime_assets=runtime_assets if runtime_assets is not None else runtime_asset_infos(),
         observation_presets=tuple(
             ObservationPresetInfo(
                 value=geometry.name,
@@ -126,6 +134,45 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
             SelectOption(value="256", label="[256]"),
             SelectOption(value="128", label="[128]"),
         ),
+    )
+
+
+def runtime_asset_infos() -> tuple[RuntimeAssetInfo, ...]:
+    root = project_root_dir()
+    return (
+        _runtime_asset_info(
+            asset_id="libretro_core",
+            label="Mupen64Plus-Next libretro core",
+            path=default_core_path(),
+            root=root,
+        ),
+        _runtime_asset_info(
+            asset_id="fzerox_rom",
+            label="F-Zero X US ROM",
+            path=default_rom_path(),
+            root=root,
+        ),
+    )
+
+
+def _runtime_asset_info(
+    *,
+    asset_id: str,
+    label: str,
+    path: Path,
+    root: Path,
+) -> RuntimeAssetInfo:
+    resolved_path = Path(path).expanduser().resolve()
+    root_path = Path(root).expanduser().resolve()
+    try:
+        display_path = str(resolved_path.relative_to(root_path))
+    except ValueError:
+        display_path = str(resolved_path)
+    return RuntimeAssetInfo(
+        id=asset_id,
+        label=label,
+        path=display_path,
+        exists=resolved_path.is_file(),
     )
 
 

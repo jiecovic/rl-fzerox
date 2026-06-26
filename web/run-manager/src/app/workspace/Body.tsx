@@ -83,10 +83,19 @@ export function WorkspaceBody({
       ? null
       : (evaluations.find((evaluation) => evaluation.id === activeEvaluationSession.evaluationId) ??
         null);
+  const checkpointRuns = useMemo(
+    () =>
+      checkpointCatalog?.installed_checkpoints.flatMap((checkpoint) => checkpoint.run ?? []) ?? [],
+    [checkpointCatalog?.installed_checkpoints],
+  );
+  const workspaceRuns = useMemo(
+    () => mergeWorkspaceRuns(runs, checkpointRuns),
+    [checkpointRuns, runs],
+  );
   const activeRunSummary =
     activeRunTab === null
       ? null
-      : (runs.find((candidate) => candidate.id === activeRunTab.runId) ?? null);
+      : (workspaceRuns.find((candidate) => candidate.id === activeRunTab.runId) ?? null);
   const activeRunDetail =
     activeRunTab === null ? null : (runDetailsById[activeRunTab.runId] ?? null);
   const activeRun = useMemo(
@@ -154,6 +163,12 @@ export function WorkspaceBody({
           error={checkpointCatalogError}
           onGlobalError={actions.setGlobalError}
           onInstallCheckpoint={actions.installManagedCatalogCheckpoint}
+          onDeleteCheckpoint={actions.removeManagedCheckpoint}
+          onOpenCheckpoint={(checkpoint) => {
+            if (checkpoint.run !== null) {
+              sessions.openRun(checkpoint.run);
+            }
+          }}
         />
       ) : null}
       {!isLoading && sessions.activeTabId === "charts" ? (
@@ -161,7 +176,7 @@ export function WorkspaceBody({
           focusedRunId={sessions.chartsFocusRunId}
           onGlobalError={actions.setGlobalError}
           onOpenRun={sessions.openRun}
-          runs={runs}
+          runs={workspaceRuns}
         />
       ) : null}
       {!isLoading && sessions.activeTabId === "evaluations" ? (
@@ -201,9 +216,10 @@ export function WorkspaceBody({
       ) : null}
       {!isLoading && activeSaveGameSession !== null ? (
         <SaveGameWorkspace
+          checkpointCatalog={checkpointCatalog}
           evaluations={evaluations}
           metadata={metadata}
-          runs={runs}
+          runs={workspaceRuns}
           saveGame={
             activeSaveGameSession.saveGameId === null
               ? null
@@ -238,7 +254,7 @@ export function WorkspaceBody({
           </Notice>
         ) : (
           <RunWorkspace
-            allRuns={runs}
+            allRuns={workspaceRuns}
             metadata={metadata}
             onClearAltBaselines={actions.clearManagedRunAltBaselines}
             onClearCourseAltBaselines={actions.clearManagedRunCourseAltBaselines}
@@ -326,6 +342,19 @@ function mergeRunDetail(summary: ManagedRun, detail: ManagedRunDetail): ManagedR
     ...summary,
     config: detail.config,
   };
+}
+
+function mergeWorkspaceRuns(visibleRuns: ManagedRun[], checkpointRuns: ManagedRun[]) {
+  const byId = new Map<string, ManagedRun>();
+  for (const run of visibleRuns) {
+    byId.set(run.id, run);
+  }
+  for (const run of checkpointRuns) {
+    if (!byId.has(run.id)) {
+      byId.set(run.id, run);
+    }
+  }
+  return [...byId.values()];
 }
 
 function forkDraftAltBaselineCount(

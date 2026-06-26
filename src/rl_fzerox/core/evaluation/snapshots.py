@@ -36,6 +36,8 @@ class EvaluationCheckpointSource:
     lineage_step_offset: int = 0
     policy_path: Path | None = None
     model_path: Path | None = None
+    engine_tuning_state_path: Path | None = None
+    engine_tuning_model_path: Path | None = None
     local_num_timesteps: int | None = None
     lineage_num_timesteps: int | None = None
 
@@ -74,6 +76,14 @@ def snapshot_evaluation_checkpoint(
         _copy_checkpoint_artifact_dir(
             source_dirs=(model_path.parent, policy_path.parent),
             destination_dir=checkpoint_dir,
+        )
+        _copy_optional_sidecar(
+            source.engine_tuning_state_path,
+            checkpoint_dir / RUN_LAYOUT.engine_tuning_state_filename,
+        )
+        _copy_optional_sidecar(
+            source.engine_tuning_model_path,
+            checkpoint_dir / RUN_LAYOUT.engine_tuning_model_filename,
         )
         os.replace(tmp_dir, resolved_destination_dir)
     finally:
@@ -147,6 +157,11 @@ def _copy_checkpoint_artifact_dir(
         for source_path in sorted(resolved_source_dir.iterdir()):
             if source_path.is_file():
                 _link_or_copy_file(source_path, destination_dir / source_path.name)
+
+
+def _copy_optional_sidecar(source: Path | None, destination: Path) -> None:
+    if source is not None:
+        _link_or_copy_file(source.expanduser().resolve(), destination)
 
 
 def _link_or_copy_file(source: Path, destination: Path) -> Path:

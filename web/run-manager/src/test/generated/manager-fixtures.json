@@ -437,6 +437,20 @@
         "value": "bilinear"
       }
     ],
+    "runtime_assets": [
+      {
+        "exists": false,
+        "id": "libretro_core",
+        "label": "Mupen64Plus-Next libretro core",
+        "path": "local/libretro/mupen64plus_next_libretro.so"
+      },
+      {
+        "exists": false,
+        "id": "fzerox_rom",
+        "label": "F-Zero X US ROM",
+        "path": "local/roms/F-Zero X (USA).n64"
+      }
+    ],
     "stack_modes": [
       {
         "label": "rgb",

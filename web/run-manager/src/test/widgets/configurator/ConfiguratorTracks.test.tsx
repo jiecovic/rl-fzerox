@@ -199,8 +199,14 @@ describe("Configurator", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("textbox", { name: "Engine range minimum" })).toHaveValue("20");
-    expect(screen.getByRole("textbox", { name: "Engine range maximum" })).toHaveValue("80");
+    expect(screen.getByRole("slider", { name: "Engine range minimum" })).toHaveAttribute(
+      "aria-valuetext",
+      "20.3%",
+    );
+    expect(screen.getByRole("slider", { name: "Engine range maximum" })).toHaveAttribute(
+      "aria-valuetext",
+      "79.7%",
+    );
   });
 
   it("lets you edit episode bounds from the environment tab", async () => {

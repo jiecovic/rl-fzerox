@@ -1,9 +1,17 @@
 // web/run-manager/src/pages/evaluations/sections/RecordsPanel.tsx
 import type { ManagedEvaluation } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
-import { cn } from "@/shared/ui/cn";
 import { formatDate } from "@/shared/ui/format";
 import { TrashIcon } from "@/shared/ui/icons";
+import {
+  ListActionsCell,
+  ListActionsHeaderCell,
+  ListRow,
+  ListSelectAllHeaderCell,
+  ListSelectionCell,
+  ListTable,
+  ListTableHead,
+} from "@/shared/ui/ListTable";
 import { Notice } from "@/shared/ui/Panel";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
@@ -103,120 +111,87 @@ function EvaluationTable({
   "evaluationError" | "onRequestSelectedDelete" | "selectedEvaluationCount"
 >) {
   return (
-    <div className="overflow-x-auto border border-app-border bg-app-surface">
-      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-        <thead className="border-b border-app-border text-xs font-bold tracking-[0.04em] text-app-muted uppercase">
-          <tr>
-            <th className="w-10 px-4 py-3">
-              <label className="grid place-items-center" data-evaluation-row-interaction>
-                <input
-                  aria-label="Select all inactive evaluations"
-                  checked={allDeletableEvaluationsSelected}
-                  className={evaluationCheckboxClass}
-                  disabled={isDeletingEvaluation}
-                  type="checkbox"
-                  onChange={(event) => onSelectAllEvaluations(event.currentTarget.checked)}
-                />
-              </label>
-            </th>
-            <th className="px-4 py-3">Evaluation</th>
-            <th className="px-4 py-3">Checkpoint</th>
-            <th className="px-4 py-3">Target</th>
-            <th className="px-4 py-3">Progress</th>
-            <th className="px-4 py-3">Created</th>
-            <th className="w-12 px-4 py-3">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {evaluations.map((evaluation) => {
-            const isDeletable = evaluation.status !== "running";
-            const selected = selectedEvaluationIds.has(evaluation.id);
-            return (
-              <tr
-                className={evaluationRowClass(selected)}
-                key={evaluation.id}
-                tabIndex={0}
-                onClick={(event) => {
-                  if (isEvaluationRowInteractionTarget(event.target)) {
-                    return;
+    <ListTable>
+      <ListTableHead>
+        <tr>
+          <ListSelectAllHeaderCell
+            aria-label="Select all inactive evaluations"
+            checked={allDeletableEvaluationsSelected}
+            disabled={isDeletingEvaluation}
+            onChange={onSelectAllEvaluations}
+          />
+          <th className="px-4 py-3">Evaluation</th>
+          <th className="px-4 py-3">Checkpoint</th>
+          <th className="px-4 py-3">Target</th>
+          <th className="px-4 py-3">Progress</th>
+          <th className="px-4 py-3">Created</th>
+          <ListActionsHeaderCell />
+        </tr>
+      </ListTableHead>
+      <tbody>
+        {evaluations.map((evaluation) => {
+          const isDeletable = evaluation.status !== "running";
+          const selected = selectedEvaluationIds.has(evaluation.id);
+          return (
+            <ListRow
+              key={evaluation.id}
+              selected={selected}
+              onOpen={() => onOpenEvaluation(evaluation)}
+            >
+              <ListSelectionCell
+                aria-label={`Select evaluation ${evaluation.name}`}
+                checked={selected}
+                disabled={!isDeletable || isDeletingEvaluation}
+                onChange={(checked) => onToggleEvaluationSelection(evaluation.id, checked)}
+              />
+              <td className="px-4 py-3 align-top">
+                <div className="grid gap-1">
+                  <strong className="text-app-text">{evaluation.name}</strong>
+                  <span className="text-xs capitalize text-app-muted">{evaluation.status}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3 align-top">
+                <div className="grid gap-1 text-app-muted">
+                  <span>
+                    {evaluation.checkpoint.source_run_name ?? evaluation.source_run_id ?? "-"} ·{" "}
+                    {evaluation.checkpoint.artifact}
+                  </span>
+                  <span className="text-xs">
+                    {formatStepCount(evaluation.checkpoint.lineage_num_timesteps)}
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-3 align-top text-app-muted">
+                <div className="grid gap-1">
+                  <span>{targetRuntimeLabel(evaluation.target)}</span>
+                  <span className="text-xs">{targetSelectionLabel(evaluation.target)}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3 align-top">
+                <span className="text-app-muted">{evaluationExecutionLabel(evaluation)}</span>
+              </td>
+              <td className="px-4 py-3 align-top text-app-muted">
+                {formatDate(evaluation.created_at)}
+              </td>
+              <ListActionsCell>
+                <TooltipIconButton
+                  aria-label={`Delete evaluation ${evaluation.name}`}
+                  disabled={
+                    !isDeletable || deletingEvaluationId === evaluation.id || isDeletingEvaluation
                   }
-                  onOpenEvaluation(evaluation);
-                }}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) {
-                    return;
-                  }
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onOpenEvaluation(evaluation);
-                  }
-                }}
-              >
-                <td className="px-4 py-3 align-top" data-evaluation-row-interaction>
-                  <label className="grid place-items-center">
-                    <input
-                      aria-label={`Select evaluation ${evaluation.name}`}
-                      checked={selected}
-                      className={evaluationCheckboxClass}
-                      disabled={!isDeletable || isDeletingEvaluation}
-                      type="checkbox"
-                      onChange={(event) =>
-                        onToggleEvaluationSelection(evaluation.id, event.currentTarget.checked)
-                      }
-                    />
-                  </label>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <div className="grid gap-1">
-                    <strong className="text-app-text">{evaluation.name}</strong>
-                    <span className="text-xs capitalize text-app-muted">{evaluation.status}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <div className="grid gap-1 text-app-muted">
-                    <span>
-                      {evaluation.checkpoint.source_run_name ?? evaluation.source_run_id ?? "-"} ·{" "}
-                      {evaluation.checkpoint.artifact}
-                    </span>
-                    <span className="text-xs">
-                      {formatStepCount(evaluation.checkpoint.lineage_num_timesteps)}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 align-top text-app-muted">
-                  <div className="grid gap-1">
-                    <span>{targetRuntimeLabel(evaluation.target)}</span>
-                    <span className="text-xs">{targetSelectionLabel(evaluation.target)}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <span className="text-app-muted">{evaluationExecutionLabel(evaluation)}</span>
-                </td>
-                <td className="px-4 py-3 align-top text-app-muted">
-                  {formatDate(evaluation.created_at)}
-                </td>
-                <td className="px-4 py-3 align-top" data-evaluation-row-interaction>
-                  <TooltipIconButton
-                    aria-label={`Delete evaluation ${evaluation.name}`}
-                    disabled={
-                      !isDeletable || deletingEvaluationId === evaluation.id || isDeletingEvaluation
-                    }
-                    size="compact"
-                    tone="danger"
-                    tooltip="Delete evaluation"
-                    onClick={() => onDeleteEvaluation(evaluation)}
-                  >
-                    <TrashIcon />
-                  </TooltipIconButton>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                  size="compact"
+                  tone="danger"
+                  tooltip="Delete evaluation"
+                  onClick={() => onDeleteEvaluation(evaluation)}
+                >
+                  <TrashIcon />
+                </TooltipIconButton>
+              </ListActionsCell>
+            </ListRow>
+          );
+        })}
+      </tbody>
+    </ListTable>
   );
 }
 
@@ -287,21 +262,4 @@ function evaluationProgressLabel(evaluation: ManagedEvaluation) {
     return `${completed}/${total} course runs`;
   }
   return completed > 0 ? `${completed} course runs` : null;
-}
-
-const evaluationCheckboxClass = "h-4 w-4 accent-app-accent";
-
-function evaluationRowClass(selected: boolean) {
-  return cn(
-    "cursor-pointer border-b border-app-border transition-colors last:border-b-0 hover:bg-app-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-app-accent",
-    selected ? "bg-app-surface-muted" : undefined,
-  );
-}
-
-function isEvaluationRowInteractionTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    target.closest("[data-evaluation-row-interaction],a,button,input,label,select,textarea") !==
-      null
-  );
 }

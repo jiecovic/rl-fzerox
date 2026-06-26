@@ -92,9 +92,19 @@ class VehicleInfo(BaseModel):
     menu_column: int
 
 
+class RuntimeAssetInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+    path: str
+    exists: bool
+
+
 class RunManagerConfigMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    runtime_assets: tuple[RuntimeAssetInfo, ...]
     observation_presets: tuple[ObservationPresetInfo, ...]
     observation_resolution_bounds: ObservationResolutionBounds
     observation_source_geometries: tuple[ObservationSourceGeometryInfo, ...]

@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildWorkspaceSessionTabs,
   compareRuns,
   configuratorBaseConfigForDraftEditor,
   forkInitialConfig,
@@ -79,6 +80,37 @@ describe("workspace run ordering", () => {
       "failed-run",
       "stopped-run",
     ]);
+  });
+});
+
+describe("workspace tabs", () => {
+  it("labels installed checkpoint run sessions as checkpoints", () => {
+    const checkpointRun = runFixture({
+      id: "checkpoint-blue-falcon-all-cups-v1",
+      name: "72 x 96 IMPALA - like: Blue Falcon All Cups V1",
+      status: "archived",
+    });
+
+    const [tab] = buildWorkspaceSessionTabs(
+      new Set([checkpointRun.id]),
+      [],
+      [],
+      [],
+      [
+        {
+          runId: checkpointRun.id,
+          sessionId: `run:${checkpointRun.id}`,
+          title: checkpointRun.name,
+        },
+      ],
+      [checkpointRun],
+      [],
+    );
+
+    expect(tab).toMatchObject({
+      icon: "checkpoint",
+      label: `Checkpoint · ${checkpointRun.name}`,
+    });
   });
 });
 

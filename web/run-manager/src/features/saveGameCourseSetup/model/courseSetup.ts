@@ -1,5 +1,6 @@
 // web/run-manager/src/features/saveGameCourseSetup/model/courseSetup.ts
 import type {
+  CheckpointCatalogResponse,
   ConfigMetadata,
   ManagedEvaluation,
   ManagedRun,
@@ -254,9 +255,11 @@ export function preferredVehicleSetup({
 }
 
 export function policySourceOptions({
+  checkpointCatalog,
   evaluations,
   runs,
 }: {
+  checkpointCatalog: CheckpointCatalogResponse | null;
   evaluations: readonly ManagedEvaluation[];
   runs: readonly ManagedRun[];
 }): PolicySourceOption[] {
@@ -292,6 +295,25 @@ export function policySourceOptions({
           },
         }),
       ),
+    ...(checkpointCatalog?.installed_checkpoints ?? []).map(
+      (checkpoint): PolicySourceOption => ({
+        artifact: checkpoint.source_artifact,
+        id: checkpoint.id,
+        kind: "checkpoint",
+        label: `${checkpoint.name} · release checkpoint`,
+        canImportEngineTuning:
+          checkpoint.has_engine_tuning_state &&
+          checkpoint.config.vehicle.engine_mode === "adaptive_tuner",
+        vehicleSetup: {
+          selection_mode: checkpoint.config.vehicle.selection_mode,
+          selected_vehicle_ids: checkpoint.config.vehicle.selected_vehicle_ids,
+          engine_mode: checkpoint.config.vehicle.engine_mode,
+          engine_setting_raw_value: checkpoint.config.vehicle.engine_setting_raw_value,
+          engine_setting_min_raw_value: checkpoint.config.vehicle.engine_setting_min_raw_value,
+          engine_setting_max_raw_value: checkpoint.config.vehicle.engine_setting_max_raw_value,
+        },
+      }),
+    ),
   ];
 }
 
@@ -320,7 +342,10 @@ export function policySelectionDraftForSource(
 ): PolicySelectionDraft {
   return {
     ...draft,
-    policyArtifact: source.kind === "evaluation" ? source.artifact : draft.policyArtifact,
+    policyArtifact:
+      source.kind === "evaluation" || source.kind === "checkpoint"
+        ? source.artifact
+        : draft.policyArtifact,
     policySourceId: source.id,
     policySourceKind: source.kind,
   };

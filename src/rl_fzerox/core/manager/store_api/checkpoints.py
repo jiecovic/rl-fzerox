@@ -33,3 +33,9 @@ class CheckpointStoreMixin:
 
     def list_published_checkpoints(self) -> tuple[ManagedPublishedCheckpoint, ...]:
         return checkpoint_registry.list_published_checkpoints(_manager_store(self))
+
+    def delete_published_checkpoint(self, checkpoint_id: str) -> bool:
+        return checkpoint_registry.delete_published_checkpoint(
+            _manager_store(self),
+            checkpoint_id,
+        )

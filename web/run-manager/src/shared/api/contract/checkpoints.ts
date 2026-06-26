@@ -1,6 +1,13 @@
 // web/run-manager/src/shared/api/contract/checkpoints.ts
 import { z } from "zod";
 
+import { managedRunConfigSchema } from "@/shared/api/contract/config";
+import { evaluationResultSummarySchema } from "@/shared/api/contract/evaluations";
+import {
+  engineTuningRuntimeStateSchema,
+  managedRunSummarySchema,
+} from "@/shared/api/contract/runs";
+
 const checkpointBundleFileSchema = z.object({
   path: z.string(),
   role: z.string(),
@@ -53,12 +60,20 @@ export const publishedCheckpointSchema = z.object({
   checkpoint_id: z.string(),
   version: z.string(),
   name: z.string(),
-  source_artifact: z.string(),
+  run_id: z.string(),
+  run: managedRunSummarySchema.nullable(),
+  config: managedRunConfigSchema,
+  import_dir: z.string(),
+  source_run_id: z.string().nullable(),
+  source_run_name: z.string().nullable(),
+  source_artifact: z.enum(["latest", "best", "final"]),
   local_num_timesteps: z.number().int().nonnegative().nullable(),
   lineage_num_timesteps: z.number().int().nonnegative().nullable(),
   source_bundle_sha256: z.string().nullable(),
   has_evaluation_metrics: z.boolean(),
   has_engine_tuning_state: z.boolean(),
+  evaluation_summary: evaluationResultSummarySchema.nullable(),
+  engine_tuning_state: engineTuningRuntimeStateSchema.nullable(),
   exported_at: z.string(),
   imported_at: z.string(),
   updated_at: z.string(),
@@ -79,7 +94,12 @@ export const installCheckpointResponseSchema = z.object({
   checkpoint: publishedCheckpointSchema,
 });
 
+export const deleteCheckpointResponseSchema = z.object({
+  deleted: z.boolean(),
+});
+
 export type CheckpointCatalogEntry = z.infer<typeof checkpointCatalogEntrySchema>;
 export type CheckpointCatalogResponse = z.infer<typeof checkpointCatalogResponseSchema>;
+export type DeleteCheckpointResponse = z.infer<typeof deleteCheckpointResponseSchema>;
 export type InstallCheckpointResponse = z.infer<typeof installCheckpointResponseSchema>;
 export type PublishedCheckpoint = z.infer<typeof publishedCheckpointSchema>;

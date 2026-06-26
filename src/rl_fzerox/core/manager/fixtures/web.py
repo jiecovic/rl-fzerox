@@ -16,7 +16,23 @@ from rl_fzerox.core.manager.architecture import (
     policy_architecture_preview,
     run_manager_config_metadata,
 )
+from rl_fzerox.core.manager.architecture.models import RuntimeAssetInfo
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
+
+WEB_FIXTURE_RUNTIME_ASSETS = (
+    RuntimeAssetInfo(
+        id="libretro_core",
+        label="Mupen64Plus-Next libretro core",
+        path="local/libretro/mupen64plus_next_libretro.so",
+        exists=False,
+    ),
+    RuntimeAssetInfo(
+        id="fzerox_rom",
+        label="F-Zero X US ROM",
+        path="local/roms/F-Zero X (USA).n64",
+        exists=False,
+    ),
+)
 
 
 def web_test_fixture_payload() -> dict[str, object]:
@@ -24,7 +40,9 @@ def web_test_fixture_payload() -> dict[str, object]:
     config = default_managed_run_config()
     return {
         "managed_run_config": config.model_dump(mode="json"),
-        "config_metadata": run_manager_config_metadata().model_dump(mode="json"),
+        "config_metadata": run_manager_config_metadata(
+            runtime_assets=WEB_FIXTURE_RUNTIME_ASSETS,
+        ).model_dump(mode="json"),
         "policy_preview": policy_architecture_preview(config).model_dump(mode="json"),
     }
 

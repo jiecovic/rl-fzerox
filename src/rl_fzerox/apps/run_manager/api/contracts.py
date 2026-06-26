@@ -116,6 +116,8 @@ class CreateDraftRequest(BaseModel):
 
     name: str
     config: ManagedRunConfig
+    source_policy_kind: PolicySourceKind | None = None
+    source_policy_id: str | None = None
     source_run_id: str | None = None
     source_artifact: Literal["latest", "best"] | None = None
 
@@ -255,6 +257,8 @@ class UpdateDraftRequest(BaseModel):
 
     name: str
     config: ManagedRunConfig
+    source_policy_kind: PolicySourceKind | None = None
+    source_policy_id: str | None = None
     source_run_id: str | None = None
     source_artifact: Literal["latest", "best"] | None = None
 
@@ -293,6 +297,8 @@ class LaunchRunRequest(BaseModel):
     name: str
     config: ManagedRunConfig
     draft_id: str | None = None
+    source_policy_kind: PolicySourceKind | None = None
+    source_policy_id: str | None = None
     source_run_id: str | None = None
     source_artifact: Literal["latest", "best"] | None = None
     copy_alt_baselines: bool = True
@@ -318,6 +324,8 @@ class RunLauncher(Protocol):
         name: str,
         config: ManagedRunConfig,
         draft_id: str | None,
+        source_policy_kind: PolicySourceKind | None,
+        source_policy_id: str | None,
         source_run_id: str | None,
         source_artifact: Literal["latest", "best"] | None,
         copy_alt_baselines: bool,

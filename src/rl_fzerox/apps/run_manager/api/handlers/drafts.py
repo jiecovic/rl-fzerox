@@ -28,6 +28,8 @@ def create_draft_payload(
         draft = store.create_draft(
             name=name,
             config=request.config,
+            source_policy_kind=request.source_policy_kind,
+            source_policy_id=request.source_policy_id,
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
         )
@@ -49,6 +51,8 @@ def update_draft_payload(
             draft_id=draft_id,
             name=name,
             config=request.config,
+            source_policy_kind=request.source_policy_kind,
+            source_policy_id=request.source_policy_id,
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
         )

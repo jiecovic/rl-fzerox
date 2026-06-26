@@ -43,10 +43,6 @@ def create_runs_router(store: ManagerStore, launcher: RunLauncher) -> APIRouter:
     @router.post("/api/runs", status_code=201)
     async def launch_run(request: LaunchRunRequest) -> dict[str, dict[str, object]]:
         name = required_name(request.name, subject="run")
-        handlers.validate_source_fields(
-            source_run_id=request.source_run_id,
-            source_artifact=request.source_artifact,
-        )
         return await run_sync(handlers.launch_run_payload, store, launcher, request, name)
 
     @router.post("/api/runs/{run_id}/fork", status_code=201)

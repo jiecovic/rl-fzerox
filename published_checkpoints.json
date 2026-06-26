@@ -2,19 +2,19 @@
   "entries": [
     {
       "bundle": {
-        "filename": "rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip",
-        "sha256": "341c923e5865842978397c7dc53921268fce0ffaad52e237533b5c7b5ad81b94",
-        "size_bytes": 33569307,
-        "url": "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip"
+        "filename": "rl-fzerox-checkpoint-blue-falcon-all-cups-v1.zip",
+        "sha256": "53cfdc29335388ad5b7c48abbebbc4c728867d88f834184514df5ff29176c49a",
+        "size_bytes": 33536535,
+        "url": "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/rl-fzerox-checkpoint-blue-falcon-all-cups-v1.zip"
       },
-      "id": "blue-falcon-fine-tuned",
+      "id": "blue-falcon-all-cups",
       "manifest": {
         "checkpoint": {
-          "created_at": "2026-06-26T10:26:03+00:00",
-          "id": "blue-falcon-fine-tuned",
+          "created_at": "2026-06-26T15:22:58+00:00",
+          "id": "blue-falcon-all-cups",
           "lineage_num_timesteps": 1979774040,
           "local_num_timesteps": 68288256,
-          "name": "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+          "name": "72 x 96 IMPALA - like: Blue Falcon All Cups V1",
           "source_artifact": "best",
           "source_run_id": "20260624-120927-f6fa7b32",
           "source_run_name": "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
@@ -30,7 +30,7 @@
           "train_config_sha256": "bc890dbc2339113804de1d3a7397b189864b290209f57247e32bbded3547c022",
           "training_algorithm": "maskable_hybrid_recurrent_ppo"
         },
-        "exported_at": "2026-06-26T14:21:41+00:00",
+        "exported_at": "2026-06-26T17:33:38+00:00",
         "files": [
           {
             "path": "checkpoint/policy.zip",
@@ -57,12 +57,6 @@
             "size_bytes": 10238
           },
           {
-            "path": "metrics/evaluation.json",
-            "role": "evaluation_metrics",
-            "sha256": "918d42d7be2ce43bc2cc18ecdee4aafcb8de367bd27af358acdc48f1f9b63f91",
-            "size_bytes": 363737
-          },
-          {
             "path": "engine_tuning/state.json",
             "role": "engine_tuning_state",
             "sha256": "9849be59afaf71ba63b47dc591d4f4ec5a9a80edef26af0a6d68b6eb5d97d297",
@@ -77,5 +71,5 @@
   ],
   "format_name": "rl-fzerox-checkpoint-catalog",
   "schema_version": 1,
-  "updated_at": "2026-06-26T14:21:42+00:00"
+  "updated_at": "2026-06-26T17:33:58+00:00"
 }

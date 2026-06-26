@@ -9,9 +9,17 @@ import { useSaveGameDeletion } from "@/features/saveGameDeletion/model/useSaveGa
 import type { ManagedSaveGame } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
-import { cn } from "@/shared/ui/cn";
 import { formatDate } from "@/shared/ui/format";
 import { PlusIcon, TrashIcon } from "@/shared/ui/icons";
+import {
+  ListActionsCell,
+  ListActionsHeaderCell,
+  ListRow,
+  ListSelectAllHeaderCell,
+  ListSelectionCell,
+  ListTable,
+  ListTableHead,
+} from "@/shared/ui/ListTable";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
@@ -61,49 +69,37 @@ export function SaveGamesPanel({
         {saveGames.length === 0 ? (
           <Notice>No career saves yet. Create one to prepare an unlock path.</Notice>
         ) : (
-          <div className="overflow-x-auto border border-app-border bg-app-surface">
-            <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-              <thead className="border-b border-app-border text-xs font-bold tracking-[0.04em] text-app-muted uppercase">
-                <tr>
-                  <th className="w-10 px-4 py-3">
-                    <label className="grid place-items-center">
-                      <input
-                        aria-label="Select all career saves"
-                        checked={saveGameDeletion.allSaveGamesSelected}
-                        className={saveGameCheckboxClass}
-                        disabled={saveGameDeletion.isDeleting}
-                        type="checkbox"
-                        onChange={(event) =>
-                          saveGameDeletion.setAllSaveGamesSelected(event.currentTarget.checked)
-                        }
-                      />
-                    </label>
-                  </th>
-                  <th className="px-4 py-3">Career save</th>
-                  <th className="px-4 py-3">Progress</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Updated</th>
-                  <th className="px-4 py-3">Path</th>
-                  <th className="w-12 px-4 py-3">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {saveGames.map((saveGame) => (
-                  <SaveGameRow
-                    isDeleting={saveGameDeletion.isDeleting}
-                    key={saveGame.id}
-                    saveGame={saveGame}
-                    selected={saveGameDeletion.selectedSaveGameIds.has(saveGame.id)}
-                    onOpen={onOpenSaveGame}
-                    onRequestDelete={saveGameDeletion.requestSingleDelete}
-                    onToggleSelection={saveGameDeletion.toggleSaveGameSelection}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ListTable minWidthClass="min-w-[960px]">
+            <ListTableHead>
+              <tr>
+                <ListSelectAllHeaderCell
+                  aria-label="Select all career saves"
+                  checked={saveGameDeletion.allSaveGamesSelected}
+                  disabled={saveGameDeletion.isDeleting}
+                  onChange={saveGameDeletion.setAllSaveGamesSelected}
+                />
+                <th className="px-4 py-3">Career save</th>
+                <th className="px-4 py-3">Progress</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Updated</th>
+                <th className="px-4 py-3">Path</th>
+                <ListActionsHeaderCell />
+              </tr>
+            </ListTableHead>
+            <tbody>
+              {saveGames.map((saveGame) => (
+                <SaveGameRow
+                  isDeleting={saveGameDeletion.isDeleting}
+                  key={saveGame.id}
+                  saveGame={saveGame}
+                  selected={saveGameDeletion.selectedSaveGameIds.has(saveGame.id)}
+                  onOpen={onOpenSaveGame}
+                  onRequestDelete={saveGameDeletion.requestSingleDelete}
+                  onToggleSelection={saveGameDeletion.toggleSaveGameSelection}
+                />
+              ))}
+            </tbody>
+          </ListTable>
         )}
       </Panel>
       <ConfirmDialog
@@ -138,37 +134,13 @@ function SaveGameRow({
   const targetSummary = summarizeSaveGameTargets(saveGame);
   const completion = unlockCompletionFraction(targetSummary);
   return (
-    <tr
-      className={saveGameRowClass(selected)}
-      tabIndex={0}
-      onClick={(event) => {
-        if (isSaveGameRowInteractionTarget(event.target)) {
-          return;
-        }
-        onOpen(saveGame);
-      }}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) {
-          return;
-        }
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen(saveGame);
-        }
-      }}
-    >
-      <td className="px-4 py-3 align-top" data-save-game-row-interaction>
-        <label className="grid place-items-center">
-          <input
-            aria-label={`Select career save ${saveGame.name}`}
-            checked={selected}
-            className={saveGameCheckboxClass}
-            disabled={isDeleting}
-            type="checkbox"
-            onChange={(event) => onToggleSelection(saveGame.id, event.currentTarget.checked)}
-          />
-        </label>
-      </td>
+    <ListRow selected={selected} onOpen={() => onOpen(saveGame)}>
+      <ListSelectionCell
+        aria-label={`Select career save ${saveGame.name}`}
+        checked={selected}
+        disabled={isDeleting}
+        onChange={(checked) => onToggleSelection(saveGame.id, checked)}
+      />
       <td className="px-4 py-3 align-top">
         <div className="grid gap-1">
           <div className="font-semibold text-app-text">{saveGame.name}</div>
@@ -189,37 +161,18 @@ function SaveGameRow({
       <td className="max-w-[280px] overflow-hidden px-4 py-3 align-top font-mono text-xs text-ellipsis whitespace-nowrap text-app-muted">
         {saveGame.save_path}
       </td>
-      <td className="px-4 py-3 align-top" data-save-game-row-interaction>
+      <ListActionsCell>
         <TooltipIconButton
           aria-label={`Delete career save ${saveGame.name}`}
           disabled={isDeleting}
           size="compact"
           tone="danger"
           tooltip="Delete career save"
-          onClick={(event) => {
-            event.stopPropagation();
-            onRequestDelete(saveGame);
-          }}
+          onClick={() => onRequestDelete(saveGame)}
         >
           <TrashIcon />
         </TooltipIconButton>
-      </td>
-    </tr>
-  );
-}
-
-const saveGameCheckboxClass = "h-4 w-4 accent-app-accent";
-
-function saveGameRowClass(selected: boolean) {
-  return cn(
-    "cursor-pointer border-b border-app-border transition-colors last:border-b-0 hover:bg-app-surface-muted",
-    selected ? "bg-app-surface-muted" : undefined,
-  );
-}
-
-function isSaveGameRowInteractionTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    target.closest("[data-save-game-row-interaction],a,button,input,label,select,textarea") !== null
+      </ListActionsCell>
+    </ListRow>
   );
 }

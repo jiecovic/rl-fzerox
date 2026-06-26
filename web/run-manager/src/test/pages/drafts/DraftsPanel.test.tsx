@@ -33,7 +33,7 @@ describe("DraftsPanel", () => {
     await user.click(screen.getByRole("button", { name: "Create draft" }));
     expect(onCreateDraft).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole("button", { name: /50,000,000 steps/i }));
+    await user.click(screen.getByText(draft.name));
     expect(onOpenDraft).toHaveBeenCalledWith(draft);
 
     await user.click(screen.getByRole("button", { name: `Delete draft ${draft.name}` }));

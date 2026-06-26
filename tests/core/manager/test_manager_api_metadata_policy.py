@@ -22,6 +22,14 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    runtime_assets = {asset["id"]: asset for asset in payload["runtime_assets"]}
+    assert set(runtime_assets) == {"fzerox_rom", "libretro_core"}
+    assert runtime_assets["fzerox_rom"]["path"].endswith("local/roms/F-Zero X (USA).n64")
+    assert runtime_assets["libretro_core"]["path"].endswith(
+        "local/libretro/mupen64plus_next_libretro.so"
+    )
+    assert isinstance(runtime_assets["fzerox_rom"]["exists"], bool)
+    assert isinstance(runtime_assets["libretro_core"]["exists"], bool)
     preset_values = {preset["value"] for preset in payload["observation_presets"]}
     assert preset_values == {"crop_72x96", "crop_84x84"}
     preset_labels = {preset["value"]: preset["label"] for preset in payload["observation_presets"]}

@@ -22,6 +22,7 @@ def published_checkpoint_from_model(
         name=checkpoint.name,
         config=load_config_json(checkpoint.config_snapshot.config_json),
         config_hash=checkpoint.config_snapshot.config_hash,
+        run_id=checkpoint.run_id,
         import_dir=Path(checkpoint.import_dir),
         manifest_json=checkpoint.manifest_json,
         source_bundle_path=(

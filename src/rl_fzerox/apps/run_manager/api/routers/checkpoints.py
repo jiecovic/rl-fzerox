@@ -30,4 +30,10 @@ def create_checkpoints_router(store: ManagerStore) -> APIRouter:
             version=version,
         )
 
+    @router.delete("/api/checkpoints/{checkpoint_id}")
+    async def delete_checkpoint(
+        checkpoint_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, bool]:
+        return await run_sync(handlers.delete_checkpoint_payload, store, checkpoint_id)
+
     return router

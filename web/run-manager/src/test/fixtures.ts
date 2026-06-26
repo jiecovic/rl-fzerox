@@ -8,6 +8,7 @@ import type {
   ManagedRunMetricSample,
   ManagedSaveGame,
   PolicyArchitecturePreview,
+  PublishedCheckpoint,
 } from "@/shared/api/contract";
 import {
   configMetadataSchema,
@@ -43,20 +44,20 @@ export function checkpointCatalogFixture(
     },
     entries: [
       {
-        id: "blue-falcon-fine-tuned",
+        id: "blue-falcon-all-cups",
         version: "v1",
-        name: "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+        name: "72 x 96 IMPALA - like: Blue Falcon All Cups V1",
         bundle: {
-          filename: "rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip",
-          sha256: "a".repeat(64),
-          size_bytes: 33_569_307,
-          url: "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/bundle.zip",
+          filename: "rl-fzerox-checkpoint-blue-falcon-all-cups-v1.zip",
+          sha256: "53cfdc29335388ad5b7c48abbebbc4c728867d88f834184514df5ff29176c49a",
+          size_bytes: 33_536_535,
+          url: "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/rl-fzerox-checkpoint-blue-falcon-all-cups-v1.zip",
         },
         installed_checkpoint_id: null,
         manifest: {
           checkpoint: {
-            id: "blue-falcon-fine-tuned",
-            name: "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+            id: "blue-falcon-all-cups",
+            name: "72 x 96 IMPALA - like: Blue Falcon All Cups V1",
             version: "v1",
             source_artifact: "best",
             local_num_timesteps: 68_288_256,
@@ -73,6 +74,35 @@ export function checkpointCatalogFixture(
       },
     ],
     installed_checkpoints: [],
+    ...overrides,
+  };
+}
+
+export function installedCheckpointFixture(
+  overrides: Partial<PublishedCheckpoint> = {},
+): PublishedCheckpoint {
+  return {
+    id: "blue-falcon-all-cups-v1",
+    checkpoint_id: "blue-falcon-all-cups",
+    version: "v1",
+    name: "72 x 96 IMPALA - like: Blue Falcon All Cups V1",
+    run_id: "checkpoint-blue-falcon-all-cups-v1",
+    run: null,
+    config: managedRunConfigFixture,
+    import_dir: "local/manager/checkpoints/blue-falcon-all-cups/v1",
+    source_run_id: "20260624-120927-f6fa7b32",
+    source_run_name: "72 x 96 IMPALA - like Blue Falcon Fine Tuned",
+    source_artifact: "best",
+    local_num_timesteps: 68_288_256,
+    lineage_num_timesteps: 1_979_774_040,
+    source_bundle_sha256: "53cfdc29335388ad5b7c48abbebbc4c728867d88f834184514df5ff29176c49a",
+    has_evaluation_metrics: false,
+    has_engine_tuning_state: true,
+    evaluation_summary: null,
+    engine_tuning_state: null,
+    exported_at: "2026-06-26T12:15:44+00:00",
+    imported_at: "2026-06-26T12:20:00+00:00",
+    updated_at: "2026-06-26T12:20:00+00:00",
     ...overrides,
   };
 }

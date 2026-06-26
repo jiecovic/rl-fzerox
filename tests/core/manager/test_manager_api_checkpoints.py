@@ -70,7 +70,133 @@ async def test_manager_api_installs_checkpoint_catalog_entry(
     payload = response.json()
     assert payload["status"] == "installed"
     assert payload["checkpoint"]["id"] == "blue-falcon-fine-tuned-v1"
+    assert payload["checkpoint"]["run_id"] == "checkpoint-blue-falcon-fine-tuned-v1"
+    assert payload["checkpoint"]["run"]["id"] == "checkpoint-blue-falcon-fine-tuned-v1"
+    assert payload["checkpoint"]["run"]["status"] == "archived"
+    assert payload["checkpoint"]["config"]["version"] == 1
+    assert payload["checkpoint"]["import_dir"].endswith(
+        "manager/checkpoints/blue-falcon-fine-tuned/v1"
+    )
     assert store.get_published_checkpoint("blue-falcon-fine-tuned-v1") is not None
+
+
+async def test_manager_api_catalog_includes_installed_checkpoint_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle_path, catalog_path = _write_catalog_bundle(tmp_path)
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "default_checkpoint_catalog_path",
+        lambda: catalog_path,
+    )
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "_download_catalog_bundle",
+        lambda entry, *, download_dir: bundle_path,
+    )
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    client = _client(tmp_path, store=store)
+    install_response = await client.post(
+        "/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install"
+    )
+    assert install_response.status_code == 200
+
+    response = await client.get("/api/checkpoints/catalog")
+
+    assert response.status_code == 200
+    checkpoint = response.json()["installed_checkpoints"][0]
+    assert checkpoint["run_id"] == "checkpoint-blue-falcon-fine-tuned-v1"
+    assert checkpoint["run"]["id"] == checkpoint["run_id"]
+    assert checkpoint["run"]["status"] == "archived"
+
+
+async def test_manager_api_does_not_expose_checkpoint_fork_route(tmp_path: Path) -> None:
+    client = _client(tmp_path, store=ManagerStore(tmp_path / "manager" / "runs.db"))
+
+    response = await client.post(
+        "/api/checkpoints/blue-falcon-fine-tuned-v1/fork",
+        json={"name": "Blue Falcon Fork"},
+    )
+
+    assert response.status_code == 404
+
+
+async def test_manager_api_deletes_installed_checkpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle_path, catalog_path = _write_catalog_bundle(tmp_path)
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "default_checkpoint_catalog_path",
+        lambda: catalog_path,
+    )
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "_download_catalog_bundle",
+        lambda entry, *, download_dir: bundle_path,
+    )
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    client = _client(tmp_path, store=store)
+    install_response = await client.post(
+        "/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install"
+    )
+    assert install_response.status_code == 200
+    checkpoint = store.get_published_checkpoint("blue-falcon-fine-tuned-v1")
+    assert checkpoint is not None
+    assert checkpoint.import_dir.is_dir()
+
+    response = await client.delete("/api/checkpoints/blue-falcon-fine-tuned-v1")
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted": True}
+    assert store.get_published_checkpoint("blue-falcon-fine-tuned-v1") is None
+    assert not checkpoint.import_dir.exists()
+
+
+async def test_manager_api_rejects_checkpoint_delete_when_save_game_uses_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle_path, catalog_path = _write_catalog_bundle(tmp_path)
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "default_checkpoint_catalog_path",
+        lambda: catalog_path,
+    )
+    monkeypatch.setattr(
+        manager_api_checkpoints,
+        "_download_catalog_bundle",
+        lambda entry, *, download_dir: bundle_path,
+    )
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    client = _client(tmp_path, store=store)
+    install_response = await client.post(
+        "/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install"
+    )
+    assert install_response.status_code == 200
+    checkpoint = store.get_published_checkpoint("blue-falcon-fine-tuned-v1")
+    assert checkpoint is not None
+    save_game = store.create_save_game(name="Career", save_games_root=tmp_path / "saves")
+    store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        policy_source_kind="checkpoint",
+        policy_source_id=checkpoint.id,
+        policy_artifact=checkpoint.source_artifact,
+        cup_id="jack",
+        course_id="mute_city",
+    )
+
+    response = await client.delete("/api/checkpoints/blue-falcon-fine-tuned-v1")
+
+    assert response.status_code == 400
+    assert (
+        response.json()["error"]
+        == "remove save-game course setups that still use this checkpoint"
+    )
+    assert store.get_published_checkpoint("blue-falcon-fine-tuned-v1") is not None
+    assert checkpoint.import_dir.is_dir()
 
 
 async def test_manager_api_checkpoint_catalog_install_is_idempotent(
@@ -106,7 +232,10 @@ async def test_manager_api_checkpoint_catalog_install_is_idempotent(
     )
 
     assert second_response.status_code == 200
-    assert second_response.json()["status"] == "already_installed"
+    payload = second_response.json()
+    assert payload["status"] == "already_installed"
+    assert payload["checkpoint"]["run_id"] == "checkpoint-blue-falcon-fine-tuned-v1"
+    assert payload["checkpoint"]["run"]["status"] == "archived"
 
 
 async def test_manager_api_checkpoint_catalog_returns_404_for_unknown_entry(

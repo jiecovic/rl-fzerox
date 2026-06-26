@@ -37,6 +37,7 @@ class ForkSourceMetadata:
     source_algorithm: TrainAlgorithmName
     source_auxiliary_state_enabled: bool
     source_auxiliary_state_head_arch: tuple[int, ...]
+    source_lineage_num_timesteps: int | None = None
 
 
 def draft_fork_source_dir(*, manager_db_path: Path, draft_id: str) -> Path:
@@ -140,6 +141,7 @@ def write_fork_source_metadata(
                 "source_auxiliary_state_head_arch": list(
                     metadata.source_auxiliary_state_head_arch
                 ),
+                "source_lineage_num_timesteps": metadata.source_lineage_num_timesteps,
             },
             indent=2,
             sort_keys=True,
@@ -169,6 +171,11 @@ def load_fork_source_metadata(*, source_dir: Path) -> ForkSourceMetadata:
         source_auxiliary_state_head_arch=_metadata_int_tuple(
             raw_metadata,
             "source_auxiliary_state_head_arch",
+            metadata_path=metadata_path,
+        ),
+        source_lineage_num_timesteps=_metadata_optional_nonnegative_int(
+            raw_metadata,
+            "source_lineage_num_timesteps",
             metadata_path=metadata_path,
         ),
     )
@@ -259,6 +266,20 @@ def _metadata_int_tuple(
             raise ValueError(f"Fork source metadata has invalid {key}: {metadata_path}")
         result.append(value)
     return tuple(result)
+
+
+def _metadata_optional_nonnegative_int(
+    metadata: dict[object, object],
+    key: str,
+    *,
+    metadata_path: Path,
+) -> int | None:
+    value = metadata.get(key)
+    if value is None:
+        return None
+    if isinstance(value, int) and value >= 0:
+        return value
+    raise ValueError(f"Fork source metadata has invalid {key}: {metadata_path}")
 
 
 def _copy_checkpoint_artifact_dir(

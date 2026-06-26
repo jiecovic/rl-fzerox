@@ -73,7 +73,15 @@ const stateComponentSchema = z.object({
   features: z.array(stateComponentInfoSchema),
 });
 
+const runtimeAssetInfoSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  path: z.string(),
+  exists: z.boolean(),
+});
+
 export const configMetadataSchema = z.object({
+  runtime_assets: z.array(runtimeAssetInfoSchema),
   observation_presets: z.array(observationPresetInfoSchema),
   observation_resolution_bounds: observationResolutionBoundsSchema,
   observation_source_geometries: z.array(observationSourceGeometryInfoSchema),

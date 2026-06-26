@@ -19,6 +19,7 @@ import type {
 } from "@/shared/api/contract";
 
 export interface UseWorkspaceSessionsOptions {
+  checkpointRunIds: readonly string[];
   drafts: ManagedDraft[];
   evaluations: ManagedEvaluation[];
   runs: ManagedRun[];

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from rl_fzerox.apps.run_manager.api.handlers.checkpoints import (
     checkpoint_catalog_response,
+    delete_checkpoint_payload,
     install_catalog_checkpoint_response,
 )
 from rl_fzerox.apps.run_manager.api.handlers.common import (
@@ -92,6 +93,7 @@ __all__ = [
     "create_evaluation_preset_payload",
     "create_evaluation_payload",
     "create_save_game_payload",
+    "delete_checkpoint_payload",
     "delete_draft_payload",
     "delete_evaluation_preset_payload",
     "delete_evaluation_payload",

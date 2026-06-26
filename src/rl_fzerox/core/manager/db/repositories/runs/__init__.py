@@ -19,6 +19,7 @@ from rl_fzerox.core.manager.db.repositories.runs.mapping import (
 )
 from rl_fzerox.core.manager.db.repositories.runs.records import (
     get_managed_run,
+    get_managed_run_summary,
     insert_run,
     list_managed_runs,
     list_visible_managed_run_summaries,
@@ -31,6 +32,7 @@ __all__ = [
     "append_run_event",
     "assert_draft_name_available",
     "get_managed_run",
+    "get_managed_run_summary",
     "insert_draft",
     "insert_run",
     "list_managed_runs",

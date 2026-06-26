@@ -1,5 +1,5 @@
 // web/run-manager/src/app/App.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWorkspaceActions } from "@/app/workspace/actions";
 import { WorkspaceBody } from "@/app/workspace/Body";
 import { primaryWorkspaceTabs } from "@/app/workspace/model";
@@ -19,7 +19,15 @@ export function App() {
       ? null
       : `Evaluation records could not be loaded: ${managerData.evaluationError}`;
   const workspaceError = globalError ?? managerData.error ?? evaluationLoadError;
+  const checkpointRunIds = useMemo(
+    () =>
+      managerData.checkpointCatalog?.installed_checkpoints.flatMap((checkpoint) =>
+        checkpoint.run === null ? [] : [checkpoint.run.id],
+      ) ?? [],
+    [managerData.checkpointCatalog?.installed_checkpoints],
+  );
   const sessions = useWorkspaceSessions({
+    checkpointRunIds,
     drafts: managerData.drafts,
     evaluations: managerData.evaluations,
     runs: managerData.runs,

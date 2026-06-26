@@ -15,6 +15,7 @@ from rl_fzerox.core.manager.db.repositories.runs import (
 )
 from rl_fzerox.core.manager.db.repositories.runs import (
     get_managed_run,
+    get_managed_run_summary,
     insert_run,
     list_managed_runs,
     list_recent_managed_run_events,
@@ -142,6 +143,12 @@ def get_run(store: ManagerStore, run_id: str) -> ManagedRun | None:
     store.initialize()
     with store._orm_session() as session:
         return get_managed_run(session, run_id)
+
+
+def get_run_summary(store: ManagerStore, run_id: str) -> ManagedRunSummary | None:
+    store.initialize()
+    with store._orm_session() as session:
+        return get_managed_run_summary(session, run_id)
 
 
 def list_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:

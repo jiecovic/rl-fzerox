@@ -20,7 +20,12 @@ from rl_fzerox.core.manager.db.repositories.runs import (
     update_draft as update_draft_record,
 )
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
-from rl_fzerox.core.manager.models import ManagedRunDraft, ManagedRunTemplate
+from rl_fzerox.core.manager.models import (
+    ManagedRun,
+    ManagedRunDraft,
+    ManagedRunTemplate,
+    PolicySourceKind,
+)
 from rl_fzerox.core.manager.registry.common import (
     new_record_id,
     optional_source_artifact,
@@ -42,6 +47,8 @@ def create_draft(
     *,
     name: str,
     config: ManagedRunConfig,
+    source_policy_kind: PolicySourceKind | None = None,
+    source_policy_id: str | None = None,
     source_run_id: str | None = None,
     source_artifact: Literal["latest", "best"] | None = None,
 ) -> ManagedRunDraft:
@@ -53,10 +60,14 @@ def create_draft(
     normalized_name = name.strip() or draft_id
     source_snapshot_dir = None
     source_num_timesteps = None
-    source_run = None if source_run_id is None else store.get_run(source_run_id)
-    if source_run_id is not None and source_run is None:
-        raise ValueError(f"run not found: {source_run_id}")
-    if source_run_id is not None and source_artifact is not None:
+    source_kind, source_id, source_run = _resolve_create_source(
+        store,
+        source_policy_kind=source_policy_kind,
+        source_policy_id=source_policy_id,
+        source_run_id=source_run_id,
+        source_artifact=source_artifact,
+    )
+    if source_id is not None and source_artifact is not None:
         config = reset_fork_action_bias_deltas(config)
     draft: ManagedRunDraft | None = None
 
@@ -81,8 +92,7 @@ def create_draft(
                 created_at=created_at,
                 updated_at=created_at,
             )
-            if source_run_id is not None and source_artifact is not None:
-                assert source_run is not None
+            if source_kind == "run" and source_run is not None and source_artifact is not None:
                 source_snapshot_dir, source_num_timesteps = snapshot_draft_source(
                     manager_db_path=store.db_path,
                     draft_id=draft_id,
@@ -91,7 +101,7 @@ def create_draft(
                 )
                 draft = replace(
                     draft,
-                    source_run_id=source_run_id,
+                    source_run_id=source_run.id,
                     source_artifact=source_artifact,
                     source_snapshot_dir=source_snapshot_dir,
                     source_num_timesteps=source_num_timesteps,
@@ -146,6 +156,8 @@ def update_draft(
     draft_id: str,
     name: str,
     config: ManagedRunConfig,
+    source_policy_kind: PolicySourceKind | None = None,
+    source_policy_id: str | None = None,
     source_run_id: str | None = None,
     source_artifact: Literal["latest", "best"] | None = None,
 ) -> ManagedRunDraft | None:
@@ -155,16 +167,22 @@ def update_draft(
     current_draft = store.get_draft(draft_id)
     if current_draft is None:
         return None
-    source_run = None if source_run_id is None else store.get_run(source_run_id)
-    if source_run_id is not None and source_run is None:
-        raise ValueError(f"run not found: {source_run_id}")
+    source_kind, _source_id_value, source_run = _resolve_update_source(
+        store,
+        current_draft=current_draft,
+        source_policy_kind=source_policy_kind,
+        source_policy_id=source_policy_id,
+        source_run_id=source_run_id,
+        source_artifact=source_artifact,
+    )
+    next_source_run_id = source_run.id if source_run is not None else None
     next_snapshot_dir = current_draft.source_snapshot_dir
     next_source_num_timesteps = current_draft.source_num_timesteps
     source_changed = (
-        current_draft.source_run_id != source_run_id
+        current_draft.source_run_id != next_source_run_id
         or current_draft.source_artifact != source_artifact
     )
-    if source_changed and current_draft.source_run_id is not None:
+    if source_changed and current_draft.source_snapshot_dir is not None:
         raise ValueError("changing a fork draft source is not supported; create a new fork draft")
     updated = False
     try:
@@ -177,8 +195,7 @@ def update_draft(
             if source_changed:
                 next_snapshot_dir = None
                 next_source_num_timesteps = None
-                if source_run_id is not None and source_artifact is not None:
-                    assert source_run is not None
+                if source_kind == "run" and source_run is not None and source_artifact is not None:
                     next_snapshot_dir, next_source_num_timesteps = snapshot_draft_source(
                         manager_db_path=store.db_path,
                         draft_id=draft_id,
@@ -196,7 +213,7 @@ def update_draft(
                 draft_id=draft_id,
                 name=normalized_name,
                 config_snapshot_id=config_snapshot.id,
-                source_run_id=source_run_id,
+                source_run_id=next_source_run_id,
                 source_artifact=source_artifact,
                 source_snapshot_dir=None if next_snapshot_dir is None else str(next_snapshot_dir),
                 source_num_timesteps=next_source_num_timesteps,
@@ -244,6 +261,73 @@ def _draft_from_model(draft: RunDraftModel) -> ManagedRunDraft:
         ),
         source_num_timesteps=draft.source_num_timesteps,
     )
+
+
+def _resolve_create_source(
+    store: ManagerStore,
+    *,
+    source_policy_kind: PolicySourceKind | None,
+    source_policy_id: str | None,
+    source_run_id: str | None,
+    source_artifact: Literal["latest", "best"] | None,
+) -> tuple[PolicySourceKind | None, str | None, ManagedRun | None]:
+    source_kind = _source_kind(source_policy_kind, source_policy_id, source_run_id)
+    source_id = _source_id(source_policy_id, source_run_id)
+    if source_kind is None and source_id is None and source_artifact is None:
+        return None, None, None
+    if source_kind is None or source_id is None or source_artifact is None:
+        raise ValueError("draft fork source requires source kind, source id, and source artifact")
+    if source_kind == "run":
+        source_run = store.get_run(source_id)
+        if source_run is None:
+            raise ValueError(f"run not found: {source_id}")
+        return source_kind, source_id, source_run
+    raise ValueError(f"{source_kind} sources cannot be used for training fork drafts")
+
+
+def _resolve_update_source(
+    store: ManagerStore,
+    *,
+    current_draft: ManagedRunDraft,
+    source_policy_kind: PolicySourceKind | None,
+    source_policy_id: str | None,
+    source_run_id: str | None,
+    source_artifact: Literal["latest", "best"] | None,
+) -> tuple[PolicySourceKind | None, str | None, ManagedRun | None]:
+    if source_artifact is not None and source_policy_id is None and source_run_id is None:
+        if (
+            current_draft.source_snapshot_dir is None
+            or current_draft.source_artifact != source_artifact
+        ):
+            raise ValueError("draft fork source id is required")
+        return None, None, None
+    return _resolve_create_source(
+        store,
+        source_policy_kind=source_policy_kind,
+        source_policy_id=source_policy_id,
+        source_run_id=source_run_id,
+        source_artifact=source_artifact,
+    )
+
+
+def _source_kind(
+    source_policy_kind: PolicySourceKind | None,
+    source_policy_id: str | None,
+    source_run_id: str | None,
+) -> PolicySourceKind | None:
+    if source_policy_kind is not None:
+        return source_policy_kind
+    if source_policy_id is not None or source_run_id is not None:
+        return "run"
+    return None
+
+
+def _source_id(source_policy_id: str | None, source_run_id: str | None) -> str | None:
+    if source_policy_id is None:
+        return source_run_id
+    if source_run_id is not None and source_policy_id != source_run_id:
+        raise ValueError("source_policy_id and source_run_id disagree")
+    return source_policy_id
 
 
 def _template_from_model(template: RunTemplateModel) -> ManagedRunTemplate:

@@ -1,8 +1,16 @@
 // web/run-manager/src/entities/draft/ui/DraftList.tsx
 import type { ManagedDraft } from "@/shared/api/contract";
-import { cn } from "@/shared/ui/cn";
 import { formatDate } from "@/shared/ui/format";
 import { TrashIcon } from "@/shared/ui/icons";
+import {
+  ListActionsCell,
+  ListActionsHeaderCell,
+  ListRow,
+  ListSelectAllHeaderCell,
+  ListSelectionCell,
+  ListTable,
+  ListTableHead,
+} from "@/shared/ui/ListTable";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface DraftListProps {
@@ -27,48 +35,38 @@ export function DraftList({
   selectedDraftIds,
 }: DraftListProps) {
   return (
-    <div className="overflow-x-auto border border-app-border bg-app-surface">
-      <table className="w-full min-w-[780px] border-collapse text-left text-sm">
-        <thead className="border-b border-app-border text-xs font-bold tracking-[0.04em] text-app-muted uppercase">
-          <tr>
-            <th className="w-10 px-4 py-3">
-              <label className="grid place-items-center" data-draft-row-interaction>
-                <input
-                  aria-label="Select all drafts"
-                  checked={allDraftsSelected}
-                  className={draftCheckboxClass}
-                  disabled={isDeleting}
-                  type="checkbox"
-                  onChange={(event) => onSelectAll(event.currentTarget.checked)}
-                />
-              </label>
-            </th>
-            <th className="px-4 py-3">Draft</th>
-            <th className="px-4 py-3">Envs</th>
-            <th className="px-4 py-3">Steps</th>
-            <th className="px-4 py-3">LR</th>
-            <th className="px-4 py-3">CNN</th>
-            <th className="px-4 py-3">Created</th>
-            <th className="w-12 px-4 py-3">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {drafts.map((draft) => (
-            <DraftRow
-              draft={draft}
-              isDeleting={isDeleting}
-              key={draft.id}
-              selected={selectedDraftIds.has(draft.id)}
-              onOpenDraft={onOpenDraft}
-              onRequestDelete={onRequestDelete}
-              onToggleDraftSelection={onToggleDraftSelection}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListTable minWidthClass="min-w-[780px]">
+      <ListTableHead>
+        <tr>
+          <ListSelectAllHeaderCell
+            aria-label="Select all drafts"
+            checked={allDraftsSelected}
+            disabled={isDeleting}
+            onChange={onSelectAll}
+          />
+          <th className="px-4 py-3">Draft</th>
+          <th className="px-4 py-3">Envs</th>
+          <th className="px-4 py-3">Steps</th>
+          <th className="px-4 py-3">LR</th>
+          <th className="px-4 py-3">CNN</th>
+          <th className="px-4 py-3">Created</th>
+          <ListActionsHeaderCell />
+        </tr>
+      </ListTableHead>
+      <tbody>
+        {drafts.map((draft) => (
+          <DraftRow
+            draft={draft}
+            isDeleting={isDeleting}
+            key={draft.id}
+            selected={selectedDraftIds.has(draft.id)}
+            onOpenDraft={onOpenDraft}
+            onRequestDelete={onRequestDelete}
+            onToggleDraftSelection={onToggleDraftSelection}
+          />
+        ))}
+      </tbody>
+    </ListTable>
   );
 }
 
@@ -88,37 +86,13 @@ function DraftRow({
   selected: boolean;
 }) {
   return (
-    <tr
-      className={draftRowClass(selected)}
-      tabIndex={0}
-      onClick={(event) => {
-        if (isDraftRowInteractionTarget(event.target)) {
-          return;
-        }
-        onOpenDraft(draft);
-      }}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) {
-          return;
-        }
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpenDraft(draft);
-        }
-      }}
-    >
-      <td className="px-4 py-3 align-top" data-draft-row-interaction>
-        <label className="grid place-items-center">
-          <input
-            aria-label={`Select draft ${draft.name}`}
-            checked={selected}
-            className={draftCheckboxClass}
-            disabled={isDeleting}
-            type="checkbox"
-            onChange={(event) => onToggleDraftSelection(draft.id, event.currentTarget.checked)}
-          />
-        </label>
-      </td>
+    <ListRow selected={selected} onOpen={() => onOpenDraft(draft)}>
+      <ListSelectionCell
+        aria-label={`Select draft ${draft.name}`}
+        checked={selected}
+        disabled={isDeleting}
+        onChange={(checked) => onToggleDraftSelection(draft.id, checked)}
+      />
       <td className="px-4 py-3 align-top">
         <strong className="text-app-text">{draft.name}</strong>
       </td>
@@ -133,7 +107,7 @@ function DraftRow({
       <td className="px-4 py-3 align-top whitespace-nowrap text-app-muted">
         {formatDate(draft.created_at)}
       </td>
-      <td className="px-4 py-3 align-top" data-draft-row-interaction>
+      <ListActionsCell>
         <TooltipIconButton
           aria-label={`Delete draft ${draft.name}`}
           disabled={isDeleting}
@@ -144,23 +118,7 @@ function DraftRow({
         >
           <TrashIcon />
         </TooltipIconButton>
-      </td>
-    </tr>
-  );
-}
-
-const draftCheckboxClass = "h-4 w-4 accent-app-accent";
-
-function draftRowClass(selected: boolean) {
-  return cn(
-    "cursor-pointer border-b border-app-border transition-colors last:border-b-0 hover:bg-app-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-app-accent",
-    selected ? "bg-app-surface-muted" : undefined,
-  );
-}
-
-function isDraftRowInteractionTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    target.closest("[data-draft-row-interaction],a,button,input,label,select,textarea") !== null
+      </ListActionsCell>
+    </ListRow>
   );
 }

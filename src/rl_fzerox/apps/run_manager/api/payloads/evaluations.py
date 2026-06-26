@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Literal
 
 from typing_extensions import TypedDict
@@ -217,6 +218,14 @@ def evaluation_payload(
     }
 
 
+def evaluation_result_summary_payload_from_path(
+    path: Path | None,
+) -> EvaluationResultSummaryPayload | None:
+    """Return the standard evaluation summary payload for a stored result JSON file."""
+
+    return _result_summary_payload(_read_result_json(path))
+
+
 def evaluation_preset_payload(preset: ManagedEvaluationPreset) -> EvaluationPresetPayload:
     """Return one persisted evaluation-preset payload."""
 
@@ -284,10 +293,14 @@ def _checkpoint_payload(checkpoint: EvaluationCheckpointSnapshot) -> EvaluationC
 
 
 def _read_result_file(evaluation: ManagedEvaluation) -> dict[str, object] | None:
-    if evaluation.result_json_path is None or not evaluation.result_json_path.is_file():
+    return _read_result_json(evaluation.result_json_path)
+
+
+def _read_result_json(path: Path | None) -> dict[str, object] | None:
+    if path is None or not path.is_file():
         return None
     try:
-        payload: object = json.loads(evaluation.result_json_path.read_text(encoding="utf-8"))
+        payload: object = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     return _object_mapping(payload)

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from rl_fzerox.core.manager.db.models.checkpoints import PublishedCheckpointModel
@@ -29,6 +29,7 @@ def insert_published_checkpoint(
             checkpoint_id=checkpoint.checkpoint_id,
             version=checkpoint.version,
             name=checkpoint.name,
+            run_id=checkpoint.run_id,
             config_snapshot_id=config_snapshot_id,
             import_dir=str(checkpoint.import_dir),
             manifest_json=checkpoint.manifest_json,
@@ -96,3 +97,51 @@ def list_published_checkpoints(session: Session) -> tuple[ManagedPublishedCheckp
         )
     )
     return tuple(published_checkpoint_from_model(checkpoint) for checkpoint in checkpoints)
+
+
+def update_published_checkpoint_snapshot(
+    session: Session,
+    *,
+    checkpoint: ManagedPublishedCheckpoint,
+    config_snapshot_id: str,
+) -> ManagedPublishedCheckpoint:
+    """Update one installed checkpoint after repairing its run snapshot."""
+
+    model = session.get(PublishedCheckpointModel, checkpoint.id)
+    if model is None:
+        raise ValueError(f"published checkpoint {checkpoint.id!r} does not exist")
+    model.run_id = checkpoint.run_id
+    model.config_snapshot_id = config_snapshot_id
+    model.policy_path = str(checkpoint.policy_path)
+    model.model_path = str(checkpoint.model_path)
+    model.checkpoint_metadata_path = str(checkpoint.checkpoint_metadata_path)
+    model.train_config_path = str(checkpoint.train_config_path)
+    model.engine_tuning_state_path = (
+        None
+        if checkpoint.engine_tuning_state_path is None
+        else str(checkpoint.engine_tuning_state_path)
+    )
+    model.engine_tuning_model_path = (
+        None
+        if checkpoint.engine_tuning_model_path is None
+        else str(checkpoint.engine_tuning_model_path)
+    )
+    model.updated_at = checkpoint.updated_at
+    session.flush()
+    return published_checkpoint_from_model(model)
+
+
+def delete_published_checkpoint(
+    session: Session,
+    checkpoint_id: str,
+) -> ManagedPublishedCheckpoint | None:
+    """Delete one installed checkpoint row and return its deleted domain record."""
+
+    checkpoint = session.get(PublishedCheckpointModel, checkpoint_id)
+    if checkpoint is None:
+        return None
+    deleted_checkpoint = published_checkpoint_from_model(checkpoint)
+    session.execute(
+        delete(PublishedCheckpointModel).where(PublishedCheckpointModel.id == checkpoint_id)
+    )
+    return deleted_checkpoint

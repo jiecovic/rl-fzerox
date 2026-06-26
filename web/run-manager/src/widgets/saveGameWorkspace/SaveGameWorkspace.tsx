@@ -20,6 +20,7 @@ import {
 import { UnlockPathPanel } from "@/features/saveGameCourseSetup/ui/UnlockPathPanel";
 import type {
   CareerModeRunnerLaunchRequest,
+  CheckpointCatalogResponse,
   ConfigMetadata,
   ManagedEvaluation,
   ManagedRun,
@@ -48,6 +49,7 @@ import {
 } from "@/widgets/saveGameWorkspace/useSaveGameWorkspaceController";
 
 interface SaveGameWorkspaceProps {
+  checkpointCatalog: CheckpointCatalogResponse | null;
   metadata: ConfigMetadata | null;
   onGlobalError: (message: string | null) => void;
   onCreateSaveGame: (name: string) => Promise<ManagedSaveGame>;
@@ -76,6 +78,7 @@ interface SaveGameWorkspaceProps {
 }
 
 export function SaveGameWorkspace({
+  checkpointCatalog,
   metadata,
   onGlobalError,
   onCreateSaveGame,
@@ -133,7 +136,9 @@ export function SaveGameWorkspace({
     saveGame,
     session,
   });
-  const policySources = useStablePolicySources(policySourceOptions({ evaluations, runs }));
+  const policySources = useStablePolicySources(
+    policySourceOptions({ checkpointCatalog, evaluations, runs }),
+  );
 
   const saveGameCourseSetups = saveGame?.course_setups ?? EMPTY_COURSE_SETUPS;
   const saveGameCupSetups = saveGame?.cup_setups ?? EMPTY_CUP_SETUPS;

@@ -1,5 +1,5 @@
 # src/rl_fzerox/apps/run_manager/api/handlers/checkpoints.py
-"""Handlers for official checkpoint catalog listing and installation."""
+"""Handlers for official checkpoint catalog listing, installation, and use."""
 
 from __future__ import annotations
 
@@ -33,9 +33,16 @@ _DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 
 def checkpoint_catalog_response(store: ManagerStore) -> CheckpointCatalogPayload:
     catalog = _load_checkpoint_catalog()
+    installed_checkpoints = store.list_published_checkpoints()
+    snapshot_runs = {
+        checkpoint.run_id: snapshot_run
+        for checkpoint in installed_checkpoints
+        if (snapshot_run := store.get_run_summary(checkpoint.run_id)) is not None
+    }
     return checkpoint_catalog_payload(
         catalog,
-        installed_checkpoints=store.list_published_checkpoints(),
+        installed_checkpoints=installed_checkpoints,
+        snapshot_runs=snapshot_runs,
     )
 
 
@@ -49,9 +56,10 @@ def install_catalog_checkpoint_response(
     entry = _catalog_entry(catalog, checkpoint_id=checkpoint_id, version=version)
     installed = _installed_checkpoint_for_entry(store, entry)
     if installed is not None:
+        snapshot_run = store.get_run_summary(installed.run_id)
         return {
             "status": "already_installed",
-            "checkpoint": published_checkpoint_payload(installed),
+            "checkpoint": published_checkpoint_payload(installed, snapshot_run=snapshot_run),
         }
 
     try:
@@ -65,8 +73,21 @@ def install_catalog_checkpoint_response(
 
     return {
         "status": "installed",
-        "checkpoint": published_checkpoint_payload(checkpoint),
+        "checkpoint": published_checkpoint_payload(
+            checkpoint,
+            snapshot_run=store.get_run_summary(checkpoint.run_id),
+        ),
     }
+
+
+def delete_checkpoint_payload(store: ManagerStore, checkpoint_id: str) -> dict[str, bool]:
+    try:
+        deleted = store.delete_published_checkpoint(checkpoint_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not deleted:
+        raise HTTPException(status_code=404, detail="checkpoint not found")
+    return {"deleted": True}
 
 
 def _load_checkpoint_catalog() -> CheckpointCatalog:

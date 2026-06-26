@@ -45,6 +45,8 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
             name: str,
             config: ManagedRunConfig,
             draft_id: str | None,
+            source_policy_kind: object | None,
+            source_policy_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
@@ -53,6 +55,8 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
             del (
                 copy_alt_baselines,
                 draft_id,
+                source_policy_kind,
+                source_policy_id,
                 source_artifact,
                 source_run_id,
                 engine_tuning_source_action,
@@ -162,6 +166,8 @@ async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Pat
             name: str,
             config: ManagedRunConfig,
             draft_id: str | None,
+            source_policy_kind: object | None,
+            source_policy_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
@@ -170,6 +176,8 @@ async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Pat
             del (
                 copy_alt_baselines,
                 draft_id,
+                source_policy_kind,
+                source_policy_id,
                 source_artifact,
                 source_run_id,
                 engine_tuning_source_action,
@@ -224,11 +232,14 @@ async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
             name: str,
             config: ManagedRunConfig,
             draft_id: str | None,
+            source_policy_kind: object | None,
+            source_policy_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
             engine_tuning_source_action: Literal["convert", "discard"],
         ):
+            del source_policy_kind, source_policy_id
             seen_source.append(
                 (
                     draft_id,
@@ -289,12 +300,21 @@ async def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Pat
             name: str,
             config: ManagedRunConfig,
             draft_id: str | None,
+            source_policy_kind: object | None,
+            source_policy_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
             engine_tuning_source_action: Literal["convert", "discard"],
         ):
-            del copy_alt_baselines, source_artifact, source_run_id, engine_tuning_source_action
+            del (
+                copy_alt_baselines,
+                source_artifact,
+                source_policy_id,
+                source_policy_kind,
+                source_run_id,
+                engine_tuning_source_action,
+            )
             run = store.create_run(
                 name=name,
                 config=config,
@@ -342,6 +362,8 @@ async def test_manager_api_forks_run(tmp_path: Path) -> None:
             name: str,
             config: ManagedRunConfig,
             draft_id: str | None,
+            source_policy_kind: object | None,
+            source_policy_id: str | None,
             source_run_id: str | None,
             source_artifact: Literal["latest", "best"] | None,
             copy_alt_baselines: bool,
@@ -353,6 +375,8 @@ async def test_manager_api_forks_run(tmp_path: Path) -> None:
                 draft_id,
                 name,
                 source_artifact,
+                source_policy_id,
+                source_policy_kind,
                 source_run_id,
                 engine_tuning_source_action,
             )

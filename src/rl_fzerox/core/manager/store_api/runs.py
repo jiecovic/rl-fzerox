@@ -67,6 +67,9 @@ class RunStoreMixin:
     def get_run(self, run_id: str) -> ManagedRun | None:
         return run_registry.get_run(_manager_store(self), run_id)
 
+    def get_run_summary(self, run_id: str) -> ManagedRunSummary | None:
+        return run_registry.get_run_summary(_manager_store(self), run_id)
+
     def list_runs(self) -> tuple[ManagedRun, ...]:
         return run_registry.list_runs(_manager_store(self))
 

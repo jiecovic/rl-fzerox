@@ -78,7 +78,7 @@ export function PolicyArtifactSelect<TDraft extends PolicySelectionDraft>({
   visibleLabel?: string;
 }) {
   const source = selectedPolicySource(policySources, draft);
-  const fixedArtifact = source?.kind === "evaluation";
+  const fixedArtifact = source?.kind === "evaluation" || source?.kind === "checkpoint";
   return (
     <FieldShell>
       <span>{visibleLabel ?? label}</span>
@@ -168,10 +168,12 @@ const PolicySourceOptions = memo(function PolicySourceOptions({
 }) {
   const runSources = policySources.filter((source) => source.kind === "run");
   const evaluationSources = policySources.filter((source) => source.kind === "evaluation");
+  const checkpointSources = policySources.filter((source) => source.kind === "checkpoint");
   return (
     <>
       <PolicySourceOptionGroup label="Run" policySources={runSources} />
       <PolicySourceOptionGroup label="Evaluation" policySources={evaluationSources} />
+      <PolicySourceOptionGroup label="Checkpoint" policySources={checkpointSources} />
     </>
   );
 });
