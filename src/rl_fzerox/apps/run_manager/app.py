@@ -57,6 +57,7 @@ def main(argv: list[str] | None = None) -> None:
         uvicorn.Config(
             create_manager_api_app(store),
             access_log=False,
+            lifespan="off",
             log_level="warning",
         )
     )
@@ -68,7 +69,7 @@ def main(argv: list[str] | None = None) -> None:
     api_thread.start()
 
     if args.api_only:
-        print(f"Run manager API listening on http://127.0.0.1:{api_binding.port}")
+        print(f"Run manager API listening on http://127.0.0.1:{api_binding.port}", flush=True)
         try:
             _join_api_server(api_thread)
         except KeyboardInterrupt:
@@ -85,8 +86,11 @@ def main(argv: list[str] | None = None) -> None:
             f"Run manager UI port {args.web_port} is busy; using {web_binding.port} instead.",
             file=sys.stderr,
         )
-    print(f"Run manager UI:  http://{_display_web_host(args.web_host)}:{web_binding.port}")
-    print(f"Run manager API: http://127.0.0.1:{api_binding.port}")
+    print(
+        f"Run manager UI:  http://{_display_web_host(args.web_host)}:{web_binding.port}",
+        flush=True,
+    )
+    print(f"Run manager API: http://127.0.0.1:{api_binding.port}", flush=True)
     process = subprocess.Popen(command, cwd=DEFAULTS.web_root, env=environment)
     try:
         process.wait()
