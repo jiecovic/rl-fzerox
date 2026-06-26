@@ -21,14 +21,13 @@ Full Master cups playlist:
 
 ## Requirements
 
-- Linux userspace, either native Linux or Windows with WSL2
-- Python 3.10+ to run the installer
-- Python 3.12 for the project environment; `uv` can install/manage it
+- Linux or WSL2
+- Python bootstrap: `python3` or `python` 3.10+. The project venv uses Python
+  3.12; `./install` creates it with `uv` or `python3.12`.
 - Rust toolchain with Cargo
 - Node.js 20.19+, 22.12+, or 24+, with npm
-- Git
 - Mupen64Plus-Next libretro core shared library
-- a local US F-Zero X ROM
+- local US F-Zero X ROM
 
 ## Setup
 
@@ -44,9 +43,9 @@ cd rl-fzerox
 emulator extension in release mode, installs the run manager frontend, and
 creates the ignored `local/` folders.
 
-The installer may be started with a newer system Python, for example Python
-3.13 or 3.14. The project environment it creates is still Python 3.12 when `uv`
-or `python3.12` is available.
+Your system `python` does not have to be Python 3.12. It only needs to be new
+enough to run the installer; the installer then creates a Python 3.12 `.venv`
+through `uv` or an existing `python3.12`.
 
 For NVIDIA CUDA training with a recent driver, use the CUDA 12.8 setup path:
 
