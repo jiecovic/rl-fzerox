@@ -69,10 +69,8 @@ python -m pip install -U pip
 
 Then install the project:
 
-For a quick local checkpoint/watch test, CPU PyTorch is enough and the project
-install below can resolve it normally. For NVIDIA CUDA training, install a
-CUDA-enabled PyTorch wheel first. With a recent NVIDIA driver, use the current
-CUDA 12.8 wheel:
+For NVIDIA CUDA training, install a CUDA-enabled PyTorch wheel first. With a
+recent NVIDIA driver, use the current CUDA 12.8 wheel:
 
 ```bash
 python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
