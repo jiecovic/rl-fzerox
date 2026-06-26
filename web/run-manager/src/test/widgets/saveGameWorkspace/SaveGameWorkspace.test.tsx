@@ -850,6 +850,8 @@ function evaluationFixture(overrides: Partial<ManagedEvaluation> = {}): ManagedE
     name: "evaluation snapshot",
     status: "completed",
     evaluation_dir: "/tmp/evaluations/eval-001",
+    source_policy_kind: "run",
+    source_policy_id: "run-policy",
     source_run_id: "run-policy",
     source_artifact: "best",
     preset_id: "preset-001",

@@ -61,10 +61,24 @@ class CreateEvaluationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    source_run_id: str
+    source_policy_kind: PolicySourceKind = "run"
+    source_policy_id: str | None = None
+    source_run_id: str | None = None
     source_artifact: EvaluationCheckpointArtifact = "latest"
     preset_id: str
     policy_mode: PolicyPlaybackMode = "deterministic"
+
+    @model_validator(mode="after")
+    def _validate_source(self) -> CreateEvaluationRequest:
+        if self.source_policy_id is not None:
+            if self.source_run_id is not None and self.source_policy_kind != "run":
+                raise ValueError(
+                    "source_run_id is only valid with source_policy_kind='run'"
+                )
+            return self
+        if self.source_policy_kind == "run" and self.source_run_id is not None:
+            return self
+        raise ValueError("source_policy_id is required")
 
 
 class StartEvaluationRequest(BaseModel):

@@ -34,6 +34,10 @@ class EvaluationCheckpointSource:
     run_dir: Path
     artifact: EvaluationCheckpointArtifact
     lineage_step_offset: int = 0
+    policy_path: Path | None = None
+    model_path: Path | None = None
+    local_num_timesteps: int | None = None
+    lineage_num_timesteps: int | None = None
 
 
 def snapshot_evaluation_checkpoint(
@@ -53,8 +57,8 @@ def snapshot_evaluation_checkpoint(
     resolved_destination_dir = destination_dir.expanduser().resolve()
     _assert_empty_destination(resolved_destination_dir)
 
-    model_path = resolve_model_artifact_path(resolved_source_run_dir, artifact=source.artifact)
-    policy_path = resolve_policy_artifact_path(resolved_source_run_dir, artifact=source.artifact)
+    model_path = _source_model_path(source, resolved_source_run_dir)
+    policy_path = _source_policy_path(source, resolved_source_run_dir)
     metadata = load_policy_artifact_metadata(policy_path)
     if metadata is None or metadata.num_timesteps is None:
         raise ValueError(
@@ -79,8 +83,16 @@ def snapshot_evaluation_checkpoint(
     copied_checkpoint_dir = (
         resolved_destination_dir / RUN_LAYOUT.checkpoints_dirname / source.artifact
     )
-    local_num_timesteps = metadata.num_timesteps
-    lineage_num_timesteps = metadata.lineage_num_timesteps
+    local_num_timesteps = (
+        source.local_num_timesteps
+        if source.local_num_timesteps is not None
+        else metadata.num_timesteps
+    )
+    lineage_num_timesteps = (
+        source.lineage_num_timesteps
+        if source.lineage_num_timesteps is not None
+        else metadata.lineage_num_timesteps
+    )
     if lineage_num_timesteps is None and source.lineage_step_offset > 0:
         lineage_num_timesteps = source.lineage_step_offset + local_num_timesteps
     return EvaluationCheckpointSnapshot(
@@ -95,6 +107,18 @@ def snapshot_evaluation_checkpoint(
         lineage_num_timesteps=lineage_num_timesteps,
         source_mtime_ns=policy_path.stat().st_mtime_ns,
     )
+
+
+def _source_model_path(source: EvaluationCheckpointSource, resolved_source_run_dir: Path) -> Path:
+    if source.model_path is not None:
+        return source.model_path.expanduser().resolve()
+    return resolve_model_artifact_path(resolved_source_run_dir, artifact=source.artifact)
+
+
+def _source_policy_path(source: EvaluationCheckpointSource, resolved_source_run_dir: Path) -> Path:
+    if source.policy_path is not None:
+        return source.policy_path.expanduser().resolve()
+    return resolve_policy_artifact_path(resolved_source_run_dir, artifact=source.artifact)
 
 
 def _assert_empty_destination(destination_dir: Path) -> None:

@@ -35,6 +35,8 @@ describe("evaluations API contract", () => {
           name: "Eval 1",
           status: "created",
           evaluation_dir: "local/evaluations/eval-001",
+          source_policy_kind: "run",
+          source_policy_id: "run-001",
           source_run_id: "run-001",
           source_artifact: "latest",
           preset_id: "time_attack_all_courses",

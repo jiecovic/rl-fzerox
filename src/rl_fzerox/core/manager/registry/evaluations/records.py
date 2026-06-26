@@ -20,12 +20,17 @@ from rl_fzerox.core.evaluation.snapshots import (
 )
 from rl_fzerox.core.manager.db.repositories import evaluations as evaluation_repository
 from rl_fzerox.core.manager.db.repositories.filesystem import queue_delete_tree
-from rl_fzerox.core.manager.models import ManagedEvaluation, ManagedEvaluationPreset
+from rl_fzerox.core.manager.models import (
+    ManagedEvaluation,
+    ManagedEvaluationPreset,
+    ManagedPolicySource,
+    PolicySourceKind,
+)
+from rl_fzerox.core.manager.policy_sources import resolve_policy_source
 from rl_fzerox.core.manager.registry.common import new_record_id, utc_now
 from rl_fzerox.core.manager.registry.evaluations.presets import get_evaluation_preset
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.serialization import config_json
-from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -43,6 +48,29 @@ def create_evaluation(
     preset_id: str,
     evaluations_root: Path | None = None,
 ) -> ManagedEvaluation:
+    return create_evaluation_from_policy_source(
+        store,
+        name=name,
+        source_policy_kind="run",
+        source_policy_id=source_run_id,
+        source_artifact=source_artifact,
+        policy_mode=policy_mode,
+        preset_id=preset_id,
+        evaluations_root=evaluations_root,
+    )
+
+
+def create_evaluation_from_policy_source(
+    store: ManagerStore,
+    *,
+    name: str,
+    source_policy_kind: PolicySourceKind,
+    source_policy_id: str,
+    source_artifact: EvaluationCheckpointArtifact,
+    policy_mode: EvaluationPolicyMode,
+    preset_id: str,
+    evaluations_root: Path | None = None,
+) -> ManagedEvaluation:
     """Create one evaluation record and freeze its source checkpoint."""
 
     preset = get_evaluation_preset(store, preset_id)
@@ -50,23 +78,32 @@ def create_evaluation(
         raise ValueError("evaluation preset not found")
     preset_version = preset.version
 
-    source_run = store.get_run(source_run_id)
-    if source_run is None:
-        raise ValueError("source run not found")
+    with store._orm_session() as session:
+        policy_source = resolve_policy_source(
+            session,
+            kind=source_policy_kind,
+            source_id=source_policy_id,
+            artifact=source_artifact,
+            require_policy_artifact=True,
+        )
+    if policy_source.policy_path is None:
+        raise FileNotFoundError("evaluation source policy checkpoint is missing")
+    if policy_source.model_path is None:
+        raise FileNotFoundError("evaluation source model checkpoint is missing")
     seed = preset.seed
-    target = _evaluation_target_for_source(source_run.config, preset.target)
+    target = _evaluation_target_for_source(policy_source.config, preset.target)
     config = _evaluation_config_for_source(
-        source_run.config,
+        policy_source.config,
         preset=preset,
         target=target,
     )
-    source_policy_path = resolve_policy_artifact_path(source_run.run_dir, artifact=source_artifact)
-    source_mtime_ns = source_policy_path.stat().st_mtime_ns
+    source_mtime_ns = policy_source.policy_path.stat().st_mtime_ns
     with store._orm_session() as session:
         existing = evaluation_repository.find_created_evaluation_snapshot(
             session,
             name=name,
-            source_run_id=source_run.id,
+            source_policy_kind=source_policy_kind,
+            source_policy_id=source_policy_id,
             source_artifact=source_artifact,
             policy_mode=policy_mode,
             seed=seed,
@@ -82,13 +119,7 @@ def create_evaluation(
     evaluation_id = new_record_id(name)
     evaluation_dir = (evaluations_root or store.evaluations_root()) / evaluation_id
     checkpoint = snapshot_evaluation_checkpoint(
-        EvaluationCheckpointSource(
-            run_id=source_run.id,
-            run_name=source_run.name,
-            run_dir=source_run.run_dir,
-            artifact=source_artifact,
-            lineage_step_offset=source_run.lineage_step_offset,
-        ),
+        _evaluation_checkpoint_source(policy_source),
         destination_dir=evaluation_dir / "checkpoint_snapshot",
     )
     evaluation = ManagedEvaluation(
@@ -96,7 +127,9 @@ def create_evaluation(
         name=name,
         status="created",
         evaluation_dir=evaluation_dir,
-        source_run_id=source_run.id,
+        source_policy_kind=source_policy_kind,
+        source_policy_id=source_policy_id,
+        source_run_id=source_policy_id if source_policy_kind == "run" else None,
         source_artifact=source_artifact,
         preset_id=preset_id,
         preset_version=preset_version,
@@ -113,6 +146,22 @@ def create_evaluation(
     with store._orm_session() as session:
         evaluation_repository.insert_evaluation(session, evaluation=evaluation)
     return evaluation
+
+
+def _evaluation_checkpoint_source(policy_source: ManagedPolicySource) -> EvaluationCheckpointSource:
+    if policy_source.policy_path is None or policy_source.model_path is None:
+        raise FileNotFoundError("evaluation source checkpoint is missing")
+    return EvaluationCheckpointSource(
+        run_id=policy_source.source_run_id,
+        run_name=policy_source.source_run_name or policy_source.name,
+        run_dir=policy_source.source_dir,
+        artifact=policy_source.artifact,
+        lineage_step_offset=policy_source.lineage_step_offset,
+        policy_path=policy_source.policy_path,
+        model_path=policy_source.model_path,
+        local_num_timesteps=policy_source.local_num_timesteps,
+        lineage_num_timesteps=policy_source.lineage_num_timesteps,
+    )
 
 
 def delete_evaluation(store: ManagerStore, evaluation_id: str) -> bool:

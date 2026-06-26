@@ -277,6 +277,8 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "name",
         "status",
         "evaluation_dir",
+        "source_policy_kind",
+        "source_policy_id",
         "source_run_id",
         "source_artifact",
         "preset_id",

@@ -12,6 +12,7 @@ from rl_fzerox.core.manager.db.models.evaluations import EvaluationPresetModel
 from rl_fzerox.core.manager.models import ManagedRun
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
+from tests.core.manager.test_manager_store_checkpoints import _manifest, _payloads, _write_bundle
 
 TIME_ATTACK_PRESET_ID = "time_attack_all_courses"
 GP_PRESET_ID = "gp_course_master_all_courses"
@@ -53,6 +54,9 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
 
     assert "-eval-1-" in evaluation.id
     assert evaluation.status == "created"
+    assert evaluation.source_policy_kind == "run"
+    assert evaluation.source_policy_id == run.id
+    assert evaluation.source_run_id == run.id
     assert evaluation.source_artifact == "latest"
     assert evaluation.checkpoint.source_run_id == run.id
     assert evaluation.checkpoint.local_num_timesteps == 123
@@ -73,6 +77,38 @@ def test_manager_store_creates_evaluation_snapshot(tmp_path: Path) -> None:
     assert reloaded[0].config.train.device == run.config.train.device
     assert reloaded[0].target.vehicle_ids == run.config.vehicle.selected_vehicle_ids
     assert reloaded[0].checkpoint.copied_policy_path == evaluation.checkpoint.copied_policy_path
+
+
+def test_manager_store_creates_evaluation_from_published_checkpoint(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    bundle_path = tmp_path / "blue-falcon.zip"
+    payloads = _payloads()
+    _write_bundle(bundle_path, manifest=_manifest(payloads), payloads=payloads)
+    checkpoint = store.import_published_checkpoint_bundle(bundle_path=bundle_path)
+
+    evaluation = store.create_evaluation_from_policy_source(
+        name="Published Eval",
+        source_policy_kind="checkpoint",
+        source_policy_id=checkpoint.id,
+        source_artifact="best",
+        policy_mode="deterministic",
+        preset_id=TIME_ATTACK_PRESET_ID,
+        evaluations_root=tmp_path / "evaluations",
+    )
+
+    assert evaluation.source_policy_kind == "checkpoint"
+    assert evaluation.source_policy_id == checkpoint.id
+    assert evaluation.source_run_id is None
+    assert evaluation.checkpoint.source_run_id == checkpoint.source_run_id
+    assert evaluation.checkpoint.source_run_name == checkpoint.source_run_name
+    assert evaluation.checkpoint.local_num_timesteps == checkpoint.local_num_timesteps
+    assert evaluation.checkpoint.lineage_num_timesteps == checkpoint.lineage_num_timesteps
+    assert Path(evaluation.checkpoint.source_policy_path) == checkpoint.policy_path.resolve()
+    assert Path(evaluation.checkpoint.source_model_path or "") == checkpoint.model_path.resolve()
+    assert Path(evaluation.checkpoint.copied_policy_path).read_bytes() == b"policy"
+    assert Path(evaluation.checkpoint.copied_model_path or "").read_bytes() == b"model"
 
 
 def test_manager_store_reuses_identical_created_evaluation_snapshot(tmp_path: Path) -> None:

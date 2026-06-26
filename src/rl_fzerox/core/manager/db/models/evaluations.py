@@ -16,12 +16,21 @@ class EvaluationModel(ManagerBase):
     __table_args__ = (
         Index("evaluations_status_created_idx", "status", "created_at", "id"),
         Index("evaluations_source_run_idx", "source_run_id", "created_at", "id"),
+        Index(
+            "evaluations_source_policy_idx",
+            "source_policy_kind",
+            "source_policy_id",
+            "created_at",
+            "id",
+        ),
     )
 
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str]
     status: Mapped[str]
     evaluation_dir: Mapped[str] = mapped_column(unique=True)
+    source_policy_kind: Mapped[str]
+    source_policy_id: Mapped[str | None]
     source_run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"))
     source_artifact: Mapped[str | None]
     preset_id: Mapped[str] = mapped_column(ForeignKey("evaluation_presets.id"), nullable=False)

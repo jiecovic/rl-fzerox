@@ -235,6 +235,8 @@ def _managed_evaluation(
         name="Eval",
         status="created",
         evaluation_dir=tmp_path / "evaluations" / evaluation_id,
+        source_policy_kind="run",
+        source_policy_id="run-001",
         source_run_id="run-001",
         source_artifact="latest",
         preset_id=preset_id,

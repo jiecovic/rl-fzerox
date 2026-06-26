@@ -51,9 +51,10 @@ def create_evaluation_payload(
     """Create one immutable checkpoint snapshot for future evaluation execution."""
 
     try:
-        evaluation = store.create_evaluation(
+        evaluation = store.create_evaluation_from_policy_source(
             name=name,
-            source_run_id=request.source_run_id,
+            source_policy_kind=request.source_policy_kind,
+            source_policy_id=_evaluation_source_policy_id(request),
             source_artifact=request.source_artifact,
             policy_mode=request.policy_mode,
             preset_id=request.preset_id,
@@ -63,6 +64,14 @@ def create_evaluation_payload(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {"evaluation": _evaluation_payload_with_suite(store, evaluation)}
+
+
+def _evaluation_source_policy_id(request: CreateEvaluationRequest) -> str:
+    if request.source_policy_id is not None:
+        return request.source_policy_id
+    if request.source_policy_kind == "run" and request.source_run_id is not None:
+        return request.source_run_id
+    raise ValueError("source_policy_id is required")
 
 
 def create_evaluation_preset_payload(

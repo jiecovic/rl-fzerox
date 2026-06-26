@@ -102,6 +102,8 @@ class ManagedEvaluation:
     name: str
     status: ManagedEvaluationStatus
     evaluation_dir: Path
+    source_policy_kind: PolicySourceKind
+    source_policy_id: str | None
     source_run_id: str | None
     source_artifact: Literal["latest", "best", "final"] | None
     preset_id: str
@@ -228,6 +230,7 @@ class ManagedPolicySource:
     source_run_name: str | None = None
     local_num_timesteps: int | None = None
     lineage_num_timesteps: int | None = None
+    lineage_step_offset: int = 0
 
 
 @dataclass(frozen=True, slots=True)

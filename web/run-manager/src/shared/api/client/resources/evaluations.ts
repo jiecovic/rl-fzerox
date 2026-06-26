@@ -31,6 +31,8 @@ export async function createEvaluation(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: request.name,
+      source_policy_kind: request.sourcePolicyKind ?? "run",
+      source_policy_id: request.sourcePolicyId ?? request.sourceRunId,
       source_run_id: request.sourceRunId,
       source_artifact: request.sourceArtifact,
       preset_id: request.presetId,

@@ -15,6 +15,7 @@ from rl_fzerox.core.manager.models import (
     ManagedEvaluation,
     ManagedEvaluationBaselineSuite,
     ManagedEvaluationPreset,
+    PolicySourceKind,
 )
 from rl_fzerox.core.manager.registry import evaluations as evaluation_registry
 from rl_fzerox.core.manager.store_api.common import manager_store as _manager_store
@@ -37,6 +38,28 @@ class EvaluationStoreMixin:
             _manager_store(self),
             name=name,
             source_run_id=source_run_id,
+            source_artifact=source_artifact,
+            policy_mode=policy_mode,
+            preset_id=preset_id,
+            evaluations_root=evaluations_root,
+        )
+
+    def create_evaluation_from_policy_source(
+        self,
+        *,
+        name: str,
+        source_policy_kind: PolicySourceKind,
+        source_policy_id: str,
+        source_artifact: EvaluationCheckpointArtifact,
+        policy_mode: EvaluationPolicyMode,
+        preset_id: str,
+        evaluations_root: Path | None = None,
+    ) -> ManagedEvaluation:
+        return evaluation_registry.create_evaluation_from_policy_source(
+            _manager_store(self),
+            name=name,
+            source_policy_kind=source_policy_kind,
+            source_policy_id=source_policy_id,
             source_artifact=source_artifact,
             policy_mode=policy_mode,
             preset_id=preset_id,

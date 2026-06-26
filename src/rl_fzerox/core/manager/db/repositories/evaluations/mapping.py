@@ -25,6 +25,7 @@ from rl_fzerox.core.manager.models import (
     ManagedEvaluationBaselineSuite,
     ManagedEvaluationPreset,
     ManagedEvaluationStatus,
+    PolicySourceKind,
 )
 from rl_fzerox.core.manager.storage.serialization import load_config_json
 
@@ -39,6 +40,8 @@ def managed_evaluation_from_model(evaluation: EvaluationModel) -> ManagedEvaluat
         name=evaluation.name,
         status=_evaluation_status(evaluation.status),
         evaluation_dir=Path(evaluation.evaluation_dir),
+        source_policy_kind=_policy_source_kind(evaluation.source_policy_kind),
+        source_policy_id=evaluation.source_policy_id,
         source_run_id=evaluation.source_run_id,
         source_artifact=_source_artifact(evaluation.source_artifact),
         preset_id=evaluation.preset_id,
@@ -148,6 +151,17 @@ def _source_artifact(value: object) -> EvaluationCheckpointArtifact | None:
     if value is None:
         return None
     return _checkpoint_artifact(value)
+
+
+def _policy_source_kind(value: object) -> PolicySourceKind:
+    match str(value):
+        case "run":
+            return "run"
+        case "evaluation":
+            return "evaluation"
+        case "checkpoint":
+            return "checkpoint"
+    raise ValueError(f"Unsupported evaluation policy source kind: {value!r}")
 
 
 def _checkpoint_artifact(value: object) -> EvaluationCheckpointArtifact:

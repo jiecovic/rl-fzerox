@@ -22,6 +22,8 @@ def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
         name="Eval 1",
         status="created",
         evaluation_dir=Path("local/evaluations/eval-001"),
+        source_policy_kind="run",
+        source_policy_id="run-001",
         source_run_id="run-001",
         source_artifact="latest",
         preset_id="time_attack_all_courses",
@@ -55,6 +57,8 @@ def test_evaluation_payload_serializes_source_mtime_ns_losslessly() -> None:
     checkpoint = payload["checkpoint"]
 
     assert isinstance(checkpoint, dict)
+    assert payload["source_policy_kind"] == "run"
+    assert payload["source_policy_id"] == "run-001"
     assert checkpoint["source_mtime_ns"] == "1765000000000000123"
     assert payload["result_summary"] is None
 
@@ -151,6 +155,8 @@ def test_evaluation_payload_includes_result_summary(tmp_path: Path) -> None:
         name="Eval 1",
         status="running",
         evaluation_dir=tmp_path,
+        source_policy_kind="run",
+        source_policy_id="run-001",
         source_run_id="run-001",
         source_artifact="latest",
         preset_id="time_attack_all_courses",
@@ -237,6 +243,8 @@ def test_evaluation_payload_normalizes_runtime_contract_values(tmp_path: Path) -
         name="Eval 1",
         status="running",
         evaluation_dir=tmp_path,
+        source_policy_kind="run",
+        source_policy_id="run-001",
         source_run_id="run-001",
         source_artifact="latest",
         preset_id="time_attack_all_courses",

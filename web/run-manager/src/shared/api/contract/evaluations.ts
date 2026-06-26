@@ -3,7 +3,11 @@ import { z } from "zod";
 
 import { managedRunConfigSchema } from "@/shared/api/contract/config";
 import type { WatchDevice } from "@/shared/api/contract/enums";
-import { policyPlaybackModeSchema } from "@/shared/api/contract/saveGames";
+import {
+  policyPlaybackModeSchema,
+  type SavePolicySourceKind,
+  savePolicySourceKindSchema,
+} from "@/shared/api/contract/saveGames";
 
 export const evaluationStatusSchema = z.enum([
   "created",
@@ -117,6 +121,8 @@ export const managedEvaluationSchema = z.object({
   name: z.string(),
   status: evaluationStatusSchema,
   evaluation_dir: z.string(),
+  source_policy_kind: savePolicySourceKindSchema,
+  source_policy_id: z.string().nullable(),
   source_run_id: z.string().nullable(),
   source_artifact: evaluationSourceArtifactSchema.nullable(),
   preset_id: z.string(),
@@ -193,7 +199,9 @@ export interface CreateEvaluationRequest {
   policyMode: "deterministic" | "stochastic";
   presetId: string;
   sourceArtifact: EvaluationSourceArtifact;
-  sourceRunId: string;
+  sourcePolicyKind?: SavePolicySourceKind;
+  sourcePolicyId?: string | null;
+  sourceRunId?: string | null;
 }
 
 export interface StartEvaluationRequest {

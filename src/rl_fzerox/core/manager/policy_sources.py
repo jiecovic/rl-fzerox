@@ -97,6 +97,7 @@ def _run_policy_source(
         source_run_id=run.id,
         source_run_name=run.name,
         lineage_num_timesteps=_run_lineage_timesteps(run),
+        lineage_step_offset=run.lineage_step_offset,
     )
 
 
@@ -136,6 +137,7 @@ def _evaluation_policy_source(
         source_run_name=evaluation.checkpoint.source_run_name,
         local_num_timesteps=evaluation.checkpoint.local_num_timesteps,
         lineage_num_timesteps=evaluation.checkpoint.lineage_num_timesteps,
+        lineage_step_offset=0,
     )
 
 
@@ -175,6 +177,7 @@ def _checkpoint_policy_source(
         source_run_name=checkpoint.source_run_name,
         local_num_timesteps=checkpoint.local_num_timesteps,
         lineage_num_timesteps=checkpoint.lineage_num_timesteps,
+        lineage_step_offset=0,
     )
 
 

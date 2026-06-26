@@ -37,6 +37,8 @@ def insert_evaluation(
             name=evaluation.name,
             status=evaluation.status,
             evaluation_dir=str(evaluation.evaluation_dir),
+            source_policy_kind=evaluation.source_policy_kind,
+            source_policy_id=evaluation.source_policy_id,
             source_run_id=evaluation.source_run_id,
             source_artifact=evaluation.source_artifact,
             preset_id=evaluation.preset_id,
@@ -86,7 +88,8 @@ def find_created_evaluation_snapshot(
     session: Session,
     *,
     name: str,
-    source_run_id: str,
+    source_policy_kind: str,
+    source_policy_id: str | None,
     source_artifact: EvaluationCheckpointArtifact,
     policy_mode: EvaluationPolicyMode,
     seed: int,
@@ -103,7 +106,8 @@ def find_created_evaluation_snapshot(
             select(EvaluationModel)
             .where(EvaluationModel.name == name)
             .where(EvaluationModel.status == "created")
-            .where(EvaluationModel.source_run_id == source_run_id)
+            .where(EvaluationModel.source_policy_kind == source_policy_kind)
+            .where(EvaluationModel.source_policy_id == source_policy_id)
             .where(EvaluationModel.source_artifact == source_artifact)
             .where(EvaluationModel.policy_mode == policy_mode)
             .where(EvaluationModel.seed == seed)

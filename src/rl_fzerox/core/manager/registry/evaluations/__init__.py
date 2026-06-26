@@ -16,6 +16,7 @@ from rl_fzerox.core.manager.registry.evaluations.presets import (
 from rl_fzerox.core.manager.registry.evaluations.records import (
     CANCEL_REQUEST_FILENAME,
     create_evaluation,
+    create_evaluation_from_policy_source,
     delete_evaluation,
     evaluation_cancel_request_path,
     get_evaluation,
@@ -32,6 +33,7 @@ __all__ = [
     "CANCEL_REQUEST_FILENAME",
     "baseline_suite_for_evaluation",
     "create_evaluation",
+    "create_evaluation_from_policy_source",
     "create_evaluation_preset",
     "delete_evaluation",
     "delete_evaluation_preset",

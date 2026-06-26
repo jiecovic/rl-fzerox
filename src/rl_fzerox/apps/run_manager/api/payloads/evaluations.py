@@ -22,6 +22,7 @@ from rl_fzerox.core.manager import (
 from rl_fzerox.core.manager.models import (
     EvaluationBaselineSuiteStatus,
     ManagedEvaluationStatus,
+    PolicySourceKind,
 )
 
 JsonObject = Mapping[str, object]
@@ -126,6 +127,8 @@ class EvaluationPayload(TypedDict):
     name: str
     status: ManagedEvaluationStatus
     evaluation_dir: str
+    source_policy_kind: PolicySourceKind
+    source_policy_id: str | None
     source_run_id: str | None
     source_artifact: EvaluationCheckpointArtifact | None
     preset_id: str
@@ -189,6 +192,8 @@ def evaluation_payload(
         "name": evaluation.name,
         "status": evaluation.status,
         "evaluation_dir": str(evaluation.evaluation_dir),
+        "source_policy_kind": evaluation.source_policy_kind,
+        "source_policy_id": evaluation.source_policy_id,
         "source_run_id": evaluation.source_run_id,
         "source_artifact": evaluation.source_artifact,
         "preset_id": evaluation.preset_id,
