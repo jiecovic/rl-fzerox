@@ -1,7 +1,15 @@
 # tests/apps/test_run_manager_app.py
 from __future__ import annotations
 
-from rl_fzerox.apps.run_manager.app import DEFAULTS, _parse_args, _web_dev_command
+import socket
+
+from rl_fzerox.apps.run_manager.app import (
+    DEFAULTS,
+    _parse_args,
+    _port_is_free,
+    _resolve_web_port,
+    _web_dev_command,
+)
 
 
 def test_run_manager_web_root_is_top_level_frontend() -> None:
@@ -41,3 +49,20 @@ def test_run_manager_web_host_can_be_explicitly_exposed() -> None:
         "6000",
         "--strictPort",
     ]
+
+
+def test_run_manager_web_port_resolver_skips_reachable_localhost_listener() -> None:
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(socket.SOMAXCONN)
+        port = int(listener.getsockname()[1])
+
+        resolved = _resolve_web_port(port, host="localhost")
+
+        assert _port_is_free(port, host="localhost") is False
+        assert resolved.reassigned is True
+        assert resolved.port > port
+    finally:
+        listener.close()

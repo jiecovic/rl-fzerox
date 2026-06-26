@@ -163,17 +163,59 @@ def _resolve_web_port(requested_port: int, *, host: str) -> ResolvedWebPort:
 
 
 def _port_is_free(port: int, *, host: str) -> bool:
-    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        probe.bind((host, port))
-    except OSError as exc:
-        if exc.errno == errno.EADDRINUSE:
-            return False
-        raise
-    finally:
-        probe.close()
+    if _tcp_listener_is_reachable(port, host=host):
+        return False
+    for family, socktype, proto, address in _probe_addresses(port, host=host):
+        probe = socket.socket(family, socktype, proto)
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(address)
+        except OSError as exc:
+            if exc.errno == errno.EADDRINUSE:
+                return False
+            if exc.errno in {errno.EADDRNOTAVAIL, errno.EAFNOSUPPORT}:
+                continue
+            raise
+        finally:
+            probe.close()
     return True
+
+
+def _tcp_listener_is_reachable(port: int, *, host: str) -> bool:
+    if host in {"", "0.0.0.0", "::"}:
+        return False
+    try:
+        with socket.create_connection((host, port), timeout=0.2):
+            return True
+    except OSError as exc:
+        if exc.errno in {
+            errno.ECONNREFUSED,
+            errno.EHOSTUNREACH,
+            errno.ENETUNREACH,
+            errno.ETIMEDOUT,
+        }:
+            return False
+        return False
+
+
+def _probe_addresses(
+    port: int,
+    *,
+    host: str,
+) -> list[tuple[int, int, int, tuple[object, ...]]]:
+    addresses: list[tuple[int, int, int, tuple[object, ...]]] = []
+    seen: set[tuple[int, tuple[object, ...]]] = set()
+    for family, socktype, proto, _canonname, sockaddr in socket.getaddrinfo(
+        host,
+        port,
+        type=socket.SOCK_STREAM,
+    ):
+        key = (family, sockaddr)
+        if key in seen:
+            continue
+        seen.add(key)
+        addresses.append((family, socktype, proto, sockaddr))
+    return addresses
 
 
 def _web_dev_command(*, host: str, port: int) -> list[str]:
