@@ -23,7 +23,7 @@ Full Master cups playlist:
 
 - Linux or WSL2
 - Python bootstrap: `python3` or `python` 3.10+. The project venv uses Python
-  3.12; `./install` creates it with `uv` or `python3.12`.
+  3.12, so either `uv` or `python3.12` must also be available.
 - Rust toolchain with Cargo
 - Node.js 20.19+, 22.12+, or 24+, with npm
 - Mupen64Plus-Next libretro core shared library
@@ -44,8 +44,9 @@ emulator extension in release mode, installs the run manager frontend, and
 creates the ignored `local/` folders.
 
 Your system `python` does not have to be Python 3.12. It only needs to be new
-enough to run the installer; the installer then creates a Python 3.12 `.venv`
-through `uv` or an existing `python3.12`.
+enough to run the installer. If neither `uv` nor `python3.12` is installed,
+install one of them first; otherwise the installer cannot create the project
+`.venv`.
 
 For NVIDIA CUDA training with a recent driver, use the CUDA 12.8 setup path:
 
