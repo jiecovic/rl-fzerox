@@ -3,7 +3,7 @@
     {
       "bundle": {
         "filename": "rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip",
-        "sha256": "16932e04047f3e78da225efe18fa27fb5c672ea95da48c253f2a9e9715398bd6",
+        "sha256": "341c923e5865842978397c7dc53921268fce0ffaad52e237533b5c7b5ad81b94",
         "size_bytes": 33569307,
         "url": "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/rl-fzerox-checkpoint-blue-falcon-fine-tuned-v1.zip"
       },
@@ -30,7 +30,7 @@
           "train_config_sha256": "bc890dbc2339113804de1d3a7397b189864b290209f57247e32bbded3547c022",
           "training_algorithm": "maskable_hybrid_recurrent_ppo"
         },
-        "exported_at": "2026-06-26T12:15:44+00:00",
+        "exported_at": "2026-06-26T14:21:41+00:00",
         "files": [
           {
             "path": "checkpoint/policy.zip",
@@ -77,5 +77,5 @@
   ],
   "format_name": "rl-fzerox-checkpoint-catalog",
   "schema_version": 1,
-  "updated_at": "2026-06-26T12:15:44+00:00"
+  "updated_at": "2026-06-26T14:21:42+00:00"
 }
