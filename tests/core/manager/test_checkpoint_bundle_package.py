@@ -133,6 +133,33 @@ def test_package_evaluation_checkpoint_bundle_writes_metrics_payload(tmp_path: P
     }
 
 
+def test_package_checkpoint_bundle_excludes_run_local_baseline_payloads(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = _create_run_with_checkpoint(store, tmp_path, artifact="best")
+    baseline_dir = run.run_dir / RUN_LAYOUT.baselines_dirname
+    baseline_dir.mkdir(parents=True, exist_ok=True)
+    (baseline_dir / "mute_city.state").write_bytes(b"baseline-state")
+    (baseline_dir / "mute_city.json").write_text("{}\n", encoding="utf-8")
+    bundle_path = tmp_path / "bundle.zip"
+
+    result = package_checkpoint_bundle(
+        store=store,
+        run_id=run.id,
+        artifact="best",
+        version="v1",
+        checkpoint_id="golden-fox-v1",
+        output_path=bundle_path,
+    )
+
+    with zipfile.ZipFile(result.bundle_path) as archive:
+        assert all(not name.startswith("baselines/") for name in archive.namelist())
+        manifest = parse_checkpoint_bundle_manifest_json(
+            archive.read(CHECKPOINT_BUNDLE_LAYOUT.manifest_path).decode("utf-8")
+        )
+
+    assert all(not file.path.startswith("baselines/") for file in manifest.files)
+
+
 def test_package_created_evaluation_checkpoint_bundle_omits_metrics_payload(
     tmp_path: Path,
 ) -> None:

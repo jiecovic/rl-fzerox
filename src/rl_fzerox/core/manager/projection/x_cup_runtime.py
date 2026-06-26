@@ -70,14 +70,14 @@ def restore_generated_x_cup_track_sampling_from_slots(
     return config.model_copy(update={"entries": tuple(next_entries)})
 
 
-def restore_generated_x_cup_artifacts(
+def restore_track_sampling_artifacts(
     config: TrainAppConfig,
     *,
     artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
 ) -> TrainAppConfig:
-    """Apply manager-owned generated X Cup reset artifacts to one train config."""
+    """Apply manager-owned reset artifacts to one train config."""
 
-    track_sampling = restore_generated_x_cup_track_sampling_artifacts(
+    track_sampling = restore_track_sampling_config_artifacts(
         config.env.track_sampling,
         artifacts=artifacts,
     )
@@ -90,12 +90,12 @@ def restore_generated_x_cup_artifacts(
     )
 
 
-def restore_generated_x_cup_track_sampling_artifacts(
+def restore_track_sampling_config_artifacts(
     config: TrackSamplingConfig,
     *,
     artifacts: tuple[TrackSamplingMaterializedArtifact, ...],
 ) -> TrackSamplingConfig:
-    """Apply materialized artifact paths to generated X Cup entries."""
+    """Apply materialized reset artifact paths to track-sampling entries."""
 
     artifact_index = track_sampling_artifact_index(artifacts)
     if not artifact_index:
@@ -103,9 +103,6 @@ def restore_generated_x_cup_track_sampling_artifacts(
     next_entries: list[TrackSamplingEntryConfig] = []
     changed = False
     for entry in config.entries:
-        if entry.generated_course_kind != X_CUP_COURSE.generated_kind:
-            next_entries.append(entry)
-            continue
         artifact = artifact_index.get(
             (
                 track_sampling_artifact_course_key(entry),

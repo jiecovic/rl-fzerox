@@ -4,6 +4,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import threading
+from collections.abc import Callable
 from importlib import import_module
 from pathlib import Path
 from typing import Literal, Protocol
@@ -69,6 +70,7 @@ def launch_watch_artifact(
         manager_db_path=store.db_path,
         session_name=lease_id,
         overrides=overrides,
+        startup_reporter=watch_startup_reporter(store=store, run_id=run.id),
     )
     log_path = manager_watch_log_path(run.id, artifact=artifact)
     command = [
@@ -158,6 +160,19 @@ def validate_watch_device(device: Literal["cpu", "cuda"]) -> None:
             "CUDA watch requested, but the active PyTorch build cannot use CUDA. "
             "Select cpu or install a CUDA-enabled PyTorch build."
         )
+
+
+def watch_startup_reporter(*, store: ManagerStore, run_id: str) -> Callable[[str, str], None]:
+    """Persist Watch-side baseline materialization progress in the run timeline."""
+
+    def report(_kind: str, message: str) -> None:
+        store.append_run_event(
+            run_id=run_id,
+            kind="watch_materialize",
+            message=message,
+        )
+
+    return report
 
 
 def manager_watch_log_path(run_id: str, *, artifact: str) -> Path:

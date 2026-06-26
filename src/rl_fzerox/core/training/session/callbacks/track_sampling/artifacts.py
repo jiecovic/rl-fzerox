@@ -7,7 +7,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackSamplingEntryConfig
 
@@ -38,7 +37,7 @@ class TrackSamplingMaterializedArtifact:
 def materialized_track_sampling_artifacts(
     config: TrackSamplingConfig,
 ) -> tuple[TrackSamplingMaterializedArtifact, ...]:
-    """Return active generated X Cup artifacts from one materialized config."""
+    """Return active reset artifacts from one materialized track-sampling config."""
 
     return tuple(
         artifact
@@ -50,12 +49,9 @@ def materialized_track_sampling_artifacts(
 def materialized_track_sampling_artifact(
     entry: TrackSamplingEntryConfig,
 ) -> TrackSamplingMaterializedArtifact | None:
-    """Project one materialized generated X Cup entry into artifact state."""
+    """Project one materialized track-sampling entry into artifact state."""
 
-    if (
-        entry.generated_course_kind != X_CUP_COURSE.generated_kind
-        or entry.baseline_state_path is None
-    ):
+    if entry.baseline_state_path is None:
         return None
     baseline_state_path = entry.baseline_state_path.expanduser().resolve()
     return TrackSamplingMaterializedArtifact(

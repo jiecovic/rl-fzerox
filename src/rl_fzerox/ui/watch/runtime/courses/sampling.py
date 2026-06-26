@@ -9,8 +9,8 @@ from pathlib import Path
 from rl_fzerox.core.domain.courses import X_CUP_COURSE
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.projection.x_cup_runtime import (
-    restore_generated_x_cup_track_sampling_artifacts,
     restore_generated_x_cup_track_sampling_from_slots,
+    restore_track_sampling_config_artifacts,
 )
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.core.runtime_spec.schema.tracks import TrackSamplingEntryConfig
@@ -115,7 +115,7 @@ class ManagedTrackSamplingRefresh:
         self,
         config: TrackSamplingConfig,
     ) -> TrackSamplingConfig | None:
-        refreshed = restore_generated_x_cup_track_sampling_artifacts(
+        refreshed = restore_track_sampling_config_artifacts(
             config,
             artifacts=self.store.get_run_track_sampling_artifacts(self.run_id),
         )

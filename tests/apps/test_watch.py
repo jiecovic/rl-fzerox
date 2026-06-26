@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,12 +11,16 @@ import pytest
 
 from rl_fzerox.apps.watch import main, resolve_watch_app_config
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
+from rl_fzerox.core.manager.projection import watch as watch_projection
+from rl_fzerox.core.manager.projection.launches import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
+    TrainAppConfig,
     WatchAppConfig,
     WatchConfig,
 )
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
+from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.ui.watch.app import run_viewer
 from rl_fzerox.ui.watch.runtime import WatchWorker
 from rl_fzerox.ui.watch.runtime.policy.runner import (
@@ -250,6 +255,159 @@ def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
     assert config.watch.lineage_frame_offset == 2_000
     assert config.watch.manager_db_path == db_path.resolve()
     assert config.watch.managed_run_id == child.id
+
+
+def test_resolve_watch_app_config_materializes_missing_track_sampling_baselines(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="checkpoint-run",
+        name="Checkpoint Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "checkpoint-run",
+    )
+    run.run_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
+        lambda config, **_kwargs: config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
+        _fake_track_sampling_materializer,
+    )
+
+    config = resolve_watch_app_config(
+        run_id=run.id,
+        policy_artifact="latest",
+        manager_db_path=db_path,
+        overrides=[],
+    )
+
+    artifacts = store.get_run_track_sampling_artifacts(run.id)
+    assert len(artifacts) == len(config.env.track_sampling.entries)
+    assert all(entry.baseline_state_path is not None for entry in config.env.track_sampling.entries)
+    assert all(artifact.baseline_state_path.is_file() for artifact in artifacts)
+
+
+def test_watch_baseline_repair_materializes_primary_baseline_without_track_sampling(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="single-course",
+        name="Single Course",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "single-course",
+    )
+    run.run_dir.mkdir(parents=True)
+    config = _single_track_train_config(run_id=run.id, run_dir=run.run_dir)
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
+        _fake_primary_materializer,
+    )
+
+    repaired = watch_projection.materialize_missing_watch_baselines(
+        config,
+        store=store,
+        run=run,
+    )
+
+    assert repaired.emulator.baseline_state_path is not None
+    assert repaired.emulator.baseline_state_path.is_file()
+    assert repaired.track.baseline_state_path == repaired.emulator.baseline_state_path
+    assert store.get_run_track_sampling_artifacts(run.id) == ()
+
+
+def _fake_track_sampling_materializer(
+    config: TrainAppConfig,
+    *,
+    run_paths: RunPaths,
+    startup_reporter: Callable[[str, str], None] | None = None,
+) -> TrainAppConfig:
+    if startup_reporter is not None:
+        startup_reporter("startup_materialize", "Resolving track sampling baselines")
+    entries = []
+    for entry in config.env.track_sampling.entries:
+        baseline_path = run_paths.baselines_dir / f"{entry.id}.state"
+        baseline_path.parent.mkdir(parents=True, exist_ok=True)
+        baseline_path.write_bytes(b"state")
+        baseline_path.with_suffix(".json").write_text("{}\n", encoding="utf-8")
+        entries.append(entry.model_copy(update={"baseline_state_path": baseline_path}))
+    return config.model_copy(
+        update={
+            "env": config.env.model_copy(
+                update={
+                    "track_sampling": config.env.track_sampling.model_copy(
+                        update={"entries": tuple(entries)}
+                    )
+                }
+            )
+        }
+    )
+
+
+def _single_track_train_config(*, run_id: str, run_dir: Path) -> TrainAppConfig:
+    config = build_managed_train_app_config(
+        default_managed_run_config(),
+        run_id=run_id,
+        run_dir=run_dir,
+    )
+    entry = config.env.track_sampling.entries[0]
+    track = config.track.model_copy(
+        update={
+            "course_ref": entry.course_ref,
+            "course_id": entry.course_id,
+            "course_name": entry.course_name,
+            "course_index": entry.course_index,
+            "mode": entry.mode,
+            "gp_difficulty": entry.gp_difficulty,
+            "vehicle": entry.vehicle,
+            "vehicle_name": entry.vehicle_name,
+            "source_vehicle": entry.source_vehicle,
+            "engine_setting_raw_value": entry.engine_setting_raw_value,
+            "source_course_index": entry.source_course_index,
+            "source_engine_setting_raw_value": entry.source_engine_setting_raw_value,
+        }
+    )
+    return config.model_copy(
+        update={
+            "track": track,
+            "env": config.env.model_copy(
+                update={
+                    "track_sampling": config.env.track_sampling.model_copy(
+                        update={"enabled": False, "entries": ()}
+                    )
+                }
+            ),
+        }
+    )
+
+
+def _fake_primary_materializer(
+    config: TrainAppConfig,
+    *,
+    run_paths: RunPaths,
+    startup_reporter: Callable[[str, str], None] | None = None,
+) -> TrainAppConfig:
+    if startup_reporter is not None:
+        startup_reporter("startup_materialize", "Materializing race-start baseline")
+    baseline_path = run_paths.baselines_dir / "primary.state"
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_path.write_bytes(b"state")
+    baseline_path.with_suffix(".json").write_text("{}\n", encoding="utf-8")
+    return config.model_copy(
+        update={
+            "track": config.track.model_copy(update={"baseline_state_path": baseline_path}),
+            "emulator": config.emulator.model_copy(update={"baseline_state_path": baseline_path}),
+        }
+    )
 
 
 def test_load_policy_runner_uses_configured_watch_device(monkeypatch: pytest.MonkeyPatch) -> None:

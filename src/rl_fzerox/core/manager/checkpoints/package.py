@@ -206,8 +206,11 @@ def package_evaluation_checkpoint_bundle(
         raise CheckpointBundlePackageError(f"output bundle already exists: {resolved_output_path}")
 
     policy_path = Path(evaluation.checkpoint.copied_policy_path).expanduser().resolve()
+    compatibility_run_dir = evaluation.evaluation_dir / "checkpoint_snapshot"
     payloads, train_config_sha256 = _payload_files_for_checkpoint(
         config=evaluation.config,
+        compatibility_run_id=evaluation.checkpoint.source_run_id or evaluation.id,
+        compatibility_run_dir=compatibility_run_dir,
         policy_path=policy_path,
         model_path=_evaluation_model_path(evaluation),
         artifact_label=f"evaluation {evaluation.id} {artifact}",
@@ -236,6 +239,8 @@ def _payload_files(
     artifact_paths = _ARTIFACT_RELATIVE_PATHS[artifact]
     return _payload_files_for_checkpoint(
         config=run.config,
+        compatibility_run_id=run.id,
+        compatibility_run_dir=run.run_dir,
         policy_path=run.run_dir / artifact_paths.policy,
         model_path=run.run_dir / artifact_paths.model,
         artifact_label=artifact,
@@ -245,6 +250,8 @@ def _payload_files(
 def _payload_files_for_checkpoint(
     *,
     config: ManagedRunConfig,
+    compatibility_run_id: str,
+    compatibility_run_dir: Path,
     policy_path: Path,
     model_path: Path,
     artifact_label: str,

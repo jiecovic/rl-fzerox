@@ -26,8 +26,16 @@ from rl_fzerox.core.manager.checkpoints.manifest import (
 )
 from rl_fzerox.core.manager.registry.common import slugify
 
-MAX_CHECKPOINT_BUNDLE_PAYLOAD_BYTES = 4 * 1024 * 1024 * 1024
-MAX_CHECKPOINT_BUNDLE_PAYLOAD_FILES = 16
+
+@dataclass(frozen=True, slots=True)
+class CheckpointBundleImportPolicy:
+    """Trust-boundary limits for public checkpoint bundle extraction."""
+
+    max_payload_bytes: int = 4 * 1024 * 1024 * 1024
+    max_payload_files: int = 16
+
+
+CHECKPOINT_BUNDLE_IMPORT_POLICY = CheckpointBundleImportPolicy()
 _DEFAULT_MANAGER_DB_PATH = Path("local/manager/runs.db").resolve()
 
 
@@ -71,8 +79,7 @@ def read_checkpoint_bundle_manifest(bundle_path: Path) -> CheckpointBundleManife
 def validate_checkpoint_bundle_archive(
     *,
     bundle_path: Path,
-    max_payload_bytes: int = MAX_CHECKPOINT_BUNDLE_PAYLOAD_BYTES,
-    max_payload_files: int = MAX_CHECKPOINT_BUNDLE_PAYLOAD_FILES,
+    import_policy: CheckpointBundleImportPolicy = CHECKPOINT_BUNDLE_IMPORT_POLICY,
 ) -> CheckpointBundleManifest:
     """Validate one checkpoint ZIP without copying files into manager storage."""
 
@@ -85,8 +92,7 @@ def validate_checkpoint_bundle_archive(
             _validate_archive_members(
                 archive,
                 manifest=manifest,
-                max_payload_bytes=max_payload_bytes,
-                max_payload_files=max_payload_files,
+                import_policy=import_policy,
             )
             _verify_payload_hashes(archive, manifest=manifest)
             return manifest
@@ -101,8 +107,7 @@ def import_checkpoint_bundle(
     bundle_path: Path,
     target_root: Path | None = None,
     overwrite: bool = False,
-    max_payload_bytes: int = MAX_CHECKPOINT_BUNDLE_PAYLOAD_BYTES,
-    max_payload_files: int = MAX_CHECKPOINT_BUNDLE_PAYLOAD_FILES,
+    import_policy: CheckpointBundleImportPolicy = CHECKPOINT_BUNDLE_IMPORT_POLICY,
 ) -> CheckpointBundleImportResult:
     """Validate and copy one checkpoint bundle into local checkpoint storage."""
 
@@ -118,8 +123,7 @@ def import_checkpoint_bundle(
             _validate_archive_members(
                 archive,
                 manifest=manifest,
-                max_payload_bytes=max_payload_bytes,
-                max_payload_files=max_payload_files,
+                import_policy=import_policy,
             )
             import_dir = _import_dir(root, manifest)
             _assert_target_available(import_dir, overwrite=overwrite)
@@ -162,8 +166,7 @@ def _validate_archive_members(
     archive: zipfile.ZipFile,
     *,
     manifest: CheckpointBundleManifest,
-    max_payload_bytes: int,
-    max_payload_files: int,
+    import_policy: CheckpointBundleImportPolicy,
 ) -> None:
     expected_files = frozenset(
         {CHECKPOINT_BUNDLE_LAYOUT.manifest_path, *(file.path for file in manifest.files)}
@@ -187,14 +190,15 @@ def _validate_archive_members(
         if info.filename == CHECKPOINT_BUNDLE_LAYOUT.manifest_path:
             continue
         payload_files += 1
-        if payload_files > max_payload_files:
+        if payload_files > import_policy.max_payload_files:
             raise CheckpointBundleImportError(
-                f"checkpoint bundle payload has more than {max_payload_files} files"
+                "checkpoint bundle payload has more than "
+                f"{import_policy.max_payload_files} files"
             )
         payload_bytes += info.file_size
-        if payload_bytes > max_payload_bytes:
+        if payload_bytes > import_policy.max_payload_bytes:
             raise CheckpointBundleImportError(
-                f"checkpoint bundle payload exceeds {max_payload_bytes} bytes"
+                f"checkpoint bundle payload exceeds {import_policy.max_payload_bytes} bytes"
             )
 
     missing_files = sorted(expected_files.difference(seen))

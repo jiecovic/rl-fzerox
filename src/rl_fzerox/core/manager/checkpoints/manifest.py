@@ -246,7 +246,6 @@ def _validate_files(files: tuple[CheckpointBundleFile, ...]) -> None:
                 f"checkpoint bundle file role {file.role!r} must live under {expected_root}/"
             )
 
-
 def _validate_bundle_path(value: str) -> str:
     if not value or value != value.strip():
         raise ValueError("checkpoint bundle file path must be non-empty and trimmed")
