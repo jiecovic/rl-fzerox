@@ -199,6 +199,7 @@ export function WorkspaceBody({
         ) : (
           <EvaluationWorkspace
             evaluation={activeEvaluation}
+            metadata={metadata}
             onCancelEvaluation={actions.cancelManagedEvaluation}
             onGlobalError={actions.setGlobalError}
             onRenameEvaluation={actions.renameManagedEvaluation}

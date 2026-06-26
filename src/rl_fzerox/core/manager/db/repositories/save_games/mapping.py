@@ -134,8 +134,6 @@ def _required_policy_artifact(value: object) -> PolicySourceArtifact:
             return "latest"
         case "best":
             return "best"
-        case "final":
-            return "final"
     raise ValueError(f"course setup has invalid policy artifact: {value!r}")
 
 

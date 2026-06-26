@@ -80,8 +80,13 @@ const runtimeAssetInfoSchema = z.object({
   exists: z.boolean(),
 });
 
+const runtimeCapabilityInfoSchema = z.object({
+  cuda_available: z.boolean(),
+});
+
 export const configMetadataSchema = z.object({
   runtime_assets: z.array(runtimeAssetInfoSchema),
+  runtime: runtimeCapabilityInfoSchema,
   observation_presets: z.array(observationPresetInfoSchema),
   observation_resolution_bounds: observationResolutionBoundsSchema,
   observation_source_geometries: z.array(observationSourceGeometryInfoSchema),

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 type EvaluationMode = Literal["time_attack_course", "gp_course"]
-type EvaluationCheckpointArtifact = Literal["latest", "best", "final"]
+type EvaluationCheckpointArtifact = Literal["latest", "best"]
 type EvaluationPolicyMode = Literal["deterministic", "stochastic"]
 type EvaluationDevice = Literal["cpu", "cuda"]
 type EvaluationRunStatus = Literal["completed", "failed", "cancelled", "partial"]

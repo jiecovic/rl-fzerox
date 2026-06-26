@@ -15,6 +15,7 @@ import type {
   SavePolicyArtifact,
   SavePolicySourceKind,
 } from "@/shared/api/contract";
+import { normalizeRuntimeDevice } from "@/shared/api/devices";
 import {
   launchableTargetStatus,
   parseTargetClearGoal,
@@ -116,7 +117,7 @@ export function useSaveGameWorkspaceController({
         recordingEnabled: settings.recording_enabled,
         recordingInputHudEnabled: settings.recording_input_hud_enabled,
         recordingUpscaleFactor: settings.recording_upscale_factor,
-        runnerDevice: settings.device,
+        runnerDevice: normalizeRuntimeDevice(settings.device, metadata),
         runnerRenderer: settings.renderer,
         perfectRun: settings.target_restart_on_retire,
         targetClearGoalText: String(settings.target_clear_goal),
@@ -124,7 +125,7 @@ export function useSaveGameWorkspaceController({
         reloadPolicyBetweenAttempts: settings.reload_policy_between_attempts,
       });
     },
-    [onPatchSession, session.sessionId],
+    [metadata, onPatchSession, session.sessionId],
   );
 
   async function createSaveGame() {
@@ -236,7 +237,7 @@ export function useSaveGameWorkspaceController({
     }
     return {
       attemptSeed,
-      device: session.runnerDevice,
+      device: normalizeRuntimeDevice(session.runnerDevice, metadata),
       policyMode: session.policyMode,
       recordingEnabled: session.recordingEnabled,
       recordingInputHudEnabled: session.recordingInputHudEnabled,

@@ -65,6 +65,4 @@ def _source_artifact(value: object) -> PolicySourceArtifact:
             return "latest"
         case "best":
             return "best"
-        case "final":
-            return "final"
     raise ValueError(f"unsupported checkpoint source artifact: {value!r}")

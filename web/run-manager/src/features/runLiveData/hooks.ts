@@ -226,7 +226,7 @@ export function useRunEngineTuningState(
   runId: string,
   status: ManagedRun["status"],
   enabled: boolean,
-  artifact: "latest" | "best" | "final" = "latest",
+  artifact: "latest" | "best" = "latest",
 ): {
   engineTuningError: string | null;
   engineTuningState: EngineTuningRuntimeState | null;

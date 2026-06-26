@@ -95,7 +95,6 @@ export function PolicyArtifactSelect<TDraft extends PolicySelectionDraft>({
       >
         <option value="best">best</option>
         <option value="latest">latest</option>
-        <option value="final">final</option>
       </FieldSelect>
     </FieldShell>
   );

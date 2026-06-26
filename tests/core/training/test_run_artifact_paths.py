@@ -24,15 +24,13 @@ from rl_fzerox.core.training.runs import (
     reserve_run_paths,
     resolve_latest_model_path,
     resolve_latest_policy_path,
-    resolve_model_artifact_path,
     resolve_policy_artifact_path,
 )
 
 
-def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
+def test_resolve_latest_model_path_prefers_latest_over_best(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
-    run_paths.final_model_path.write_bytes(b"final")
     run_paths.best_model_path.write_bytes(b"best")
     run_paths.latest_model_path.write_bytes(b"latest")
 
@@ -41,10 +39,9 @@ def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: 
     assert resolved_model_path == run_paths.latest_model_path
 
 
-def test_resolve_latest_policy_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
+def test_resolve_latest_policy_path_prefers_latest_over_best(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
-    run_paths.final_policy_path.write_bytes(b"final-policy")
     run_paths.best_policy_path.write_bytes(b"best-policy")
     run_paths.latest_policy_path.write_bytes(b"latest-policy")
 
@@ -56,7 +53,6 @@ def test_resolve_latest_policy_path_prefers_latest_over_best_and_final(tmp_path:
 def test_resolve_best_policy_path_requires_best_artifact(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
-    run_paths.final_policy_path.write_bytes(b"final-policy")
     run_paths.best_policy_path.write_bytes(b"best-policy")
     run_paths.latest_policy_path.write_bytes(b"latest-policy")
 
@@ -66,21 +62,6 @@ def test_resolve_best_policy_path_requires_best_artifact(tmp_path: Path) -> None
     )
 
     assert resolved_policy_path == run_paths.best_policy_path
-
-
-def test_resolve_final_model_path_requires_final_artifact(tmp_path: Path) -> None:
-    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
-    ensure_run_dirs(run_paths)
-    run_paths.final_model_path.write_bytes(b"final")
-    run_paths.best_model_path.write_bytes(b"best")
-    run_paths.latest_model_path.write_bytes(b"latest")
-
-    resolved_model_path = resolve_model_artifact_path(
-        run_paths.run_dir,
-        artifact="final",
-    )
-
-    assert resolved_model_path == run_paths.final_model_path
 
 
 def test_build_run_paths_allocates_numbered_run_directories(tmp_path: Path) -> None:

@@ -1,7 +1,13 @@
 // web/run-manager/src/widgets/evaluationWorkspace/EvaluationWorkspace.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import type { ManagedEvaluation, StartEvaluationRequest, WatchDevice } from "@/shared/api/contract";
+import type {
+  ConfigMetadata,
+  ManagedEvaluation,
+  StartEvaluationRequest,
+  WatchDevice,
+} from "@/shared/api/contract";
+import { normalizeRuntimeDevice, runtimeDeviceOptions } from "@/shared/api/devices";
 import { Button } from "@/shared/ui/Button";
 import { FieldSelect } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
@@ -31,6 +37,7 @@ import { ResultsSection } from "@/widgets/evaluationWorkspace/ResultsSection";
 
 interface EvaluationWorkspaceProps {
   evaluation: ManagedEvaluation;
+  metadata: ConfigMetadata | null;
   onCancelEvaluation: (evaluation: ManagedEvaluation) => Promise<ManagedEvaluation>;
   onGlobalError: (message: string | null) => void;
   onRenameEvaluation: (evaluationId: string, name: string) => Promise<void>;
@@ -44,13 +51,15 @@ const WORKER_COUNT_OPTIONS = [1, 2, 4, 8, 16] as const;
 
 export function EvaluationWorkspace({
   evaluation,
+  metadata,
   onCancelEvaluation,
   onGlobalError,
   onRenameEvaluation,
   onStartEvaluation,
 }: EvaluationWorkspaceProps) {
-  const [device, setDevice] = useState<WatchDevice>("cuda");
+  const [device, setDevice] = useState<WatchDevice>(() => normalizeRuntimeDevice("cuda", metadata));
   const [workerCount, setWorkerCount] = useState(1);
+  const deviceOptions = runtimeDeviceOptions(metadata);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -62,6 +71,10 @@ export function EvaluationWorkspace({
   const canCancel = evaluation.status === "running";
   const cancelRequested = evaluation.status === "cancelling";
   const runtimeStats = evaluationRuntimeStats(evaluation);
+
+  useEffect(() => {
+    setDevice((current) => normalizeRuntimeDevice(current, metadata));
+  }, [metadata]);
 
   async function startEvaluation() {
     if (!canStart || starting) {
@@ -183,8 +196,11 @@ export function EvaluationWorkspace({
                     value={device}
                     onChange={(event) => setDevice(event.currentTarget.value as WatchDevice)}
                   >
-                    <option value="cuda">cuda</option>
-                    <option value="cpu">cpu</option>
+                    {deviceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
                   </FieldSelect>
                   <FieldSelect
                     aria-label="Evaluation worker count"

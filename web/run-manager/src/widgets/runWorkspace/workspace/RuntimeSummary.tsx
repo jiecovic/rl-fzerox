@@ -28,6 +28,7 @@ import type {
   ManagedRunDetail,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
+import { runtimeDeviceOptions } from "@/shared/api/devices";
 import { rendererNames } from "@/shared/api/renderers";
 import { cn } from "@/shared/ui/cn";
 import { FieldSelect } from "@/shared/ui/Field";
@@ -81,6 +82,7 @@ export function RunRuntimeSummary({
   const progressFraction = runtime?.progress_fraction ?? 0;
   const hasLineageTotals = showsLineageTotals(run);
   const watchRendererOptions = rendererNames(metadata, actions.selectedWatchRenderer);
+  const watchDeviceOptions = runtimeDeviceOptions(metadata);
   const progressNoteText = progressNote(run);
   const activeStartupMessage = latestActiveStartupMessage(run);
 
@@ -321,8 +323,11 @@ export function RunRuntimeSummary({
                   actions.setSelectedWatchDevice(event.target.value === "cpu" ? "cpu" : "cuda")
                 }
               >
-                <option value="cuda">cuda</option>
-                <option value="cpu">cpu</option>
+                {watchDeviceOptions.map((device) => (
+                  <option key={device} value={device}>
+                    {device}
+                  </option>
+                ))}
               </FieldSelect>
             </ToolbarSelect>
             <ToolbarSelect label="Renderer">

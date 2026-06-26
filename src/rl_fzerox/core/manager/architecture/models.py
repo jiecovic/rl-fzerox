@@ -101,10 +101,17 @@ class RuntimeAssetInfo(BaseModel):
     exists: bool
 
 
+class RuntimeCapabilityInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cuda_available: bool
+
+
 class RunManagerConfigMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     runtime_assets: tuple[RuntimeAssetInfo, ...]
+    runtime: RuntimeCapabilityInfo
     observation_presets: tuple[ObservationPresetInfo, ...]
     observation_resolution_bounds: ObservationResolutionBounds
     observation_source_geometries: tuple[ObservationSourceGeometryInfo, ...]

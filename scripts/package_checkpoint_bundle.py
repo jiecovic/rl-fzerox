@@ -60,7 +60,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--run-id")
     source.add_argument("--evaluation-id")
-    parser.add_argument("--artifact", choices=("latest", "best", "final"), default="best")
+    parser.add_argument("--artifact", choices=("latest", "best"), default="best")
     parser.add_argument("--version", required=True)
     parser.add_argument("--checkpoint-id")
     parser.add_argument("--name")
@@ -76,8 +76,6 @@ def _artifact(value: str) -> CheckpointBundleSourceArtifact:
             return "latest"
         case "best":
             return "best"
-        case "final":
-            return "final"
         case _:
             raise CheckpointBundlePackageError(f"unsupported artifact: {value}")
 

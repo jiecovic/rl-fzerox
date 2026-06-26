@@ -33,7 +33,6 @@ from rl_fzerox.core.training.session import (
     maybe_resume_training_model,
     print_training_startup,
     resolve_train_run_config,
-    save_artifacts_atomically,
     save_latest_artifacts,
     training_requires_action_masks,
     validate_training_algorithm_config,
@@ -366,20 +365,12 @@ def _train_and_save(
             )
         raise
 
-    save_artifacts_atomically(
+    _save_latest_checkpoint(
+        run_config=run_config,
+        run_paths=run_paths,
         model=model,
-        model_path=run_paths.final_model_path,
-        policy_path=run_paths.final_policy_path,
-        engine_tuning_state=_engine_tuning_state(engine_tuning.controller),
-        policy_metadata=_policy_artifact_metadata(run_config, model),
+        engine_tuning=engine_tuning,
     )
-    if run_config.train.save_latest_checkpoint:
-        _save_latest_checkpoint(
-            run_config=run_config,
-            run_paths=run_paths,
-            model=model,
-            engine_tuning=engine_tuning,
-        )
 
 
 def _save_latest_checkpoint(

@@ -29,7 +29,7 @@ from rl_fzerox.core.domain.policy import (
     TrainAlgorithmName,
 )
 
-ResumeArtifact = Literal["latest", "best", "final"]
+ResumeArtifact = Literal["latest", "best"]
 ResumeMode = Literal["weights_only", "full_model"]
 
 

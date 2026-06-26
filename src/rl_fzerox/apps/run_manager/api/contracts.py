@@ -23,7 +23,7 @@ type WatchRenderer = RendererName
 PolicyPlaybackMode = Literal["deterministic", "stochastic"]
 EngineTuningSourceAction = Literal["convert", "discard"]
 PolicySourceKind = Literal["run", "evaluation", "checkpoint"]
-PolicySourceArtifact = Literal["latest", "best", "final"]
+PolicySourceArtifact = Literal["latest", "best"]
 
 
 class EvaluationTargetRequest(BaseModel):

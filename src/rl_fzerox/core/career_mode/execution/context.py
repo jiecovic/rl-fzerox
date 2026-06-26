@@ -34,5 +34,5 @@ class SaveAttemptExecutionContext:
     course_setup: ManagedSaveCourseSetup
     cup_setup: ManagedSaveCupSetup
     policy_source: ManagedPolicySource
-    policy_artifact: Literal["latest", "best", "final"]
+    policy_artifact: Literal["latest", "best"]
     policy_path: Path

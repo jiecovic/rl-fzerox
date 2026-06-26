@@ -67,10 +67,6 @@ def test_watch_clears_owned_viewer_lease_on_exit(
     captured_materialize_kwargs: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
-        lambda config, *, run_paths: config,
-    )
-    monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
         lambda config, **kwargs: (captured_materialize_kwargs.update(kwargs) or config),
     )
@@ -106,10 +102,6 @@ def test_watch_allows_run_id_overrides(
 
     captured: dict[str, WatchAppConfig] = {}
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
-        lambda config, *, run_paths: config,
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
         lambda config, **_kwargs: config,
@@ -154,10 +146,6 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     run.run_dir.mkdir(parents=True)
 
     monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
-        lambda config, *, run_paths: config,
-    )
-    monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
         lambda config, **_kwargs: config,
     )
@@ -195,10 +183,6 @@ def test_resolve_watch_app_config_syncs_manifest_mirror_from_sqlite(
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
-        lambda config, *, run_paths: config,
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
         lambda config, **_kwargs: config,
@@ -250,10 +234,6 @@ def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
     )
     child.run_dir.mkdir(parents=True)
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
-        lambda config, *, run_paths: config,
-    )
     monkeypatch.setattr(
         "rl_fzerox.core.manager.projection.watch.materialize_watch_session_config",
         lambda config, **_kwargs: config,

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from functools import cache
+from importlib import import_module
 from pathlib import Path
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
@@ -22,6 +24,7 @@ from rl_fzerox.core.manager.architecture.models import (
     ObservationSourceGeometryInfo,
     RunManagerConfigMetadata,
     RuntimeAssetInfo,
+    RuntimeCapabilityInfo,
     SelectOption,
     StateComponentInfo,
     StateFeatureInfo,
@@ -45,11 +48,15 @@ from rl_fzerox.core.runtime_spec.vehicle_catalog import CATALOG, vehicle_menu_ro
 def run_manager_config_metadata(
     *,
     runtime_assets: tuple[RuntimeAssetInfo, ...] | None = None,
+    runtime: RuntimeCapabilityInfo | None = None,
 ) -> RunManagerConfigMetadata:
     """Return stable manager options derived from backend-supported config values."""
 
     return RunManagerConfigMetadata(
         runtime_assets=runtime_assets if runtime_assets is not None else runtime_asset_infos(),
+        runtime=runtime
+        if runtime is not None
+        else RuntimeCapabilityInfo(cuda_available=torch_cuda_available()),
         observation_presets=tuple(
             ObservationPresetInfo(
                 value=geometry.name,
@@ -136,6 +143,19 @@ def run_manager_config_metadata(
             SelectOption(value="128", label="[128]"),
         ),
     )
+
+
+@cache
+def torch_cuda_available() -> bool:
+    """Return whether this Python environment can run torch workloads on CUDA."""
+
+    try:
+        torch = import_module("torch")
+    except ImportError:
+        return False
+    cuda = getattr(torch, "cuda", None)
+    is_available = getattr(cuda, "is_available", None)
+    return bool(is_available()) if callable(is_available) else False
 
 
 def runtime_asset_infos() -> tuple[RuntimeAssetInfo, ...]:

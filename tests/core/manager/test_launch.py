@@ -16,6 +16,7 @@ from rl_fzerox.apps.run_manager.launching.watch import (
     _watch_reaper,
     active_watch_pid,
     raise_if_watch_exited_early,
+    validate_watch_device,
     watch_failure_detail,
 )
 from rl_fzerox.apps.run_manager.worker.config import _resolved_train_config
@@ -809,6 +810,10 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
         lambda **_kwargs: None,
     )
     monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.watch.validate_watch_device",
+        lambda _device: None,
+    )
+    monkeypatch.setattr(
         "rl_fzerox.apps.run_manager.launching.watch.manager_watch_log_path",
         lambda run_id, *, artifact: log_path,
     )
@@ -859,6 +864,24 @@ def test_watch_artifact_passes_viewer_lease_to_watch_process(
     assert "# launched_at=" in log_text
     assert "# command=" in log_text
     assert "watch started" in log_text
+
+
+def test_watch_device_guard_rejects_cpu_only_torch(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+    class _FakeTorch:
+        cuda = _FakeCuda()
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launching.watch.import_module",
+        lambda name: _FakeTorch if name == "torch" else None,
+    )
+
+    with pytest.raises(RuntimeError, match="active PyTorch build cannot use CUDA"):
+        validate_watch_device("cuda")
 
 
 def test_watch_reaper_records_abnormal_exit(

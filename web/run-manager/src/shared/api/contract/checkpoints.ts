@@ -66,7 +66,7 @@ export const publishedCheckpointSchema = z.object({
   import_dir: z.string(),
   source_run_id: z.string().nullable(),
   source_run_name: z.string().nullable(),
-  source_artifact: z.enum(["latest", "best", "final"]),
+  source_artifact: z.enum(["latest", "best"]),
   local_num_timesteps: z.number().int().nonnegative().nullable(),
   lineage_num_timesteps: z.number().int().nonnegative().nullable(),
   source_bundle_sha256: z.string().nullable(),

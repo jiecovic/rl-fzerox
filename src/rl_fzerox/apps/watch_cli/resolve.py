@@ -18,7 +18,7 @@ from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 def resolve_watch_app_config(
     *,
     run_id: str,
-    policy_artifact: Literal["latest", "best", "final"] | None,
+    policy_artifact: Literal["latest", "best"] | None,
     manager_db_path: Path | None,
     session_name: str | None = None,
     overrides: Sequence[str],

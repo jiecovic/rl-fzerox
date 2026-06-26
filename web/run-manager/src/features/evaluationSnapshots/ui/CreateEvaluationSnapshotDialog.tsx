@@ -141,7 +141,6 @@ export function CreateEvaluationSnapshotDialog({
               >
                 <option value="latest">latest</option>
                 <option value="best">best</option>
-                <option value="final">final</option>
               </FieldSelect>
             </FieldShell>
             <FieldShell>

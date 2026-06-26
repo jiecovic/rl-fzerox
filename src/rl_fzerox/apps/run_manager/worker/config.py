@@ -135,8 +135,6 @@ def _run_paths(run: ManagedRun, *, resume: bool) -> RunPaths:
         latest_policy_path=run.run_dir / RUN_LAYOUT.policy_artifacts.latest,
         best_model_path=run.run_dir / RUN_LAYOUT.model_artifacts.best,
         best_policy_path=run.run_dir / RUN_LAYOUT.policy_artifacts.best,
-        final_model_path=run.run_dir / RUN_LAYOUT.model_artifacts.final,
-        final_policy_path=run.run_dir / RUN_LAYOUT.policy_artifacts.final,
         baselines_dir=run.run_dir / RUN_LAYOUT.baselines_dirname,
         baseline_state_path=run.run_dir
         / RUN_LAYOUT.baselines_dirname

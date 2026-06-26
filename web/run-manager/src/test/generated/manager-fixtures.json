@@ -437,6 +437,9 @@
         "value": "bilinear"
       }
     ],
+    "runtime": {
+      "cuda_available": true
+    },
     "runtime_assets": [
       {
         "exists": false,

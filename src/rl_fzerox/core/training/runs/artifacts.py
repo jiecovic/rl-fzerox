@@ -59,11 +59,9 @@ def _resolve_artifact_path(
 ) -> Path:
     resolved_run_dir = run_dir.expanduser().resolve()
     if artifact == "latest":
-        preferred_filenames = (filenames.latest, filenames.final, filenames.best)
+        preferred_filenames = (filenames.latest,)
     elif artifact == "best":
         preferred_filenames = (filenames.best,)
-    elif artifact == "final":
-        preferred_filenames = (filenames.final,)
     else:
         raise ValueError(f"Unsupported artifact kind: {artifact!r}")
 

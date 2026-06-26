@@ -28,7 +28,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--artifact",
         dest="policy_artifact",
-        choices=("latest", "best", "final"),
+        choices=("latest", "best"),
         default=None,
         help="Which saved policy artifact to load from the managed run.",
     )

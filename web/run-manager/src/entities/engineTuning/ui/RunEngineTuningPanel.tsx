@@ -28,7 +28,7 @@ import {
 } from "./runEngineTuningPanel/tables";
 
 interface RunEngineTuningPanelProps {
-  artifact: "latest" | "best" | "final";
+  artifact: "latest" | "best";
   canReset: boolean;
   enabled: boolean;
   expanded: boolean;

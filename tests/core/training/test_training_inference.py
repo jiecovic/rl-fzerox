@@ -839,4 +839,3 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
 def test_artifact_kind_from_policy_path_uses_checkpoint_directory_names() -> None:
     assert _artifact_kind_from_policy_path(Path("checkpoints/latest/policy.zip")) == "latest"
     assert _artifact_kind_from_policy_path(Path("checkpoints/best/policy.zip")) == "best"
-    assert _artifact_kind_from_policy_path(Path("checkpoints/final/policy.zip")) == "final"

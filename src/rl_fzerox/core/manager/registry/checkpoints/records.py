@@ -375,10 +375,6 @@ def _materialize_run_snapshot(
             resolved_run_dir / RUN_LAYOUT.policy_artifacts.best,
             resolved_run_dir / RUN_LAYOUT.model_artifacts.best,
         ),
-        "final": (
-            resolved_run_dir / RUN_LAYOUT.policy_artifacts.final,
-            resolved_run_dir / RUN_LAYOUT.model_artifacts.final,
-        ),
     }
     for target_policy_path, target_model_path in artifact_paths.values():
         _link_or_copy_if_distinct(source_policy_path, target_policy_path)

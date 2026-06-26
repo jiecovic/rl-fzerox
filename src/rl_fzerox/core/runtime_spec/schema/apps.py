@@ -90,7 +90,7 @@ class WatchConfig(BaseModel):
     policy_model_path: Path | None = None
     engine_tuning_state_path: Path | None = None
     engine_tuning_model_path: Path | None = None
-    policy_artifact: Literal["latest", "best", "final"] = "latest"
+    policy_artifact: Literal["latest", "best"] = "latest"
     policy_algorithm: TrainAlgorithmName | None = None
     lineage_frame_offset: NonNegativeInt | None = None
     manager_db_path: Path | None = None

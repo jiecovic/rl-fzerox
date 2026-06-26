@@ -111,6 +111,7 @@ export function RunWorkspace({
     onResetTrackPool,
     onStop,
     onWatch,
+    metadata,
     run,
     runName,
   });

@@ -165,6 +165,6 @@ def _artifact_kind_from_policy_path(policy_path: Path) -> str:
     if policy_path.parent.parent.name != RUN_LAYOUT.checkpoints_dirname:
         raise ValueError(f"Unsupported policy artifact path: {policy_path}")
     artifact_kind = policy_path.parent.name
-    if artifact_kind in {"latest", "best", "final"}:
+    if artifact_kind in {"latest", "best"}:
         return artifact_kind
     raise ValueError(f"Unsupported policy artifact path: {policy_path}")

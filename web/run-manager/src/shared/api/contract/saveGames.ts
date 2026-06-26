@@ -25,7 +25,7 @@ export const saveAttemptStatusSchema = z.enum(["running", "succeeded", "failed"]
 
 export const savePolicySourceKindSchema = z.enum(["run", "evaluation", "checkpoint"]);
 
-export const savePolicyArtifactSchema = z.enum(["latest", "best", "final"]);
+export const savePolicyArtifactSchema = z.enum(["latest", "best"]);
 
 export const policyPlaybackModeSchema = z.enum(["deterministic", "stochastic"]);
 

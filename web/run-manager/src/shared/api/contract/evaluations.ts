@@ -19,7 +19,7 @@ export const evaluationStatusSchema = z.enum([
 ]);
 
 export const evaluationModeSchema = z.enum(["time_attack_course", "gp_course"]);
-export const evaluationSourceArtifactSchema = z.enum(["latest", "best", "final"]);
+export const evaluationSourceArtifactSchema = z.enum(["latest", "best"]);
 export const evaluationBaselineSuiteStatusSchema = z.enum(["not_created", "ready", "failed"]);
 
 export const evaluationTargetSpecSchema = z.object({

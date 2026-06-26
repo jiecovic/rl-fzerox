@@ -41,7 +41,7 @@ def create_metrics_router(store: ManagerStore) -> APIRouter:
     @router.get("/api/runs/{run_id}/engine-tuning")
     async def run_engine_tuning(
         run_id: Annotated[str, Path(min_length=1)],
-        artifact: Literal["latest", "best", "final"] = Query(default="latest"),
+        artifact: Literal["latest", "best"] = Query(default="latest"),
     ) -> dict[str, object]:
         return await run_sync(
             handlers.run_engine_tuning_payload,

@@ -93,10 +93,6 @@ _ARTIFACT_RELATIVE_PATHS: dict[CheckpointBundleSourceArtifact, _ArtifactRelative
         model=RUN_LAYOUT.model_artifacts.best,
         policy=RUN_LAYOUT.policy_artifacts.best,
     ),
-    "final": _ArtifactRelativePaths(
-        model=RUN_LAYOUT.model_artifacts.final,
-        policy=RUN_LAYOUT.policy_artifacts.final,
-    ),
 }
 
 

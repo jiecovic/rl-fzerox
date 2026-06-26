@@ -4,6 +4,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import threading
+from importlib import import_module
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -17,7 +18,7 @@ from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
 WatchLaunchStatus = Literal["started", "already_running"]
 type WatchRenderer = RendererName
-WATCH_STARTUP_TIMEOUT_SECONDS = 8.0
+WATCH_STARTUP_TIMEOUT_SECONDS = 2.0
 
 
 class _WatchProcess(Protocol):
@@ -56,6 +57,7 @@ def launch_watch_artifact(
         is not None
     ):
         return "already_running"
+    validate_watch_device(device)
     overrides = watch_config_overrides(
         device=device,
         renderer=renderer,
@@ -135,6 +137,27 @@ def watch_config_overrides(
     if renderer is not None:
         overrides.append(f"emulator.renderer={renderer}")
     return tuple(overrides)
+
+
+def validate_watch_device(device: Literal["cpu", "cuda"]) -> None:
+    """Reject CUDA watch launches before spawning when this Python cannot use CUDA."""
+
+    if device != "cuda":
+        return
+    try:
+        torch = import_module("torch")
+    except ImportError as exc:
+        raise RuntimeError(
+            "CUDA watch requested, but PyTorch is not installed. "
+            "Select cpu or install a CUDA-enabled PyTorch build."
+        ) from exc
+    cuda = getattr(torch, "cuda", None)
+    is_available = getattr(cuda, "is_available", None)
+    if not callable(is_available) or not bool(is_available()):
+        raise RuntimeError(
+            "CUDA watch requested, but the active PyTorch build cannot use CUDA. "
+            "Select cpu or install a CUDA-enabled PyTorch build."
+        )
 
 
 def manager_watch_log_path(run_id: str, *, artifact: str) -> Path:

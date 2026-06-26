@@ -45,7 +45,7 @@ class SaveRaceExecutionPlan:
     policy_source_id: str
     policy_source_name: str
     policy_source_dir: Path
-    policy_artifact: Literal["latest", "best", "final"]
+    policy_artifact: Literal["latest", "best"]
     policy_algorithm: str
     policy_path: Path
     race_setup: SaveRaceSetup

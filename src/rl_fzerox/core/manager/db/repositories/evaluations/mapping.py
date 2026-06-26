@@ -170,8 +170,6 @@ def _checkpoint_artifact(value: object) -> EvaluationCheckpointArtifact:
             return "latest"
         case "best":
             return "best"
-        case "final":
-            return "final"
     raise ValueError(f"Unsupported evaluation source artifact: {value!r}")
 
 

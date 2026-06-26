@@ -56,7 +56,7 @@ export async function fetchRunAltBaselines(
 
 export async function fetchRunEngineTuningState(
   runId: string,
-  artifact: "latest" | "best" | "final" = "latest",
+  artifact: "latest" | "best" = "latest",
   options: RequestOptions = {},
 ): Promise<{ enabled: boolean; state: EngineTuningRuntimeState | null }> {
   const query = new URLSearchParams({ artifact });

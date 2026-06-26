@@ -29,6 +29,7 @@ import type {
   SaveEngineTuningCourseSetupRecommendation,
   SaveGameRunnerSettingsUpdateRequest,
 } from "@/shared/api/contract";
+import { normalizeRuntimeDevice, runtimeDeviceOptions } from "@/shared/api/devices";
 import { rendererNames } from "@/shared/api/renderers";
 import { Button } from "@/shared/ui/Button";
 import { FolderIcon, RenameIcon } from "@/shared/ui/icons";
@@ -206,6 +207,8 @@ export function SaveGameWorkspace({
       metadata === null ? EMPTY_RENDERER_OPTIONS : rendererNames(metadata, session.runnerRenderer),
     [metadata, session.runnerRenderer],
   );
+  const runnerDeviceOptions = runtimeDeviceOptions(metadata);
+  const runnerDevice = normalizeRuntimeDevice(session.runnerDevice, metadata);
 
   if (session.saveGameId === null) {
     return (
@@ -313,7 +316,8 @@ export function SaveGameWorkspace({
         canStart={canStartRunner}
         canSaveSettings={canSaveRunnerSettings}
         rendererOptions={rendererOptions}
-        runnerDevice={session.runnerDevice}
+        runnerDevice={runnerDevice}
+        runnerDeviceOptions={runnerDeviceOptions}
         runnerRenderer={session.runnerRenderer}
         policyMode={session.policyMode}
         recordingEnabled={session.recordingEnabled}

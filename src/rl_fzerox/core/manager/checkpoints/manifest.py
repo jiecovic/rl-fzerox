@@ -44,7 +44,7 @@ CheckpointBundleFileRole = Literal[
     "engine_tuning_model",
 ]
 
-CheckpointBundleSourceArtifact = Literal["latest", "best", "final"]
+CheckpointBundleSourceArtifact = Literal["latest", "best"]
 
 _HEX_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _FORBIDDEN_PATH_PARTS = frozenset(

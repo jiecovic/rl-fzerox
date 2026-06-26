@@ -25,6 +25,7 @@ export function RunnerControlPanel({
   recordingInputHudEnabled,
   recordingUpscaleFactor,
   rendererOptions,
+  runnerDeviceOptions,
   runnerDevice,
   runnerRenderer,
   startLabel,
@@ -50,6 +51,7 @@ export function RunnerControlPanel({
   recordingInputHudEnabled: boolean;
   recordingUpscaleFactor: number;
   rendererOptions: readonly WatchRenderer[];
+  runnerDeviceOptions: readonly WatchDevice[];
   runnerDevice: WatchDevice;
   runnerRenderer: WatchRenderer;
   startLabel: string;
@@ -71,8 +73,11 @@ export function RunnerControlPanel({
               value={runnerDevice}
               onChange={(event) => onRunnerDeviceChange(event.currentTarget.value as WatchDevice)}
             >
-              <option value="cuda">cuda</option>
-              <option value="cpu">cpu</option>
+              {runnerDeviceOptions.map((device) => (
+                <option key={device} value={device}>
+                  {device}
+                </option>
+              ))}
             </FieldSelect>
           </FieldShell>
           <FieldShell>

@@ -9,11 +9,10 @@ from pathlib import Path
 
 @dataclass(frozen=True, slots=True)
 class ArtifactFilenames:
-    """The latest/best/final relative paths for one artifact family."""
+    """The latest and best relative paths for one artifact family."""
 
     latest: str
     best: str
-    final: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,12 +47,10 @@ RUN_LAYOUT = RunLayout(
     model_artifacts=ArtifactFilenames(
         latest="checkpoints/latest/model.zip",
         best="checkpoints/best/model.zip",
-        final="checkpoints/final/model.zip",
     ),
     policy_artifacts=ArtifactFilenames(
         latest="checkpoints/latest/policy.zip",
         best="checkpoints/best/policy.zip",
-        final="checkpoints/final/policy.zip",
     ),
 )
 
@@ -72,8 +69,6 @@ class RunPaths:
     latest_policy_path: Path
     best_model_path: Path
     best_policy_path: Path
-    final_model_path: Path
-    final_policy_path: Path
     baselines_dir: Path
     baseline_state_path: Path
 
@@ -153,8 +148,6 @@ def _run_paths(run_dir: Path, *, fresh_run: bool) -> RunPaths:
         latest_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.latest,
         best_model_path=run_dir / RUN_LAYOUT.model_artifacts.best,
         best_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.best,
-        final_model_path=run_dir / RUN_LAYOUT.model_artifacts.final,
-        final_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.final,
         baselines_dir=run_dir / RUN_LAYOUT.baselines_dirname,
         baseline_state_path=run_dir / RUN_LAYOUT.baselines_dirname / RUN_LAYOUT.baseline_filename,
     )
@@ -171,8 +164,6 @@ def ensure_run_dirs(paths: RunPaths) -> None:
     paths.latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
     paths.best_model_path.parent.mkdir(parents=True, exist_ok=True)
     paths.best_policy_path.parent.mkdir(parents=True, exist_ok=True)
-    paths.final_model_path.parent.mkdir(parents=True, exist_ok=True)
-    paths.final_policy_path.parent.mkdir(parents=True, exist_ok=True)
     paths.baselines_dir.mkdir(parents=True, exist_ok=True)
 
 

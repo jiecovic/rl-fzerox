@@ -89,7 +89,7 @@ vi.mock("@/shared/api/client", async () => {
     fetchRuns: () => fetchRunsMock(),
     fetchRunMetrics: (runId: string) => fetchRunMetricsMock(runId),
     fetchRunTrackSamplingState: (runId: string) => fetchRunTrackSamplingStateMock(runId),
-    fetchRunEngineTuningState: (runId: string, artifact: "latest" | "best" | "final") =>
+    fetchRunEngineTuningState: (runId: string, artifact: "latest" | "best") =>
       fetchRunEngineTuningStateMock(runId, artifact),
     fetchPolicyPreview: (config: typeof managedRunConfigFixture) => fetchPolicyPreviewMock(config),
     importRunBundle: (file: File) => importRunBundleMock(file),

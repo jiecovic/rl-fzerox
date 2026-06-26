@@ -18,8 +18,6 @@ from rl_fzerox.core.runtime_spec.watch_overrides import (
 )
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
-    continue_run_paths,
-    materialize_train_run_config,
     materialize_watch_session_config,
     save_train_run_config,
 )
@@ -28,7 +26,7 @@ from rl_fzerox.core.training.runs import (
 def resolve_watch_app_config(
     *,
     run_id: str,
-    policy_artifact: Literal["latest", "best", "final"] | None,
+    policy_artifact: Literal["latest", "best"] | None,
     manager_db_path: Path | None,
     session_name: str | None = None,
     overrides: Sequence[str],
@@ -41,7 +39,7 @@ def resolve_watch_app_config(
         else default_manager_db_path().resolve()
     )
     cli_override_delta = watch_config_delta_from_dotlist(overrides) if overrides else {}
-    resolved_policy_artifact: Literal["latest", "best", "final"] = policy_artifact or "latest"
+    resolved_policy_artifact: Literal["latest", "best"] = policy_artifact or "latest"
     run, train_config, lineage_frame_offset = managed_watch_train_config(
         db_path=resolved_manager_db_path,
         run_id=run_id,
@@ -94,7 +92,7 @@ def default_watch_config_from_train_run(
     train_config: TrainAppConfig,
     *,
     run_dir: Path,
-    artifact: Literal["latest", "best", "final"],
+    artifact: Literal["latest", "best"],
 ) -> WatchAppConfig:
     """Build one minimal watch config from a projected runtime train config."""
 
@@ -118,7 +116,7 @@ def managed_watch_train_config(
     db_path: Path,
     run_id: str,
 ) -> tuple[ManagedRun, TrainAppConfig, int | None]:
-    """Resolve one manager-owned run into a materialized runtime training config."""
+    """Resolve one manager-owned run into a watch-ready training config mirror."""
 
     store = ManagerStore(db_path)
     run = store.get_run(run_id)
@@ -136,12 +134,10 @@ def managed_watch_train_config(
         run_id=run.id,
         include_artifacts=True,
     )
-    train_config = materialize_train_run_config(
-        train_config,
-        run_paths=continue_run_paths(run.run_dir),
-    )
     # The manifest is a mirror of the SQLite-projected runtime config. Keep it
     # synchronized for debugging/export, but never read it as a watch fallback.
+    # Watch launch must not call the train baseline materializer; managed
+    # training owns that expensive artifact lifecycle.
     save_train_run_config(config=train_config, run_dir=run.run_dir)
     return (run, train_config, lineage_frame_offset)
 

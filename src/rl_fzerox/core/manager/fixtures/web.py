@@ -16,7 +16,7 @@ from rl_fzerox.core.manager.architecture import (
     policy_architecture_preview,
     run_manager_config_metadata,
 )
-from rl_fzerox.core.manager.architecture.models import RuntimeAssetInfo
+from rl_fzerox.core.manager.architecture.models import RuntimeAssetInfo, RuntimeCapabilityInfo
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 
 WEB_FIXTURE_RUNTIME_ASSETS = (
@@ -33,6 +33,7 @@ WEB_FIXTURE_RUNTIME_ASSETS = (
         exists=False,
     ),
 )
+WEB_FIXTURE_RUNTIME = RuntimeCapabilityInfo(cuda_available=True)
 
 
 def web_test_fixture_payload() -> dict[str, object]:
@@ -41,6 +42,7 @@ def web_test_fixture_payload() -> dict[str, object]:
     return {
         "managed_run_config": config.model_dump(mode="json"),
         "config_metadata": run_manager_config_metadata(
+            runtime=WEB_FIXTURE_RUNTIME,
             runtime_assets=WEB_FIXTURE_RUNTIME_ASSETS,
         ).model_dump(mode="json"),
         "policy_preview": policy_architecture_preview(config).model_dump(mode="json"),

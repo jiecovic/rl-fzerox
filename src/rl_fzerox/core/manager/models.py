@@ -31,7 +31,7 @@ ManagedEvaluationStatus = Literal[
 ]
 EvaluationBaselineSuiteStatus = Literal["not_created", "ready", "failed"]
 PolicySourceKind = Literal["run", "evaluation", "checkpoint"]
-PolicySourceArtifact = Literal["latest", "best", "final"]
+PolicySourceArtifact = Literal["latest", "best"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,7 +105,7 @@ class ManagedEvaluation:
     source_policy_kind: PolicySourceKind
     source_policy_id: str | None
     source_run_id: str | None
-    source_artifact: Literal["latest", "best", "final"] | None
+    source_artifact: Literal["latest", "best"] | None
     preset_id: str
     preset_version: int
     policy_mode: EvaluationPolicyMode
