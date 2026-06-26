@@ -94,6 +94,7 @@ export const managedRunSummarySchema = z.object({
 
 export const managedRunSchema = managedRunSummarySchema.extend({
   config: managedRunConfigSchema,
+  available_policy_artifacts: z.array(z.enum(["latest", "best"])).default(["latest", "best"]),
 });
 
 export const managedRunMetricSampleSchema = z.object({

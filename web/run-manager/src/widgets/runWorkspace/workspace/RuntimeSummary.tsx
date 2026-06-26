@@ -83,6 +83,8 @@ export function RunRuntimeSummary({
   const hasLineageTotals = showsLineageTotals(run);
   const watchRendererOptions = rendererNames(metadata, actions.selectedWatchRenderer);
   const watchDeviceOptions = runtimeDeviceOptions(metadata);
+  const policyArtifactOptions = actions.availablePolicyArtifacts;
+  const hasPolicyArtifacts = policyArtifactOptions.length > 0;
   const progressNoteText = progressNote(run);
   const activeStartupMessage = latestActiveStartupMessage(run);
 
@@ -250,13 +252,20 @@ export function RunRuntimeSummary({
                 aria-label="Fork checkpoint artifact"
                 className={toolbarSelectClass("!w-[104px]")}
                 value={actions.selectedForkArtifact}
-                disabled={actions.isForking}
+                disabled={actions.isForking || !hasPolicyArtifacts}
                 onChange={(event) =>
                   actions.setSelectedForkArtifact(event.target.value === "best" ? "best" : "latest")
                 }
               >
-                <option value="latest">latest</option>
-                <option value="best">best</option>
+                {hasPolicyArtifacts ? (
+                  policyArtifactOptions.map((artifact) => (
+                    <option key={artifact} value={artifact}>
+                      {artifact}
+                    </option>
+                  ))
+                ) : (
+                  <option value={actions.selectedForkArtifact}>none</option>
+                )}
               </FieldSelect>
             </ToolbarSelect>
             <TooltipIconButton
@@ -265,11 +274,13 @@ export function RunRuntimeSummary({
                   ? `Forking ${actions.selectedForkArtifact} checkpoint`
                   : `Fork ${actions.selectedForkArtifact} checkpoint`
               }
-              disabled={actions.isForking}
+              disabled={actions.isForking || !hasPolicyArtifacts}
               tooltip={
-                actions.isForking
-                  ? `Forking ${actions.selectedForkArtifact}...`
-                  : `Fork ${actions.selectedForkArtifact}`
+                !hasPolicyArtifacts
+                  ? "No checkpoint artifact"
+                  : actions.isForking
+                    ? `Forking ${actions.selectedForkArtifact}...`
+                    : `Fork ${actions.selectedForkArtifact}`
               }
               onClick={() => void actions.forkRunArtifact(actions.selectedForkArtifact)}
             >
@@ -286,15 +297,22 @@ export function RunRuntimeSummary({
                 aria-label="Watch checkpoint artifact"
                 className={toolbarSelectClass("!w-[104px]")}
                 value={actions.selectedWatchArtifact}
-                disabled={actions.watchingArtifact !== null}
+                disabled={actions.watchingArtifact !== null || !hasPolicyArtifacts}
                 onChange={(event) =>
                   actions.setSelectedWatchArtifact(
                     event.target.value === "best" ? "best" : "latest",
                   )
                 }
               >
-                <option value="latest">latest</option>
-                <option value="best">best</option>
+                {hasPolicyArtifacts ? (
+                  policyArtifactOptions.map((artifact) => (
+                    <option key={artifact} value={artifact}>
+                      {artifact}
+                    </option>
+                  ))
+                ) : (
+                  <option value={actions.selectedWatchArtifact}>none</option>
+                )}
               </FieldSelect>
             </ToolbarSelect>
             <ToolbarSelect label="Policy mode">
@@ -354,11 +372,17 @@ export function RunRuntimeSummary({
             </ToolbarSelect>
             <TooltipIconButton
               aria-label="Save watch launch settings"
-              disabled={actions.watchingArtifact !== null || actions.watchLaunchSettingsSaved}
+              disabled={
+                actions.watchingArtifact !== null ||
+                actions.watchLaunchSettingsSaved ||
+                !hasPolicyArtifacts
+              }
               tooltip={
-                actions.watchLaunchSettingsSaved
-                  ? "Watch launch settings saved"
-                  : "Save watch launch settings"
+                !hasPolicyArtifacts
+                  ? "No checkpoint artifact"
+                  : actions.watchLaunchSettingsSaved
+                    ? "Watch launch settings saved"
+                    : "Save watch launch settings"
               }
               onClick={actions.saveWatchLaunchSettings}
             >
@@ -370,11 +394,13 @@ export function RunRuntimeSummary({
                   ? `Opening ${actions.selectedWatchArtifact} checkpoint watch`
                   : `Watch ${actions.selectedWatchArtifact} checkpoint`
               }
-              disabled={actions.watchingArtifact !== null}
+              disabled={actions.watchingArtifact !== null || !hasPolicyArtifacts}
               tooltip={
-                actions.watchingArtifact === actions.selectedWatchArtifact
-                  ? `Opening ${actions.selectedWatchArtifact}...`
-                  : `Watch ${actions.selectedWatchArtifact}`
+                !hasPolicyArtifacts
+                  ? "No checkpoint artifact"
+                  : actions.watchingArtifact === actions.selectedWatchArtifact
+                    ? `Opening ${actions.selectedWatchArtifact}...`
+                    : `Watch ${actions.selectedWatchArtifact}`
               }
               onClick={() => void actions.watchRunArtifact(actions.selectedWatchArtifact)}
             >

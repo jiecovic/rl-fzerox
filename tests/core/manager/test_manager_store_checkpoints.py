@@ -43,6 +43,8 @@ def test_manager_store_imports_published_checkpoint_bundle(tmp_path: Path) -> No
     assert checkpoint.run_id == "checkpoint-blue-falcon-fine-tuned-v1"
     assert checkpoint.policy_path == checkpoint.import_dir / RUN_LAYOUT.policy_artifacts.best
     assert checkpoint.model_path == checkpoint.import_dir / RUN_LAYOUT.model_artifacts.best
+    assert not (checkpoint.import_dir / RUN_LAYOUT.policy_artifacts.latest).exists()
+    assert not (checkpoint.import_dir / RUN_LAYOUT.model_artifacts.latest).exists()
     assert checkpoint.evaluation_metrics_path == checkpoint.import_dir / "metrics" / (
         "evaluation.json"
     )

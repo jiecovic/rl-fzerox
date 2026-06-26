@@ -168,7 +168,7 @@ def watch_startup_reporter(*, store: ManagerStore, run_id: str) -> Callable[[str
     def report(_kind: str, message: str) -> None:
         store.append_run_event(
             run_id=run_id,
-            kind="watch_materialize",
+            kind="startup_watch_materialize",
             message=message,
         )
 

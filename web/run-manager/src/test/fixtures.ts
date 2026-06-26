@@ -147,6 +147,7 @@ export function runFixture(overrides: Partial<ManagedRunDetail> = {}): ManagedRu
     source_run_id: null,
     source_artifact: null,
     source_num_timesteps: null,
+    available_policy_artifacts: ["latest", "best"],
     active_alt_baseline_count: 0,
     pending_command: null,
     worker_heartbeat_at: "2026-05-03T18:55:02+00:00",

@@ -1,7 +1,11 @@
 # src/rl_fzerox/apps/run_manager/api/payloads/runs.py
 from __future__ import annotations
 
+from pathlib import Path
+
 from rl_fzerox.core.manager import ManagedRun, ManagedRunEvent, ManagedRunSummary
+from rl_fzerox.core.manager.models import PolicySourceArtifact
+from rl_fzerox.core.training.runs import RUN_LAYOUT
 
 
 def run_payload(
@@ -16,6 +20,7 @@ def run_payload(
         active_alt_baseline_count=active_alt_baseline_count,
     )
     payload["config"] = run.config.model_dump(mode="json")
+    payload["available_policy_artifacts"] = list(_available_policy_artifacts(run))
     return payload
 
 
@@ -99,3 +104,23 @@ def _run_vehicle_setup_payload(run: ManagedRun | ManagedRunSummary) -> dict[str,
         "engine_setting_min_raw_value": vehicle.engine_setting_min_raw_value,
         "engine_setting_max_raw_value": vehicle.engine_setting_max_raw_value,
     }
+
+
+def _available_policy_artifacts(run: ManagedRun) -> tuple[PolicySourceArtifact, ...]:
+    artifacts: list[PolicySourceArtifact] = []
+    artifact_specs: tuple[tuple[PolicySourceArtifact, Path, Path], ...] = (
+        (
+            "latest",
+            run.run_dir / RUN_LAYOUT.policy_artifacts.latest,
+            run.run_dir / RUN_LAYOUT.model_artifacts.latest,
+        ),
+        (
+            "best",
+            run.run_dir / RUN_LAYOUT.policy_artifacts.best,
+            run.run_dir / RUN_LAYOUT.model_artifacts.best,
+        ),
+    )
+    for artifact, policy_path, model_path in artifact_specs:
+        if policy_path.is_file() and model_path.is_file():
+            artifacts.append(artifact)
+    return tuple(artifacts)

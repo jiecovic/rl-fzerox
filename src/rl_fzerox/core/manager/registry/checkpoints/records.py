@@ -366,35 +366,27 @@ def _materialize_run_snapshot(
     train_config = build_managed_train_app_config(config, run_id=run_id, run_dir=resolved_run_dir)
     train_config_path = save_train_run_config(config=train_config, run_dir=resolved_run_dir)
 
-    artifact_paths: dict[str, tuple[Path, Path]] = {
-        "latest": (
-            resolved_run_dir / RUN_LAYOUT.policy_artifacts.latest,
-            resolved_run_dir / RUN_LAYOUT.model_artifacts.latest,
-        ),
-        "best": (
-            resolved_run_dir / RUN_LAYOUT.policy_artifacts.best,
-            resolved_run_dir / RUN_LAYOUT.model_artifacts.best,
-        ),
-    }
-    for target_policy_path, target_model_path in artifact_paths.values():
-        _link_or_copy_if_distinct(source_policy_path, target_policy_path)
-        _link_or_copy_if_distinct(source_model_path, target_model_path)
+    artifact_policy_path, artifact_model_path = _artifact_paths(
+        resolved_run_dir,
+        artifact=manifest.checkpoint.source_artifact,
+    )
+    _link_or_copy_if_distinct(source_policy_path, artifact_policy_path)
+    _link_or_copy_if_distinct(source_model_path, artifact_model_path)
+    _link_or_copy_if_distinct(
+        source_metadata_path,
+        policy_artifact_metadata_path(artifact_policy_path),
+    )
+    if source_engine_tuning_state_path is not None:
         _link_or_copy_if_distinct(
-            source_metadata_path,
-            policy_artifact_metadata_path(target_policy_path),
+            source_engine_tuning_state_path,
+            engine_tuning_checkpoint_path(artifact_policy_path),
         )
-        if source_engine_tuning_state_path is not None:
-            _link_or_copy_if_distinct(
-                source_engine_tuning_state_path,
-                engine_tuning_checkpoint_path(target_policy_path),
-            )
-        if source_engine_tuning_model_path is not None:
-            _link_or_copy_if_distinct(
-                source_engine_tuning_model_path,
-                engine_tuning_model_path(target_policy_path),
-            )
+    if source_engine_tuning_model_path is not None:
+        _link_or_copy_if_distinct(
+            source_engine_tuning_model_path,
+            engine_tuning_model_path(artifact_policy_path),
+        )
 
-    artifact_policy_path, artifact_model_path = artifact_paths[manifest.checkpoint.source_artifact]
     engine_tuning_state_path = engine_tuning_checkpoint_path(artifact_policy_path)
     engine_tuning_model_state_path = engine_tuning_model_path(artifact_policy_path)
     return _CheckpointSnapshotPaths(
@@ -409,6 +401,26 @@ def _materialize_run_snapshot(
             engine_tuning_model_state_path if engine_tuning_model_state_path.is_file() else None
         ),
     )
+
+
+def _artifact_paths(
+    run_dir: Path,
+    *,
+    artifact: str,
+) -> tuple[Path, Path]:
+    match artifact:
+        case "latest":
+            return (
+                run_dir / RUN_LAYOUT.policy_artifacts.latest,
+                run_dir / RUN_LAYOUT.model_artifacts.latest,
+            )
+        case "best":
+            return (
+                run_dir / RUN_LAYOUT.policy_artifacts.best,
+                run_dir / RUN_LAYOUT.model_artifacts.best,
+            )
+        case _:
+            raise ValueError(f"unsupported checkpoint artifact: {artifact!r}")
 
 
 def _insert_or_repair_archived_run_snapshot(

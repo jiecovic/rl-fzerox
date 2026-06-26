@@ -114,13 +114,17 @@ def published_checkpoint_payload(
     *,
     snapshot_run: ManagedRunSummary | None = None,
 ) -> PublishedCheckpointPayload:
+    run_payload = None
+    if snapshot_run is not None:
+        run_payload = run_summary_payload(snapshot_run)
+        run_payload["available_policy_artifacts"] = list(_checkpoint_policy_artifacts(checkpoint))
     return {
         "id": checkpoint.id,
         "checkpoint_id": checkpoint.checkpoint_id,
         "version": checkpoint.version,
         "name": checkpoint.name,
         "run_id": checkpoint.run_id,
-        "run": None if snapshot_run is None else run_summary_payload(snapshot_run),
+        "run": run_payload,
         "config": checkpoint.config.model_dump(mode="json"),
         "import_dir": str(checkpoint.import_dir),
         "source_run_id": checkpoint.source_run_id,
@@ -139,6 +143,14 @@ def published_checkpoint_payload(
         "imported_at": checkpoint.imported_at,
         "updated_at": checkpoint.updated_at,
     }
+
+
+def _checkpoint_policy_artifacts(
+    checkpoint: ManagedPublishedCheckpoint,
+) -> tuple[str, ...]:
+    if checkpoint.policy_path.is_file() and checkpoint.model_path.is_file():
+        return (checkpoint.source_artifact,)
+    return ()
 
 
 def _checkpoint_engine_tuning_payload(

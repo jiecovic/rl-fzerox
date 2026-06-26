@@ -37,6 +37,7 @@ export interface RunWorkspaceActionsProps {
 }
 
 export interface RunWorkspaceActionState {
+  availablePolicyArtifacts: CheckpointArtifact[];
   canRename: boolean;
   canResume: boolean;
   canStop: boolean;
@@ -118,9 +119,12 @@ export function useRunWorkspaceActions({
   const [savedWatchPreference, setSavedWatchPreference] = useState<WatchLaunchPreference>(() =>
     readWatchLaunchPreference(run.config.environment.renderer, metadata),
   );
-  const [selectedForkArtifact, setSelectedForkArtifact] = useState<CheckpointArtifact>("latest");
+  const availablePolicyArtifacts = run.available_policy_artifacts;
+  const [selectedForkArtifact, setSelectedForkArtifact] = useState<CheckpointArtifact>(
+    preferredPolicyArtifact(availablePolicyArtifacts, "latest"),
+  );
   const [selectedWatchArtifact, setSelectedWatchArtifact] = useState<CheckpointArtifact>(
-    savedWatchPreference.artifact,
+    preferredPolicyArtifact(availablePolicyArtifacts, savedWatchPreference.artifact),
   );
   const [selectedWatchDevice, setSelectedWatchDevice] = useState<WatchDevice>(
     savedWatchPreference.device,
@@ -166,6 +170,19 @@ export function useRunWorkspaceActions({
       setSelectedWatchDevice("cpu");
     }
   }, [metadata.runtime.cuda_available, selectedWatchDevice]);
+
+  useEffect(() => {
+    setSelectedForkArtifact((current) =>
+      artifactIsAvailable(availablePolicyArtifacts, current)
+        ? current
+        : preferredPolicyArtifact(availablePolicyArtifacts, "latest"),
+    );
+    setSelectedWatchArtifact((current) =>
+      artifactIsAvailable(availablePolicyArtifacts, current)
+        ? current
+        : preferredPolicyArtifact(availablePolicyArtifacts, savedWatchPreference.artifact),
+    );
+  }, [availablePolicyArtifacts, savedWatchPreference.artifact]);
 
   useEffect(() => {
     if (!copiedRunId) {
@@ -235,6 +252,10 @@ export function useRunWorkspaceActions({
   }
 
   async function forkRunArtifact(artifact: CheckpointArtifact) {
+    if (!artifactIsAvailable(availablePolicyArtifacts, artifact)) {
+      onGlobalError("no policy checkpoint artifact is available for this run");
+      return;
+    }
     if (run.active_alt_baseline_count > 0) {
       onGlobalError(null);
       setPendingForkAltBaselineChoice({
@@ -284,6 +305,10 @@ export function useRunWorkspaceActions({
   }
 
   async function watchRunArtifact(artifact: CheckpointArtifact) {
+    if (!artifactIsAvailable(availablePolicyArtifacts, artifact)) {
+      onGlobalError("no policy checkpoint artifact is available for this run");
+      return;
+    }
     setWatchingArtifact(artifact);
     onGlobalError(null);
     try {
@@ -306,6 +331,10 @@ export function useRunWorkspaceActions({
   }
 
   function saveWatchLaunchSettings() {
+    if (!artifactIsAvailable(availablePolicyArtifacts, selectedWatchArtifact)) {
+      onGlobalError("no policy checkpoint artifact is available for this run");
+      return;
+    }
     writeWatchLaunchPreference(selectedWatchPreference);
     setSavedWatchPreference(selectedWatchPreference);
     onGlobalError(null);
@@ -373,6 +402,7 @@ export function useRunWorkspaceActions({
     (run.status === "paused" || run.status === "stopped" || run.status === "failed") && !isStopping;
 
   return {
+    availablePolicyArtifacts,
     canRename,
     canResume,
     canStop,
@@ -414,6 +444,26 @@ export function useRunWorkspaceActions({
     watchLaunchSettingsSaved,
     watchingArtifact,
   };
+}
+
+function artifactIsAvailable(
+  availableArtifacts: readonly CheckpointArtifact[],
+  artifact: CheckpointArtifact,
+): boolean {
+  return availableArtifacts.includes(artifact);
+}
+
+function preferredPolicyArtifact(
+  availableArtifacts: readonly CheckpointArtifact[],
+  preferred: CheckpointArtifact,
+): CheckpointArtifact {
+  if (availableArtifacts.includes(preferred)) {
+    return preferred;
+  }
+  if (availableArtifacts.includes("best")) {
+    return "best";
+  }
+  return "latest";
 }
 
 const WATCH_LAUNCH_PREFERENCE_STORAGE_KEY = "run-watch-launch-preference";

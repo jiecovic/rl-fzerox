@@ -71,6 +71,7 @@ async def test_manager_api_installs_checkpoint_catalog_entry(
     assert payload["checkpoint"]["run_id"] == "checkpoint-blue-falcon-fine-tuned-v1"
     assert payload["checkpoint"]["run"]["id"] == "checkpoint-blue-falcon-fine-tuned-v1"
     assert payload["checkpoint"]["run"]["status"] == "archived"
+    assert payload["checkpoint"]["run"]["available_policy_artifacts"] == ["best"]
     assert payload["checkpoint"]["config"]["version"] == 1
     assert payload["checkpoint"]["import_dir"].endswith(
         "manager/checkpoints/blue-falcon-fine-tuned/v1"
