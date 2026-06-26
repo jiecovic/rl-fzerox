@@ -25,10 +25,10 @@ from rl_fzerox.core.manager.checkpoints.manifest import (
     serialize_checkpoint_bundle_manifest_json,
 )
 from rl_fzerox.core.manager.registry.common import slugify
-from rl_fzerox.core.manager.store import default_manager_db_path
 
 MAX_CHECKPOINT_BUNDLE_PAYLOAD_BYTES = 4 * 1024 * 1024 * 1024
 MAX_CHECKPOINT_BUNDLE_PAYLOAD_FILES = 16
+_DEFAULT_MANAGER_DB_PATH = Path("local/manager/runs.db").resolve()
 
 
 @dataclass(frozen=True)
@@ -49,8 +49,23 @@ class CheckpointBundleImportError(ValueError):
 def default_imported_checkpoint_root(*, db_path: Path | None = None) -> Path:
     """Return the default local storage root for imported checkpoint payloads."""
 
-    manager_db_path = (db_path or default_manager_db_path()).expanduser().resolve()
+    manager_db_path = (db_path or _DEFAULT_MANAGER_DB_PATH).expanduser().resolve()
     return manager_db_path.parent / "checkpoints"
+
+
+def read_checkpoint_bundle_manifest(bundle_path: Path) -> CheckpointBundleManifest:
+    """Read one bundle manifest without extracting payload files."""
+
+    archive_path = bundle_path.expanduser().resolve()
+    if not archive_path.is_file():
+        raise CheckpointBundleImportError(f"checkpoint bundle does not exist: {archive_path}")
+    try:
+        with zipfile.ZipFile(archive_path, mode="r") as archive:
+            return _read_manifest(archive)
+    except CheckpointBundleImportError:
+        raise
+    except Exception as exc:
+        raise CheckpointBundleImportError(f"could not read checkpoint bundle: {exc}") from exc
 
 
 def import_checkpoint_bundle(

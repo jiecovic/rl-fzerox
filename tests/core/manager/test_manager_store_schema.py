@@ -196,6 +196,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     evaluation_columns = _table_columns(store, "evaluations")
     evaluation_preset_columns = _table_columns(store, "evaluation_presets")
     generated_slot_columns = _table_columns(store, "run_track_sampling_generated_slots")
+    published_checkpoint_columns = _table_columns(store, "published_checkpoints")
 
     assert columns == {
         "id",
@@ -324,6 +325,32 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "course_seed",
         "segment_count",
         "course_length",
+        "updated_at",
+    }
+    assert published_checkpoint_columns == {
+        "id",
+        "checkpoint_id",
+        "version",
+        "name",
+        "config_snapshot_id",
+        "import_dir",
+        "manifest_json",
+        "source_bundle_path",
+        "source_bundle_sha256",
+        "source_run_id",
+        "source_run_name",
+        "source_artifact",
+        "local_num_timesteps",
+        "lineage_num_timesteps",
+        "policy_path",
+        "model_path",
+        "checkpoint_metadata_path",
+        "train_config_path",
+        "evaluation_metrics_path",
+        "engine_tuning_state_path",
+        "engine_tuning_model_path",
+        "exported_at",
+        "imported_at",
         "updated_at",
     }
 

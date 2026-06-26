@@ -14,6 +14,7 @@ import json
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rl_fzerox.core.manager.checkpoints.manifest import (
     CHECKPOINT_BUNDLE_LAYOUT,
@@ -31,7 +32,6 @@ from rl_fzerox.core.manager.projection.launches import build_managed_train_app_c
 from rl_fzerox.core.manager.registry.common import slugify
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.serialization import config_json
-from rl_fzerox.core.manager.store import ManagerStore
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session import load_policy_artifact_metadata
@@ -40,6 +40,9 @@ from rl_fzerox.core.training.session.artifacts import (
     engine_tuning_model_path,
     policy_artifact_metadata_path,
 )
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.manager.store import ManagerStore
 
 
 @dataclass(frozen=True)

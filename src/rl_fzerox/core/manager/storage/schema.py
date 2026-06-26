@@ -26,7 +26,7 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 42
+SCHEMA_VERSION = 43
 
 
 @dataclass(frozen=True, slots=True)

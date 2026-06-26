@@ -30,6 +30,7 @@ from rl_fzerox.core.manager.storage.schema import (
     refresh_default_template,
 )
 from rl_fzerox.core.manager.store_api import (
+    CheckpointStoreMixin,
     EvaluationStoreMixin,
     RunStoreMixin,
     SaveGameStoreMixin,
@@ -49,7 +50,12 @@ def new_managed_run_id(name: str) -> str:
     return new_run_id()
 
 
-class ManagerStore(RunStoreMixin, EvaluationStoreMixin, SaveGameStoreMixin):
+class ManagerStore(
+    CheckpointStoreMixin,
+    RunStoreMixin,
+    EvaluationStoreMixin,
+    SaveGameStoreMixin,
+):
     """SQLite-backed source of truth for managed training runs.
 
     The store owns database lifecycle and exposes a narrow domain API, while
@@ -107,6 +113,9 @@ class ManagerStore(RunStoreMixin, EvaluationStoreMixin, SaveGameStoreMixin):
 
     def evaluations_root(self, *, output_root: Path | None = None) -> Path:
         return path_registry.evaluations_root(self.db_path, output_root=output_root)
+
+    def checkpoints_root(self, *, output_root: Path | None = None) -> Path:
+        return path_registry.checkpoints_root(self.db_path, output_root=output_root)
 
     def path(self, value: str | Path) -> Path:
         return path_registry.resolved_path(value)

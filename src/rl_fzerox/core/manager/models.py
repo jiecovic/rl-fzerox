@@ -151,6 +151,37 @@ class ManagedEvaluationBaselineSuite:
 
 
 @dataclass(frozen=True, slots=True)
+class ManagedPublishedCheckpoint:
+    """One installed published checkpoint bundle owned by the manager DB."""
+
+    id: str
+    checkpoint_id: str
+    version: str
+    name: str
+    config: ManagedRunConfig
+    config_hash: str
+    import_dir: Path
+    manifest_json: str
+    source_bundle_path: Path | None
+    source_bundle_sha256: str | None
+    source_run_id: str | None
+    source_run_name: str | None
+    source_artifact: PolicySourceArtifact
+    local_num_timesteps: int | None
+    lineage_num_timesteps: int | None
+    policy_path: Path
+    model_path: Path
+    checkpoint_metadata_path: Path
+    train_config_path: Path
+    evaluation_metrics_path: Path | None
+    engine_tuning_state_path: Path | None
+    engine_tuning_model_path: Path | None
+    exported_at: str
+    imported_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class ManagedRun:
     """One immutable DB-managed run record."""
 

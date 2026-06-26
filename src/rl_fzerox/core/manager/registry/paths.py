@@ -44,6 +44,12 @@ def evaluations_root(db_path: Path, *, output_root: Path | None = None) -> Path:
     return artifact_manager_evaluations_root(output_root=output_root)
 
 
+def checkpoints_root(db_path: Path, *, output_root: Path | None = None) -> Path:
+    if output_root is None:
+        return db_path.parent / "checkpoints"
+    return output_root.expanduser().resolve()
+
+
 def resolved_path(value: str | Path) -> Path:
     return Path(value).expanduser().resolve()
 

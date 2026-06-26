@@ -2,6 +2,7 @@
 """SQLAlchemy ORM models for manager persistence."""
 
 from rl_fzerox.core.manager.db.models.base import ManagerBase
+from rl_fzerox.core.manager.db.models.checkpoints import PublishedCheckpointModel
 from rl_fzerox.core.manager.db.models.configs import ConfigSnapshotModel
 from rl_fzerox.core.manager.db.models.evaluations import (
     EvaluationBaselineSuiteModel,
@@ -47,6 +48,7 @@ __all__ = [
     "FilesystemOperationModel",
     "LineageGroupModel",
     "ManagerBase",
+    "PublishedCheckpointModel",
     "RunCommandModel",
     "RunAltBaselineModel",
     "RunDraftModel",
