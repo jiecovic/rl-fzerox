@@ -69,18 +69,22 @@ python -m pip install -U pip
 
 Then install the project:
 
-For NVIDIA CUDA training, install a CUDA-enabled PyTorch wheel first. Use the
-official PyTorch selector for the exact command for your driver/platform:
-<https://pytorch.org/get-started/locally/>.
+For a quick local checkpoint/watch test, CPU PyTorch is enough and the project
+install below can resolve it normally. For NVIDIA CUDA training, install a
+CUDA-enabled PyTorch wheel first. With a recent NVIDIA driver, use the current
+CUDA 12.8 wheel:
 
 ```bash
-# Optional, for CUDA users: run the PyTorch CUDA install command here first.
+python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 python -m pip install -e ".[dev,watch,train]"
 python -m pip install "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.git"
 just native
 just run-manager-install
 ```
+
+If your driver/platform needs a different wheel, use the official PyTorch
+selector: <https://pytorch.org/get-started/locally/>.
 
 `just run-manager-install` installs the local React frontend dependencies used
 by `just fzerox`.
