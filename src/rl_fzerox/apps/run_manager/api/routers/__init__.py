@@ -1,6 +1,7 @@
 # src/rl_fzerox/apps/run_manager/api/routers/__init__.py
 from __future__ import annotations
 
+from rl_fzerox.apps.run_manager.api.routers.checkpoints import create_checkpoints_router
 from rl_fzerox.apps.run_manager.api.routers.drafts import create_drafts_router
 from rl_fzerox.apps.run_manager.api.routers.evaluations import create_evaluations_router
 from rl_fzerox.apps.run_manager.api.routers.lineages import create_lineages_router
@@ -12,6 +13,7 @@ from rl_fzerox.apps.run_manager.api.routers.system import create_system_router
 from rl_fzerox.apps.run_manager.api.routers.transfer import create_transfer_router
 
 __all__ = [
+    "create_checkpoints_router",
     "create_drafts_router",
     "create_evaluations_router",
     "create_lineages_router",

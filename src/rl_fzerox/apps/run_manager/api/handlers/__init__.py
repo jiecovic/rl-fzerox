@@ -1,6 +1,10 @@
 # src/rl_fzerox/apps/run_manager/api/handlers/__init__.py
 from __future__ import annotations
 
+from rl_fzerox.apps.run_manager.api.handlers.checkpoints import (
+    checkpoint_catalog_response,
+    install_catalog_checkpoint_response,
+)
 from rl_fzerox.apps.run_manager.api.handlers.common import (
     run_response_for_id,
     validate_source_fields,
@@ -81,6 +85,7 @@ from rl_fzerox.apps.run_manager.api.handlers.transfer import (
 __all__ = [
     "config_metadata_payload",
     "cancel_evaluation_payload",
+    "checkpoint_catalog_response",
     "clear_run_alt_baselines_payload",
     "clear_run_course_alt_baselines_payload",
     "create_draft_payload",
@@ -98,6 +103,7 @@ __all__ = [
     "export_run_bundle_path",
     "fork_run_payload",
     "import_run_bundle_payload",
+    "install_catalog_checkpoint_response",
     "launch_run_payload",
     "open_run_dir_payload",
     "open_save_game_dir_payload",
