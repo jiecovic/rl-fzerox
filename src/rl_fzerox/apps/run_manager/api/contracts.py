@@ -72,9 +72,7 @@ class CreateEvaluationRequest(BaseModel):
     def _validate_source(self) -> CreateEvaluationRequest:
         if self.source_policy_id is not None:
             if self.source_run_id is not None and self.source_policy_kind != "run":
-                raise ValueError(
-                    "source_run_id is only valid with source_policy_kind='run'"
-                )
+                raise ValueError("source_run_id is only valid with source_policy_kind='run'")
             return self
         if self.source_policy_kind == "run" and self.source_run_id is not None:
             return self

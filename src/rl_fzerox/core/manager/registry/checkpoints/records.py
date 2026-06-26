@@ -425,8 +425,7 @@ def _insert_or_repair_archived_run_snapshot(
     if existing is not None:
         if existing.status != "archived" or existing.run_dir != checkpoint.import_dir:
             raise ValueError(
-                "checkpoint run id conflicts with a non-checkpoint run "
-                f"{checkpoint.run_id!r}"
+                f"checkpoint run id conflicts with a non-checkpoint run {checkpoint.run_id!r}"
             )
         _upsert_archived_run_runtime(session, checkpoint=checkpoint)
         return

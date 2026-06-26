@@ -7,6 +7,7 @@ pub mod input;
 pub mod observation;
 pub mod payload;
 pub mod probe;
+pub mod rom;
 pub mod video;
 
 pub use emulator::{
@@ -15,4 +16,5 @@ pub use emulator::{
 pub use input::register_input_api;
 pub use observation::stacked_observation_channels;
 pub use probe::{PyCoreInfo, probe_core};
+pub use rom::validate_supported_rom_path;
 pub use video::display_size;

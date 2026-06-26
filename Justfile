@@ -10,6 +10,18 @@ default:
 native:
     "{{python_bin}}" -m maturin develop -r -q --skip-install
 
+# Install Python, native, and frontend dependencies for local use.
+setup:
+    ./install
+
+# Install with the CUDA 12.8 PyTorch wheel before project dependencies.
+setup-cuda:
+    ./install --torch cu128
+
+# Check whether local dependencies and runtime assets are ready.
+doctor:
+    ./doctor
+
 # Build and install the native extension with the Rust dev profile.
 native-dev:
     "{{python_bin}}" -m maturin develop -q --skip-install
@@ -30,15 +42,15 @@ rust-test:
 
 # Apply Python formatters only.
 py-fmt:
-    "{{python_bin}}" -m ruff format src tests scripts/check_numpy_typing.py
+    "{{python_bin}}" -m ruff format src tests scripts
 
 py-fmt-check:
-    "{{python_bin}}" -m ruff format --check src tests scripts/check_numpy_typing.py
+    "{{python_bin}}" -m ruff format --check src tests scripts
 
 py-lint:
     "{{python_bin}}" scripts/check_numpy_typing.py src tests scripts
-    "{{python_bin}}" -m ruff check src tests scripts/check_numpy_typing.py
-    PYTHONPATH=src "{{python_bin}}" -m pyright src tests scripts/check_numpy_typing.py
+    "{{python_bin}}" -m ruff check src tests scripts
+    PYTHONPATH=src "{{python_bin}}" -m pyright src tests scripts
 
 py-test: native
     @PYTHONPATH=src "{{python_bin}}" -c 'import sys; print(f"pytest interpreter: {sys.executable}"); import fzerox_emulator._native as native; print(f"native module: {native.__file__}")'
@@ -126,7 +138,7 @@ docs-open-all:
 
 # Launch the main F-Zero X app with the Python SQLite API.
 fzerox:
-    @EGL_PLATFORM="${EGL_PLATFORM:-x11}" PYTHONPATH=src "{{python_bin}}" -m rl_fzerox.apps.run_manager
+    @./fzerox
 
 # Compatibility alias for the old run-manager entrypoint.
 run-manager: fzerox

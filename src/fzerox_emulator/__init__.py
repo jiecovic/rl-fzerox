@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     joypad_mask = _native.joypad_mask
     probe_core = _native.probe_core
     stacked_observation_channels = _observations.stacked_observation_channels
+    validate_supported_rom_path = _native.validate_supported_rom_path
 
 _EXPORT_MODULES = {
     "CoreInfo": "fzerox_emulator._native",
@@ -57,6 +58,7 @@ _EXPORT_MODULES = {
     "encode_state_flags": "fzerox_emulator._native",
     "joypad_mask": "fzerox_emulator._native",
     "probe_core": "fzerox_emulator._native",
+    "validate_supported_rom_path": "fzerox_emulator._native",
     "BackendStepResult": "fzerox_emulator.base.results",
     "BackendMultiObservationStepResult": "fzerox_emulator.base.results",
     "EmulatorBackend": "fzerox_emulator.base.backend",
@@ -110,6 +112,7 @@ __all__ = [
     "joypad_mask",
     "probe_core",
     "stacked_observation_channels",
+    "validate_supported_rom_path",
 ]
 
 

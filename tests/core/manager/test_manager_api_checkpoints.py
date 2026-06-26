@@ -62,9 +62,7 @@ async def test_manager_api_installs_checkpoint_catalog_entry(
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     client = _client(tmp_path, store=store)
 
-    response = await client.post(
-        "/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install"
-    )
+    response = await client.post("/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install")
 
     assert response.status_code == 200
     payload = response.json()
@@ -192,8 +190,7 @@ async def test_manager_api_rejects_checkpoint_delete_when_save_game_uses_it(
 
     assert response.status_code == 400
     assert (
-        response.json()["error"]
-        == "remove save-game course setups that still use this checkpoint"
+        response.json()["error"] == "remove save-game course setups that still use this checkpoint"
     )
     assert store.get_published_checkpoint("blue-falcon-fine-tuned-v1") is not None
     assert checkpoint.import_dir.is_dir()
@@ -217,9 +214,7 @@ async def test_manager_api_checkpoint_catalog_install_is_idempotent(
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     client = _client(tmp_path, store=store)
 
-    first_response = await client.post(
-        "/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install"
-    )
+    first_response = await client.post("/api/checkpoints/catalog/blue-falcon-fine-tuned/v1/install")
     assert first_response.status_code == 200
 
     def fail_download(*_args: object, **_kwargs: object) -> Path:
@@ -262,9 +257,7 @@ def _write_catalog_bundle(tmp_path: Path) -> tuple[Path, Path]:
     manifest = _manifest(payloads)
     manifest = manifest.model_copy(
         update={
-            "checkpoint": manifest.checkpoint.model_copy(
-                update={"id": "blue-falcon-fine-tuned"}
-            )
+            "checkpoint": manifest.checkpoint.model_copy(update={"id": "blue-falcon-fine-tuned"})
         }
     )
     bundle_path = tmp_path / "blue-falcon.zip"

@@ -57,7 +57,7 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
             store=store,
             run_id=run.id,
             include_artifacts=True,
-    )
+        )
     if run.source_snapshot_dir is not None and run.source_artifact is not None:
         if run.source_run_id is not None:
             source_run = store.get_run(run.source_run_id)
@@ -80,12 +80,8 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
             source_run_dir=run.source_snapshot_dir,
             source_artifact=run.source_artifact,
             source_algorithm=source_metadata.source_algorithm,
-            source_auxiliary_state_enabled=(
-                source_metadata.source_auxiliary_state_enabled
-            ),
-            source_auxiliary_state_head_arch=(
-                source_metadata.source_auxiliary_state_head_arch
-            ),
+            source_auxiliary_state_enabled=(source_metadata.source_auxiliary_state_enabled),
+            source_auxiliary_state_head_arch=(source_metadata.source_auxiliary_state_head_arch),
             tensorboard_step_offset=run.lineage_step_offset,
         )
     if run.source_run_id is not None and run.source_artifact is not None:

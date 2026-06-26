@@ -24,7 +24,7 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     payload = response.json()
     runtime_assets = {asset["id"]: asset for asset in payload["runtime_assets"]}
     assert set(runtime_assets) == {"fzerox_rom", "libretro_core"}
-    assert runtime_assets["fzerox_rom"]["path"].endswith("local/roms/F-Zero X (USA).n64")
+    assert runtime_assets["fzerox_rom"]["path"].startswith("local/roms/")
     assert runtime_assets["libretro_core"]["path"].endswith(
         "local/libretro/mupen64plus_next_libretro.so"
     )

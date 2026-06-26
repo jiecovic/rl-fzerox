@@ -7,6 +7,14 @@ runtime schema that training, watch, and saved run manifests validate against.
 """
 
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.roms import (
+    FZeroXRomResolutionError,
+    find_fzerox_rom_path,
+    fzerox_default_rom_path,
+    fzerox_rom_candidates,
+    fzerox_rom_dir,
+    resolve_fzerox_rom_path,
+)
 from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
     EmulatorConfig,
@@ -37,5 +45,11 @@ __all__ = [
     "TrainConfig",
     "WatchAppConfig",
     "WatchConfig",
+    "FZeroXRomResolutionError",
+    "find_fzerox_rom_path",
+    "fzerox_default_rom_path",
+    "fzerox_rom_candidates",
+    "fzerox_rom_dir",
     "project_root_dir",
+    "resolve_fzerox_rom_path",
 ]

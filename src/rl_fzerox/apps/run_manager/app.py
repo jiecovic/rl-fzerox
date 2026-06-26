@@ -78,8 +78,7 @@ def main(argv: list[str] | None = None) -> None:
     _ensure_frontend_dependencies(DEFAULTS.web_root)
     web_binding = _resolve_web_port(args.web_port, host=args.web_host)
     command = _web_dev_command(host=args.web_host, port=web_binding.port)
-    environment = os.environ.copy()
-    environment["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{api_binding.port}"
+    environment = _web_dev_environment(api_port=api_binding.port)
 
     if web_binding.reassigned:
         print(
@@ -232,6 +231,16 @@ def _web_dev_command(*, host: str, port: int) -> list[str]:
     ]
 
 
+def _web_dev_environment(*, api_port: int) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{api_port}"
+    node_options = environment.get("NODE_OPTIONS", "").split()
+    if "--no-deprecation" not in node_options:
+        node_options.append("--no-deprecation")
+    environment["NODE_OPTIONS"] = " ".join(node_options)
+    return environment
+
+
 def _display_web_host(host: str) -> str:
     return "localhost" if host == DEFAULTS.web_host else host
 
@@ -257,7 +266,7 @@ def _ensure_frontend_dependencies(web_root: Path) -> None:
     if (web_root / "node_modules").is_dir():
         return
     print(
-        "Run-manager frontend dependencies are missing. Run: just run-manager-install",
+        "Run-manager frontend dependencies are missing. Run: ./install",
         file=sys.stderr,
     )
     raise SystemExit(1)

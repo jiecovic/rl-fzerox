@@ -215,9 +215,7 @@ def launch_pinned_fork_source(
         artifact=source_artifact,
         action=engine_tuning_source_action,
     )
-    child_lineage_step_offset = (
-        source_metadata.source_lineage_num_timesteps or source_num_timesteps
-    )
+    child_lineage_step_offset = source_metadata.source_lineage_num_timesteps or source_num_timesteps
     train_config = build_managed_fork_train_app_config_from_metadata(
         config,
         run_id=child_run_id,
@@ -225,12 +223,8 @@ def launch_pinned_fork_source(
         source_run_dir=child_source_snapshot_dir,
         source_artifact=source_artifact,
         source_algorithm=source_metadata.source_algorithm,
-        source_auxiliary_state_enabled=(
-            source_metadata.source_auxiliary_state_enabled
-        ),
-        source_auxiliary_state_head_arch=(
-            source_metadata.source_auxiliary_state_head_arch
-        ),
+        source_auxiliary_state_enabled=(source_metadata.source_auxiliary_state_enabled),
+        source_auxiliary_state_head_arch=(source_metadata.source_auxiliary_state_head_arch),
         tensorboard_step_offset=child_lineage_step_offset,
     )
     child_run = store.create_run(

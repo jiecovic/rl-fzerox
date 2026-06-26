@@ -37,6 +37,7 @@ watch = [
 ]
 train = [
   "rich>=13,<15",
+  "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.git",
   "sb3-contrib>=2.8,<3",
   "stable-baselines3>=2.6,<3",
   "tensorboard>=2.18,<3",
@@ -44,6 +45,7 @@ train = [
 ]
 
 [project.scripts]
+fzerox = "rl_fzerox.apps.run_manager:main"
 fzerox-probe = "rl_fzerox.apps.probe:main"
 fzerox-save-diff = "rl_fzerox.apps.dev.save_diff:main"
 fzerox-save-inspect = "rl_fzerox.apps.dev.save_inspect:main"

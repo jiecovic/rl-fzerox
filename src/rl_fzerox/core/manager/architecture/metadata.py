@@ -38,6 +38,7 @@ from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_supports_grounded_only,
 )
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.roms import find_fzerox_rom_path
 from rl_fzerox.core.runtime_spec.vehicle_catalog import CATALOG, vehicle_menu_row_and_column
 
 
@@ -139,6 +140,7 @@ def run_manager_config_metadata(
 
 def runtime_asset_infos() -> tuple[RuntimeAssetInfo, ...]:
     root = project_root_dir()
+    resolved_rom_path = find_fzerox_rom_path(root)
     return (
         _runtime_asset_info(
             asset_id="libretro_core",
@@ -149,8 +151,9 @@ def runtime_asset_infos() -> tuple[RuntimeAssetInfo, ...]:
         _runtime_asset_info(
             asset_id="fzerox_rom",
             label="F-Zero X US ROM",
-            path=default_rom_path(),
+            path=resolved_rom_path if resolved_rom_path is not None else default_rom_path(),
             root=root,
+            exists=resolved_rom_path is not None,
         ),
     )
 
@@ -161,6 +164,7 @@ def _runtime_asset_info(
     label: str,
     path: Path,
     root: Path,
+    exists: bool | None = None,
 ) -> RuntimeAssetInfo:
     resolved_path = Path(path).expanduser().resolve()
     root_path = Path(root).expanduser().resolve()
@@ -172,7 +176,7 @@ def _runtime_asset_info(
         id=asset_id,
         label=label,
         path=display_path,
-        exists=resolved_path.is_file(),
+        exists=resolved_path.is_file() if exists is None else exists,
     )
 
 

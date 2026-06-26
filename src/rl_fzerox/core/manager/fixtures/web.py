@@ -29,7 +29,7 @@ WEB_FIXTURE_RUNTIME_ASSETS = (
     RuntimeAssetInfo(
         id="fzerox_rom",
         label="F-Zero X US ROM",
-        path="local/roms/F-Zero X (USA).n64",
+        path="local/roms/fzerox_usa.n64",
         exists=False,
     ),
 )

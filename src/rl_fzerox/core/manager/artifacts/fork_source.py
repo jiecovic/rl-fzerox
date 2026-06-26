@@ -138,9 +138,7 @@ def write_fork_source_metadata(
                 "schema_version": 1,
                 "source_algorithm": metadata.source_algorithm,
                 "source_auxiliary_state_enabled": metadata.source_auxiliary_state_enabled,
-                "source_auxiliary_state_head_arch": list(
-                    metadata.source_auxiliary_state_head_arch
-                ),
+                "source_auxiliary_state_head_arch": list(metadata.source_auxiliary_state_head_arch),
                 "source_lineage_num_timesteps": metadata.source_lineage_num_timesteps,
             },
             indent=2,

@@ -1,5 +1,6 @@
 // web/run-manager/src/app/App.tsx
 import { useEffect, useMemo, useState } from "react";
+import { runtimeAssetNotice } from "@/app/runtimeAssets";
 import { useWorkspaceActions } from "@/app/workspace/actions";
 import { WorkspaceBody } from "@/app/workspace/Body";
 import { primaryWorkspaceTabs } from "@/app/workspace/model";
@@ -13,12 +14,22 @@ import { AppTooltipProvider } from "@/shared/ui/Tooltip";
 export function App() {
   const [theme, setTheme] = useState<Theme>("dark");
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [dismissedRuntimeAssetKey, setDismissedRuntimeAssetKey] = useState<string | null>(null);
   const managerData = useManagerData();
   const evaluationLoadError =
     managerData.evaluationError === null
       ? null
       : `Evaluation records could not be loaded: ${managerData.evaluationError}`;
-  const workspaceError = globalError ?? managerData.error ?? evaluationLoadError;
+  const runtimeNotice = useMemo(
+    () => runtimeAssetNotice(managerData.metadata),
+    [managerData.metadata],
+  );
+  const runtimeAssetError =
+    runtimeNotice !== null && runtimeNotice.key !== dismissedRuntimeAssetKey
+      ? runtimeNotice.message
+      : null;
+  const workspaceError =
+    globalError ?? managerData.error ?? evaluationLoadError ?? runtimeAssetError;
   const checkpointRunIds = useMemo(
     () =>
       managerData.checkpointCatalog?.installed_checkpoints.flatMap((checkpoint) =>
@@ -58,6 +69,10 @@ export function App() {
     }
     if (managerData.error !== null) {
       managerData.clearError();
+      return;
+    }
+    if (runtimeAssetError !== null && runtimeNotice !== null) {
+      setDismissedRuntimeAssetKey(runtimeNotice.key);
       return;
     }
     managerData.clearEvaluationError();

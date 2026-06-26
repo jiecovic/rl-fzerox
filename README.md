@@ -22,75 +22,45 @@ Full Master cups playlist:
 ## Requirements
 
 - Linux userspace, either native Linux or Windows with WSL2
-- Python 3.12 or newer
+- Python 3.10+ to run the installer
+- Python 3.12 for the project environment; `uv` can install/manage it
 - Rust toolchain with Cargo
 - Node.js 20.19+, 22.12+, or 24+, with npm
-- `just`
+- Git
 - Mupen64Plus-Next libretro core shared library
 - a local US F-Zero X ROM
-- `sb3x-extensions`
 
 ## Setup
-
-`just native` builds the Rust/PyO3 emulator extension in release mode for the
-active Python environment.
 
 ```bash
 git clone https://github.com/jiecovic/rl-fzerox.git
 cd rl-fzerox
+./install
+./doctor
+./fzerox
 ```
 
-Create or activate a Python 3.12 environment. Pick one path:
+`./install` creates `.venv`, installs Python dependencies, builds the Rust/PyO3
+emulator extension in release mode, installs the run manager frontend, and
+creates the ignored `local/` folders.
+
+The installer may be started with a newer system Python, for example Python
+3.13 or 3.14. The project environment it creates is still Python 3.12 when `uv`
+or `python3.12` is available.
+
+For NVIDIA CUDA training with a recent driver, use the CUDA 12.8 setup path:
 
 ```bash
-# Existing Python 3.12 interpreter
-python3.12 -m venv .venv
-source .venv/bin/activate
-python --version
-python -m pip install -U pip
-```
-
-```bash
-# uv-managed Python 3.12
-uv python install 3.12
-uv venv --python 3.12 .venv
-source .venv/bin/activate
-python --version
-uv pip install -U pip
-```
-
-```bash
-# Conda environment
-conda create -n rl-fzerox python=3.12
-conda activate rl-fzerox
-python --version
-python -m pip install -U pip
-```
-
-Then install the project:
-
-For NVIDIA CUDA training, install a CUDA-enabled PyTorch wheel first. With a
-recent NVIDIA driver, use the current CUDA 12.8 wheel:
-
-```bash
-python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-
-python -m pip install -e ".[dev,watch,train]"
-python -m pip install "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.git"
-just native
-just run-manager-install
+./install --torch cu128
+./doctor
+./fzerox
 ```
 
 If your driver/platform needs a different wheel, use the official PyTorch
-selector: <https://pytorch.org/get-started/locally/>.
-
-`just run-manager-install` installs the local React frontend dependencies used
-by `just fzerox`.
-
-After installing PyTorch, verify CUDA from inside the virtual environment:
+selector: <https://pytorch.org/get-started/locally/>. Advanced install options:
 
 ```bash
-python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
+./install --help
 ```
 
 `local/` is the ignored machine-local workspace. After clone, it contains empty
@@ -99,16 +69,17 @@ config:
 
 ```text
 local/libretro/mupen64plus_next_libretro.so
-local/roms/F-Zero X (USA).n64
+local/roms/fzerox_usa.n64
 ```
 
 The ROM must be the US F-Zero X build; RAM offsets and telemetry are maintained
-only for that version. If you use different local filenames, update the paths in
-the run manager. The run manager also stores its SQLite DB, generated baselines,
-TensorBoard views, and training runs under `local/`. None of those local files
-are included in git.
+only for that version. The filename can be arbitrary: the runtime scans
+`local/roms/` for `.n64`, `.z64`, and `.v64` files and uses the first compatible
+ROM. The run manager also stores its SQLite DB, generated baselines, TensorBoard
+views, and training runs under `local/`. None of those local files are included
+in git.
 
-The default ROM and libretro core paths are listed in
+The libretro core path and ROM folder are listed in
 [docs/runtime_assets.md](docs/runtime_assets.md).
 
 ## F-Zero X App
@@ -117,11 +88,30 @@ The local UI/API is used for editing experiment specs, launching training,
 watching policies, and tracking run state.
 
 ```bash
-just fzerox
+./fzerox
 ```
 
 The UI runs at `http://localhost:5174`. The local API runs at
 `http://127.0.0.1:8765`. The web server binds to loopback by default; pass
 `--web-host 0.0.0.0` only when you intentionally want LAN access.
+
+`just` is optional and mainly used as a developer shortcut. The equivalent
+developer targets are `just setup`, `just setup-cuda`, `just doctor`, and
+`just fzerox`.
+
+## Quick Start With The Release Checkpoint
+
+1. Open the run manager with `./fzerox`.
+2. Put the libretro core and F-Zero X US ROM under the paths shown by
+   `./doctor`. The UI also warns when either file is missing.
+3. Open **Checkpoints** and install the published checkpoint.
+4. Open the installed checkpoint. It behaves like a read-only run snapshot:
+   you can watch it, inspect the config, view engine tuning, evaluate it, or
+   fork it into an editable draft.
+5. Use **Career** to let a checkpoint or run policy play through save-game
+   progression. This is the path for checking what the policy can unlock or
+   complete outside a single evaluation preset.
+6. To train from scratch, create a new draft instead of forking a checkpoint,
+   adjust the config, save it, and launch the run.
 
 More project notes live in [docs](docs/index.md).

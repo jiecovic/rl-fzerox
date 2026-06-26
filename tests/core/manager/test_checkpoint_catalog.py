@@ -101,8 +101,7 @@ def _entry(*, bundle_hash: str = _HASH) -> CheckpointCatalogEntry:
 def _bundle(*, bundle_hash: str = _HASH) -> CheckpointCatalogBundle:
     return CheckpointCatalogBundle(
         url=(
-            "https://github.com/jiecovic/rl-fzerox/releases/download/"
-            "checkpoints-v1/checkpoint.zip"
+            "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/checkpoint.zip"
         ),
         filename="checkpoint.zip",
         size_bytes=1,

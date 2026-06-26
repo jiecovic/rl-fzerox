@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# fzerox
+set -euo pipefail
+
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+launcher="$repo_dir/.venv/bin/fzerox"
+
+if [ ! -x "$launcher" ]; then
+    echo "fzerox is not installed yet. Run: ./install" >&2
+    exit 1
+fi
+
+EGL_PLATFORM="${EGL_PLATFORM:-x11}" exec "$launcher" "$@"

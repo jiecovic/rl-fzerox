@@ -21,6 +21,7 @@ from rl_fzerox.core.manager.projection.tracks import build_track_sampling_data
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.run_spec.sections.training import DEFAULT_ENTROPY_COEFFICIENT
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.roms import fzerox_default_rom_path, resolve_fzerox_rom_path
 
 
 def train_config_payload(
@@ -68,7 +69,7 @@ def env_data(config: ManagedRunConfig) -> dict[str, object]:
 def emulator_data(config: ManagedRunConfig) -> dict[str, object]:
     return {
         "core_path": default_core_path(),
-        "rom_path": default_rom_path(),
+        "rom_path": resolve_fzerox_rom_path(),
         "renderer": config.environment.renderer,
     }
 
@@ -233,4 +234,4 @@ def default_core_path() -> Path:
 
 
 def default_rom_path() -> Path:
-    return (project_root_dir() / "local" / "roms" / "F-Zero X (USA).n64").resolve()
+    return fzerox_default_rom_path()

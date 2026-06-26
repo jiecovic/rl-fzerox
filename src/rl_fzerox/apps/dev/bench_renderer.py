@@ -46,7 +46,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--rom-path",
         type=Path,
-        default=Path("local/roms/F-Zero X (USA).n64"),
+        default=Path("local/roms/fzerox_usa.n64"),
         help="Path to the F-Zero X ROM.",
     )
     parser.add_argument(

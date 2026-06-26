@@ -1,16 +1,14 @@
 # Local Files
 
-The run manager uses these default paths:
+The run manager uses this default libretro core path and ROM directory:
 
 ```text
 local/libretro/mupen64plus_next_libretro.so
-local/roms/F-Zero X (USA).n64
+local/roms/
 ```
 
-If those files exist, the default run configs use them automatically.
-
-If your files use different names or paths, change the emulator core path and
-ROM path in the run manager config before launching a run.
+The ROM filename can be arbitrary. Runtime launches scan `local/roms/` for
+`.n64`, `.z64`, and `.v64` files and select the first compatible ROM.
 
 Use the US F-Zero X ROM. RAM offsets and telemetry are maintained for that
 version.
