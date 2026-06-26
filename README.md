@@ -4,8 +4,8 @@ Experimental deep reinforcement-learning project for training agents to race in
 F-Zero X through a libretro N64 emulator.
 
 This repository is still under construction. The teaser shows the current
-checkpoint in action; the checkpoint upload and fuller documentation will follow
-after fine-tuning.
+checkpoint in action; downloadable checkpoint bundles are available through the
+run manager.
 
 Teaser video: the current policy can unlock everything by completing all cups on
 Master, the hardest F-Zero X difficulty. This run shows one example: winning the
@@ -35,11 +35,20 @@ Full Master cups playlist:
 `just native` builds the Rust/PyO3 emulator extension in release mode for the
 active Python environment.
 
+Check your interpreter first:
+
+```bash
+python --version
+```
+
+Use `python3` instead of `python` below if that is the command your distribution
+provides. The interpreter must be Python 3.12 or newer.
+
 ```bash
 git clone https://github.com/jiecovic/rl-fzerox.git
 cd rl-fzerox
 
-python3.12 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[dev,watch,train]"
