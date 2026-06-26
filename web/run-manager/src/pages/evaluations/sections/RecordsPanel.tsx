@@ -187,10 +187,7 @@ function EvaluationTable({
                 </td>
                 <td className="px-4 py-3 align-top text-app-muted">
                   <div className="grid gap-1">
-                    <span>
-                      {TARGET_MODE_LABELS[evaluation.target.mode]} ·{" "}
-                      {evaluation.target.repeats_per_target}x
-                    </span>
+                    <span>{targetRuntimeLabel(evaluation.target)}</span>
                     <span className="text-xs">{targetSelectionLabel(evaluation.target)}</span>
                   </div>
                 </td>
@@ -231,6 +228,14 @@ function targetSelectionLabel(evaluationTarget: ManagedEvaluation["target"]) {
     selectionCountLabel(evaluationTarget.vehicle_ids, "vehicle"),
   ].filter((part) => part !== null);
   return parts.length === 0 ? "all targets" : parts.join(" · ");
+}
+
+function targetRuntimeLabel(evaluationTarget: ManagedEvaluation["target"]) {
+  const variants =
+    evaluationTarget.mode === "gp_course" && evaluationTarget.baseline_variant_count > 1
+      ? ` · ${evaluationTarget.baseline_variant_count} variants`
+      : "";
+  return `${TARGET_MODE_LABELS[evaluationTarget.mode]} · ${evaluationTarget.repeats_per_target}x${variants}`;
 }
 
 function difficultySelectionLabel(difficulties: readonly string[]) {

@@ -34,6 +34,7 @@ class EvaluationTargetPayload(TypedDict):
     difficulties: list[str]
     vehicle_ids: list[str]
     repeats_per_target: int
+    baseline_variant_count: int
 
 
 class EvaluationProgressPayload(TypedDict):
@@ -254,6 +255,7 @@ def _target_payload(target: EvaluationTargetSpec) -> EvaluationTargetPayload:
         "difficulties": list(target.difficulties),
         "vehicle_ids": list(target.vehicle_ids),
         "repeats_per_target": target.repeats_per_target,
+        "baseline_variant_count": target.baseline_variant_count,
     }
 
 

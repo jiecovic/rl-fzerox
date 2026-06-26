@@ -25,6 +25,7 @@ export const evaluationTargetSpecSchema = z.object({
   difficulties: z.array(z.string()),
   vehicle_ids: z.array(z.string()),
   repeats_per_target: z.number().int().positive(),
+  baseline_variant_count: z.number().int().min(1).max(16),
 });
 
 export const evaluationCheckpointSnapshotSchema = z.object({
@@ -206,6 +207,7 @@ export interface CreateEvaluationPresetRequest {
   difficulties: readonly string[];
   name: string;
   renderer: "angrylion" | "gliden64";
+  baselineVariantCount: number;
   repeatsPerTarget: number;
   seed: number;
   targetMode: EvaluationMode;

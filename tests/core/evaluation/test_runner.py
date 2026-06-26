@@ -12,6 +12,7 @@ from rl_fzerox.core.evaluation import (
     EvaluationCheckpointSnapshot,
     EvaluationCourseResult,
     EvaluationCourseTarget,
+    EvaluationMode,
     EvaluationPolicyMode,
     EvaluationRunResult,
     EvaluationRuntimeSpec,
@@ -143,6 +144,36 @@ def test_course_runner_repeats_target_set_in_rounds(tmp_path: Path) -> None:
     ]
 
 
+def test_attempt_plan_round_robins_baseline_variants_without_extra_attempts(
+    tmp_path: Path,
+) -> None:
+    targets = tuple(
+        EvaluationCourseTarget(
+            target_id=f"mute-city-variant-{variant_index + 1}",
+            course_id="mute_city",
+            baseline_group_id="mute_city_gp",
+            baseline_variant_index=variant_index,
+            baseline_variant_count=10,
+        )
+        for variant_index in range(10)
+    )
+
+    plan = build_evaluation_attempt_plan(
+        _evaluation_spec(
+            tmp_path,
+            repeats=10,
+            mode="gp_course",
+            baseline_variant_count=10,
+        ),
+        targets,
+    )
+
+    assert len(plan.jobs) == 10
+    assert [job.target.target_id for job in plan.jobs] == [
+        f"mute-city-variant-{variant_index + 1}" for variant_index in range(10)
+    ]
+
+
 def test_course_runner_attempt_plan_is_worker_partition_invariant(tmp_path: Path) -> None:
     targets = (
         EvaluationCourseTarget(target_id="mute-city", course_id="mute_city"),
@@ -192,15 +223,22 @@ def test_course_runner_cancels_between_attempts(tmp_path: Path) -> None:
     assert payload["result"]["status"] == "cancelled"
 
 
-def _evaluation_spec(tmp_path: Path, *, repeats: int) -> EvaluationSpec:
+def _evaluation_spec(
+    tmp_path: Path,
+    *,
+    repeats: int,
+    mode: EvaluationMode = "time_attack_course",
+    baseline_variant_count: int = 1,
+) -> EvaluationSpec:
     return EvaluationSpec(
         evaluation_id="eval-runner",
         seed=123,
         target=EvaluationTargetSpec(
-            mode="time_attack_course",
+            mode=mode,
             course_ids=("mute_city",),
             vehicle_ids=("blue_falcon",),
             repeats_per_target=repeats,
+            baseline_variant_count=baseline_variant_count,
         ),
         checkpoint=EvaluationCheckpointSnapshot(
             source_run_id="run-a",

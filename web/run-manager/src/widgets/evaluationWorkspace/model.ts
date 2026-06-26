@@ -70,6 +70,14 @@ export function evaluationSubtitle(evaluation: ManagedEvaluation) {
   } · ${evaluation.policy_mode}`;
 }
 
+export function targetRuntimeLabel(target: ManagedEvaluation["target"]) {
+  const variants =
+    target.mode === "gp_course" && target.baseline_variant_count > 1
+      ? ` · ${target.baseline_variant_count.toLocaleString()} variants`
+      : "";
+  return `${EVALUATION_MODE_LABELS[target.mode]} · ${target.repeats_per_target.toLocaleString()}x${variants}`;
+}
+
 export function progressLabel(evaluation: ManagedEvaluation) {
   const { completed_attempts: completed, total_attempts: total } = evaluation.progress;
   if (total !== null && total > 0) {
@@ -116,9 +124,13 @@ export function runCountDetail(evaluation: ManagedEvaluation, observedCourseCoun
         ? observedCourseCount
         : null;
   const repeats = evaluation.target.repeats_per_target;
+  const variants =
+    evaluation.target.mode === "gp_course" && evaluation.target.baseline_variant_count > 1
+      ? ` · ${evaluation.target.baseline_variant_count.toLocaleString()} variants round-robin`
+      : "";
   return targetCount === null
-    ? `${repeats.toLocaleString()} repeats per selected course`
-    : `${targetCount.toLocaleString()} courses x ${repeats.toLocaleString()} repeats`;
+    ? `${repeats.toLocaleString()} repeats per selected course${variants}`
+    : `${targetCount.toLocaleString()} courses x ${repeats.toLocaleString()} repeats${variants}`;
 }
 
 export function weakestCourses(courses: readonly EvaluationMetricSummary[]) {

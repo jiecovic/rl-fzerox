@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import inspect, select
@@ -13,6 +15,8 @@ from sqlalchemy.sql.schema import Table
 
 from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import (
+    EvaluationModel,
+    EvaluationPresetModel,
     ManagerBase,
     SchemaVersionModel,
 )
@@ -22,7 +26,16 @@ from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 40
+SCHEMA_VERSION = 41
+
+
+@dataclass(frozen=True, slots=True)
+class _EvaluationTargetJsonDefaults:
+    gp_baseline_variant_count: int = 10
+    time_attack_baseline_variant_count: int = 1
+
+
+_EVALUATION_TARGET_JSON_DEFAULTS = _EvaluationTargetJsonDefaults()
 
 RUN_CHILD_TABLES = (
     "run_alt_baselines",
@@ -52,6 +65,7 @@ def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
         engine.dispose()
 
     with manager_session(db_path) as session:
+        _migrate_evaluation_target_json(session=session, updated_at=applied_at)
         for version in session.scalars(select(SchemaVersionModel)):
             session.delete(version)
         session.add(SchemaVersionModel(version=SCHEMA_VERSION, applied_at=applied_at))
@@ -99,6 +113,48 @@ def _refresh_default_evaluation_presets(
     )
 
     upsert_default_evaluation_presets(session, now=updated_at)
+
+
+def _migrate_evaluation_target_json(*, session: Session, updated_at: str) -> None:
+    """Rewrite persisted evaluation target JSON to the current strict shape."""
+
+    for preset in session.scalars(select(EvaluationPresetModel)):
+        target = _evaluation_target_json_object(preset.target_json)
+        if "baseline_variant_count" in target:
+            continue
+        target["baseline_variant_count"] = _target_baseline_variant_default(target)
+        preset.target_json = _dump_target_json(target)
+        preset.updated_at = updated_at
+        if not preset.builtin and target["baseline_variant_count"] > 1:
+            preset.version += 1
+
+    for evaluation in session.scalars(select(EvaluationModel)):
+        target = _evaluation_target_json_object(evaluation.target_json)
+        if "baseline_variant_count" in target:
+            continue
+        target["baseline_variant_count"] = 1
+        evaluation.target_json = _dump_target_json(target)
+        evaluation.updated_at = updated_at
+
+
+def _evaluation_target_json_object(raw_json: str) -> dict[str, object]:
+    target = json.loads(raw_json)
+    if not isinstance(target, dict):
+        raise RuntimeError("evaluation target JSON must be an object")
+    return target
+
+
+def _target_baseline_variant_default(
+    target: dict[str, object],
+) -> int:
+    mode = target.get("mode")
+    if mode == "gp_course":
+        return _EVALUATION_TARGET_JSON_DEFAULTS.gp_baseline_variant_count
+    return _EVALUATION_TARGET_JSON_DEFAULTS.time_attack_baseline_variant_count
+
+
+def _dump_target_json(target: dict[str, object]) -> str:
+    return json.dumps(target, sort_keys=True)
 
 
 def _has_manager_schema(table_names: set[str]) -> bool:

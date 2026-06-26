@@ -217,7 +217,11 @@ function presetSummary(preset: ManagedEvaluationPreset | null) {
   if (preset === null) {
     return "-";
   }
-  return `${preset.target.repeats_per_target}x · seed ${preset.seed} · ${preset.renderer}`;
+  const variants =
+    preset.target.mode === "gp_course" && preset.target.baseline_variant_count > 1
+      ? ` · ${preset.target.baseline_variant_count} variants`
+      : "";
+  return `${preset.target.repeats_per_target}x${variants} · seed ${preset.seed} · ${preset.renderer}`;
 }
 
 function checkpointStepLabel(run: ManagedRunDetail) {

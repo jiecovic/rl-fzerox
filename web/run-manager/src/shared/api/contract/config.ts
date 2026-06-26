@@ -130,7 +130,7 @@ const tracksConfigSchema = z
     race_mode: raceModeSchema,
     gp_difficulties: z.array(gpDifficultySchema).optional(),
     include_x_cup: z.boolean(),
-    baseline_variant_count: z.number().int().min(1).max(8).default(1),
+    baseline_variant_count: z.number().int().min(1).max(16).default(1),
     x_cup_course_count: z.number().int().positive(),
     x_cup_auto_regeneration: z.object({
       enabled: z.boolean(),

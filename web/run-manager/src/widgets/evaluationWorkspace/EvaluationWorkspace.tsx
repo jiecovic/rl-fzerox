@@ -11,7 +11,6 @@ import { RenameDialog } from "@/shared/ui/RenameDialog";
 import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 import {
-  EVALUATION_MODE_LABELS,
   evaluationProgressStatusLabel,
   evaluationRuntimeLabel,
   evaluationRuntimeStats,
@@ -24,6 +23,7 @@ import {
   progressLabel,
   sourceSnapshotLabel,
   statusLabel,
+  targetRuntimeLabel,
   targetSelectionLabel,
 } from "@/widgets/evaluationWorkspace/model";
 import { Detail, Metric } from "@/widgets/evaluationWorkspace/parts";
@@ -151,9 +151,7 @@ export function EvaluationWorkspace({
               />
               <Metric
                 label="Target"
-                value={`${EVALUATION_MODE_LABELS[evaluation.target.mode]} · ${
-                  evaluation.target.repeats_per_target
-                }x`}
+                value={targetRuntimeLabel(evaluation.target)}
                 detail={targetSelectionLabel(evaluation.target)}
               />
               <Metric label="Seed" value={String(evaluation.seed)} />

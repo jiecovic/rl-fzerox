@@ -193,7 +193,35 @@ def _expand_targets(
     concrete_targets = tuple(targets)
     if not concrete_targets:
         raise ValueError("single-course evaluation requires at least one target")
-    return tuple(target for _ in range(repeats) for target in concrete_targets)
+    target_groups = _group_baseline_variants(concrete_targets)
+    return tuple(
+        group[repeat_index % len(group)]
+        for repeat_index in range(repeats)
+        for group in target_groups
+    )
+
+
+def _group_baseline_variants(
+    targets: tuple[EvaluationCourseTarget, ...],
+) -> tuple[tuple[EvaluationCourseTarget, ...], ...]:
+    groups: dict[
+        tuple[str, str, str | None, str | None, str | None],
+        list[EvaluationCourseTarget],
+    ] = {}
+    for target in targets:
+        key = (
+            target.baseline_group_id or target.target_id,
+            target.course_id,
+            target.cup_id,
+            target.difficulty,
+            target.vehicle_id,
+        )
+        groups.setdefault(key, []).append(target)
+    return tuple(tuple(sorted(group, key=_baseline_variant_order_key)) for group in groups.values())
+
+
+def _baseline_variant_order_key(target: EvaluationCourseTarget) -> tuple[int, str]:
+    return (target.baseline_variant_index or 0, target.target_id)
 
 
 def _attempt_seed(master_seed: int, attempt_index: int) -> int:

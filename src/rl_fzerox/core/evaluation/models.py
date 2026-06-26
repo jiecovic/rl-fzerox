@@ -20,6 +20,16 @@ type AttemptStatus = Literal["succeeded", "failed", "cancelled", "partial"]
 type CourseResultStatus = Literal["finished", "retired", "crashed", "truncated", "failed"]
 
 
+@dataclass(frozen=True, slots=True)
+class EvaluationTargetLimits:
+    """Validation limits shared by evaluation API and persistence boundaries."""
+
+    baseline_variant_count: int = 16
+
+
+EVALUATION_TARGET_LIMITS = EvaluationTargetLimits()
+
+
 def _require_non_empty_text(value: object, field_name: str) -> None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty string")
@@ -33,6 +43,11 @@ def _require_text_items(values: tuple[str, ...], field_name: str) -> None:
 def _require_minimum_int(value: object, field_name: str, minimum: int) -> None:
     if not isinstance(value, int) or value < minimum:
         raise ValueError(f"{field_name} must be at least {minimum}")
+
+
+def _require_maximum_int(value: int, field_name: str, maximum: int) -> None:
+    if value > maximum:
+        raise ValueError(f"{field_name} must be at most {maximum}")
 
 
 def _require_optional_minimum_int(
@@ -59,6 +74,7 @@ class EvaluationTargetSpec:
     difficulties: tuple[str, ...] = ()
     vehicle_ids: tuple[str, ...] = ()
     repeats_per_target: int = 1
+    baseline_variant_count: int = 1
 
     def __post_init__(self) -> None:
         _require_text_items(self.course_ids, "course_ids")
@@ -66,6 +82,12 @@ class EvaluationTargetSpec:
         _require_text_items(self.difficulties, "difficulties")
         _require_text_items(self.vehicle_ids, "vehicle_ids")
         _require_minimum_int(self.repeats_per_target, "repeats_per_target", 1)
+        _require_minimum_int(self.baseline_variant_count, "baseline_variant_count", 1)
+        _require_maximum_int(
+            self.baseline_variant_count,
+            "baseline_variant_count",
+            EVALUATION_TARGET_LIMITS.baseline_variant_count,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +106,10 @@ class EvaluationCourseTarget:
     difficulty: str | None = None
     vehicle_id: str | None = None
     baseline_state_path: str | None = None
+    baseline_group_id: str | None = None
+    baseline_variant_index: int | None = None
+    baseline_variant_count: int | None = None
+    baseline_variant_seed: int | None = None
     engine_setting_raw_value: int | None = None
 
     def __post_init__(self) -> None:
@@ -94,6 +120,18 @@ class EvaluationCourseTarget:
         _require_optional_non_empty_text(self.difficulty, "difficulty")
         _require_optional_non_empty_text(self.vehicle_id, "vehicle_id")
         _require_optional_non_empty_text(self.baseline_state_path, "baseline_state_path")
+        _require_optional_non_empty_text(self.baseline_group_id, "baseline_group_id")
+        _require_optional_minimum_int(
+            self.baseline_variant_index,
+            "baseline_variant_index",
+            0,
+        )
+        _require_optional_minimum_int(
+            self.baseline_variant_count,
+            "baseline_variant_count",
+            1,
+        )
+        _require_optional_minimum_int(self.baseline_variant_seed, "baseline_variant_seed", 0)
 
 
 @dataclass(frozen=True, slots=True)

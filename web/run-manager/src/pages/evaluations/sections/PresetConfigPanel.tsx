@@ -295,10 +295,7 @@ export function PresetConfigPanel({
                   </td>
                   <td className="px-4 py-3 align-top text-app-muted">
                     <div className="grid gap-1">
-                      <span>
-                        {TARGET_MODE_LABELS[preset.target.mode]} ·{" "}
-                        {preset.target.repeats_per_target}x
-                      </span>
+                      <span>{targetRuntimeLabel(preset.target)}</span>
                       <span className="text-xs">{targetSelectionLabel(preset.target)}</span>
                     </div>
                   </td>
@@ -436,6 +433,14 @@ function targetSelectionLabel(target: ManagedEvaluationPreset["target"]) {
     difficultySelectionLabel(target.difficulties),
   ].filter((part) => part !== null);
   return parts.length === 0 ? "all targets" : parts.join(" · ");
+}
+
+function targetRuntimeLabel(target: ManagedEvaluationPreset["target"]) {
+  const variants =
+    target.mode === "gp_course" && target.baseline_variant_count > 1
+      ? ` · ${target.baseline_variant_count} variants`
+      : "";
+  return `${TARGET_MODE_LABELS[target.mode]} · ${target.repeats_per_target}x${variants}`;
 }
 
 function difficultySelectionLabel(difficulties: readonly string[]) {

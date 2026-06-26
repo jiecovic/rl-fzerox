@@ -173,7 +173,7 @@ export function GpDifficultyPanel({
             help="Materialize this many GP race-start baselines per built-in course/difficulty/vehicle by varying the game RNG before race init. Time Attack and X Cup stay single-baseline."
             label="Race-start variants"
             min={1}
-            max={8}
+            max={16}
             resetValue={defaultConfig.tracks.baseline_variant_count}
             value={config.tracks.baseline_variant_count}
             onChange={(value) => updateTracks({ baseline_variant_count: value })}

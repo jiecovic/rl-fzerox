@@ -264,7 +264,7 @@ class TrackSamplingConfig(BaseModel):
     deficit_budget_difficulty_metric: DeficitBudgetDifficultyMetric = "completion_ema"
     deficit_budget_warmup_min_episodes_per_course: int = Field(default=10, ge=0)
     deficit_budget_uniform_staleness_rotations: float = Field(default=2.0, ge=0.0)
-    baseline_variant_count: PositiveInt = Field(default=1, le=8)
+    baseline_variant_count: PositiveInt = Field(default=1, le=16)
     step_balance_log_details: bool = False
     x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
     engine_tuning: AdaptiveEngineTuningConfig = Field(default_factory=AdaptiveEngineTuningConfig)

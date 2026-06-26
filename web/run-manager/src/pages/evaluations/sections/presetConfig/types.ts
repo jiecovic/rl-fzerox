@@ -6,6 +6,7 @@ export interface PresetFormState {
   difficulties: readonly string[];
   name: string;
   renderer: ManagedEvaluationPreset["renderer"];
+  baselineVariantCount: string;
   repeatsPerTarget: string;
   seed: string;
   targetMode: EvaluationMode;

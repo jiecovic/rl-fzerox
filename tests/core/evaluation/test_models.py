@@ -17,6 +17,14 @@ def test_evaluation_target_spec_rejects_invalid_repeats() -> None:
         EvaluationTargetSpec(mode="gp_course", repeats_per_target=0)
 
 
+def test_evaluation_target_spec_rejects_invalid_baseline_variants() -> None:
+    with pytest.raises(ValueError, match="baseline_variant_count must be at least 1"):
+        EvaluationTargetSpec(mode="gp_course", baseline_variant_count=0)
+
+    with pytest.raises(ValueError, match="baseline_variant_count must be at most 16"):
+        EvaluationTargetSpec(mode="gp_course", baseline_variant_count=17)
+
+
 def test_evaluation_target_spec_rejects_empty_filter_ids() -> None:
     with pytest.raises(ValueError, match=r"course_ids\[0\] must be a non-empty string"):
         EvaluationTargetSpec(mode="time_attack_course", course_ids=("",))

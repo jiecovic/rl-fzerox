@@ -78,7 +78,7 @@ class ManagedTracksConfig(BaseModel):
     race_mode: RaceMode = "time_attack"
     gp_difficulties: tuple[GpDifficulty, ...] = Field(default_factory=default_gp_difficulties)
     include_x_cup: bool = False
-    baseline_variant_count: int = Field(default=1, ge=1, le=8)
+    baseline_variant_count: int = Field(default=1, ge=1, le=16)
     x_cup_course_count: int = Field(
         default=X_CUP_COURSE.default_generated_count,
         ge=1,

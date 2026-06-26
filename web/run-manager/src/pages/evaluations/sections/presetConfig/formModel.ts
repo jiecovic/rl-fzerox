@@ -11,19 +11,31 @@ import type {
   ManagedEvaluationPreset,
 } from "@/shared/api/contract";
 
-const DEFAULT_PRESET_NAME = "Custom evaluation preset";
-const DEFAULT_PRESET_SEED = "2262218583";
-const DEFAULT_REPEATS_PER_TARGET = "10";
+export const EVALUATION_PRESET_FORM_SETTINGS = {
+  defaults: {
+    baselineVariantCount: "1",
+    gpBaselineVariantCount: "10",
+    name: "Custom evaluation preset",
+    repeatsPerTarget: "10",
+    seed: "2262218583",
+  },
+  limits: {
+    baselineVariantCount: 16,
+    repeatsPerTarget: 1000,
+    seed: 2 ** 32 - 1,
+  },
+} as const;
 
 export function defaultPresetForm(metadata: ConfigMetadata): PresetFormState {
   const allCourseIds = allBuiltInCourseIds(metadata);
   return {
     courseIds: defaultSelectedCourseIds(metadata, allCourseIds),
     difficulties: [],
-    name: DEFAULT_PRESET_NAME,
+    name: EVALUATION_PRESET_FORM_SETTINGS.defaults.name,
     renderer: "gliden64",
-    repeatsPerTarget: DEFAULT_REPEATS_PER_TARGET,
-    seed: DEFAULT_PRESET_SEED,
+    baselineVariantCount: EVALUATION_PRESET_FORM_SETTINGS.defaults.baselineVariantCount,
+    repeatsPerTarget: EVALUATION_PRESET_FORM_SETTINGS.defaults.repeatsPerTarget,
+    seed: EVALUATION_PRESET_FORM_SETTINGS.defaults.seed,
     targetMode: "time_attack_course",
   };
 }
@@ -38,6 +50,7 @@ export function presetFormFromPreset(
     difficulties: difficultyFromPresetTarget(preset, metadata),
     name: options.copyName === true ? `${preset.name} copy` : preset.name,
     renderer: preset.renderer,
+    baselineVariantCount: String(preset.target.baseline_variant_count),
     repeatsPerTarget: String(preset.target.repeats_per_target),
     seed: String(preset.seed),
     targetMode: preset.target.mode,
@@ -66,12 +79,25 @@ export function presetRequestFromForm(
     return "Preset name is required.";
   }
   const seed = Number(form.seed);
-  if (!Number.isInteger(seed) || seed < 0 || seed > 2 ** 32 - 1) {
+  if (!Number.isInteger(seed) || seed < 0 || seed > EVALUATION_PRESET_FORM_SETTINGS.limits.seed) {
     return "Seed must be an integer from 0 to 4294967295.";
   }
   const repeatsPerTarget = Number(form.repeatsPerTarget);
-  if (!Number.isInteger(repeatsPerTarget) || repeatsPerTarget < 1 || repeatsPerTarget > 1000) {
+  if (
+    !Number.isInteger(repeatsPerTarget) ||
+    repeatsPerTarget < 1 ||
+    repeatsPerTarget > EVALUATION_PRESET_FORM_SETTINGS.limits.repeatsPerTarget
+  ) {
     return "Repeats must be an integer from 1 to 1000.";
+  }
+  const baselineVariantCount =
+    form.targetMode === "gp_course" ? Number(form.baselineVariantCount) : 1;
+  if (
+    !Number.isInteger(baselineVariantCount) ||
+    baselineVariantCount < 1 ||
+    baselineVariantCount > EVALUATION_PRESET_FORM_SETTINGS.limits.baselineVariantCount
+  ) {
+    return `Race-start variants must be an integer from 1 to ${EVALUATION_PRESET_FORM_SETTINGS.limits.baselineVariantCount}.`;
   }
   if (form.courseIds.length === 0) {
     return "Select at least one course.";
@@ -85,6 +111,7 @@ export function presetRequestFromForm(
     difficulties: form.targetMode === "gp_course" ? [...form.difficulties] : [],
     name,
     renderer: form.renderer,
+    baselineVariantCount,
     repeatsPerTarget,
     seed,
     targetMode: form.targetMode,

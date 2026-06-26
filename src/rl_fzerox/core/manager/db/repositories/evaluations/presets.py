@@ -30,16 +30,18 @@ from rl_fzerox.core.manager.models import (
 class _DefaultPresetSettings:
     seed: int
     repeats_per_target: int
+    gp_baseline_variant_count: int
 
 
 _DEFAULT_PRESET_SETTINGS = _DefaultPresetSettings(
     seed=2_262_218_583,
     repeats_per_target=10,
+    gp_baseline_variant_count=10,
 )
 
 
 def upsert_default_evaluation_presets(session: Session, *, now: str) -> None:
-    """Create missing built-in evaluation presets without mutating existing rows."""
+    """Create or refresh repo-owned built-in evaluation presets."""
 
     for preset in _default_evaluation_presets(now=now):
         existing = session.get(EvaluationPresetModel, preset.id)
@@ -47,6 +49,8 @@ def upsert_default_evaluation_presets(session: Session, *, now: str) -> None:
             session.add(_preset_model_from_dataclass(preset))
         elif not existing.builtin:
             continue
+        else:
+            _sync_builtin_preset_model(existing, preset=preset, updated_at=now)
 
 
 def list_evaluation_presets(session: Session) -> tuple[ManagedEvaluationPreset, ...]:
@@ -131,6 +135,30 @@ def _preset_model_from_dataclass(preset: ManagedEvaluationPreset) -> EvaluationP
     )
 
 
+def _sync_builtin_preset_model(
+    model: EvaluationPresetModel,
+    *,
+    preset: ManagedEvaluationPreset,
+    updated_at: str,
+) -> None:
+    target_json = json.dumps(asdict(preset.target), sort_keys=True)
+    changed = (
+        model.name != preset.name
+        or model.version != preset.version
+        or model.seed != preset.seed
+        or model.renderer != preset.renderer
+        or model.target_json != target_json
+    )
+    if not changed:
+        return
+    model.name = preset.name
+    model.version = preset.version
+    model.seed = preset.seed
+    model.renderer = preset.renderer
+    model.target_json = target_json
+    model.updated_at = updated_at
+
+
 def _default_evaluation_presets(*, now: str) -> tuple[ManagedEvaluationPreset, ...]:
     all_course_ids = tuple(course.id for course in BUILT_IN_COURSES)
     return (
@@ -152,7 +180,7 @@ def _default_evaluation_presets(*, now: str) -> tuple[ManagedEvaluationPreset, .
         ManagedEvaluationPreset(
             id="gp_course_master_all_courses",
             name="GP course · Master · all courses",
-            version=1,
+            version=2,
             seed=_DEFAULT_PRESET_SETTINGS.seed,
             renderer="gliden64",
             target=EvaluationTargetSpec(
@@ -160,6 +188,7 @@ def _default_evaluation_presets(*, now: str) -> tuple[ManagedEvaluationPreset, .
                 course_ids=all_course_ids,
                 difficulties=("master",),
                 repeats_per_target=_DEFAULT_PRESET_SETTINGS.repeats_per_target,
+                baseline_variant_count=_DEFAULT_PRESET_SETTINGS.gp_baseline_variant_count,
             ),
             builtin=True,
             created_at=now,

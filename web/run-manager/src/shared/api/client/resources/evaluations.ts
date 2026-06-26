@@ -55,6 +55,7 @@ export async function createEvaluationPreset(request: CreateEvaluationPresetRequ
         cup_ids: request.cupIds,
         difficulties: request.difficulties,
         repeats_per_target: request.repeatsPerTarget,
+        baseline_variant_count: request.baselineVariantCount,
       },
     }),
   });

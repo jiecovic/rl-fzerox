@@ -10,7 +10,11 @@ from rl_fzerox.core.domain.engine import (
     ENGINE_SLIDER,
     engine_percent_to_slider_step,
 )
-from rl_fzerox.core.evaluation.models import EvaluationCheckpointArtifact, EvaluationMode
+from rl_fzerox.core.evaluation.models import (
+    EVALUATION_TARGET_LIMITS,
+    EvaluationCheckpointArtifact,
+    EvaluationMode,
+)
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
 from rl_fzerox.core.runtime_spec.renderers import RendererName
 
@@ -30,6 +34,11 @@ class EvaluationTargetRequest(BaseModel):
     cup_ids: tuple[str, ...] = ()
     difficulties: tuple[str, ...] = ()
     repeats_per_target: int = Field(default=1, ge=1, le=1000)
+    baseline_variant_count: int = Field(
+        default=1,
+        ge=1,
+        le=EVALUATION_TARGET_LIMITS.baseline_variant_count,
+    )
 
     @model_validator(mode="after")
     def _validate_mode_specific_target(self) -> EvaluationTargetRequest:
@@ -39,6 +48,8 @@ class EvaluationTargetRequest(BaseModel):
             return self
         if self.difficulties:
             raise ValueError("time_attack_course evaluation presets must not set difficulties")
+        if self.baseline_variant_count != 1:
+            raise ValueError("time_attack_course evaluation presets must use one baseline variant")
         return self
 
 

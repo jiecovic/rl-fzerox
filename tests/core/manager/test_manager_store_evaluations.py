@@ -1,6 +1,7 @@
 # tests/core/manager/test_manager_store_evaluations.py
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -189,11 +190,11 @@ def test_manager_store_lists_default_evaluation_presets_and_suites(tmp_path: Pat
     assert {preset.id for preset in presets} == {TIME_ATTACK_PRESET_ID, GP_PRESET_ID}
     assert {(suite.preset_id, suite.preset_version, suite.status) for suite in suites} == {
         (TIME_ATTACK_PRESET_ID, 1, "not_created"),
-        (GP_PRESET_ID, 1, "not_created"),
+        (GP_PRESET_ID, 2, "not_created"),
     }
 
 
-def test_manager_store_does_not_mutate_existing_default_evaluation_presets(
+def test_manager_store_refreshes_existing_default_evaluation_presets(
     tmp_path: Path,
 ) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
@@ -204,14 +205,65 @@ def test_manager_store_does_not_mutate_existing_default_evaluation_presets(
         assert preset is not None
         preset.name = "Pinned GP benchmark"
         preset.renderer = "angrylion"
+        preset.version = 1
+        preset.target_json = json.dumps(
+            {
+                "mode": "gp_course",
+                "course_ids": ["mute_city"],
+                "cup_ids": [],
+                "difficulties": ["master"],
+                "vehicle_ids": [],
+                "repeats_per_target": 10,
+            },
+            sort_keys=True,
+        )
         preset.updated_at = "2000-01-01T00:00:00+00:00"
 
     reloaded = ManagerStore(store.db_path).list_evaluation_presets()
     gp_preset = next(preset for preset in reloaded if preset.id == GP_PRESET_ID)
 
-    assert gp_preset.name == "Pinned GP benchmark"
-    assert gp_preset.renderer == "angrylion"
-    assert gp_preset.updated_at == "2000-01-01T00:00:00+00:00"
+    assert gp_preset.name == "GP course · Master · all courses"
+    assert gp_preset.renderer == "gliden64"
+    assert gp_preset.version == 2
+    assert gp_preset.target.baseline_variant_count == 10
+
+
+def test_manager_store_migrates_existing_custom_gp_preset_variants(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    preset = store.create_evaluation_preset(
+        name="Custom GP",
+        seed=7,
+        renderer="gliden64",
+        target=EvaluationTargetSpec(
+            mode="gp_course",
+            course_ids=("mute_city",),
+            difficulties=("master",),
+            repeats_per_target=10,
+        ),
+    )
+    with store._orm_session() as session:
+        preset_model = session.get(EvaluationPresetModel, preset.id)
+        assert preset_model is not None
+        preset_model.target_json = json.dumps(
+            {
+                "mode": "gp_course",
+                "course_ids": ["mute_city"],
+                "cup_ids": [],
+                "difficulties": ["master"],
+                "vehicle_ids": [],
+                "repeats_per_target": 10,
+            },
+            sort_keys=True,
+        )
+        preset_model.version = 1
+
+    reloaded = ManagerStore(store.db_path).get_evaluation_preset(preset.id)
+
+    assert reloaded is not None
+    assert reloaded.version == 2
+    assert reloaded.target.baseline_variant_count == 10
 
 
 def test_manager_store_creates_and_deletes_unused_custom_evaluation_preset(

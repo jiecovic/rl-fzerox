@@ -139,6 +139,44 @@ def test_single_course_targets_match_time_attack_by_course_id_or_entry_id(
     assert targets[1].engine_setting_raw_value == 85
 
 
+def test_single_course_targets_preserve_baseline_variant_metadata(
+    tmp_path: Path,
+) -> None:
+    config = _config_with_entries(
+        tmp_path,
+        (
+            TrackSamplingEntryConfig(
+                id="mute-city-variant-2",
+                course_ref="jack/mute_city",
+                course_id="mute_city",
+                mode="gp_race",
+                gp_difficulty="master",
+                vehicle="blue_falcon",
+                baseline_group_id="mute_city_gp",
+                baseline_variant_index=1,
+                baseline_variant_count=10,
+                baseline_variant_seed=123,
+            ),
+        ),
+    )
+
+    targets = single_course_targets_from_config(
+        config,
+        EvaluationTargetSpec(
+            mode="gp_course",
+            course_ids=("mute_city",),
+            difficulties=("master",),
+            vehicle_ids=("blue_falcon",),
+        ),
+    )
+
+    assert len(targets) == 1
+    assert targets[0].baseline_group_id == "mute_city_gp"
+    assert targets[0].baseline_variant_index == 1
+    assert targets[0].baseline_variant_count == 10
+    assert targets[0].baseline_variant_seed == 123
+
+
 def _config_with_entries(
     tmp_path: Path,
     entries: tuple[TrackSamplingEntryConfig, ...],

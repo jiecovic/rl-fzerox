@@ -262,6 +262,7 @@ def _evaluation_target_for_source(
         difficulties=target.difficulties,
         vehicle_ids=vehicle_ids,
         repeats_per_target=target.repeats_per_target,
+        baseline_variant_count=target.baseline_variant_count,
     )
 
 
@@ -277,12 +278,14 @@ def _evaluation_config_for_source(
     if target.mode == "gp_course":
         race_mode = "gp_race"
         gp_difficulties = target.difficulties or config.tracks.gp_difficulties
+        baseline_variant_count = target.baseline_variant_count
     else:
         race_mode = "time_attack"
         gp_difficulties = ()
+        baseline_variant_count = 1
     tracks = config.tracks.model_copy(
         update={
-            "baseline_variant_count": 1,
+            "baseline_variant_count": baseline_variant_count,
             "gp_difficulties": gp_difficulties,
             "include_x_cup": False,
             "race_mode": race_mode,

@@ -93,3 +93,5 @@ def _validate_preset_target(target: EvaluationTargetSpec) -> None:
         raise ValueError("gp_course evaluation presets require exactly one difficulty")
     if target.mode == "time_attack_course" and target.difficulties:
         raise ValueError("time_attack_course evaluation presets must not set difficulties")
+    if target.mode == "time_attack_course" and target.baseline_variant_count != 1:
+        raise ValueError("time_attack_course evaluation presets must use one baseline variant")

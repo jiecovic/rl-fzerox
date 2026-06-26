@@ -217,15 +217,9 @@ def _materialize_baseline_suite(
 def _evaluation_materializer_input(config: TrainAppConfig, *, seed: int) -> TrainAppConfig:
     """Return a materializer input whose reset pool is owned by the eval target.
 
-    Training configs may carry multiple GP baseline variants. Evaluation repeats
-    are specified by the evaluation preset, so variants must not multiply the
-    target count.
+    Evaluation configs are SQLite-owned snapshots produced from the preset.
+    Preserve their baseline-variant count so the preset-version baseline suite
+    can be reused across evaluations with the same preset.
     """
 
-    track_sampling = config.env.track_sampling.model_copy(update={"baseline_variant_count": 1})
-    return config.model_copy(
-        update={
-            "seed": seed,
-            "env": config.env.model_copy(update={"track_sampling": track_sampling}),
-        }
-    )
+    return config.model_copy(update={"seed": seed})

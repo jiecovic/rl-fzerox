@@ -89,6 +89,10 @@ def _course_target(entry: TrackSamplingEntryConfig) -> EvaluationCourseTarget:
         baseline_state_path=None
         if entry.baseline_state_path is None
         else str(entry.baseline_state_path),
+        baseline_group_id=entry.baseline_group_id,
+        baseline_variant_index=entry.baseline_variant_index,
+        baseline_variant_count=entry.baseline_variant_count,
+        baseline_variant_seed=entry.baseline_variant_seed,
         engine_setting_raw_value=entry.engine_setting_raw_value,
     )
 

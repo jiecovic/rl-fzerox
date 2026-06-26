@@ -13,6 +13,7 @@ from rl_fzerox.core.evaluation.managed.engine_tuning import (
 from rl_fzerox.core.evaluation.managed.runner import (
     EvaluationBaselineSuite,
     _evaluation_baseline_suite,
+    _evaluation_materializer_input,
     _materialize_baseline_suite,
     run_managed_evaluation,
 )
@@ -124,6 +125,25 @@ def test_baseline_suite_uses_projected_config_instead_of_existing_manifest(
     saved_manifest = config_path.read_text(encoding="utf-8")
     assert "removed_top_level_field" not in saved_manifest
     assert "seed: 456" in saved_manifest
+
+
+def test_evaluation_materializer_input_preserves_preset_baseline_variants(
+    tmp_path: Path,
+) -> None:
+    config = build_managed_train_app_config(
+        default_managed_run_config(),
+        run_id="eval-001",
+        run_dir=tmp_path / "evaluations" / "eval-001" / "runtime_projection",
+    )
+    track_sampling = config.env.track_sampling.model_copy(update={"baseline_variant_count": 10})
+    config = config.model_copy(
+        update={"env": config.env.model_copy(update={"track_sampling": track_sampling})}
+    )
+
+    materializer_input = _evaluation_materializer_input(config, seed=456)
+
+    assert materializer_input.seed == 456
+    assert materializer_input.env.track_sampling.baseline_variant_count == 10
 
 
 def test_evaluation_engine_tuning_uses_greedy_checkpoint_sampler(

@@ -78,6 +78,7 @@ def create_evaluation_preset_payload(
         cup_ids=tuple(request.target.cup_ids),
         difficulties=tuple(request.target.difficulties),
         repeats_per_target=request.target.repeats_per_target,
+        baseline_variant_count=request.target.baseline_variant_count,
     )
     try:
         preset = store.create_evaluation_preset(

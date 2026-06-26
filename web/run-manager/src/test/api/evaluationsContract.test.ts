@@ -25,6 +25,7 @@ describe("evaluations API contract", () => {
       difficulties: [],
       vehicle_ids: [],
       repeats_per_target: 1,
+      baseline_variant_count: 1,
     };
     const config = managedRunConfigFixture;
     const payload = evaluationsResponseSchema.parse({

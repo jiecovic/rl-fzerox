@@ -10,6 +10,7 @@ import { shortCupLabel } from "@/entities/runConfig/ui/sections/tracks/options";
 import type { TrackCupView } from "@/entities/runConfig/ui/sections/tracks/types";
 import {
   defaultGpDifficulties,
+  EVALUATION_PRESET_FORM_SETTINGS,
   selectGpDifficulty,
 } from "@/pages/evaluations/sections/presetConfig/formModel";
 import type {
@@ -79,6 +80,10 @@ export function PresetEditor({
             ? current.difficulties.slice(0, 1)
             : defaultGpDifficulties(metadata)
           : [],
+      baselineVariantCount:
+        targetMode === "gp_course"
+          ? EVALUATION_PRESET_FORM_SETTINGS.defaults.gpBaselineVariantCount
+          : EVALUATION_PRESET_FORM_SETTINGS.defaults.baselineVariantCount,
       targetMode,
     }));
   }
@@ -105,7 +110,7 @@ export function PresetEditor({
       </div>
 
       <ConfigPanel title="Preset settings" wide>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <FieldShell className="sm:col-span-2 lg:col-span-2">
             <span>Name</span>
             <FieldInput
@@ -161,6 +166,19 @@ export function PresetEditor({
               }
             />
           </FieldShell>
+          {form.targetMode === "gp_course" ? (
+            <FieldShell>
+              <span>Race-start variants</span>
+              <FieldInput
+                disabled={readOnly}
+                inputMode="numeric"
+                value={form.baselineVariantCount}
+                onChange={(event) =>
+                  setForm({ ...form, baselineVariantCount: event.currentTarget.value })
+                }
+              />
+            </FieldShell>
+          ) : null}
         </div>
       </ConfigPanel>
 

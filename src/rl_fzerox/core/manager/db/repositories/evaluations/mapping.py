@@ -105,6 +105,7 @@ def _target_from_json(raw_json: str) -> EvaluationTargetSpec:
         difficulties=tuple(data.get("difficulties", ())),
         vehicle_ids=tuple(data.get("vehicle_ids", ())),
         repeats_per_target=int(data.get("repeats_per_target", 1)),
+        baseline_variant_count=int(data["baseline_variant_count"]),
     )
 
 
