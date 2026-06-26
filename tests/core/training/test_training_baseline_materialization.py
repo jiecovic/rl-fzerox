@@ -24,6 +24,9 @@ from rl_fzerox.core.training.runs import (
     materialize_train_run_config,
 )
 from rl_fzerox.core.training.runs.race_start import RaceStartVariant
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
+    materialized_track_sampling_artifacts,
+)
 from tests.core.training.training_artifacts_support import (
     _patch_fake_boot_materializer,
     _required_baseline_path,
@@ -483,6 +486,63 @@ def test_materialize_track_sampling_reuses_gp_baseline_variants_across_run_seeds
     ]
     assert [_required_baseline_path(entry).name for entry in first_entries] == [
         _required_baseline_path(entry).name for entry in second_entries
+    ]
+
+
+def test_materialized_track_sampling_artifacts_distinguish_baseline_variants(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="equal",
+                baseline_variant_count=3,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city_gp",
+                        course_id="mute_city",
+                        runtime_course_key="mute_city",
+                        course_index=0,
+                        mode="gp_race",
+                        gp_difficulty="novice",
+                        vehicle="blue_falcon",
+                        engine_setting_raw_value=50,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+    artifacts = materialized_track_sampling_artifacts(materialized.env.track_sampling)
+
+    assert len(artifacts) == 3
+    assert {artifact.course_key for artifact in artifacts} == {"mute_city"}
+    assert [artifact.reset_variant_key for artifact in artifacts] == [
+        "mode=gp_race|gp_difficulty=novice|vehicle=blue_falcon|baseline_variant=0",
+        "mode=gp_race|gp_difficulty=novice|vehicle=blue_falcon|baseline_variant=1",
+        "mode=gp_race|gp_difficulty=novice|vehicle=blue_falcon|baseline_variant=2",
     ]
 
 

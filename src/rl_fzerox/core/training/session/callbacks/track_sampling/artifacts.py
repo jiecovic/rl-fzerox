@@ -90,6 +90,7 @@ def track_sampling_artifact_reset_variant_key(entry: TrackSamplingEntryConfig) -
         mode=entry.mode,
         gp_difficulty=entry.gp_difficulty or entry.source_gp_difficulty,
         vehicle=entry.vehicle or entry.source_vehicle,
+        baseline_variant_index=entry.baseline_variant_index,
     )
 
 
@@ -98,14 +99,16 @@ def reset_variant_key(
     mode: str | None,
     gp_difficulty: str | None,
     vehicle: str | None,
+    baseline_variant_index: int | None = None,
 ) -> str:
-    return "|".join(
-        (
-            _variant_part("mode", mode),
-            _variant_part("gp_difficulty", gp_difficulty),
-            _variant_part("vehicle", vehicle),
-        )
-    )
+    parts = [
+        _variant_part("mode", mode),
+        _variant_part("gp_difficulty", gp_difficulty),
+        _variant_part("vehicle", vehicle),
+    ]
+    if baseline_variant_index is not None:
+        parts.append(_variant_part("baseline_variant", str(baseline_variant_index)))
+    return "|".join(parts)
 
 
 def _variant_part(name: str, value: str | None) -> str:
