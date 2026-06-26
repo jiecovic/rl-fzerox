@@ -35,21 +35,18 @@ Full Master cups playlist:
 `just native` builds the Rust/PyO3 emulator extension in release mode for the
 active Python environment.
 
-Check your interpreter first:
-
-```bash
-python --version
-```
-
-Use `python3` instead of `python` below if that is the command your distribution
-provides. The interpreter must be Python 3.12 or newer.
+Create a virtual environment with Python 3.12. `uv` is a convenient option on
+distributions whose default `python` is newer; Conda, pyenv, or a system
+`python3.12` are also fine.
 
 ```bash
 git clone https://github.com/jiecovic/rl-fzerox.git
 cd rl-fzerox
 
-python -m venv .venv
+uv python install 3.12
+uv venv --python 3.12 .venv
 source .venv/bin/activate
+python --version
 python -m pip install -U pip
 python -m pip install -e ".[dev,watch,train]"
 python -m pip install "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.git"
@@ -57,6 +54,9 @@ python -m pip install "sb3x @ git+https://github.com/jiecovic/sb3x-extensions.gi
 just native
 just run-manager-install
 ```
+
+If your active interpreter is already Python 3.12, `python -m venv .venv` also
+works. Check `python --version` before installing dependencies.
 
 `just run-manager-install` installs the local React frontend dependencies used
 by `just fzerox`.
