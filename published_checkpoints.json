@@ -3,8 +3,8 @@
     {
       "bundle": {
         "filename": "rl-fzerox-checkpoint-blue-falcon-all-cups-v1.zip",
-        "sha256": "53cfdc29335388ad5b7c48abbebbc4c728867d88f834184514df5ff29176c49a",
-        "size_bytes": 33536535,
+        "sha256": "510b86a98499e068a35f352dd6def5aeb8c4f59fe9a9ef2e6d82e4e925fb6d8f",
+        "size_bytes": 33536536,
         "url": "https://github.com/jiecovic/rl-fzerox/releases/download/checkpoints-v1/rl-fzerox-checkpoint-blue-falcon-all-cups-v1.zip"
       },
       "id": "blue-falcon-all-cups",
@@ -27,10 +27,10 @@
           "observation_space_sha256": "e023c2cea9f85813edfa25f9a526841c09a71ddd3925e5edf6fcca70424fc911",
           "policy_architecture": null,
           "policy_signature_sha256": "cbfa6cce924a8b17004c59c210664ba951562c8380cce81ce178897fe1f533fb",
-          "train_config_sha256": "bc890dbc2339113804de1d3a7397b189864b290209f57247e32bbded3547c022",
+          "train_config_sha256": "f8e5d97f6e40c518018de4bfbe078d13cbaf42cb73be63e304ae66b0dc0e0181",
           "training_algorithm": "maskable_hybrid_recurrent_ppo"
         },
-        "exported_at": "2026-06-26T17:33:38+00:00",
+        "exported_at": "2026-06-26T22:28:23+00:00",
         "files": [
           {
             "path": "checkpoint/policy.zip",
@@ -53,8 +53,8 @@
           {
             "path": "config/train_config.json",
             "role": "train_config",
-            "sha256": "bc890dbc2339113804de1d3a7397b189864b290209f57247e32bbded3547c022",
-            "size_bytes": 10238
+            "sha256": "f8e5d97f6e40c518018de4bfbe078d13cbaf42cb73be63e304ae66b0dc0e0181",
+            "size_bytes": 10237
           },
           {
             "path": "engine_tuning/state.json",
@@ -71,5 +71,5 @@
   ],
   "format_name": "rl-fzerox-checkpoint-catalog",
   "schema_version": 1,
-  "updated_at": "2026-06-26T17:33:58+00:00"
+  "updated_at": "2026-06-26T22:28:24+00:00"
 }
