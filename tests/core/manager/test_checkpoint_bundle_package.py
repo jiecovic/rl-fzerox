@@ -12,6 +12,7 @@ from rl_fzerox.core.manager.checkpoints import (
     CHECKPOINT_BUNDLE_LAYOUT,
     CheckpointBundlePackageError,
     package_checkpoint_bundle,
+    package_evaluation_checkpoint_bundle,
     parse_checkpoint_bundle_manifest_json,
 )
 from rl_fzerox.core.manager.storage.serialization import config_json
@@ -64,6 +65,70 @@ def test_package_checkpoint_bundle_writes_manifest_and_payloads(tmp_path: Path) 
         "model",
         "checkpoint_metadata",
         "train_config",
+        "engine_tuning_state",
+    }
+
+
+def test_package_evaluation_checkpoint_bundle_writes_metrics_payload(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = _create_run_with_checkpoint(store, tmp_path, artifact="best")
+    evaluation = store.create_evaluation(
+        name="Blue Falcon Eval",
+        source_run_id=run.id,
+        source_artifact="best",
+        policy_mode="deterministic",
+        preset_id="time_attack_all_courses",
+        evaluations_root=tmp_path / "evaluations",
+    )
+    evaluation = store.mark_evaluation_running(evaluation.id)
+    assert evaluation.result_json_path is not None
+    evaluation.result_json_path.write_text(
+        '{"kind":"evaluation_summary","schema_version":1}\n',
+        encoding="utf-8",
+    )
+    evaluation = store.mark_evaluation_completed(evaluation.id)
+    bundle_path = tmp_path / "evaluation-bundle.zip"
+
+    result = package_evaluation_checkpoint_bundle(
+        store=store,
+        evaluation_id=evaluation.id,
+        version="v1",
+        checkpoint_id="blue-falcon-v1",
+        output_path=bundle_path,
+    )
+
+    assert result.bundle_path == bundle_path
+    with zipfile.ZipFile(bundle_path) as archive:
+        assert sorted(archive.namelist()) == [
+            "checkpoint/model.zip",
+            "checkpoint/policy.metadata.json",
+            "checkpoint/policy.zip",
+            "config/train_config.json",
+            "engine_tuning/state.json",
+            "manifest.json",
+            "metrics/evaluation.json",
+        ]
+        manifest = parse_checkpoint_bundle_manifest_json(
+            archive.read(CHECKPOINT_BUNDLE_LAYOUT.manifest_path).decode("utf-8")
+        )
+        assert archive.read("metrics/evaluation.json") == (
+            b'{"kind":"evaluation_summary","schema_version":1}\n'
+        )
+
+    assert manifest.checkpoint.id == "blue-falcon-v1"
+    assert manifest.checkpoint.name == "Blue Falcon Eval"
+    assert manifest.checkpoint.source_run_id == run.id
+    assert manifest.checkpoint.source_run_name == run.name
+    assert manifest.checkpoint.source_artifact == "best"
+    assert manifest.checkpoint.local_num_timesteps == 123_456
+    assert manifest.checkpoint.lineage_num_timesteps == 10_123_456
+    assert manifest.checkpoint.created_at == evaluation.finished_at
+    assert {file.role for file in manifest.files} == {
+        "policy",
+        "model",
+        "checkpoint_metadata",
+        "train_config",
+        "evaluation_metrics",
         "engine_tuning_state",
     }
 

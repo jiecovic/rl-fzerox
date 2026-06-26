@@ -14,6 +14,7 @@ from rl_fzerox.core.manager.checkpoints import (  # noqa: E402
     CheckpointBundlePackageError,
     CheckpointBundleSourceArtifact,
     package_checkpoint_bundle,
+    package_evaluation_checkpoint_bundle,
 )
 from rl_fzerox.core.manager.store import ManagerStore, default_manager_db_path  # noqa: E402
 
@@ -22,17 +23,28 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     store = ManagerStore(args.db)
     try:
-        result = package_checkpoint_bundle(
-            store=store,
-            run_id=args.run_id,
-            artifact=_artifact(args.artifact),
-            version=args.version,
-            checkpoint_id=args.checkpoint_id,
-            checkpoint_name=args.name,
-            output_path=args.output,
-            allow_running=args.allow_running,
-            overwrite=args.overwrite,
-        )
+        if args.evaluation_id is not None:
+            result = package_evaluation_checkpoint_bundle(
+                store=store,
+                evaluation_id=args.evaluation_id,
+                version=args.version,
+                checkpoint_id=args.checkpoint_id,
+                checkpoint_name=args.name,
+                output_path=args.output,
+                overwrite=args.overwrite,
+            )
+        else:
+            result = package_checkpoint_bundle(
+                store=store,
+                run_id=args.run_id,
+                artifact=_artifact(args.artifact),
+                version=args.version,
+                checkpoint_id=args.checkpoint_id,
+                checkpoint_name=args.name,
+                output_path=args.output,
+                allow_running=args.allow_running,
+                overwrite=args.overwrite,
+            )
     except CheckpointBundlePackageError as exc:
         raise SystemExit(str(exc)) from exc
 
@@ -45,7 +57,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         description="Package one local manager checkpoint as a release bundle."
     )
     parser.add_argument("--db", type=Path, default=default_manager_db_path())
-    parser.add_argument("--run-id", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--run-id")
+    source.add_argument("--evaluation-id")
     parser.add_argument("--artifact", choices=("latest", "best", "final"), default="best")
     parser.add_argument("--version", required=True)
     parser.add_argument("--checkpoint-id")
