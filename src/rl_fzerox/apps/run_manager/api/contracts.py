@@ -229,7 +229,8 @@ class ImportSaveEngineTuningRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     course_setups: tuple[ImportSaveEngineTuningCourseSetupRequest, ...] = ()
-    policy_run_id: str
+    policy_source_kind: PolicySourceKind = "run"
+    policy_source_id: str
     policy_artifact: PolicySourceArtifact = "latest"
 
 

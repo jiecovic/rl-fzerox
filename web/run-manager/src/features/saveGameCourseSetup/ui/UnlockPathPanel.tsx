@@ -29,6 +29,7 @@ import {
   dirtyCourseSetupDrafts,
   dirtyCupSetupDrafts,
   EMPTY_COURSE_SETUP_DRAFT,
+  preferredEngineSetting,
   resetCourseEngineDrafts,
   selectedPolicySource,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
@@ -68,7 +69,8 @@ interface UnlockPathPanelProps {
       vehicleId: string;
     }[];
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
   }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   onUpsertCupSetup: (request: {
@@ -205,6 +207,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
       if (draft.policySourceId === "") {
         return;
       }
+      const selectedSource = selectedPolicySource(policySources, draft);
       setCourseSetupDrafts((current) => {
         const next = { ...current };
         for (const setup of setups) {
@@ -214,7 +217,10 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
           };
           next[courseSetupKey(setup)] = {
             ...setup,
-            engineSettingRawValue: currentDraft.engineSettingRawValue,
+            engineSettingRawValue:
+              selectedSource === null
+                ? currentDraft.engineSettingRawValue
+                : preferredEngineSetting(selectedSource.vehicleSetup),
             policyArtifact: draft.policyArtifact,
             policySourceId: draft.policySourceId,
             policySourceKind: draft.policySourceKind,
@@ -224,7 +230,7 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
         return next;
       });
     },
-    [],
+    [policySources],
   );
 
   const resetEngineSetups = useCallback((setups: readonly CourseSetupValues[]) => {
@@ -261,7 +267,8 @@ export const UnlockPathPanel = memo(function UnlockPathPanel({
       const recommendations = await onImportEngineTuning({
         courseSetups,
         policyArtifact: draft.policyArtifact,
-        policyRunId: draft.policySourceId,
+        policySourceId: draft.policySourceId,
+        policySourceKind: draft.policySourceKind,
         saveGameId: saveGame.id,
       });
       setCourseSetupDrafts((current) =>

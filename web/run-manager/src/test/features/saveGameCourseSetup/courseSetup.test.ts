@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   type CourseSetupDraftMap,
   courseSetupKey,
+  preferredEngineSetting,
   resetCourseEngineDrafts,
   sharedPolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
@@ -57,6 +58,34 @@ describe("resetCourseEngineDrafts", () => {
       policySourceKind: "run",
       vehicleId: "blue_falcon",
     });
+  });
+});
+
+describe("preferredEngineSetting", () => {
+  it("uses the fixed engine value for fixed policies", () => {
+    expect(
+      preferredEngineSetting({
+        engine_mode: "fixed",
+        engine_setting_max_raw_value: 100,
+        engine_setting_min_raw_value: 0,
+        engine_setting_raw_value: 77,
+        selected_vehicle_ids: ["blue_falcon"],
+        selection_mode: "fixed",
+      }),
+    ).toBe(77);
+  });
+
+  it("uses the raw midpoint for range policies", () => {
+    expect(
+      preferredEngineSetting({
+        engine_mode: "random_range",
+        engine_setting_max_raw_value: 84,
+        engine_setting_min_raw_value: 44,
+        engine_setting_raw_value: 64,
+        selected_vehicle_ids: ["blue_falcon"],
+        selection_mode: "fixed",
+      }),
+    ).toBe(64);
   });
 });
 

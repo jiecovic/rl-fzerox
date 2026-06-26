@@ -11,6 +11,7 @@ import {
   type SaveEngineTuningCourseSetupRecommendation,
   type SaveGameRunnerSettingsUpdateRequest,
   type SavePolicyArtifact,
+  type SavePolicySourceKind,
   saveGameStatusResponseSchema,
   saveGamesResponseSchema,
   updateSaveGameRunnerSettingsResponseSchema,
@@ -196,7 +197,8 @@ export async function upsertSaveCourseSetup({
 export async function importSaveEngineTuning({
   courseSetups,
   policyArtifact,
-  policyRunId,
+  policySourceId,
+  policySourceKind,
   saveGameId,
 }: {
   courseSetups: readonly {
@@ -206,7 +208,8 @@ export async function importSaveEngineTuning({
     vehicleId: string;
   }[];
   policyArtifact: SavePolicyArtifact;
-  policyRunId: string;
+  policySourceId: string;
+  policySourceKind: SavePolicySourceKind;
   saveGameId: string;
 }): Promise<readonly SaveEngineTuningCourseSetupRecommendation[]> {
   const response = await fetch(
@@ -222,7 +225,8 @@ export async function importSaveEngineTuning({
           vehicle_id: setup.vehicleId,
         })),
         policy_artifact: policyArtifact,
-        policy_run_id: policyRunId,
+        policy_source_kind: policySourceKind,
+        policy_source_id: policySourceId,
       }),
     },
   );

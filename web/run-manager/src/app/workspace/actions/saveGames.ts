@@ -39,7 +39,8 @@ export interface WorkspaceSaveGameActions {
       vehicleId: string;
     }[];
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
   }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   openManagedSaveGameDirectory: (saveGameId: string) => Promise<void>;
@@ -119,7 +120,8 @@ export function workspaceSaveGameActions({
       vehicleId: string;
     }[];
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
   }) {
     return await importSaveEngineTuning(request);

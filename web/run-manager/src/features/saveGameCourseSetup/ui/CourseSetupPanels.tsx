@@ -26,6 +26,7 @@ import {
   EMPTY_COURSE_SETUP_DRAFT,
   EMPTY_CUP_SETUP_DRAFT,
   exactCourseSetupDraft,
+  preferredEngineSetting,
   selectedPolicySource,
   sharedPolicySelectionDraft,
 } from "@/features/saveGameCourseSetup/model/courseSetup";
@@ -41,7 +42,8 @@ import { clampRawEngineValue } from "@/shared/domain/engineBuckets";
 import { Button } from "@/shared/ui/Button";
 import { cn } from "@/shared/ui/cn";
 import { DisclosureToolbar } from "@/shared/ui/config/DisclosureToolbar";
-import { ChevronIcon, ImportIcon, ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
+import { ToggleSwitch } from "@/shared/ui/configFields";
+import { ImportIcon, ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
 
 const EMPTY_POLICY_SELECTION_DRAFT: PolicySelectionDraft = {
   policyArtifact: "best",
@@ -68,24 +70,40 @@ export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
   updating: boolean;
 }) {
   const [draft, setDraft] = useState<PolicySelectionDraft>(EMPTY_POLICY_SELECTION_DRAFT);
+  const [includeEngineTuning, setIncludeEngineTuning] = useState(true);
   const [importing, setImporting] = useState(false);
   const selectedSource = useMemo(
     () => selectedPolicySource(policySources, draft),
     [draft, policySources],
   );
-  const canImportEngines = !updating && selectedSource?.canImportEngineTuning === true;
-  const canApply = !updating && draft.policySourceId !== "";
+  const sourceCanImportEngines = selectedSource?.canImportEngineTuning === true;
+  const canImportEngines = !updating && sourceCanImportEngines;
+  const canApply = !updating && !importing && draft.policySourceId !== "";
+  const shouldImportEngines = canImportEngines && includeEngineTuning;
+  const sourceSelectionKey =
+    draft.policySourceId === ""
+      ? ""
+      : `${draft.policySourceKind}:${draft.policySourceId}:${draft.policyArtifact}`;
   const allCourseSetups = useMemo(() => courseSetupsForCups(cups), [cups]);
 
-  async function importEngineTuning() {
-    if (!canImportEngines) {
+  useEffect(() => {
+    if (sourceSelectionKey !== "" && sourceCanImportEngines) {
+      setIncludeEngineTuning(true);
+    }
+  }, [sourceCanImportEngines, sourceSelectionKey]);
+
+  async function importPolicy() {
+    if (!canApply) {
       return;
     }
-    setImporting(true);
-    try {
-      await onImportEngineTuning(draft);
-    } finally {
-      setImporting(false);
+    onApplySetups(allCourseSetups, draft);
+    if (shouldImportEngines) {
+      setImporting(true);
+      try {
+        await onImportEngineTuning(draft);
+      } finally {
+        setImporting(false);
+      }
     }
   }
 
@@ -96,10 +114,10 @@ export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
           Bulk policy
         </h4>
         <p className="m-0 text-sm text-app-muted">
-          Copy a trained policy artifact into course rows without changing engines.
+          Copy a trained policy artifact into course rows.
         </p>
       </div>
-      <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_140px_auto] lg:items-end">
+      <div className="grid gap-3 lg:grid-cols-[minmax(18rem,1fr)_140px_minmax(12rem,auto)_auto] lg:items-end">
         <PolicySelectionSelect
           disabled={updating}
           draft={draft}
@@ -114,26 +132,50 @@ export const GlobalPolicyPanel = memo(function GlobalPolicyPanel({
           policySources={policySources}
           onDraftChange={setDraft}
         />
+        <div className="flex min-h-9 items-center">
+          {sourceCanImportEngines ? (
+            <EngineImportToggle
+              checked={includeEngineTuning}
+              disabled={updating || importing}
+              onChange={setIncludeEngineTuning}
+            />
+          ) : null}
+        </div>
         <div className="flex flex-wrap gap-2 lg:justify-end">
           <Button
             className="min-w-[160px]"
             disabled={!canApply}
             type="button"
-            onClick={() => onApplySetups(allCourseSetups, draft)}
+            onClick={() => void importPolicy()}
           >
-            Apply to all courses
-          </Button>
-          <Button
-            className="min-w-[180px]"
-            disabled={!canImportEngines || importing}
-            type="button"
-            onClick={() => void importEngineTuning()}
-          >
-            {importing ? "Importing engines" : "Import learned engines"}
+            {importing ? "Importing" : "Import to all courses"}
           </Button>
         </div>
       </div>
     </div>
+  );
+});
+
+const EngineImportToggle = memo(function EngineImportToggle({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <span className="flex min-h-9 items-center gap-2 whitespace-nowrap">
+      <ToggleSwitch
+        checked={checked}
+        disabled={disabled}
+        hideLabel
+        label="Use tuner recommendations"
+        onChange={onChange}
+      />
+      <span className="text-sm font-semibold text-app-text">Tuner recommendations</span>
+    </span>
   );
 });
 
@@ -319,6 +361,7 @@ const CupSetupBlock = memo(function CupSetupBlock({
     [courseValuesList, cupValues],
   );
   const [importingEngines, setImportingEngines] = useState(false);
+  const [includeEngineTuning, setIncludeEngineTuning] = useState(true);
   const cupDirtyCount = useMemo(() => {
     const dirtyCourseCount = dirtyCourseSetupDrafts(
       courseSetupDrafts,
@@ -354,18 +397,51 @@ const CupSetupBlock = memo(function CupSetupBlock({
     () => selectedPolicySource(policySources, bulkPolicyDraft),
     [bulkPolicyDraft, policySources],
   );
-  const canImportEngines = !updating && selectedSource?.canImportEngineTuning === true;
+  const sourceCanImportEngines = selectedSource?.canImportEngineTuning === true;
+  const canImportEngines = !updating && sourceCanImportEngines;
+  const canApply = !updating && !importingEngines && bulkPolicyDraft.policySourceId !== "";
+  const shouldImportEngines = canImportEngines && includeEngineTuning;
+  const sourceSelectionKey =
+    bulkPolicyDraft.policySourceId === ""
+      ? ""
+      : `${bulkPolicyDraft.policySourceKind}:${bulkPolicyDraft.policySourceId}:${bulkPolicyDraft.policyArtifact}`;
 
   function applyBulkCoursePolicy(nextDraft: PolicySelectionDraft) {
+    const nextSource = selectedPolicySource(policySources, nextDraft);
     for (const values of courseValuesList) {
       const currentDraft = exactCourseSetupDraft(courseSetupDrafts, values) ?? fallbackDraft;
       onCourseSetupDraftChange(values, {
         ...currentDraft,
+        engineSettingRawValue:
+          nextSource === null
+            ? currentDraft.engineSettingRawValue
+            : preferredEngineSetting(nextSource.vehicleSetup),
         policyArtifact: nextDraft.policyArtifact,
         policySourceId: nextDraft.policySourceId,
         policySourceKind: nextDraft.policySourceKind,
         vehicleId: cupDraft.vehicleId,
       });
+    }
+  }
+
+  useEffect(() => {
+    if (sourceSelectionKey !== "" && sourceCanImportEngines) {
+      setIncludeEngineTuning(true);
+    }
+  }, [sourceCanImportEngines, sourceSelectionKey]);
+
+  async function importBulkCoursePolicy() {
+    if (!canApply) {
+      return;
+    }
+    applyBulkCoursePolicy(bulkPolicyDraft);
+    if (shouldImportEngines) {
+      setImportingEngines(true);
+      try {
+        await onImportEngineTuning(bulkPolicyDraft, saveScope);
+      } finally {
+        setImportingEngines(false);
+      }
     }
   }
 
@@ -434,7 +510,7 @@ const CupSetupBlock = memo(function CupSetupBlock({
       </summary>
       {collapsed ? null : (
         <div className="config-disclosure-body gap-3">
-          <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_120px_minmax(170px,220px)_auto] xl:items-end">
+          <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_120px_minmax(170px,220px)_minmax(12rem,auto)_auto] xl:items-end">
             <PolicySelectionSelect
               disabled={updating}
               draft={bulkPolicyDraft}
@@ -460,15 +536,24 @@ const CupSetupBlock = memo(function CupSetupBlock({
               visibleLabel="Vehicle"
               onDraftChange={(nextDraft) => onCupSetupDraftChange(cupValues, nextDraft.vehicleId)}
             />
+            <div className="flex min-h-9 items-center">
+              {sourceCanImportEngines ? (
+                <EngineImportToggle
+                  checked={includeEngineTuning}
+                  disabled={updating || importingEngines}
+                  onChange={setIncludeEngineTuning}
+                />
+              ) : null}
+            </div>
             <div className="flex flex-wrap gap-2 xl:flex-nowrap xl:justify-end">
               <Button
                 className="min-w-[96px] gap-2 px-3"
-                disabled={updating || bulkPolicyDraft.policySourceId === ""}
+                disabled={!canApply}
                 type="button"
-                onClick={() => applyBulkCoursePolicy(bulkPolicyDraft)}
+                onClick={() => void importBulkCoursePolicy()}
               >
-                <ChevronIcon />
-                <span>Apply</span>
+                <ImportIcon />
+                <span>{importingEngines ? "Importing" : "Import"}</span>
               </Button>
               <Button
                 aria-label={`Save ${cup.label} setup`}
@@ -480,22 +565,6 @@ const CupSetupBlock = memo(function CupSetupBlock({
               >
                 <SaveDraftIcon />
                 <span>Save</span>
-              </Button>
-              <Button
-                className="min-w-[142px] gap-2 px-3"
-                disabled={!canImportEngines || importingEngines}
-                type="button"
-                onClick={async () => {
-                  setImportingEngines(true);
-                  try {
-                    await onImportEngineTuning(bulkPolicyDraft, saveScope);
-                  } finally {
-                    setImportingEngines(false);
-                  }
-                }}
-              >
-                <ImportIcon />
-                <span>{importingEngines ? "Importing" : "Import engines"}</span>
               </Button>
               <ResetEngineSetupsButton
                 disabled={updating}

@@ -47,7 +47,8 @@ export interface ImportSaveEngineTuningRequest {
     vehicleId: string;
   }[];
   policyArtifact: SavePolicyArtifact;
-  policyRunId: string;
+  policySourceId: string;
+  policySourceKind: SavePolicySourceKind;
   saveGameId: string;
 }
 

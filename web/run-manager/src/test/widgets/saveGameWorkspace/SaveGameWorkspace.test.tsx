@@ -131,7 +131,7 @@ describe("SaveGameWorkspace", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), `run:${run.id}`);
     expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
+    await user.click(screen.getByRole("button", { name: "Import to all courses" }));
     expect(onUpsertCourseSetup).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Save 24 changes" }));
@@ -141,7 +141,7 @@ describe("SaveGameWorkspace", () => {
       courseId: "mute_city",
       cupId: "jack",
       difficulty: null,
-      engineSettingRawValue: 64,
+      engineSettingRawValue: 70,
       policyArtifact: "best",
       policySourceId: "run-policy",
       policySourceKind: "run",
@@ -150,7 +150,7 @@ describe("SaveGameWorkspace", () => {
     expect(onUpsertCupSetup).not.toHaveBeenCalled();
   });
 
-  it("imports learned engines from the selected bulk policy without saving", async () => {
+  it("imports a bulk policy with engine tuner values without saving", async () => {
     const user = userEvent.setup();
     const saveGame = saveGameFixture({
       cup_setups: [cupSetupFixture({ cup_id: "jack", vehicle_id: "fire_stingray" })],
@@ -200,7 +200,7 @@ describe("SaveGameWorkspace", () => {
     });
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Policy" }), `run:${run.id}`);
-    await user.click(screen.getByRole("button", { name: "Import learned engines" }));
+    await user.click(screen.getByRole("button", { name: "Import to all courses" }));
 
     expect(onImportEngineTuning).toHaveBeenCalledWith({
       courseSetups: expect.arrayContaining([
@@ -218,7 +218,8 @@ describe("SaveGameWorkspace", () => {
         },
       ]),
       policyArtifact: "best",
-      policyRunId: "run-adaptive",
+      policySourceId: "run-adaptive",
+      policySourceKind: "run",
       saveGameId: "save-001",
     });
     expect(onUpsertCourseSetup).not.toHaveBeenCalled();
@@ -231,7 +232,7 @@ describe("SaveGameWorkspace", () => {
       "aria-valuenow",
       "88",
     );
-    expect(screen.getByRole("button", { name: "Save 2 changes" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save 24 changes" })).toBeEnabled();
   });
 
   it("saves evaluation snapshots as policy sources", async () => {
@@ -254,7 +255,7 @@ describe("SaveGameWorkspace", () => {
       screen.getByRole("combobox", { name: "Policy" }),
       "evaluation:eval-policy",
     );
-    await user.click(screen.getByRole("button", { name: "Apply to all courses" }));
+    await user.click(screen.getByRole("button", { name: "Import to all courses" }));
     await user.click(screen.getByRole("button", { name: "Save 24 changes" }));
 
     expect(onUpsertCourseSetup).toHaveBeenCalledWith(
@@ -262,6 +263,47 @@ describe("SaveGameWorkspace", () => {
         policyArtifact: "best",
         policySourceId: "eval-policy",
         policySourceKind: "evaluation",
+      }),
+    );
+  });
+
+  it("imports engine tuner values from evaluation policy snapshots", async () => {
+    const user = userEvent.setup();
+    const saveGame = saveGameFixture();
+    const evaluation = evaluationFixture({
+      id: "eval-adaptive",
+      name: "adaptive eval",
+      config: {
+        ...managedRunConfigFixture,
+        vehicle: {
+          ...managedRunConfigFixture.vehicle,
+          engine_mode: "adaptive_tuner",
+          engine_setting_min_raw_value: 0,
+          engine_setting_max_raw_value: 100,
+          engine_setting_raw_value: 50,
+        },
+      },
+    });
+    const onImportEngineTuning = vi.fn().mockResolvedValue([]);
+
+    renderSaveGameWorkspace({
+      evaluations: [evaluation],
+      saveGame,
+      onImportEngineTuning,
+    });
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Policy" }),
+      "evaluation:eval-adaptive",
+    );
+    await user.click(screen.getByRole("button", { name: "Import to all courses" }));
+
+    expect(onImportEngineTuning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyArtifact: "best",
+        policySourceId: "eval-adaptive",
+        policySourceKind: "evaluation",
+        saveGameId: "save-001",
       }),
     );
   });

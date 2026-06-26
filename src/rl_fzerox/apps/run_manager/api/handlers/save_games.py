@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 from fastapi import HTTPException
 
@@ -24,10 +23,14 @@ from rl_fzerox.core.engine_tuning import (
     OrderedEngineTuner,
 )
 from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
-from rl_fzerox.core.manager import ManagedRun, ManagerStore
+from rl_fzerox.core.manager import (
+    ManagedPolicySource,
+    ManagedRun,
+    ManagerStore,
+    PolicySourceArtifact,
+)
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.projection.engine_tuning import adaptive_engine_tuning_config
-from rl_fzerox.core.runtime_spec.schema import AdaptiveEngineTuningConfig
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 from rl_fzerox.core.training.session.artifacts import load_engine_tuning_checkpoint_state
 
@@ -172,31 +175,36 @@ def import_save_engine_tuning_payload(
     save_game = store.get_save_game(save_game_id)
     if save_game is None:
         raise HTTPException(status_code=404, detail="save game not found")
-    run = store.get_run(request.policy_run_id)
-    if run is None:
-        raise HTTPException(status_code=404, detail="policy run not found")
-    if run.config.vehicle.engine_mode != "adaptive_tuner":
-        raise HTTPException(status_code=400, detail="policy run has no adaptive engine tuning")
     try:
-        policy_path = _resolve_engine_tuning_policy_artifact(
-            run,
-            artifact=request.policy_artifact,
+        policy_source = store.resolve_policy_source(
+            policy_source_kind=request.policy_source_kind,
+            policy_source_id=request.policy_source_id,
+            policy_artifact=request.policy_artifact,
+            require_policy_artifact=request.policy_source_kind == "evaluation",
         )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error).strip("'")) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if policy_source.config.vehicle.engine_mode != "adaptive_tuner":
+        raise HTTPException(status_code=400, detail="policy source has no adaptive engine tuning")
+    try:
+        policy_path = _resolve_engine_tuning_policy_path(store, policy_source)
     except FileNotFoundError as error:
         raise HTTPException(
             status_code=400,
-            detail=f"policy run has no {request.policy_artifact} artifact",
+            detail=f"policy source has no {request.policy_artifact} artifact",
         ) from error
     state = load_engine_tuning_checkpoint_state(policy_path)
     if state is None or (not state.candidates and state.model_state is None):
-        raise HTTPException(status_code=400, detail="policy run has no engine tuning samples")
+        raise HTTPException(status_code=400, detail="policy source has no engine tuning samples")
     if not request.course_setups:
         raise HTTPException(
             status_code=400,
-            detail="no course setup drafts use this policy run",
+            detail="no course setup drafts use this policy source",
         )
     tuner = OrderedEngineTuner(
-        settings=engine_tuner_settings(_adaptive_engine_config(run)),
+        settings=engine_tuner_settings(adaptive_engine_tuning_config(policy_source.config)),
         state=state,
     )
     recommendations: list[dict[str, object]] = []
@@ -232,14 +240,24 @@ def open_save_game_dir_payload(store: ManagerStore, save_game_id: str) -> dict[s
     return {"opened": True}
 
 
-def _adaptive_engine_config(run: ManagedRun) -> AdaptiveEngineTuningConfig:
-    return adaptive_engine_tuning_config(run.config)
+def _resolve_engine_tuning_policy_path(
+    store: ManagerStore,
+    policy_source: ManagedPolicySource,
+) -> Path:
+    if policy_source.kind == "evaluation":
+        if policy_source.policy_path is None:
+            raise FileNotFoundError("evaluation policy checkpoint is missing")
+        return policy_source.policy_path
+    run = store.get_run(policy_source.id)
+    if run is None:
+        raise FileNotFoundError(f"policy run not found: {policy_source.id}")
+    return _resolve_engine_tuning_run_policy_artifact(run, artifact=policy_source.artifact)
 
 
-def _resolve_engine_tuning_policy_artifact(
+def _resolve_engine_tuning_run_policy_artifact(
     run: ManagedRun,
     *,
-    artifact: Literal["latest", "best", "final"],
+    artifact: PolicySourceArtifact,
 ) -> Path:
     try:
         return resolve_policy_artifact_path(run.run_dir, artifact=artifact)

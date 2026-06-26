@@ -281,7 +281,7 @@ export function policySourceOptions({
           id: evaluation.id,
           kind: "evaluation",
           label: `${evaluation.name} · evaluation snapshot`,
-          canImportEngineTuning: false,
+          canImportEngineTuning: evaluation.config.vehicle.engine_mode === "adaptive_tuner",
           vehicleSetup: {
             selection_mode: evaluation.config.vehicle.selection_mode,
             selected_vehicle_ids: evaluation.config.vehicle.selected_vehicle_ids,
@@ -375,14 +375,13 @@ function policySelectionDraftsEqual(
   );
 }
 
-function preferredEngineSetting(vehicle: PolicySourceVehicleSetup): number {
+export function preferredEngineSetting(vehicle: PolicySourceVehicleSetup): number {
   if (vehicle.engine_mode === "fixed") {
     return vehicle.engine_setting_raw_value;
   }
-  if (vehicle.engine_setting_min_raw_value === vehicle.engine_setting_max_raw_value) {
-    return vehicle.engine_setting_min_raw_value;
-  }
-  return NEUTRAL_ENGINE_SETTING_RAW_VALUE;
+  return Math.round(
+    (vehicle.engine_setting_min_raw_value + vehicle.engine_setting_max_raw_value) / 2,
+  );
 }
 
 function resolveSavedCourseSetupForCourse(

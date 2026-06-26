@@ -122,7 +122,8 @@ export interface WorkspaceActions {
       vehicleId: string;
     }[];
     policyArtifact: SavePolicyArtifact;
-    policyRunId: string;
+    policySourceId: string;
+    policySourceKind: SavePolicySourceKind;
     saveGameId: string;
   }) => Promise<readonly SaveEngineTuningCourseSetupRecommendation[]>;
   exportManagedRun: (run: ManagedRun) => Promise<void>;
