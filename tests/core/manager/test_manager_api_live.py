@@ -1,6 +1,8 @@
 # tests/core/manager/test_manager_api_live.py
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
 from pathlib import Path
 
 import pytest
@@ -35,6 +37,17 @@ class _DisconnectingWebSocket:
     async def send_json(self, data: dict[str, object]) -> None:
         self.messages.append(data)
         raise WebSocketDisconnect()
+
+
+class _AcceptedWebSocket:
+    def __init__(self) -> None:
+        self.accepted = asyncio.Event()
+
+    async def accept(self) -> None:
+        self.accepted.set()
+
+    async def send_json(self, _data: dict[str, object]) -> None:
+        raise AssertionError("shutdown cancellation should happen before a send")
 
 
 async def test_manager_api_live_track_sampling_sends_initial_snapshot(tmp_path: Path) -> None:
@@ -104,3 +117,31 @@ async def test_manager_api_live_runs_sends_initial_snapshot(tmp_path: Path) -> N
     first_run = runs[0]
     assert isinstance(first_run, dict)
     assert first_run["id"] == run.id
+
+
+async def test_manager_api_live_shutdown_cancellation_disconnects_quietly() -> None:
+    snapshot_released = asyncio.Event()
+
+    async def load_snapshot() -> dict[str, object]:
+        await snapshot_released.wait()
+        return {}
+
+    broadcaster = LiveSnapshotBroadcaster(
+        load_snapshot,
+        message_types=LiveMessageTypes(snapshot="runs_snapshot", error="runs_error"),
+        error_log_message="failed to poll live run snapshot",
+        interval_seconds=0.0,
+    )
+    websocket = _AcceptedWebSocket()
+    task = asyncio.create_task(broadcaster.serve(websocket))
+    await websocket.accepted.wait()
+
+    task.cancel()
+    await task
+    assert broadcaster.has_subscribers is False
+
+    snapshot_released.set()
+    poll_task = broadcaster._poll_task
+    if poll_task is not None:
+        with suppress(asyncio.CancelledError):
+            await asyncio.wait_for(poll_task, timeout=1.0)

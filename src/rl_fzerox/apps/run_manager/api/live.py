@@ -78,7 +78,7 @@ class LiveSnapshotBroadcaster:
                     )
                     continue
                 await websocket.send_json({"type": self._message_types.snapshot, **update.payload})
-        except (RuntimeError, WebSocketDisconnect):
+        except (asyncio.CancelledError, RuntimeError, WebSocketDisconnect):
             return
         finally:
             self._subscribers.discard(queue)
