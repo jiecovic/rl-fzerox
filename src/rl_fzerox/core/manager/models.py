@@ -30,7 +30,7 @@ ManagedEvaluationStatus = Literal[
     "cancelled",
 ]
 EvaluationBaselineSuiteStatus = Literal["not_created", "ready", "failed"]
-PolicySourceKind = Literal["run", "evaluation"]
+PolicySourceKind = Literal["run", "evaluation", "checkpoint"]
 PolicySourceArtifact = Literal["latest", "best", "final"]
 
 
@@ -221,6 +221,9 @@ class ManagedPolicySource:
     created_at: str
     updated_at: str
     policy_path: Path | None = None
+    model_path: Path | None = None
+    engine_tuning_state_path: Path | None = None
+    engine_tuning_model_path: Path | None = None
     source_run_id: str | None = None
     source_run_name: str | None = None
     local_num_timesteps: int | None = None

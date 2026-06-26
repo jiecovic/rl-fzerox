@@ -22,7 +22,7 @@ WatchDevice = Literal["cpu", "cuda"]
 type WatchRenderer = RendererName
 PolicyPlaybackMode = Literal["deterministic", "stochastic"]
 EngineTuningSourceAction = Literal["convert", "discard"]
-PolicySourceKind = Literal["run", "evaluation"]
+PolicySourceKind = Literal["run", "evaluation", "checkpoint"]
 PolicySourceArtifact = Literal["latest", "best", "final"]
 
 

@@ -23,7 +23,7 @@ export const saveUnlockTargetStatusSchema = z.enum([
 
 export const saveAttemptStatusSchema = z.enum(["running", "succeeded", "failed"]);
 
-export const savePolicySourceKindSchema = z.enum(["run", "evaluation"]);
+export const savePolicySourceKindSchema = z.enum(["run", "evaluation", "checkpoint"]);
 
 export const savePolicyArtifactSchema = z.enum(["latest", "best", "final"]);
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,8 @@ class LoadedPolicy:
     run_dir: Path
     policy_path: Path
     artifact: str
+    reload_source: Literal["artifact", "path"] = "artifact"
+    model_path: Path | None = None
     device: str = "cpu"
     algorithm: str | None = None
     num_timesteps: int | None = None

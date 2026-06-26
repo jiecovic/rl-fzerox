@@ -219,11 +219,48 @@ def load_policy_runner(
     )
 
 
+def load_policy_runner_from_paths(
+    *,
+    source_dir: Path,
+    policy_path: Path,
+    model_path: Path | None,
+    artifact: str,
+    device: str = "cpu",
+    algorithm: str | None = None,
+) -> PolicyRunner:
+    """Load one policy from explicit artifact paths instead of a run layout."""
+
+    resolved_source_dir = source_dir.expanduser().resolve()
+    resolved_policy_path = policy_path.expanduser().resolve()
+    resolved_model_path = None if model_path is None else model_path.expanduser().resolve()
+    policy = _load_saved_policy(
+        resolved_policy_path,
+        run_dir=resolved_source_dir,
+        model_path=resolved_model_path,
+        device=device,
+        algorithm=algorithm,
+    )
+    return PolicyRunner(
+        LoadedPolicy(
+            run_dir=resolved_source_dir,
+            policy_path=resolved_policy_path,
+            artifact=artifact,
+            reload_source="path",
+            model_path=resolved_model_path,
+            device=device,
+            algorithm=algorithm,
+            **_loaded_policy_metadata_fields(policy_path=resolved_policy_path),
+        ),
+        policy=policy,
+    )
+
+
 __all__ = [
     "LoadedPolicy",
     "PolicyCnnActivation",
     "PolicyRunner",
     "load_policy_runner",
+    "load_policy_runner_from_paths",
 ]
 
 

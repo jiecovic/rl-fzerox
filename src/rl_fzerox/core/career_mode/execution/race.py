@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 from rl_fzerox.core.career_mode.execution.context import SaveAttemptExecutionContext
+from rl_fzerox.core.manager.models import PolicySourceKind
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.vehicle_catalog import (
     vehicle_by_id,
@@ -40,7 +41,7 @@ class SaveRaceExecutionPlan:
     """Resolved inputs for launching one policy-backed GP race attempt."""
 
     attempt_id: str
-    policy_source_kind: Literal["run", "evaluation"]
+    policy_source_kind: PolicySourceKind
     policy_source_id: str
     policy_source_name: str
     policy_source_dir: Path

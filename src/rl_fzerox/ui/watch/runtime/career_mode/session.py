@@ -138,6 +138,14 @@ class CareerModeRuntimeSession:
                 "watch": base_config.watch.model_copy(
                     update={
                         "policy_run_dir": policy_control.policy_source.source_dir,
+                        "policy_path": policy_control.policy_source.policy_path,
+                        "policy_model_path": policy_control.policy_source.model_path,
+                        "engine_tuning_state_path": (
+                            policy_control.policy_source.engine_tuning_state_path
+                        ),
+                        "engine_tuning_model_path": (
+                            policy_control.policy_source.engine_tuning_model_path
+                        ),
                         "policy_artifact": policy_control.course_setup.policy_artifact,
                         "policy_algorithm": train_config.train.algorithm,
                     }

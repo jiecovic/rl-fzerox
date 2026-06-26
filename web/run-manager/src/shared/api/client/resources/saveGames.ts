@@ -174,7 +174,7 @@ export async function upsertSaveCourseSetup({
   engineSettingRawValue: number;
   policyArtifact: SavePolicyArtifact;
   policySourceId: string;
-  policySourceKind: "run" | "evaluation";
+  policySourceKind: SavePolicySourceKind;
   saveGameId: string;
 }): Promise<ManagedSaveGame> {
   const response = await fetch(`/api/save-games/${encodeURIComponent(saveGameId)}/course-setups`, {

@@ -20,9 +20,11 @@ from rl_fzerox.apps.run_manager.api.handlers.save_game_status import (
 from rl_fzerox.apps.run_manager.desktop import open_directory
 from rl_fzerox.core.engine_tuning import (
     EngineTuningContext,
+    EngineTuningRuntimeState,
     OrderedEngineTuner,
 )
 from rl_fzerox.core.engine_tuning.config import engine_tuner_settings
+from rl_fzerox.core.engine_tuning.persistence import load_engine_tuning_runtime_state
 from rl_fzerox.core.manager import (
     ManagedPolicySource,
     ManagedRun,
@@ -180,7 +182,7 @@ def import_save_engine_tuning_payload(
             policy_source_kind=request.policy_source_kind,
             policy_source_id=request.policy_source_id,
             policy_artifact=request.policy_artifact,
-            require_policy_artifact=request.policy_source_kind == "evaluation",
+            require_policy_artifact=request.policy_source_kind != "run",
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error).strip("'")) from error
@@ -195,7 +197,7 @@ def import_save_engine_tuning_payload(
             status_code=400,
             detail=f"policy source has no {request.policy_artifact} artifact",
         ) from error
-    state = load_engine_tuning_checkpoint_state(policy_path)
+    state = _load_policy_source_engine_tuning_state(policy_source, policy_path=policy_path)
     if state is None or (not state.candidates and state.model_state is None):
         raise HTTPException(status_code=400, detail="policy source has no engine tuning samples")
     if not request.course_setups:
@@ -244,9 +246,9 @@ def _resolve_engine_tuning_policy_path(
     store: ManagerStore,
     policy_source: ManagedPolicySource,
 ) -> Path:
-    if policy_source.kind == "evaluation":
+    if policy_source.kind != "run":
         if policy_source.policy_path is None:
-            raise FileNotFoundError("evaluation policy checkpoint is missing")
+            raise FileNotFoundError("policy checkpoint is missing")
         return policy_source.policy_path
     run = store.get_run(policy_source.id)
     if run is None:
@@ -265,3 +267,16 @@ def _resolve_engine_tuning_run_policy_artifact(
         if run.source_snapshot_dir is None:
             raise
     return resolve_policy_artifact_path(run.source_snapshot_dir, artifact=artifact)
+
+
+def _load_policy_source_engine_tuning_state(
+    policy_source: ManagedPolicySource,
+    *,
+    policy_path: Path,
+) -> EngineTuningRuntimeState | None:
+    if policy_source.engine_tuning_state_path is None:
+        return load_engine_tuning_checkpoint_state(policy_path)
+    return load_engine_tuning_runtime_state(
+        policy_source.engine_tuning_state_path,
+        model_path=policy_source.engine_tuning_model_path,
+    )

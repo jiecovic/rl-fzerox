@@ -27,7 +27,11 @@ from rl_fzerox.core.manager.models import (
 )
 from rl_fzerox.core.manager.projection.assembly import effective_train_algorithm
 from rl_fzerox.core.runtime_spec.schema import CareerModeRaceSetupConfig
-from rl_fzerox.core.training.inference import PolicyRunner, load_policy_runner
+from rl_fzerox.core.training.inference import (
+    PolicyRunner,
+    load_policy_runner,
+    load_policy_runner_from_paths,
+)
 
 
 class CareerPolicySourceStore(Protocol):
@@ -161,12 +165,23 @@ class CareerPolicyResolver:
             policy_artifact=course_setup.policy_artifact,
             require_policy_artifact=True,
         )
-        runner = load_policy_runner(
-            policy_source.source_dir,
-            artifact=course_setup.policy_artifact,
-            device=self._device,
-            algorithm=effective_train_algorithm(policy_source.config),
-        )
+        algorithm = effective_train_algorithm(policy_source.config)
+        if policy_source.policy_path is None:
+            runner = load_policy_runner(
+                policy_source.source_dir,
+                artifact=course_setup.policy_artifact,
+                device=self._device,
+                algorithm=algorithm,
+            )
+        else:
+            runner = load_policy_runner_from_paths(
+                source_dir=policy_source.source_dir,
+                policy_path=policy_source.policy_path,
+                model_path=policy_source.model_path,
+                artifact=course_setup.policy_artifact,
+                device=self._device,
+                algorithm=algorithm,
+            )
         loaded_policy = _LoadedPolicy(source=policy_source, runner=runner)
         self._policy_cache[key] = loaded_policy
         return loaded_policy

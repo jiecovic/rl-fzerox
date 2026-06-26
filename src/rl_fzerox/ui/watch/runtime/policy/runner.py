@@ -14,7 +14,21 @@ def _load_policy_runner(
     artifact: str,
     device: str,
     algorithm: str | None = None,
+    policy_path: Path | None = None,
+    model_path: Path | None = None,
 ) -> PolicyRunner | None:
+    if policy_path is not None:
+        from rl_fzerox.core.training.inference import load_policy_runner_from_paths
+
+        source_dir = policy_run_dir or policy_path.parent
+        return load_policy_runner_from_paths(
+            source_dir=source_dir,
+            policy_path=policy_path,
+            model_path=model_path,
+            artifact=artifact,
+            device=device,
+            algorithm=algorithm,
+        )
     if policy_run_dir is None:
         return None
     from rl_fzerox.core.training.inference import load_policy_runner

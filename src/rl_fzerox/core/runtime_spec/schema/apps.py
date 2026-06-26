@@ -86,6 +86,10 @@ class WatchConfig(BaseModel):
     device: Literal["auto", "cpu", "cuda"] = "cpu"
     attempt_seed: int | None = Field(default=None, ge=0, le=(1 << 32) - 1)
     policy_run_dir: Path | None = None
+    policy_path: Path | None = None
+    policy_model_path: Path | None = None
+    engine_tuning_state_path: Path | None = None
+    engine_tuning_model_path: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
     policy_algorithm: TrainAlgorithmName | None = None
     lineage_frame_offset: NonNegativeInt | None = None

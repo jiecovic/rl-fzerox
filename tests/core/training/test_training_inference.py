@@ -232,11 +232,68 @@ def test_policy_runner_reloads_updated_policy_artifact(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference.reload._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None, model_path=None, device="cpu", algorithm=None: _FakePolicy(
+            [4, 1]
+        ),
     )
 
     assert _array_action(runner.predict(observation)).tolist() == [4, 1]
     assert runner.reload_age_seconds < 1.0
+
+
+def test_policy_runner_fixed_path_reload_uses_explicit_model_path(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    checkpoint_dir = tmp_path / "imported" / "checkpoint"
+    checkpoint_dir.mkdir(parents=True)
+    policy_path = checkpoint_dir / "policy.zip"
+    model_path = checkpoint_dir / "model.zip"
+    policy_path.write_bytes(b"v1")
+    model_path.write_bytes(b"model")
+
+    loaded_policy = LoadedPolicy(
+        run_dir=tmp_path / "imported",
+        policy_path=policy_path,
+        artifact="best",
+        reload_source="path",
+        model_path=model_path,
+    )
+    runner = PolicyRunner(loaded_policy, _FakePolicy([2, 0]))
+    loaded_model_paths: list[Path | None] = []
+
+    policy_path.write_bytes(b"v2")
+    stat = policy_path.stat()
+    os.utime(policy_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
+
+    def fail_artifact_resolution(run_dir: Path, *, artifact: str) -> Path:
+        raise AssertionError(f"fixed-path reload resolved {artifact} under {run_dir}")
+
+    def fake_load_policy(
+        path: Path,
+        *,
+        run_dir: Path | None = None,
+        model_path: Path | None = None,
+        device: str = "cpu",
+        algorithm: str | None = None,
+    ) -> _FakePolicy:
+        del path, run_dir, device, algorithm
+        loaded_model_paths.append(model_path)
+        return _FakePolicy([4, 1])
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.inference.reload.resolve_policy_artifact_path",
+        fail_artifact_resolution,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.inference.reload._load_saved_policy",
+        fake_load_policy,
+    )
+
+    observation = np.zeros((84, 116, 12), dtype=np.uint8)
+
+    assert _array_action(runner.predict(observation)).tolist() == [4, 1]
+    assert loaded_model_paths == [model_path]
 
 
 def test_policy_runner_reports_reload_age_since_initial_load(tmp_path: Path) -> None:
@@ -525,9 +582,9 @@ def test_policy_runner_exposes_reload_error_until_success(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference.reload._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu", algorithm=None: (_ for _ in ()).throw(
-            RuntimeError("bad checkpoint")
-        ),
+        lambda path, *, run_dir=None, model_path=None, device="cpu", algorithm=None: (
+            _ for _ in ()
+        ).throw(RuntimeError("bad checkpoint")),
     )
 
     observation = np.zeros((84, 116, 12), dtype=np.uint8)
@@ -537,7 +594,9 @@ def test_policy_runner_exposes_reload_error_until_success(
 
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference.reload._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None, model_path=None, device="cpu", algorithm=None: _FakePolicy(
+            [4, 1]
+        ),
     )
 
     assert _array_action(runner.predict(observation)).tolist() == [4, 1]

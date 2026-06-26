@@ -123,6 +123,8 @@ def _required_policy_source_kind(value: object) -> PolicySourceKind:
             return "run"
         case "evaluation":
             return "evaluation"
+        case "checkpoint":
+            return "checkpoint"
     raise ValueError(f"course setup has invalid policy source kind: {value!r}")
 
 

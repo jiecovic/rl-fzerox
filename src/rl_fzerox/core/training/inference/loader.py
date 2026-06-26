@@ -41,6 +41,7 @@ def _load_saved_policy(
     policy_path: Path,
     *,
     run_dir: Path | None = None,
+    model_path: Path | None = None,
     device: str = "cpu",
     algorithm: str | None = None,
 ) -> _HasPredict:
@@ -50,14 +51,18 @@ def _load_saved_policy(
 
     algorithm = _load_saved_policy_algorithm(run_dir, explicit_algorithm=algorithm)
     if algorithm in TRAINING_ALGORITHMS.full_model_policy:
-        if run_dir is None:
-            raise RuntimeError(f"{algorithm} policy loading requires the source run directory")
+        resolved_model_path = model_path
+        if resolved_model_path is None:
+            if run_dir is None:
+                raise RuntimeError(
+                    f"{algorithm} policy loading requires a model path or source run directory"
+                )
+            resolved_model_path = resolve_model_artifact_path(
+                run_dir,
+                artifact=_artifact_kind_from_policy_path(policy_path),
+            )
         algorithm_class = _full_model_class_for_algorithm(algorithm)
-        model_path = resolve_model_artifact_path(
-            run_dir,
-            artifact=_artifact_kind_from_policy_path(policy_path),
-        )
-        loaded_model = algorithm_class.load(str(model_path), device=device)
+        loaded_model = algorithm_class.load(str(resolved_model_path), device=device)
         if not _has_predict(loaded_model):
             raise TypeError("Loaded model does not expose a compatible predict(...)")
         return loaded_model

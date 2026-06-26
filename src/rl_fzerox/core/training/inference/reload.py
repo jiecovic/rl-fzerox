@@ -70,13 +70,16 @@ class PolicyHotReloader:
         even when the in-memory policy object can be reused.
         """
 
-        try:
-            policy_path = resolve_policy_artifact_path(
-                self._loaded_policy.run_dir,
-                artifact=self._loaded_policy.artifact,
-            )
-        except FileNotFoundError:
-            return PolicyReloadResult(policy=policy, policy_changed=False)
+        if self._loaded_policy.reload_source == "artifact":
+            try:
+                policy_path = resolve_policy_artifact_path(
+                    self._loaded_policy.run_dir,
+                    artifact=self._loaded_policy.artifact,
+                )
+            except FileNotFoundError:
+                return PolicyReloadResult(policy=policy, policy_changed=False)
+        else:
+            policy_path = self._loaded_policy.policy_path
 
         policy_mtime_ns = _policy_mtime_ns(policy_path)
         policy_changed = (
@@ -97,6 +100,7 @@ class PolicyHotReloader:
                 next_policy = _load_saved_policy(
                     policy_path,
                     run_dir=self._loaded_policy.run_dir,
+                    model_path=self._loaded_policy.model_path,
                     device=self._loaded_policy.device,
                     algorithm=self._loaded_policy.algorithm,
                 )
@@ -112,6 +116,8 @@ class PolicyHotReloader:
             run_dir=self._loaded_policy.run_dir,
             policy_path=policy_path,
             artifact=self._loaded_policy.artifact,
+            reload_source=self._loaded_policy.reload_source,
+            model_path=self._loaded_policy.model_path,
             device=self._loaded_policy.device,
             algorithm=self._loaded_policy.algorithm,
             **_loaded_policy_metadata_fields(policy_path=policy_path),

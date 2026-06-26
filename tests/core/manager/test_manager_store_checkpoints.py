@@ -102,6 +102,55 @@ def test_manager_store_rejects_duplicate_published_checkpoint(
     assert not (tmp_path / "other-checkpoints").exists()
 
 
+def test_manager_store_resolves_published_checkpoint_policy_source(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    bundle_path = tmp_path / "blue-falcon.zip"
+    payloads = _payloads()
+    _write_bundle(bundle_path, manifest=_manifest(payloads), payloads=payloads)
+    checkpoint = store.import_published_checkpoint_bundle(bundle_path=bundle_path)
+
+    policy_source = store.resolve_policy_source(
+        policy_source_kind="checkpoint",
+        policy_source_id=checkpoint.id,
+        policy_artifact="best",
+        require_policy_artifact=True,
+    )
+
+    assert policy_source.kind == "checkpoint"
+    assert policy_source.id == checkpoint.id
+    assert policy_source.mutable is False
+    assert policy_source.source_dir == checkpoint.import_dir
+    assert policy_source.policy_path == checkpoint.policy_path
+    assert policy_source.model_path == checkpoint.model_path
+    assert policy_source.engine_tuning_state_path == checkpoint.engine_tuning_state_path
+    assert policy_source.engine_tuning_model_path == checkpoint.engine_tuning_model_path
+    assert policy_source.lineage_num_timesteps == checkpoint.lineage_num_timesteps
+
+
+def test_manager_store_save_course_setup_accepts_published_checkpoint(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    bundle_path = tmp_path / "blue-falcon.zip"
+    payloads = _payloads()
+    _write_bundle(bundle_path, manifest=_manifest(payloads), payloads=payloads)
+    checkpoint = store.import_published_checkpoint_bundle(bundle_path=bundle_path)
+    save_game = store.create_save_game(name="Unlock Save", save_games_root=tmp_path / "saves")
+
+    setup = store.upsert_save_course_setup(
+        save_game_id=save_game.id,
+        cup_id="jack",
+        course_id="mute_city",
+        policy_source_kind="checkpoint",
+        policy_source_id=checkpoint.id,
+        policy_artifact="best",
+    )
+
+    assert setup.policy_source_kind == "checkpoint"
+    assert setup.policy_source_id == checkpoint.id
+    assert store.list_save_course_setups(save_game.id) == (setup,)
+
+
 def _payloads() -> dict[str, bytes]:
     return {
         "checkpoint/policy.zip": b"policy",

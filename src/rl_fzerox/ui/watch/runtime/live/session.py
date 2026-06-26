@@ -13,7 +13,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fzerox_emulator import Emulator
+from rl_fzerox.core.engine_tuning import EngineTuningRuntimeState
 from rl_fzerox.core.engine_tuning.contexts import engine_tuning_contexts_for_track_sampling
+from rl_fzerox.core.engine_tuning.persistence import load_engine_tuning_runtime_state
 from rl_fzerox.core.engine_tuning.training import EngineTuningTrainingController
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
@@ -76,6 +78,8 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
         artifact=config.watch.policy_artifact,
         device=config.watch.device,
         algorithm=config.watch.policy_algorithm,
+        policy_path=config.watch.policy_path,
+        model_path=config.watch.policy_model_path,
     )
 
     native_control_fps = env.backend.native_fps / config.env.action_repeat
@@ -125,13 +129,23 @@ class WatchEngineTuningStateCache:
             return
         contexts = engine_tuning_contexts_for_track_sampling(track_sampling)
         policy_path = _watch_policy_artifact_path(self.config)
+        engine_state_path, engine_model_path = _watch_engine_tuning_paths(
+            self.config,
+            policy_path=policy_path,
+        )
         signature = _engine_tuning_signature(
             policy_path=policy_path,
+            engine_state_path=engine_state_path,
+            engine_model_path=engine_model_path,
             context_keys=tuple(context.key for context in contexts),
         )
         if signature == self._signature:
             return
-        state = None if policy_path is None else load_engine_tuning_checkpoint_state(policy_path)
+        state = _watch_engine_tuning_state(
+            policy_path=policy_path,
+            engine_state_path=engine_state_path,
+            engine_model_path=engine_model_path,
+        )
         controller = EngineTuningTrainingController(
             track_sampling.engine_tuning,
             state=state,
@@ -141,6 +155,8 @@ class WatchEngineTuningStateCache:
 
 
 def _watch_policy_artifact_path(config: WatchAppConfig) -> Path | None:
+    if config.watch.policy_path is not None:
+        return config.watch.policy_path
     if config.watch.policy_run_dir is None:
         return None
     try:
@@ -152,12 +168,39 @@ def _watch_policy_artifact_path(config: WatchAppConfig) -> Path | None:
         return None
 
 
+def _watch_engine_tuning_paths(
+    config: WatchAppConfig,
+    *,
+    policy_path: Path | None,
+) -> tuple[Path | None, Path | None]:
+    if config.watch.engine_tuning_state_path is not None:
+        return (config.watch.engine_tuning_state_path, config.watch.engine_tuning_model_path)
+    if policy_path is None:
+        return (None, None)
+    return (engine_tuning_checkpoint_path(policy_path), engine_tuning_model_path(policy_path))
+
+
+def _watch_engine_tuning_state(
+    *,
+    policy_path: Path | None,
+    engine_state_path: Path | None,
+    engine_model_path: Path | None,
+) -> EngineTuningRuntimeState | None:
+    if engine_state_path is not None:
+        return load_engine_tuning_runtime_state(engine_state_path, model_path=engine_model_path)
+    if policy_path is None:
+        return None
+    return load_engine_tuning_checkpoint_state(policy_path)
+
+
 def _engine_tuning_signature(
     *,
     policy_path: Path | None,
+    engine_state_path: Path | None,
+    engine_model_path: Path | None,
     context_keys: tuple[str, ...],
 ) -> _EngineTuningFileSignature:
-    if policy_path is None:
+    if engine_state_path is None:
         return _EngineTuningFileSignature(
             policy_path=None,
             state_mtime_ns=None,
@@ -166,8 +209,11 @@ def _engine_tuning_signature(
             model_size=None,
             context_keys=context_keys,
         )
-    state_mtime_ns, state_size = _file_identity(engine_tuning_checkpoint_path(policy_path))
-    model_mtime_ns, model_size = _file_identity(engine_tuning_model_path(policy_path))
+    state_mtime_ns, state_size = _file_identity(engine_state_path)
+    if engine_model_path is None:
+        model_mtime_ns, model_size = (None, None)
+    else:
+        model_mtime_ns, model_size = _file_identity(engine_model_path)
     return _EngineTuningFileSignature(
         policy_path=policy_path,
         state_mtime_ns=state_mtime_ns,

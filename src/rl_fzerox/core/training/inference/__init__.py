@@ -7,6 +7,7 @@ from rl_fzerox.core.training.inference.activations import PolicyCnnActivation
 from rl_fzerox.core.training.inference.runner import (
     PolicyRunner,
     load_policy_runner,
+    load_policy_runner_from_paths,
 )
 from rl_fzerox.core.training.inference.types import LoadedPolicy
 
@@ -15,4 +16,5 @@ __all__ = [
     "PolicyCnnActivation",
     "PolicyRunner",
     "load_policy_runner",
+    "load_policy_runner_from_paths",
 ]
