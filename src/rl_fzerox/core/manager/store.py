@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -225,14 +224,6 @@ class ManagerStore(RunStoreMixin, EvaluationStoreMixin, SaveGameStoreMixin):
         from rl_fzerox.core.manager.registry.common import utc_now
 
         return utc_now()
-
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path, timeout=30.0)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA journal_mode = WAL")
-        connection.execute("PRAGMA busy_timeout = 30000")
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
 
     def _manager_engine(self) -> Engine:
         if self._orm_engine is None:

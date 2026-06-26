@@ -7,8 +7,10 @@ import shutil
 import zipfile
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError as SqlAlchemyIntegrityError
 
+from rl_fzerox.core.manager.db.models.runs import RunEventModel
 from rl_fzerox.core.manager.models import ManagedRun, ManagedRunRuntime
 from rl_fzerox.core.manager.store import ManagerStore
 from rl_fzerox.core.manager.transfer.errors import RunBundleError
@@ -210,21 +212,19 @@ def _runtime_for_bundle(runtime: ManagedRunRuntime | None) -> RunBundleRuntime |
 
 def _events_for_bundle(store: ManagerStore, run_id: str) -> tuple[RunBundleEvent, ...]:
     store.initialize()
-    with store._connect() as connection:
-        rows = connection.execute(
-            """
-            SELECT created_at, kind, message
-            FROM run_events
-            WHERE run_id = ?
-            ORDER BY created_at ASC, id ASC
-            """,
-            (run_id,),
-        ).fetchall()
+    with store._orm_session() as session:
+        rows = tuple(
+            session.scalars(
+                select(RunEventModel)
+                .where(RunEventModel.run_id == run_id)
+                .order_by(RunEventModel.created_at.asc(), RunEventModel.id.asc())
+            )
+        )
     return tuple(
         RunBundleEvent(
-            created_at=str(row["created_at"]),
-            kind=str(row["kind"]),
-            message=str(row["message"]),
+            created_at=row.created_at,
+            kind=row.kind,
+            message=row.message,
         )
         for row in rows
     )

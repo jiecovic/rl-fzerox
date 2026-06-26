@@ -166,16 +166,36 @@ const PolicySourceOptions = memo(function PolicySourceOptions({
 }: {
   policySources: readonly PolicySourceOption[];
 }) {
+  const runSources = policySources.filter((source) => source.kind === "run");
+  const evaluationSources = policySources.filter((source) => source.kind === "evaluation");
   return (
     <>
+      <PolicySourceOptionGroup label="Run" policySources={runSources} />
+      <PolicySourceOptionGroup label="Evaluation" policySources={evaluationSources} />
+    </>
+  );
+});
+
+function PolicySourceOptionGroup({
+  label,
+  policySources,
+}: {
+  label: string;
+  policySources: readonly PolicySourceOption[];
+}) {
+  if (policySources.length === 0) {
+    return null;
+  }
+  return (
+    <optgroup label={label}>
       {policySources.map((source) => (
         <option key={policySourceOptionKey(source)} value={policySourceOptionKey(source)}>
           {source.label}
         </option>
       ))}
-    </>
+    </optgroup>
   );
-});
+}
 
 export function VehicleDraftSelect({
   disabled,
