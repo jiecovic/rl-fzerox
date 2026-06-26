@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         default_imported_checkpoint_root,
         import_checkpoint_bundle,
         read_checkpoint_bundle_manifest,
+        validate_checkpoint_bundle_archive,
     )
     from rl_fzerox.core.manager.checkpoints.manifest import (
         CHECKPOINT_BUNDLE_LAYOUT,
@@ -43,6 +44,15 @@ if TYPE_CHECKING:
         package_checkpoint_bundle,
         package_evaluation_checkpoint_bundle,
     )
+    from rl_fzerox.core.manager.checkpoints.release import (
+        CheckpointCatalogWriteResult,
+        CheckpointReleaseError,
+        checkpoint_catalog_entry_for_bundle,
+        github_release_upload_command,
+        make_github_release_asset_url,
+        sha256_file,
+        write_checkpoint_catalog_entry,
+    )
 
 _EXPORT_MODULES = {
     "CHECKPOINT_CATALOG_LAYOUT": "rl_fzerox.core.manager.checkpoints.catalog",
@@ -51,6 +61,7 @@ _EXPORT_MODULES = {
     "CheckpointCatalogBundle": "rl_fzerox.core.manager.checkpoints.catalog",
     "CheckpointCatalogEntry": "rl_fzerox.core.manager.checkpoints.catalog",
     "CheckpointCatalogError": "rl_fzerox.core.manager.checkpoints.catalog",
+    "CheckpointCatalogWriteResult": "rl_fzerox.core.manager.checkpoints.release",
     "CheckpointBundleCheckpoint": "rl_fzerox.core.manager.checkpoints.manifest",
     "CheckpointBundleCompatibility": "rl_fzerox.core.manager.checkpoints.manifest",
     "CheckpointBundleFile": "rl_fzerox.core.manager.checkpoints.manifest",
@@ -62,10 +73,14 @@ _EXPORT_MODULES = {
     "CheckpointBundlePackageError": "rl_fzerox.core.manager.checkpoints.package",
     "CheckpointBundlePackageResult": "rl_fzerox.core.manager.checkpoints.package",
     "CheckpointBundleSourceArtifact": "rl_fzerox.core.manager.checkpoints.manifest",
+    "CheckpointReleaseError": "rl_fzerox.core.manager.checkpoints.release",
+    "checkpoint_catalog_entry_for_bundle": "rl_fzerox.core.manager.checkpoints.release",
     "default_checkpoint_catalog_path": "rl_fzerox.core.manager.checkpoints.catalog",
     "default_checkpoint_bundle_path": "rl_fzerox.core.manager.checkpoints.package",
     "default_imported_checkpoint_root": "rl_fzerox.core.manager.checkpoints.import_bundle",
+    "github_release_upload_command": "rl_fzerox.core.manager.checkpoints.release",
     "import_checkpoint_bundle": "rl_fzerox.core.manager.checkpoints.import_bundle",
+    "make_github_release_asset_url": "rl_fzerox.core.manager.checkpoints.release",
     "package_checkpoint_bundle": "rl_fzerox.core.manager.checkpoints.package",
     "package_evaluation_checkpoint_bundle": "rl_fzerox.core.manager.checkpoints.package",
     "parse_checkpoint_catalog_json": "rl_fzerox.core.manager.checkpoints.catalog",
@@ -73,6 +88,9 @@ _EXPORT_MODULES = {
     "read_checkpoint_bundle_manifest": "rl_fzerox.core.manager.checkpoints.import_bundle",
     "serialize_checkpoint_catalog_json": "rl_fzerox.core.manager.checkpoints.catalog",
     "serialize_checkpoint_bundle_manifest_json": "rl_fzerox.core.manager.checkpoints.manifest",
+    "sha256_file": "rl_fzerox.core.manager.checkpoints.release",
+    "validate_checkpoint_bundle_archive": "rl_fzerox.core.manager.checkpoints.import_bundle",
+    "write_checkpoint_catalog_entry": "rl_fzerox.core.manager.checkpoints.release",
 }
 
 __all__ = [
@@ -82,6 +100,7 @@ __all__ = [
     "CheckpointCatalogBundle",
     "CheckpointCatalogEntry",
     "CheckpointCatalogError",
+    "CheckpointCatalogWriteResult",
     "CheckpointBundleCheckpoint",
     "CheckpointBundleCompatibility",
     "CheckpointBundleFile",
@@ -93,10 +112,14 @@ __all__ = [
     "CheckpointBundlePackageError",
     "CheckpointBundlePackageResult",
     "CheckpointBundleSourceArtifact",
+    "CheckpointReleaseError",
+    "checkpoint_catalog_entry_for_bundle",
     "default_checkpoint_catalog_path",
     "default_checkpoint_bundle_path",
     "default_imported_checkpoint_root",
+    "github_release_upload_command",
     "import_checkpoint_bundle",
+    "make_github_release_asset_url",
     "package_checkpoint_bundle",
     "package_evaluation_checkpoint_bundle",
     "parse_checkpoint_catalog_json",
@@ -104,6 +127,9 @@ __all__ = [
     "read_checkpoint_bundle_manifest",
     "serialize_checkpoint_catalog_json",
     "serialize_checkpoint_bundle_manifest_json",
+    "sha256_file",
+    "validate_checkpoint_bundle_archive",
+    "write_checkpoint_catalog_entry",
 ]
 
 

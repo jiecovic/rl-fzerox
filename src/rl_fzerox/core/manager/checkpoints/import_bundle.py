@@ -68,6 +68,34 @@ def read_checkpoint_bundle_manifest(bundle_path: Path) -> CheckpointBundleManife
         raise CheckpointBundleImportError(f"could not read checkpoint bundle: {exc}") from exc
 
 
+def validate_checkpoint_bundle_archive(
+    *,
+    bundle_path: Path,
+    max_payload_bytes: int = MAX_CHECKPOINT_BUNDLE_PAYLOAD_BYTES,
+    max_payload_files: int = MAX_CHECKPOINT_BUNDLE_PAYLOAD_FILES,
+) -> CheckpointBundleManifest:
+    """Validate one checkpoint ZIP without copying files into manager storage."""
+
+    archive_path = bundle_path.expanduser().resolve()
+    if not archive_path.is_file():
+        raise CheckpointBundleImportError(f"checkpoint bundle does not exist: {archive_path}")
+    try:
+        with zipfile.ZipFile(archive_path, mode="r") as archive:
+            manifest = _read_manifest(archive)
+            _validate_archive_members(
+                archive,
+                manifest=manifest,
+                max_payload_bytes=max_payload_bytes,
+                max_payload_files=max_payload_files,
+            )
+            _verify_payload_hashes(archive, manifest=manifest)
+            return manifest
+    except CheckpointBundleImportError:
+        raise
+    except Exception as exc:
+        raise CheckpointBundleImportError(f"could not validate checkpoint bundle: {exc}") from exc
+
+
 def import_checkpoint_bundle(
     *,
     bundle_path: Path,
@@ -232,6 +260,15 @@ def _extract_payloads(
         target_path.write_bytes(data)
         extracted.append(target_path)
     return tuple(extracted)
+
+
+def _verify_payload_hashes(
+    archive: zipfile.ZipFile,
+    *,
+    manifest: CheckpointBundleManifest,
+) -> None:
+    for bundle_file in manifest.files:
+        _verified_payload_bytes(archive, bundle_file)
 
 
 def _verified_payload_bytes(
