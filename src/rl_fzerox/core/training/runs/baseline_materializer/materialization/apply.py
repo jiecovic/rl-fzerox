@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +12,9 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
     TrainAppConfig,
+)
+from rl_fzerox.core.runtime_spec.track_sampling_variants import (
+    expanded_baseline_variant_entries,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.cache import sha256_file
 from rl_fzerox.core.training.runs.baseline_materializer.materialization.baselines import (
@@ -225,7 +227,7 @@ def _materialize_track_sampling(
 
     if not config.entries:
         return config
-    entries_to_materialize = _expanded_baseline_variant_entries(
+    entries_to_materialize = expanded_baseline_variant_entries(
         config.entries,
         baseline_variant_count=config.baseline_variant_count,
     )
@@ -271,88 +273,6 @@ def _materialize_track_sampling(
         ),
     )
     return config.model_copy(update={"entries": tuple(entries)})
-
-
-def _expanded_baseline_variant_entries(
-    entries: tuple[TrackSamplingEntryConfig, ...],
-    *,
-    baseline_variant_count: int,
-) -> tuple[TrackSamplingEntryConfig, ...]:
-    if baseline_variant_count <= 1:
-        return entries
-    expanded: list[TrackSamplingEntryConfig] = []
-    for entry in entries:
-        if not _entry_supports_baseline_variants(entry):
-            expanded.append(entry)
-            continue
-        expanded.extend(
-            _baseline_variant_entry(
-                entry,
-                baseline_variant_index=variant_index,
-                baseline_variant_count=baseline_variant_count,
-            )
-            for variant_index in range(baseline_variant_count)
-        )
-    return tuple(expanded)
-
-
-def _entry_supports_baseline_variants(entry: TrackSamplingEntryConfig) -> bool:
-    # Only built-in GP race starts have shuffled opponent grids. Time Attack has
-    # no opponents, X Cup already gets course-generation seeds, and alt
-    # baselines should preserve the captured state exactly.
-    return (
-        entry.mode == "gp_race"
-        and entry.baseline_variant_index is None
-        and entry.alt_baseline_id is None
-        and entry.generated_course_kind is None
-        and entry.course_index is not None
-        and entry.vehicle is not None
-    )
-
-
-def _baseline_variant_entry(
-    entry: TrackSamplingEntryConfig,
-    *,
-    baseline_variant_index: int,
-    baseline_variant_count: int,
-) -> TrackSamplingEntryConfig:
-    # Variant entries share a scheduler group, so course-level weight overrides
-    # still target one course while resets fan out across its materialized grids.
-    update: dict[str, object] = {
-        "weight": float(entry.weight) / baseline_variant_count,
-        "baseline_group_id": entry.baseline_group_id or entry.id,
-        "baseline_group_weight": 1.0,
-        "baseline_variant_index": baseline_variant_index,
-        "baseline_variant_count": baseline_variant_count,
-    }
-    if baseline_variant_index > 0:
-        update["id"] = f"{entry.id}__variant_{baseline_variant_index + 1}"
-        update["baseline_variant_seed"] = _baseline_variant_seed(
-            entry,
-            baseline_variant_index=baseline_variant_index,
-        )
-    return entry.model_copy(update=update)
-
-
-def _baseline_variant_seed(
-    entry: TrackSamplingEntryConfig,
-    *,
-    baseline_variant_index: int,
-) -> int:
-    """Derive stable reusable opponent-grid seeds without sharing RNG state."""
-
-    parts = (
-        "baseline_variant",
-        entry.id,
-        str(entry.course_id or ""),
-        str(entry.runtime_course_key or ""),
-        str(entry.course_index if entry.course_index is not None else ""),
-        str(entry.gp_difficulty or ""),
-        str(entry.vehicle or ""),
-        str(baseline_variant_index),
-    )
-    digest = hashlib.blake2s("|".join(parts).encode("utf-8"), digest_size=8).digest()
-    return int.from_bytes(digest, byteorder="big", signed=False)
 
 
 def _materialized_track_sampling_entry(

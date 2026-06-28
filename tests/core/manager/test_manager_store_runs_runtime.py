@@ -18,12 +18,18 @@ from rl_fzerox.core.manager import (
 )
 from rl_fzerox.core.manager.db import manager_session
 from rl_fzerox.core.manager.db.models import RunModel
+from rl_fzerox.core.manager.projection.x_cup_runtime import (
+    restore_track_sampling_config_artifacts,
+)
+from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingAltBaseline,
+    TrackSamplingMaterializedArtifact,
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import reset_variant_key
 from tests.core.manager.manager_store_support import (
     _track_sampling_artifact,
 )
@@ -436,6 +442,54 @@ def test_manager_store_replaces_track_sampling_artifact_rows(tmp_path: Path) -> 
     assert store.get_run_track_sampling_artifacts(run.id) == ()
 
 
+def test_track_sampling_projection_restores_baseline_variant_artifacts(tmp_path: Path) -> None:
+    config = TrackSamplingConfig(
+        enabled=True,
+        baseline_variant_count=2,
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute_city_gp",
+                course_id="mute_city",
+                runtime_course_key="mute_city",
+                course_index=0,
+                mode="gp_race",
+                gp_difficulty="novice",
+                vehicle="blue_falcon",
+                engine_setting_raw_value=50,
+            ),
+        ),
+    )
+    first_path = tmp_path / "baselines" / "mute_city_gp.state"
+    second_path = tmp_path / "baselines" / "mute_city_gp__variant_2.state"
+
+    restored = restore_track_sampling_config_artifacts(
+        config,
+        artifacts=(
+            _baseline_variant_artifact(
+                first_path,
+                entry_id="mute_city_gp",
+                baseline_variant_index=0,
+            ),
+            _baseline_variant_artifact(
+                second_path,
+                entry_id="mute_city_gp__variant_2",
+                baseline_variant_index=1,
+            ),
+        ),
+    )
+
+    assert [entry.id for entry in restored.entries] == [
+        "mute_city_gp",
+        "mute_city_gp__variant_2",
+    ]
+    assert [entry.baseline_variant_index for entry in restored.entries] == [0, 1]
+    assert [entry.baseline_state_path for entry in restored.entries] == [
+        first_path.resolve(),
+        second_path.resolve(),
+    ]
+    assert all(entry.baseline_group_id == "mute_city_gp" for entry in restored.entries)
+
+
 def test_manager_store_replaces_generated_x_cup_slot_rows(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
@@ -483,6 +537,38 @@ def test_manager_store_replaces_generated_x_cup_slot_rows(tmp_path: Path) -> Non
     store.clear_run_track_sampling_state(run.id)
 
     assert store.get_run_generated_x_cup_slots(run.id) == ()
+
+
+def _baseline_variant_artifact(
+    baseline_path: Path,
+    *,
+    entry_id: str,
+    baseline_variant_index: int,
+) -> TrackSamplingMaterializedArtifact:
+    return TrackSamplingMaterializedArtifact(
+        course_key="mute_city",
+        reset_variant_key=reset_variant_key(
+            mode="gp_race",
+            gp_difficulty="novice",
+            vehicle="blue_falcon",
+            baseline_variant_index=baseline_variant_index,
+        ),
+        entry_id=entry_id,
+        baseline_state_path=baseline_path.expanduser().resolve(),
+        metadata_path=baseline_path.with_suffix(".json").expanduser().resolve(),
+        source_course_index=0,
+        source_gp_difficulty="novice",
+        source_vehicle="blue_falcon",
+        source_engine_setting_raw_value=50,
+        generated_course_slot=None,
+        generated_course_generation=None,
+        generated_course_id=None,
+        generated_course_name=None,
+        generated_course_hash=None,
+        generated_course_seed=None,
+        generated_course_segment_count=None,
+        generated_course_length=None,
+    )
 
 
 def test_manager_store_updates_track_sampling_rows_incrementally(tmp_path: Path) -> None:

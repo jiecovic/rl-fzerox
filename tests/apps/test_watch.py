@@ -19,6 +19,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.core.runtime_spec.track_sampling_variants import expanded_baseline_variant_entries
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.ui.watch.app import run_viewer
@@ -291,6 +292,53 @@ def test_resolve_watch_app_config_materializes_missing_track_sampling_baselines(
     assert len(artifacts) == len(config.env.track_sampling.entries)
     assert all(entry.baseline_state_path is not None for entry in config.env.track_sampling.entries)
     assert all(artifact.baseline_state_path.is_file() for artifact in artifacts)
+
+
+def test_watch_baseline_repair_preserves_restored_baseline_variants(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="variant-run",
+        name="Variant Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "variant-run",
+    )
+    run.run_dir.mkdir(parents=True)
+    config = build_managed_train_app_config(run.config, run_id=run.id, run_dir=run.run_dir)
+    entries = []
+    for entry in expanded_baseline_variant_entries(
+        (config.env.track_sampling.entries[0],),
+        baseline_variant_count=2,
+    ):
+        baseline_path = run.run_dir / "baselines" / f"{entry.id}.state"
+        baseline_path.parent.mkdir(parents=True, exist_ok=True)
+        baseline_path.write_bytes(b"state")
+        entries.append(entry.model_copy(update={"baseline_state_path": baseline_path}))
+    track_sampling = config.env.track_sampling.model_copy(
+        update={"baseline_variant_count": 2, "entries": tuple(entries)}
+    )
+    config = config.model_copy(
+        update={"env": config.env.model_copy(update={"track_sampling": track_sampling})}
+    )
+
+    def fail_materializer(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("watch should not materialize restored baseline variants")
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.manager.projection.watch.materialize_train_run_config",
+        fail_materializer,
+    )
+
+    repaired = watch_projection.materialize_missing_watch_baselines(
+        config,
+        store=store,
+        run=run,
+    )
+
+    assert repaired.env.track_sampling.entries == tuple(entries)
 
 
 def test_watch_baseline_repair_materializes_primary_baseline_without_track_sampling(

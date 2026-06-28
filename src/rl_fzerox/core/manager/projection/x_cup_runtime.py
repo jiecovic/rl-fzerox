@@ -12,6 +12,9 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainAppConfig,
 )
 from rl_fzerox.core.runtime_spec.track_sampling_identity import track_sampling_entry_id
+from rl_fzerox.core.runtime_spec.track_sampling_variants import (
+    expanded_baseline_variant_entries,
+)
 from rl_fzerox.core.runtime_spec.x_cup_slots import GeneratedXCupSlot
 from rl_fzerox.core.training.session.callbacks.track_sampling.artifacts import (
     TrackSamplingMaterializedArtifact,
@@ -100,16 +103,20 @@ def restore_track_sampling_config_artifacts(
     artifact_index = track_sampling_artifact_index(artifacts)
     if not artifact_index:
         return config
+    restored_entries = expanded_baseline_variant_entries(
+        config.entries,
+        baseline_variant_count=config.baseline_variant_count,
+    )
     next_entries: list[TrackSamplingEntryConfig] = []
-    changed = False
-    for entry in config.entries:
+    changed = restored_entries != config.entries
+    for entry in restored_entries:
         artifact = artifact_index.get(
             (
                 track_sampling_artifact_course_key(entry),
                 track_sampling_artifact_reset_variant_key(entry),
             )
         )
-        if artifact is None:
+        if artifact is None or not _artifact_matches_entry_identity(entry, artifact):
             next_entries.append(entry)
             continue
         next_entry = _restore_entry_artifact(entry, artifact)
@@ -201,3 +208,18 @@ def _restore_entry_artifact(
     if artifact.generated_course_seed is not None:
         update["generated_course_seed"] = artifact.generated_course_seed
     return entry.model_copy(update=update)
+
+
+def _artifact_matches_entry_identity(
+    entry: TrackSamplingEntryConfig,
+    artifact: TrackSamplingMaterializedArtifact,
+) -> bool:
+    if entry.generated_course_kind != X_CUP_COURSE.generated_kind:
+        return True
+    return (
+        artifact.generated_course_slot == entry.generated_course_slot
+        and artifact.generated_course_generation == entry.generated_course_generation
+        and artifact.generated_course_id == entry.course_id
+        and artifact.generated_course_hash == entry.generated_course_hash
+        and artifact.generated_course_seed == entry.generated_course_seed
+    )

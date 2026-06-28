@@ -19,6 +19,9 @@ from rl_fzerox.core.runtime_spec.schema import (
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.core.runtime_spec.track_sampling_variants import (
+    entry_supports_baseline_variants,
+)
 from rl_fzerox.core.runtime_spec.watch_overrides import (
     apply_watch_config_delta,
     watch_config_delta_from_dotlist,
@@ -259,15 +262,7 @@ def _entry_needs_baseline_variant_expansion(
     config: TrackSamplingConfig,
     entry: TrackSamplingEntryConfig,
 ) -> bool:
-    return (
-        config.baseline_variant_count > 1
-        and entry.baseline_variant_index is None
-        and entry.mode == "gp_race"
-        and entry.alt_baseline_id is None
-        and entry.generated_course_kind is None
-        and entry.course_index is not None
-        and entry.vehicle is not None
-    )
+    return config.baseline_variant_count > 1 and entry_supports_baseline_variants(entry)
 
 
 def _primary_baseline_needs_materialization(config: TrainAppConfig) -> bool:
