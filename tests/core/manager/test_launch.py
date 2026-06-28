@@ -30,6 +30,7 @@ from rl_fzerox.core.engine_tuning import (
     save_engine_tuning_runtime_state,
 )
 from rl_fzerox.core.manager import (
+    ManagedPublishedCheckpoint,
     ManagedRun,
     ManagedRunConfig,
     ManagerStore,
@@ -246,7 +247,7 @@ def test_fork_published_checkpoint_run_snapshot_creates_child_run(
     assert child.source_artifact == "best"
     assert child.source_snapshot_dir is not None
     assert child.source_num_timesteps == checkpoint.local_num_timesteps
-    assert child.lineage_step_offset == checkpoint.lineage_num_timesteps
+    assert child.lineage_step_offset == checkpoint.local_num_timesteps
     assert child.lineage_id == checkpoint.id
     assert (child.source_snapshot_dir / RUN_LAYOUT.policy_artifacts.best).read_bytes() == b"policy"
     assert (child.source_snapshot_dir / RUN_LAYOUT.model_artifacts.best).read_bytes() == b"model"
@@ -258,7 +259,7 @@ def test_fork_published_checkpoint_run_snapshot_creates_child_run(
     assert train_config.train.resume_artifact == "best"
     assert train_config.policy.auxiliary_state.enabled is True
     assert train_config.train.resume_source_auxiliary_state_enabled is False
-    assert train_config.train.tensorboard_step_offset == checkpoint.lineage_num_timesteps
+    assert train_config.train.tensorboard_step_offset == checkpoint.local_num_timesteps
 
 
 def test_fork_without_explicit_config_resets_action_bias_deltas(tmp_path: Path) -> None:
@@ -771,6 +772,34 @@ def test_watch_artifact_skips_duplicate_materialization_launch(
     assert status == "already_running"
 
 
+def test_watch_artifact_rejects_unpublished_checkpoint_snapshot_artifact(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    checkpoint = _import_checkpoint_with_stale_latest_artifact(store, tmp_path)
+    launcher = ManagerRunLauncher(store)
+
+    with pytest.raises(ValueError, match="only exposes 'best', got 'latest'"):
+        launcher.watch_artifact(
+            run_id=checkpoint.run_id,
+            artifact="latest",
+            device="cpu",
+            renderer=None,
+            deterministic_policy=True,
+        )
+
+
+def test_fork_rejects_unpublished_checkpoint_snapshot_artifact(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    checkpoint = _import_checkpoint_with_stale_latest_artifact(store, tmp_path)
+    launcher = ManagerRunLauncher(store)
+
+    with pytest.raises(ValueError, match="only exposes 'best', got 'latest'"):
+        launcher.fork(run_id=checkpoint.run_id, artifact="latest")
+
+
 def test_active_watch_pid_clears_stale_viewer_lease(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1254,6 +1283,23 @@ def _write_latest_checkpoint(run_dir: Path) -> None:
         '{"num_timesteps": 816040}\n',
         encoding="utf-8",
     )
+
+
+def _import_checkpoint_with_stale_latest_artifact(
+    store: ManagerStore,
+    tmp_path: Path,
+) -> ManagedPublishedCheckpoint:
+    bundle_path = tmp_path / "blue-falcon.zip"
+    payloads = _payloads()
+    _write_bundle(bundle_path, manifest=_manifest(payloads), payloads=payloads)
+    checkpoint = store.import_published_checkpoint_bundle(bundle_path=bundle_path)
+    stale_latest_policy = checkpoint.import_dir / RUN_LAYOUT.policy_artifacts.latest
+    stale_latest_model = checkpoint.import_dir / RUN_LAYOUT.model_artifacts.latest
+    stale_latest_policy.parent.mkdir(parents=True, exist_ok=True)
+    stale_latest_model.parent.mkdir(parents=True, exist_ok=True)
+    stale_latest_policy.write_bytes(b"stale policy")
+    stale_latest_model.write_bytes(b"stale model")
+    return checkpoint
 
 
 def _bandit_engine_config() -> ManagedRunConfig:

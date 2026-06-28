@@ -4,6 +4,7 @@
 from rl_fzerox.core.manager.db.repositories.checkpoints.records import (
     delete_published_checkpoint,
     get_published_checkpoint,
+    get_published_checkpoint_by_run_id,
     insert_published_checkpoint,
     list_published_checkpoints,
     update_published_checkpoint_snapshot,
@@ -12,6 +13,7 @@ from rl_fzerox.core.manager.db.repositories.checkpoints.records import (
 __all__ = [
     "delete_published_checkpoint",
     "get_published_checkpoint",
+    "get_published_checkpoint_by_run_id",
     "insert_published_checkpoint",
     "list_published_checkpoints",
     "update_published_checkpoint_snapshot",

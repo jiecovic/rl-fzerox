@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import rl_fzerox.apps.run_manager.api.handlers.checkpoints as manager_api_checkpoints
+from rl_fzerox.apps.run_manager.api.handlers.common import run_response
 from rl_fzerox.apps.run_manager.api.handlers.runs import runs_live_payload, runs_payload
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.manager.checkpoints import (
@@ -15,6 +16,7 @@ from rl_fzerox.core.manager.checkpoints import (
     CheckpointCatalogEntry,
     serialize_checkpoint_catalog_json,
 )
+from rl_fzerox.core.training.runs import RUN_LAYOUT
 from tests.core.manager.manager_api_support import _client
 from tests.core.manager.test_manager_store_checkpoints import _manifest, _payloads, _write_bundle
 
@@ -72,12 +74,37 @@ async def test_manager_api_installs_checkpoint_catalog_entry(
     assert payload["checkpoint"]["run_id"] == "checkpoint-blue-falcon-fine-tuned-v1"
     assert payload["checkpoint"]["run"]["id"] == "checkpoint-blue-falcon-fine-tuned-v1"
     assert payload["checkpoint"]["run"]["status"] == "archived"
+    assert payload["checkpoint"]["run"]["lineage_step_offset"] == 0
     assert payload["checkpoint"]["run"]["available_policy_artifacts"] == ["best"]
     assert payload["checkpoint"]["config"]["version"] == 1
     assert payload["checkpoint"]["import_dir"].endswith(
         "manager/checkpoints/blue-falcon-fine-tuned/v1"
     )
     assert store.get_published_checkpoint("blue-falcon-fine-tuned-v1") is not None
+
+
+def test_manager_api_checkpoint_run_payload_uses_published_artifact_record(
+    tmp_path: Path,
+) -> None:
+    bundle_path = tmp_path / "blue-falcon.zip"
+    payloads = _payloads()
+    _write_bundle(bundle_path, manifest=_manifest(payloads), payloads=payloads)
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    checkpoint = store.import_published_checkpoint_bundle(bundle_path=bundle_path)
+
+    stale_latest_policy = checkpoint.import_dir / RUN_LAYOUT.policy_artifacts.latest
+    stale_latest_model = checkpoint.import_dir / RUN_LAYOUT.model_artifacts.latest
+    stale_latest_policy.parent.mkdir(parents=True, exist_ok=True)
+    stale_latest_model.parent.mkdir(parents=True, exist_ok=True)
+    stale_latest_policy.write_bytes(b"stale policy")
+    stale_latest_model.write_bytes(b"stale model")
+
+    run = store.get_run(checkpoint.run_id)
+    assert run is not None
+    payload = run_response(store, run)
+
+    assert payload["run"]["id"] == checkpoint.run_id
+    assert payload["run"]["available_policy_artifacts"] == ["best"]
 
 
 async def test_manager_api_catalog_includes_installed_checkpoint_run(

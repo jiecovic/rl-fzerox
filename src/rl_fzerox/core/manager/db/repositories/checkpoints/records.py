@@ -85,6 +85,18 @@ def get_published_checkpoint(
     return None if checkpoint is None else published_checkpoint_from_model(checkpoint)
 
 
+def get_published_checkpoint_by_run_id(
+    session: Session,
+    run_id: str,
+) -> ManagedPublishedCheckpoint | None:
+    """Return one installed checkpoint by its archived run snapshot id."""
+
+    checkpoint = session.scalar(
+        select(PublishedCheckpointModel).where(PublishedCheckpointModel.run_id == run_id).limit(1)
+    )
+    return None if checkpoint is None else published_checkpoint_from_model(checkpoint)
+
+
 def list_published_checkpoints(session: Session) -> tuple[ManagedPublishedCheckpoint, ...]:
     """Return installed checkpoints in manager display order."""
 

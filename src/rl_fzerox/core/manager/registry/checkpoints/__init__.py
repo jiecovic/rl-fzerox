@@ -4,6 +4,7 @@
 from rl_fzerox.core.manager.registry.checkpoints.records import (
     delete_published_checkpoint,
     get_published_checkpoint,
+    get_published_checkpoint_by_run_id,
     import_published_checkpoint_bundle,
     list_published_checkpoints,
 )
@@ -11,6 +12,7 @@ from rl_fzerox.core.manager.registry.checkpoints.records import (
 __all__ = [
     "delete_published_checkpoint",
     "get_published_checkpoint",
+    "get_published_checkpoint_by_run_id",
     "import_published_checkpoint_bundle",
     "list_published_checkpoints",
 ]

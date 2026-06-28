@@ -31,6 +31,15 @@ class CheckpointStoreMixin:
     ) -> ManagedPublishedCheckpoint | None:
         return checkpoint_registry.get_published_checkpoint(_manager_store(self), checkpoint_id)
 
+    def get_published_checkpoint_by_run_id(
+        self,
+        run_id: str,
+    ) -> ManagedPublishedCheckpoint | None:
+        return checkpoint_registry.get_published_checkpoint_by_run_id(
+            _manager_store(self),
+            run_id,
+        )
+
     def list_published_checkpoints(self) -> tuple[ManagedPublishedCheckpoint, ...]:
         return checkpoint_registry.list_published_checkpoints(_manager_store(self))
 

@@ -72,7 +72,7 @@ def test_manager_store_imports_published_checkpoint_bundle(tmp_path: Path) -> No
     assert run.status == "archived"
     assert run.run_dir == checkpoint.import_dir
     assert run.lineage_id == checkpoint.id
-    assert run.lineage_step_offset == 1_911_485_784
+    assert run.lineage_step_offset == 0
     assert run.source_num_timesteps == checkpoint.local_num_timesteps
 
 

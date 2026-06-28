@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from rl_fzerox.apps.run_manager.api.payloads.runs import run_payload
 from rl_fzerox.core.manager import ManagedRun, ManagerStore
+from rl_fzerox.core.manager.models import PolicySourceArtifact
 
 
 def run_response(store: ManagerStore, run: ManagedRun) -> dict[str, dict[str, object]]:
@@ -16,6 +17,7 @@ def run_response(store: ManagerStore, run: ManagedRun) -> dict[str, dict[str, ob
             run,
             recent_events=recent_events.get(run.id, ()),
             active_alt_baseline_count=active_alt_baseline_count(store, run.id),
+            available_policy_artifacts=_published_checkpoint_policy_artifacts(store, run),
         )
     }
 
@@ -33,6 +35,18 @@ def require_run(store: ManagerStore, run_id: str) -> ManagedRun:
 
 def active_alt_baseline_count(store: ManagerStore, run_id: str) -> int:
     return len(store.active_run_alt_baselines(run_id))
+
+
+def _published_checkpoint_policy_artifacts(
+    store: ManagerStore,
+    run: ManagedRun,
+) -> tuple[PolicySourceArtifact, ...] | None:
+    checkpoint = store.get_published_checkpoint_by_run_id(run.id)
+    if checkpoint is None:
+        return None
+    if checkpoint.policy_path.is_file() and checkpoint.model_path.is_file():
+        return (checkpoint.source_artifact,)
+    return ()
 
 
 def validate_source_fields(

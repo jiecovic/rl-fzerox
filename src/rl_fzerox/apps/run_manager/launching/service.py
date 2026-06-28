@@ -86,6 +86,7 @@ class ManagerRunLauncher:
         copy_alt_baselines: bool = True,
         engine_tuning_source_action: EngineTuningSourceAction = "convert",
     ) -> ManagedRun:
+        _assert_published_checkpoint_artifact(self._store, run_id=run_id, artifact=artifact)
         return fork_run(
             self._store,
             run_id=run_id,
@@ -124,6 +125,7 @@ class ManagerRunLauncher:
     ) -> WatchLaunchStatus:
         """Launch the desktop watch app against one saved artifact for one run."""
 
+        _assert_published_checkpoint_artifact(self._store, run_id=run_id, artifact=artifact)
         return launch_watch_artifact(
             store=self._store,
             run_id=run_id,
@@ -277,4 +279,20 @@ class ManagerRunLauncher:
             exclude_draft_id=draft_id,
             engine_tuning_source_action=engine_tuning_source_action,
             spawn_worker=self._spawn_worker_for_lifecycle,
+        )
+
+
+def _assert_published_checkpoint_artifact(
+    store: ManagerStore,
+    *,
+    run_id: str,
+    artifact: str,
+) -> None:
+    checkpoint = store.get_published_checkpoint_by_run_id(run_id)
+    if checkpoint is None:
+        return
+    if artifact != checkpoint.source_artifact:
+        raise ValueError(
+            "published checkpoint run snapshot only exposes "
+            f"{checkpoint.source_artifact!r}, got {artifact!r}"
         )

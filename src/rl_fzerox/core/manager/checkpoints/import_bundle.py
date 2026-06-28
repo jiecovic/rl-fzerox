@@ -192,8 +192,7 @@ def _validate_archive_members(
         payload_files += 1
         if payload_files > import_policy.max_payload_files:
             raise CheckpointBundleImportError(
-                "checkpoint bundle payload has more than "
-                f"{import_policy.max_payload_files} files"
+                f"checkpoint bundle payload has more than {import_policy.max_payload_files} files"
             )
         payload_bytes += info.file_size
         if payload_bytes > import_policy.max_payload_bytes:

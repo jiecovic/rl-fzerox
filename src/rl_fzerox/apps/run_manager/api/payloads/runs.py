@@ -13,6 +13,7 @@ def run_payload(
     *,
     recent_events: tuple[ManagedRunEvent, ...] = (),
     active_alt_baseline_count: int = 0,
+    available_policy_artifacts: tuple[PolicySourceArtifact, ...] | None = None,
 ) -> dict[str, object]:
     payload = run_summary_payload(
         run,
@@ -20,7 +21,11 @@ def run_payload(
         active_alt_baseline_count=active_alt_baseline_count,
     )
     payload["config"] = run.config.model_dump(mode="json")
-    payload["available_policy_artifacts"] = list(_available_policy_artifacts(run))
+    payload["available_policy_artifacts"] = list(
+        _available_policy_artifacts(run)
+        if available_policy_artifacts is None
+        else available_policy_artifacts
+    )
     return payload
 
 

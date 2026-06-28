@@ -142,6 +142,17 @@ def get_published_checkpoint(
         return checkpoint_repository.get_published_checkpoint(session, checkpoint_id)
 
 
+def get_published_checkpoint_by_run_id(
+    store: ManagerStore,
+    run_id: str,
+) -> ManagedPublishedCheckpoint | None:
+    """Return the installed checkpoint that owns one archived run snapshot."""
+
+    store.initialize()
+    with store._orm_session() as session:
+        return checkpoint_repository.get_published_checkpoint_by_run_id(session, run_id)
+
+
 def list_published_checkpoints(store: ManagerStore) -> tuple[ManagedPublishedCheckpoint, ...]:
     """Return installed published checkpoints in manager display order."""
 
@@ -435,6 +446,7 @@ def _insert_or_repair_archived_run_snapshot(
             raise ValueError(
                 f"checkpoint run id conflicts with a non-checkpoint run {checkpoint.run_id!r}"
             )
+        _sync_archived_checkpoint_run_row(session, checkpoint=checkpoint)
         _upsert_archived_run_runtime(session, checkpoint=checkpoint)
         return
 
@@ -446,7 +458,7 @@ def _insert_or_repair_archived_run_snapshot(
         config_hash=checkpoint.config_hash,
         run_dir=checkpoint.import_dir,
         lineage_id=checkpoint.id,
-        lineage_step_offset=_checkpoint_lineage_step_offset(checkpoint),
+        lineage_step_offset=0,
         source_num_timesteps=checkpoint.local_num_timesteps,
         created_at=_checkpoint_created_at(checkpoint),
         stopped_at=checkpoint.exported_at,
@@ -461,6 +473,23 @@ def _insert_or_repair_archived_run_snapshot(
         message="published checkpoint installed as archived run snapshot",
     )
     _upsert_archived_run_runtime(session, checkpoint=checkpoint)
+
+
+def _sync_archived_checkpoint_run_row(
+    session: Session,
+    *,
+    checkpoint: ManagedPublishedCheckpoint,
+) -> None:
+    run = session.get(RunModel, checkpoint.run_id)
+    if run is None:
+        return
+    run.lineage_id = checkpoint.id
+    run.lineage_step_offset = 0
+    run.parent_run_id = None
+    run.source_run_id = None
+    run.source_artifact = None
+    run.source_snapshot_dir = None
+    run.source_num_timesteps = checkpoint.local_num_timesteps
 
 
 def _upsert_archived_run_runtime(
@@ -492,14 +521,6 @@ def _upsert_archived_run_runtime(
     runtime.num_timesteps = local_steps
     runtime.progress_fraction = 1.0
     runtime.updated_at = checkpoint.exported_at
-
-
-def _checkpoint_lineage_step_offset(checkpoint: ManagedPublishedCheckpoint) -> int:
-    local_steps = checkpoint.local_num_timesteps
-    lineage_steps = checkpoint.lineage_num_timesteps
-    if local_steps is None or lineage_steps is None:
-        return 0
-    return max(0, lineage_steps - local_steps)
 
 
 def _checkpoint_created_at(checkpoint: ManagedPublishedCheckpoint) -> str:
