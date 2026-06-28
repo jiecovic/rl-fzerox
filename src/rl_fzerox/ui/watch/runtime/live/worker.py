@@ -139,6 +139,7 @@ def _run_simulation_loop(
             session.auxiliary_target_names
         )
         engine_tuning_cache = session.engine_tuning_cache
+        track_sampling_state.preload_generated_x_cup_baselines(env)
 
         def publish_snapshot() -> None:
             nonlocal last_live_series_publish_time

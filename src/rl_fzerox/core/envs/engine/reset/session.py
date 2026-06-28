@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import sync_race_intro_target
@@ -147,6 +148,13 @@ class EngineResetCoordinator:
             self._active_track_sampling,
             course_id=course_id,
         )
+
+    def preload_track_baseline_paths(self, paths: Sequence[Path]) -> None:
+        """Warm selected sampled-track savestates without changing reset order."""
+
+        if not self._config.cache_track_baselines:
+            return
+        self._track_baseline_cache.preload(paths)
 
     def select_episode_track(self, seed: int | None) -> SelectedTrack | None:
         self._reset_seeds.remember_reset_seed(seed)

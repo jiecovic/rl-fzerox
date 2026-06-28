@@ -9,6 +9,7 @@ engine modules so this wrapper stays focused on the Gym API boundary.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 import gymnasium as gym
 
@@ -158,6 +159,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Align the next sequential watch reset to a specific configured course."""
 
         self._runtime.set_next_sequential_reset_course(course_id)
+
+    def preload_track_baseline_paths(self, paths: Sequence[Path]) -> None:
+        """Warm selected sampled-track savestates before watch navigation."""
+
+        self._runtime.preload_track_baseline_paths(paths)
 
     def auxiliary_state_targets(self) -> StateVector:
         """Return the current hidden auxiliary-state target vector."""

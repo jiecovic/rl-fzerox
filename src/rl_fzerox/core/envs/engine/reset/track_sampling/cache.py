@@ -45,6 +45,18 @@ class TrackBaselineCache:
             self._states_by_path.move_to_end(cache_path)
         backend.load_baseline_bytes(state, source_path=path)
 
+    def preload(self, paths: Iterable[Path]) -> None:
+        """Read selected savestates into memory before they become reset targets."""
+
+        if self._max_cached_state_bytes <= 0:
+            return
+        for path in paths:
+            cache_path = _cache_path(path)
+            if cache_path in self._states_by_path:
+                self._states_by_path.move_to_end(cache_path)
+                continue
+            self._remember_state(cache_path, path.read_bytes())
+
     def retain_paths(self, paths: Iterable[Path]) -> None:
         """Forget cached savestates that are no longer reset candidates."""
 

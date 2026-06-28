@@ -78,6 +78,45 @@ def test_managed_watch_track_sampling_refresh_restores_generated_x_cup_slot(
     assert entry.generated_course_length == 61_743.98046875
 
 
+def test_managed_watch_track_sampling_refresh_keeps_active_x_cup_until_artifact_is_ready(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    run = store.create_run(
+        run_id="run",
+        name="Run",
+        config=_managed_x_cup_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    run.run_dir.mkdir(parents=True, exist_ok=True)
+    stale_baseline_path = tmp_path / "baselines" / "x_cup_old.state"
+    stale_baseline_path.parent.mkdir(parents=True)
+    stale_baseline_path.write_bytes(b"state")
+    store.replace_run_track_sampling_artifacts(
+        run_id=run.id,
+        artifacts=(_stale_x_cup_artifact(stale_baseline_path),),
+    )
+    _write_x_cup_slot_state(store, run.id)
+    config = _track_sampling_config()
+    refresh = ManagedTrackSamplingRefresh.from_config(
+        WatchAppConfig(
+            emulator=EmulatorConfig(
+                core_path=_touched(tmp_path / "core.so"),
+                rom_path=_touched(tmp_path / "rom.n64"),
+            ),
+            env=EnvConfig(track_sampling=config),
+            watch=WatchConfig(manager_db_path=db_path, managed_run_id=run.id),
+        )
+    )
+
+    assert refresh is not None
+    status = refresh.refresh_status(config, force=True)
+
+    assert status.refreshed_config is None
+    assert status.ready_for_reset
+
+
 def test_managed_watch_track_sampling_refresh_ignores_unchanged_slots(tmp_path: Path) -> None:
     db_path = tmp_path / "manager" / "runs.db"
     store = ManagerStore(db_path)
@@ -116,7 +155,7 @@ def test_managed_watch_track_sampling_refresh_ignores_unchanged_slots(tmp_path: 
     assert refresh.refreshed_config(config, force=True) is None
 
 
-def test_managed_watch_track_sampling_refresh_waits_for_run_local_baseline_artifact(
+def test_managed_watch_track_sampling_refresh_does_not_block_pending_x_cup_artifact(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "manager" / "runs.db"
@@ -147,10 +186,10 @@ def test_managed_watch_track_sampling_refresh_waits_for_run_local_baseline_artif
     assert refresh.refreshed_config(config, force=True) is None
     status = refresh.refresh_status(config, force=True)
     assert status.refreshed_config is None
-    assert not status.ready_for_reset
+    assert status.ready_for_reset
 
 
-def test_managed_watch_track_sampling_refresh_remembers_blocked_state_between_checks(
+def test_managed_watch_track_sampling_refresh_remembers_pending_state_between_checks(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -179,18 +218,18 @@ def test_managed_watch_track_sampling_refresh_remembers_blocked_state_between_ch
     )
 
     assert refresh is not None
-    blocked_status = refresh.refresh_status(config, force=True)
-    assert not blocked_status.ready_for_reset
+    pending_status = refresh.refresh_status(config, force=True)
+    assert pending_status.ready_for_reset
 
     def fail_store_read(_run_id: str) -> None:
-        raise AssertionError("blocked watch refresh should wait for the next interval")
+        raise AssertionError("pending watch refresh should wait for the next interval")
 
     monkeypatch.setattr(refresh.store, "get_run_generated_x_cup_slots", fail_store_read)
 
     status = refresh.refresh_status(config, force=False)
 
     assert status.refreshed_config is None
-    assert not status.ready_for_reset
+    assert status.ready_for_reset
 
 
 def test_live_track_sampling_state_refreshes_config_and_clears_stale_lock() -> None:
@@ -211,6 +250,93 @@ def test_live_track_sampling_state_refreshes_config_and_clears_stale_lock() -> N
     assert state.locked_reset_target_key is None
     assert env.track_sampling_configs == [refreshed_config]
     assert env.locked_reset_courses == [None]
+
+
+def test_live_track_sampling_state_rejects_unmaterialized_x_cup_refresh(
+    tmp_path: Path,
+) -> None:
+    active_baseline = tmp_path / "active.state"
+    active_baseline.write_bytes(b"active")
+    current_config = _track_sampling_config(baseline_path=active_baseline)
+    pending_config = _track_sampling_config(
+        entry_id="x_cup_new",
+        course_id="x_cup_new",
+        course_name="X Cup new",
+        course_hash="newhash",
+        course_seed=1234,
+        generation=3,
+        baseline_path=None,
+    )
+    env = _FakeTrackSamplingEnv()
+    state = _live_track_sampling_state(
+        current_config,
+        _FakeTrackSamplingRefresh(refreshed_config=pending_config),
+    )
+
+    assert not state.refresh(env, force=True)
+
+    assert state.active_track_sampling == current_config
+    assert env.track_sampling_configs == []
+    assert env.preloaded_paths == []
+
+
+def test_live_track_sampling_state_preloads_x_cup_before_apply(tmp_path: Path) -> None:
+    active_baseline = tmp_path / "active.state"
+    refreshed_baseline = tmp_path / "refreshed.state"
+    active_baseline.write_bytes(b"active")
+    refreshed_baseline.write_bytes(b"refreshed")
+    current_config = _track_sampling_config(baseline_path=active_baseline)
+    refreshed_config = _track_sampling_config(
+        entry_id="x_cup_new",
+        course_id="x_cup_new",
+        course_name="X Cup new",
+        course_hash="newhash",
+        course_seed=1234,
+        generation=3,
+        baseline_path=refreshed_baseline,
+    )
+    env = _FakeTrackSamplingEnv()
+    state = _live_track_sampling_state(
+        current_config,
+        _FakeTrackSamplingRefresh(refreshed_config=refreshed_config),
+    )
+
+    assert state.refresh(env, force=True)
+
+    assert env.preloaded_paths == [(refreshed_baseline.resolve(),)]
+    assert env.track_sampling_configs == [refreshed_config]
+
+
+def test_live_track_sampling_state_preloads_active_x_cup_on_startup(tmp_path: Path) -> None:
+    active_baseline = tmp_path / "active.state"
+    active_baseline.write_bytes(b"active")
+    current_config = _track_sampling_config(baseline_path=active_baseline)
+    env = _FakeTrackSamplingEnv()
+    state = _live_track_sampling_state(
+        current_config,
+        _FakeTrackSamplingRefresh(),
+    )
+
+    state.preload_generated_x_cup_baselines(env)
+
+    assert env.preloaded_paths == [(active_baseline.resolve(),)]
+
+
+def test_live_track_sampling_state_keeps_preloaded_x_cup_ready_if_file_disappears(
+    tmp_path: Path,
+) -> None:
+    active_baseline = tmp_path / "active.state"
+    active_baseline.write_bytes(b"active")
+    current_config = _track_sampling_config(baseline_path=active_baseline)
+    env = _FakeTrackSamplingEnv()
+    state = _live_track_sampling_state(
+        current_config,
+        _FakeTrackSamplingRefresh(),
+    )
+    state.preload_generated_x_cup_baselines(env)
+    active_baseline.unlink()
+
+    assert state.ready_for_reset(env, force=True)
 
 
 def test_live_track_sampling_state_waits_until_refresh_is_ready() -> None:
@@ -457,6 +583,32 @@ def _x_cup_artifact(baseline_path: Path) -> TrackSamplingMaterializedArtifact:
     )
 
 
+def _stale_x_cup_artifact(baseline_path: Path) -> TrackSamplingMaterializedArtifact:
+    return TrackSamplingMaterializedArtifact(
+        course_key="x_cup_slot_1",
+        reset_variant_key=reset_variant_key(
+            mode="gp_race",
+            gp_difficulty="novice",
+            vehicle="blue_falcon",
+        ),
+        entry_id="x_cup_old_gp_race_novice_blue_falcon",
+        baseline_state_path=baseline_path.resolve(),
+        metadata_path=baseline_path.with_suffix(".json").resolve(),
+        source_course_index=48,
+        source_gp_difficulty="novice",
+        source_vehicle="blue_falcon",
+        source_engine_setting_raw_value=50,
+        generated_course_slot=0,
+        generated_course_generation=0,
+        generated_course_id="x_cup_old",
+        generated_course_name="X Cup old",
+        generated_course_hash="oldhash",
+        generated_course_seed=7,
+        generated_course_segment_count=38,
+        generated_course_length=61_743.98046875,
+    )
+
+
 def _touched(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch()
@@ -472,12 +624,16 @@ class _FakeTrackSamplingEnv:
     def __init__(self) -> None:
         self.track_sampling_configs: list[TrackSamplingConfig] = []
         self.locked_reset_courses: list[str | None] = []
+        self.preloaded_paths: list[tuple[Path, ...]] = []
 
     def set_track_sampling_config(self, config: TrackSamplingConfig) -> None:
         self.track_sampling_configs.append(config)
 
     def set_locked_reset_course(self, target_key: str | None) -> None:
         self.locked_reset_courses.append(target_key)
+
+    def preload_track_baseline_paths(self, paths: tuple[Path, ...]) -> None:
+        self.preloaded_paths.append(paths)
 
 
 class _FakeTrackSamplingRefresh:

@@ -8,6 +8,7 @@ low-level work to reset, stepping, action, and engine component modules.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 from gymnasium import spaces
 
@@ -161,6 +162,11 @@ class FZeroXEnvRuntime:
         """Align the next sequential watch reset to a specific configured course."""
 
         self._reset_coordinator.set_next_sequential_course(course_id)
+
+    def preload_track_baseline_paths(self, paths: Sequence[Path]) -> None:
+        """Warm selected sampled-track savestates before manual watch navigation."""
+
+        self._reset_coordinator.preload_track_baseline_paths(paths)
 
     def auxiliary_state_targets(self) -> StateVector:
         """Return the current hidden auxiliary-state target vector."""

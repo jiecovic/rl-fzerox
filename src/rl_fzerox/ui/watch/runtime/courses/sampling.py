@@ -38,7 +38,7 @@ class ManagedTrackSamplingRefresh:
     run_id: str
     interval_seconds: float = 10.0
     _last_check_monotonic: float = field(default=0.0, init=False)
-    _last_blocked_signature: TrackSamplingSignature | None = field(default=None, init=False)
+    _last_pending_signature: TrackSamplingSignature | None = field(default=None, init=False)
 
     @classmethod
     def from_config(cls, config: WatchAppConfig) -> ManagedTrackSamplingRefresh | None:
@@ -68,7 +68,7 @@ class ManagedTrackSamplingRefresh:
         if not force and not self._refresh_due():
             return TrackSamplingRefreshStatus(
                 refreshed_config=None,
-                ready_for_reset=self._last_blocked_signature is None,
+                ready_for_reset=True,
             )
         self._last_check_monotonic = time.monotonic()
         slots = self.store.get_run_generated_x_cup_slots(self.run_id)
@@ -84,28 +84,28 @@ class ManagedTrackSamplingRefresh:
             and has_materialized_x_cup_entries
             and not missing_generated_x_cup_baseline_paths(current_config)
         ):
-            self._last_blocked_signature = None
+            self._last_pending_signature = None
         else:
             materialized_config = self._with_materialized_x_cup_artifacts(projected_config)
             if materialized_config is None:
-                if projected_signature != self._last_blocked_signature:
+                if projected_signature != self._last_pending_signature:
                     LOGGER.warning(
                         "skipping managed watch track-sampling refresh for run_id=%s: "
                         "generated X Cup state changed but run-local baseline artifacts "
                         "are not ready",
                         self.run_id,
                     )
-                    self._last_blocked_signature = projected_signature
-                return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=False)
+                    self._last_pending_signature = projected_signature
+                return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)
             refreshed_config = materialized_config
-            self._last_blocked_signature = None
+            self._last_pending_signature = None
         refreshed_config = apply_alt_baselines_to_track_sampling(
             refreshed_config,
             self.store.active_run_alt_baselines(self.run_id),
         )
         if _track_sampling_signature(refreshed_config) == _track_sampling_signature(current_config):
             return TrackSamplingRefreshStatus(refreshed_config=None, ready_for_reset=True)
-        self._last_blocked_signature = None
+        self._last_pending_signature = None
         return TrackSamplingRefreshStatus(refreshed_config=refreshed_config, ready_for_reset=True)
 
     def _refresh_due(self) -> bool:
