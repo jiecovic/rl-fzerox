@@ -6,7 +6,7 @@ from contextlib import suppress
 from pathlib import Path
 
 import pytest
-from fastapi import WebSocketDisconnect
+from fastapi import HTTPException, WebSocketDisconnect
 
 from rl_fzerox.apps.run_manager.api import handlers
 from rl_fzerox.apps.run_manager.api.execution import run_sync
@@ -117,6 +117,35 @@ async def test_manager_api_live_runs_sends_initial_snapshot(tmp_path: Path) -> N
     first_run = runs[0]
     assert isinstance(first_run, dict)
     assert first_run["id"] == run.id
+
+
+async def test_manager_api_live_track_sampling_404_disconnects_quietly(tmp_path: Path) -> None:
+    del tmp_path
+
+    async def missing_run_snapshot(_run_id: str) -> dict[str, object]:
+        raise HTTPException(status_code=404, detail="run not found")
+
+    broadcaster = KeyedLiveSnapshotBroadcaster(
+        missing_run_snapshot,
+        message_types=LiveMessageTypes(
+            snapshot="track_sampling_snapshot",
+            error="track_sampling_error",
+        ),
+        error_log_message="failed to poll live track-pool snapshot",
+        interval_seconds=0.0,
+    )
+    websocket = _DisconnectingWebSocket()
+
+    await broadcaster.serve("missing-run", websocket)
+
+    assert websocket.accepted is True
+    assert websocket.messages == [
+        {
+            "type": "track_sampling_error",
+            "message": "HTTPException: run not found",
+        }
+    ]
+    assert broadcaster._broadcasters == {}
 
 
 async def test_manager_api_live_shutdown_cancellation_disconnects_quietly() -> None:

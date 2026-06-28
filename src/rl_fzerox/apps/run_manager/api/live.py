@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
 LivePayload = Mapping[str, object]
 
@@ -91,6 +91,15 @@ class LiveSnapshotBroadcaster:
         while self._subscribers:
             try:
                 snapshot = await self._load_snapshot()
+            except HTTPException as exc:
+                message = f"{type(exc).__name__}: {exc.detail}"
+                for queue in tuple(self._subscribers):
+                    _queue_latest(queue, LiveErrorUpdate(message))
+                if exc.status_code == 404:
+                    return
+                LOGGER.warning("%s: %s", self._error_log_message, message)
+                await asyncio.sleep(self._interval_seconds)
+                continue
             except Exception as exc:
                 LOGGER.exception(self._error_log_message)
                 message = f"{type(exc).__name__}: {exc}"
