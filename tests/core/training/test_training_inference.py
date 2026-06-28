@@ -52,7 +52,7 @@ class _FakePolicy:
         self.deterministic_calls: list[bool] = []
         self.state_calls: list[PolicyState] = []
         self.episode_start_calls: list[BoolArray | None] = []
-        self.observation_calls: list[ObservationValue] = []
+        self.observation_calls: list[object] = []
 
     def predict(
         self,
@@ -205,6 +205,11 @@ def _array_action(action: object) -> NumpyArray:
     return action
 
 
+def _array_observation(observation: object) -> NumpyArray:
+    assert isinstance(observation, np.ndarray)
+    return observation
+
+
 def test_policy_runner_reloads_updated_policy_artifact(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -352,8 +357,7 @@ def test_policy_runner_adapts_channels_last_box_observation_for_channels_first_p
     _array_action(runner.predict(observation))
 
     recorded_observation = fake_policy.observation_calls[-1]
-    assert isinstance(recorded_observation, np.ndarray)
-    assert recorded_observation.shape == (6, 72, 96)
+    assert _array_observation(recorded_observation).shape == (6, 72, 96)
 
 
 def test_policy_runner_adapts_channels_last_dict_image_for_channels_first_policy(
@@ -405,8 +409,7 @@ def test_policy_runner_leaves_mismatched_image_shape_visible(tmp_path: Path) -> 
     _array_action(runner.predict(observation))
 
     recorded_observation = fake_policy.observation_calls[-1]
-    assert isinstance(recorded_observation, np.ndarray)
-    assert recorded_observation.shape == (84, 84, 6)
+    assert _array_observation(recorded_observation).shape == (84, 84, 6)
 
 
 def test_policy_runner_preserves_continuous_action_values(tmp_path: Path) -> None:
