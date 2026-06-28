@@ -95,6 +95,9 @@ export function lineageSimToWallRatioLabel(
   allRuns: ManagedRun[],
   nowMs: number,
 ): string {
+  if (!lineageWallHistoryCoversStepOffset(run, allRuns)) {
+    return "n/a";
+  }
   const lineageWallSeconds = lineageWallTimeSeconds(run, allRuns, nowMs);
   const lineageSimSeconds = lineageSimGameTimeSeconds(run, allRuns);
   if (lineageWallSeconds === null || lineageSimSeconds === null || lineageWallSeconds <= 0) {
@@ -211,9 +214,9 @@ function lineageFrameOffset(run: ManagedRun, allRuns: ManagedRun[]): number | nu
     return 0;
   }
 
-  // Match watch experience semantics: known parent edges use the parent's
-  // action repeat; missing source history falls back to the stored lineage step
-  // offset in the current run's frame scale.
+  // Match watch experience semantics for normal forks. Published checkpoint
+  // roots intentionally cut timing history: they carry a trained snapshot, not
+  // trustworthy wall-time data from the original training machine.
   const runsById = new Map(allRuns.map((candidate) => [candidate.id, candidate]));
   const visited = new Set<string>();
   let totalFrames = 0;
@@ -225,6 +228,9 @@ function lineageFrameOffset(run: ManagedRun, allRuns: ManagedRun[]): number | nu
       currentRun.parent_run_id === null ? null : (runsById.get(currentRun.parent_run_id) ?? null);
     if (parentRun === null) {
       totalFrames += Math.max(0, currentRun.lineage_step_offset) * runActionRepeat(currentRun);
+      return totalFrames;
+    }
+    if (isPublishedCheckpointRoot(parentRun)) {
       return totalFrames;
     }
 
@@ -241,8 +247,34 @@ function lineageFrameOffset(run: ManagedRun, allRuns: ManagedRun[]): number | nu
   return totalFrames;
 }
 
+function lineageWallHistoryCoversStepOffset(run: ManagedRun, allRuns: ManagedRun[]): boolean {
+  if (run.lineage_step_offset <= 0) {
+    return true;
+  }
+  const runsById = new Map(allRuns.map((candidate) => [candidate.id, candidate]));
+  const visited = new Set<string>();
+  let currentRun: ManagedRun | null = run;
+  while (currentRun !== null && !visited.has(currentRun.id)) {
+    visited.add(currentRun.id);
+    if (currentRun.lineage_step_offset <= 0) {
+      return true;
+    }
+    if (currentRun.parent_run_id === null) {
+      return false;
+    }
+    currentRun = runsById.get(currentRun.parent_run_id) ?? null;
+  }
+  return false;
+}
+
 function runActionRepeat(run: ManagedRun): number {
   return Math.max(run.action_repeat, 1);
+}
+
+function isPublishedCheckpointRoot(run: ManagedRun): boolean {
+  return (
+    run.status === "archived" && run.parent_run_id === null && run.source_num_timesteps !== null
+  );
 }
 
 function envStepRateValue(run: ManagedRun): number | null {
@@ -327,6 +359,9 @@ function lineageAggregateSeconds(
 
   while (currentRun !== null && !visited.has(currentRun.id)) {
     visited.add(currentRun.id);
+    if (currentRun.id !== run.id && isPublishedCheckpointRoot(currentRun)) {
+      break;
+    }
     const seconds = selector(currentRun);
     if (seconds !== null) {
       totalSeconds += seconds;

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   latestActiveStartupMessage,
   lineageSimGameTimeLabel,
+  lineageSimToWallRatioLabel,
   progressNote,
 } from "@/entities/run/model/runtime";
 import { runFixture } from "@/test/fixtures";
@@ -127,5 +128,65 @@ describe("run runtime labels", () => {
     });
 
     expect(lineageSimGameTimeLabel(forkRun, [forkRun])).toBe("22m 13s");
+  });
+
+  it("does not compute total sim-wall ratio from missing parent wall history", () => {
+    const runtime = runFixture().runtime;
+    if (runtime === null) {
+      throw new Error("run fixture must include runtime data");
+    }
+    const importedCheckpointRun = runFixture({
+      parent_run_id: null,
+      lineage_step_offset: 1_911_485_784,
+      action_repeat: 2,
+      started_at: "2026-06-28T08:28:36+00:00",
+      runtime: {
+        ...runtime,
+        num_timesteps: 2_976_144,
+        fps: 902,
+        updated_at: "2026-06-28T09:23:35+00:00",
+      },
+    });
+
+    expect(lineageSimToWallRatioLabel(importedCheckpointRun, [importedCheckpointRun], 0)).toBe(
+      "n/a",
+    );
+  });
+
+  it("starts timing totals at published checkpoint forks", () => {
+    const runtime = runFixture().runtime;
+    if (runtime === null) {
+      throw new Error("run fixture must include runtime data");
+    }
+    const checkpointRun = runFixture({
+      id: "checkpoint-blue-falcon-all-cups-v1",
+      status: "archived",
+      parent_run_id: null,
+      source_run_id: null,
+      source_num_timesteps: 68_288_256,
+      lineage_step_offset: 0,
+      action_repeat: 2,
+      runtime: {
+        ...runtime,
+        num_timesteps: 68_288_256,
+        fps: 8710,
+      },
+    });
+    const childRun = runFixture({
+      id: "child",
+      parent_run_id: checkpointRun.id,
+      source_run_id: checkpointRun.id,
+      source_num_timesteps: 68_288_256,
+      lineage_step_offset: 68_288_256,
+      action_repeat: 2,
+      runtime: {
+        ...runtime,
+        num_timesteps: 5_000,
+        fps: 1000,
+      },
+    });
+
+    expect(lineageSimGameTimeLabel(childRun, [checkpointRun, childRun])).toBe("2m 46s");
+    expect(lineageSimToWallRatioLabel(childRun, [checkpointRun, childRun], 0)).toBe("33.33x");
   });
 });
